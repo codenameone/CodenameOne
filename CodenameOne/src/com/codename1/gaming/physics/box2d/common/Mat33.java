@@ -25,11 +25,9 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/*
- * A 3-by-3 matrix. Stored in column-major order.
- * 
- * @author Daniel Murphy
- */
+/// A 3-by-3 matrix. Stored in column-major order.
+///
+/// @author Daniel Murphy
 public class Mat33 implements Serializable {
   private static final long serialVersionUID = 2L;
 
@@ -93,26 +91,22 @@ public class Mat33 implements Serializable {
     out.z = v.x * A.ex.z + v.y * A.ey.z + v.z * A.ez.z;
   }
 
-  /*
-   * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
-   * in one-shot cases.
-   * 
-   * @param b
-   * @return
-   */
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @return
   public final Vec2 solve22(Vec2 b) {
     Vec2 x = new Vec2();
     solve22ToOut(b, x);
     return x;
   }
 
-  /*
-   * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
-   * in one-shot cases.
-   * 
-   * @param b
-   * @return
-   */
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @return
   public final void solve22ToOut(Vec2 b, Vec2 out) {
     final float a11 = ex.x, a12 = ey.x, a21 = ex.y, a22 = ey.y;
     float det = a11 * a22 - a12 * a21;
@@ -124,26 +118,22 @@ public class Mat33 implements Serializable {
   }
 
   // djm pooling from below
-  /*
-   * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
-   * in one-shot cases.
-   * 
-   * @param b
-   * @return
-   */
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @return
   public final Vec3 solve33(Vec3 b) {
     Vec3 x = new Vec3();
     solve33ToOut(b, x);
     return x;
   }
 
-  /*
-   * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
-   * in one-shot cases.
-   * 
-   * @param b
-   * @param out the result
-   */
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @param out the result
   public final void solve33ToOut(Vec3 b, Vec3 out) {
     assert (b != out);
     Vec3.crossToOutUnsafe(ey, ez, out);

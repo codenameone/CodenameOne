@@ -24,28 +24,20 @@
 package com.codename1.gaming.physics.box2d.dynamics;
 
 // updated to rev 100
-/*
- * This holds contact filtering data.
- * 
- * @author daniel
- */
+/// This holds contact filtering data.
+///
+/// @author daniel
 public class Filter {
-	/*
-	 * The collision category bits. Normally you would just set one bit.
-	 */
+	/// The collision category bits. Normally you would just set one bit.
 	public int categoryBits;
 	
-	/*
-	 * The collision mask bits. This states the categories that this
-	 * shape would accept for collision.
-	 */
+	/// The collision mask bits. This states the categories that this
+	/// shape would accept for collision.
 	public int maskBits;
 	
-	/*
-	 * Collision groups allow a certain group of objects to never collide (negative)
-	 * or always collide (positive). Zero means no collision group. Non-zero group
-	 * filtering always wins against the mask bits.
-	 */
+	/// Collision groups allow a certain group of objects to never collide (negative)
+	/// or always collide (positive). Zero means no collision group. Non-zero group
+	/// filtering always wins against the mask bits.
 	public int groupIndex;
 	
 	public Filter() {

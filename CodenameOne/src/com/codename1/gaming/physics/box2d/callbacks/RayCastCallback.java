@@ -21,39 +21,33 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 4:33:10 AM Jul 15, 2010
- */
+/// Created at 4:33:10 AM Jul 15, 2010
 package com.codename1.gaming.physics.box2d.callbacks;
 
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 
 // updated to rev 100;
-/*
- * Callback class for ray casts.
- * See World.rayCast
- * @author Daniel Murphy
- */
+/// Callback class for ray casts.
+/// See World.rayCast
+/// @author Daniel Murphy
 public interface RayCastCallback {
 
-	/*
-	 * Called for each fixture found in the query. You control how the ray cast
-	 * proceeds by returning a float:
-	 * return -1: ignore this fixture and continue
-	 * return 0: terminate the ray cast
-	 * return fraction: clip the ray to this point
-	 * return 1: don't clip the ray and continue
-	 * @param fixture the fixture hit by the ray
-	 * @param point the point of initial intersection
-	 * @param normal the normal vector at the point of intersection
-	 * @return -1 to filter, 0 to terminate, fraction to clip the ray for
-	 * closest hit, 1 to continue
-	 * @param fixture
-	 * @param point
-	 * @param normal
-	 * @param fraction
-	 * @return
-	 */
+	/// Called for each fixture found in the query. You control how the ray cast
+	/// proceeds by returning a float:
+	/// return -1: ignore this fixture and continue
+	/// return 0: terminate the ray cast
+	/// return fraction: clip the ray to this point
+	/// return 1: don't clip the ray and continue
+	/// @param fixture the fixture hit by the ray
+	/// @param point the point of initial intersection
+	/// @param normal the normal vector at the point of intersection
+	/// @return -1 to filter, 0 to terminate, fraction to clip the ray for
+	/// closest hit, 1 to continue
+	/// @param fixture
+	/// @param point
+	/// @param normal
+	/// @param fraction
+	/// @return
 	public float reportFixture(Fixture fixture, Vec2 point, Vec2 normal, float fraction);
 }

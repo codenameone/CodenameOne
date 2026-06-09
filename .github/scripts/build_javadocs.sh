@@ -73,7 +73,6 @@ find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java
   --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
   --release 8 \
   -exclude com.codename1.impl \
-  -exclude com.codename1.gaming.physics.box2d \
   -Xdoclint:none \
   -quiet \
   -protected \

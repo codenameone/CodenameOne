@@ -51,32 +51,26 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 
 //Updated to rev 56->130->142 of b2DistanceJoint.cpp/.h
 
-/*
- * Distance joint definition. This requires defining an
- * anchor point on both bodies and the non-zero length of the
- * distance joint. The definition uses local anchor points
- * so that the initial configuration can violate the constraint
- * slightly. This helps when saving and loading a game.
- * @warning Do not use a zero or short length.
- */
+/// Distance joint definition. This requires defining an
+/// anchor point on both bodies and the non-zero length of the
+/// distance joint. The definition uses local anchor points
+/// so that the initial configuration can violate the constraint
+/// slightly. This helps when saving and loading a game.
+/// @warning Do not use a zero or short length.
 public class DistanceJointDef extends JointDef {
-	/* The local anchor point relative to body1's origin. */
+	/// The local anchor point relative to body1's origin.
 	public final Vec2 localAnchorA;
 
-	/* The local anchor point relative to body2's origin. */
+	/// The local anchor point relative to body2's origin.
 	public final Vec2 localAnchorB;
 
-	/* The equilibrium length between the anchor points. */
+	/// The equilibrium length between the anchor points.
 	public float length;
 
-	/*
-	 * The mass-spring-damper frequency in Hertz.
-	 */
+	/// The mass-spring-damper frequency in Hertz.
 	public float frequencyHz;
 
-	/*
-	 * The damping ratio. 0 = no damping, 1 = critical damping.
-	 */
+	/// The damping ratio. 0 = no damping, 1 = critical damping.
 	public float dampingRatio;
 
 	public DistanceJointDef() {
@@ -88,14 +82,12 @@ public class DistanceJointDef extends JointDef {
 		dampingRatio = 0.0f;
 	}
 
-	/*
-	 * Initialize the bodies, anchors, and length using the world
-	 * anchors.
-	 * @param b1 First body
-	 * @param b2 Second body
-	 * @param anchor1 World anchor on first body
-	 * @param anchor2 World anchor on second body
-	 */
+	/// Initialize the bodies, anchors, and length using the world
+	/// anchors.
+	/// @param b1 First body
+	/// @param b2 Second body
+	/// @param anchor1 World anchor on first body
+	/// @param anchor2 World anchor on second body
 	public void initialize(final Body b1, final Body b2, final Vec2 anchor1, final Vec2 anchor2) {
 		bodyA = b1;
 		bodyB = b2;

@@ -21,9 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 11:34:45 AM Jan 23, 2011
- */
+/// Created at 11:34:45 AM Jan 23, 2011
 package com.codename1.gaming.physics.box2d.dynamics.joints;
 
 import com.codename1.gaming.physics.box2d.common.Rot;
@@ -53,17 +51,15 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 //J = [ug cross(r, ug)]
 //K = J * invM * JT = invMass + invI * cross(r, ug)^2
 
-/*
- * A gear joint is used to connect two joints together. Either joint can be a revolute or prismatic
- * joint. You specify a gear ratio to bind the motions together: coordinate1 + ratio * coordinate2 =
- * constant The ratio can be negative or positive. If one joint is a revolute joint and the other
- * joint is a prismatic joint, then the ratio will have units of length or units of 1/length.
- * 
- * @warning The revolute and prismatic joints must be attached to fixed bodies (which must be body1
- *          on those joints).
- * @warning You have to manually destroy the gear joint if joint1 or joint2 is destroyed.
- * @author Daniel Murphy
- */
+/// A gear joint is used to connect two joints together. Either joint can be a revolute or prismatic
+/// joint. You specify a gear ratio to bind the motions together: coordinate1 + ratio * coordinate2 =
+/// constant The ratio can be negative or positive. If one joint is a revolute joint and the other
+/// joint is a prismatic joint, then the ratio will have units of length or units of 1/length.
+///
+/// @warning The revolute and prismatic joints must be attached to fixed bodies (which must be body1
+///          on those joints).
+/// @warning You have to manually destroy the gear joint if joint1 or joint2 is destroyed.
+/// @author Daniel Murphy
 public class GearJoint extends Joint {
 
   private final Joint m_joint1;

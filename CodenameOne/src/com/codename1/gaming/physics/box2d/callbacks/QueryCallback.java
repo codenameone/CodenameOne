@@ -21,25 +21,19 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 4:30:03 AM Jul 15, 2010
- */
+/// Created at 4:30:03 AM Jul 15, 2010
 package com.codename1.gaming.physics.box2d.callbacks;
 
 import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 
 // update to rev 100
-/*
- * Callback class for AABB queries.
- * See World.query
- * @author Daniel Murphy
- */
+/// Callback class for AABB queries.
+/// See World.query
+/// @author Daniel Murphy
 public interface QueryCallback {
 
-	/*
-	 * Called for each fixture found in the query AABB.
-	 * @param fixture
-	 * @return false to terminate the query.
-	 */
+	/// Called for each fixture found in the query AABB.
+	/// @param fixture
+	/// @return false to terminate the query.
 	public boolean reportFixture(Fixture fixture);
 }

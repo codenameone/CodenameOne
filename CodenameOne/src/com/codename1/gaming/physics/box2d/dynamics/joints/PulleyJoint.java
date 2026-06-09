@@ -21,9 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 12:12:02 PM Jan 23, 2011
- */
+/// Created at 12:12:02 PM Jan 23, 2011
 package com.codename1.gaming.physics.box2d.dynamics.joints;
 
 import com.codename1.gaming.physics.box2d.common.MathUtils;
@@ -33,15 +31,13 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.SolverData;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
-/*
- * The pulley joint is connected to two bodies and two fixed ground points. The pulley supports a
- * ratio such that: length1 + ratio * length2 <= constant Yes, the force transmitted is scaled by
- * the ratio. Warning: the pulley joint can get a bit squirrelly by itself. They often work better
- * when combined with prismatic joints. You should also cover the the anchor points with static
- * shapes to prevent one side from going to zero length.
- * 
- * @author Daniel Murphy
- */
+/// The pulley joint is connected to two bodies and two fixed ground points. The pulley supports a
+/// ratio such that: length1 + ratio * length2 <= constant Yes, the force transmitted is scaled by
+/// the ratio. Warning: the pulley joint can get a bit squirrelly by itself. They often work better
+/// when combined with prismatic joints. You should also cover the the anchor points with static
+/// shapes to prevent one side from going to zero length.
+///
+/// @author Daniel Murphy
 public class PulleyJoint extends Joint {
 
   public static final float MIN_PULLEY_LENGTH = 2.0f;

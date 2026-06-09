@@ -33,14 +33,12 @@ import com.codename1.gaming.physics.box2d.common.MathUtils;
 import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/*
- * A dynamic tree arranges data in a binary tree to accelerate queries such as volume queries and
- * ray casts. Leafs are proxies with an AABB. In the tree we expand the proxy AABB by _fatAABBFactor
- * so that the proxy AABB is bigger than the client object. This allows the client object to move by
- * small amounts without triggering a tree update.
- * 
- * @author daniel
- */
+/// A dynamic tree arranges data in a binary tree to accelerate queries such as volume queries and
+/// ray casts. Leafs are proxies with an AABB. In the tree we expand the proxy AABB by _fatAABBFactor
+/// so that the proxy AABB is bigger than the client object. This allows the client object to move by
+/// small amounts without triggering a tree update.
+///
+/// @author daniel
 public class DynamicTree implements BroadPhaseStrategy {
   public static final int MAX_STACK_SIZE = 64;
   public static final int NULL_NODE = -1;
@@ -302,9 +300,7 @@ public class DynamicTree implements BroadPhaseStrategy {
     return 1 + MathUtils.max(height1, height2);
   }
 
-  /*
-   * Validate this tree. For testing.
-   */
+  /// Validate this tree. For testing.
   public void validate() {
     validateStructure(m_root);
     validateMetrics(m_root);
@@ -371,9 +367,7 @@ public class DynamicTree implements BroadPhaseStrategy {
     return totalArea / rootArea;
   }
 
-  /*
-   * Build an optimal tree. Very expensive. For testing.
-   */
+  /// Build an optimal tree. Very expensive. For testing.
   public void rebuildBottomUp() {
     int[] nodes = new int[m_nodeCount];
     int count = 0;
@@ -469,9 +463,7 @@ public class DynamicTree implements BroadPhaseStrategy {
     return treeNode;
   }
 
-  /*
-   * returns a node to the pool
-   */
+  /// returns a node to the pool
   private final void freeNode(DynamicTreeNode node) {
     assert (node != null);
     assert (0 < m_nodeCount);

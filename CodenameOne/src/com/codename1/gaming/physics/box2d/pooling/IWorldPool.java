@@ -34,11 +34,8 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.common.Vec3;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 
-/*
- * World pool interface
- * @author Daniel
- *
- */
+/// World pool interface
+/// @author Daniel
 public interface IWorldPool {
 
 	public IDynamicStack<Contact> getPolyContactStack();

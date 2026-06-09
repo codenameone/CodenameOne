@@ -36,15 +36,13 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 
-/*
- * A fixture is used to attach a shape to a body for collision detection. A fixture inherits its
- * transform from its parent. Fixtures hold additional non-geometric data such as friction,
- * collision filters, etc. Fixtures are created via Body::CreateFixture.
- * 
- * @warning you cannot reuse fixtures.
- * 
- * @author daniel
- */
+/// A fixture is used to attach a shape to a body for collision detection. A fixture inherits its
+/// transform from its parent. Fixtures hold additional non-geometric data such as friction,
+/// collision filters, etc. Fixtures are created via Body::CreateFixture.
+///
+/// @warning you cannot reuse fixtures.
+///
+/// @author daniel
 public class Fixture {
 
   public float m_density;
@@ -76,40 +74,32 @@ public class Fixture {
     m_filter = new Filter();
   }
 
-  /*
-   * Get the type of the child shape. You can use this to down cast to the concrete shape.
-   * 
-   * @return the shape type.
-   */
+  /// Get the type of the child shape. You can use this to down cast to the concrete shape.
+  ///
+  /// @return the shape type.
   public ShapeType getType() {
     return m_shape.getType();
   }
 
-  /*
-   * Get the child shape. You can modify the child shape, however you should not change the number
-   * of vertices because this will crash some collision caching mechanisms.
-   * 
-   * @return
-   */
+  /// Get the child shape. You can modify the child shape, however you should not change the number
+  /// of vertices because this will crash some collision caching mechanisms.
+  ///
+  /// @return
   public Shape getShape() {
     return m_shape;
   }
 
-  /*
-   * Is this fixture a sensor (non-solid)?
-   * 
-   * @return the true if the shape is a sensor.
-   * @return
-   */
+  /// Is this fixture a sensor (non-solid)?
+  ///
+  /// @return the true if the shape is a sensor.
+  /// @return
   public boolean isSensor() {
     return m_isSensor;
   }
 
-  /*
-   * Set if this fixture is a sensor.
-   * 
-   * @param sensor
-   */
+  /// Set if this fixture is a sensor.
+  ///
+  /// @param sensor
   public void setSensor(boolean sensor) {
     if (sensor != m_isSensor) {
       m_body.setAwake(true);
@@ -117,32 +107,26 @@ public class Fixture {
     }
   }
 
-  /*
-   * Set the contact filtering data. This is an expensive operation and should not be called
-   * frequently. This will not update contacts until the next time step when either parent body is
-   * awake. This automatically calls refilter.
-   * 
-   * @param filter
-   */
+  /// Set the contact filtering data. This is an expensive operation and should not be called
+  /// frequently. This will not update contacts until the next time step when either parent body is
+  /// awake. This automatically calls refilter.
+  ///
+  /// @param filter
   public void setFilterData(final Filter filter) {
     m_filter.set(filter);
 
     refilter();
   }
 
-  /*
-   * Get the contact filtering data.
-   * 
-   * @return
-   */
+  /// Get the contact filtering data.
+  ///
+  /// @return
   public Filter getFilterData() {
     return m_filter;
   }
 
-  /*
-   * Call this if you want to establish collision that was previously disabled by
-   * ContactFilter::ShouldCollide.
-   */
+  /// Call this if you want to establish collision that was previously disabled by
+  /// ContactFilter::ShouldCollide.
   public void refilter() {
     if (m_body == null) {
       return;
@@ -173,22 +157,18 @@ public class Fixture {
     }
   }
 
-  /*
-   * Get the parent body of this fixture. This is NULL if the fixture is not attached.
-   * 
-   * @return the parent body.
-   * @return
-   */
+  /// Get the parent body of this fixture. This is NULL if the fixture is not attached.
+  ///
+  /// @return the parent body.
+  /// @return
   public Body getBody() {
     return m_body;
   }
 
-  /*
-   * Get the next fixture in the parent body's fixture list.
-   * 
-   * @return the next shape.
-   * @return
-   */
+  /// Get the next fixture in the parent body's fixture list.
+  ///
+  /// @return the next shape.
+  /// @return
   public Fixture getNext() {
     return m_next;
   }
@@ -202,110 +182,88 @@ public class Fixture {
     return m_density;
   }
 
-  /*
-   * Get the user data that was assigned in the fixture definition. Use this to store your
-   * application specific data.
-   * 
-   * @return
-   */
+  /// Get the user data that was assigned in the fixture definition. Use this to store your
+  /// application specific data.
+  ///
+  /// @return
   public Object getUserData() {
     return m_userData;
   }
 
-  /*
-   * Set the user data. Use this to store your application specific data.
-   * 
-   * @param data
-   */
+  /// Set the user data. Use this to store your application specific data.
+  ///
+  /// @param data
   public void setUserData(Object data) {
     m_userData = data;
   }
 
-  /*
-   * Test a point for containment in this fixture. This only works for convex shapes.
-   * 
-   * @param p a point in world coordinates.
-   * @return
-   */
+  /// Test a point for containment in this fixture. This only works for convex shapes.
+  ///
+  /// @param p a point in world coordinates.
+  /// @return
   public boolean testPoint(final Vec2 p) {
     return m_shape.testPoint(m_body.m_xf, p);
   }
 
-  /*
-   * Cast a ray against this shape.
-   * 
-   * @param output the ray-cast results.
-   * @param input the ray-cast input parameters.
-   * @param output
-   * @param input
-   */
+  /// Cast a ray against this shape.
+  ///
+  /// @param output the ray-cast results.
+  /// @param input the ray-cast input parameters.
+  /// @param output
+  /// @param input
   public boolean raycast(RayCastOutput output, RayCastInput input, int childIndex) {
     return m_shape.raycast(output, input, m_body.m_xf, childIndex);
   }
 
-  /*
-   * Get the mass data for this fixture. The mass data is based on the density and the shape. The
-   * rotational inertia is about the shape's origin.
-   * 
-   * @return
-   */
+  /// Get the mass data for this fixture. The mass data is based on the density and the shape. The
+  /// rotational inertia is about the shape's origin.
+  ///
+  /// @return
   public void getMassData(MassData massData) {
     m_shape.computeMass(massData, m_density);
   }
 
-  /*
-   * Get the coefficient of friction.
-   * 
-   * @return
-   */
+  /// Get the coefficient of friction.
+  ///
+  /// @return
   public float getFriction() {
     return m_friction;
   }
 
-  /*
-   * Set the coefficient of friction. This will _not_ change the friction of existing contacts.
-   * 
-   * @param friction
-   */
+  /// Set the coefficient of friction. This will _not_ change the friction of existing contacts.
+  ///
+  /// @param friction
   public void setFriction(float friction) {
     m_friction = friction;
   }
 
-  /*
-   * Get the coefficient of restitution.
-   * 
-   * @return
-   */
+  /// Get the coefficient of restitution.
+  ///
+  /// @return
   public float getRestitution() {
     return m_restitution;
   }
 
-  /*
-   * Set the coefficient of restitution. This will _not_ change the restitution of existing
-   * contacts.
-   * 
-   * @param restitution
-   */
+  /// Set the coefficient of restitution. This will _not_ change the restitution of existing
+  /// contacts.
+  ///
+  /// @param restitution
   public void setRestitution(float restitution) {
     m_restitution = restitution;
   }
 
-  /*
-   * Get the fixture's AABB. This AABB may be enlarge and/or stale. If you need a more accurate
-   * AABB, compute it using the shape and the body transform.
-   * 
-   * @return
-   */
+  /// Get the fixture's AABB. This AABB may be enlarge and/or stale. If you need a more accurate
+  /// AABB, compute it using the shape and the body transform.
+  ///
+  /// @return
   public AABB getAABB(int childIndex) {
     assert (childIndex >= 0 && childIndex < m_proxyCount);
     return m_proxies[childIndex].aabb;
   }
 
-  /*
-   * Dump this fixture to the log file.
-   * 
-   * @param bodyIndex
-   */
+  /// Dump this fixture to the log file.
+  ///
+  /// @param bodyIndex
   public void dump(int bodyIndex) {
 
   }
@@ -387,11 +345,9 @@ public class Fixture {
     }
   }
 
-  /*
-   * Internal method
-   * 
-   * @param broadPhase
-   */
+  /// Internal method
+  ///
+  /// @param broadPhase
   public void destroyProxies(BroadPhase broadPhase) {
     // Destroy proxies in the broad-phase.
     for (int i = 0; i < m_proxyCount; ++i) {
@@ -407,13 +363,11 @@ public class Fixture {
   private final AABB pool2 = new AABB();
   private final Vec2 displacement = new Vec2();
 
-  /*
-   * Internal method
-   * 
-   * @param broadPhase
-   * @param xf1
-   * @param xf2
-   */
+  /// Internal method
+  ///
+  /// @param broadPhase
+  /// @param xf1
+  /// @param xf2
   protected void synchronize(BroadPhase broadPhase, final Transform transform1,
       final Transform transform2) {
     if (m_proxyCount == 0) {

@@ -26,9 +26,7 @@ package com.codename1.gaming.physics.box2d.collision.broadphase;
 import com.codename1.gaming.physics.box2d.collision.AABB;
 
 public class DynamicTreeNode {
-  /*
-   * Enlarged AABB
-   */
+  /// Enlarged AABB
   public final AABB aabb = new AABB();
 
   public Object userData;
@@ -53,8 +51,6 @@ public class DynamicTreeNode {
     userData = argData;
   }
 
-  /*
-   * Should never be constructed outside the engine
-   */
+  /// Should never be constructed outside the engine
   protected DynamicTreeNode(int id) { this.id = id;}
 }

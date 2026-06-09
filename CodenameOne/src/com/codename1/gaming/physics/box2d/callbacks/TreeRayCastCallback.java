@@ -28,17 +28,12 @@ import com.codename1.gaming.physics.box2d.collision.broadphase.DynamicTree;
 
 // updated to rev 100
 
-/*
- * callback for {@link DynamicTree}
- * @author Daniel Murphy
- *
- */
+/// callback for {@link DynamicTree}
+/// @author Daniel Murphy
 public interface TreeRayCastCallback {
-	/*
-	 * 
-	 * @param input
-	 * @param nodeId
-	 * @return the fraction to the node
-	 */
+	///
+	/// @param input
+	/// @param nodeId
+	/// @return the fraction to the node
 	public float raycastCallback( RayCastInput input, int nodeId);
 }

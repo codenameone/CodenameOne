@@ -31,11 +31,9 @@ import com.codename1.gaming.physics.box2d.collision.broadphase.BroadPhaseStrateg
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 
-/*
- * Delegate of World.
- * 
- * @author Daniel Murphy
- */
+/// Delegate of World.
+///
+/// @author Daniel Murphy
 public class ContactManager implements PairCallback {
 
   public BroadPhase m_broadPhase;
@@ -55,12 +53,10 @@ public class ContactManager implements PairCallback {
     pool = argPool;
   }
 
-  /*
-   * Broad-phase callback.
-   * 
-   * @param proxyUserDataA
-   * @param proxyUserDataB
-   */
+  /// Broad-phase callback.
+  ///
+  /// @param proxyUserDataA
+  /// @param proxyUserDataB
   public void addPair(Object proxyUserDataA, Object proxyUserDataB) {
     FixtureProxy proxyA = (FixtureProxy) proxyUserDataA;
     FixtureProxy proxyB = (FixtureProxy) proxyUserDataB;
@@ -227,10 +223,8 @@ public class ContactManager implements PairCallback {
     --m_contactCount;
   }
 
-  /*
-   * This is the top level collision call for the time step. Here all the narrow phase collision is
-   * processed for the world contact list.
-   */
+  /// This is the top level collision call for the time step. Here all the narrow phase collision is
+  /// processed for the world contact list.
   public void collide() {
     // Update awake contacts.
     Contact c = m_contactList;

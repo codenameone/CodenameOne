@@ -27,11 +27,8 @@ import java.util.HashMap;
 
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/*
- * not thread safe Vec2[] pool
- * @author dmurph
- *
- */
+/// not thread safe Vec2[] pool
+/// @author dmurph
 public class Vec2Array {
 
 	private final HashMap<Integer, Vec2[]> map = new HashMap<Integer, Vec2[]>();

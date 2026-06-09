@@ -21,39 +21,27 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 7:23:39 AM Jan 20, 2011
- */
+/// Created at 7:23:39 AM Jan 20, 2011
 package com.codename1.gaming.physics.box2d.dynamics.joints;
 
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
-/*
- * Friction joint definition.
- * @author Daniel Murphy
- */
+/// Friction joint definition.
+/// @author Daniel Murphy
 public class FrictionJointDef extends JointDef {
 
 
-	/*
-	 * The local anchor point relative to bodyA's origin.
-	 */
+	/// The local anchor point relative to bodyA's origin.
 	public final Vec2 localAnchorA;
 
-	/*
-	 * The local anchor point relative to bodyB's origin.
-	 */
+	/// The local anchor point relative to bodyB's origin.
 	public final Vec2 localAnchorB;
 
-	/*
-	 * The maximum friction force in N.
-	 */
+	/// The maximum friction force in N.
 	public float maxForce;
 
-	/*
-	 * The maximum friction torque in N-m.
-	 */
+	/// The maximum friction torque in N-m.
 	public float maxTorque;
 	
 	public FrictionJointDef(){
@@ -63,10 +51,8 @@ public class FrictionJointDef extends JointDef {
 		maxForce = 0f;
 		maxTorque = 0f;
 	}
-	/*
-	 * Initialize the bodies, anchors, axis, and reference angle using the world
-	 * anchor and world axis.
-	 */
+	/// Initialize the bodies, anchors, axis, and reference angle using the world
+	/// anchor and world axis.
 	public void initialize(Body bA, Body bB, Vec2 anchor){
 		bodyA = bA;
 		bodyB = bB;

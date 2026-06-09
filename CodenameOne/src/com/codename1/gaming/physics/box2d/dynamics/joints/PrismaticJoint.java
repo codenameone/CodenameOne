@@ -101,13 +101,11 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 //Now compute impulse to be applied:
 //df = f2 - f1
 
-/*
- * A prismatic joint. This joint provides one degree of freedom: translation along an axis fixed in
- * bodyA. Relative rotation is prevented. You can use a joint limit to restrict the range of motion
- * and a joint motor to drive the motion or to model joint friction.
- * 
- * @author Daniel
- */
+/// A prismatic joint. This joint provides one degree of freedom: translation along an axis fixed in
+/// bodyA. Relative rotation is prevented. You can use a joint limit to restrict the range of motion
+/// and a joint motor to drive the motion or to model joint friction.
+///
+/// @author Daniel
 public class PrismaticJoint extends Joint {
 
   // Solver shared
@@ -195,9 +193,7 @@ public class PrismaticJoint extends Joint {
     return inv_dt * m_impulse.y;
   }
 
-  /*
-   * Get the current joint translation, usually in meters.
-   */
+  /// Get the current joint translation, usually in meters.
   public float getJointSpeed() {
     Body bA = m_bodyA;
     Body bB = m_bodyB;
@@ -253,20 +249,16 @@ public class PrismaticJoint extends Joint {
     return translation;
   }
 
-  /*
-   * Is the joint limit enabled?
-   * 
-   * @return
-   */
+  /// Is the joint limit enabled?
+  ///
+  /// @return
   public boolean isLimitEnabled() {
     return m_enableLimit;
   }
 
-  /*
-   * Enable/disable the joint limit.
-   * 
-   * @param flag
-   */
+  /// Enable/disable the joint limit.
+  ///
+  /// @param flag
   public void enableLimit(boolean flag) {
     if (flag != m_enableLimit) {
       m_bodyA.setAwake(true);
@@ -276,30 +268,24 @@ public class PrismaticJoint extends Joint {
     }
   }
 
-  /*
-   * Get the lower joint limit, usually in meters.
-   * 
-   * @return
-   */
+  /// Get the lower joint limit, usually in meters.
+  ///
+  /// @return
   public float getLowerLimit() {
     return m_lowerTranslation;
   }
 
-  /*
-   * Get the upper joint limit, usually in meters.
-   * 
-   * @return
-   */
+  /// Get the upper joint limit, usually in meters.
+  ///
+  /// @return
   public float getUpperLimit() {
     return m_upperTranslation;
   }
 
-  /*
-   * Set the joint limits, usually in meters.
-   * 
-   * @param lower
-   * @param upper
-   */
+  /// Set the joint limits, usually in meters.
+  ///
+  /// @param lower
+  /// @param upper
   public void setLimits(float lower, float upper) {
     assert (lower <= upper);
     if (lower != m_lowerTranslation || upper != m_upperTranslation) {
@@ -311,63 +297,51 @@ public class PrismaticJoint extends Joint {
     }
   }
 
-  /*
-   * Is the joint motor enabled?
-   * 
-   * @return
-   */
+  /// Is the joint motor enabled?
+  ///
+  /// @return
   public boolean isMotorEnabled() {
     return m_enableMotor;
   }
 
-  /*
-   * Enable/disable the joint motor.
-   * 
-   * @param flag
-   */
+  /// Enable/disable the joint motor.
+  ///
+  /// @param flag
   public void enableMotor(boolean flag) {
     m_bodyA.setAwake(true);
     m_bodyB.setAwake(true);
     m_enableMotor = flag;
   }
 
-  /*
-   * Set the motor speed, usually in meters per second.
-   * 
-   * @param speed
-   */
+  /// Set the motor speed, usually in meters per second.
+  ///
+  /// @param speed
   public void setMotorSpeed(float speed) {
     m_bodyA.setAwake(true);
     m_bodyB.setAwake(true);
     m_motorSpeed = speed;
   }
 
-  /*
-   * Get the motor speed, usually in meters per second.
-   * 
-   * @return
-   */
+  /// Get the motor speed, usually in meters per second.
+  ///
+  /// @return
   public float getMotorSpeed() {
     return m_motorSpeed;
   }
 
-  /*
-   * Set the maximum motor force, usually in N.
-   * 
-   * @param force
-   */
+  /// Set the maximum motor force, usually in N.
+  ///
+  /// @param force
   public void setMaxMotorForce(float force) {
     m_bodyA.setAwake(true);
     m_bodyB.setAwake(true);
     m_maxMotorForce = force;
   }
 
-  /*
-   * Get the current motor force, usually in N.
-   * 
-   * @param inv_dt
-   * @return
-   */
+  /// Get the current motor force, usually in N.
+  ///
+  /// @param inv_dt
+  /// @return
   public float getMotorForce(float inv_dt) {
     return m_motorImpulse * inv_dt;
   }

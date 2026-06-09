@@ -47,14 +47,12 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 //Cdot = wB - wA
 //J = [0 0 -1 0 0 1]
 
-/*
- * A wheel joint. This joint provides two degrees of freedom: translation along an axis fixed in
- * bodyA and rotation in the plane. You can use a joint limit to restrict the range of motion and a
- * joint motor to drive the rotation or to model rotational friction. This joint is designed for
- * vehicle suspensions.
- * 
- * @author Daniel Murphy
- */
+/// A wheel joint. This joint provides two degrees of freedom: translation along an axis fixed in
+/// bodyA and rotation in the plane. You can use a joint limit to restrict the range of motion and a
+/// joint motor to drive the rotation or to model rotational friction. This joint is designed for
+/// vehicle suspensions.
+///
+/// @author Daniel Murphy
 public class WheelJoint extends Joint {
 
   private float m_frequencyHz;
@@ -159,7 +157,7 @@ public class WheelJoint extends Joint {
     return translation;
   }
 
-  /* For serialization */
+  /// For serialization
   public Vec2 getLocalAxisA() {
     return m_localXAxisA;
   }

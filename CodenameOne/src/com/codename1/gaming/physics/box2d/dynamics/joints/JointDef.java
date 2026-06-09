@@ -25,10 +25,8 @@ package com.codename1.gaming.physics.box2d.dynamics.joints;
 
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
-/*
- * Joint definitions are used to construct joints.
- * @author Daniel Murphy
- */
+/// Joint definitions are used to construct joints.
+/// @author Daniel Murphy
 public class JointDef {
 
 	public JointDef(){
@@ -38,28 +36,18 @@ public class JointDef {
 		bodyB = null;
 		collideConnected = false;
 	}
-	/*
-	 * The joint type is set automatically for concrete joint types.
-	 */
+	/// The joint type is set automatically for concrete joint types.
 	public JointType type;
 	
-	/*
-	 * Use this to attach application specific data to your joints.
-	 */
+	/// Use this to attach application specific data to your joints.
 	public Object userData;
 	
-	/*
-	 * The first attached body.
-	 */
+	/// The first attached body.
 	public Body bodyA;
 	
-	/*
-	 * The second attached body.
-	 */
+	/// The second attached body.
 	public Body bodyB;
 	
-	/*
-	 * Set this flag to true if the attached bodies should collide.
-	 */
+	/// Set this flag to true if the attached bodies should collide.
 	public boolean collideConnected;
 }

@@ -35,21 +35,17 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.common.Transform;
 
 // updated to rev 100
-/*
- * This is non-static for faster pooling. To get an instance, use the {@link SingletonPool}, don't
- * construct a distance object.
- * 
- * @author Daniel Murphy
- */
+/// This is non-static for faster pooling. To get an instance, use the {@link SingletonPool}, don't
+/// construct a distance object.
+///
+/// @author Daniel Murphy
 public class Distance {
 
   public static int GJK_CALLS = 0;
   public static int GJK_ITERS = 0;
   public static int GJK_MAX_ITERS = 20;
 
-  /*
-   * GJK using Voronoi regions (Christer Ericson) and Barycentric coordinates.
-   */
+  /// GJK using Voronoi regions (Christer Ericson) and Barycentric coordinates.
   private class SimplexVertex {
     public final Vec2 wA = new Vec2(); // support point in shapeA
     public final Vec2 wB = new Vec2(); // support point in shapeB
@@ -68,18 +64,16 @@ public class Distance {
     }
   }
 
-  /*
-   * Used to warm start Distance. Set count to zero on first call.
-   * 
-   * @author daniel
-   */
+  /// Used to warm start Distance. Set count to zero on first call.
+  ///
+  /// @author daniel
   public static class SimplexCache {
-    /* length or area */
+    /// length or area
     public float metric;
     public int count;
-    /* vertices on shape A */
+    /// vertices on shape A
     public final int indexA[] = new int[3];
-    /* vertices on shape B */
+    /// vertices on shape B
     public final int indexB[] = new int[3];
 
     public SimplexCache() {
@@ -195,11 +189,9 @@ public class Distance {
     private final Vec2 case2 = new Vec2();
     private final Vec2 case22 = new Vec2();
 
-    /*
-     * this returns pooled objects. don't keep or modify them
-     * 
-     * @return
-     */
+    /// this returns pooled objects. don't keep or modify them
+    ///
+    /// @return
     public void getClosestPoint(final Vec2 out) {
       switch (m_count) {
         case 0:
@@ -291,9 +283,7 @@ public class Distance {
     }
 
     // djm pooled from above
-    /*
-     * Solve a line segment using barycentric coordinates.
-     */
+    /// Solve a line segment using barycentric coordinates.
     public void solve2() {
       // Solve a line segment using barycentric coordinates.
       //
@@ -355,14 +345,12 @@ public class Distance {
     private final Vec2 w2 = new Vec2();
     private final Vec2 w3 = new Vec2();
 
-    /*
-     * Solve a line segment using barycentric coordinates.<br/>
-     * Possible regions:<br/>
-     * - points[2]<br/>
-     * - edge points[0]-points[2]<br/>
-     * - edge points[1]-points[2]<br/>
-     * - inside the triangle
-     */
+    /// Solve a line segment using barycentric coordinates.<br/>
+    /// Possible regions:<br/>
+    /// - points[2]<br/>
+    /// - edge points[0]-points[2]<br/>
+    /// - edge points[1]-points[2]<br/>
+    /// - inside the triangle
     public void solve3() {
       w1.set(m_v1.w);
       w2.set(m_v2.w);
@@ -466,12 +454,10 @@ public class Distance {
     }
   }
 
-  /*
-   * A distance proxy is used by the GJK algorithm. It encapsulates any shape. TODO: see if we can
-   * just do assignments with m_vertices, instead of copying stuff over
-   * 
-   * @author daniel
-   */
+  /// A distance proxy is used by the GJK algorithm. It encapsulates any shape. TODO: see if we can
+  /// just do assignments with m_vertices, instead of copying stuff over
+  ///
+  /// @author daniel
   public static class DistanceProxy {
     public final Vec2[] m_vertices;
     public int m_count;
@@ -488,10 +474,8 @@ public class Distance {
       m_radius = 0f;
     }
 
-    /*
-     * Initialize the proxy using the given shape. The shape must remain in scope while the proxy is
-     * in use.
-     */
+    /// Initialize the proxy using the given shape. The shape must remain in scope while the proxy is
+    /// in use.
     public final void set(final Shape shape, int index) {
       switch (shape.getType()) {
         case CIRCLE:
@@ -537,12 +521,10 @@ public class Distance {
       }
     }
 
-    /*
-     * Get the supporting vertex index in the given direction.
-     * 
-     * @param d
-     * @return
-     */
+    /// Get the supporting vertex index in the given direction.
+    ///
+    /// @param d
+    /// @return
     public final int getSupport(final Vec2 d) {
       int bestIndex = 0;
       float bestValue = Vec2.dot(m_vertices[0], d);
@@ -557,12 +539,10 @@ public class Distance {
       return bestIndex;
     }
 
-    /*
-     * Get the supporting vertex in the given direction.
-     * 
-     * @param d
-     * @return
-     */
+    /// Get the supporting vertex in the given direction.
+    ///
+    /// @param d
+    /// @return
     public final Vec2 getSupportVertex(final Vec2 d) {
       int bestIndex = 0;
       float bestValue = Vec2.dot(m_vertices[0], d);
@@ -577,21 +557,17 @@ public class Distance {
       return m_vertices[bestIndex];
     }
 
-    /*
-     * Get the vertex count.
-     * 
-     * @return
-     */
+    /// Get the vertex count.
+    ///
+    /// @return
     public final int getVertexCount() {
       return m_count;
     }
 
-    /*
-     * Get a vertex by index. Used by Distance.
-     * 
-     * @param index
-     * @return
-     */
+    /// Get a vertex by index. Used by Distance.
+    ///
+    /// @param index
+    /// @return
     public final Vec2 getVertex(int index) {
       assert (0 <= index && index < m_count);
       return m_vertices[index];
@@ -606,15 +582,13 @@ public class Distance {
   private Vec2 temp = new Vec2();
   private Vec2 normal = new Vec2();
 
-  /*
-   * Compute the closest points between two shapes. Supports any combination of: CircleShape and
-   * PolygonShape. The simplex cache is input/output. On the first call set SimplexCache.count to
-   * zero.
-   * 
-   * @param output
-   * @param cache
-   * @param input
-   */
+  /// Compute the closest points between two shapes. Supports any combination of: CircleShape and
+  /// PolygonShape. The simplex cache is input/output. On the first call set SimplexCache.count to
+  /// zero.
+  ///
+  /// @param output
+  /// @param cache
+  /// @param input
   public final void distance(final DistanceOutput output, final SimplexCache cache,
       final DistanceInput input) {
     GJK_CALLS++;

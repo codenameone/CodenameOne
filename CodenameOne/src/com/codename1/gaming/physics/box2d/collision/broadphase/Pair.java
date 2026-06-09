@@ -24,10 +24,8 @@
 package com.codename1.gaming.physics.box2d.collision.broadphase;
 
 // updated to rev 100
-/*
- * Java note: at the "creation" of each node, a random key is given to that node, and that's what we
- * sort from.
- */
+/// Java note: at the "creation" of each node, a random key is given to that node, and that's what we
+/// sort from.
 public class Pair implements Comparable<Pair> {
   public int proxyIdA;
   public int proxyIdB;

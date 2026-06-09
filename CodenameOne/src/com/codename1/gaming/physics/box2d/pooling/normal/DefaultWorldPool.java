@@ -21,9 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 3:26:14 AM Jan 11, 2011
- */
+/// Created at 3:26:14 AM Jan 11, 2011
 package com.codename1.gaming.physics.box2d.pooling.normal;
 
 import java.util.HashMap;
@@ -49,12 +47,10 @@ import com.codename1.gaming.physics.box2d.dynamics.contacts.PolygonContact;
 import com.codename1.gaming.physics.box2d.pooling.IDynamicStack;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
-/*
- * Provides object pooling for all objects used in the engine. Objects retrieved from here should
- * only be used temporarily, and then pushed back (with the exception of arrays).
- * 
- * @author Daniel Murphy
- */
+/// Provides object pooling for all objects used in the engine. Objects retrieved from here should
+/// only be used temporarily, and then pushed back (with the exception of arrays).
+///
+/// @author Daniel Murphy
 public class DefaultWorldPool implements IWorldPool {
 
   private final OrderedStack<Vec2> vecs;

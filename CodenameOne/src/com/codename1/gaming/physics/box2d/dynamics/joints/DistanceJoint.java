@@ -60,10 +60,8 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 //K = J * invM * JT
 //= invMass1 + invI1 * cross(r1, u)^2 + invMass2 + invI2 * cross(r2, u)^2
 
-/*
- * A distance joint constrains two points on two bodies to remain at a fixed distance from each
- * other. You can view this as a massless, rigid rod.
- */
+/// A distance joint constrains two points on two bodies to remain at a fixed distance from each
+/// other. You can view this as a massless, rigid rod.
 public class DistanceJoint extends Joint {
 
   private float m_frequencyHz;
@@ -143,18 +141,14 @@ public class DistanceJoint extends Joint {
     return m_localAnchorB;
   }
 
-  /*
-   * Get the reaction force given the inverse time step. Unit is N.
-   */
+  /// Get the reaction force given the inverse time step. Unit is N.
   public void getReactionForce(float inv_dt, Vec2 argOut) {
     argOut.x = m_impulse * m_u.x * inv_dt;
     argOut.y = m_impulse * m_u.y * inv_dt;
   }
 
-  /*
-   * Get the reaction torque given the inverse time step. Unit is N*m. This is always zero for a
-   * distance joint.
-   */
+  /// Get the reaction torque given the inverse time step. Unit is N*m. This is always zero for a
+  /// distance joint.
   public float getReactionTorque(float inv_dt) {
     return 0.0f;
   }

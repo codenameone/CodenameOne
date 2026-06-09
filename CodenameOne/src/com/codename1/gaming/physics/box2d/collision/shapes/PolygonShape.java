@@ -34,34 +34,24 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.pooling.arrays.IntArray;
 import com.codename1.gaming.physics.box2d.pooling.arrays.Vec2Array;
 
-/*
- * A convex polygon shape. Polygons have a maximum number of vertices equal to _maxPolygonVertices.
- * In most cases you should not need many vertices for a convex polygon.
- */
+/// A convex polygon shape. Polygons have a maximum number of vertices equal to _maxPolygonVertices.
+/// In most cases you should not need many vertices for a convex polygon.
 public class PolygonShape extends Shape {
-  /* Dump lots of debug information. */
+  /// Dump lots of debug information.
   private final static boolean m_debug = false;
 
-  /*
-   * Local position of the shape centroid in parent body frame.
-   */
+  /// Local position of the shape centroid in parent body frame.
   public final Vec2 m_centroid = new Vec2();
 
-  /*
-   * The vertices of the shape. Note: use getVertexCount(), not m_vertices.length, to get number of
-   * active vertices.
-   */
+  /// The vertices of the shape. Note: use getVertexCount(), not m_vertices.length, to get number of
+  /// active vertices.
   public final Vec2 m_vertices[];
 
-  /*
-   * The normals of the shape. Note: use getVertexCount(), not m_normals.length, to get number of
-   * active normals.
-   */
+  /// The normals of the shape. Note: use getVertexCount(), not m_normals.length, to get number of
+  /// active normals.
   public final Vec2 m_normals[];
 
-  /*
-   * Number of active vertices in the shape.
-   */
+  /// Number of active vertices in the shape.
   public int m_count;
 
   // pooling
@@ -99,26 +89,22 @@ public class PolygonShape extends Shape {
     return shape;
   }
 
-  /*
-   * Create a convex hull from the given array of points. The count must be in the range [3,
-   * Settings.maxPolygonVertices].
-   * 
-   * @warning the points may be re-ordered, even if they form a convex polygon
-   * @warning collinear points are handled but not removed. Collinear points may lead to poor
-   *          stacking behavior.
-   */
+  /// Create a convex hull from the given array of points. The count must be in the range [3,
+  /// Settings.maxPolygonVertices].
+  ///
+  /// @warning the points may be re-ordered, even if they form a convex polygon
+  /// @warning collinear points are handled but not removed. Collinear points may lead to poor
+  ///          stacking behavior.
   public final void set(final Vec2[] vertices, final int count) {
     set(vertices, count, null, null);
   }
 
-  /*
-   * Create a convex hull from the given array of points. The count must be in the range [3,
-   * Settings.maxPolygonVertices]. This method takes an arraypool for pooling
-   * 
-   * @warning the points may be re-ordered, even if they form a convex polygon
-   * @warning collinear points are handled but not removed. Collinear points may lead to poor
-   *          stacking behavior.
-   */
+  /// Create a convex hull from the given array of points. The count must be in the range [3,
+  /// Settings.maxPolygonVertices]. This method takes an arraypool for pooling
+  ///
+  /// @warning the points may be re-ordered, even if they form a convex polygon
+  /// @warning collinear points are handled but not removed. Collinear points may lead to poor
+  ///          stacking behavior.
   public final void set(final Vec2[] verts, final int num, final Vec2Array vecPool,
       final IntArray intPool) {
     assert (3 <= num && num <= Settings.maxPolygonVertices);
@@ -214,12 +200,10 @@ public class PolygonShape extends Shape {
     computeCentroidToOut(m_vertices, m_count, m_centroid);
   }
 
-  /*
-   * Build vertices to represent an axis-aligned box.
-   * 
-   * @param hx the half-width.
-   * @param hy the half-height.
-   */
+  /// Build vertices to represent an axis-aligned box.
+  ///
+  /// @param hx the half-width.
+  /// @param hy the half-height.
   public final void setAsBox(final float hx, final float hy) {
     m_count = 4;
     m_vertices[0].set(-hx, -hy);
@@ -233,14 +217,12 @@ public class PolygonShape extends Shape {
     m_centroid.setZero();
   }
 
-  /*
-   * Build vertices to represent an oriented box.
-   * 
-   * @param hx the half-width.
-   * @param hy the half-height.
-   * @param center the center of the box in local coordinates.
-   * @param angle the rotation of the box in local coordinates.
-   */
+  /// Build vertices to represent an oriented box.
+  ///
+  /// @param hx the half-width.
+  /// @param hy the half-height.
+  /// @param center the center of the box in local coordinates.
+  /// @param angle the rotation of the box in local coordinates.
   public final void setAsBox(final float hx, final float hy, final Vec2 center, final float angle) {
     m_count = 4;
     m_vertices[0].set(-hx, -hy);
@@ -329,21 +311,17 @@ public class PolygonShape extends Shape {
     upper.y += m_radius;
   }
 
-  /*
-   * Get the vertex count.
-   * 
-   * @return
-   */
+  /// Get the vertex count.
+  ///
+  /// @return
   public final int getVertexCount() {
     return m_count;
   }
 
-  /*
-   * Get a vertex by index.
-   * 
-   * @param index
-   * @return
-   */
+  /// Get a vertex by index.
+  ///
+  /// @param index
+  /// @return
   public final Vec2 getVertex(final int index) {
     assert (0 <= index && index < m_count);
     return m_vertices[index];
@@ -550,11 +528,9 @@ public class PolygonShape extends Shape {
     massData.I += massData.mass * (Vec2.dot(massData.center, massData.center));
   }
 
-  /*
-   * Validate convexity. This is a very time consuming operation.
-   * 
-   * @return
-   */
+  /// Validate convexity. This is a very time consuming operation.
+  ///
+  /// @return
   public boolean validate() {
     for (int i = 0; i < m_count; ++i) {
       int i1 = i;
@@ -578,22 +554,22 @@ public class PolygonShape extends Shape {
     return true;
   }
 
-  /* Get the vertices in local coordinates. */
+  /// Get the vertices in local coordinates.
   public Vec2[] getVertices() {
     return m_vertices;
   }
 
-  /* Get the edge normal vectors. There is one for each vertex. */
+  /// Get the edge normal vectors. There is one for each vertex.
   public Vec2[] getNormals() {
     return m_normals;
   }
 
-  /* Get the centroid and apply the supplied transform. */
+  /// Get the centroid and apply the supplied transform.
   public Vec2 centroid(final Transform xf) {
     return Transform.mul(xf, m_centroid);
   }
 
-  /* Get the centroid and apply the supplied transform. */
+  /// Get the centroid and apply the supplied transform.
   public Vec2 centroidToOut(final Transform xf, final Vec2 out) {
     Transform.mulToOutUnsafe(xf, m_centroid, out);
     return out;

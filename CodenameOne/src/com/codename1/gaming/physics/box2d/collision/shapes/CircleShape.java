@@ -33,9 +33,7 @@ import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/*
- * A circle shape.
- */
+/// A circle shape.
 public class CircleShape extends Shape {
 
   public final Vec2 m_p;
@@ -58,41 +56,33 @@ public class CircleShape extends Shape {
     return 1;
   }
 
-  /*
-   * Get the supporting vertex index in the given direction.
-   * 
-   * @param d
-   * @return
-   */
+  /// Get the supporting vertex index in the given direction.
+  ///
+  /// @param d
+  /// @return
   public final int getSupport(final Vec2 d) {
     return 0;
   }
 
-  /*
-   * Get the supporting vertex in the given direction.
-   * 
-   * @param d
-   * @return
-   */
+  /// Get the supporting vertex in the given direction.
+  ///
+  /// @param d
+  /// @return
   public final Vec2 getSupportVertex(final Vec2 d) {
     return m_p;
   }
 
-  /*
-   * Get the vertex count.
-   * 
-   * @return
-   */
+  /// Get the vertex count.
+  ///
+  /// @return
   public final int getVertexCount() {
     return 1;
   }
 
-  /*
-   * Get a vertex by index.
-   * 
-   * @param index
-   * @return
-   */
+  /// Get a vertex by index.
+  ///
+  /// @param index
+  /// @return
   public final Vec2 getVertex(final int index) {
     assert (index == 0);
     return m_p;

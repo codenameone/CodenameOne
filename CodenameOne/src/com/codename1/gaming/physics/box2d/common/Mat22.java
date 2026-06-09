@@ -25,15 +25,13 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/*
- * A 2-by-2 matrix. Stored in column-major order.
- */
+/// A 2-by-2 matrix. Stored in column-major order.
 public class Mat22 implements Serializable {
   private static final long serialVersionUID = 2L;
 
   public final Vec2 ex, ey;
 
-  /* Convert the matrix to printable format. */
+  /// Convert the matrix to printable format.
   public String toString() {
     String s = "";
     s += "[" + ex.x + "," + ey.x + "]\n";
@@ -41,44 +39,36 @@ public class Mat22 implements Serializable {
     return s;
   }
 
-  /*
-   * Construct zero matrix. Note: this is NOT an identity matrix! djm fixed double allocation
-   * problem
-   */
+  /// Construct zero matrix. Note: this is NOT an identity matrix! djm fixed double allocation
+  /// problem
   public Mat22() {
     ex = new Vec2();
     ey = new Vec2();
   }
 
-  /*
-   * Create a matrix with given vectors as columns.
-   * 
-   * @param c1 Column 1 of matrix
-   * @param c2 Column 2 of matrix
-   */
+  /// Create a matrix with given vectors as columns.
+  ///
+  /// @param c1 Column 1 of matrix
+  /// @param c2 Column 2 of matrix
   public Mat22(final Vec2 c1, final Vec2 c2) {
     ex = c1.clone();
     ey = c2.clone();
   }
 
-  /*
-   * Create a matrix from four floats.
-   * 
-   * @param exx
-   * @param col2x
-   * @param exy
-   * @param col2y
-   */
+  /// Create a matrix from four floats.
+  ///
+  /// @param exx
+  /// @param col2x
+  /// @param exy
+  /// @param col2y
   public Mat22(final float exx, final float col2x, final float exy, final float col2y) {
     ex = new Vec2(exx, exy);
     ey = new Vec2(col2x, col2y);
   }
 
-  /*
-   * Set as a copy of another matrix.
-   * 
-   * @param m Matrix to copy
-   */
+  /// Set as a copy of another matrix.
+  ///
+  /// @param m Matrix to copy
   public final Mat22 set(final Mat22 m) {
     ex.x = m.ex.x;
     ex.y = m.ex.y;
@@ -95,19 +85,15 @@ public class Mat22 implements Serializable {
     return this;
   }
 
-  /*
-   * Return a clone of this matrix. djm fixed double allocation
-   */
+  /// Return a clone of this matrix. djm fixed double allocation
   // @Override // annotation omitted for GWT-compatibility
   public final Mat22 clone() {
     return new Mat22(ex, ey);
   }
 
-  /*
-   * Set as a matrix representing a rotation.
-   * 
-   * @param angle Rotation (in radians) that matrix represents.
-   */
+  /// Set as a matrix representing a rotation.
+  ///
+  /// @param angle Rotation (in radians) that matrix represents.
   public final void set(final float angle) {
     final float c = MathUtils.cos(angle), s = MathUtils.sin(angle);
     ex.x = c;
@@ -116,9 +102,7 @@ public class Mat22 implements Serializable {
     ey.y = c;
   }
 
-  /*
-   * Set as the identity matrix.
-   */
+  /// Set as the identity matrix.
   public final void setIdentity() {
     ex.x = 1.0f;
     ey.x = 0.0f;
@@ -126,9 +110,7 @@ public class Mat22 implements Serializable {
     ey.y = 1.0f;
   }
 
-  /*
-   * Set as the zero matrix.
-   */
+  /// Set as the zero matrix.
   public final void setZero() {
     ex.x = 0.0f;
     ey.x = 0.0f;
@@ -136,21 +118,17 @@ public class Mat22 implements Serializable {
     ey.y = 0.0f;
   }
 
-  /*
-   * Extract the angle from this matrix (assumed to be a rotation matrix).
-   * 
-   * @return
-   */
+  /// Extract the angle from this matrix (assumed to be a rotation matrix).
+  ///
+  /// @return
   public final float getAngle() {
     return MathUtils.atan2(ex.y, ex.x);
   }
 
-  /*
-   * Set by column vectors.
-   * 
-   * @param c1 Column 1
-   * @param c2 Column 2
-   */
+  /// Set by column vectors.
+  ///
+  /// @param c1 Column 1
+  /// @param c2 Column 2
   public final void set(final Vec2 c1, final Vec2 c2) {
     ex.x = c1.x;
     ey.x = c2.x;
@@ -158,7 +136,7 @@ public class Mat22 implements Serializable {
     ey.y = c2.y;
   }
 
-  /* Returns the inverted Mat22 - does NOT invert the matrix locally! */
+  /// Returns the inverted Mat22 - does NOT invert the matrix locally!
   public final Mat22 invert() {
     final float a = ex.x, b = ey.x, c = ex.y, d = ey.y;
     final Mat22 B = new Mat22();
@@ -199,11 +177,9 @@ public class Mat22 implements Serializable {
 
 
 
-  /*
-   * Return the matrix composed of the absolute values of all elements. djm: fixed double allocation
-   * 
-   * @return Absolute value matrix
-   */
+  /// Return the matrix composed of the absolute values of all elements. djm: fixed double allocation
+  ///
+  /// @return Absolute value matrix
   public final Mat22 abs() {
     return new Mat22(MathUtils.abs(ex.x), MathUtils.abs(ey.x), MathUtils.abs(ex.y),
         MathUtils.abs(ey.y));
@@ -215,11 +191,9 @@ public class Mat22 implements Serializable {
     ey.absLocal();
   }
 
-  /*
-   * Return the matrix composed of the absolute values of all elements.
-   * 
-   * @return Absolute value matrix
-   */
+  /// Return the matrix composed of the absolute values of all elements.
+  ///
+  /// @return Absolute value matrix
   public final static Mat22 abs(final Mat22 R) {
     return R.abs();
   }
@@ -232,12 +206,10 @@ public class Mat22 implements Serializable {
     out.ey.y = MathUtils.abs(R.ey.y);
   }
 
-  /*
-   * Multiply a vector by this matrix.
-   * 
-   * @param v Vector to multiply by matrix.
-   * @return Resulting vector
-   */
+  /// Multiply a vector by this matrix.
+  ///
+  /// @param v Vector to multiply by matrix.
+  /// @return Resulting vector
   public final Vec2 mul(final Vec2 v) {
     return new Vec2(ex.x * v.x + ey.x * v.y, ex.y * v.x + ey.y * v.y);
   }
@@ -255,12 +227,10 @@ public class Mat22 implements Serializable {
   }
 
 
-  /*
-   * Multiply another matrix by this one (this one on left). djm optimized
-   * 
-   * @param R
-   * @return
-   */
+  /// Multiply another matrix by this one (this one on left). djm optimized
+  ///
+  /// @param R
+  /// @return
   public final Mat22 mul(final Mat22 R) {
     /*
      * Mat22 C = new Mat22();C.set(this.mul(R.ex), this.mul(R.ey));return C;
@@ -299,13 +269,11 @@ public class Mat22 implements Serializable {
     out.ey.y = this.ex.y * R.ey.x + this.ey.y * R.ey.y;
   }
 
-  /*
-   * Multiply another matrix by the transpose of this one (transpose of this one on left). djm:
-   * optimized
-   * 
-   * @param B
-   * @return
-   */
+  /// Multiply another matrix by the transpose of this one (transpose of this one on left). djm:
+  /// optimized
+  ///
+  /// @param B
+  /// @return
   public final Mat22 mulTrans(final Mat22 B) {
     /*
      * Vec2 c1 = new Vec2(Vec2.dot(this.ex, B.ex), Vec2.dot(this.ey, B.ex)); Vec2 c2 = new
@@ -351,12 +319,10 @@ public class Mat22 implements Serializable {
     out.ey.y = this.ey.x * B.ey.x + this.ey.y * B.ey.y;
   }
 
-  /*
-   * Multiply a vector by the transpose of this matrix.
-   * 
-   * @param v
-   * @return
-   */
+  /// Multiply a vector by the transpose of this matrix.
+  ///
+  /// @param v
+  /// @return
   public final Vec2 mulTrans(final Vec2 v) {
     // return new Vec2(Vec2.dot(v, ex), Vec2.dot(v, col2));
     return new Vec2((v.x * ex.x + v.y * ex.y), (v.x * ey.x + v.y * ey.y));
@@ -372,12 +338,10 @@ public class Mat22 implements Serializable {
     out.x = tempx;
   }
 
-  /*
-   * Add this matrix to B, return the result.
-   * 
-   * @param B
-   * @return
-   */
+  /// Add this matrix to B, return the result.
+  ///
+  /// @param B
+  /// @return
   public final Mat22 add(final Mat22 B) {
     // return new Mat22(ex.add(B.ex), col2.add(B.ey));
     Mat22 m = new Mat22();
@@ -388,12 +352,10 @@ public class Mat22 implements Serializable {
     return m;
   }
 
-  /*
-   * Add B to this matrix locally.
-   * 
-   * @param B
-   * @return
-   */
+  /// Add B to this matrix locally.
+  ///
+  /// @param B
+  /// @return
   public final Mat22 addLocal(final Mat22 B) {
     // ex.addLocal(B.ex);
     // col2.addLocal(B.ey);
@@ -404,11 +366,9 @@ public class Mat22 implements Serializable {
     return this;
   }
 
-  /*
-   * Solve A * x = b where A = this matrix.
-   * 
-   * @return The vector x that solves the above equation.
-   */
+  /// Solve A * x = b where A = this matrix.
+  ///
+  /// @return The vector x that solves the above equation.
   public final Vec2 solve(final Vec2 b) {
     final float a11 = ex.x, a12 = ey.x, a21 = ex.y, a22 = ey.y;
     float det = a11 * a22 - a12 * a21;

@@ -234,16 +234,16 @@ public class ConstantVolumeJoint extends Joint {
     }
   }
 
-  /* No-op */
+  /// No-op
   public void getAnchorA(Vec2 argOut) {}
 
-  /* No-op */
+  /// No-op
   public void getAnchorB(Vec2 argOut) {}
 
-  /* No-op */
+  /// No-op
   public void getReactionForce(float inv_dt, Vec2 argOut) {}
 
-  /* No-op */
+  /// No-op
   public float getReactionTorque(float inv_dt) {
     return 0;
   }

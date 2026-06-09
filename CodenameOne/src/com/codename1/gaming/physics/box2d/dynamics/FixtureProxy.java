@@ -25,11 +25,9 @@ package com.codename1.gaming.physics.box2d.dynamics;
 
 import com.codename1.gaming.physics.box2d.collision.AABB;
 
-/*
- * This proxy is used internally to connect fixtures to the broad-phase.
- * 
- * @author Daniel
- */
+/// This proxy is used internally to connect fixtures to the broad-phase.
+///
+/// @author Daniel
 public class FixtureProxy {
   final AABB aabb = new AABB();
   Fixture fixture;

@@ -25,10 +25,8 @@ package com.codename1.gaming.physics.box2d.pooling.arrays;
 
 import java.util.HashMap;
 
-/*
- * Not thread safe float[] pooling.
- * @author Daniel
- */
+/// Not thread safe float[] pooling.
+/// @author Daniel
 public class FloatArray {
 	
 	private final HashMap<Integer, float[]> map = new HashMap<Integer, float[]>();

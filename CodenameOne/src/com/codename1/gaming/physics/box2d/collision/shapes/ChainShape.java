@@ -33,14 +33,12 @@ import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/*
- * A chain shape is a free form sequence of line segments. The chain has two-sided collision, so you
- * can use inside and outside collision. Therefore, you may use any winding order. Since there may
- * be many vertices, they are allocated using Alloc. Connectivity information is used to create
- * smooth collisions. WARNING The chain will not collide properly if there are self-intersections.
- * 
- * @author Daniel
- */
+/// A chain shape is a free form sequence of line segments. The chain has two-sided collision, so you
+/// can use inside and outside collision. Therefore, you may use any winding order. Since there may
+/// be many vertices, they are allocated using Alloc. Connectivity information is used to create
+/// smooth collisions. WARNING The chain will not collide properly if there are self-intersections.
+///
+/// @author Daniel
 public class ChainShape extends Shape {
 
   public Vec2[] m_vertices;
@@ -61,9 +59,7 @@ public class ChainShape extends Shape {
     return m_count - 1;
   }
 
-  /*
-   * Get a child edge.
-   */
+  /// Get a child edge.
   public void getChildEdge(EdgeShape edge, int index) {
     assert (0 <= index && index < m_count - 1);
     edge.m_radius = m_radius;
@@ -164,12 +160,10 @@ public class ChainShape extends Shape {
     return clone;
   }
 
-  /*
-   * Create a loop. This automatically adjusts connectivity.
-   * 
-   * @param vertices an array of vertices, these are copied
-   * @param count the vertex count
-   */
+  /// Create a loop. This automatically adjusts connectivity.
+  ///
+  /// @param vertices an array of vertices, these are copied
+  /// @param count the vertex count
   public void createLoop(final Vec2[] vertices, int count) {
     assert (m_vertices == null && m_count == 0);
     assert (count >= 3);
@@ -193,12 +187,10 @@ public class ChainShape extends Shape {
     m_hasNextVertex = true;
   }
 
-  /*
-   * Create a chain with isolated end vertices.
-   * 
-   * @param vertices an array of vertices, these are copied
-   * @param count the vertex count
-   */
+  /// Create a chain with isolated end vertices.
+  ///
+  /// @param vertices an array of vertices, these are copied
+  /// @param count the vertex count
   public void createChain(final Vec2 vertices[], int count) {
     assert (m_vertices == null && m_count == 0);
     assert (count >= 2);
@@ -219,21 +211,17 @@ public class ChainShape extends Shape {
     m_hasNextVertex = false;
   }
 
-  /*
-   * Establish connectivity to a vertex that precedes the first vertex. Don't call this for loops.
-   * 
-   * @param prevVertex
-   */
+  /// Establish connectivity to a vertex that precedes the first vertex. Don't call this for loops.
+  ///
+  /// @param prevVertex
   public void setPrevVertex(final Vec2 prevVertex) {
     m_prevVertex.set(prevVertex);
     m_hasPrevVertex = true;
   }
 
-  /*
-   * Establish connectivity to a vertex that follows the last vertex. Don't call this for loops.
-   * 
-   * @param nextVertex
-   */
+  /// Establish connectivity to a vertex that follows the last vertex. Don't call this for loops.
+  ///
+  /// @param nextVertex
   public void setNextVertex(final Vec2 nextVertex) {
     m_nextVertex.set(nextVertex);
     m_hasNextVertex = true;

@@ -23,10 +23,8 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.collision.shapes;
 
-/*
- * Types of shapes
- * @author Daniel
- */
+/// Types of shapes
+/// @author Daniel
 public enum ShapeType {
 	CIRCLE, EDGE, POLYGON, CHAIN
 }

@@ -21,17 +21,13 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 4:14:34 AM Jul 17, 2010
- */
+/// Created at 4:14:34 AM Jul 17, 2010
 package com.codename1.gaming.physics.box2d.pooling.arrays;
 
 import java.util.HashMap;
 
-/*
- * Not thread safe int[] pooling
- * @author Daniel Murphy
- */
+/// Not thread safe int[] pooling
+/// @author Daniel Murphy
 public class IntArray {
 	
 	private final HashMap<Integer, int[]> map = new HashMap<Integer, int[]>();

@@ -21,9 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 3:38:38 AM Jan 15, 2011
- */
+/// Created at 3:38:38 AM Jan 15, 2011
 package com.codename1.gaming.physics.box2d.dynamics.joints;
 
 import com.codename1.gaming.physics.box2d.common.Mat33;
@@ -49,12 +47,10 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 //J = [0 0 -1 0 0 1]
 //K = invI1 + invI2
 
-/*
- * A weld joint essentially glues two bodies together. A weld joint may distort somewhat because the
- * island constraint solver is approximate.
- * 
- * @author Daniel Murphy
- */
+/// A weld joint essentially glues two bodies together. A weld joint may distort somewhat because the
+/// island constraint solver is approximate.
+///
+/// @author Daniel Murphy
 public class WeldJoint extends Joint {
 
   private float m_frequencyHz;

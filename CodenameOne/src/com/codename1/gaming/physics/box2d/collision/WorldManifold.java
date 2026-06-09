@@ -29,20 +29,14 @@ import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/*
- * This is used to compute the current state of a contact manifold.
- * 
- * @author daniel
- */
+/// This is used to compute the current state of a contact manifold.
+///
+/// @author daniel
 public class WorldManifold {
-  /*
-   * World vector pointing from A to B
-   */
+  /// World vector pointing from A to B
   public final Vec2 normal;
 
-  /*
-   * World contact point (point of intersection)
-   */
+  /// World contact point (point of intersection)
   public final Vec2[] points;
 
   public WorldManifold() {

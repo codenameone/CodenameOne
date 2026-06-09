@@ -155,11 +155,9 @@ import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
  However, we can compute sin+cos of the same angle fast.
  */
 
-/*
- * This is an internal class.
- * 
- * @author Daniel Murphy
- */
+/// This is an internal class.
+///
+/// @author Daniel Murphy
 public class Island {
 
   public ContactListener m_listener;

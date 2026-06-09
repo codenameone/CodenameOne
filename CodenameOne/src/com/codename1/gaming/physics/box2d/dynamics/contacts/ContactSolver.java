@@ -38,22 +38,16 @@ import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 import com.codename1.gaming.physics.box2d.dynamics.TimeStep;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactVelocityConstraint.VelocityConstraintPoint;
 
-/*
- * @author Daniel
- */
+/// @author Daniel
 public class ContactSolver {
 
   public static final boolean DEBUG_SOLVER = false;
   public static final float k_errorTol = 1e-3f;
-  /*
-   * For each solver, this is the initial number of constraints in the array, which expands as
-   * needed.
-   */
+  /// For each solver, this is the initial number of constraints in the array, which expands as
+  /// needed.
   public static final int INITIAL_NUM_CONSTRAINTS = 256;
 
-  /*
-   * Ensure a reasonable condition number. for the block solver
-   */
+  /// Ensure a reasonable condition number. for the block solver
   public static final float k_maxConditionNumber = 100.0f;
 
   public TimeStep m_step;
@@ -810,9 +804,7 @@ public class ContactSolver {
   private final Vec2 rA = new Vec2();
   private final Vec2 rB = new Vec2();
 
-  /*
-   * Sequential solver.
-   */
+  /// Sequential solver.
   public final boolean solvePositionConstraints() {
     float minSeparation = 0.0f;
 

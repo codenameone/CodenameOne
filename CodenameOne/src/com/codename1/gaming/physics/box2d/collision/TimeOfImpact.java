@@ -33,12 +33,10 @@ import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
-/*
- * Class used for computing the time of impact. This class should not be constructed usually, just
- * retrieve from the {@link SingletonPool#getTOI()}.
- * 
- * @author daniel
- */
+/// Class used for computing the time of impact. This class should not be constructed usually, just
+/// retrieve from the {@link SingletonPool#getTOI()}.
+///
+/// @author daniel
 public class TimeOfImpact {
   public static final int MAX_ITERATIONS = 1000;
 
@@ -48,19 +46,15 @@ public class TimeOfImpact {
   public static int toiRootIters = 0;
   public static int toiMaxRootIters = 0;
 
-  /*
-   * Input parameters for TOI
-   * 
-   * @author Daniel Murphy
-   */
+  /// Input parameters for TOI
+  ///
+  /// @author Daniel Murphy
   public static class TOIInput {
     public final DistanceProxy proxyA = new DistanceProxy();
     public final DistanceProxy proxyB = new DistanceProxy();
     public final Sweep sweepA = new Sweep();
     public final Sweep sweepB = new Sweep();
-    /*
-     * defines sweep interval [0, tMax]
-     */
+    /// defines sweep interval [0, tMax]
     public float tMax;
   }
 
@@ -68,11 +62,9 @@ public class TimeOfImpact {
     UNKNOWN, FAILED, OVERLAPPED, TOUCHING, SEPARATED
   }
 
-  /*
-   * Output parameters for TimeOfImpact
-   * 
-   * @author daniel
-   */
+  /// Output parameters for TimeOfImpact
+  ///
+  /// @author daniel
   public static class TOIOutput {
     public TOIOutputState state;
     public float t;
@@ -97,15 +89,13 @@ public class TimeOfImpact {
     pool = argPool;
   }
 
-  /*
-   * Compute the upper bound on time before two shapes penetrate. Time is represented as a fraction
-   * between [0,tMax]. This uses a swept separating axis and may miss some intermediate,
-   * non-tunneling collision. If you change the time interval, you should call this function again.
-   * Note: use Distance to compute the contact point and normal at the time of impact.
-   * 
-   * @param output
-   * @param input
-   */
+  /// Compute the upper bound on time before two shapes penetrate. Time is represented as a fraction
+  /// between [0,tMax]. This uses a swept separating axis and may miss some intermediate,
+  /// non-tunneling collision. If you change the time interval, you should call this function again.
+  /// Note: use Distance to compute the contact point and normal at the time of impact.
+  ///
+  /// @param output
+  /// @param input
   public final void timeOfImpact(TOIOutput output, TOIInput input) {
     // CCD via the local separating axis method. This seeks progression
     // by computing the largest time at which separation is maintained.

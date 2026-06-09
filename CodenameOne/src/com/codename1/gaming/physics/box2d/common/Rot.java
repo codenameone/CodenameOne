@@ -25,11 +25,9 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/*
- * Represents a rotation
- * 
- * @author Daniel
- */
+/// Represents a rotation
+///
+/// @author Daniel
 public class Rot implements Serializable {
   private static final long serialVersionUID = 1L;
 

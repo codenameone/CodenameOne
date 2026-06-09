@@ -64,12 +64,10 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 import com.codename1.gaming.physics.box2d.pooling.arrays.Vec2Array;
 import com.codename1.gaming.physics.box2d.pooling.normal.DefaultWorldPool;
 
-/*
- * The world class manages all physics entities, dynamic simulation, and asynchronous queries. The
- * world also contains efficient memory management facilities.
- * 
- * @author Daniel Murphy
- */
+/// The world class manages all physics entities, dynamic simulation, and asynchronous queries. The
+/// world also contains efficient memory management facilities.
+///
+/// @author Daniel Murphy
 public class World {
   public static final int WORLD_POOL_SIZE = 100;
   public static final int WORLD_POOL_CONTAINER_SIZE = 10;
@@ -103,9 +101,7 @@ public class World {
 
   private final IWorldPool pool;
 
-  /*
-   * This is used to compute the time step ratio to support a variable time step.
-   */
+  /// This is used to compute the time step ratio to support a variable time step.
   private float m_inv_dt0;
 
   // these are for debugging the solver
@@ -121,20 +117,16 @@ public class World {
   private ContactRegister[][] contactStacks =
       new ContactRegister[ShapeType.values().length][ShapeType.values().length];
 
-  /*
-   * Construct a world object.
-   * 
-   * @param gravity the world gravity vector.
-   */
+  /// Construct a world object.
+  ///
+  /// @param gravity the world gravity vector.
   public World(Vec2 gravity) {
     this(gravity, new DefaultWorldPool(WORLD_POOL_SIZE, WORLD_POOL_CONTAINER_SIZE));
   }
 
-  /*
-   * Construct a world object.
-   * 
-   * @param gravity the world gravity vector.
-   */
+  /// Construct a world object.
+  ///
+  /// @param gravity the world gravity vector.
   public World(Vec2 gravity, IWorldPool pool) {
     this(gravity, pool, new DynamicTree());
   }
@@ -258,51 +250,41 @@ public class World {
     return pool;
   }
 
-  /*
-   * Register a destruction listener. The listener is owned by you and must remain in scope.
-   * 
-   * @param listener
-   */
+  /// Register a destruction listener. The listener is owned by you and must remain in scope.
+  ///
+  /// @param listener
   public void setDestructionListener(DestructionListener listener) {
     m_destructionListener = listener;
   }
 
-  /*
-   * Register a contact filter to provide specific control over collision. Otherwise the default
-   * filter is used (_defaultFilter). The listener is owned by you and must remain in scope.
-   * 
-   * @param filter
-   */
+  /// Register a contact filter to provide specific control over collision. Otherwise the default
+  /// filter is used (_defaultFilter). The listener is owned by you and must remain in scope.
+  ///
+  /// @param filter
   public void setContactFilter(ContactFilter filter) {
     m_contactManager.m_contactFilter = filter;
   }
 
-  /*
-   * Register a contact event listener. The listener is owned by you and must remain in scope.
-   * 
-   * @param listener
-   */
+  /// Register a contact event listener. The listener is owned by you and must remain in scope.
+  ///
+  /// @param listener
   public void setContactListener(ContactListener listener) {
     m_contactManager.m_contactListener = listener;
   }
 
-  /*
-   * Register a routine for debug drawing. The debug draw functions are called inside with
-   * World.DrawDebugData method. The debug draw object is owned by you and must remain in scope.
-   * 
-   * @param debugDraw
-   */
+  /// Register a routine for debug drawing. The debug draw functions are called inside with
+  /// World.DrawDebugData method. The debug draw object is owned by you and must remain in scope.
+  ///
+  /// @param debugDraw
   public void setDebugDraw(DebugDraw debugDraw) {
     m_debugDraw = debugDraw;
   }
 
-  /*
-   * create a rigid body given a definition. No reference to the definition is retained.
-   * 
-   * @warning This function is locked during callbacks.
-   * @param def
-   * @return
-   */
+  /// create a rigid body given a definition. No reference to the definition is retained.
+  ///
+  /// @warning This function is locked during callbacks.
+  /// @param def
+  /// @return
   public Body createBody(BodyDef def) {
     assert (isLocked() == false);
     if (isLocked()) {
@@ -323,14 +305,12 @@ public class World {
     return b;
   }
 
-  /*
-   * destroy a rigid body given a definition. No reference to the definition is retained. This
-   * function is locked during callbacks.
-   * 
-   * @warning This automatically deletes all associated shapes and joints.
-   * @warning This function is locked during callbacks.
-   * @param body
-   */
+  /// destroy a rigid body given a definition. No reference to the definition is retained. This
+  /// function is locked during callbacks.
+  ///
+  /// @warning This automatically deletes all associated shapes and joints.
+  /// @warning This function is locked during callbacks.
+  /// @param body
   public void destroyBody(Body body) {
     assert (m_bodyCount > 0);
     assert (isLocked() == false);
@@ -397,14 +377,12 @@ public class World {
     // TODO djm recycle body
   }
 
-  /*
-   * create a joint to constrain bodies together. No reference to the definition is retained. This
-   * may cause the connected bodies to cease colliding.
-   * 
-   * @warning This function is locked during callbacks.
-   * @param def
-   * @return
-   */
+  /// create a joint to constrain bodies together. No reference to the definition is retained. This
+  /// may cause the connected bodies to cease colliding.
+  ///
+  /// @warning This function is locked during callbacks.
+  /// @param def
+  /// @return
   public Joint createJoint(JointDef def) {
     assert (isLocked() == false);
     if (isLocked()) {
@@ -463,12 +441,10 @@ public class World {
     return j;
   }
 
-  /*
-   * destroy a joint. This may cause the connected bodies to begin colliding.
-   * 
-   * @warning This function is locked during callbacks.
-   * @param joint
-   */
+  /// destroy a joint. This may cause the connected bodies to begin colliding.
+  ///
+  /// @warning This function is locked during callbacks.
+  /// @param joint
   public void destroyJoint(Joint j) {
     assert (isLocked() == false);
     if (isLocked()) {
@@ -555,13 +531,11 @@ public class World {
   private final Timer stepTimer = new Timer();
   private final Timer tempTimer = new Timer();
 
-  /*
-   * Take a time step. This performs collision detection, integration, and constraint solution.
-   * 
-   * @param timeStep the amount of time to simulate, this should not vary.
-   * @param velocityIterations for the velocity constraint solver.
-   * @param positionIterations for the position constraint solver.
-   */
+  /// Take a time step. This performs collision detection, integration, and constraint solution.
+  ///
+  /// @param timeStep the amount of time to simulate, this should not vary.
+  /// @param velocityIterations for the velocity constraint solver.
+  /// @param positionIterations for the position constraint solver.
   public void step(float dt, int velocityIterations, int positionIterations) {
     stepTimer.reset();
     // log.debug("Starting step");
@@ -620,13 +594,11 @@ public class World {
     m_profile.step = stepTimer.getMilliseconds();
   }
 
-  /*
-   * Call this after you are done with time steps to clear the forces. You normally call this after
-   * each call to Step, unless you are performing sub-steps. By default, forces will be
-   * automatically cleared, so you don't need to call this function.
-   * 
-   * @see setAutoClearForces
-   */
+  /// Call this after you are done with time steps to clear the forces. You normally call this after
+  /// each call to Step, unless you are performing sub-steps. By default, forces will be
+  /// automatically cleared, so you don't need to call this function.
+  ///
+  /// @see setAutoClearForces
   public void clearForces() {
     for (Body body = m_bodyList; body != null; body = body.getNext()) {
       body.m_force.setZero();
@@ -640,9 +612,7 @@ public class World {
   private final Vec2 cB = new Vec2();
   private final Vec2Array avs = new Vec2Array();
 
-  /*
-   * Call this to draw shapes and other debug draw data.
-   */
+  /// Call this to draw shapes and other debug draw data.
   public void drawDebugData() {
     if (m_debugDraw == null) {
       return;
@@ -729,12 +699,10 @@ public class World {
 
   private final WorldQueryWrapper wqwrapper = new WorldQueryWrapper();
 
-  /*
-   * Query the world for all fixtures that potentially overlap the provided AABB.
-   * 
-   * @param callback a user implemented callback class.
-   * @param aabb the query box.
-   */
+  /// Query the world for all fixtures that potentially overlap the provided AABB.
+  ///
+  /// @param callback a user implemented callback class.
+  /// @param aabb the query box.
   public void queryAABB(QueryCallback callback, AABB aabb) {
     wqwrapper.broadPhase = m_contactManager.m_broadPhase;
     wqwrapper.callback = callback;
@@ -744,15 +712,13 @@ public class World {
   private final WorldRayCastWrapper wrcwrapper = new WorldRayCastWrapper();
   private final RayCastInput input = new RayCastInput();
 
-  /*
-   * Ray-cast the world for all fixtures in the path of the ray. Your callback controls whether you
-   * get the closest point, any point, or n-points. The ray-cast ignores shapes that contain the
-   * starting point.
-   * 
-   * @param callback a user implemented callback class.
-   * @param point1 the ray starting point
-   * @param point2 the ray ending point
-   */
+  /// Ray-cast the world for all fixtures in the path of the ray. Your callback controls whether you
+  /// get the closest point, any point, or n-points. The ray-cast ignores shapes that contain the
+  /// starting point.
+  ///
+  /// @param callback a user implemented callback class.
+  /// @param point1 the ray starting point
+  /// @param point2 the ray ending point
   public void raycast(RayCastCallback callback, Vec2 point1, Vec2 point2) {
     wrcwrapper.broadPhase = m_contactManager.m_broadPhase;
     wrcwrapper.callback = callback;
@@ -762,34 +728,28 @@ public class World {
     m_contactManager.m_broadPhase.raycast(wrcwrapper, input);
   }
 
-  /*
-   * Get the world body list. With the returned body, use Body.getNext to get the next body in the
-   * world list. A null body indicates the end of the list.
-   * 
-   * @return the head of the world body list.
-   */
+  /// Get the world body list. With the returned body, use Body.getNext to get the next body in the
+  /// world list. A null body indicates the end of the list.
+  ///
+  /// @return the head of the world body list.
   public Body getBodyList() {
     return m_bodyList;
   }
 
-  /*
-   * Get the world joint list. With the returned joint, use Joint.getNext to get the next joint in
-   * the world list. A null joint indicates the end of the list.
-   * 
-   * @return the head of the world joint list.
-   */
+  /// Get the world joint list. With the returned joint, use Joint.getNext to get the next joint in
+  /// the world list. A null joint indicates the end of the list.
+  ///
+  /// @return the head of the world joint list.
   public Joint getJointList() {
     return m_jointList;
   }
 
-  /*
-   * Get the world contact list. With the returned contact, use Contact.getNext to get the next
-   * contact in the world list. A null contact indicates the end of the list.
-   * 
-   * @return the head of the world contact list.
-   * @warning contacts are created and destroyed in the middle of a time step. Use ContactListener
-   *          to avoid missing contacts.
-   */
+  /// Get the world contact list. With the returned contact, use Contact.getNext to get the next
+  /// contact in the world list. A null contact indicates the end of the list.
+  ///
+  /// @return the head of the world contact list.
+  /// @warning contacts are created and destroyed in the middle of a time step. Use ContactListener
+  ///          to avoid missing contacts.
   public Contact getContactList() {
     return m_contactManager.m_contactList;
   }
@@ -802,11 +762,9 @@ public class World {
     m_allowSleep = sleepingAllowed;
   }
 
-  /*
-   * Enable/disable warm starting. For testing.
-   * 
-   * @param flag
-   */
+  /// Enable/disable warm starting. For testing.
+  ///
+  /// @param flag
   public void setWarmStarting(boolean flag) {
     m_warmStarting = flag;
   }
@@ -815,11 +773,9 @@ public class World {
     return m_warmStarting;
   }
 
-  /*
-   * Enable/disable continuous physics. For testing.
-   * 
-   * @param flag
-   */
+  /// Enable/disable continuous physics. For testing.
+  ///
+  /// @param flag
   public void setContinuousPhysics(boolean flag) {
     m_continuousPhysics = flag;
   }
@@ -830,101 +786,79 @@ public class World {
 
 
 
-  /*
-   * Get the number of broad-phase proxies.
-   * 
-   * @return
-   */
+  /// Get the number of broad-phase proxies.
+  ///
+  /// @return
   public int getProxyCount() {
     return m_contactManager.m_broadPhase.getProxyCount();
   }
 
-  /*
-   * Get the number of bodies.
-   * 
-   * @return
-   */
+  /// Get the number of bodies.
+  ///
+  /// @return
   public int getBodyCount() {
     return m_bodyCount;
   }
 
-  /*
-   * Get the number of joints.
-   * 
-   * @return
-   */
+  /// Get the number of joints.
+  ///
+  /// @return
   public int getJointCount() {
     return m_jointCount;
   }
 
-  /*
-   * Get the number of contacts (each may have 0 or more contact points).
-   * 
-   * @return
-   */
+  /// Get the number of contacts (each may have 0 or more contact points).
+  ///
+  /// @return
   public int getContactCount() {
     return m_contactManager.m_contactCount;
   }
 
-  /*
-   * Gets the height of the dynamic tree
-   * 
-   * @return
-   */
+  /// Gets the height of the dynamic tree
+  ///
+  /// @return
   public int getTreeHeight() {
     return m_contactManager.m_broadPhase.getTreeHeight();
   }
 
-  /*
-   * Gets the balance of the dynamic tree
-   * 
-   * @return
-   */
+  /// Gets the balance of the dynamic tree
+  ///
+  /// @return
   public int getTreeBalance() {
     return m_contactManager.m_broadPhase.getTreeBalance();
   }
 
-  /*
-   * Gets the quality of the dynamic tree
-   * 
-   * @return
-   */
+  /// Gets the quality of the dynamic tree
+  ///
+  /// @return
   public float getTreeQuality() {
     return m_contactManager.m_broadPhase.getTreeQuality();
   }
 
-  /*
-   * Change the global gravity vector.
-   * 
-   * @param gravity
-   */
+  /// Change the global gravity vector.
+  ///
+  /// @param gravity
   public void setGravity(Vec2 gravity) {
     m_gravity.set(gravity);
   }
 
-  /*
-   * Get the global gravity vector.
-   * 
-   * @return
-   */
+  /// Get the global gravity vector.
+  ///
+  /// @return
   public Vec2 getGravity() {
     return m_gravity;
   }
 
-  /*
-   * Is the world locked (in the middle of a time step).
-   * 
-   * @return
-   */
+  /// Is the world locked (in the middle of a time step).
+  ///
+  /// @return
   public boolean isLocked() {
     return (m_flags & LOCKED) == LOCKED;
   }
 
-  /*
-   * Set flag to control automatic clearing of forces after each time step.
-   * 
-   * @param flag
-   */
+  /// Set flag to control automatic clearing of forces after each time step.
+  ///
+  /// @param flag
   public void setAutoClearForces(boolean flag) {
     if (flag) {
       m_flags |= CLEAR_FORCES;
@@ -933,20 +867,16 @@ public class World {
     }
   }
 
-  /*
-   * Get the flag that controls automatic clearing of forces after each time step.
-   * 
-   * @return
-   */
+  /// Get the flag that controls automatic clearing of forces after each time step.
+  ///
+  /// @return
   public boolean getAutoClearForces() {
     return (m_flags & CLEAR_FORCES) == CLEAR_FORCES;
   }
 
-  /*
-   * Get the contact manager for testing purposes
-   * 
-   * @return
-   */
+  /// Get the contact manager for testing purposes
+  ///
+  /// @return
   public ContactManager getContactManager() {
     return m_contactManager;
   }

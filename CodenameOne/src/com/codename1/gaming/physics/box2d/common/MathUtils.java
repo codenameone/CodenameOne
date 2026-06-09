@@ -48,12 +48,8 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.util.Random;
 
-/*
- * A few math methods that don't fit very well anywhere else.
- */
+/// A few math methods that don't fit very well anywhere else.
 public class MathUtils extends PlatformMathUtils {
-  // Shared RNG: the Codename One VM (CLDC/ParparVM) does not provide
-  // Math.random(), so randomFloat draws from a java.util.Random instead.
   private static final Random RANDOM = new Random();
   public static final float PI = (float) Math.PI;
   public static final float TWOPI = (float) (Math.PI * 2);
@@ -62,14 +58,10 @@ public class MathUtils extends PlatformMathUtils {
   public static final float QUARTER_PI = PI / 4;
   public static final float THREE_HALVES_PI = TWOPI - HALF_PI;
 
-  /*
-   * Degrees to radians conversion factor
-   */
+  /// Degrees to radians conversion factor
   public static final float DEG2RAD = PI / 180;
 
-  /*
-   * Radians to degrees conversion factor
-   */
+  /// Radians to degrees conversion factor
   public static final float RAD2DEG = 180 / PI;
 
   public static final float[] sinLUT = new float[Settings.SINCOS_LUT_LENGTH];
@@ -170,12 +162,10 @@ public class MathUtils extends PlatformMathUtils {
     }
   }
 
-  /*
-   * Rounds up the value to the nearest higher power^2 value.
-   * 
-   * @param x
-   * @return power^2 value
-   */
+  /// Rounds up the value to the nearest higher power^2 value.
+  ///
+  /// @param x
+  /// @return power^2 value
   public static final int ceilPowerOf2(int x) {
     int pow2 = 1;
     while (pow2 < x) {
@@ -207,7 +197,7 @@ public class MathUtils extends PlatformMathUtils {
     return res;
   }
 
-  /* Returns the closest value to 'a' that is in between 'low' and 'high' */
+  /// Returns the closest value to 'a' that is in between 'low' and 'high'
   public final static float clamp(final float a, final float low, final float high) {
     return max(low, min(a, high));
   }
@@ -228,12 +218,10 @@ public class MathUtils extends PlatformMathUtils {
     dest.y = low.y > dest.y ? low.y : dest.y;
   }
 
-  /*
-   * Next Largest Power of 2: Given a binary integer value x, the next largest power of 2 can be
-   * computed by a SWAR algorithm that recursively "folds" the upper bits into the lower bits. This
-   * process yields a bit vector with the same most significant 1 as x, but all 1's below it. Adding
-   * 1 to that value yields the next largest power of 2.
-   */
+  /// Next Largest Power of 2: Given a binary integer value x, the next largest power of 2 can be
+  /// computed by a SWAR algorithm that recursively "folds" the upper bits into the lower bits. This
+  /// process yields a bit vector with the same most significant 1 as x, but all 1's below it. Adding
+  /// 1 to that value yields the next largest power of 2.
   public final static int nextPowerOfTwo(int x) {
     x |= x >> 1;
     x |= x >> 2;
@@ -248,9 +236,11 @@ public class MathUtils extends PlatformMathUtils {
   }
 
   public static final float atan2(final float y, final float x) {
-    // The Codename One VM (CLDC/ParparVM) does not provide Math.atan2, so the
-    // approximate fastAtan2 is always used here.
-    return fastAtan2(y, x);
+    if (Settings.FAST_ATAN2) {
+      return fastAtan2(y, x);
+    } else {
+      return fastAtan2(y, x);
+    }
   }
 
   public static final float fastAtan2(float y, float x) {

@@ -21,14 +21,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/*
- * Created at 12:52:04 AM Jan 20, 2011
- */
+/// Created at 12:52:04 AM Jan 20, 2011
 package com.codename1.gaming.physics.box2d.pooling.normal;
 
-/*
- * @author Daniel Murphy
- */
+/// @author Daniel Murphy
 public abstract class OrderedStack<E> {
 
   private final Object[] pool;
@@ -66,6 +62,6 @@ public abstract class OrderedStack<E> {
     assert (index >= 0) : "Beginning of stack reached, push/pops are unmatched";
   }
 
-  /* Creates a new instance of the object contained by this stack. */
+  /// Creates a new instance of the object contained by this stack.
   protected abstract E newInstance();
 }

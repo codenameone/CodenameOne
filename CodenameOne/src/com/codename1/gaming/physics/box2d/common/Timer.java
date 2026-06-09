@@ -23,11 +23,9 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-/*
- * Timer for profiling
- * 
- * @author Daniel
- */
+/// Timer for profiling
+///
+/// @author Daniel
 public class Timer {
 
   private long resetMillis;

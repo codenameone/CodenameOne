@@ -30,12 +30,10 @@ import com.codename1.gaming.physics.box2d.dynamics.World;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
 // updated to rev 100
-/*
- * The base joint class. Joints are used to constrain two bodies together in various fashions. Some
- * joints also feature limits and motors.
- * 
- * @author Daniel Murphy
- */
+/// The base joint class. Joints are used to constrain two bodies together in various fashions. Some
+/// joints also feature limits and motors.
+///
+/// @author Daniel Murphy
 public abstract class Joint {
 
   public static Joint create(World world, JointDef def) {
@@ -122,78 +120,58 @@ public abstract class Joint {
     // m_localCenterB = new Vec2();
   }
 
-  /*
-   * get the type of the concrete joint.
-   * 
-   * @return
-   */
+  /// get the type of the concrete joint.
+  ///
+  /// @return
   public JointType getType() {
     return m_type;
   }
 
-  /*
-   * get the first body attached to this joint.
-   */
+  /// get the first body attached to this joint.
   public final Body getBodyA() {
     return m_bodyA;
   }
 
-  /*
-   * get the second body attached to this joint.
-   * 
-   * @return
-   */
+  /// get the second body attached to this joint.
+  ///
+  /// @return
   public final Body getBodyB() {
     return m_bodyB;
   }
 
-  /*
-   * get the anchor point on bodyA in world coordinates.
-   * 
-   * @return
-   */
+  /// get the anchor point on bodyA in world coordinates.
+  ///
+  /// @return
   public abstract void getAnchorA(Vec2 out);
 
-  /*
-   * get the anchor point on bodyB in world coordinates.
-   * 
-   * @return
-   */
+  /// get the anchor point on bodyB in world coordinates.
+  ///
+  /// @return
   public abstract void getAnchorB(Vec2 out);
 
-  /*
-   * get the reaction force on body2 at the joint anchor in Newtons.
-   * 
-   * @param inv_dt
-   * @return
-   */
+  /// get the reaction force on body2 at the joint anchor in Newtons.
+  ///
+  /// @param inv_dt
+  /// @return
   public abstract void getReactionForce(float inv_dt, Vec2 out);
 
-  /*
-   * get the reaction torque on body2 in N*m.
-   * 
-   * @param inv_dt
-   * @return
-   */
+  /// get the reaction torque on body2 in N*m.
+  ///
+  /// @param inv_dt
+  /// @return
   public abstract float getReactionTorque(float inv_dt);
 
-  /*
-   * get the next joint the world joint list.
-   */
+  /// get the next joint the world joint list.
   public Joint getNext() {
     return m_next;
   }
 
-  /*
-   * get the user data pointer.
-   */
+  /// get the user data pointer.
   public Object getUserData() {
     return m_userData;
   }
 
-  /*
-   * Set the user data pointer.
-   */
+  /// Set the user data pointer.
   public void setUserData(Object data) {
     m_userData = data;
   }
@@ -205,11 +183,9 @@ public abstract class Joint {
     return m_collideConnected;
   }
 
-  /*
-   * Short-cut function to determine if either body is inactive.
-   * 
-   * @return
-   */
+  /// Short-cut function to determine if either body is inactive.
+  ///
+  /// @return
   public boolean isActive() {
     return m_bodyA.isActive() && m_bodyB.isActive();
   }
@@ -218,16 +194,12 @@ public abstract class Joint {
 
   public abstract void solveVelocityConstraints(SolverData data);
 
-  /*
-   * This returns true if the position errors are within tolerance.
-   * 
-   * @param baumgarte
-   * @return
-   */
+  /// This returns true if the position errors are within tolerance.
+  ///
+  /// @param baumgarte
+  /// @return
   public abstract boolean solvePositionConstraints(SolverData data);
 
-  /*
-   * Override to handle destruction of joint
-   */
+  /// Override to handle destruction of joint
   public void destructor() {}
 }

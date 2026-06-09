@@ -45,9 +45,7 @@
  */
 package com.codename1.gaming.physics.box2d.collision;
 
-/*
- * Contact ids to facilitate warm starting. Note: the ContactFeatures class is just embedded in here
- */
+/// Contact ids to facilitate warm starting. Note: the ContactFeatures class is just embedded in here
 public class ContactID implements Comparable<ContactID> {
 
   public static enum Type {
@@ -89,9 +87,7 @@ public class ContactID implements Comparable<ContactID> {
     typeB = tempA;
   }
 
-  /*
-   * zeros out the data
-   */
+  /// zeros out the data
   public void zero() {
     indexA = 0;
     indexB = 0;
