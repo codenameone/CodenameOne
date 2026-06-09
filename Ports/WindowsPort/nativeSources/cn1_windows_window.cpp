@@ -349,6 +349,21 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
                 cn1WinPushEvent(CN1_EVENT_POINTER_DRAGGED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 0);
             }
             return 0;
+        case WM_MOUSEWHEEL:
+        case WM_MOUSEHWHEEL: {
+            /* The wheel message reports the cursor in SCREEN coordinates; the
+             * input ring (and the synthetic scroll the EDT builds from it) work
+             * in client coordinates, so map it. The delta is signed, a multiple
+             * of WHEEL_DELTA (120). */
+            POINT pt;
+            pt.x = GET_X_LPARAM(lParam);
+            pt.y = GET_Y_LPARAM(lParam);
+            ScreenToClient(hwnd, &pt);
+            int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+            cn1WinPushEvent(msg == WM_MOUSEHWHEEL ? CN1_EVENT_MOUSE_HWHEEL : CN1_EVENT_MOUSE_WHEEL,
+                    pt.x, pt.y, delta);
+            return 0;
+        }
         case WM_KEYDOWN:
             cn1WinPushEvent(CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
             return 0;
@@ -382,6 +397,10 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             /* Native EDIT-control op marshaled from the EDT (cn1_windows_edit.c). */
             cn1WinEditHandleMessage(wParam, lParam);
             return 0;
+        case WM_CN1_FILEDIALOG:
+            /* Modal file open/save dialog, run synchronously on this (pump) thread
+             * while the EDT blocks in SendMessage (cn1_windows_io.c). */
+            return cn1WinFileDialogHandleMessage(wParam);
         case WM_CTLCOLOREDIT: {
             /* Colour the native edit overlay to match the CN1 field it stands in
              * for; fall through to default when it is not our control. */

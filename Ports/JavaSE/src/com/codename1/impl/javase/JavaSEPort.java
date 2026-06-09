@@ -877,8 +877,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return componentTreeInspector;
     }
-    private boolean scrollWheeling;
-    
+    // Scroll-wheel state now lives in CodenameOneImplementation (isScrollWheeling
+    // / pointerWheelMoved); the JavaSE canvas just feeds wheel events into it.
+
     private JComponent textCmp;
 
     private java.util.Timer backgroundFetchTimer;
@@ -3311,8 +3312,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return;
             }
             lastInputEvent = e;
-            final int x = scrollWheeling ? lastX : scaleCoordinateX(e.getX());
-            final int y = scrollWheeling ? lastY : scaleCoordinateY(e.getY());
+            final int x = isScrollWheeling() ? lastX : scaleCoordinateX(e.getX());
+            final int y = isScrollWheeling() ? lastY : scaleCoordinateY(e.getY());
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
                 Form f = getCurrentForm();
                 if(f != null){
@@ -3346,85 +3347,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (ignoreWheelMovements) {
                     return;
                 }
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        scrollWheeling = true;
-                        Form f = getCurrentForm();
-                        if(f != null){
-                            Component cmp = f.getComponentAt(x, y);
-                            
-                            if(cmp != null && cmp.isFocusable()) {
-                                cmp.setFocusable(false);
-                                f.pointerPressed(x, y);
-                                f.pointerDragged(x, y + units / 4);
-                                cmp.setFocusable(true);
-                            } else {
-                                f.pointerPressed(x, y);
-                                f.pointerDragged(x, y + units / 4);
-                            }
-                        }
-                    }
-                });
-                
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        Form f = getCurrentForm();
-                        if(f != null){
-                            Component cmp = f.getComponentAt(x, y);
-                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
-                                return;
-                            }
-                            if(cmp != null && cmp.isFocusable()) {
-                                cmp.setFocusable(false);
-                                f.pointerDragged(x, y + units / 4 * 2);
-                                cmp.setFocusable(true);
-                            } else {
-                                f.pointerDragged(x, y + units / 4 * 2);
-                            }
-                        }
-                    }
-                });
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        Form f = getCurrentForm();
-                        if(f != null){
-                            Component cmp = f.getComponentAt(x, y);
-                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
-                                return;
-                            }
-                            if(cmp != null && cmp.isFocusable()) {
-                                cmp.setFocusable(false);
-                                f.pointerDragged(x, y + units / 4 * 3);
-                                cmp.setFocusable(true);
-                            } else {
-                                f.pointerDragged(x, y + units / 4 * 3);
-                            }
-                        }
-                    }
-                });
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        Form f = getCurrentForm();
-                        if(f != null){
-                            Component cmp = f.getComponentAt(x, y);
-                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
-                                f.pointerReleased(x, y + units);
-                                return;
-                            }
-                            if(cmp != null && cmp.isFocusable()) {
-                                cmp.setFocusable(false);
-                                f.pointerDragged(x, y + units);
-                                f.pointerReleased(x, y + units);
-                                cmp.setFocusable(true);
-                            } else {
-                                f.pointerDragged(x, y + units);
-                                f.pointerReleased(x, y + units);
-                            }
-                        }
-                        scrollWheeling = false;
-                    }
-                });
-            } 
+                // Hand the wheel scroll to the shared CodenameOneImplementation
+                // gesture so every port maps the wheel the same way; it replays
+                // the press/drag/release across EDT cycles and tracks
+                // isScrollWheeling() for us.
+                pointerWheelMoved(x, y, 0, units);
+            }
         }
         
     }
@@ -8622,7 +8550,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void editString(final Component cmp, final int maxSize, final int constraint, String text, final int keyCode) {
-        if(scrollWheeling) {
+        if(isScrollWheeling()) {
             return;
         }
         if(System.getProperty("TextCompatMode") != null) {
@@ -16590,11 +16518,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 "Permission Request",
                 JOptionPane.YES_NO_OPTION);
         return selectedOption == JOptionPane.YES_OPTION;
-    }
-
-    @Override
-    public boolean isScrollWheeling() {
-        return scrollWheeling;
     }
 
     @Override

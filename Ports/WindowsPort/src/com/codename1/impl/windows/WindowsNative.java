@@ -411,6 +411,27 @@ public final class WindowsNative {
 
     public static native String clipboardGetText();
 
+    /* ----------------------------------------------------- shell / launch */
+
+    /**
+     * Hands a URI or path to the Windows shell ({@code ShellExecuteW "open"}):
+     * {@code http(s):} opens the browser, {@code tel:} the dialer, {@code sms:}
+     * the Messaging app, {@code mailto:} the mail client, a filesystem path its
+     * registered program. Returns {@code true} only when the shell accepted it
+     * (no handler registered reports {@code false} rather than fabricating
+     * success).
+     */
+    public static native boolean shellOpen(String target);
+
+    /**
+     * Shows a modal native file dialog and returns the chosen path, or
+     * {@code null} on cancel (or in headless mode). {@code type} mirrors the
+     * Display gallery types (0 image, 1 video, 2 all) and selects the file
+     * filter. The dialog runs on the window-owning pump thread; the caller
+     * blocks until the user chooses.
+     */
+    public static native String fileDialog(boolean save, int type, String title);
+
     /* ----------------------------------------------------------- media */
 
     /** Creates a Media Foundation player from the given bytes (spooled to a temp

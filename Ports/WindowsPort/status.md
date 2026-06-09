@@ -55,17 +55,23 @@ one of the most bug-prone areas of any port.
   needed. IME composition (CJK), bidi/RTL, and a keyboard toolbar are not yet
   verified. A `RichEdit`-backed control may be needed for advanced cases.
 
-### 1b. Mouse wheel scrolling — not wired
+### 1b. Mouse wheel scrolling — implemented (shared core API)
 
-`WM_MOUSEWHEEL` / `WM_MOUSEHWHEEL` are not handled in the native window proc, so
-the scroll wheel does nothing. Touch/drag scrolling works (that path is what the
-overscroll-smear fix exercised). To wire it, push a wheel event from the WndProc
-into the input ring (delta in the spare `eventScratch` slot, like keys) and, in
-`WindowsImplementation.drainInput()`, translate it into a scroll. The JavaSE port
-shows the canonical approach (`JavaSEPort.mouseWheelMoved`): a synthetic
-pointerPressed → pointerDragged → pointerReleased sequence run through Codename
-One's scroll logic, with the component under the cursor temporarily made
-non-focusable so the synthetic press cannot register as a click. Deferred.
+Done. `WM_MOUSEWHEEL` / `WM_MOUSEHWHEEL` are handled in the native window proc
+(`cn1_windows_window.cpp`): the cursor is mapped to client coordinates and the
+signed delta is pushed into the input ring as a new `CN1_EVENT_MOUSE_WHEEL` /
+`CN1_EVENT_MOUSE_HWHEEL` event. `WindowsImplementation.drainInput()` converts the
+delta to a DPI-scaled pixel distance (`wheelUnits`) and feeds it to the shared
+scroll entry point.
+
+Rather than re-implement the synthetic-scroll hack per port, the mapping now
+lives once in the core: `CodenameOneImplementation.pointerWheelMoved(x, y,
+scrollX, scrollY)` replays the wheel as a press → drag → release gesture spread
+across four EDT cycles (so Codename One's own tensile/deceleration animates it),
+temporarily makes the component under the cursor non-focusable so the synthetic
+press is not a click, and reports `isScrollWheeling()` for the duration. The
+JavaSE port was refactored onto this same method (it had carried the original
+inline implementation), so every desktop port maps the wheel identically.
 
 ### 2. SIMD acceleration — software fallback only
 
@@ -87,18 +93,34 @@ was removed because a port must not hand a shipping app fake frames. The legacy
 enumeration + preview peer + still capture, surfaced honestly through
 `Camera.getCameras()` / `isSupported()`.
 
-### 4. Platform services — not implemented (report unsupported)
+### 4. Platform services — desktop services done; hardware services unsupported
 
-All inherit the base defaults (null / no-op / `false`); none fabricate data:
+**Implemented (honest desktop backends):**
+
+- Clipboard (copy/paste) — real Win32 clipboard (`cn1_windows_io.c`,
+  `clipboardSetText` / `clipboardGetText`), so text round-trips with other apps.
+- Launch services via `ShellExecuteW` (`shellOpen`): `execute(url)` opens the
+  default browser/handler, `dial()` opens the dialer (`tel:`), `sendSMS()` the
+  Messaging app (`sms:?body=`, so `getSMSSupport()` reports `SMS_INTERACTIVE`),
+  `sendMessage()` the mail client (`mailto:?subject=&body=`). Nothing is
+  fabricated — an absent handler reports failure rather than pretending to send.
+- Native file open dialog + gallery picker — `GetOpenFileNameW` (comdlg32) run
+  modally on the window-owning pump thread (marshaled via a blocking
+  `WM_CN1_FILEDIALOG` `SendMessage`), filtered by media type. `openGallery` /
+  `openImageGallery` now use the real OS picker and return a `file://` path the
+  port's `FileSystemStorage` opens, instead of the in-app `FileTree` fallback.
+  `fileDialog(save, …)` also exposes the save dialog for future hooks.
+
+**Still unsupported (return null / no-op / `false`, never fabricated):** these
+are genuine hardware/OS-account capabilities that a desktop either lacks or that
+need WinRT/Media-Foundation work, so per the port's "real or unsupported" rule
+they stay honest until backed by a real implementation:
 
 - Location / GPS (`getLocationManager` → null)
 - Sensors: accelerometer, compass/magnetometer (`getSensor*`)
 - Contacts (`getContacts` / `getContactById`)
 - Push + local notifications (`sendLocalNotification`)
-- Vibrate, dial, SMS
-- Clipboard (copy/paste) — common desktop expectation; worth doing early
-- Native file open/save dialogs + gallery picker (`IFileOpenDialog` /
-  `IFileSaveDialog`) — common desktop expectation; worth doing early
+- Vibrate (no desktop vibration motor)
 - System share, print
 - Biometric (Windows Hello)
 - Audio recording

@@ -65,6 +65,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int EVENT_KEY_RELEASED = 5;
     private static final int EVENT_SIZE_CHANGED = 6;
     private static final int EVENT_CLOSE = 7;
+    private static final int EVENT_MOUSE_WHEEL = 8;
+    private static final int EVENT_MOUSE_HWHEEL = 9;
+
+    // One mouse-wheel notch is WHEEL_DELTA (120). Windows defaults to scrolling
+    // three lines per notch; * 5 then converted through the screen DPI gives a
+    // comfortable per-notch pixel travel that scales with the display, matching
+    // the JavaSE desktop port's feel.
+    private static final int WHEEL_DELTA = 120;
 
     private long windowGraphicsPeer;
     private Long windowGraphics;
@@ -421,6 +429,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 case EVENT_SIZE_CHANGED:
                     sizeChanged(x, y);
                     break;
+                case EVENT_MOUSE_WHEEL:
+                    // key carries the signed wheel delta (multiple of WHEEL_DELTA).
+                    // A forward (positive) notch reveals content above, i.e. drags
+                    // the finger down -> positive scrollY. Map through the shared
+                    // CodenameOneImplementation.pointerWheelMoved scroll gesture.
+                    pointerWheelMoved(x, y, 0, wheelUnits(key));
+                    break;
+                case EVENT_MOUSE_HWHEEL:
+                    // A positive horizontal notch tilts right (scrolls content
+                    // left), i.e. drags the finger left -> negative scrollX.
+                    pointerWheelMoved(x, y, -wheelUnits(key), 0);
+                    break;
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();
                     break;
@@ -428,6 +448,21 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     break;
             }
         }
+    }
+
+    /**
+     * Converts a raw Win32 wheel delta (a signed multiple of {@link #WHEEL_DELTA})
+     * into a pixel scroll distance for {@link #pointerWheelMoved}. Scaled through
+     * the real screen DPI so one notch travels a comparable physical distance at
+     * any density.
+     */
+    private int wheelUnits(int delta) {
+        int notches = delta / WHEEL_DELTA;
+        if (notches == 0) {
+            // Sub-notch high-resolution wheels still deliver a fraction of travel.
+            notches = delta > 0 ? 1 : -1;
+        }
+        return notches * convertToPixels(15, true);
     }
 
     @Override
@@ -1508,6 +1543,117 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return text;
         }
         return super.getPasteDataFromClipboard();
+    }
+
+    /* ----------------------------------------------------- shell launches
+     * dial / sendSMS / sendMessage / execute all defer to the Windows shell
+     * (ShellExecuteW) so they hand off to whatever handler the user actually has
+     * registered (browser, dialer, Messaging, mail client). Nothing is
+     * fabricated: an absent handler reports false / does nothing rather than
+     * pretending to have launched, in keeping with the port's "real or
+     * unsupported" rule. */
+
+    /**
+     * Opens the given URL with the default registered handler (browser for
+     * http(s), the associated app for other schemes / file paths).
+     */
+    @Override
+    public void execute(String url) {
+        if (url != null) {
+            WindowsNative.shellOpen(url);
+        }
+    }
+
+    /**
+     * Opens the Windows dialer for the number via a {@code tel:} URI. Desktops
+     * without a registered dialer simply do nothing (shellOpen reports false).
+     */
+    @Override
+    public void dial(String phoneNumber) {
+        if (phoneNumber != null) {
+            WindowsNative.shellOpen("tel:" + phoneNumber.trim());
+        }
+    }
+
+    /**
+     * Composes an SMS through the platform Messaging app via an {@code sms:} URI
+     * (with the body pre-filled). This is interactive on Windows -- the user
+     * confirms in the Messaging app -- so {@link #getSMSSupport()} reports
+     * {@code SMS_INTERACTIVE}.
+     */
+    @Override
+    public void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException {
+        String uri = "sms:" + (phoneNumber == null ? "" : phoneNumber.trim());
+        if (message != null && message.length() > 0) {
+            uri += "?body=" + com.codename1.io.Util.encodeUrl(message);
+        }
+        if (!WindowsNative.shellOpen(uri)) {
+            throw new IOException("No SMS handler is registered on this device");
+        }
+    }
+
+    @Override
+    public int getSMSSupport() {
+        return Display.SMS_INTERACTIVE;
+    }
+
+    /**
+     * Opens the platform mail client through a {@code mailto:} URI carrying the
+     * recipients, subject and body. Attachments are not expressible in a mailto:
+     * URI, so only the textual content is passed.
+     */
+    @Override
+    public void sendMessage(String[] recipients, String subject, com.codename1.messaging.Message msg) {
+        StringBuilder uri = new StringBuilder("mailto:");
+        if (recipients != null) {
+            for (int i = 0; i < recipients.length; i++) {
+                if (i > 0) {
+                    uri.append(',');
+                }
+                uri.append(recipients[i]);
+            }
+        }
+        char sep = '?';
+        if (subject != null && subject.length() > 0) {
+            uri.append(sep).append("subject=").append(com.codename1.io.Util.encodeUrl(subject));
+            sep = '&';
+        }
+        String body = msg != null ? msg.getContent() : null;
+        if (body != null && body.length() > 0) {
+            uri.append(sep).append("body=").append(com.codename1.io.Util.encodeUrl(body));
+        }
+        WindowsNative.shellOpen(uri.toString());
+    }
+
+    /* -------------------------------------------------- native file picker
+     * The desktop file picker is the honest gallery on Windows: a real
+     * IFileOpenDialog-class common dialog filtered to the requested media type,
+     * rather than the framework's in-app FileTree fallback. The native dialog is
+     * modal and returns the chosen path synchronously, which is delivered through
+     * the listener exactly like every other port. Multi-select gallery types are
+     * not offered here (isGalleryTypeSupported reports them unsupported), so they
+     * keep the cross-platform fallback. */
+
+    @Override
+    public void openGallery(com.codename1.ui.events.ActionListener response, int type) {
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type " + type + " not supported on this platform.");
+        }
+        String title = type == Display.GALLERY_VIDEO ? "Select a video" : "Select a picture";
+        String path = WindowsNative.fileDialog(false, type, title);
+        com.codename1.ui.events.ActionEvent result = null;
+        if (path != null) {
+            // Hand back a file:// URL the port's FileSystemStorage understands
+            // (openInputStream strips the scheme); forward slashes keep it a valid
+            // path for the native CreateFileW calls.
+            result = new com.codename1.ui.events.ActionEvent("file://" + path.replace('\\', '/'));
+        }
+        response.actionPerformed(result);
+    }
+
+    @Override
+    public void openImageGallery(com.codename1.ui.events.ActionListener response) {
+        openGallery(response, Display.GALLERY_IMAGE);
     }
 
     @Override

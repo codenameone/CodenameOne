@@ -89,7 +89,12 @@ typedef enum {
     CN1_EVENT_KEY_PRESSED = 4,
     CN1_EVENT_KEY_RELEASED = 5,
     CN1_EVENT_SIZE_CHANGED = 6,
-    CN1_EVENT_CLOSE = 7
+    CN1_EVENT_CLOSE = 7,
+    /* Mouse wheel: x/y are the cursor's client coordinates, keyCode carries the
+     * signed wheel delta in WHEEL_DELTA (120) units. The EDT turns it into a
+     * synthetic scroll gesture (see WindowsImplementation.drainInput). */
+    CN1_EVENT_MOUSE_WHEEL = 8,
+    CN1_EVENT_MOUSE_HWHEEL = 9
 } CN1EventType;
 
 typedef struct {
@@ -222,6 +227,13 @@ void cn1WinBrowserHandleMessage(WPARAM wParam, LPARAM lParam);
 void cn1WinEditHandleMessage(WPARAM wParam, LPARAM lParam);
 /* WM_CTLCOLOREDIT hook: colours the native edit control to match the CN1 field. */
 HBRUSH cn1WinEditCtlColor(HDC hdc, HWND control);
+
+/* Native file open/save dialog (cn1_windows_io.c). The common dialog is modal
+ * and must run on the thread that owns the window, so the EDT-facing fileDialog
+ * sends (not posts) WM_CN1_FILEDIALOG to cn1Win.hwnd -- a blocking SendMessage
+ * that returns once the user has chosen -- and cn1WinWndProc forwards it here. */
+#define WM_CN1_FILEDIALOG (WM_APP + 19)
+LRESULT cn1WinFileDialogHandleMessage(WPARAM wParam);
 
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);
