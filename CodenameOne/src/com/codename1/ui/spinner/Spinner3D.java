@@ -217,6 +217,13 @@ class Spinner3D extends Container implements InternalPickerWidget {
 
     @Override
     public void setValue(Object value) {
+        if (value == null) {
+            // A null value (e.g. Picker.setSelectedString(null) / setDate(null)
+            // while the popup is on screen) has no row to select; leave the
+            // current selection untouched instead of NPE'ing in the model
+            // adapters. Mirrors TimeSpinner3D's null tolerance. #5069
+            return;
+        }
         ListModel lm = root.getListModel();
         if (lm instanceof NumberModelAdapter) {
             NumberModelAdapter adapter = (NumberModelAdapter) lm;
