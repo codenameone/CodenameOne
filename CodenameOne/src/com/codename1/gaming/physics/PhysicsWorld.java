@@ -103,8 +103,8 @@ public class PhysicsWorld {
     /// meters to pixels and flipping the y axis. Called automatically by
     /// `#step(float)`.
     public void syncSprites() {
-        for (int i = 0; i < bodies.size(); i++) {
-            ((PhysicsBody) bodies.get(i)).syncLinked();
+        for (Object body : bodies) {
+            ((PhysicsBody) body).syncLinked();
         }
     }
 
@@ -217,23 +217,27 @@ public class PhysicsWorld {
             listeners.remove(l);
         }
 
+        @Override
         public void beginContact(com.codename1.gaming.physics.box2d.dynamics.contacts.Contact contact) {
             PhysicsContact c = wrap(contact);
-            for (int i = 0; i < listeners.size(); i++) {
-                ((ContactListener) listeners.get(i)).beginContact(c);
+            for (Object l : listeners) {
+                ((ContactListener) l).beginContact(c);
             }
         }
 
+        @Override
         public void endContact(com.codename1.gaming.physics.box2d.dynamics.contacts.Contact contact) {
             PhysicsContact c = wrap(contact);
-            for (int i = 0; i < listeners.size(); i++) {
-                ((ContactListener) listeners.get(i)).endContact(c);
+            for (Object l : listeners) {
+                ((ContactListener) l).endContact(c);
             }
         }
 
+        @Override
         public void preSolve(com.codename1.gaming.physics.box2d.dynamics.contacts.Contact contact, com.codename1.gaming.physics.box2d.collision.Manifold oldManifold) {
         }
 
+        @Override
         public void postSolve(com.codename1.gaming.physics.box2d.dynamics.contacts.Contact contact, com.codename1.gaming.physics.box2d.callbacks.ContactImpulse impulse) {
         }
 

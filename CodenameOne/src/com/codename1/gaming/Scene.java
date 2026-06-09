@@ -42,6 +42,7 @@ public class Scene {
     private static final Comparator Z_ORDER = new ZComparator();
 
     private static final class ZComparator implements Comparator {
+        @Override
         public int compare(Object a, Object b) {
             int za = ((Sprite) a).getZOrder();
             int zb = ((Sprite) b).getZOrder();
@@ -73,11 +74,11 @@ public class Scene {
         return (Sprite) sprites.get(index);
     }
 
-    /// Advances every sprite in the scene by calling `Sprite#onUpdate(double)`.
-    /// Iterating by index tolerates a sprite removing itself during update.
+    /// Advances every sprite in the scene by calling `Sprite#onUpdate(double)`. Do
+    /// not add or remove sprites from within `onUpdate`; defer that to the next frame.
     public void update(double deltaSeconds) {
-        for (int i = 0; i < sprites.size(); i++) {
-            ((Sprite) sprites.get(i)).onUpdate(deltaSeconds);
+        for (Object sprite : sprites) {
+            ((Sprite) sprite).onUpdate(deltaSeconds);
         }
     }
 

@@ -133,6 +133,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     }
 
     /// {@inheritDoc} Forwards GPU setup to `#onSetup(com.codename1.gpu.GraphicsDevice)`.
+    @Override
     public void setup(GraphicsDevice device) {
         onSetup(device);
     }
@@ -201,6 +202,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     }
 
     /// {@inheritDoc} Re-applies the running state once the GPU peer exists.
+    @Override
     protected void initComponent() {
         super.initComponent();
         if (running) {
@@ -211,6 +213,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
 
     /// {@inheritDoc} Drives game logic each frame -- invoked by the `SpriteRenderer`
     /// before the scene is drawn.
+    @Override
     public void frame(double deltaSeconds) {
         if (running && !paused) {
             if (fixedTimestep <= 0) {
@@ -237,26 +240,32 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
 
     /// While running the view consumes all key events (including the directional
     /// pad and fire button) so they are not stolen for focus traversal.
+    @Override
     public boolean handlesInput() {
         return running && !paused;
     }
 
+    @Override
     public void keyPressed(int keyCode) {
         input.keyDown(keyCode);
     }
 
+    @Override
     public void keyReleased(int keyCode) {
         input.keyUp(keyCode);
     }
 
+    @Override
     public void pointerPressed(int x, int y) {
         input.pointer(x - getAbsoluteX(), y - getAbsoluteY(), true, true, false);
     }
 
+    @Override
     public void pointerDragged(int x, int y) {
         input.pointer(x - getAbsoluteX(), y - getAbsoluteY(), true, false, false);
     }
 
+    @Override
     public void pointerReleased(int x, int y) {
         input.pointer(x - getAbsoluteX(), y - getAbsoluteY(), false, false, true);
     }

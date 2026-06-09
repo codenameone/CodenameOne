@@ -79,35 +79,17 @@ public class Model {
     }
 
     /// Builds the world transform `T * Rz * Ry * Rx * S` for this model. The returned
-    /// array is reused each call -- copy it if you need to keep it. Rotations
-    /// ping-pong between two scratch buffers so no `Matrix4#multiply` ever aliases
-    /// its source and destination.
+    /// array is reused each call -- copy it if you need to keep it. The three
+    /// rotations are always applied (an identity rotation is cheap) and the
+    /// multiplications alternate between two scratch buffers so no `Matrix4#multiply`
+    /// ever aliases its source and destination.
     float[] modelMatrix() {
-        // `cur` starts as a fresh scaling matrix, then each applied rotation writes
-        // into the scratch buffer `cur` is NOT currently in.
-        float[] cur = Matrix4.scaling(scaleX, scaleY, scaleZ);
-        if (rotX != 0f) {
-            float[] dst = next(cur);
-            Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotX), 1f, 0f, 0f), cur, dst);
-            cur = dst;
-        }
-        if (rotY != 0f) {
-            float[] dst = next(cur);
-            Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotY), 0f, 1f, 0f), cur, dst);
-            cur = dst;
-        }
-        if (rotZ != 0f) {
-            float[] dst = next(cur);
-            Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotZ), 0f, 0f, 1f), cur, dst);
-            cur = dst;
-        }
-        Matrix4.multiply(Matrix4.translation(x, y, z), cur, matrix);
+        float[] scale = Matrix4.scaling(scaleX, scaleY, scaleZ);
+        Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotX), 1f, 0f, 0f), scale, scratchA);
+        Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotY), 0f, 1f, 0f), scratchA, scratchB);
+        Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotZ), 0f, 0f, 1f), scratchB, scratchA);
+        Matrix4.multiply(Matrix4.translation(x, y, z), scratchA, matrix);
         return matrix;
-    }
-
-    /// The scratch buffer that is not `cur` (so a multiply into it never aliases).
-    private float[] next(float[] cur) {
-        return cur == scratchA ? scratchB : scratchA;
     }
 
     public Mesh getMesh() {

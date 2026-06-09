@@ -50,7 +50,7 @@ import java.io.InputStream;
 /// back to a `com.codename1.media.MediaManager` based pool that still works
 /// everywhere but has higher latency and ignores pan and rate --
 /// `#isNativeAccelerated()` reports which path is in use.
-public class SoundPool {
+public final class SoundPool {
     private final SoundPoolPeer peer;
     private final boolean nativeAccelerated;
     private final int maxStreams;
@@ -99,6 +99,7 @@ public class SoundPool {
     public AsyncResource<SoundEffect> loadAsync(final String uri) {
         final AsyncResource<SoundEffect> result = new AsyncResource<SoundEffect>();
         new Thread(new Runnable() {
+            @Override
             public void run() {
                 try {
                     result.complete(load(uri));

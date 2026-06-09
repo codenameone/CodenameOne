@@ -83,6 +83,7 @@ public class GameSoundPool implements SoundPoolPeer {
             try {
                 data.close();
             } catch (IOException e) {
+                // best effort; ignore
             }
         }
         return f;

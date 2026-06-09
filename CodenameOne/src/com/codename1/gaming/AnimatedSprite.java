@@ -76,6 +76,7 @@ public class AnimatedSprite extends Sprite {
         setImage(f[0]);
     }
 
+    @Override
     protected void onUpdate(double deltaSeconds) {
         if (!playing || frameDuration <= 0) {
             return;

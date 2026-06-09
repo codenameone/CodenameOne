@@ -149,6 +149,7 @@ public class SpriteRenderer implements Renderer {
         this.updatable = updatable;
     }
 
+    @Override
     public void onInit(GraphicsDevice device) {
         quad = Primitives.quad(device, 1f);
         // 2D: ignore depth entirely (draw order wins). 3D: still alpha blended with
@@ -164,12 +165,14 @@ public class SpriteRenderer implements Renderer {
         }
     }
 
+    @Override
     public void onResize(GraphicsDevice device, int width, int height) {
         viewWidth = width;
         viewHeight = height;
         device.setViewport(0, 0, width, height);
     }
 
+    @Override
     public void onFrame(GraphicsDevice device) {
         long now = System.currentTimeMillis();
         double dt = hasLast ? (now - lastTime) / 1000.0 : 0;
@@ -215,6 +218,7 @@ public class SpriteRenderer implements Renderer {
         }
     }
 
+    @Override
     public void onDispose(GraphicsDevice device) {
         if (textures != null) {
             java.util.Iterator it = textures.values().iterator();

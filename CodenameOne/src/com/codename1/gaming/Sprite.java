@@ -111,11 +111,13 @@ public class Sprite implements PhysicsLinkable {
 
     // ---- PhysicsLinkable -------------------------------------------------
 
+    @Override
     public void setPhysicsPosition(float xPx, float yPx) {
         this.x = xPx;
         this.y = yPx;
     }
 
+    @Override
     public void setPhysicsRotation(float radians) {
         this.rotation = (float) Math.toDegrees(radians);
     }

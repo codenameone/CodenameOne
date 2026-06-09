@@ -23,6 +23,7 @@
 package com.codename1.media;
 
 import com.codename1.io.Util;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -79,10 +80,12 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
             this.slot = slot;
         }
 
+        @Override
         public void run() {
             try {
                 slot.media.setTime(0);
             } catch (Throwable t) {
+                Log.e(t);
             }
             slot.media.play();
         }
@@ -90,6 +93,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
 
     private Media newMedia(Sound s, final Slot slot) throws IOException {
         Runnable onComplete = new Runnable() {
+            @Override
             public void run() {
                 onVoiceComplete(slot);
             }
@@ -112,7 +116,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
             try {
                 slot.media.prepare();
             } catch (Throwable t) {
-                // prepare is best effort; play will still work
+                Log.e(t);
             }
             s.ring[i] = slot;
         }
@@ -122,6 +126,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         return s;
     }
 
+    @Override
     public Object loadSound(InputStream data, String mimeType) throws IOException {
         byte[] bytes = Util.readInputStream(data);
         Util.cleanup(data);
@@ -131,12 +136,14 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         return buildSound(s);
     }
 
+    @Override
     public Object loadSound(String uri) throws IOException {
         Sound s = new Sound();
         s.uri = uri;
         return buildSound(s);
     }
 
+    @Override
     public synchronized int play(Object soundHandle, float volume, float pan, float rate, int loop) {
         if (activeVoices >= maxStreams) {
             return -1;
@@ -162,7 +169,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         try {
             free.media.setTime(0);
         } catch (Throwable t) {
-            // some media may not support seeking; ignore
+            Log.e(t);
         }
         free.media.play();
         return vid;
@@ -199,9 +206,11 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         try {
             m.setVolume(pct);
         } catch (Throwable t) {
+            Log.e(t);
         }
     }
 
+    @Override
     public synchronized void setVolume(int voiceId, float volume) {
         Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));
         if (slot != null) {
@@ -209,14 +218,17 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         }
     }
 
+    @Override
     public void setRate(int voiceId, float rate) {
         // not supported by the generic Media player
     }
 
+    @Override
     public void setPan(int voiceId, float pan) {
         // not supported by the generic Media player
     }
 
+    @Override
     public synchronized void pauseVoice(int voiceId) {
         Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));
         if (slot != null) {
@@ -224,6 +236,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         }
     }
 
+    @Override
     public synchronized void resumeVoice(int voiceId) {
         Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));
         if (slot != null) {
@@ -231,6 +244,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         }
     }
 
+    @Override
     public synchronized void stopVoice(int voiceId) {
         Slot slot = (Slot) voices.remove(Integer.valueOf(voiceId));
         if (slot != null && slot.busy) {
@@ -245,16 +259,18 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
             slot.media.pause();
             slot.media.setTime(0);
         } catch (Throwable t) {
+            Log.e(t);
         }
         slot.busy = false;
     }
 
+    @Override
     public synchronized void stopAll() {
-        for (int i = 0; i < sounds.size(); i++) {
-            Sound s = (Sound) sounds.get(i);
-            for (int j = 0; j < s.ring.length; j++) {
-                if (s.ring[j].busy) {
-                    stopSlot(s.ring[j]);
+        for (Object o : sounds) {
+            Sound s = (Sound) o;
+            for (Slot slot : s.ring) {
+                if (slot.busy) {
+                    stopSlot(slot);
                 }
             }
         }
@@ -262,32 +278,34 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         activeVoices = 0;
     }
 
+    @Override
     public synchronized void autoPause() {
-        for (int i = 0; i < sounds.size(); i++) {
-            Sound s = (Sound) sounds.get(i);
-            for (int j = 0; j < s.ring.length; j++) {
-                if (s.ring[j].busy) {
-                    s.ring[j].media.pause();
+        for (Object o : sounds) {
+            Sound s = (Sound) o;
+            for (Slot slot : s.ring) {
+                if (slot.busy) {
+                    slot.media.pause();
                 }
             }
         }
     }
 
+    @Override
     public synchronized void autoResume() {
-        for (int i = 0; i < sounds.size(); i++) {
-            Sound s = (Sound) sounds.get(i);
-            for (int j = 0; j < s.ring.length; j++) {
-                if (s.ring[j].busy) {
-                    s.ring[j].media.play();
+        for (Object o : sounds) {
+            Sound s = (Sound) o;
+            for (Slot slot : s.ring) {
+                if (slot.busy) {
+                    slot.media.play();
                 }
             }
         }
     }
 
+    @Override
     public synchronized void unloadSound(Object soundHandle) {
         Sound s = (Sound) soundHandle;
-        for (int j = 0; j < s.ring.length; j++) {
-            Slot slot = s.ring[j];
+        for (Slot slot : s.ring) {
             if (slot.busy) {
                 voices.remove(Integer.valueOf(slot.voiceId));
                 activeVoices--;
@@ -296,18 +314,21 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
             try {
                 slot.media.cleanup();
             } catch (Throwable t) {
+                Log.e(t);
             }
         }
         sounds.remove(s);
     }
 
+    @Override
     public synchronized void release() {
-        for (int i = 0; i < sounds.size(); i++) {
-            Sound s = (Sound) sounds.get(i);
-            for (int j = 0; j < s.ring.length; j++) {
+        for (Object o : sounds) {
+            Sound s = (Sound) o;
+            for (Slot slot : s.ring) {
                 try {
-                    s.ring[j].media.cleanup();
+                    slot.media.cleanup();
                 } catch (Throwable t) {
+                    Log.e(t);
                 }
             }
         }

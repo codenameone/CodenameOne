@@ -63,9 +63,15 @@ public class GameCamera {
     private float near = 0.1f;
     private float far = 1000f;
 
-    private float eyeX, eyeY, eyeZ = 10f;
-    private float targetX, targetY, targetZ;
-    private float upX, upY = 1f, upZ;
+    private float eyeX;
+    private float eyeY;
+    private float eyeZ = 10f;
+    private float targetX;
+    private float targetY;
+    private float targetZ;
+    private float upX;
+    private float upY = 1f;
+    private float upZ;
 
     // billboard basis, recomputed by #updateBasis(); columns right | up | toCamera
     private final float[] basis = new float[16];
