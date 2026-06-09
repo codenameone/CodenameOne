@@ -34,6 +34,7 @@
 
 #include "cn1_windows.h"
 #include <shlobj.h>
+#include <shellapi.h>  /* ShellExecuteW -- not pulled in by WIN32_LEAN_AND_MEAN */
 #include <commdlg.h>   /* GetOpenFileNameW / GetSaveFileNameW (comdlg32) */
 #include <stdio.h>
 #include <wchar.h>
