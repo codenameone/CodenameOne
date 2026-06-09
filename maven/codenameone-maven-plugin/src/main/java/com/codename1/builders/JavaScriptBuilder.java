@@ -632,7 +632,15 @@ public class JavaScriptBuilder extends Executor {
             sb.append("        return ").append(call).append("callChar(").append(invokeArgs).append(");\n");
         } else if (ret == String.class) {
             sb.append("        return ").append(call).append("callString(").append(invokeArgs).append(");\n");
+        } else if (ret.isArray()) {
+            // Primitive arrays + String[]: callArray builds the correctly-typed
+            // Java array from the JS array the host returns (componentToken picks
+            // the element type).
+            sb.append("        return (").append(ret.getCanonicalName()).append(") ")
+                    .append(call).append("callArray(").append(invokeArgs)
+                    .append(", \"").append(arrayComponentToken(ret.getComponentType())).append("\");\n");
         } else {
+            // PeerComponent / other reference types -- best effort passthrough.
             sb.append("        return (").append(ret.getCanonicalName()).append(") ")
                     .append(call).append("callObject(").append(invokeArgs).append(");\n");
         }
@@ -662,6 +670,20 @@ public class JavaScriptBuilder extends Executor {
             }
         }
         return key.toString();
+    }
+
+    // Runtime newArray() component-class token for an array's element type.
+    private static String arrayComponentToken(Class<?> component) {
+        if (component == int.class) return "JAVA_INT";
+        if (component == long.class) return "JAVA_LONG";
+        if (component == double.class) return "JAVA_DOUBLE";
+        if (component == float.class) return "JAVA_FLOAT";
+        if (component == boolean.class) return "JAVA_BOOLEAN";
+        if (component == byte.class) return "JAVA_BYTE";
+        if (component == short.class) return "JAVA_SHORT";
+        if (component == char.class) return "JAVA_CHAR";
+        if (component == String.class) return "java_lang_String";
+        return component.getName().replace('.', '_');
     }
 
     private static String xmlvmTypeName(Class<?> type) {

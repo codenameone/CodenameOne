@@ -2400,6 +2400,23 @@ const jvm = {
     if (value.__class === "java_lang_String") {
       return this.toNativeString(value);
     }
+    // 64-bit long ({__l:1,l,h}) -> JS number for the host.
+    if (value.__l === 1) {
+      return _LtoNumber(value);
+    }
+    // Boxed primitives -> their JS value. NativeInterface args arrive boxed in an
+    // Object[] (Integer.valueOf(...) etc.); the host wants the plain value.
+    switch (value.__class) {
+      case "java_lang_Integer": return value.cn1_java_lang_Integer_value | 0;
+      case "java_lang_Short": return value.cn1_java_lang_Short_value | 0;
+      case "java_lang_Byte": return value.cn1_java_lang_Byte_value | 0;
+      case "java_lang_Character": return value.cn1_java_lang_Character_value | 0;
+      case "java_lang_Boolean": return !!value.cn1_java_lang_Boolean_value;
+      case "java_lang_Double": return Number(value.cn1_java_lang_Double_value);
+      case "java_lang_Float": return Number(value.cn1_java_lang_Float_value);
+      case "java_lang_Long": return _LtoNum(value.cn1_java_lang_Long_value);
+      default: break;
+    }
     if (value.__cn1HostRef != null) {
       return value.__cn1HostClass
         ? { __cn1HostRef: value.__cn1HostRef, __cn1HostClass: value.__cn1HostClass }
@@ -5157,6 +5174,83 @@ bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
   }
   const event = jvm.eventQueue.shift();
   return event && event.code != null ? (event.code | 0) : -1;
+});
+
+// ---- NativeInterface bridge -----------------------------------------------------
+// The generated <Iface>Impl methods call these NativeInterfaceBridge.call*
+// natives. Each forwards the (iface, method, args) tuple to the MAIN thread via
+// the shared __cn1_native_interface_call__ host hook (browser_bridge.js runs the
+// developer's JS stub with DOM access and resolves through its callback), then
+// coerces the JS result to the declared Java return type. Args were already
+// unboxed by toHostTransferArg (boxed primitives / Java String / long).
+const __NI_PREFIX = "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_";
+const __NI_SIG = "java_lang_String_java_lang_String_java_lang_Object_1ARRAY";
+function* __cn1NativeInterfaceCall(iface, method, args) {
+  return yield jvm.invokeHostNative("__cn1_native_interface_call__", [iface, method, args]);
+}
+function __cn1NativeInterfaceArray(v, token) {
+  if (v == null) {
+    return null;
+  }
+  const len = v.length | 0;
+  const arr = jvm.newArray(len, token, 1);
+  for (let i = 0; i < len; i++) {
+    const e = v[i];
+    switch (token) {
+      case "java_lang_String": arr[i] = (e == null ? null : createJavaString(e)); break;
+      case "JAVA_LONG": arr[i] = _LfromNumber(Number(e || 0)); break;
+      case "JAVA_BOOLEAN": arr[i] = !!e; break;
+      case "JAVA_CHAR": arr[i] = (e | 0) & 0xffff; break;
+      case "JAVA_BYTE": arr[i] = ((e | 0) << 24) >> 24; break;
+      case "JAVA_SHORT": arr[i] = ((e | 0) << 16) >> 16; break;
+      case "JAVA_INT": arr[i] = e | 0; break;
+      case "JAVA_FLOAT": arr[i] = Math.fround(Number(e || 0)); break;
+      case "JAVA_DOUBLE": arr[i] = Number(e || 0); break;
+      default: arr[i] = e;
+    }
+  }
+  return arr;
+}
+bindNative([__NI_PREFIX + "callBoolean_" + __NI_SIG + "_R_boolean"], function*(iface, method, args) {
+  return !!(yield* __cn1NativeInterfaceCall(iface, method, args));
+});
+bindNative([__NI_PREFIX + "callByte_" + __NI_SIG + "_R_byte"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args); return ((v | 0) << 24) >> 24;
+});
+bindNative([__NI_PREFIX + "callShort_" + __NI_SIG + "_R_short"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args); return ((v | 0) << 16) >> 16;
+});
+bindNative([__NI_PREFIX + "callInt_" + __NI_SIG + "_R_int"], function*(iface, method, args) {
+  return (yield* __cn1NativeInterfaceCall(iface, method, args)) | 0;
+});
+bindNative([__NI_PREFIX + "callChar_" + __NI_SIG + "_R_char"], function*(iface, method, args) {
+  return ((yield* __cn1NativeInterfaceCall(iface, method, args)) | 0) & 0xffff;
+});
+bindNative([__NI_PREFIX + "callLong_" + __NI_SIG + "_R_long"], function*(iface, method, args) {
+  return _LfromNumber(Number((yield* __cn1NativeInterfaceCall(iface, method, args)) || 0));
+});
+bindNative([__NI_PREFIX + "callFloat_" + __NI_SIG + "_R_float"], function*(iface, method, args) {
+  return Math.fround(Number((yield* __cn1NativeInterfaceCall(iface, method, args)) || 0));
+});
+bindNative([__NI_PREFIX + "callDouble_" + __NI_SIG + "_R_double"], function*(iface, method, args) {
+  return Number((yield* __cn1NativeInterfaceCall(iface, method, args)) || 0);
+});
+bindNative([__NI_PREFIX + "callString_" + __NI_SIG + "_R_java_lang_String"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args);
+  return v == null ? null : createJavaString(v);
+});
+bindNative([__NI_PREFIX + "callObject_" + __NI_SIG + "_R_java_lang_Object"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args);
+  return (typeof v === "string") ? createJavaString(v) : (v == null ? null : v);
+});
+bindNative([__NI_PREFIX + "callVoid_" + __NI_SIG], function*(iface, method, args) {
+  yield* __cn1NativeInterfaceCall(iface, method, args);
+  return null;
+});
+bindNative([__NI_PREFIX + "callArray_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_java_lang_String_R_java_lang_Object"],
+        function*(iface, method, args, token) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args);
+  return __cn1NativeInterfaceArray(v, jvm.toNativeString(token));
 });
 
 // Worker liveness heartbeat (diag-only). If the worker wedges in a synchronous

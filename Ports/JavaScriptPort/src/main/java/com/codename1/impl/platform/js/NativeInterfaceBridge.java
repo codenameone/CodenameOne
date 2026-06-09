@@ -12,19 +12,20 @@ package com.codename1.impl.platform.js;
  *
  * <p>The generated {@code <Interface>Impl} classes (emitted by the JavaScript
  * builder) delegate every interface method to one of the {@code call*} natives
- * below. Because this class lives in {@code com.codename1.impl.platform.js}, the
- * translator categorizes these natives as HOST_HOOK: the worker suspends and the
- * call is replayed on the <em>main thread</em> (via {@code browser_bridge.js}),
- * where the developer-authored JS stub runs with full DOM access and completes
- * the call through its callback. The worker resumes with the returned value.</p>
+ * below, picked by the method's return type. These natives are runtime-
+ * implemented in {@code parparvm_runtime.js}: the worker suspends, the call is
+ * replayed on the <em>main thread</em> (via {@code browser_bridge.js}) where the
+ * developer-authored JS stub runs with full DOM access and completes the call
+ * through its callback, and the worker resumes with the result coerced to the
+ * declared Java type.</p>
  *
- * <p>This preserves the existing JS native-interface impl format
- * ({@code cn1_native_interfaces["<pkg>_<Iface>"]["<method>_<paramTypes>"](args..., callback)})
- * so existing stubs work unchanged.</p>
+ * <p>Supported types mirror {@code NativeInterface}: all primitives, {@code String},
+ * primitive arrays plus {@code String[]} (via {@link #callArray}), and
+ * {@code com.codename1.ui.PeerComponent} (routed through {@link #callObject}).</p>
  *
  * <p>{@code iface} is the interface class name with dots replaced by underscores
- * (the {@code cn1_native_interfaces} registry key) and {@code method} is the
- * trailing-underscore method key (e.g. {@code "isDarkMode_"}). {@code args}
+ * (the {@code cn1_native_interfaces} registry key), {@code method} is the
+ * trailing-underscore method key (e.g. {@code "isDarkMode_"}), and {@code args}
  * holds the (boxed) Java arguments, or an empty array for a no-arg method.</p>
  */
 public final class NativeInterfaceBridge {
@@ -33,23 +34,33 @@ public final class NativeInterfaceBridge {
 
     public static native boolean callBoolean(String iface, String method, Object[] args);
 
-    public static native int callInt(String iface, String method, Object[] args);
-
-    public static native long callLong(String iface, String method, Object[] args);
-
-    public static native double callDouble(String iface, String method, Object[] args);
-
-    public static native float callFloat(String iface, String method, Object[] args);
-
     public static native byte callByte(String iface, String method, Object[] args);
 
     public static native short callShort(String iface, String method, Object[] args);
 
+    public static native int callInt(String iface, String method, Object[] args);
+
     public static native char callChar(String iface, String method, Object[] args);
+
+    public static native long callLong(String iface, String method, Object[] args);
+
+    public static native float callFloat(String iface, String method, Object[] args);
+
+    public static native double callDouble(String iface, String method, Object[] args);
 
     public static native String callString(String iface, String method, Object[] args);
 
     public static native Object callObject(String iface, String method, Object[] args);
 
     public static native void callVoid(String iface, String method, Object[] args);
+
+    /**
+     * Array-returning call. {@code componentToken} identifies the element type so
+     * the runtime can build the correctly-typed Java array: {@code "JAVA_INT"},
+     * {@code "JAVA_BYTE"}, {@code "JAVA_LONG"}, {@code "JAVA_DOUBLE"},
+     * {@code "JAVA_FLOAT"}, {@code "JAVA_BOOLEAN"}, {@code "JAVA_CHAR"},
+     * {@code "JAVA_SHORT"} or {@code "java_lang_String"}. The caller casts the
+     * result to the concrete array type.
+     */
+    public static native Object callArray(String iface, String method, Object[] args, String componentToken);
 }

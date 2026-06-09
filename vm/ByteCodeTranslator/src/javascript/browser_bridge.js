@@ -214,31 +214,13 @@
     });
   }
 
-  // One handler per NativeInterfaceBridge.call* native symbol (the suffix encodes
-  // the bridge method + its (String, String, Object[]) signature and return type;
-  // void has no _R_). Dispatch is identical across return types -- the worker side
-  // coerces the resolved value to the declared Java type.
-  var __cn1NativeInterfaceBridgeSymbols = [
-    'callBoolean_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_boolean',
-    'callInt_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_int',
-    'callLong_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_long',
-    'callDouble_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_double',
-    'callFloat_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_float',
-    'callByte_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_byte',
-    'callShort_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_short',
-    'callChar_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_char',
-    'callString_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String',
-    'callObject_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_Object',
-    'callVoid_java_lang_String_java_lang_String_java_lang_Object_1ARRAY'
-  ];
-  for (var __cn1NiIdx = 0; __cn1NiIdx < __cn1NativeInterfaceBridgeSymbols.length; __cn1NiIdx++) {
-    (function(suffix) {
-      var symbol = 'cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_' + suffix;
-      hostBridge.register(symbol, function(iface, method, args) {
-        return cn1InvokeNativeInterface(iface, method, args);
-      });
-    })(__cn1NativeInterfaceBridgeSymbols[__cn1NiIdx]);
-  }
+  // Single host hook for every NativeInterfaceBridge.call* native. The worker-side
+  // bindNative wrappers (parparvm_runtime.js) funnel here with (iface, method, args)
+  // and coerce the resolved value to the declared Java return type, so dispatch is
+  // uniform on this side.
+  hostBridge.register('__cn1_native_interface_call__', function(iface, method, args) {
+    return cn1InvokeNativeInterface(iface, method, args);
+  });
 
   var hostRefNextId = 1;
   var hostRefById = {};
