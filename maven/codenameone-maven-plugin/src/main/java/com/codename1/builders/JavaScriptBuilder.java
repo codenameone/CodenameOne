@@ -639,8 +639,12 @@ public class JavaScriptBuilder extends Executor {
             sb.append("        return (").append(ret.getCanonicalName()).append(") ")
                     .append(call).append("callArray(").append(invokeArgs)
                     .append(", \"").append(arrayComponentToken(ret.getComponentType())).append("\");\n");
+        } else if ("com.codename1.ui.PeerComponent".equals(ret.getName())) {
+            // The stub returns a native element (delivered to the worker as a
+            // host-ref); wrap it as a Codename One peer component.
+            sb.append("        return com.codename1.ui.PeerComponent.create(")
+                    .append(call).append("callObject(").append(invokeArgs).append("));\n");
         } else {
-            // PeerComponent / other reference types -- best effort passthrough.
             sb.append("        return (").append(ret.getCanonicalName()).append(") ")
                     .append(call).append("callObject(").append(invokeArgs).append(");\n");
         }
@@ -648,6 +652,11 @@ public class JavaScriptBuilder extends Executor {
     }
 
     private static String boxArgExpression(Class<?> type, String var) {
+        // Pass a PeerComponent's underlying native element (a host-ref) to the
+        // stub, not the Java peer wrapper.
+        if ("com.codename1.ui.PeerComponent".equals(type.getName())) {
+            return var + ".getNativePeer()";
+        }
         if (type == int.class) return "Integer.valueOf(" + var + ")";
         if (type == long.class) return "Long.valueOf(" + var + ")";
         if (type == double.class) return "Double.valueOf(" + var + ")";

@@ -194,7 +194,17 @@
         complete: function(value) {
           if (settled) return;
           settled = true;
-          resolve(value === undefined ? null : value);
+          if (value === undefined) {
+            value = null;
+          }
+          // A returned host object (e.g. a DOM element backing a PeerComponent)
+          // is not structured-cloneable; hand the worker a host-ref handle it can
+          // use as a JSO receiver. Primitives, strings and plain arrays
+          // (String[]/primitive[]) pass through untouched for worker-side coercion.
+          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            value = hostResult(value);
+          }
+          resolve(value);
         },
         error: function(err) {
           if (settled) return;
