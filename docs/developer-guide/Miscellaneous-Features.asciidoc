@@ -458,7 +458,11 @@ cn1_icon_<lang>[_<country>].png
 * `cn1_icon_en_GB.png`: British English
 * `cn1_icon_es_MX.png`: Mexican Spanish
 
-Supply a square source image at least 432×432 pixels (the largest size emitted for Android adaptive icons); the build resizes it to every target density. The default app icon continues to be controlled by your `codenameone_settings.properties` file and is used whenever the device locale doesn't match any of the localized variants. At runtime the builders look for a `<lang>_<COUNTRY>` match first, then fall back to a bare `<lang>` match. Providing both (for example `cn1_icon_en.png` plus `cn1_icon_en_GB.png`) lets you give British users a country-specific icon while every other English locale still receives the generic English icon.
+Supply a square source image at least 432×432 pixels (the largest size emitted for Android adaptive icons; 1024×1024 is recommended, matching the main app icon); the build resizes it to every target density. A smaller source would be upscaled and look blurry, so the build now fails with a clear error when it detects an undersized localized icon rather than shipping a soft one. The default app icon continues to be controlled by your `codenameone_settings.properties` file and is used whenever the device locale doesn't match any of the localized variants.
+
+NOTE: These icons live under `src/main/resources` and Maven copies them into `target/classes` incrementally — it *doesn't* delete the copy when you remove or rename the source file. If you replace a localized icon and still see the old (often blurry) one, run `mvn clean` to clear the stale resource from `target/classes` before rebuilding. The build also fails when it finds an undersized `cn1_icon_*.png` in the compiled output that's about to be bundled and sent to the build server.
+
+At runtime the builders look for a `<lang>_<COUNTRY>` match first, then fall back to a bare `<lang>` match. Providing both (for example `cn1_icon_en.png` plus `cn1_icon_en_GB.png`) lets you give British users a country-specific icon while every other English locale still receives the generic English icon.
 
 ===== Android behavior
 
