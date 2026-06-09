@@ -4966,7 +4966,7 @@ public class AndroidGradleBuilder extends Executor {
      * the supplied variant receive it.</p>
      */
     private void processLocalizedIcons(File assetsDir, File resDir, boolean enableAdaptiveIcons,
-            BufferedImage defaultIcon) throws IOException {
+            BufferedImage defaultIcon) throws IOException, BuildException {
         File[] candidates = assetsDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
@@ -4977,6 +4977,12 @@ public class AndroidGradleBuilder extends Executor {
         if (candidates == null || candidates.length == 0) {
             return;
         }
+        // Icons smaller than the largest launcher density would have to be upscaled and would
+        // render blurry. Collect any such offenders and fail the build at the end so a soft icon
+        // never reaches production. The threshold matches the largest size writeLocalizedIconSet
+        // emits: 192px normally, 432px for the adaptive foreground.
+        int largestTarget = enableAdaptiveIcons ? 432 : 192;
+        List<String> undersizedIcons = new ArrayList<String>();
         Set<String> languagesWithRegion = new HashSet<String>();
         Set<String> languagesWithLanguageOnly = new HashSet<String>();
         for (File candidate : candidates) {
@@ -5013,10 +5019,24 @@ public class AndroidGradleBuilder extends Executor {
                 continue;
             }
 
+            // Anything smaller than the largest launcher density would be upscaled and render
+            // blurry on high-density devices. Record it and fail the build after the loop rather
+            // than silently shipping a soft icon to production.
+            if (img.getWidth() < largestTarget || img.getHeight() < largestTarget) {
+                undersizedIcons.add(name + " (" + img.getWidth() + "x" + img.getHeight() + "px)");
+            }
+
             writeLocalizedIconSet(resDir, qualifier, img, enableAdaptiveIcons);
 
             candidate.delete();
             log("Registered localized launcher icon for qualifier " + qualifier + " (" + name + ")");
+        }
+
+        if (!undersizedIcons.isEmpty()) {
+            throw new BuildException("The following localized launcher icon(s) are smaller than "
+                    + largestTarget + "x" + largestTarget + "px and would be upscaled to a blurry icon: "
+                    + undersizedIcons + ". Supply each localized icon at no less than " + largestTarget + "x"
+                    + largestTarget + "px (1024x1024 is recommended, matching the main app icon).");
         }
 
         for (String lang : languagesWithRegion) {
