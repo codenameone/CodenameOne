@@ -7928,6 +7928,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (BrowserComponent.BROWSER_PROPERTY_FOLLOW_TARGET_BLANK.equals(key)) {
             nativeInstance.setBrowserFollowTargetBlank(get(browserPeer), Boolean.TRUE.equals(value));
         }
+        if (BrowserComponent.BROWSER_PROPERTY_INTERFACE_STYLE.equals(key)) {
+            // Maps to UIUserInterfaceStyle: 0 = unspecified/auto, 1 = light, 2 = dark.
+            int style = 0;
+            if (value != null) {
+                String v = value.toString();
+                if ("light".equalsIgnoreCase(v)) {
+                    style = 1;
+                } else if ("dark".equalsIgnoreCase(v)) {
+                    style = 2;
+                }
+            }
+            nativeInstance.setBrowserInterfaceStyle(get(browserPeer), style);
+        }
     }
 
     /**
