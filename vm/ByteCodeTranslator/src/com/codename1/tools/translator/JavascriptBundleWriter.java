@@ -261,6 +261,9 @@ final class JavascriptBundleWriter {
         for (String t : stringTokens) {
             excluded.add(t + "__impl");
         }
+        // Authoritative: every native method the translator emitted (the bridge's
+        // override targets, by name) -- more reliable than scanning runtime JS text.
+        excluded.addAll(JavascriptMethodGenerator.NATIVE_METHOD_IDENTIFIERS);
         defs.removeAll(excluded);
         if (defs.isEmpty()) {
             return;

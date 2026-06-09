@@ -29,6 +29,14 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 final class JavascriptMethodGenerator {
+    /**
+     * Mangled identifiers (and their {@code __impl} variants) of every native
+     * method emitted this translation run. The JS<->worker bridge overrides
+     * natives by their exact global name, so {@link JavascriptBundleWriter}'s
+     * identifier minifier must never rename these. Populated during emission.
+     */
+    static final java.util.Set<String> NATIVE_METHOD_IDENTIFIERS = new java.util.HashSet<String>();
+
     // Global class-name to ByteCodeClass index, used by appendFieldInstruction
     // to resolve a getfield/putfield instruction's class reference (the
     // "current receiver type" from the bytecode's Fieldref) to the actual
@@ -385,6 +393,15 @@ final class JavascriptMethodGenerator {
             if (!method.isNative() || method.isEliminated()) {
                 continue;
             }
+            // Record native method identifiers so the bundle-writer's identifier
+            // minifier never renames them: the JS<->worker bridge overrides natives
+            // by reassigning the global of their exact name (and the constructed
+            // name+"__impl" static body) at runtime -- a renamed native stub would
+            // bypass its override. The translator's own isNative() knowledge is the
+            // authoritative source (more reliable than scanning runtime JS text).
+            String nativeId = jsMethodIdentifier(cls, method);
+            NATIVE_METHOD_IDENTIFIERS.add(nativeId);
+            NATIVE_METHOD_IDENTIFIERS.add(nativeId + "__impl");
             appendNativeStubIfNeeded(methodsOut, cls, method);
             if (!method.isStatic() && !method.isConstructor()) {
                 String jsMethodName = jsMethodIdentifier(cls, method);
