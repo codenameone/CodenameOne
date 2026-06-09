@@ -164,6 +164,82 @@
     }
   };
 
+  // ---- Native interface dispatch -------------------------------------------------
+  // Codename One NativeInterface calls arrive here (on the MAIN thread) from the
+  // worker via the generated <Iface>Impl -> NativeInterfaceBridge.call* host-hooks.
+  // We look up the developer's JS implementation in cn1_native_interfaces (the
+  // registry the stub self-registers into, populated on the main thread by the
+  // <script>-loaded stub) and invoke it with the trailing callback, returning a
+  // Promise so the worker resumes with the result once callback.complete fires.
+  function cn1InvokeNativeInterface(iface, method, args) {
+    var registry = global.cn1_native_interfaces
+            || (global.window && global.window.cn1_native_interfaces);
+    var impl = registry ? registry[iface] : null;
+    if (!impl) {
+      return Promise.reject(new Error('No native interface implementation registered for ' + iface));
+    }
+    var fn = impl[method];
+    if (typeof fn !== 'function') {
+      return Promise.reject(new Error('Native interface ' + iface + ' has no implementation for ' + method));
+    }
+    var callArgs = [];
+    if (args != null) {
+      for (var i = 0; i < args.length; i++) {
+        callArgs.push(args[i]);
+      }
+    }
+    return new Promise(function(resolve, reject) {
+      var settled = false;
+      var callback = {
+        complete: function(value) {
+          if (settled) return;
+          settled = true;
+          resolve(value === undefined ? null : value);
+        },
+        error: function(err) {
+          if (settled) return;
+          settled = true;
+          reject(err instanceof Error ? err : new Error(err == null ? 'native interface error' : String(err)));
+        }
+      };
+      callArgs.push(callback);
+      try {
+        fn.apply(impl, callArgs);
+      } catch (e) {
+        if (!settled) {
+          settled = true;
+          reject(e);
+        }
+      }
+    });
+  }
+
+  // One handler per NativeInterfaceBridge.call* native symbol (the suffix encodes
+  // the bridge method + its (String, String, Object[]) signature and return type;
+  // void has no _R_). Dispatch is identical across return types -- the worker side
+  // coerces the resolved value to the declared Java type.
+  var __cn1NativeInterfaceBridgeSymbols = [
+    'callBoolean_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_boolean',
+    'callInt_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_int',
+    'callLong_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_long',
+    'callDouble_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_double',
+    'callFloat_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_float',
+    'callByte_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_byte',
+    'callShort_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_short',
+    'callChar_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_char',
+    'callString_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String',
+    'callObject_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_Object',
+    'callVoid_java_lang_String_java_lang_String_java_lang_Object_1ARRAY'
+  ];
+  for (var __cn1NiIdx = 0; __cn1NiIdx < __cn1NativeInterfaceBridgeSymbols.length; __cn1NiIdx++) {
+    (function(suffix) {
+      var symbol = 'cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_' + suffix;
+      hostBridge.register(symbol, function(iface, method, args) {
+        return cn1InvokeNativeInterface(iface, method, args);
+      });
+    })(__cn1NativeInterfaceBridgeSymbols[__cn1NiIdx]);
+  }
+
   var hostRefNextId = 1;
   var hostRefById = {};
   var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;

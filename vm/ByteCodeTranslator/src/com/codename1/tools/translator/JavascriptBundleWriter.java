@@ -536,6 +536,10 @@ final class JavascriptBundleWriter {
                 // call) but *after* other runtime helpers / native shims.
                 if (name.startsWith("translated_app_") && name.endsWith(".js")) {
                     classChunkScripts.add(name);
+                } else if (isNativeInterfaceStub(file)) {
+                    // Native-interface implementations run on the MAIN thread (index.html),
+                    // not in the worker -- they need DOM access. Skip them here.
+                    continue;
                 } else {
                     nativeScripts.add(name);
                 }
@@ -560,7 +564,53 @@ final class JavascriptBundleWriter {
     }
 
     private static void writeIndex(File outputDirectory) throws IOException {
-        writeResource(outputDirectory, "index.html", "index.html");
+        String index = loadResource("index.html");
+        StringBuilder stubs = new StringBuilder();
+        for (String stub : collectNativeInterfaceStubs(outputDirectory)) {
+            stubs.append("<script src=\"").append(stub).append("\"></script>\n");
+        }
+        index = index.replace("<!--__NATIVE_INTERFACE_STUBS__-->", stubs.toString().trim());
+        Files.write(new File(outputDirectory, "index.html").toPath(), index.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Native-interface JS implementations self-register into
+     * {@code cn1_native_interfaces} (they end with {@code })(cn1_get_native_interfaces());}).
+     * They run on the MAIN thread so their DOM access works, and are dispatched from the
+     * worker via the host-call bridge. Identify them by that content marker so the worker
+     * importScripts list excludes them and index.html loads them on the page instead.
+     */
+    private static List<String> collectNativeInterfaceStubs(File outputDirectory) {
+        List<String> stubs = new ArrayList<String>();
+        File[] files = outputDirectory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.getName().endsWith(".js") && isNativeInterfaceStub(file)) {
+                    stubs.add(file.getName());
+                }
+            }
+        }
+        Collections.sort(stubs);
+        return stubs;
+    }
+
+    private static boolean isNativeInterfaceStub(File jsFile) {
+        String name = jsFile.getName();
+        if ("parparvm_runtime.js".equals(name)
+                || "translated_app.js".equals(name)
+                || "worker.js".equals(name)
+                || "sw.js".equals(name)
+                || "port.js".equals(name)
+                || "browser_bridge.js".equals(name)
+                || name.startsWith("translated_app_")) {
+            return false;
+        }
+        try {
+            String content = new String(Files.readAllBytes(jsFile.toPath()), StandardCharsets.UTF_8);
+            return content.contains("cn1_get_native_interfaces");
+        } catch (IOException ex) {
+            return false;
+        }
     }
 
     private static void writeBrowserBridge(File outputDirectory) throws IOException {

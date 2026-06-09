@@ -2393,6 +2393,13 @@ const jvm = {
       }
       return out;
     }
+    // A Java String is a VM object, not a JS primitive. Host code (e.g. the
+    // native-interface bridge, which passes the interface/method names) expects
+    // the actual text, so marshal it to a plain JS string rather than letting it
+    // fall through to the opaque object-iteration path below.
+    if (value.__class === "java_lang_String") {
+      return this.toNativeString(value);
+    }
     if (value.__cn1HostRef != null) {
       return value.__cn1HostClass
         ? { __cn1HostRef: value.__cn1HostRef, __cn1HostClass: value.__cn1HostClass }

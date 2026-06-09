@@ -23,18 +23,6 @@ self.getParameterByName = function(name) {
   }
   return decodeURIComponent(results[1].replace(/\+/g, ' '));
 };
-// Native-interface stubs (com_<pkg>_<Class>.js, imported just below) end with
-// ``})(cn1_get_native_interfaces());`` — they self-register into the registry
-// returned by that accessor. The accessor is defined in fontmetrics.js, which
-// only loads on the main thread; in the worker ``window`` aliases ``self`` and
-// fontmetrics.js never loads, so the IIFE throws ReferenceError and aborts
-// worker startup before ``jvm.start()`` ever runs — any app with a JS-port
-// NativeInterface fails to boot. Define a worker-local registry so the stubs
-// register cleanly here too (mirrors the getParameterByName shim above).
-self.cn1_native_interfaces = self.cn1_native_interfaces || {};
-self.cn1_get_native_interfaces = self.cn1_get_native_interfaces || function() {
-  return self.cn1_native_interfaces;
-};
 /*__IMPORTS__*/
 if (typeof self.__parparInstallNativeBindings === 'function') {
   self.__parparInstallNativeBindings();
