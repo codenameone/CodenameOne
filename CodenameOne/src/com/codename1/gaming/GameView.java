@@ -22,6 +22,8 @@
  */
 package com.codename1.gaming;
 
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
 
 /// A GPU accelerated game surface: a `com.codename1.gpu.RenderView` that hosts a
@@ -92,6 +94,47 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     /// The pollable input state for this view.
     public GameInput getInput() {
         return input;
+    }
+
+    /// The camera this view renders through. It starts in 2D mode; call
+    /// `GameCamera#setPerspective(float, float, float)` on it to switch the view into
+    /// a 3D perspective with billboarded sprites.
+    public GameCamera getCamera() {
+        return ((SpriteRenderer) getRenderer()).getCamera();
+    }
+
+    /// The directional light shading lit 3D `Model`s in perspective mode.
+    public Light getLight() {
+        return ((SpriteRenderer) getRenderer()).getLight();
+    }
+
+    /// Adds a 3D `Model` to be drawn in the perspective camera alongside the sprites.
+    /// Build models from `#onSetup(com.codename1.gpu.GraphicsDevice)`, where the GPU
+    /// device is available.
+    public void addModel(Model model) {
+        ((SpriteRenderer) getRenderer()).addModel(model);
+    }
+
+    /// Removes a previously added 3D `Model`.
+    public void removeModel(Model model) {
+        ((SpriteRenderer) getRenderer()).removeModel(model);
+    }
+
+    /// Override to allocate GPU resources (meshes, textures, `Model`s) once the GPU
+    /// device is ready. Invoked once on the render thread before the first frame --
+    /// the only place you can call `com.codename1.gpu.Primitives` /
+    /// `com.codename1.gpu.GltfLoader`, which need the device. The default does
+    /// nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the GPU device for creating meshes, textures and buffers
+    protected void onSetup(GraphicsDevice device) {
+    }
+
+    /// {@inheritDoc} Forwards GPU setup to `#onSetup(com.codename1.gpu.GraphicsDevice)`.
+    public void setup(GraphicsDevice device) {
+        onSetup(device);
     }
 
     /// Sets the ARGB color the view is cleared to each frame.

@@ -44,6 +44,8 @@ public class Sprite implements PhysicsLinkable {
     private Image image;
     private double x;
     private double y;
+    /// world-space depth, used only in a perspective `GameCamera`; ignored in 2D.
+    private double z;
     /// rotation in degrees, clockwise.
     private float rotation;
     private float scaleX = 1;
@@ -147,6 +149,24 @@ public class Sprite implements PhysicsLinkable {
     public void setPosition(double x, double y) {
         this.x = x;
         this.y = y;
+    }
+
+    /// The world-space depth, used when the `GameView`'s `GameCamera` is in
+    /// perspective mode (`GameCamera#MODE_PERSPECTIVE`). Ignored in 2D.
+    public double getZ() {
+        return z;
+    }
+
+    public void setZ(double z) {
+        this.z = z;
+    }
+
+    /// Sets the full 3D position. In a 2D camera only x and y matter; in a
+    /// perspective camera all three place the (billboarded) sprite in world space.
+    public void setPosition(double x, double y, double z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
     }
 
     /// The rotation in degrees, clockwise.

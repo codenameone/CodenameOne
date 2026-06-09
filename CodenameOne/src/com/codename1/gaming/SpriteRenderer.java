@@ -24,6 +24,7 @@ package com.codename1.gaming;
 
 import com.codename1.gpu.Camera;
 import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
@@ -32,7 +33,9 @@ import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Renderer;
 import com.codename1.gpu.Texture;
 import com.codename1.ui.Image;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /// Draws a `Scene` of `Sprite`s on the GPU, implementing the `com.codename1.gpu`
@@ -56,9 +59,14 @@ import java.util.Map;
 /// form.add(BorderLayout.CENTER, view);
 /// ```
 public class SpriteRenderer implements Renderer {
-    /// Per frame callback invoked before the scene is drawn (used by `GameView` to
-    /// run game logic and advance input).
+    /// Callbacks invoked by the renderer on the render thread (used by `GameView` to
+    /// run game logic and to let the game allocate GPU resources once the device is
+    /// ready).
     interface Updatable {
+        /// Invoked once after the GPU device is created, before the first frame.
+        void setup(GraphicsDevice device);
+
+        /// Invoked every frame before the scene is drawn.
         void frame(double deltaSeconds);
     }
 
@@ -66,9 +74,14 @@ public class SpriteRenderer implements Renderer {
     private Updatable updatable;
     private int clearColor = 0xff000000;
 
+    private final GameCamera gameCamera = new GameCamera();
     private final Camera camera = new Camera();
+    private final Light light = new Light();
+    private final List models = new ArrayList();
     private Mesh quad;
     private Material material;
+    private RenderState spriteState2D;
+    private RenderState spriteState3D;
     private Map textures;
     private int viewWidth;
     private int viewHeight;
@@ -95,6 +108,34 @@ public class SpriteRenderer implements Renderer {
         return scene;
     }
 
+    /// The camera this renderer draws through. Leave it in its default 2D mode for a
+    /// classic sprite game, or put it in `GameCamera#MODE_PERSPECTIVE` to render the
+    /// sprites as billboards in a 3D world.
+    public GameCamera getCamera() {
+        return gameCamera;
+    }
+
+    /// The directional light used to shade lit 3D `Model`s. Configure it with
+    /// `com.codename1.gpu.Light#setDirection(float, float, float)` etc.
+    public Light getLight() {
+        return light;
+    }
+
+    /// Adds a 3D model to be drawn (in perspective mode) alongside the sprites.
+    public void addModel(Model model) {
+        models.add(model);
+    }
+
+    /// Removes a previously added 3D model.
+    public void removeModel(Model model) {
+        models.remove(model);
+    }
+
+    /// The number of 3D models in this renderer.
+    public int getModelCount() {
+        return models.size();
+    }
+
     /// The ARGB color the framebuffer is cleared to each frame.
     public void setClearColor(int argb) {
         this.clearColor = argb;
@@ -110,20 +151,22 @@ public class SpriteRenderer implements Renderer {
 
     public void onInit(GraphicsDevice device) {
         quad = Primitives.quad(device, 1f);
-        material = new Material(Material.Type.SPRITE)
-                .setRenderState(RenderState.transparent().setDepthTest(false));
+        // 2D: ignore depth entirely (draw order wins). 3D: still alpha blended with
+        // no depth write, but depth-test against opaque 3D models so closer geometry
+        // occludes the billboards.
+        spriteState2D = RenderState.transparent().setDepthTest(false);
+        spriteState3D = RenderState.transparent().setDepthTest(true);
+        material = new Material(Material.Type.SPRITE).setRenderState(spriteState2D);
         textures = new HashMap();
         hasLast = false;
+        if (updatable != null) {
+            updatable.setup(device);
+        }
     }
 
     public void onResize(GraphicsDevice device, int width, int height) {
         viewWidth = width;
         viewHeight = height;
-        camera.setOrthographic(height, -1000f, 1000f)
-                .setAspect((float) width / Math.max(1, height))
-                .setPosition(0f, 0f, 1f)
-                .setTarget(0f, 0f, 0f)
-                .setUp(0f, 1f, 0f);
         device.setViewport(0, 0, width, height);
     }
 
@@ -142,9 +185,24 @@ public class SpriteRenderer implements Renderer {
         scene.update(dt);
 
         device.clear(clearColor, true, true);
+        // configure the GPU camera from the GameCamera each frame so a moving 3D
+        // camera (or a switch between 2D and perspective) takes effect immediately.
+        gameCamera.apply(camera, viewWidth, viewHeight);
         device.setCamera(camera);
-        scene.ensureSorted();
+        device.setLight(light);
+        boolean perspective = gameCamera.getMode() == GameCamera.MODE_PERSPECTIVE;
 
+        // opaque 3D models first (they write depth), then alpha-blended sprites.
+        int modelCount = models.size();
+        for (int i = 0; i < modelCount; i++) {
+            Model m = (Model) models.get(i);
+            if (m.isVisible() && m.getMesh() != null) {
+                device.draw(m.getMesh(), m.getMaterial(), m.modelMatrix());
+            }
+        }
+
+        material.setRenderState(perspective ? spriteState3D : spriteState2D);
+        scene.ensureSorted();
         int count = scene.size();
         for (int i = 0; i < count; i++) {
             Sprite s = scene.get(i);
@@ -181,10 +239,18 @@ public class SpriteRenderer implements Renderer {
         return t;
     }
 
-    /// Builds the sprite's model matrix: translate the anchor to the origin, scale
-    /// to the pixel size, rotate, then translate to the sprite's world position
-    /// (pixel coordinates converted to the camera's centered, y-up space).
+    /// Builds the sprite's model matrix, dispatching on the camera mode.
     private float[] modelMatrix(Sprite s) {
+        if (gameCamera.getMode() == GameCamera.MODE_PERSPECTIVE) {
+            return billboardMatrix(s);
+        }
+        return orthoMatrix(s);
+    }
+
+    /// 2D path: translate the anchor to the origin, scale to the pixel size, rotate,
+    /// then translate to the sprite's world position (pixel coordinates converted to
+    /// the camera's centered, y-up space).
+    private float[] orthoMatrix(Sprite s) {
         float w = s.getRenderWidth() * s.getScaleX();
         float h = s.getRenderHeight() * s.getScaleY();
         float worldX = (float) (s.getX() - scene.getCameraX()) - viewWidth / 2f;
@@ -201,6 +267,30 @@ public class SpriteRenderer implements Renderer {
         Matrix4.multiply(scale, anchor, scratchA);   // S * Ta
         Matrix4.multiply(rot, scratchA, scratchB);    // R * S * Ta
         Matrix4.multiply(trans, scratchB, model);     // T * R * S * Ta
+        return model;
+    }
+
+    /// 3D path: orient a quad in world space so it always faces the camera (a
+    /// billboard). The sprite's `Sprite#getX()`/`getY()`/`getZ()` is the world
+    /// position and its size/scale are world units. The quad is anchored, scaled,
+    /// rolled around the view axis, oriented by the camera billboard basis and then
+    /// translated to the world position: `T * B * R * S * Ta`.
+    private float[] billboardMatrix(Sprite s) {
+        float w = s.getRenderWidth() * s.getScaleX();
+        float h = s.getRenderHeight() * s.getScaleY();
+
+        // y-up anchor offset (image y is top-down, world y is up)
+        float[] anchor = Matrix4.translation(0.5f - (float) s.getAnchorX(),
+                0.5f - (float) s.getAnchorY(), 0f);
+        float[] scale = Matrix4.scaling(w, h, 1f);
+        float[] roll = Matrix4.rotation((float) -Math.toRadians(s.getRotation()), 0f, 0f, 1f);
+        float[] basis = gameCamera.getBillboardBasis();
+        float[] trans = Matrix4.translation((float) s.getX(), (float) s.getY(), (float) s.getZ());
+
+        Matrix4.multiply(scale, anchor, scratchA);    // S * Ta
+        Matrix4.multiply(roll, scratchA, scratchB);    // R * S * Ta
+        Matrix4.multiply(basis, scratchB, scratchA);   // B * R * S * Ta
+        Matrix4.multiply(trans, scratchA, model);      // T * B * R * S * Ta
         return model;
     }
 }
