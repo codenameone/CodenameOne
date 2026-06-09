@@ -48,11 +48,18 @@ bootstrap_local_cn1_snapshots() {
     return
   fi
 
+  # Each site app (initializr/playground/skindesigner) calls this; the full
+  # reactor build is expensive, so run setup-workspace.sh only once per build.
+  if [ "${__CN1_SNAPSHOTS_BOOTSTRAPPED:-}" = "true" ]; then
+    return
+  fi
+
   echo "Bootstrapping local Codename One snapshot Maven artifacts..." >&2
   (
     cd "${REPO_ROOT}"
     SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
   )
+  __CN1_SNAPSHOTS_BOOTSTRAPPED="true"
 }
 
 activate_bootstrapped_java17() {
@@ -569,6 +576,13 @@ build_initializr_for_site() {
     return
   fi
 
+  # The initializr builds the JavaScript app with the local ParparVM target
+  # (codename1.buildTarget=local-javascript). That builder lives in the repo's
+  # 8.0-SNAPSHOT plugin, not the pinned release, so bootstrap the local
+  # snapshots and build with -Dcn1.localWorkspace=true (the cn1-local-workspace
+  # profile then overrides cn1.version/cn1.plugin.version to the repo build).
+  bootstrap_local_cn1_snapshots
+
   echo "Building Initializr JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/initializr"
@@ -581,7 +595,13 @@ build_initializr_for_site() {
       fi
     }
 
-    if [ -n "${JAVA_HOME_8_X64:-}" ]; then
+    local initializr_workspace_args=()
+    if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
+      # Local ParparVM JS build runs the translator + javac; use the
+      # bootstrapped JDK 17 (matching the Playground/Skin Designer path).
+      activate_bootstrapped_java17
+      initializr_workspace_args+=(-Dcn1.localWorkspace=true)
+    elif [ -n "${JAVA_HOME_8_X64:-}" ]; then
       export JAVA_HOME="${JAVA_HOME_8_X64}"
       export PATH="${JAVA_HOME}/bin:${PATH}"
     fi
@@ -589,6 +609,7 @@ build_initializr_for_site() {
     # Ensure attached classifier artifact initializr-ZipSupport:jar:common is present
     # in the local Maven repo before building modules that depend on it (e.g. initializr-common).
     run_initializr_mvn -q -U -pl cn1libs/ZipSupport -am \
+      "${initializr_workspace_args[@]}" \
       -DskipTests \
       -Dcodename1.platform=javascript \
       install
@@ -596,6 +617,7 @@ build_initializr_for_site() {
     set_cn1_user_token "Initializr"
 
     run_initializr_mvn -q -U -pl javascript -am \
+      "${initializr_workspace_args[@]}" \
       -DskipTests \
       -Dautomated=true \
       -Dcodename1.platform=javascript \
