@@ -257,6 +257,21 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-08T15:03:50+00:00"
       }
+    },
+    "we-will-not-sabotage-your-code": {
+      "devto": {
+        "id": 3866356,
+        "url": "https://dev.to/codenameone/we-will-not-sabotage-your-code-1k4k",
+        "syndicated_at": "2026-06-10T14:07:55+00:00"
+      },
+      "foojay": {
+        "id": 124169,
+        "url": "https://foojay.io/wp-admin/post.php?post=124169&action=edit",
+        "preview_url": "https://foojay.io/?p=124169",
+        "featured_media_id": 124168,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-10T14:08:52+00:00"
+      }
     }
   }
 }
