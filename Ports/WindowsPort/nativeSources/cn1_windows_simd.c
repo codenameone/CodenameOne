@@ -625,6 +625,62 @@ JAVA_VOID com_codename1_impl_windows_WindowsSimd_blendByMaskTestNonzero___int_1A
     }
 }
 
+/* Fused blend used by Image.modifyAlpha(alpha, removeColor): like the above, but
+ * a kept value equal to removeMatch substitutes removeValue (transparent) instead
+ * of OR-ing trueOrValue. Without this native kernel removeColor fell back to the
+ * scalar default and lost; vectorized it joins the other blend ops that win. */
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_blendByMaskTestNonzeroSubstituteOnKeepEq___int_1ARRAY_int_int_int_int_int_int_int_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
+        JAVA_INT testMask, JAVA_INT trueKeepMask, JAVA_INT trueOrValue, JAVA_INT removeMatch,
+        JAVA_INT removeValue, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    int i = 0;
+#if defined(CN1_SIMD_X64)
+    __m128i vTest = _mm_set1_epi32(testMask);
+    __m128i vKeep = _mm_set1_epi32(trueKeepMask);
+    __m128i vOr = _mm_set1_epi32(trueOrValue);
+    __m128i vMatch = _mm_set1_epi32(removeMatch);
+    __m128i vRemove = _mm_set1_epi32(removeValue);
+    __m128i vZero = _mm_setzero_si128();
+    for (; i <= length - 4; i += 4) {
+        __m128i v = _mm_loadu_si128((const __m128i*) (s + srcOffset + i));
+        __m128i selMask = _mm_xor_si128(_mm_cmpeq_epi32(_mm_and_si128(v, vTest), vZero), _mm_set1_epi32(-1));
+        __m128i kept = _mm_and_si128(v, vKeep);
+        __m128i isRemove = _mm_cmpeq_epi32(kept, vMatch);
+        __m128i normal = _mm_or_si128(kept, vOr);
+        __m128i modified = _mm_or_si128(_mm_and_si128(isRemove, vRemove), _mm_andnot_si128(isRemove, normal));
+        __m128i result = _mm_or_si128(_mm_and_si128(selMask, modified), _mm_andnot_si128(selMask, v));
+        _mm_storeu_si128((__m128i*) (d + dstOffset + i), result);
+    }
+#elif defined(CN1_SIMD_ARM64)
+    int32x4_t vTest = vdupq_n_s32(testMask);
+    int32x4_t vKeep = vdupq_n_s32(trueKeepMask);
+    int32x4_t vOr = vdupq_n_s32(trueOrValue);
+    int32x4_t vMatch = vdupq_n_s32(removeMatch);
+    int32x4_t vRemove = vdupq_n_s32(removeValue);
+    for (; i <= length - 4; i += 4) {
+        int32x4_t v = vld1q_s32((const int32_t*) (s + srcOffset + i));
+        uint32x4_t selMask = vtstq_s32(v, vTest);
+        int32x4_t kept = vandq_s32(v, vKeep);
+        uint32x4_t isRemove = vceqq_s32(kept, vMatch);
+        int32x4_t normal = vorrq_s32(kept, vOr);
+        int32x4_t modified = vbslq_s32(isRemove, vRemove, normal);
+        int32x4_t result = vbslq_s32(selMask, modified, v);
+        vst1q_s32((int32_t*) (d + dstOffset + i), result);
+    }
+#endif
+    for (; i < length; i++) {
+        int v = s[srcOffset + i];
+        if ((v & testMask) == 0) {
+            d[dstOffset + i] = v;
+        } else {
+            int kept = v & trueKeepMask;
+            d[dstOffset + i] = (kept == removeMatch) ? removeValue : (kept | trueOrValue);
+        }
+    }
+}
+
 /* --------------------------------------------------------------------------
  * Byte-manipulation kernels the Base64 SIMD codec and Image.createMask use
  * (shl / shrLogical / lookupBytes / pack+unpack interleaved / packIntToByteTruncate).

@@ -124,6 +124,11 @@ public class WindowsSimd extends Simd {
     @Override
     public native void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length);
 
+    // Image.modifyAlpha(alpha, removeColor) -- the only image op still on the slow
+    // scalar fallback; now a fused native blend like its sibling above.
+    @Override
+    public native void blendByMaskTestNonzeroSubstituteOnKeepEq(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int removeMatch, int removeValue, int[] dst, int dstOffset, int length);
+
     /* ------------------------------------------------ byte codec hot paths */
     // Used by the Base64 SIMD codec and Image.createMask. Without these natives
     // they fell through to the generic Simd scalar defaults (lane-scratch loops),
