@@ -436,6 +436,21 @@ public final class WindowsNative {
     /** Inverse of {@link #dpapiProtect}: decrypts a DPAPI blob, or {@code null}. */
     public static native byte[] dpapiUnprotect(byte[] data);
 
+    /* --------------------------------------------------- local notifications */
+
+    /**
+     * Displays a local-notification balloon ({@code Shell_NotifyIcon}) with the
+     * given title/body, remembering {@code id} so a click can be routed back. The
+     * call is marshaled to the window-owning pump thread. No-op in headless mode.
+     */
+    public static native void showNotification(String id, String title, String body);
+
+    /**
+     * Returns (and clears) the id of a clicked notification balloon, or
+     * {@code null} when none was clicked since the last poll. Drained by the EDT.
+     */
+    public static native String notificationPollClicked();
+
     /**
      * Shows a modal native file dialog and returns the chosen path, or
      * {@code null} on cancel (or in headless mode). {@code type} mirrors the

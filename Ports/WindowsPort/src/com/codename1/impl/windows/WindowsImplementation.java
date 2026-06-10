@@ -470,6 +470,83 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     break;
             }
         }
+        // A clicked notification balloon hands its id back here; deliver it to the
+        // app's LocalNotificationCallback like the mobile ports do.
+        String clicked = WindowsNative.notificationPollClicked();
+        if (clicked != null) {
+            dispatchLocalNotification(clicked);
+        }
+    }
+
+    /* --------------------------------------------------- local notifications
+     * Desktop semantic (mirrors the JavaSE port): while the app runs, a Timer
+     * fires the notification at its scheduled time and Shell_NotifyIcon shows a
+     * tray balloon; clicking it dispatches the id to the app's
+     * LocalNotificationCallback. */
+    private java.util.Timer localNotificationsTimer;
+    private final java.util.HashMap<String, java.util.TimerTask> localNotifications =
+            new java.util.HashMap<String, java.util.TimerTask>();
+
+    @Override
+    public void scheduleLocalNotification(final com.codename1.notifications.LocalNotification notif,
+            long firstTime, int repeat) {
+        if (localNotificationsTimer == null) {
+            localNotificationsTimer = new java.util.Timer();
+        }
+        java.util.TimerTask old = localNotifications.get(notif.getId());
+        if (old != null) {
+            old.cancel();
+        }
+        java.util.TimerTask task = new java.util.TimerTask() {
+            @Override
+            public void run() {
+                WindowsNative.showNotification(notif.getId(), notif.getAlertTitle(), notif.getAlertBody());
+            }
+        };
+        localNotifications.put(notif.getId(), task);
+        long period = repeatPeriod(repeat);
+        if (period <= 0) {
+            localNotificationsTimer.schedule(task, new Date(firstTime));
+        } else {
+            localNotificationsTimer.schedule(task, new Date(firstTime), period);
+        }
+    }
+
+    @Override
+    public void cancelLocalNotification(String notificationId) {
+        java.util.TimerTask task = localNotifications.remove(notificationId);
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    private static long repeatPeriod(int repeat) {
+        switch (repeat) {
+            case com.codename1.notifications.LocalNotification.REPEAT_MINUTE:
+                return 60 * 1000L;
+            case com.codename1.notifications.LocalNotification.REPEAT_HOUR:
+                return 60 * 60 * 1000L;
+            case com.codename1.notifications.LocalNotification.REPEAT_DAY:
+                return 24 * 60 * 60 * 1000L;
+            case com.codename1.notifications.LocalNotification.REPEAT_WEEK:
+                return 7 * 24 * 60 * 60 * 1000L;
+            default:
+                return 0L;
+        }
+    }
+
+    private void dispatchLocalNotification(final String notificationId) {
+        Object app = getCurrentApplicationInstance();
+        if (app instanceof com.codename1.notifications.LocalNotificationCallback) {
+            final com.codename1.notifications.LocalNotificationCallback cb =
+                    (com.codename1.notifications.LocalNotificationCallback) app;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    cb.localNotificationReceived(notificationId);
+                }
+            });
+        }
     }
 
     /**

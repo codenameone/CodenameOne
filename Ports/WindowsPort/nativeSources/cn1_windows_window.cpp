@@ -401,6 +401,15 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             /* Modal file open/save dialog, run synchronously on this (pump) thread
              * while the EDT blocks in SendMessage (cn1_windows_io.c). */
             return cn1WinFileDialogHandleMessage(wParam);
+        case WM_CN1_NOTIFY:
+            /* Show a local-notification balloon on the tray icon, marshaled from
+             * the notification Timer thread (cn1_windows_notify.c). */
+            cn1WinNotifyHandleMessage(wParam);
+            return 0;
+        case WM_CN1_TRAY:
+            /* The tray icon's own callback (balloon click etc.). */
+            cn1WinTrayHandleMessage(wParam, lParam);
+            return 0;
         case WM_CTLCOLOREDIT: {
             /* Colour the native edit overlay to match the CN1 field it stands in
              * for; fall through to default when it is not our control. */

@@ -131,6 +131,13 @@ enumeration + preview peer + still capture, surfaced honestly through
   EncryptedSharedPreferences. The biometric-prompting overloads map to the same
   store (DPAPI is itself the user-account auth boundary); a Windows Hello gate can
   layer on once biometric support lands. Round-tripped by `SecureStorageTest`.
+- Local notifications (`scheduleLocalNotification` / `cancelLocalNotification`) —
+  a `Shell_NotifyIcon` tray balloon, the same desktop semantic the JavaSE port
+  uses: while the app runs, a `Timer` fires the notification at its scheduled time
+  (with `REPEAT_*` support) and clicking the balloon dispatches the id to the
+  app's `LocalNotificationCallback` (`cn1_windows_notify.c`). Desktop background
+  scheduling only fires while the process is running -- there is no OS scheduler
+  that survives app exit (a tracked limitation, not a desktop capability).
 
 **Still unsupported (return null / no-op / `false`, never fabricated):** these
 are genuine hardware/OS-account capabilities that a desktop either lacks or that

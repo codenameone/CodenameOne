@@ -235,6 +235,15 @@ HBRUSH cn1WinEditCtlColor(HDC hdc, HWND control);
 #define WM_CN1_FILEDIALOG (WM_APP + 19)
 LRESULT cn1WinFileDialogHandleMessage(WPARAM wParam);
 
+/* Local notifications via Shell_NotifyIcon (cn1_windows_notify.c). A Timer on a
+ * worker thread posts WM_CN1_NOTIFY to the pump thread (which owns the tray icon)
+ * to display a balloon; cn1WinWndProc forwards both that and the tray's own
+ * callback message (WM_CN1_TRAY, sent when the user clicks the balloon) here. */
+#define WM_CN1_NOTIFY (WM_APP + 20)
+#define WM_CN1_TRAY   (WM_APP + 21)
+void cn1WinNotifyHandleMessage(WPARAM wParam);
+void cn1WinTrayHandleMessage(WPARAM wParam, LPARAM lParam);
+
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);
 void cn1WinBeginFrame(CN1Graphics* g);
