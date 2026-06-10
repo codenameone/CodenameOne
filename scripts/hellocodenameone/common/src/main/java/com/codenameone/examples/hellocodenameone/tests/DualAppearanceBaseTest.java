@@ -196,8 +196,10 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                     // time to reach the front buffer.
                     Display.getInstance().callSerially(() ->
                         Display.getInstance().callSerially(() ->
-                            Display.getInstance().callSerially(() ->
-                                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next))));
+                            Display.getInstance().callSerially(() -> {
+                                markCaptureStarted();
+                                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next);
+                            })));
                 });
             }
         };

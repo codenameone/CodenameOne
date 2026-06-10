@@ -161,6 +161,81 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
     /**
+     * Localized launcher icons (cn1_icon_&lt;lang&gt;[_&lt;country&gt;].png) are scaled up to the
+     * largest launcher density by the build server, so a low-resolution source produces a
+     * blurry icon. Maven copies these into the build output (target/classes) with its
+     * incremental resource plugin, which also leaves stale copies behind when a source icon
+     * is removed or replaced (only {@code mvn clean} clears them). Scan the compiled output
+     * directories that will be bundled and sent to the build server and warn about any
+     * localized icon that is too small to render sharply -- this catches both an undersized
+     * new icon and an outdated low-resolution one lingering in target/classes.
+     *
+     * @param classpathElements the compile classpath; directory entries are the project /
+     *                          module {@code target/classes} folders that get bundled.
+     * @param codenameOneSettings the project's codenameone_settings.properties, used to detect
+     *                           whether adaptive icons are enabled (which raises the target size).
+     */
+    private void warnAboutSmallLocalizedIcons(List<String> classpathElements, File codenameOneSettings)
+            throws MojoFailureException {
+        int largestTarget = 192;
+        try {
+            Properties settings = new Properties();
+            try (FileInputStream fis = new FileInputStream(codenameOneSettings)) {
+                settings.load(fis);
+            }
+            if ("true".equals(settings.getProperty("codename1.arg.android.enableAdaptiveIcons", "false").trim())) {
+                largestTarget = 432;
+            }
+        } catch (IOException ex) {
+            getLog().debug("Could not read " + codenameOneSettings + " to determine adaptive icon setting", ex);
+        }
+        List<String> undersizedIcons = new ArrayList<String>();
+        for (String element : classpathElements) {
+            File dir = new File(element);
+            if (dir.isDirectory()) {
+                collectSmallLocalizedIcons(dir, largestTarget, undersizedIcons);
+            }
+        }
+        if (!undersizedIcons.isEmpty()) {
+            throw new MojoFailureException("The following localized launcher icon(s) are smaller than "
+                    + largestTarget + "x" + largestTarget + "px and would be upscaled to a blurry icon in the "
+                    + "production build:\n  " + String.join("\n  ", undersizedIcons)
+                    + "\nSupply each localized icon at no less than " + largestTarget + "x" + largestTarget
+                    + "px (1024x1024 recommended, matching the main app icon). NOTE: if you recently replaced an icon, "
+                    + "an offending copy may be a stale resource left in target/classes -- run 'mvn clean' to clear it.");
+        }
+    }
+
+    private void collectSmallLocalizedIcons(File dir, int largestTarget, List<String> undersizedIcons) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                collectSmallLocalizedIcons(child, largestTarget, undersizedIcons);
+                continue;
+            }
+            String lower = child.getName().toLowerCase();
+            if (!lower.startsWith("cn1_icon_") || !lower.endsWith(".png")) {
+                continue;
+            }
+            try {
+                BufferedImage img = ImageIO.read(child);
+                if (img == null) {
+                    undersizedIcons.add(child + " (not a valid PNG image)");
+                    continue;
+                }
+                if (img.getWidth() < largestTarget || img.getHeight() < largestTarget) {
+                    undersizedIcons.add(child + " (" + img.getWidth() + "x" + img.getHeight() + "px)");
+                }
+            } catch (IOException ex) {
+                getLog().debug("Could not read localized icon " + child + " to check its resolution", ex);
+            }
+        }
+    }
+
+    /**
      * The dependency scopes to include in the jar file that is sent to the build server.
      */
     private static String[] BUNDLE_ARTIFACT_SCOPES = new String[] { "compile" };
@@ -323,7 +398,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 || BUILD_TARGET_WINDOWS_NATIVE.equals(buildTarget));
     }
 
-    private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException {
+    private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException, MojoFailureException {
         File cn1dir = new File(project.getBuild().getDirectory() + File.separator + "codenameone");
         File antProject = new File(cn1dir, "antProject");
 
@@ -353,6 +428,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("Failed to get classpath elements", ex);
 
         }
+
+        warnAboutSmallLocalizedIcons(cpElements, codenameOneSettings);
 
         File appExtensionsJar = getAppExtensionsJar();
         if (appExtensionsJar != null) {

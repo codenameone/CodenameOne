@@ -618,19 +618,21 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private boolean textMightGrowByContent(String oldText, String newText) {
-        int oldNewLines = countNewLines(oldText);
-        int newNewLines = countNewLines(newText);
-        if (newNewLines > oldNewLines) {
+        if (newText == null || oldText == null) {
             return true;
         }
-        if (newText == null || oldText == null || newText.length() <= oldText.length()) {
-            return false;
+        // An added hard newline always adds a row.
+        if (countNewLines(newText) > countNewLines(oldText)) {
+            return true;
         }
-        int cols = getColumns();
-        if (cols > 1) {
-            return estimateLineCount(newText, cols) > estimateLineCount(oldText, cols);
-        }
-        return false;
+        // Any growth in length can push the content onto an extra wrapped row.
+        // We deliberately do NOT try to predict the wrap point here: the previous
+        // character-column estimate ignored the font and padding, so proportional
+        // text wrapped a row earlier than predicted and the field clipped the prior
+        // line while editing (#4854). revalidateLater() coalesces and the layout's
+        // getLines() (real font metrics, real width) determines the actual size, so
+        // erring toward an extra revalidate is cheap and never under-grows.
+        return newText.length() > oldText.length();
     }
 
     private int countNewLines(String value) {
@@ -644,24 +646,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             }
         }
         return count;
-    }
-
-    private int estimateLineCount(String value, int cols) {
-        if (value == null || value.length() == 0) {
-            return 1;
-        }
-        int lines = 0;
-        int segmentLength = 0;
-        for (int i = 0; i < value.length(); i++) {
-            if (value.charAt(i) == '\n') {
-                lines += Math.max(1, (segmentLength + cols - 1) / cols);
-                segmentLength = 0;
-            } else {
-                segmentLength++;
-            }
-        }
-        lines += Math.max(1, (segmentLength + cols - 1) / cols);
-        return lines;
     }
 
     /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the

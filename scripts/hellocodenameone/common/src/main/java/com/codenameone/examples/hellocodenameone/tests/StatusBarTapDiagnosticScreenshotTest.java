@@ -120,6 +120,7 @@ public class StatusBarTapDiagnosticScreenshotTest extends BaseTest {
         beforeFrame.dispose();
         afterFrame.dispose();
 
+        markCaptureStarted();
         Cn1ssDeviceRunnerHelper.emitImage(composite, "StatusBarTapDiagnosticScreenshotTest", this::done);
         return true;
     }
