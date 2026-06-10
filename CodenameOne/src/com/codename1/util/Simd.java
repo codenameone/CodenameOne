@@ -13,7 +13,7 @@ import com.codename1.annotations.Concrete;
 import com.codename1.ui.CN;
 
 /// Portable SIMD API with Java fallback implementations.
-@Concrete(name = "com.codename1.impl.ios.IOSSimd")
+@Concrete(name = "com.codename1.impl.ios.IOSSimd", win = "com.codename1.impl.windows.WindowsSimd")
 public class Simd {
     /// Returns the singleton instance of the Simd class. Equivalent to `CN.getSimd();`
     public static Simd get() {

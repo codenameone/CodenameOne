@@ -73,15 +73,28 @@ press is not a click, and reports `isScrollWheeling()` for the duration. The
 JavaSE port was refactored onto this same method (it had carried the original
 inline implementation), so every desktop port maps the wheel identically.
 
-### 2. SIMD acceleration — software fallback only
+### 2. SIMD acceleration — implemented (SSE2 x64 / NEON arm64)
 
-`com.codename1.util.Simd` (`Simd.java`, `@Concrete` → `IOSSimd`) is the portable
-vector API (packed byte/int/float add/sub/mul/min/max/dot/unpack/…). iOS overrides
-it with NEON-backed `native` methods (`IOSSimd.isSupported()` → `true`). The
-Windows port has **no `Simd` override**, so `isSupported()` is `false` and every
-op runs the Java software fallback — no SSE/AVX (x64) or NEON (arm64). Correct,
-but slow for the image/pixel hot paths that use it. A `WindowsSimd` with intrinsic
-or compiler-autovectorized native ops is the iOS-parity fix.
+Done. `WindowsSimd` (the x86/ARM analog of `IOSSimd`) overrides the hot-path
+vector ops with `native` SSE2 (x64) / NEON (arm64) kernels in
+`nativeSources/cn1_windows_simd.c`, and `Simd`'s `@Concrete` now carries
+`win = "com.codename1.impl.windows.WindowsSimd"` plus a
+`WindowsImplementation.createSimd()` override, so `Simd.get().isSupported()`
+returns `true` on Windows. Each kernel runs a 128-bit vector main loop with a
+scalar tail; loads/stores are unaligned, so no special aligned allocator is
+needed. Ops SSE2 lacks natively (int32 mul/min/max/dot) stay scalar on x64 but
+are vectorized on arm64; every op not overridden falls back to the portable
+`Simd` scalar loop, so the API is always complete and correct.
+
+Covered natively: int add/sub/mul/min/max/and/or/xor/sum/dot, float
+add/sub/mul/min/max/sum/dot, byte add/sub (saturating)/and/or/xor, and the fused
+image hot paths `replaceTopByteFromUnsignedBytes` / `blendByMaskTestNonzero`.
+
+Correctness is gated by the existing `SimdApiTest` (already in the Windows
+screenshot suite). A new `SimdBenchmarkTest` tallies the speedup: it times the
+native kernel against an inline Java scalar loop over a 64K-element workload,
+verifies the native result is identical, and logs `CN1SS:SIMD:BENCH … speedup=Nx`
+so CI shows the concrete benefit (the iOS-parity "benchmark/tally").
 
 ### 3. Camera — no host webcam access
 

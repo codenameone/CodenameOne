@@ -321,6 +321,15 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return gpuImpl;
     }
 
+    // SIMD acceleration: SSE2 (x64) / NEON (arm64) backed vector kernels, the
+    // x86/ARM analog of the iOS IOSSimd/NEON layer. WindowsSimd.isSupported()
+    // returns true and the hot-path operations run native intrinsics; ops it does
+    // not override fall back to the portable Simd scalar loop (still correct).
+    @Override
+    public com.codename1.util.Simd createSimd() {
+        return new WindowsSimd();
+    }
+
     @Override
     public int getDisplayWidth() {
         return WindowsNative.getDisplayWidth();
