@@ -246,7 +246,8 @@ class CleanTargetIntegrationTest {
                 "cn1_windows_window.cpp", "cn1_windows_graphics.cpp", "cn1_windows_text.c",
                 "cn1_windows_image.cpp", "cn1_windows_io.c", "cn1_windows_net.c",
                 "cn1_windows_dwrite.cpp", "cn1_windows_screenshot.cpp", "cn1_windows_simd.c",
-                "cn1_windows_notify.c", "cn1_windows_audiorec.c", "cn1_windows_winrt.cpp"
+                "cn1_windows_notify.c", "cn1_windows_audiorec.c", "cn1_windows_winrt.cpp",
+                "cn1_windows_camera.cpp"
         };
         for (String f : files) {
             Files.copy(nativeDir.resolve(f), srcRoot.resolve(f), StandardCopyOption.REPLACE_EXISTING);

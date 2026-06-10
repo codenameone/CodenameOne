@@ -549,6 +549,16 @@ public final class WindowsNative {
      */
     public static native boolean shareText(String text, String title);
 
+    /* ----------------------------------------------------------- camera */
+
+    /**
+     * Grabs a single frame from the default webcam via Media Foundation and
+     * returns it as a CN1 ARGB {@code int[]} (length width*height), filling
+     * {@code outDims[0]=width, [1]=height}. Returns {@code null} when there is no
+     * camera or capture fails. Blocks briefly (call off the EDT).
+     */
+    public static native int[] cameraCaptureFrame(int[] outDims);
+
     // ---------------------------------------------------------------------
     // 3D / Direct3D 11 backend (com.codename1.gpu). Implemented in
     // nativeSources/cn1_windows_d3d.cpp. Every peer is an opaque long (a D3D

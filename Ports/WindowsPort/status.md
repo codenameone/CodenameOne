@@ -96,15 +96,20 @@ native kernel against an inline Java scalar loop over a 64K-element workload,
 verifies the native result is identical, and logs `CN1SS:SIMD:BENCH … speedup=Nx`
 so CI shows the concrete benefit (the iOS-parity "benchmark/tally").
 
-### 3. Camera — no host webcam access
+### 3. Camera — still capture implemented (Media Foundation)
 
-`createCameraImpl()` is **not** overridden, so `Camera.isSupported()` is `false`
-(the base returns `null`). This is deliberate: the earlier synthetic-frame backend
-was removed because a port must not hand a shipping app fake frames. The legacy
-`Capture` API (`capturePhoto/captureVideo/captureAudio`) is likewise unimplemented.
-**To-do:** real Media Foundation (`IMFSourceReader` / Media Capture) webcam
-enumeration + preview peer + still capture, surfaced honestly through
-`Camera.getCameras()` / `isSupported()`.
+The legacy Capture API `capturePhoto` is implemented: it grabs a single real
+frame from the default webcam through Media Foundation
+(`MFEnumDeviceSources(VIDCAP)` → `IMFSourceReader` → RGB32, discarding the first
+few frames so exposure settles), hands the pixels back as a CN1 ARGB `int[]`, and
+Java encodes the PNG + writes the file (`cn1_windows_camera.cpp`). A desktop has
+no built-in capture UI, so this is the honest snapshot equivalent -- a real frame,
+never synthetic. Verified on the Windows ARM64 VM: a 640×480 frame with genuine
+image data (≈150K non-zero pixels) is captured from the passed-through camera.
+
+`createCameraImpl()` (the richer `com.codename1.camera` API: live preview peer,
+video) stays `null` -- the preview peer needs the generic native-peer placement
+the port does not have yet (gap 5a). `captureVideo` is likewise still to do.
 
 ### 4. Platform services — desktop services done; hardware services unsupported
 

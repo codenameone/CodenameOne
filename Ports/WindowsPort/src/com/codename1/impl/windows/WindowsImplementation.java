@@ -469,12 +469,45 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* --------------------------------------------------------------- camera */
 
-    // No camera backend is provided: the port does not yet access the host's
-    // webcam, so createCameraImpl() inherits the base null (Camera.isSupported()
-    // returns false) rather than returning fabricated frames. A real device port
-    // must surface real hardware or report unsupported -- never synthetic data
-    // that could reach a shipping app. Real Media Foundation webcam capture is a
-    // tracked gap (see Ports/WindowsPort/status.md).
+    // Legacy Capture API: capturePhoto grabs a single real frame from the default
+    // webcam via Media Foundation (cn1_windows_camera.cpp) -- the honest desktop
+    // snapshot, never synthetic. The richer com.codename1.camera CameraImpl (live
+    // preview peer / video) needs the generic native-peer placement the port does
+    // not have yet, so createCameraImpl() stays null.
+    @Override
+    public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String result = null;
+                try {
+                    int[] dims = new int[2];
+                    int[] argb = WindowsNative.cameraCaptureFrame(dims);
+                    if (argb != null && dims[0] > 0 && dims[1] > 0) {
+                        byte[] png = WindowsNative.encodeArgbToPng(argb, dims[0], dims[1]);
+                        String path = WindowsNative.storageDir() + getFileSystemSeparator()
+                                + "cn1photo" + System.currentTimeMillis() + ".png";
+                        OutputStream os = openOutputStream(path);
+                        os.write(png);
+                        os.close();
+                        result = "file://" + path.replace('\\', '/');
+                    }
+                } catch (Throwable err) {
+                    err.printStackTrace();
+                }
+                final com.codename1.ui.events.ActionEvent ev = result != null
+                        ? new com.codename1.ui.events.ActionEvent(result) : null;
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        response.actionPerformed(ev);
+                    }
+                });
+            }
+        }, "cn1-windows-capturephoto");
+        t.setDaemon(true);
+        t.start();
+    }
 
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
