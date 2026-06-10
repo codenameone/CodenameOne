@@ -2658,6 +2658,15 @@ const jvm = {
     if (this.draining) {
       return;
     }
+    // Opportunistic wakeup delivery on every outermost drain (i.e. every host
+    // event that wakes the worker): when the one-shot wakeup timeout is being
+    // throttled by the host (see _ensureWakeupPump), due sleeps/waits still
+    // fire with near-zero latency here instead of waiting for the 1s pump.
+    // O(pending) once per burst; no-op when nothing is due.
+    if (this.timedWakeups.length && !this._processingWakeups
+            && this._earliestWakeAt() <= this.schedulerNow() + 1) {
+      this._processExpiredTimedWakeups();
+    }
     this.draining = true;
     const deadline = this.schedulerNow() + 8;
     let steps = 0;
@@ -2818,6 +2827,47 @@ const jvm = {
   _scheduleTimedWakeup(entry) {
     this.timedWakeups.push(entry);
     this._refreshTimedWakeupTimer();
+    this._ensureWakeupPump();
+  },
+  // Permanent low-frequency backstop for the one-shot wakeup timer.
+  //
+  // Headless/hidden Chromium intensively throttles rapidly re-armed
+  // setTimeout CHAINS (nesting depth >= 5, short delays) down to ~one
+  // firing per minute, while >=1s intervals keep firing normally --
+  // observed on the screenshot suite as the heartbeat interval beating
+  // every 1.5s while the armed wakeup timeout sat 12-48s past its target
+  // (sinceStepMs == wakeFiredAgo == 12771 with every thread parked), so
+  // every Thread.sleep / Object.wait(timeout) in the VM stalled in
+  // batches. The pump bounds that worst case at ~1s: a cheap length +
+  // earliest-deadline check, processing only when something is actually
+  // due. The one-shot timer remains the precision path; drain() also
+  // opportunistically processes due wakeups on every host event.
+  _ensureWakeupPump() {
+    if (this._wakeupPump != null || typeof setInterval !== "function") {
+      return;
+    }
+    const self = this;
+    this._wakeupPump = setInterval(function() {
+      try {
+        if (self.timedWakeups.length && self._earliestWakeAt() <= self.schedulerNow() + 1) {
+          self._processExpiredTimedWakeups();
+        }
+      } catch (_e) {
+        // Never let the backstop kill itself.
+      }
+    }, 1000);
+    // Node harnesses: don't hold the process open for the pump.
+    if (this._wakeupPump && typeof this._wakeupPump.unref === "function") {
+      this._wakeupPump.unref();
+    }
+  },
+  _earliestWakeAt() {
+    let earliest = Infinity;
+    for (let i = 0; i < this.timedWakeups.length; i++) {
+      const w = this.timedWakeups[i];
+      if (!w.cancelled && w.wakeAt < earliest) earliest = w.wakeAt;
+    }
+    return earliest;
   },
   _removeTimedWakeup(entry) {
     if (!entry || entry.cancelled) return;
@@ -2840,15 +2890,37 @@ const jvm = {
       }
       return;
     }
-    if (this._wakeupTimer != null && this._wakeupAt <= earliest) {
-      // Existing timer fires sooner or at the same moment; keep it.
+    if (this._wakeupTimer != null && this._wakeupAt <= earliest
+            && this._wakeupAt > this.schedulerNow() - 100) {
+      // Existing timer fires sooner or at the same moment; keep it. The
+      // third clause guards against a ZOMBIE: a timer whose target time is
+      // already well past yet whose callback never ran (its first statement
+      // nulls _wakeupTimer, so non-null + past-due means the host lost the
+      // timeout -- observed on the screenshot suite as every sleeping thread
+      // stranded 30s+ past its deadline with the queue intact, because a
+      // past-due _wakeupAt satisfies ``<= earliest`` for EVERY later wakeup
+      // and this branch then never re-arms). Distrust it and re-arm; if the
+      // old timer does still fire, the callback's _wakeupTimer-null reset +
+      // re-entrant processing are idempotent, so the duplicate is harmless.
       return;
     }
-    if (this._wakeupTimer != null) clearTimeout(this._wakeupTimer);
+    if (this._wakeupTimer != null) {
+      if (VM_DIAG_ENABLED && this._wakeupAt !== Infinity
+              && this._wakeupAt <= this.schedulerNow() - 100) {
+        try {
+          vmTrace("DIAG:WAKEUP_TIMER_ZOMBIE:rearmed:staleMs="
+            + Math.round(this.schedulerNow() - this._wakeupAt));
+        } catch (_e) {}
+      }
+      clearTimeout(this._wakeupTimer);
+    }
     const delay = Math.max(0, earliest - this.schedulerNow());
     this._wakeupAt = earliest;
     const self = this;
+    this._wakeupArmCount = (this._wakeupArmCount | 0) + 1;
     this._wakeupTimer = setTimeout(function() {
+      self._wakeupFireCount = (self._wakeupFireCount | 0) + 1;
+      self._wakeupLastFiredAt = self.schedulerNow();
       self._wakeupTimer = null;
       self._wakeupAt = Infinity;
       // ALWAYS reschedule remaining wakeups, even if processing one throws --
@@ -2861,6 +2933,20 @@ const jvm = {
     }, delay);
   },
   _processExpiredTimedWakeups() {
+    if (this._processingWakeups) {
+      // Re-entrancy guard: the resume loop below runs green threads via
+      // enqueue -> drain, and drain's opportunistic due-check (or the pump /
+      // a late one-shot) could otherwise re-enter while a batch is mid-resume.
+      return;
+    }
+    this._processingWakeups = true;
+    try {
+      this._processExpiredTimedWakeupsInner();
+    } finally {
+      this._processingWakeups = false;
+    }
+  },
+  _processExpiredTimedWakeupsInner() {
     const now = this.schedulerNow();
     const expired = [];
     for (let i = this.timedWakeups.length - 1; i >= 0; i--) {
@@ -2874,6 +2960,17 @@ const jvm = {
       if (w.wakeAt <= now + 1) {
         expired.push(w);
         this.timedWakeups.splice(i, 1);
+      } else if (VM_DIAG_ENABLED && !(w.wakeAt > now - 2000)) {
+        // An entry that is neither due (<= now+1) nor sane-future fails BOTH
+        // comparisons only when wakeAt isn't an ordinary number (NaN / boxed
+        // long / string). Print its raw shape -- this is the only way a
+        // queued, uncancelled, overdue entry can survive processing.
+        try {
+          vmTrace("DIAG:WAKEUP_BAD_ENTRY:kind=" + String(w.kind)
+            + ":typeof=" + (typeof w.wakeAt)
+            + ":val=" + String(w.wakeAt).slice(0, 30)
+            + ":thread=" + (w.thread ? w.thread.id : "-"));
+        } catch (_e) {}
       }
     }
     expired.reverse();  // restore registration order for FIFO fairness
@@ -2891,6 +2988,7 @@ const jvm = {
       if (w.cancelled) {
         continue;
       }
+      try {
       if (w.kind === "sleep") {
         this.enqueue(w.thread);
       } else if (w.kind === "wait") {
@@ -2907,6 +3005,16 @@ const jvm = {
           }
           this.resolveHostCall(w.id, false, null, "host call timed out (jso bridge)");
         }
+      }
+      } catch (resumeErr) {
+        // Per-entry guard: every entry in this batch is ALREADY spliced out of
+        // timedWakeups, so an exception escaping one resume would strand every
+        // remaining entry's thread in a sleep/wait that can never fire again.
+        // Contain the failure to the one entry and keep resuming the rest.
+        try {
+          vmTrace("DIAG:WAKEUP_RESUME_THREW:kind=" + String(w.kind)
+            + ":err=" + String(resumeErr && resumeErr.message || resumeErr).slice(0, 120));
+        } catch (_e) {}
       }
     }
     this._refreshTimedWakeupTimer();
@@ -5361,6 +5469,30 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
       if (__cn1HbTick % 20 === 0) {
         vmTrace("DIAG:WORKER_HB_THREADS:" + jvm.dumpThreadStates());
       }
+      // Stranded-sleep detector: a thread parked in sleep PAST its deadline is
+      // in one of three states, each implicating a different bug:
+      //   queued=1   -- entry still in timedWakeups; the single host timer is
+      //                 not firing / mis-armed (_refreshTimedWakeupTimer).
+      //   cancelled=1 -- something _removeTimedWakeup'd it without resuming
+      //                 the thread.
+      //   gone       -- spliced out of timedWakeups while not cancelled:
+      //                 _processExpiredTimedWakeups collected it but the
+      //                 enqueue never landed.
+      var __ths = jvm.threads || [];
+      for (var __i = 0; __i < __ths.length; __i++) {
+        var __t = __ths[__i];
+        if (__t.done || !__t.waiting || __t.waiting.op !== "sleep" || !__t.waiting.entry) continue;
+        var __e = __t.waiting.entry;
+        var __due = __e.wakeAt - jvm.schedulerNow();
+        if (__due > -2000) continue;
+        vmTrace("DIAG:STRANDED_SLEEP:t" + __t.id
+          + ":dueIn=" + Math.round(__due)
+          + ":queued=" + (jvm.timedWakeups.indexOf(__e) >= 0 ? 1 : 0)
+          + ":cancelled=" + (__e.cancelled ? 1 : 0)
+          + ":wakeupTimerArmed=" + (jvm._wakeupTimer != null ? 1 : 0)
+          + ":wakeupAt=" + (jvm._wakeupAt === Infinity ? "inf" : Math.round(jvm._wakeupAt - jvm.schedulerNow()))
+          + ":pendingWakeups=" + jvm.timedWakeups.length);
+      }
       vmTrace("DIAG:WORKER_HB:resumes=" + rc
         + ":runnable=" + (jvm.runnable ? jvm.runnable.length : -1)
         + ":draining=" + (jvm.draining ? 1 : 0)
@@ -5368,7 +5500,10 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
         + ":frozen=" + (frozen ? 1 : 0)
         + ":captureGate=" + (jvm.captureGateOwner ? 1 : 0)
         + ":sinceStepMs=" + (jvm.__cn1LastResumeTs != null ? Math.round(jvm.schedulerNow() - jvm.__cn1LastResumeTs) : -1)
-        + ":lastThread=" + String(jvm.__cn1LastResumeLabel));
+        + ":lastThread=" + String(jvm.__cn1LastResumeLabel)
+        + ":wakeArm=" + (jvm._wakeupArmCount | 0)
+        + ":wakeFire=" + (jvm._wakeupFireCount | 0)
+        + ":wakeFiredAgo=" + (jvm._wakeupLastFiredAt != null ? Math.round(jvm.schedulerNow() - jvm._wakeupLastFiredAt) : -1));
       // When the worker is wedged (frozen with nothing runnable) every green
       // thread is parked. Dump WHAT they are parked on so the lost-response /
       // deadlock can be isolated without worker-internal tracing (which

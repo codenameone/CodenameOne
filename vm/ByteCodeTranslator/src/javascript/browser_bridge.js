@@ -2706,6 +2706,20 @@
     }
     var worker = new Worker(workerUrl);
     global.__parparWorker = worker;
+    // External liveness nudge. Hidden/headless Chromium throttles BOTH the
+    // page's and the worker's timers (intensive wake-up throttling batches
+    // re-armed chains to ~1/min), which starves the VM scheduler's
+    // sleep/wait wakeups -- observed as every green thread parked 12-60s
+    // past its deadline while the worker idles. postMessage delivery is
+    // never throttled, and a 'timer-wake' makes the worker drain(), which
+    // opportunistically fires any due timed wakeups. Test harnesses (or
+    // embedders that detect background stalls) call this from an
+    // un-throttled context, e.g. CDP Runtime.evaluate.
+    global.__cn1NudgeVm = function() {
+      try {
+        worker.postMessage({ type: 'timer-wake' });
+      } catch (e) { /* worker torn down */ }
+    };
     worker.onmessage = function(event) {
       handleVmMessage(event.data, worker);
     };

@@ -45,7 +45,20 @@ let finalizeProfile = async () => {};
 const launchArgs = [
   '--autoplay-policy=no-user-gesture-required',
   '--disable-web-security',
-  '--allow-file-access-from-files'
+  '--allow-file-access-from-files',
+  // Headless pages count as hidden, so Chromium's background-timer machinery
+  // (IntensiveWakeUpThrottling in particular) batches re-armed setTimeout
+  // chains to ~one firing per MINUTE once the page's wake-up budget drains.
+  // The ParparVM worker schedules every Thread.sleep / Object.wait(timeout)
+  // through host timers, so the whole green-thread scheduler stalls in
+  // 12-60s bursts during quiet (no-host-event) phases -- observed as the
+  // screenshot suite crawling ~60s/test through the theme cluster with every
+  // thread parked past its wake deadline. Disable the throttling: this
+  // harness IS the foreground workload.
+  '--disable-background-timer-throttling',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+  '--disable-features=IntensiveWakeUpThrottling'
 ];
 if (profileWorker) {
   launchArgs.push(`--remote-debugging-port=${remoteDebugPort}`);
@@ -212,6 +225,18 @@ try {
 
   append(`goto:${url}`);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // VM liveness nudge from the Node side. Headless Chromium intensively
+  // throttles page AND worker timers (re-armed setTimeout chains batch to
+  // ~1/min once the hidden page's wake-up budget drains), which starves the
+  // ParparVM scheduler's sleep/wait wakeups and crawls the suite. CDP
+  // Runtime.evaluate is exempt from that throttling, so a Node interval
+  // pinging the bridge's __cn1NudgeVm (worker postMessage 'timer-wake' ->
+  // drain -> fire due wakeups) keeps the VM clock honest regardless of the
+  // browser's visibility heuristics.
+  const nudgeTimer = setInterval(() => {
+    page.evaluate('window.__cn1NudgeVm && window.__cn1NudgeVm()').catch(() => {});
+  }, 250);
+  nudgeTimer.unref?.();
   await page.waitForTimeout(2000);
 
   const start = Date.now();
