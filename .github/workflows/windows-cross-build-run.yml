@@ -58,7 +58,10 @@ jobs:
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build unzip
+          # xvfb: the CN1 CSS compiler (codenameone-maven-plugin css goal) renders
+          # via CEF/AWT and throws HeadlessException without a display, so the
+          # hellocodenameone-common build below runs under a virtual X server.
+          sudo apt-get install -y cmake ninja-build unzip xvfb
           wget -q https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 19
@@ -136,6 +139,10 @@ jobs:
         run: |
           set -e
           export JAVA_HOME="$JDK_17_HOME"
+          # Headful virtual display for the CSS compiler's CEF/AWT rendering.
+          Xvfb :99 -screen 0 1600x1200x24 >/tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+          sleep 2
           mkdir -p "$HOME/.codenameone"
           [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
           mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
