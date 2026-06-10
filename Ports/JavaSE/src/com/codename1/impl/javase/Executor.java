@@ -129,8 +129,14 @@ public class Executor {
     
     
     public static void main(final Class launcherClass, final String[] argv) throws Exception {
-        if (System.getProperty("cn1.simulator.useAppFrame", null) == null) {
-            System.setProperty("cn1.simulator.useAppFrame", "true");
+        // Mark that we are launching the interactive simulator. Only in this
+        // context does the persisted "Single Window Mode" preference take
+        // effect (see JavaSEPort.computeUseAppFrame). The default shell is the
+        // standalone device simulator; Single Window mode is opt-in via the
+        // Device menu. We intentionally do NOT force cn1.simulator.useAppFrame
+        // here anymore so the standalone simulator is the out-of-the-box mode.
+        if (System.getProperty("cn1.simulator.interactiveSimulator", null) == null) {
+            System.setProperty("cn1.simulator.interactiveSimulator", "true");
         }
         if(IS_MAC) {
             
