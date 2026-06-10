@@ -828,21 +828,39 @@ public class JavaSEPort extends CodenameOneImplementation {
     static LocationSimulation locSimulation;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
-    private static boolean useAppFrame = Boolean.getBoolean("cn1.simulator.useAppFrame");
-    static {
-        try {
-            if (useAppFrame) {
-                // If  the app frame is enabled in System properties, it can be disabled
-                // by the user preferences.
-                // If the system property is false, however, then it should not be overridden
-                // by the preference. The app frame must be DOUBLE activated - in system property
-                // and preferences to be active to prevent it from accendentally being enabled
-                // in other contexts, like unit tests or desktop app distributions.
-                Preferences prefs = Preferences.userNodeForPackage(JavaSEPort.class);
-                useAppFrame = prefs.getBoolean("cn1.simulator.useAppFrame", useAppFrame);
-            }
+    private static boolean useAppFrame = computeUseAppFrame();
 
-        } catch (Exception ex){}
+    /**
+     * Resolves whether the simulator should launch in "Single Window" (app
+     * frame) mode or as the plain standalone device simulator.
+     *
+     * <p>The default is the standalone simulator - Single Window mode is an
+     * opt-in chosen from the menu. Resolution order:</p>
+     * <ol>
+     *   <li>An explicit {@code -Dcn1.simulator.useAppFrame=true|false} always
+     *       wins. Test harnesses (e.g. SimulatorWindowModeVerifier) use this to
+     *       force a specific shell.</li>
+     *   <li>Otherwise, only the interactive simulator (which sets
+     *       {@code cn1.simulator.interactiveSimulator}) honours the persisted
+     *       "Single Window Mode" preference. Unit tests and packaged desktop
+     *       apps never go through that path, so they always get the standalone
+     *       simulator and can never accidentally enable the app frame.</li>
+     *   <li>Failing both, the standalone simulator is used.</li>
+     * </ol>
+     */
+    private static boolean computeUseAppFrame() {
+        try {
+            String explicit = System.getProperty("cn1.simulator.useAppFrame");
+            if (explicit != null) {
+                return Boolean.parseBoolean(explicit);
+            }
+            if (Boolean.getBoolean("cn1.simulator.interactiveSimulator")) {
+                return Preferences.userNodeForPackage(JavaSEPort.class)
+                        .getBoolean("cn1.simulator.useAppFrame", false);
+            }
+        } catch (Exception ex) {
+        }
+        return false;
     }
     protected static boolean fxExists = false;
     private JFrame window;
@@ -4681,10 +4699,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             Container parent = canvas.getParent();
             parent.remove(canvas);
-            canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()*zoomLevel), (int)(getSkin().getHeight()*zoomLevel)));
+            java.awt.Dimension displaySize = computeSkinDisplaySize();
+            canvas.setForcedSize(displaySize);
             if (appFrame == null) {
                 if (window != null) {
-                    window.setSize(new java.awt.Dimension((int) (getSkin().getWidth() * zoomLevel), (int) (getSkin().getHeight() * zoomLevel)));
+                    window.setSize(displaySize);
                 }
             }
             java.awt.Container top = ((JComponent)parent).getTopLevelAncestor();
@@ -4829,13 +4848,42 @@ public class JavaSEPort extends CodenameOneImplementation {
         return null;
     }
 
+    /**
+     * Computes the fit-to-screen zoom factor for the current skin, i.e. the
+     * largest factor &lt;= 1 that keeps the whole skin within the desktop
+     * screen bounds. This mirrors the calculation the Zoom toggle performs
+     * when scrollable mode is turned off.
+     */
+    private float fitToScreenZoomFactor() {
+        int screenH = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getHeight();
+        int screenW = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDisplayMode().getWidth();
+        float zoomY = getSkin().getHeight() > screenH ? screenH / (float) getSkin().getHeight() : 1f;
+        float zoomX = getSkin().getWidth() > screenW ? screenW / (float) getSkin().getWidth() : 1f;
+        return Math.min(zoomX, zoomY);
+    }
+
+    /**
+     * The on-screen size the device skin should occupy in the current display
+     * mode. When zoom (scrollable skin) is active the user's {@code zoomLevel}
+     * is honoured; otherwise the skin is fit to the screen exactly as the Zoom
+     * toggle does. Rotation handlers use this so that flipping the device keeps
+     * whatever fit/zoom state was already in effect instead of snapping back to
+     * 1:1 and forcing the user to re-toggle the Zoom menu.
+     */
+    private java.awt.Dimension computeSkinDisplaySize() {
+        float zoom = scrollableSkin ? zoomLevel : fitToScreenZoomFactor();
+        return new java.awt.Dimension(
+                (int) (getSkin().getWidth() * zoom),
+                (int) (getSkin().getHeight() * zoom));
+    }
+
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
         final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         JMenuBar bar = new JMenuBar();
         frm.setJMenuBar(bar);
 
-        JMenu simulatorMenu = new JMenu("Simulator");
-        registerMenuWithBlit(simulatorMenu);
+        JMenu deviceMenu = new JMenu("Device");
+        registerMenuWithBlit(deviceMenu);
         JMenu simulateMenu = new JMenu("Simulate");
         registerMenuWithBlit(simulateMenu);
         JMenu toolsMenu = new JMenu("Tools");
@@ -4869,7 +4917,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             }
         });
-        simulatorMenu.add(useAppFrameMenu);
+        deviceMenu.add(useAppFrameMenu);
 
         final JCheckBoxMenuItem autoLocalizationMenu = new JCheckBoxMenuItem("Auto Update Default Bundle");
         autoLocalizationMenu.setSelected(autoUpdateDefaultResourceBundle);
@@ -4887,7 +4935,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         });
-        simulatorMenu.add(autoLocalizationMenu);
+        deviceMenu.add(autoLocalizationMenu);
 
         // Rotate menu item: only added when app-frame mode is off. The
         // app-frame toolbar already exposes Portrait / Landscape RotateAction
@@ -4904,13 +4952,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 setPortrait(!portrait);
                 Container parent = canvas.getParent();
                 parent.remove(canvas);
-                canvas.setForcedSize(new java.awt.Dimension(
-                        (int) (getSkin().getWidth() * zoomLevel),
-                        (int) (getSkin().getHeight() * zoomLevel)));
+                java.awt.Dimension displaySize = computeSkinDisplaySize();
+                canvas.setForcedSize(displaySize);
                 if (window != null) {
-                    window.setSize(new java.awt.Dimension(
-                            (int) (getSkin().getWidth() * zoomLevel),
-                            (int) (getSkin().getHeight() * zoomLevel)));
+                    window.setSize(displaySize);
                 }
                 java.awt.Container top = ((JComponent) parent).getTopLevelAncestor();
                 top.revalidate();
@@ -4922,10 +4967,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
             }
         });
-        if (appFrame == null) simulatorMenu.add(rotateMenu);
+        if (appFrame == null) deviceMenu.add(rotateMenu);
 
         final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
-        if (appFrame == null) simulatorMenu.add(zoomMenu);
+        if (appFrame == null) deviceMenu.add(zoomMenu);
 
         JMenu debugEdtMenu = new JMenu("Debug EDT");
         toolsMenu.add(debugEdtMenu);
@@ -4987,7 +5032,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         JMenuItem screenshot = new JMenuItem("Screenshot");
-        if (appFrame == null) simulatorMenu.add(screenshot);
+        if (appFrame == null) deviceMenu.add(screenshot);
         KeyStroke f2 = KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0);
         screenshot.setAccelerator(f2);
         screenshot.addActionListener(new ActionListener() {
@@ -5061,7 +5106,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         JMenuItem screenshotWithSkin = new JMenuItem("Screenshot With Skin");
-        if (appFrame == null) simulatorMenu.add(screenshotWithSkin);
+        if (appFrame == null) deviceMenu.add(screenshotWithSkin);
         screenshotWithSkin.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -5141,7 +5186,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
         includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
         includeHeaderMenu.setSelected(includeHeaderInScreenshot);
-        if (appFrame == null) simulatorMenu.add(includeHeaderMenu);
+        if (appFrame == null) deviceMenu.add(includeHeaderMenu);
         includeHeaderMenu.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent e) {
@@ -5658,7 +5703,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         simulateMenu.add(biometricMenu);
 
-        installNfcSimulationMenu(simulateMenu, pref);
+        final JMenu nfcMenu = installNfcSimulationMenu(simulateMenu, pref);
 
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
@@ -5938,20 +5983,21 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
         //final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
-        //simulatorMenu.add(touchFlag);
+        //deviceMenu.add(touchFlag);
         //final JCheckBoxMenuItem nativeInputFlag = new JCheckBoxMenuItem("Native Input", useNativeInput);
-        //simulatorMenu.add(nativeInputFlag);
+        //deviceMenu.add(nativeInputFlag);
         //final JCheckBoxMenuItem simulateAndroidVKBFlag = new JCheckBoxMenuItem("Simulate Android VKB", simulateAndroidKeyboard);
-        //simulatorMenu.add(simulateAndroidVKBFlag);
+        //deviceMenu.add(simulateAndroidVKBFlag);
 
-        /*final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
-        toolsMenu.add(slowMotionFlag);
+        final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion",
+                com.codename1.ui.animations.Motion.isSlowMotion());
+        slowMotionFlag.setToolTipText("Slows every animation down 50x so transitions and motion can be inspected frame by frame");
         slowMotionFlag.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent e) {
-                Motion.setSlowMotion(slowMotionFlag.isSelected());
+                com.codename1.ui.animations.Motion.setSlowMotion(slowMotionFlag.isSelected());
             }
-        });*/
+        });
 
         final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 Permissions", android6PermissionsFlag);
         simulateMenu.add(permFlag);
@@ -5965,9 +6011,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
 
-        installLargerTextMenu(simulateMenu, pref, frm);
+        final JMenu largerTextMenu = installLargerTextMenu(simulateMenu, pref, frm);
 
-        installNotificationBackgroundSimulationMenu(simulateMenu);
+        final JMenu notificationBackgroundMenu = installNotificationBackgroundSimulationMenu(simulateMenu);
 
         pause = new JMenuItem("Pause App");
         simulateMenu.addSeparator();
@@ -5999,13 +6045,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         final JCheckBoxMenuItem alwaysOnTopFlag = new JCheckBoxMenuItem("Always on Top", alwaysOnTop);
-        if (appFrame == null) simulatorMenu.add(alwaysOnTopFlag);
+        if (appFrame == null) deviceMenu.add(alwaysOnTopFlag);
 
-        if (appFrame == null) simulatorMenu.addSeparator();
+        if (appFrame == null) deviceMenu.addSeparator();
 
 
         JMenuItem exit = new JMenuItem("Exit");
-        simulatorMenu.add(exit);
+        deviceMenu.add(exit);
 
         JMenu helpMenu = new JMenu("Help");
         helpMenu.setDoubleBuffered(true);
@@ -6125,12 +6171,85 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         helpMenu.add(about);
 
+        // ------------------------------------------------------------------
+        // Final menu assembly. Every item above was created with its listener
+        // already wired, but its provisional placement is discarded here and
+        // re-added in a deliberate order so the bar follows a clear
+        // Device / Simulate / Tools hierarchy instead of the historical and
+        // confusing "Simulator" vs "Simulate" split. Skins and Native Theme
+        // are folded into Device as submenus rather than being top-level menus.
+        // ------------------------------------------------------------------
+        final JMenu nativeThemeMenu = createNativeThemeMenu(frm);
+        skinMenu.setText("Skin");
+
+        // Device: the simulated device and its window. Rotate/Zoom/Screenshot
+        // and Always-on-Top only make sense for the standalone window - in
+        // Single Window (app frame) mode those live on the app-frame toolbar.
+        deviceMenu.removeAll();
+        if (appFrame == null) {
+            deviceMenu.add(rotateMenu);
+            deviceMenu.add(zoomMenu);
+            deviceMenu.addSeparator();
+        }
+        deviceMenu.add(skinMenu);
+        deviceMenu.add(nativeThemeMenu);
+        deviceMenu.addSeparator();
+        if (appFrame == null) {
+            deviceMenu.add(screenshot);
+            deviceMenu.add(screenshotWithSkin);
+            deviceMenu.add(includeHeaderMenu);
+            deviceMenu.addSeparator();
+        }
+        deviceMenu.add(useAppFrameMenu);
+        if (appFrame == null) {
+            deviceMenu.add(alwaysOnTopFlag);
+        }
+        deviceMenu.addSeparator();
+        deviceMenu.add(exit);
+
+        // Simulate: fake device state and events the app reacts to.
+        simulateMenu.removeAll();
+        simulateMenu.add(pause);
+        simulateMenu.add(appArg);
+        simulateMenu.addSeparator();
+        simulateMenu.add(locationSim);
+        simulateMenu.add(pushSim);
+        simulateMenu.add(biometricMenu);
+        simulateMenu.add(nfcMenu);
+        simulateMenu.add(statusBarTapDiag);
+        simulateMenu.addSeparator();
+        simulateMenu.add(darkLightModeMenu);
+        simulateMenu.add(largerTextMenu);
+        simulateMenu.add(purchaseMenu);
+        simulateMenu.add(permFlag);
+        simulateMenu.add(notificationBackgroundMenu);
+
+        // Tools: developer tools, diagnostics and the build/storage helpers.
+        toolsMenu.removeAll();
+        if (appFrame == null) {
+            // In Single Window mode the component inspector is a docked panel.
+            toolsMenu.add(componentTreeInspector);
+        }
+        toolsMenu.add(networkDebug);
+        toolsMenu.add(performanceMonitor);
+        toolsMenu.add(testRecorderMenu);
+        toolsMenu.add(scriptingConsole);
+        toolsMenu.addSeparator();
+        toolsMenu.add(debugEdtMenu);
+        toolsMenu.add(slowMotionFlag);
+        toolsMenu.add(debugWebViews);
+        if (isRunningInMaven() && MavenUtils.isRunningInJDK()) {
+            toolsMenu.add(hotReloadMenu);
+        }
+        toolsMenu.addSeparator();
+        toolsMenu.add(buildHintEditor);
+        toolsMenu.add(autoLocalizationMenu);
+        toolsMenu.add(clean);
+
         if (showMenu) {
-            bar.add(simulatorMenu);
+            bar.add(deviceMenu);
             bar.add(simulateMenu);
             bar.add(toolsMenu);
-            bar.add(skinMenu);
-            bar.add(createNativeThemeMenu(frm));
             for (JMenu extensionMenu : buildExtensionMenus()) {
                 bar.add(extensionMenu);
             }
@@ -6964,7 +7083,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return Math.min(h1, w1);
     }
     
-    private void installLargerTextMenu(JMenu parent, final Preferences pref, final JFrame frm) {
+    private JMenu installLargerTextMenu(JMenu parent, final Preferences pref, final JFrame frm) {
         // Standard iOS Dynamic Type stops with their actual body-text point sizes.
         // The simulator returns ratio = bodyPt / 17pt, matching what iOS reports.
         final String[] labels = {
@@ -7023,7 +7142,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             group.add(item);
             largerTextMenu.add(item);
         }
-        parent.add(largerTextMenu);
+        return largerTextMenu;
     }
 
     /// The Larger Text menu only changes the on-screen fonts when the running app
@@ -7075,7 +7194,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * Preferences keys all start with "NfcSim." so they survive simulator
      * restarts.
      */
-    private void installNotificationBackgroundSimulationMenu(JMenu simulateMenu) {
+    private JMenu installNotificationBackgroundSimulationMenu(JMenu simulateMenu) {
         JMenu menu = new JMenu("Notifications and Background");
 
         final JCheckBoxMenuItem network = new JCheckBoxMenuItem("Network available", simNetworkAvailable);
@@ -7197,7 +7316,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         SimulatorNotifications.setForegroundServiceLabel(fgStatus);
         menu.add(fgStatus);
 
-        simulateMenu.add(menu);
+        return menu;
     }
 
     private void deliverSharedContent(final SharedContent content) {
@@ -7208,7 +7327,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
-    private void installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+    private JMenu installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
         JMenu nfcMenu = new JMenu("NFC");
 
         final JCheckBoxMenuItem hwAvailable = new JCheckBoxMenuItem(
@@ -7387,7 +7506,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         nfcMenu.add(deactivate);
 
-        simulateMenu.add(nfcMenu);
+        return nfcMenu;
     }
 
     private static byte[] parseHex(String hex) {
