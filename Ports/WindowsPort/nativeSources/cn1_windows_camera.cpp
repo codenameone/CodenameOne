@@ -113,7 +113,13 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraCaptureFrame___int_1A
     }
 
     ComPtr<IMFSourceReader> reader;
-    if (FAILED(MFCreateSourceReaderFromMediaSource(source.Get(), NULL, &reader))) {
+    // Enable advanced video processing so a YUY2/NV12 webcam (the common case) is
+    // converted to RGB32; without it the RGB32 request below is ignored and frames
+    // come back 2-bpp, failing the size check (verified on a real YUY2 webcam).
+    ComPtr<IMFAttributes> readerAttr;
+    MFCreateAttributes(&readerAttr, 1);
+    readerAttr->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE);
+    if (FAILED(MFCreateSourceReaderFromMediaSource(source.Get(), readerAttr.Get(), &reader))) {
         source->Shutdown();
         return JAVA_NULL;
     }
@@ -237,7 +243,13 @@ static bool cn1CameraOpenReader(int deviceIndex, ComPtr<IMFMediaSource>& source,
     for (UINT32 i = 0; i < count; i++) { if (devices[i]) devices[i]->Release(); }
     CoTaskMemFree(devices);
     if (FAILED(hr) || !source) return false;
-    if (FAILED(MFCreateSourceReaderFromMediaSource(source.Get(), NULL, &reader))) {
+    // Enable the reader's video processor so a YUY2/NV12 webcam (the common case)
+    // is converted to RGB32; without it SetCurrentMediaType(RGB32) fails and frames
+    // arrive in the native 2-bpp format, failing the width*height*4 size check.
+    ComPtr<IMFAttributes> rattr;
+    MFCreateAttributes(&rattr, 1);
+    rattr->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE);
+    if (FAILED(MFCreateSourceReaderFromMediaSource(source.Get(), rattr.Get(), &reader))) {
         source->Shutdown();
         return false;
     }
