@@ -583,3 +583,6 @@ HLSL
 Catalyst
 texels
 billboarded
+Bezier
+subpath
+subpaths
