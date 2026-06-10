@@ -343,6 +343,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return secureStorage;
     }
 
+    // Windows Hello biometric authentication (WinRT UserConsentVerifier). Reports
+    // unsupported honestly when no Hello hardware is present or WinRT is absent.
+    private com.codename1.security.Biometrics biometrics;
+
+    @Override
+    public com.codename1.security.Biometrics getBiometrics() {
+        if (biometrics == null) {
+            biometrics = new WindowsBiometrics();
+        }
+        return biometrics;
+    }
+
     @Override
     public int getDisplayWidth() {
         return WindowsNative.getDisplayWidth();

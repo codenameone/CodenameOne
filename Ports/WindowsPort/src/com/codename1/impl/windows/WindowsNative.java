@@ -500,6 +500,22 @@ public final class WindowsNative {
     /** Stops recording, finalizes the WAV header and frees the peer. */
     public static native void audioRecStop(long peer);
 
+    /* ------------------------------------------- biometric (Windows Hello) */
+
+    /**
+     * Windows Hello availability via {@code UserConsentVerifier}: 0 Available,
+     * 1 DeviceNotPresent, 2 NotConfiguredForUser, 3 DisabledByPolicy,
+     * 4 DeviceBusy. Returns 1 when WinRT is unavailable (stub build).
+     */
+    public static native int biometricAvailability();
+
+    /**
+     * Shows the Windows Hello consent prompt with {@code message}; returns true
+     * when the user is verified. Blocks (call off the EDT). Returns false in the
+     * stub build.
+     */
+    public static native boolean biometricAuthenticate(String message);
+
     // ---------------------------------------------------------------------
     // 3D / Direct3D 11 backend (com.codename1.gpu). Implemented in
     // nativeSources/cn1_windows_d3d.cpp. Every peer is an opaque long (a D3D

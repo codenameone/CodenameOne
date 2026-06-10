@@ -778,6 +778,36 @@ public class ByteCodeTranslator {
                 writer.append("        endif()\n");
                 writer.append("        target_link_libraries(${PROJECT_NAME} shlwapi version shell32 advapi32)\n");
                 writer.append("    endif()\n");
+                // WinRT-backed services (biometric / location / contacts / share) are
+                // consumed through the WRL ABI projection. The WinRT ABI headers
+                // (windows.security.credentials.ui.h etc.) and runtimeobject.lib are
+                // part of a full Windows SDK but may be absent from a cross-compile
+                // sysroot (e.g. an xwin splat), so probe the toolchain: only when a
+                // minimal WinRT translation unit compiles + links is CN1_HAVE_WINRT
+                // defined and runtimeobject linked -- otherwise those natives compile
+                // as stubs and the matching capabilities report unsupported, exactly
+                // like the WebView2 gate above. This keeps the Windows-free cross-compile
+                // green while the real services light up on a Windows-host build.
+                writer.append("    include(CheckCXXSourceCompiles)\n");
+                writer.append("    set(CMAKE_REQUIRED_FLAGS \"/EHsc /std:c++17\")\n");
+                writer.append("    set(CMAKE_REQUIRED_LIBRARIES runtimeobject)\n");
+                writer.append("    check_cxx_source_compiles(\"\n");
+                writer.append("#include <roapi.h>\n");
+                writer.append("#include <wrl.h>\n");
+                writer.append("#include <wrl/wrappers/corewrappers.h>\n");
+                writer.append("#include <windows.foundation.h>\n");
+                writer.append("#include <windows.security.credentials.ui.h>\n");
+                writer.append("using namespace ABI::Windows::Security::Credentials::UI;\n");
+                writer.append("int main(){ Microsoft::WRL::Wrappers::RoInitializeWrapper i(RO_INIT_MULTITHREADED);\n");
+                writer.append("  Microsoft::WRL::ComPtr<IUserConsentVerifierStatics> s;\n");
+                writer.append("  RoGetActivationFactory(Microsoft::WRL::Wrappers::HStringReference(RuntimeClass_Windows_Security_Credentials_UI_UserConsentVerifier).Get(), IID_PPV_ARGS(&s)); return 0; }\n");
+                writer.append("\" CN1_WINRT_AVAILABLE)\n");
+                writer.append("    unset(CMAKE_REQUIRED_FLAGS)\n");
+                writer.append("    unset(CMAKE_REQUIRED_LIBRARIES)\n");
+                writer.append("    if(CN1_WINRT_AVAILABLE)\n");
+                writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_HAVE_WINRT=1)\n");
+                writer.append("        target_link_libraries(${PROJECT_NAME} runtimeobject)\n");
+                writer.append("    endif()\n");
                 // Release is the shipping default: optimized (/O2 from the Release
                 // config) and stripped -- no debug info, and the linker dead-strips
                 // unreferenced functions (/OPT:REF) and folds identical COMDATs

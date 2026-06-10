@@ -150,7 +150,20 @@ they stay honest until backed by a real implementation:
 - Push + local notifications (`sendLocalNotification`)
 - Vibrate (no desktop vibration motor)
 - System share, print
-- Biometric (Windows Hello)
+- Location / GPS, Contacts (WinRT — see below)
+
+**Biometric (Windows Hello) — implemented.** `getBiometrics()` →
+`WindowsBiometrics`, backed by the WinRT `UserConsentVerifier` (face / fingerprint
+/ PIN). `isSupported()` / `canAuthenticate()` map to `CheckAvailabilityAsync`;
+`authenticate(...)` runs the system Hello prompt off the EDT and completes the
+`AsyncResource`. WinRT is consumed via the WRL ABI projection
+(`cn1_windows_winrt.cpp`), gated on `CN1_HAVE_WINRT` (the generated CMake probes
+the toolchain and defines it only when the WinRT ABI headers + `runtimeobject`
+link), so a cross-compile sysroot without WinRT compiles the natives as honest
+"unsupported" stubs and stays green — the same gating model as WebView2. Verified
+on a real Windows ARM64 VM: the WRL pattern activates the factory and awaits the
+async op; the VM correctly reports `DeviceNotPresent` (no Hello hardware), so the
+port reports unsupported there and a real Hello-equipped laptop reports available.
 
 **Audio recording — implemented.** `createMediaRecorder` / `captureAudio` record
 from the default microphone via the classic `waveIn` (winmm) API to a 16-bit PCM
