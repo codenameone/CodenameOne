@@ -22,8 +22,10 @@
  */
 package com.codename1.gaming;
 
+import com.codename1.media.CompletionAwareSoundPoolPeer;
 import com.codename1.media.MediaManager;
 import com.codename1.media.SoundPoolPeer;
+import com.codename1.media.VoiceCompletionListener;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import java.io.IOException;
@@ -54,6 +56,7 @@ public final class SoundPool {
     private final SoundPoolPeer peer;
     private final boolean nativeAccelerated;
     private final int maxStreams;
+    private VoiceListener voiceListener;
 
     private SoundPool(SoundPoolPeer peer, boolean nativeAccelerated, int maxStreams) {
         this.peer = peer;
@@ -76,6 +79,37 @@ public final class SoundPool {
     /// platform `MediaManager` fallback is in use.
     public boolean isNativeAccelerated() {
         return nativeAccelerated;
+    }
+
+    /// True if this pool can report voice completion to a `VoiceListener`. The
+    /// cross-platform fallback mixer supports it; some native engines (e.g. Android's
+    /// `SoundPool`) do not.
+    public boolean isVoiceCompletionSupported() {
+        return peer instanceof CompletionAwareSoundPoolPeer;
+    }
+
+    /// Registers a listener notified (on the EDT) as each voice finishes playing, or
+    /// `null` to clear it. Has no effect on backends where
+    /// `#isVoiceCompletionSupported()` is false.
+    public void setVoiceListener(VoiceListener listener) {
+        this.voiceListener = listener;
+        if (peer instanceof CompletionAwareSoundPoolPeer) {
+            ((CompletionAwareSoundPoolPeer) peer).setVoiceCompletionListener(
+                    listener == null ? null : new VoiceCompletionListener() {
+                        @Override
+                        public void onVoiceComplete(final int voiceId) {
+                            final VoiceListener l = voiceListener;
+                            if (l != null) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        l.onComplete(voiceId);
+                                    }
+                                });
+                            }
+                        }
+                    });
+        }
     }
 
     /// The maximum number of voices that can play simultaneously.

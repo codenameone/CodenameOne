@@ -44,7 +44,7 @@ import java.util.Map;
 /// pitch or pan -- `rate` and `pan` are ignored. Ports that provide a real low
 /// latency `SoundPoolPeer` are used in preference to this (see
 /// `com.codename1.gaming.SoundPool#isNativeAccelerated()`).
-class MediaSoundPoolPeer implements SoundPoolPeer {
+class MediaSoundPoolPeer implements CompletionAwareSoundPoolPeer {
     private static final int RING_DEFAULT = 4;
 
     private final int maxStreams;
@@ -52,6 +52,12 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
     private final Map voices = new HashMap();
     private int activeVoices;
     private int nextVoiceId = 1;
+    private VoiceCompletionListener completionListener;
+
+    @Override
+    public synchronized void setVoiceCompletionListener(VoiceCompletionListener listener) {
+        this.completionListener = listener;
+    }
 
     MediaSoundPoolPeer(int maxStreams) {
         this.maxStreams = maxStreams < 1 ? 1 : maxStreams;
@@ -178,6 +184,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
     private void onVoiceComplete(final Slot slot) {
         // Media completion callbacks arrive off the EDT; restart looping playback
         // on the EDT and keep bookkeeping synchronized.
+        VoiceCompletionListener notify;
         synchronized (this) {
             if (!slot.busy) {
                 return;
@@ -192,6 +199,10 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
             voices.remove(Integer.valueOf(slot.voiceId));
             slot.busy = false;
             activeVoices--;
+            notify = completionListener;
+        }
+        if (notify != null) {
+            notify.onVoiceComplete(slot.voiceId);
         }
     }
 

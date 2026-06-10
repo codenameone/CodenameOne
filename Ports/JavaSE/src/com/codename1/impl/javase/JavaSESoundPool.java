@@ -42,7 +42,7 @@ import javax.sound.sampled.SourceDataLine;
 /// supports per voice volume, stereo pan, pitch/rate (via fractional resampling)
 /// and unbounded polyphony up to the configured voice cap -- matching what the
 /// native mobile backends provide so the simulator behaves like a device.
-class JavaSESoundPool implements SoundPoolPeer {
+class JavaSESoundPool implements com.codename1.media.CompletionAwareSoundPoolPeer {
     private static final float SAMPLE_RATE = 44100f;
     private static final int CHANNELS = 2;
     private static final int BUFFER_FRAMES = 1024;
@@ -56,6 +56,12 @@ class JavaSESoundPool implements SoundPoolPeer {
     private int nextVoiceId = 1;
     private volatile boolean alive = true;
     private final Thread mixerThread;
+    private volatile com.codename1.media.VoiceCompletionListener completionListener;
+
+    @Override
+    public void setVoiceCompletionListener(com.codename1.media.VoiceCompletionListener listener) {
+        this.completionListener = listener;
+    }
 
     private static final class Sound {
         float[] pcm;   // interleaved stereo
@@ -70,6 +76,7 @@ class JavaSESoundPool implements SoundPoolPeer {
         float gainR;
         int loopsRemaining; // -1 == infinite
         boolean paused;
+        boolean stopped;    // explicitly stopped (vs. finished naturally)
         int voiceId;
     }
 
@@ -97,6 +104,7 @@ class JavaSESoundPool implements SoundPoolPeer {
             for (int i = 0; i < mix.length; i++) {
                 mix[i] = 0f;
             }
+            java.util.List completed = null;
             synchronized (this) {
                 for (int v = 0; v < activeCount; v++) {
                     mixVoice(active[v], mix);
@@ -108,12 +116,26 @@ class JavaSESoundPool implements SoundPoolPeer {
                         active[w++] = active[v];
                     } else {
                         voices.remove(Integer.valueOf(active[v].voiceId));
+                        if (!active[v].stopped) {
+                            if (completed == null) {
+                                completed = new java.util.ArrayList();
+                            }
+                            completed.add(Integer.valueOf(active[v].voiceId));
+                        }
                     }
                 }
                 for (int v = w; v < activeCount; v++) {
                     active[v] = null;
                 }
                 activeCount = w;
+            }
+            if (completed != null) {
+                com.codename1.media.VoiceCompletionListener l = completionListener;
+                if (l != null) {
+                    for (int i = 0; i < completed.size(); i++) {
+                        l.onVoiceComplete(((Integer) completed.get(i)).intValue());
+                    }
+                }
             }
             for (int i = 0; i < mix.length; i++) {
                 float s = mix[i];
@@ -312,12 +334,14 @@ class JavaSESoundPool implements SoundPoolPeer {
     public synchronized void stopVoice(int voiceId) {
         Voice v = (Voice) voices.get(Integer.valueOf(voiceId));
         if (v != null) {
+            v.stopped = true;
             v.sound = null; // compacted out on next mixer pass
         }
     }
 
     public synchronized void stopAll() {
         for (int v = 0; v < activeCount; v++) {
+            active[v].stopped = true;
             active[v].sound = null;
         }
     }

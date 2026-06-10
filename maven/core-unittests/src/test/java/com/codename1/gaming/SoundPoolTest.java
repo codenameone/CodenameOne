@@ -33,4 +33,19 @@ class SoundPoolTest extends UITestBase {
         pool.stopAll();
         pool.release();
     }
+
+    @Test
+    void voiceCompletionListenerWiring() {
+        SoundPool pool = SoundPool.create(4);
+        // the cross-platform fallback mixer reports completion
+        assertTrue(pool.isVoiceCompletionSupported());
+        // registering and clearing a listener is a safe no-op even without playback
+        pool.setVoiceListener(new VoiceListener() {
+            @Override
+            public void onComplete(int voiceId) {
+            }
+        });
+        pool.setVoiceListener(null);
+        pool.release();
+    }
 }
