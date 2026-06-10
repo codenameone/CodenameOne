@@ -150,7 +150,18 @@ they stay honest until backed by a real implementation:
 - Push + local notifications (`sendLocalNotification`)
 - Vibrate (no desktop vibration motor)
 - System share, print
-- Location / GPS, Contacts (WinRT — see below)
+- Contacts (WinRT — pending)
+
+**Location / GPS — implemented (WinRT).** `getLocationManager()` →
+`WindowsLocationManager`, backed by the WinRT `Geolocator`
+(`cn1_windows_winrt.cpp`, same `CN1_HAVE_WINRT` gate). `getCurrentLocation` /
+`getLastKnownLocation` resolve one fix (lat/lon/accuracy/altitude/heading/speed);
+a continuous `LocationListener` is served by a polling thread. When Windows
+location is disabled or no provider answers, it reports `OUT_OF_SERVICE` / throws
+rather than fabricating a position; `getLocationManager` returns `null` on a
+WinRT-less build. Verified on the Windows ARM64 VM: the `Geolocator` activates and
+`GetGeopositionAsync` returns `E_ACCESSDENIED` (location off on the VM), which the
+port surfaces honestly as unavailable.
 
 **Biometric (Windows Hello) — implemented.** `getBiometrics()` →
 `WindowsBiometrics`, backed by the WinRT `UserConsentVerifier` (face / fingerprint

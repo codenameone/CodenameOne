@@ -355,6 +355,22 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return biometrics;
     }
 
+    // WinRT Geolocator-backed location. Returns null (unsupported) on a build
+    // without WinRT; on a real build getCurrentLocation reports OUT_OF_SERVICE
+    // honestly when Windows location is disabled.
+    private com.codename1.location.LocationManager locationManager;
+
+    @Override
+    public com.codename1.location.LocationManager getLocationManager() {
+        if (!WindowsNative.locationSupported()) {
+            return null;
+        }
+        if (locationManager == null) {
+            locationManager = new WindowsLocationManager();
+        }
+        return locationManager;
+    }
+
     @Override
     public int getDisplayWidth() {
         return WindowsNative.getDisplayWidth();

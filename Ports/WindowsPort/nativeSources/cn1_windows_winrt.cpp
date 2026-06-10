@@ -48,24 +48,35 @@
 #include <wrl/wrappers/corewrappers.h>
 #include <windows.foundation.h>
 #include <windows.security.credentials.ui.h>
+#include <windows.devices.geolocation.h>
 
 using namespace ABI::Windows::Foundation;
 using namespace ABI::Windows::Security::Credentials::UI;
+using namespace ABI::Windows::Devices::Geolocation;
 using namespace Microsoft::WRL;
 using namespace Microsoft::WRL::Wrappers;
+
+/* IGeocoordinate's direct lat/lon/altitude getters are marked deprecated (the
+ * docs steer toward Point.Position), but they remain functional and are far
+ * simpler than the IGeocoordinateWithPoint -> IGeopoint -> BasicGeoposition path;
+ * silence the deprecation noise rather than take the heavier path. */
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 /* Blocks the calling (CN1 worker) thread until a WinRT IAsyncOperation<T>
  * completes, then fetches its result. Used for the inherently-async WinRT APIs;
  * callers invoke these natives off the EDT (via AsyncResource) so blocking is
  * fine. */
-template <typename T>
-static HRESULT cn1AwaitOp(IAsyncOperation<T>* op, T* result) {
+/* TOp is the operation's logical result type (a value type, or a runtimeclass --
+ * for which GetResults yields the ABI *interface* pointer, so the result pointer
+ * type TResultPtr is kept separate from TOp). */
+template <typename TOp, typename TResultPtr>
+static HRESULT cn1AwaitOp(IAsyncOperation<TOp>* op, TResultPtr result) {
     Event done(CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS));
     if (!done.IsValid()) {
         return E_FAIL;
     }
-    HRESULT hr = op->put_Completed(Callback<IAsyncOperationCompletedHandler<T>>(
-            [&done](IAsyncOperation<T>*, AsyncStatus) {
+    HRESULT hr = op->put_Completed(Callback<IAsyncOperationCompletedHandler<TOp>>(
+            [&done](IAsyncOperation<TOp>*, AsyncStatus) {
                 SetEvent(done.Get());
                 return S_OK;
             }).Get());
@@ -148,6 +159,86 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_biometricAuthenticate___ja
     return result == UserConsentVerificationResult_Verified ? JAVA_TRUE : JAVA_FALSE;
 #else
     (void) message;
+    return JAVA_FALSE;
+#endif
+}
+
+/* True when the port was built with WinRT (so a real Geolocator can be used);
+ * lets getLocationManager() return null honestly on a stub build. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationSupported___R_boolean(CODENAME_ONE_THREAD_STATE) {
+#ifdef CN1_HAVE_WINRT
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+/* -------------------------------------------------------------- location
+ *
+ * Maps Windows.Devices.Geolocation.Geolocator to LocationManager. Fills `out`
+ * with [latitude, longitude, accuracy(m), altitude(m), direction(deg),
+ * velocity(m/s), timestampMillis] and returns true; false when location is
+ * unavailable / disabled (Windows location off, or WinRT stub build) so the
+ * port reports unsupported honestly rather than fabricating a position. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationGetCurrent___double_1ARRAY_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT outArr) {
+#ifdef CN1_HAVE_WINRT
+    if (outArr == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    cn1WinRtInit();
+    ComPtr<IInspectable> inspectable;
+    HRESULT hr = RoActivateInstance(
+            HStringReference(RuntimeClass_Windows_Devices_Geolocation_Geolocator).Get(), &inspectable);
+    if (FAILED(hr)) {
+        return JAVA_FALSE;
+    }
+    ComPtr<IGeolocator> geo;
+    if (FAILED(inspectable.As(&geo))) {
+        return JAVA_FALSE;
+    }
+    ComPtr<IAsyncOperation<Geoposition*>> op;
+    if (FAILED(geo->GetGeopositionAsync(&op))) {
+        return JAVA_FALSE;
+    }
+    ComPtr<IGeoposition> pos;
+    if (FAILED(cn1AwaitOp(op.Get(), pos.GetAddressOf())) || !pos) {
+        return JAVA_FALSE;
+    }
+    ComPtr<IGeocoordinate> coord;
+    if (FAILED(pos->get_Coordinate(&coord)) || !coord) {
+        return JAVA_FALSE;
+    }
+    DOUBLE latitude = 0, longitude = 0, altitude = 0, accuracy = 0;
+    coord->get_Latitude(&latitude);
+    coord->get_Longitude(&longitude);
+    coord->get_Accuracy(&accuracy);
+    ComPtr<IReference<double>> altRef;
+    if (SUCCEEDED(coord->get_Altitude(&altRef)) && altRef) {
+        altRef->get_Value(&altitude);
+    }
+    /* Heading / Speed are IReference<double> (may be null when stationary). */
+    double heading = 0, speed = 0;
+    ComPtr<IReference<double>> headingRef;
+    if (SUCCEEDED(coord->get_Heading(&headingRef)) && headingRef) {
+        headingRef->get_Value(&heading);
+    }
+    ComPtr<IReference<double>> speedRef;
+    if (SUCCEEDED(coord->get_Speed(&speedRef)) && speedRef) {
+        speedRef->get_Value(&speed);
+    }
+    JAVA_ARRAY arr = (JAVA_ARRAY) outArr;
+    double* out = (double*) arr->data;
+    int n = arr->length;
+    if (n > 0) { out[0] = latitude; }
+    if (n > 1) { out[1] = longitude; }
+    if (n > 2) { out[2] = accuracy; }
+    if (n > 3) { out[3] = altitude; }
+    if (n > 4) { out[4] = heading; }
+    if (n > 5) { out[5] = speed; }
+    return JAVA_TRUE;
+#else
+    (void) outArr;
     return JAVA_FALSE;
 #endif
 }
