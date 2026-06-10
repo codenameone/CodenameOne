@@ -1,0 +1,43 @@
+name: Scaffolding settings parity
+
+# Guards that the two project-scaffolding paths -- the Maven archetype
+# (maven/cn1app-archetype) and the initializr (scripts/initializr, via the embedded
+# common.zip) -- ship the SAME build-hint properties in codenameone_settings.properties.
+#
+# A newly generated project must look identical regardless of which path produced it.
+# This caught a real drift: the iOS/Android on-device-debug hints (ios.onDeviceDebug,
+# android.onDeviceDebug, ...) were added to the archetype but never to the initializr's
+# common.zip, so they were silently missing from initializr projects.
+#
+# The check only needs python3 + unzip, so it runs fast and is path-gated to the two
+# templates and the test harness itself.
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/common/codenameone_settings.properties'
+      - 'scripts/initializr/common/src/main/resources/common.zip'
+      - 'maven/integration-tests/scaffolding-settings-parity-test.sh'
+      - 'maven/integration-tests/normalize_cn1_settings.py'
+      - '.github/workflows/scaffolding-parity.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/common/codenameone_settings.properties'
+      - 'scripts/initializr/common/src/main/resources/common.zip'
+      - 'maven/integration-tests/scaffolding-settings-parity-test.sh'
+      - 'maven/integration-tests/normalize_cn1_settings.py'
+      - '.github/workflows/scaffolding-parity.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  scaffolding-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Compare archetype vs initializr codenameone_settings.properties
+        run: bash maven/integration-tests/scaffolding-settings-parity-test.sh
