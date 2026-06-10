@@ -13,9 +13,9 @@ layout system render them -- the techniques in the <<Animations>> chapter are
 often a better fit. Reach for `com.codename1.gaming` when you want a frame driven
 loop and GPU sprite rendering.
 
-=== Three sample games
+=== Sample games
 
-The samples project ships three runnable starting points. Each is a single file
+The samples project ships several runnable starting points. Each is a single file
 built entirely from art generated at runtime -- no asset files -- so you can copy
 one and start changing it immediately. The rest of this chapter draws on them to
 show how the pieces fit together.
@@ -40,9 +40,25 @@ colored `Model` buildings and billboarded coins, lit and orbited by a perspectiv
 camera.
 |===
 
-All three are driven by the joystick and buttons in <<On-screen touch controls>>,
-so they're equally playable on a touch device and in the desktop simulator (where
-the arrow keys and mouse stand in for the stick).
+Two more samples show how far the same 2D primitives stretch -- one flat, one faked
+into 3D:
+
+* *`CardGameSample`* -- a 2D Memory (Concentration) match. Each card is a `Sprite`
+in a grid; flipping one animates its horizontal scale through zero and swaps the
+image at the thin point, and taps are hit-tested against sprite bounds through
+`GameInput`. A compact illustration of flat 2D play with no camera tricks at all.
+* *`BoardGameSample`* -- *faux-3D* checkers on an isometric board. Every tile and
+piece is still a flat `Sprite`, but laying them out in an isometric (2:1 diamond)
+projection and raising the pieces off their tiles with a drop shadow gives a
+convincing 3D look without any GPU 3D, perspective camera or models. The screen
+pixel-to-board-cell mapping (and its inverse, for picking) is the same math behind
+any isometric strategy or tycoon game; it also implements the full move/jump/chain
+/crown rules and a small AI so you can play it solo.
+
+The action samples are driven by the joystick and buttons in
+<<On-screen touch controls>>, so they're equally playable on a touch device and in
+the desktop simulator (where the arrow keys and mouse stand in for the stick); the
+card and board games are pure tap.
 
 === The game loop: `GameView`
 
@@ -187,7 +203,7 @@ boolean jump = getInput().wasKeyPressed(jumpKey);  // or GAME_UP, etc.
 ----
 
 The joystick (bottom-left) and JUMP button (bottom-right) are visible in the
-<<Three sample games,sample screenshots>> above. There are also absolutely
+<<Sample games,sample screenshots>> above. There are also absolutely
 positioned overloads (`addJoystick(centerX, centerY, radius)`), and
 `setVisible(false)` hides the overlay -- handy when a real keyboard is attached.
 Multi-touch is supported, so the player can steer and press a button at once.
@@ -409,10 +425,29 @@ blocks on the hot path). The parameters are: `volume` 0 to 1, `pan` -1 (left) to
 forever, n extra repeats). `stop`, `pause`, `resume`, `stopAll`, `autoPause` and
 `autoResume` manage playback; `release()` frees the pool.
 
-On platforms with a purpose built low latency audio engine the pool uses it
-directly with full volume/pan/pitch support. Where none exists it falls back to a
-`MediaManager` based pool that still works everywhere but has higher latency and
-ignores pan and rate. `isNativeAccelerated()` tells you which path is active.
+On platforms with a purpose built low latency audio engine -- Android's `SoundPool`,
+iOS `AVAudioEngine`, the desktop `javax.sound.sampled` mixer and `WebAudio` in the
+browser -- the pool uses it directly with full volume/pan/pitch support. Where none
+exists it falls back to a `MediaManager` based pool that still works everywhere but
+has higher latency and ignores pan and rate. `isNativeAccelerated()` tells you which
+path is active.
+
+To react as a sound finishes -- chaining clips, recycling a game object when its
+effect ends -- register a
+https://www.codenameone.com/javadoc/com/codename1/gaming/VoiceListener.html[`VoiceListener`].
+It's called on the EDT with the voice id as each voice completes. Not every native
+engine can report completion, so guard with `isVoiceCompletionSupported()`:
+
+[source,java]
+----
+if (sfx.isVoiceCompletionSupported()) {
+    sfx.setVoiceListener(new VoiceListener() {
+        public void onComplete(int voiceId) {
+            onEffectFinished(voiceId);
+        }
+    });
+}
+----
 
 NOTE: Load your sounds once, up front -- ideally on a background thread with
 `SoundPool.loadAsync(...)` -- and keep the `SoundEffect` references for the life of
@@ -504,6 +539,39 @@ If you need a feature the wrapper doesn't expose, `PhysicsWorld.getNativeWorld()
 and `PhysicsBody.getNativeBody()` give you the underlying engine objects (which
 work in meters, y up).
 
+==== Joints
+
+Joints constrain how two bodies move relative to each other -- hinges, ropes, axles,
+welds. `PhysicsWorld` creates them in pixel coordinates and returns a
+https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsJoint.html[`PhysicsJoint`]
+handle:
+
+[source,java]
+----
+// a hinge the two bodies pivot around (anchor in pixels)
+world.createRevoluteJoint(bodyA, bodyB, pivotXpx, pivotYpx);
+// a fixed-length link, like a rod between two crates
+world.createDistanceJoint(bodyA, bodyB, ax, ay, bx, by, 0f, 0f);
+// drag a body toward the finger -- great for "pick up and throw"
+PhysicsJoint drag = world.createMouseJoint(ground, body, px, py, 1000f);
+// ... while the finger moves:
+drag.setTarget(getInput().getPointerX(), getInput().getPointerY());
+// ... on release:
+drag.destroy();
+----
+
+`createWeldJoint` and `createPrismaticJoint` (a sliding axis) round out the set.
+
+==== Debugging physics
+
+When sprites and bodies drift apart it helps to see the raw simulation. Call
+`world.debugDraw(Graphics)` to overlay every fixture, joint and contact straight onto
+a Codename One `Graphics` -- shapes, centers of mass and bounding boxes -- in pixel
+space, with the y-axis flip already applied. Choose what to show with
+`setDebugDrawFlags(shapes, joints, boundingBoxes)`. Because it draws to an ordinary
+`Graphics` you can render it over a regular Codename One component, not only a
+`GameView`.
+
 === Putting it together: Anatomy of a game
 
 Every sample follows the same shape, which is the recipe for your own game:
@@ -517,10 +585,10 @@ Every sample follows the same shape, which is the recipe for your own game:
 a `PhysicsWorld`, scale all movement by `dt`, and trigger `SoundPool` effects.
 . *Show it*: add the view to a `Form` and call `start()`.
 
-The samples project has four runnable examples to copy from:
+The samples project has several runnable examples to copy from:
 
 * *`CasualGameSample`* -- sprites, per-sprite animation, collision and particle bursts
-in a top-down arena (see <<Three sample games>>).
+in a top-down arena (see <<Sample games>>).
 * *`ScrollerGameSample`* -- an `AnimatedSprite` walk cycle, a parallax backdrop and a
 scrolling `Scene` camera.
 * *`Gaming3DDemoSample`* -- lit cube `Model` objects, a textured ground and
@@ -528,6 +596,10 @@ billboarded sprites under a perspective camera.
 * *`GamingDemoSample`* -- the physics tour, built on a `PhysicsWorld` with a floor and walls,
 tap-to-drop balls that bounce (each `Sprite` linked to its body) and a `SoundPool`
 blip whose pitch varies per drop.
+* *`CardGameSample`* -- a flat 2D Memory match: a grid of card `Sprite` objects with a
+flip animation and tap hit-testing.
+* *`BoardGameSample`* -- faux-3D checkers: flat sprites placed in an isometric
+projection, with screen-to-cell picking, full rules and a small AI.
 
 Each is a single self-contained file that generates its art at runtime, so it needs
 no assets -- a compact starting point you can copy and reshape.
