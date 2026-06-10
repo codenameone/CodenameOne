@@ -151,7 +151,15 @@ they stay honest until backed by a real implementation:
 - Vibrate (no desktop vibration motor)
 - System share, print
 - Biometric (Windows Hello)
-- Audio recording
+
+**Audio recording — implemented.** `createMediaRecorder` / `captureAudio` record
+from the default microphone via the classic `waveIn` (winmm) API to a 16-bit PCM
+WAV file (`cn1_windows_audiorec.c` + `WindowsAudioRecorder`); a worker thread
+drains capture buffers to disk and the RIFF/data sizes are patched on stop.
+`getAvailableRecordingMimeTypes()` reports `audio/wav` (also decodable by the
+port's MF playback). waveIn rather than an MF encode pipeline: dependency-free
+and robust (no codec/media-type negotiation). Verified on a real Windows ARM64
+VM — compiles clean and `waveIn` captures 88200 bytes/s from the mic.
 
 ### 5. Native peers beyond WebView2
 

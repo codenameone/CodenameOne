@@ -2136,6 +2136,33 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return new WindowsMedia(peer, onCompletion);
     }
 
+    /* ---------------------------------------------------- audio recording
+     * waveIn-backed PCM WAV recorder (cn1_windows_audiorec.c). createMediaRecorder
+     * returns a Media whose play() starts capturing from the default microphone
+     * and pause()/cleanup() finalizes the file. */
+
+    @Override
+    public Media createMediaRecorder(String path, String mimeType) throws IOException {
+        if (path == null) {
+            return null;
+        }
+        return new WindowsAudioRecorder(path, 0, 0);
+    }
+
+    @Override
+    public Media createMediaRecorder(com.codename1.media.MediaRecorderBuilder builder) throws IOException {
+        if (builder == null || builder.getPath() == null) {
+            return null;
+        }
+        return new WindowsAudioRecorder(builder.getPath(), builder.getSamplingRate(), builder.getAudioChannels());
+    }
+
+    @Override
+    public String[] getAvailableRecordingMimeTypes() {
+        // waveIn produces 16-bit PCM WAV, which the port's MF playback also decodes.
+        return new String[]{"audio/wav"};
+    }
+
     /** English long month names; index 0 = January. */
     private static final String[] LONG_MONTHS = {
             "January", "February", "March", "April", "May", "June",

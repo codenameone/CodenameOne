@@ -488,6 +488,18 @@ public final class WindowsNative {
     /** Stops playback, frees the engine and deletes the temp file. */
     public static native void mediaDestroy(long peer);
 
+    /* ------------------------------------------------------ audio recording */
+
+    /**
+     * Starts recording from the default microphone (waveIn) into a PCM WAV file
+     * at {@code path}. {@code sampleRate}/{@code channels} use sensible defaults
+     * when &lt;= 0. Returns an opaque peer, or 0 on failure (no mic / open error).
+     */
+    public static native long audioRecStart(String path, int sampleRate, int channels);
+
+    /** Stops recording, finalizes the WAV header and frees the peer. */
+    public static native void audioRecStop(long peer);
+
     // ---------------------------------------------------------------------
     // 3D / Direct3D 11 backend (com.codename1.gpu). Implemented in
     // nativeSources/cn1_windows_d3d.cpp. Every peer is an opaque long (a D3D
