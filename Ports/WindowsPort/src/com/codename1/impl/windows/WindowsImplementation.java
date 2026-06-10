@@ -355,16 +355,12 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return biometrics;
     }
 
-    // WinRT Geolocator-backed location. Returns null (unsupported) on a build
-    // without WinRT; on a real build getCurrentLocation reports OUT_OF_SERVICE
-    // honestly when Windows location is disabled.
+    // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE
+    // honestly when Windows location is disabled / denied.
     private com.codename1.location.LocationManager locationManager;
 
     @Override
     public com.codename1.location.LocationManager getLocationManager() {
-        if (!WindowsNative.locationSupported()) {
-            return null;
-        }
         if (locationManager == null) {
             locationManager = new WindowsLocationManager();
         }
@@ -1831,9 +1827,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isNativeShareSupported() {
-        // locationSupported() reports whether WinRT was compiled in (the gate the
-        // whole WinRT layer shares); the share UI also needs a host window.
-        return WindowsNative.locationSupported();
+        // The WinRT DataTransferManager share UI is always compiled in; it just
+        // needs a host window (absent only in headless screenshot mode).
+        return getDisplayWidth() > 0;
     }
 
     @Override

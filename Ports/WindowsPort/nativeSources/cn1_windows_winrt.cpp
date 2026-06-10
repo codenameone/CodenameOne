@@ -22,25 +22,23 @@
  */
 
 /*
- * WinRT-backed services for the Windows port (biometric / Windows Hello, and --
- * added incrementally -- location, contacts, share). WinRT is consumed through
- * the WRL ABI projection (RoGetActivationFactory + the ABI:: interfaces), the
- * same COM-based mechanism the Media Foundation layer already uses, so no
- * C++/WinRT (cppwinrt) projection headers are required.
+ * WinRT-backed services for the Windows port: biometric (Windows Hello), location,
+ * contacts and system share. WinRT is consumed through the WRL ABI projection
+ * (RoGetActivationFactory / RoActivateInstance + the ABI:: interfaces), the same
+ * COM-based mechanism the Media Foundation layer already uses -- no C++/WinRT
+ * (cppwinrt) projection headers are required, and runtimeobject.lib is linked
+ * unconditionally. The WinRT ABI headers + runtimeobject ship in every Windows
+ * SDK the port builds against, including the xwin-laid-out SDK used by the
+ * Windows-free Linux cross-compile (verified by that CI leg compiling this file).
  *
- * The whole real implementation is gated on CN1_HAVE_WINRT, which the generated
- * CMake defines only after a probe confirms the WinRT ABI headers +
- * runtimeobject.lib are present and link on the build toolchain. When it is not
- * defined (e.g. a cross-compile sysroot without WinRT) every bridge below
- * compiles as an honest "unsupported" stub, so the Windows-free build stays green
- * and the matching CN1 capability simply reports false / null.
+ * Each bridge still degrades honestly at RUNTIME -- a missing device, disabled
+ * Windows setting or denied permission surfaces as false / null (never fabricated
+ * data) -- which is what the matching CN1 capability reports as "unsupported".
  */
 
 #ifdef _WIN32
 
 #include "cn1_windows.h"
-
-#ifdef CN1_HAVE_WINRT
 
 #include <roapi.h>
 #include <stdlib.h>
@@ -74,10 +72,9 @@ using namespace Microsoft::WRL::Wrappers;
 /* Blocks the calling (CN1 worker) thread until a WinRT IAsyncOperation<T>
  * completes, then fetches its result. Used for the inherently-async WinRT APIs;
  * callers invoke these natives off the EDT (via AsyncResource) so blocking is
- * fine. */
-/* TOp is the operation's logical result type (a value type, or a runtimeclass --
- * for which GetResults yields the ABI *interface* pointer, so the result pointer
- * type TResultPtr is kept separate from TOp). */
+ * fine. TOp is the operation's logical result type (a value type, or a
+ * runtimeclass -- for which GetResults yields the ABI *interface* pointer, so the
+ * result pointer type TResultPtr is kept separate from TOp). */
 template <typename TOp, typename TResultPtr>
 static HRESULT cn1AwaitOp(IAsyncOperation<TOp>* op, TResultPtr result) {
     Event done(CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS));
@@ -162,8 +159,6 @@ static void cn1AppendHString(CN1Buf* out, HSTRING h) {
     free(tmp);
 }
 
-#endif /* CN1_HAVE_WINRT */
-
 extern "C" {
 
 /* ------------------------------------------------------------- biometric
@@ -171,9 +166,8 @@ extern "C" {
  * Maps Windows Hello (UserConsentVerifier) to com.codename1.security.Biometrics.
  * Returns the UserConsentVerifierAvailability enum: 0 Available, 1
  * DeviceNotPresent, 2 NotConfiguredForUser, 3 DisabledByPolicy, 4 DeviceBusy.
- * The Java side treats 0 as supported+ready. The stub reports DeviceNotPresent. */
+ * The Java side treats 0 as supported+ready; anything else degrades honestly. */
 JAVA_INT com_codename1_impl_windows_WindowsNative_biometricAvailability___R_int(CODENAME_ONE_THREAD_STATE) {
-#ifdef CN1_HAVE_WINRT
     cn1WinRtInit();
     ComPtr<IUserConsentVerifierStatics> statics;
     HRESULT hr = RoGetActivationFactory(
@@ -191,16 +185,12 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_biometricAvailability___R_int(
         return 1;
     }
     return (JAVA_INT) avail;
-#else
-    return 1; /* DeviceNotPresent: no WinRT -> report unsupported */
-#endif
 }
 
 /* Shows the Windows Hello consent prompt with the given reason; returns true
- * when the user is verified. Stub returns false. */
+ * when the user is verified. */
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_biometricAuthenticate___java_lang_String_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT message) {
-#ifdef CN1_HAVE_WINRT
     cn1WinRtInit();
     ComPtr<IUserConsentVerifierStatics> statics;
     HRESULT hr = RoGetActivationFactory(
@@ -225,32 +215,17 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_biometricAuthenticate___ja
         return JAVA_FALSE;
     }
     return result == UserConsentVerificationResult_Verified ? JAVA_TRUE : JAVA_FALSE;
-#else
-    (void) message;
-    return JAVA_FALSE;
-#endif
-}
-
-/* True when the port was built with WinRT (so a real Geolocator can be used);
- * lets getLocationManager() return null honestly on a stub build. */
-JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationSupported___R_boolean(CODENAME_ONE_THREAD_STATE) {
-#ifdef CN1_HAVE_WINRT
-    return JAVA_TRUE;
-#else
-    return JAVA_FALSE;
-#endif
 }
 
 /* -------------------------------------------------------------- location
  *
  * Maps Windows.Devices.Geolocation.Geolocator to LocationManager. Fills `out`
  * with [latitude, longitude, accuracy(m), altitude(m), direction(deg),
- * velocity(m/s), timestampMillis] and returns true; false when location is
- * unavailable / disabled (Windows location off, or WinRT stub build) so the
- * port reports unsupported honestly rather than fabricating a position. */
+ * velocity(m/s)] and returns true; false when location is unavailable / disabled
+ * (Windows location off or permission denied) so the port reports unsupported
+ * honestly rather than fabricating a position. */
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationGetCurrent___double_1ARRAY_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT outArr) {
-#ifdef CN1_HAVE_WINRT
     if (outArr == JAVA_NULL) {
         return JAVA_FALSE;
     }
@@ -305,10 +280,6 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationGetCurrent___doubl
     if (n > 4) { out[4] = heading; }
     if (n > 5) { out[5] = speed; }
     return JAVA_TRUE;
-#else
-    (void) outArr;
-    return JAVA_FALSE;
-#endif
 }
 
 /* -------------------------------------------------------------- contacts
@@ -317,10 +288,9 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationGetCurrent___doubl
  * single record-delimited blob: each contact is "id US name US phone US email"
  * (field separator 0x1F, record separator 0x1E). The Java side parses it into CN1
  * Contact objects. One native call avoids a chatty per-field bridge. Returns null
- * when the store is inaccessible (no WinRT, or access denied) and an empty string
- * when the store simply has no contacts -- both honest, never fabricated. */
+ * when the store is inaccessible (access denied) and an empty string when the
+ * store simply has no contacts -- both honest, never fabricated. */
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
-#ifdef CN1_HAVE_WINRT
     cn1WinRtInit();
     ComPtr<IContactManagerStatics2> statics;
     if (FAILED(RoGetActivationFactory(
@@ -408,9 +378,6 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
         free(blob.data);
         return s;
     }
-#else
-    return JAVA_NULL;
-#endif
 }
 
 /* ----------------------------------------------------------------- share
@@ -421,15 +388,12 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
  * and cn1WinShareHandleMessage runs here on the pump thread. The text/title are
  * stashed in file-static state read by the (same-thread) DataRequested handler.
  * Shares text (the common case); image-file sharing is a later addition. */
-#ifdef CN1_HAVE_WINRT
 static WCHAR* g_shareTextW = NULL;
 static WCHAR* g_shareTitleW = NULL;
 static bool g_shareHandlerRegistered = false;
 static ComPtr<IDataTransferManager> g_shareDtm;
-#endif
 
 void cn1WinShareHandleMessage(WPARAM wParam) {
-#ifdef CN1_HAVE_WINRT
     /* wParam carries [textW, titleW] allocated by the caller; take ownership. */
     WCHAR** data = (WCHAR**) wParam;
     if (g_shareTextW != NULL) { free(g_shareTextW); }
@@ -475,16 +439,12 @@ void cn1WinShareHandleMessage(WPARAM wParam) {
         g_shareHandlerRegistered = true;
     }
     interop->ShowShareUIForWindow(cn1Win.hwnd);
-#else
-    (void) wParam;
-#endif
 }
 
 /* Java bridge: marshals the share request to the window thread. Returns false in
- * headless / WinRT-less builds. */
+ * headless mode (no host window). */
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_shareText___java_lang_String_java_lang_String_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT textObj, JAVA_OBJECT titleObj) {
-#ifdef CN1_HAVE_WINRT
     if (cn1Win.hwnd == NULL) {
         return JAVA_FALSE;
     }
@@ -496,11 +456,6 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_shareText___java_lang_Stri
     data[1] = titleObj != JAVA_NULL ? cn1WinJavaStringToWide(threadStateData, titleObj, NULL) : NULL;
     PostMessageW(cn1Win.hwnd, WM_CN1_SHARE, (WPARAM) data, 0);
     return JAVA_TRUE;
-#else
-    (void) textObj;
-    (void) titleObj;
-    return JAVA_FALSE;
-#endif
 }
 
 } /* extern "C" */

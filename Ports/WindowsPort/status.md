@@ -149,9 +149,8 @@ the port does not have yet (gap 5a). `captureVideo` is likewise still to do.
 marshals to the window thread (`WM_CN1_SHARE`), where `IDataTransferManagerInterop`
 `GetForWindow` + `ShowShareUIForWindow` open the system share flyout for the
 unpackaged Win32 window and a `DataRequested` handler supplies the text/title
-(`cn1_windows_winrt.cpp`, same `CN1_HAVE_WINRT` gate). Shares text today (the
-common case); image-file sharing via `SetStorageItems` is a follow-up. Compiles
-(real + stub) on the Windows ARM64 VM; the flyout itself is interactive.
+(`cn1_windows_winrt.cpp`, shared WinRT layer). Shares text today (the
+common case); image-file sharing via `SetStorageItems` is a follow-up. Compiles and links on the Windows ARM64 VM; the flyout itself is interactive.
 
 **Print — not applicable.** Codename One core exposes no printing API (no
 `Printer` class or impl hook), so there is nothing for the port to override; this
@@ -171,7 +170,7 @@ they stay honest until backed by a real implementation:
 
 **Contacts — implemented (WinRT).** `getAllContacts` / `getContactById` read the
 user's contacts via the WinRT `ContactStore` (`cn1_windows_winrt.cpp`, same
-`CN1_HAVE_WINRT` gate). One native call returns every contact as a delimited blob
+shared WinRT layer). One native call returns every contact as a delimited blob
 (id / name / phone / email) which the impl parses and briefly caches, so the
 base's id-then-fetch loop shares a single store read. Returns nothing when the
 store is inaccessible (no WinRT / access denied) -- honest, never fabricated.
@@ -180,12 +179,12 @@ biometric/location.
 
 **Location / GPS — implemented (WinRT).** `getLocationManager()` →
 `WindowsLocationManager`, backed by the WinRT `Geolocator`
-(`cn1_windows_winrt.cpp`, same `CN1_HAVE_WINRT` gate). `getCurrentLocation` /
+(`cn1_windows_winrt.cpp`, shared WinRT layer). `getCurrentLocation` /
 `getLastKnownLocation` resolve one fix (lat/lon/accuracy/altitude/heading/speed);
 a continuous `LocationListener` is served by a polling thread. When Windows
 location is disabled or no provider answers, it reports `OUT_OF_SERVICE` / throws
-rather than fabricating a position; `getLocationManager` returns `null` on a
-WinRT-less build. Verified on the Windows ARM64 VM: the `Geolocator` activates and
+rather than fabricating a position. Verified on the Windows ARM64 VM: the
+`Geolocator` activates and
 `GetGeopositionAsync` returns `E_ACCESSDENIED` (location off on the VM), which the
 port surfaces honestly as unavailable.
 
@@ -194,13 +193,15 @@ port surfaces honestly as unavailable.
 / PIN). `isSupported()` / `canAuthenticate()` map to `CheckAvailabilityAsync`;
 `authenticate(...)` runs the system Hello prompt off the EDT and completes the
 `AsyncResource`. WinRT is consumed via the WRL ABI projection
-(`cn1_windows_winrt.cpp`), gated on `CN1_HAVE_WINRT` (the generated CMake probes
-the toolchain and defines it only when the WinRT ABI headers + `runtimeobject`
-link), so a cross-compile sysroot without WinRT compiles the natives as honest
-"unsupported" stubs and stays green — the same gating model as WebView2. Verified
-on a real Windows ARM64 VM: the WRL pattern activates the factory and awaits the
-async op; the VM correctly reports `DeviceNotPresent` (no Hello hardware), so the
-port reports unsupported there and a real Hello-equipped laptop reports available.
+(`cn1_windows_winrt.cpp`) -- the same COM mechanism the Media Foundation layer
+uses, no C++/WinRT needed -- and `runtimeobject` is linked unconditionally: the
+WinRT ABI headers + import lib ship in every Windows SDK the port builds against,
+including the `xwin`-laid-out SDK the Windows-free Linux cross-compile uses (that
+CI leg compiles this file, confirming it). The natives still degrade honestly at
+runtime (no device / disabled / denied → `false`/`null`). Verified on a real
+Windows ARM64 VM: the WRL pattern activates the factory and awaits the async op;
+the VM correctly reports `DeviceNotPresent` (no Hello hardware), so the port
+reports unsupported there and a real Hello-equipped laptop reports available.
 
 **Audio recording — implemented.** `createMediaRecorder` / `captureAudio` record
 from the default microphone via the classic `waveIn` (winmm) API to a 16-bit PCM

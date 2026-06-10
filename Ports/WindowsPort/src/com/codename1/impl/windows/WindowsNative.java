@@ -518,9 +518,6 @@ public final class WindowsNative {
 
     /* -------------------------------------------------- location (WinRT) */
 
-    /** True when WinRT is compiled in, so a real {@code Geolocator} is available. */
-    public static native boolean locationSupported();
-
     /**
      * Fills {@code out} with the current fix [latitude, longitude, accuracy(m),
      * altitude(m), direction(deg), velocity(m/s)] from the WinRT Geolocator and
