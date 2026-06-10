@@ -552,6 +552,9 @@ jobs:
           fi
           echo "Posting ${#entries[@]} screenshot(s)"
           mkdir -p "$ART/previews"
+          # Lift the SIMD benchmark tally (captured next to the PNGs) to the dir
+          # cn1ss scans for --extra-stats, so it renders in the comment.
+          cp -f "$ART"/raw-x64/windows-simd-stats.txt "$ART/" 2>/dev/null || true
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
           # Compare against the in-repo baseline (scripts/windows/screenshots).

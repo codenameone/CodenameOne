@@ -71,7 +71,11 @@ public class RenderScreenshotReport {
 
     private static boolean isBenchmarkStatsFile(Path p) {
         Path name = p.getFileName();
-        return name != null && "base64-performance-stats.txt".equals(name.toString());
+        if (name == null) {
+            return false;
+        }
+        String n = name.toString();
+        return "base64-performance-stats.txt".equals(n) || "windows-simd-stats.txt".equals(n);
     }
 
     private static void writeLines(Path path, List<String> lines) throws IOException {

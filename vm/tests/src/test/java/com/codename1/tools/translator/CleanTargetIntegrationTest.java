@@ -1128,6 +1128,11 @@ class CleanTargetIntegrationTest {
             final java.util.concurrent.atomic.AtomicInteger finishedTests = new java.util.concurrent.atomic.AtomicInteger(0);
             final java.util.concurrent.atomic.AtomicReference<String> lastLine =
                     new java.util.concurrent.atomic.AtomicReference<String>("");
+            // Ready-to-render "key : value" benchmark lines the app emits (SIMD
+            // tally); written to windows-simd-stats.txt below so the cn1ss report
+            // surfaces them in the PR comment's Benchmark Results table.
+            final java.util.List<String> simdStats =
+                    java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
             final Process appF = app;
             Thread areader = new Thread(new Runnable() {
                 public void run() {
@@ -1137,6 +1142,8 @@ class CleanTargetIntegrationTest {
                         while ((line = r.readLine()) != null) {
                             if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
                             if (line.contains("suite finished test=")) { finishedTests.incrementAndGet(); }
+                            int s = line.indexOf("CN1SS:SIMD:STAT ");
+                            if (s >= 0) { simdStats.add(line.substring(s + "CN1SS:SIMD:STAT ".length()).trim()); }
                             if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
                         }
                     } catch (IOException ignore) {
@@ -1183,6 +1190,18 @@ class CleanTargetIntegrationTest {
                             Files.copy(p, dest.resolve(p.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
                         }
                     }
+                }
+                // Persist the SIMD benchmark tally next to the PNGs so the cn1ss
+                // comment job can pick it up (--extra-stats) and render it in the
+                // PR comment's Benchmark Results table.
+                if (!simdStats.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    synchronized (simdStats) {
+                        for (String l : simdStats) { sb.append(l).append('\n'); }
+                    }
+                    Files.write(dest.resolve("windows-simd-stats.txt"),
+                            sb.toString().getBytes(StandardCharsets.UTF_8));
+                    System.out.println("CN1_SIMD_STATS=" + simdStats.size() + " lines");
                 }
             }
             System.out.println("CN1_HELLO_SUITE_PNGS=" + pngs);

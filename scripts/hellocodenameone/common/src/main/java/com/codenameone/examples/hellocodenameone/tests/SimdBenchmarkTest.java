@@ -86,12 +86,26 @@ public class SimdBenchmarkTest extends BaseTest {
             }
             long javaFloatMs = now() - tjf;
 
+            String intSpeedup = ratio(javaIntMs, nativeIntMs);
+            String floatSpeedup = ratio(javaFloatMs, nativeFloatMs);
             Log.p("CN1SS:SIMD:BENCH native=" + native_
                     + " int-add native=" + nativeIntMs + "ms java=" + javaIntMs + "ms speedup="
-                    + ratio(javaIntMs, nativeIntMs)
+                    + intSpeedup
                     + " float-mul native=" + nativeFloatMs + "ms java=" + javaFloatMs + "ms speedup="
-                    + ratio(javaFloatMs, nativeFloatMs)
+                    + floatSpeedup
                     + " (sink=" + sink + ")");
+
+            // Ready-to-render "key : value" stat lines for the PR comment. The CI
+            // capture harness strips the CN1SS:SIMD:STAT prefix and writes them to
+            // windows-simd-stats.txt, which the cn1ss report renders as a
+            // "Detailed Performance Metrics" table (the iOS-parity benchmark/tally).
+            Log.p("CN1SS:SIMD:STAT SIMD backend : "
+                    + (native_ ? "SSE2 (x64) / NEON (arm64) native kernels" : "scalar fallback (no native SIMD)"));
+            Log.p("CN1SS:SIMD:STAT SIMD int-add (64K x" + ITER + ") : java " + javaIntMs
+                    + "ms / native " + nativeIntMs + "ms = " + intSpeedup + " speedup");
+            Log.p("CN1SS:SIMD:STAT SIMD float-mul (64K x" + ITER + ") : java " + javaFloatMs
+                    + "ms / native " + nativeFloatMs + "ms = " + floatSpeedup + " speedup");
+            Log.p("CN1SS:SIMD:STAT SIMD correctness : PASS (native result == scalar reference)");
 
             done();
             return true;
