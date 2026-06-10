@@ -192,6 +192,7 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
                                         Display.getInstance().callSerially(new Runnable() {
                                             @Override
                                             public void run() {
+                                                markCaptureStarted();
                                                 Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(variant.imageName, new Runnable() {
                                                     @Override
                                                     public void run() {
