@@ -36,6 +36,7 @@
 #include <shlobj.h>
 #include <shellapi.h>  /* ShellExecuteW -- not pulled in by WIN32_LEAN_AND_MEAN */
 #include <commdlg.h>   /* GetOpenFileNameW / GetSaveFileNameW (comdlg32) */
+#include <dpapi.h>     /* CryptProtectData / CryptUnprotectData (crypt32) */
 #include <stdio.h>
 #include <wchar.h>
 
@@ -668,6 +669,67 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileDialog___boolean_int_ja
         return JAVA_NULL;
     }
     return cn1WinWideToJavaString(threadStateData, req.result);
+}
+
+/* ------------------------------------------------- DPAPI secure storage */
+
+/*
+ * Windows Data Protection API (DPAPI). CryptProtectData encrypts a blob with a
+ * key derived from the current Windows user's logon credentials, so the
+ * ciphertext can only be decrypted by the same user on the same machine -- the
+ * OS-backed at-rest secret store the port's SecureStorage uses for non-prompting
+ * secrets (API keys / tokens read on every network call). CRYPTPROTECT_UI_FORBIDDEN
+ * keeps it fully non-interactive. The Java side persists the returned ciphertext
+ * through the normal CN1 Storage; only this crypto step is native. Returns the
+ * encrypted bytes, or JAVA_NULL on failure.
+ */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiProtect___byte_1ARRAY_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    DATA_BLOB in, out;
+    JAVA_OBJECT result;
+    if (__cn1Arg1 == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    in.cbData = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
+    in.pbData = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    out.cbData = 0;
+    out.pbData = NULL;
+    if (!CryptProtectData(&in, L"cn1securestorage", NULL, NULL, NULL,
+            CRYPTPROTECT_UI_FORBIDDEN, &out)) {
+        return JAVA_NULL;
+    }
+    result = allocArray(threadStateData, (int) out.cbData, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    if (result != JAVA_NULL) {
+        memcpy((*(JAVA_ARRAY) result).data, out.pbData, out.cbData);
+    }
+    LocalFree(out.pbData);
+    return result;
+}
+
+/* Inverse of dpapiProtect: decrypts a CryptProtectData blob for the current
+ * user, returning the plaintext bytes (JAVA_NULL if the blob is corrupt or was
+ * produced by a different user/machine). */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiUnprotect___byte_1ARRAY_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    DATA_BLOB in, out;
+    JAVA_OBJECT result;
+    if (__cn1Arg1 == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    in.cbData = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
+    in.pbData = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    out.cbData = 0;
+    out.pbData = NULL;
+    if (!CryptUnprotectData(&in, NULL, NULL, NULL, NULL,
+            CRYPTPROTECT_UI_FORBIDDEN, &out)) {
+        return JAVA_NULL;
+    }
+    result = allocArray(threadStateData, (int) out.cbData, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    if (result != JAVA_NULL) {
+        memcpy((*(JAVA_ARRAY) result).data, out.pbData, out.cbData);
+    }
+    LocalFree(out.pbData);
+    return result;
 }
 
 #endif /* _WIN32 */

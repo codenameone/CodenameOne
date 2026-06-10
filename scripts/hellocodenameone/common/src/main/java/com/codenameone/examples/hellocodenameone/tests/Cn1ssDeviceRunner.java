@@ -267,6 +267,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
             new SimdBenchmarkTest(),
+            new SecureStorageTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission
             // prompts). Self-skips on iOS / Android / JS where the open

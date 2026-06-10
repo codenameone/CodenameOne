@@ -423,6 +423,19 @@ public final class WindowsNative {
      */
     public static native boolean shellOpen(String target);
 
+    /* ----------------------------------------------------- secure storage */
+
+    /**
+     * Encrypts {@code data} with the Windows Data Protection API
+     * ({@code CryptProtectData}) so the ciphertext is decryptable only by the
+     * current Windows user on this machine. Returns the encrypted bytes, or
+     * {@code null} on failure. Backs {@link WindowsSecureStorage}.
+     */
+    public static native byte[] dpapiProtect(byte[] data);
+
+    /** Inverse of {@link #dpapiProtect}: decrypts a DPAPI blob, or {@code null}. */
+    public static native byte[] dpapiUnprotect(byte[] data);
+
     /**
      * Shows a modal native file dialog and returns the chosen path, or
      * {@code null} on cancel (or in headless mode). {@code type} mirrors the

@@ -123,6 +123,14 @@ enumeration + preview peer + still capture, surfaced honestly through
   `openImageGallery` now use the real OS picker and return a `file://` path the
   port's `FileSystemStorage` opens, instead of the in-app `FileTree` fallback.
   `fileDialog(save, …)` also exposes the save dialog for future hooks.
+- Secure storage (`getSecureStorage` → `WindowsSecureStorage`) — the
+  non-prompting key/value store the networking layer reads on every call (LLM API
+  keys, refresh tokens). Values are encrypted with DPAPI (`CryptProtectData`,
+  bound to the Windows user account) and the ciphertext persisted through CN1
+  `Storage`; the desktop analog of the iOS keychain / Android
+  EncryptedSharedPreferences. The biometric-prompting overloads map to the same
+  store (DPAPI is itself the user-account auth boundary); a Windows Hello gate can
+  layer on once biometric support lands. Round-tripped by `SecureStorageTest`.
 
 **Still unsupported (return null / no-op / `false`, never fabricated):** these
 are genuine hardware/OS-account capabilities that a desktop either lacks or that

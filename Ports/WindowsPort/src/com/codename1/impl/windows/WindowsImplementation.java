@@ -330,6 +330,19 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return new WindowsSimd();
     }
 
+    // DPAPI-backed secure storage (the desktop analog of the iOS keychain /
+    // Android EncryptedSharedPreferences non-prompting store). Used by the
+    // networking layer to read API keys / tokens at rest; see WindowsSecureStorage.
+    private com.codename1.security.SecureStorage secureStorage;
+
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new WindowsSecureStorage();
+        }
+        return secureStorage;
+    }
+
     @Override
     public int getDisplayWidth() {
         return WindowsNative.getDisplayWidth();
