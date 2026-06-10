@@ -75,7 +75,7 @@ public class RenderScreenshotReport {
             return false;
         }
         String n = name.toString();
-        return "base64-performance-stats.txt".equals(n) || "windows-simd-stats.txt".equals(n);
+        return "base64-performance-stats.txt".equals(n) || "windows-benchmark-stats.txt".equals(n);
     }
 
     private static void writeLines(Path path, List<String> lines) throws IOException {

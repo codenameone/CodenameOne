@@ -1128,9 +1128,12 @@ class CleanTargetIntegrationTest {
             final java.util.concurrent.atomic.AtomicInteger finishedTests = new java.util.concurrent.atomic.AtomicInteger(0);
             final java.util.concurrent.atomic.AtomicReference<String> lastLine =
                     new java.util.concurrent.atomic.AtomicReference<String>("");
-            // Ready-to-render "key : value" benchmark lines the app emits (SIMD
-            // tally); written to windows-simd-stats.txt below so the cn1ss report
-            // surfaces them in the PR comment's Benchmark Results table.
+            // The real shared benchmark emits "CN1SS:STAT:<metric>: <value>" lines
+            // (Base64NativePerformanceTest: base64 native/CN1/SIMD + image
+            // createMask/applyMask/modifyAlpha/PNG/JPEG, plus the SIMD kernel tally),
+            // the same markers iOS/Android surface. Collected here and written to
+            // windows-benchmark-stats.txt so the cn1ss report renders them in the PR
+            // comment's Benchmark Results table.
             final java.util.List<String> simdStats =
                     java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
             final Process appF = app;
@@ -1142,8 +1145,8 @@ class CleanTargetIntegrationTest {
                         while ((line = r.readLine()) != null) {
                             if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
                             if (line.contains("suite finished test=")) { finishedTests.incrementAndGet(); }
-                            int s = line.indexOf("CN1SS:SIMD:STAT ");
-                            if (s >= 0) { simdStats.add(line.substring(s + "CN1SS:SIMD:STAT ".length()).trim()); }
+                            int s = line.indexOf("CN1SS:STAT:");
+                            if (s >= 0) { simdStats.add(line.substring(s + "CN1SS:STAT:".length()).trim()); }
                             if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
                         }
                     } catch (IOException ignore) {
@@ -1199,7 +1202,7 @@ class CleanTargetIntegrationTest {
                     synchronized (simdStats) {
                         for (String l : simdStats) { sb.append(l).append('\n'); }
                     }
-                    Files.write(dest.resolve("windows-simd-stats.txt"),
+                    Files.write(dest.resolve("windows-benchmark-stats.txt"),
                             sb.toString().getBytes(StandardCharsets.UTF_8));
                     System.out.println("CN1_SIMD_STATS=" + simdStats.size() + " lines");
                 }
