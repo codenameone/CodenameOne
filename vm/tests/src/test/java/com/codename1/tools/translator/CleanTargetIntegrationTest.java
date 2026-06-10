@@ -593,6 +593,21 @@ class CleanTargetIntegrationTest {
         assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");
 
         // --- cross-compile that dist to a Windows x64 PE with clang-cl + xwin ---
+        Path exe = crossBuildDist(cmakeRoot, sys, clangCl, "WinFormApp");
+        System.out.println("CN1_XWIN_EXE=" + exe.toAbsolutePath() + " (" + (Files.size(exe) / 1024) + "KB)");
+    }
+
+    /**
+     * Cross-compiles a translator-emitted CMake dist to a Windows x64 PE with
+     * clang-cl + lld-link + llvm-rc against an xwin-laid-out Windows SDK ({@code
+     * sys}). Shared by the link-only smoke test (crossCompilesWindowsExeWithXwin)
+     * and the full-suite cross-build (crossBuildsHelloSuiteExe). Returns the
+     * produced exe and asserts it is a non-trivial PE. The cmake/clang-cl
+     * subprocess inherits this process's environment, so WEBVIEW2_SDK_DIR (when the
+     * CI fetched the SDK) flows into the generated CMake and links the
+     * BrowserComponent peer; otherwise the browser natives compile as stubs.
+     */
+    static Path crossBuildDist(Path cmakeRoot, Path sys, String clangCl, String exeName) throws Exception {
         String target = "x86_64-pc-windows-msvc";
         String libArch = "x86_64";
         String inc = String.join(" ",
@@ -635,7 +650,7 @@ class CleanTargetIntegrationTest {
                 "-DCMAKE_EXE_LINKER_FLAGS=" + linkFlags), cmakeRoot);
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
 
-        Path exe = buildDir.resolve("WinFormApp.exe");
+        Path exe = buildDir.resolve(exeName + ".exe");
         assertTrue(Files.exists(exe), "cross-compiled Windows executable should be produced: " + exe);
         assertTrue(Files.size(exe) > 100_000, "PE should be non-trivial, was " + Files.size(exe) + " bytes");
         byte[] head = new byte[2];
@@ -644,7 +659,50 @@ class CleanTargetIntegrationTest {
         }
         assertEquals('M', head[0] & 0xff, "exe should start with the PE 'MZ' magic");
         assertEquals('Z', head[1] & 0xff, "exe should start with the PE 'MZ' magic");
-        System.out.println("CN1_XWIN_EXE=" + exe.toAbsolutePath() + " (" + (Files.size(exe) / 1024) + "KB)");
+        return exe;
+    }
+
+    /**
+     * Cross-compiles the FULL hellocodenameone screenshot suite (not just a Form
+     * app) into a Windows x64 PE on a non-Windows host with clang-cl + xwin, and
+     * writes it to CN1_CROSS_EXE_OUT so the CI can upload it as an artifact. The
+     * companion Windows job downloads that exe and runs the screenshot suite
+     * against it (capturesHelloSuiteOverWebSocket with CN1_PREBUILT_EXE) -- so the
+     * binary that renders on Windows is the exact one cross-compiled on Linux,
+     * mirroring the real cloud build pipeline (compile on Linux, run on the user's
+     * Windows machine). When the CI fetched the WebView2 SDK (WEBVIEW2_SDK_DIR set)
+     * the cross-build also compiles + links the BrowserComponent peer, so the run
+     * proves a cross-compiled browser actually renders.
+     *
+     * Gated like crossCompilesWindowsExeWithXwin: a non-Windows host with
+     * CN1_XWIN_SYSROOT pointing at an `xwin splat` directory, plus a built
+     * core/port/common (translateHelloSuiteDist's assumptions). The CI builds those
+     * before invoking this test.
+     */
+    @org.junit.jupiter.api.Test
+    void crossBuildsHelloSuiteExe() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeFalse(CompilerHelper.isWindows(),
+                "Cross-build is for non-Windows hosts; Windows uses the native path");
+        String sysroot = System.getenv("CN1_XWIN_SYSROOT");
+        org.junit.jupiter.api.Assumptions.assumeTrue(sysroot != null && !sysroot.trim().isEmpty(),
+                "Set CN1_XWIN_SYSROOT to an `xwin splat` directory to run the cross-build");
+        Path sys = Paths.get(sysroot.trim()).toAbsolutePath();
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isDirectory(sys.resolve("crt/include")),
+                "CN1_XWIN_SYSROOT must contain crt/include + sdk/include (run `xwin splat`): " + sys);
+        String clangCl = System.getenv().getOrDefault("CN1_CLANG_CL", "clang-cl");
+
+        Path cmakeRoot = translateHelloSuiteDist();
+        Path exe = crossBuildDist(cmakeRoot, sys, clangCl, "WinHelloMain");
+        System.out.println("CN1_CROSS_SUITE_EXE=" + exe.toAbsolutePath() + " (" + (Files.size(exe) / 1024) + "KB)");
+
+        // Hand the cross-built exe to the CI (artifact upload + the Windows run).
+        String out = System.getenv("CN1_CROSS_EXE_OUT");
+        if (out != null && !out.trim().isEmpty()) {
+            Path dest = Paths.get(out.trim());
+            if (dest.getParent() != null) { Files.createDirectories(dest.getParent()); }
+            Files.copy(exe, dest, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("Cross-built suite exe copied to " + dest.toAbsolutePath());
+        }
     }
 
     /** clang-cl system-include flag for an xwin include dir ({@code /imsvc <dir>}). */
@@ -751,6 +809,34 @@ class CleanTargetIntegrationTest {
     static Path buildHelloCodenameOneExe() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
                 "Native Windows build is Windows-only");
+        Path cmakeRoot = translateHelloSuiteDist();
+        Path buildDir = cmakeRoot.resolve("build");
+        Files.createDirectories(buildDir);
+        // Native Windows build with the MSVC clang-cl on PATH (the dev env / CI
+        // sets it up). RelWithDebInfo so a native crash address symbolizes.
+        runCommand(Arrays.asList("cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-G", "Ninja",
+                "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"), cmakeRoot);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+        Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
+        assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
+        // The single executable is fully self-contained: its classpath resources
+        // (theme.res, windowsNativeTheme.res, material-design-font.ttf) are embedded
+        // in the exe's PE resource section by the windows translator target and read
+        // via getResourceAsStream -- nothing is staged next to the exe.
+        return exe;
+    }
+
+    /**
+     * Translates the real hellocodenameone screenshot suite (the Kotlin/Java app +
+     * every *ScreenshotTest, the Kotlin stdlib, core, the Windows port, JavaAPI and
+     * the port's nativeSources) into a CMake dist with the "windows" app type, and
+     * returns the dist root (the CMake project). Host-agnostic -- pure Java
+     * translation, no native toolchain -- so it backs both the native Windows build
+     * (buildHelloCodenameOneExe) and the Linux xwin cross-build
+     * (crossBuildsHelloSuiteExe).
+     */
+    static Path translateHelloSuiteDist() throws Exception {
         Path coreClasses = Paths.get("..", "..", "maven", "core", "target", "classes").normalize().toAbsolutePath();
         Path portClasses = Paths.get("..", "..", "maven", "windows", "target", "classes").normalize().toAbsolutePath();
         Path commonClasses = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
@@ -824,25 +910,7 @@ class CleanTargetIntegrationTest {
 
         Path cmakeRoot = outputDir.resolve("dist");
         assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");
-        Path buildDir = cmakeRoot.resolve("build");
-        Files.createDirectories(buildDir);
-        runCommand(Arrays.asList("cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
-                "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-G", "Ninja",
-                "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"), cmakeRoot);
-        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
-        Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
-        assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
-
-        // Nothing is staged next to the exe: the single executable is fully
-        // self-contained. Its classpath resources are embedded in the exe's PE
-        // resource section by the windows translator target and read via
-        // getResourceAsStream -- the app theme (theme.res, compiled by the Maven
-        // build), the port's native material theme (windowsNativeTheme.res, shipped
-        // in the WindowsPort jar), and the material icon font (material-design-font.ttf,
-        // on codename1-core's classpath; the DirectWrite in-memory loader registers it
-        // straight from the embedded bytes). installNativeTheme() and the launcher's
-        // UIManager.initFirstTheme("/theme") load their .res straight out of the exe.
-        return exe;
+        return cmakeRoot;
     }
 
     /**
@@ -990,7 +1058,21 @@ class CleanTargetIntegrationTest {
     void capturesHelloSuiteOverWebSocket() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
                 "Native Windows websocket capture is Windows-only");
-        Path exe = buildHelloCodenameOneExe();
+        // When CN1_PREBUILT_EXE points at an already-built suite exe -- the Windows
+        // job that runs the Linux cross-compiled artifact -- run that one instead of
+        // building here. That runner only needs a JDK + the exe (the cn1ss server is
+        // Java), not core/port/common or the native toolchain. Otherwise build the
+        // suite exe natively on this Windows host.
+        Path exe;
+        String prebuilt = System.getenv("CN1_PREBUILT_EXE");
+        if (prebuilt != null && !prebuilt.trim().isEmpty()) {
+            exe = Paths.get(prebuilt.trim()).toAbsolutePath();
+            org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(exe),
+                    "CN1_PREBUILT_EXE does not exist: " + exe);
+            System.out.println("Running prebuilt suite exe (cross-compiled): " + exe);
+        } else {
+            exe = buildHelloCodenameOneExe();
+        }
 
         // Compile the shared cn1ss screenshot server with an available JDK.
         java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();

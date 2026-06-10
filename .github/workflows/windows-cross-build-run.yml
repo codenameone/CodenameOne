@@ -1,0 +1,289 @@
+# Real-life Windows build pipeline: CROSS-COMPILE the native Windows port's full
+# hellocodenameone screenshot-suite .exe on a *Linux* runner (clang-cl + lld-link
+# + llvm-rc against an xwin-laid-out Windows SDK, with the WebView2 SDK fetched so
+# the BrowserComponent peer is linked), then RUN that exact Linux-built binary on
+# a real Windows runner and capture the screenshot suite over the cn1ss WebSocket.
+#
+# This mirrors how a Codename One app is actually shipped for Windows -- compiled
+# on a (Linux) build host, executed on the user's Windows machine -- which neither
+# of the other two Windows workflows does on its own: windows-cross-compile.yml
+# builds on Linux but only *links* (never runs), and parparvm-tests-windows.yml
+# builds *natively on Windows* and runs. Here the binary that renders on Windows
+# is the one cross-compiled on Linux, browser included.
+#
+# Three jobs, artifact-chained within the run:
+#   cross-build (ubuntu)    -> uploads WinHelloMain.exe (Linux-cross-compiled, x64)
+#   run-on-windows (x64)    -> downloads + runs it, captures the suite PNGs
+#   compare-comment (ubuntu)-> diffs the PNGs vs the in-repo baseline, posts the PR
+name: Windows cross-build + run (Linux build -> Windows run)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/windows-cross-build-run.yml'
+      - 'vm/**'
+      - 'Ports/WindowsPort/**'
+      - 'maven/windows/**'
+      - 'scripts/windows/**'
+      - 'scripts/hellocodenameone/**'
+      - '!vm/**/README.md'
+      - '!vm/**/readme.md'
+      - '!vm/**/docs/**'
+  push:
+    branches: [ master, main ]
+    paths:
+      - '.github/workflows/windows-cross-build-run.yml'
+      - 'vm/**'
+      - 'Ports/WindowsPort/**'
+      - 'maven/windows/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  cross-build:
+    name: cross-build suite exe (Linux, x64 + WebView2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      # The native BrowserComponent peer (cn1_windows_browser.cpp) is C++ that
+      # uses the MSVC STL via the xwin headers; the MSVC STL gates on a recent
+      # clang (older clang-cl trips STL1000 "Unexpected compiler version"), so
+      # pin LLVM 19 for the cross-build rather than the distro default.
+      - name: Install LLVM 19 + CMake/Ninja
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build unzip
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19
+          sudo apt-get install -y clang-19 lld-19 llvm-19
+          echo "/usr/lib/llvm-19/bin" >> "$GITHUB_PATH"
+          /usr/lib/llvm-19/bin/clang-cl --version
+          /usr/lib/llvm-19/bin/lld-link --version 2>&1 | head -1 || true
+          /usr/lib/llvm-19/bin/llvm-rc --version 2>&1 | head -1 || true
+
+      # JDK matrix the translator harness auto-discovers (JDK_*_HOME). JDK 8 is
+      # restored last so it is the active JAVA_HOME (it builds codename1-core and
+      # is what CompilerHelper translates with). JDK 17 builds the sample app.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '11' }
+      - run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '17' }
+      - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Restore JDK 8 as the active JDK
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+
+      - name: Install xwin + lay out the Windows SDK (x64)
+        run: |
+          set -e
+          cargo install xwin --version 0.9.0 --locked
+          xwin --accept-license --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk"
+          test -d "$RUNNER_TEMP/xwin-sdk/crt/include"
+          test -f "$RUNNER_TEMP/xwin-sdk/sdk/include/um/d2d1.h"
+
+      # Fetch the WebView2 NuGet SDK on Linux (portable bash counterpart of the
+      # Windows fetch script). It is a plain zip of headers + the x64/arm64 static
+      # loader libs, so the cross-build links the BrowserComponent peer exactly
+      # like the Windows runners do. Non-fatal: if the download fails the browser
+      # natives compile as stubs (WEBVIEW2_SDK_DIR stays unset) and the suite runs
+      # without the BrowserComponent tile rather than failing the whole pipeline.
+      - name: Fetch WebView2 SDK (Linux)
+        continue-on-error: true
+        run: |
+          set -e
+          LINE="$(bash scripts/windows/fetch-webview2-sdk.sh "$RUNNER_TEMP/webview2sdk" | tail -1)"
+          echo "Resolved: $LINE"
+          case "$LINE" in
+            WEBVIEW2_SDK_DIR=*) echo "$LINE" >> "$GITHUB_ENV" ;;
+            *) echo "WebView2 fetch did not yield a dir; browser will be stubbed" ;;
+          esac
+
+      # Build codename1-core + the Windows port, the codenameone maven plugin
+      # (runs transcode-svg / css / annotation processing during the sample build)
+      # and cn1-ads-mock (a sample dependency) -- the same inputs the native
+      # Windows screenshot job installs. JDK 8: core is source/target 1.5.
+      - name: Build core + Windows port + CN1 maven plugin (JDK 8)
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am \
+            -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+          test -f core/target/classes/com/codename1/ui/Form.class
+          test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
+
+      # Build the hellocodenameone screenshot app into common/target/classes (the
+      # suite the cross-build translates). Plain Maven build of the sample on JDK
+      # 17 -- exactly what a fresh initializr project does; the plugin runs
+      # transcode-svg/css/annotation processing. Kotlin 1.6.0 compiles on JDK 17.
+      # Seed an empty guibuilder.jar marker to skip the codenameone install
+      # bootstrap's network step (artifacts are already in the local repo).
+      - name: Build hellocodenameone-common (Maven, JDK 17)
+        env:
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+        run: |
+          set -e
+          export JAVA_HOME="$JDK_17_HOME"
+          mkdir -p "$HOME/.codenameone"
+          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
+          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+          test -f scripts/hellocodenameone/common/target/classes/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class
+          test -f scripts/hellocodenameone/common/target/classes/com/codename1/generated/svg/SVGRegistry.class
+
+      # Translate the full suite and cross-compile it to a Windows x64 PE with
+      # clang-cl + xwin. WEBVIEW2_SDK_DIR (exported above when the fetch worked)
+      # flows into the generated CMake and links the BrowserComponent peer. The
+      # exe is written to CN1_CROSS_EXE_OUT for the upload below.
+      - name: Cross-build the full suite exe (clang-cl + xwin + WebView2)
+        env:
+          CN1_XWIN_SYSROOT: ${{ runner.temp }}/xwin-sdk
+          CN1_CLANG_CL: clang-cl
+          CN1_LLVM_RC: llvm-rc
+          CN1_CROSS_EXE_OUT: ${{ github.workspace }}/artifacts/WinHelloMain.exe
+        run: |
+          cd vm
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl tests -am test \
+            '-Dtest=CleanTargetIntegrationTest#crossBuildsHelloSuiteExe' \
+            '-Dsurefire.failIfNoSpecifiedTests=false'
+          test -f "$CN1_CROSS_EXE_OUT"
+          ls -l "$CN1_CROSS_EXE_OUT"
+
+      - name: Upload cross-built suite exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-cross-suite-exe
+          path: artifacts/WinHelloMain.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  run-on-windows:
+    name: run cross-built exe + capture (Windows x64)
+    needs: cross-build
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Only a JDK is needed here: with CN1_PREBUILT_EXE set the capture test
+      # neither translates nor builds -- it just compiles the Java cn1ss server,
+      # launches the prebuilt exe and collects the PNGs it streams. No MSVC /
+      # Ninja / clang. windows-latest ships the WebView2 Evergreen runtime the
+      # BrowserComponent peer loads at activation.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Download cross-built suite exe
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-cross-suite-exe
+          path: artifacts
+
+      - name: Verify the downloaded exe
+        shell: pwsh
+        run: |
+          $exe = "artifacts/WinHelloMain.exe"
+          if (!(Test-Path $exe)) { Write-Error "cross-built exe missing: $exe"; exit 1 }
+          Write-Host "Cross-built exe: $((Get-Item $exe).Length) bytes"
+
+      # Run the Linux-cross-compiled exe and capture the screenshot suite over the
+      # cn1ss WebSocket. CN1_PREBUILT_EXE makes the capture test run this exact
+      # binary instead of building one. ~112 PNGs land in CN1_SHOT_OUTPUT_DIR.
+      - name: Run cross-built suite + capture screenshots
+        working-directory: vm
+        shell: pwsh
+        env:
+          CN1_PREBUILT_EXE: ${{ github.workspace }}\artifacts\WinHelloMain.exe
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+        run: |
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+
+      - name: Upload screenshot artifact (cross-compiled, x64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-cross-screenshot-raw
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Diffs the screenshots produced by the Linux-cross-compiled binary against the
+  # in-repo baseline (scripts/windows/screenshots) and posts them to the PR, with
+  # a marker distinct from the native-Windows screenshot comment so both coexist.
+  compare-comment:
+    name: cross-compiled screenshot-comment
+    needs: run-on-windows
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download cross-compiled screenshot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-cross-screenshot-raw
+          path: artifacts/windows-port/raw-x64
+
+      - name: Post screenshots to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_CROSS_COMPILED_COMMENT -->'
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-cross-compiled]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-cross'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port, REAL shipping pipeline: the hellocodenameone screenshot suite rendered by a binary CROSS-COMPILED on Linux (clang-cl + xwin, WebView2 linked) and RUN on a Windows x64 runner. Compared against the in-repo baseline in scripts/windows/screenshots.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          entries=()
+          if [ -d "$ART/raw-x64" ]; then
+            for f in "$ART"/raw-x64/*.png; do
+              [ -f "$f" ] || continue
+              name=$(basename "$f" .png)
+              entries+=("$name=$f")
+            done
+          fi
+          if [ ${#entries[@]} -eq 0 ]; then
+            echo "No screenshots were produced; skipping PR comment."
+            exit 0
+          fi
+          echo "Posting ${#entries[@]} screenshot(s)"
+          mkdir -p "$ART/previews"
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
+          cn1ss_process_and_report \
+            "Native Windows port (cross-compiled)" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$REF_DIR" "$ART/previews" "$ART" \
+            "${entries[@]}"
