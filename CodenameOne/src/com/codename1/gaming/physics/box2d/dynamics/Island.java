@@ -27,7 +27,6 @@ import com.codename1.gaming.physics.box2d.callbacks.ContactImpulse;
 import com.codename1.gaming.physics.box2d.callbacks.ContactListener;
 import com.codename1.gaming.physics.box2d.common.MathUtils;
 import com.codename1.gaming.physics.box2d.common.Settings;
-import com.codename1.gaming.physics.box2d.common.Timer;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactSolver;
@@ -231,7 +230,8 @@ public class Island {
   }
 
   private final ContactSolver contactSolver = new ContactSolver();
-  private final Timer timer = new Timer();
+  // Profiling stopwatch: holds the millis timestamp of its last reset.
+  private long timer = System.currentTimeMillis();
   private final SolverData solverData = new SolverData();
   private final ContactSolverDef solverDef = new ContactSolverDef();
 
@@ -281,7 +281,7 @@ public class Island {
       m_velocities[i].w = w;
     }
 
-    timer.reset();
+    timer = System.currentTimeMillis();
 
     // Solver data
     solverData.step = step;
@@ -308,10 +308,10 @@ public class Island {
       m_joints[i].initVelocityConstraints(solverData);
     }
 
-    profile.solveInit = timer.getMilliseconds();
+    profile.solveInit = (System.currentTimeMillis() - timer);
 
     // Solve velocity constraints
-    timer.reset();
+    timer = System.currentTimeMillis();
     // System.out.println("island solving velocities");
     for (int i = 0; i < step.velocityIterations; ++i) {
       for (int j = 0; j < m_jointCount; ++j) {
@@ -323,7 +323,7 @@ public class Island {
 
     // Store impulses for warm starting
     contactSolver.storeImpulses();
-    profile.solveVelocity = timer.getMilliseconds();
+    profile.solveVelocity = (System.currentTimeMillis() - timer);
 
     // Integrate positions
     for (int i = 0; i < m_bodyCount; ++i) {
@@ -359,7 +359,7 @@ public class Island {
     }
 
     // Solve position constraints
-    timer.reset();
+    timer = System.currentTimeMillis();
     boolean positionSolved = false;
     for (int i = 0; i < step.positionIterations; ++i) {
       boolean contactsOkay = contactSolver.solvePositionConstraints();
@@ -389,7 +389,7 @@ public class Island {
       body.synchronizeTransform();
     }
 
-    profile.solvePosition = timer.getMilliseconds();
+    profile.solvePosition = (System.currentTimeMillis() - timer);
 
     report(contactSolver.m_velocityConstraints);
 

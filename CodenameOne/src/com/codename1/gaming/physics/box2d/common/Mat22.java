@@ -23,11 +23,9 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-import java.io.Serializable;
 
 /// A 2-by-2 matrix. Stored in column-major order.
-public class Mat22 implements Serializable {
-  private static final long serialVersionUID = 2L;
+public class Mat22 {
 
   public final Vec2 ex, ey;
 

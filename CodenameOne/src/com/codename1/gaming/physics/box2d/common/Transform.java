@@ -23,14 +23,12 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-import java.io.Serializable;
 
 // updated to rev 100
 
 /// A transform contains translation and rotation. It is used to represent the position and
 /// orientation of rigid frames.
-public class Transform implements Serializable {
-  private static final long serialVersionUID = 1L;
+public class Transform {
 
   /// The translation caused by the transform
   public final Vec2 p;

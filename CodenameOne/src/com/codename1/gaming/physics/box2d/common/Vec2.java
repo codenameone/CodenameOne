@@ -23,11 +23,9 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-import java.io.Serializable;
 
 /// A 2D column vector
-public class Vec2 implements Serializable {
-  private static final long serialVersionUID = 1L;
+public class Vec2 {
 
   public float x, y;
 

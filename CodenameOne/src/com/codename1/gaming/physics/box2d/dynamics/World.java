@@ -49,7 +49,6 @@ import com.codename1.gaming.physics.box2d.common.Color3f;
 import com.codename1.gaming.physics.box2d.common.MathUtils;
 import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Sweep;
-import com.codename1.gaming.physics.box2d.common.Timer;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
@@ -528,8 +527,9 @@ public class World {
 
   // djm pooling
   private final TimeStep step = new TimeStep();
-  private final Timer stepTimer = new Timer();
-  private final Timer tempTimer = new Timer();
+  // Profiling stopwatches: each holds the millis timestamp of its last reset.
+  private long stepTimer = System.currentTimeMillis();
+  private long tempTimer = System.currentTimeMillis();
 
   /// Take a time step. This performs collision detection, integration, and constraint solution.
   ///
@@ -537,7 +537,7 @@ public class World {
   /// @param velocityIterations for the velocity constraint solver.
   /// @param positionIterations for the position constraint solver.
   public void step(float dt, int velocityIterations, int positionIterations) {
-    stepTimer.reset();
+    stepTimer = System.currentTimeMillis();
     // log.debug("Starting step");
     // If new fixtures were added, we need to find the new contacts.
     if ((m_flags & NEW_FIXTURE) == NEW_FIXTURE) {
@@ -562,22 +562,22 @@ public class World {
     step.warmStarting = m_warmStarting;
 
     // Update contacts. This is where some contacts are destroyed.
-    tempTimer.reset();
+    tempTimer = System.currentTimeMillis();
     m_contactManager.collide();
-    m_profile.collide = tempTimer.getMilliseconds();
+    m_profile.collide = (System.currentTimeMillis() - tempTimer);
 
     // Integrate velocities, solve velocity constraints, and integrate positions.
     if (m_stepComplete && step.dt > 0.0f) {
-      tempTimer.reset();
+      tempTimer = System.currentTimeMillis();
       solve(step);
-      m_profile.solve = tempTimer.getMilliseconds();
+      m_profile.solve = (System.currentTimeMillis() - tempTimer);
     }
 
     // Handle TOI events.
     if (m_continuousPhysics && step.dt > 0.0f) {
-      tempTimer.reset();
+      tempTimer = System.currentTimeMillis();
       solveTOI(step);
-      m_profile.solveTOI = tempTimer.getMilliseconds();
+      m_profile.solveTOI = (System.currentTimeMillis() - tempTimer);
     }
 
     if (step.dt > 0.0f) {
@@ -591,7 +591,7 @@ public class World {
     m_flags &= ~LOCKED;
     // log.debug("ending step");
 
-    m_profile.step = stepTimer.getMilliseconds();
+    m_profile.step = System.currentTimeMillis() - stepTimer;
   }
 
   /// Call this after you are done with time steps to clear the forces. You normally call this after
@@ -888,7 +888,7 @@ public class World {
   private final Island island = new Island();
   private Body[] stack = new Body[10]; // TODO djm find a good initial stack number;
   private final Profile islandProfile = new Profile();
-  private final Timer broadphaseTimer = new Timer();
+  private long broadphaseTimer = System.currentTimeMillis();
 
   private void solve(TimeStep step) {
     m_profile.solveInit = 0;
@@ -1027,7 +1027,7 @@ public class World {
       }
     }
 
-    broadphaseTimer.reset();
+    broadphaseTimer = System.currentTimeMillis();
     // Synchronize fixtures, check for out of range bodies.
     for (Body b = m_bodyList; b != null; b = b.getNext()) {
       // If a body was not in an island then it did not move.
@@ -1045,7 +1045,7 @@ public class World {
 
     // Look for new contacts.
     m_contactManager.findNewContacts();
-    m_profile.broadphase = broadphaseTimer.getMilliseconds();
+    m_profile.broadphase = System.currentTimeMillis() - broadphaseTimer;
   }
 
   private final Island toiIsland = new Island();

@@ -23,13 +23,11 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-import java.io.Serializable;
 
 /// This describes the motion of a body/shape for TOI computation. Shapes are defined with respect to
 /// the body origin, which may no coincide with the center of mass. However, to support dynamics we
 /// must interpolate the center of mass position.
-public class Sweep implements Serializable {
-  private static final long serialVersionUID = 1L;
+public class Sweep {
 
   /// Local center of mass position
   public final Vec2 localCenter;

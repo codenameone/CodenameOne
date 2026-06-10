@@ -23,13 +23,11 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-import java.io.Serializable;
 
 /// A 3-by-3 matrix. Stored in column-major order.
 ///
 /// @author Daniel Murphy
-public class Mat33 implements Serializable {
-  private static final long serialVersionUID = 2L;
+public class Mat33 {
 
   public static final Mat33 IDENTITY = new Mat33(new Vec3(1, 0, 0), new Vec3(0, 1, 0), new Vec3(0,
       0, 1));
