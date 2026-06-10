@@ -147,7 +147,8 @@ public class WindowsCameraImpl extends CameraImpl {
                 }
             }
         }, "cn1-windows-takephoto");
-        t.setDaemon(true);
+        // NB: no setDaemon -- java.lang.Thread.setDaemon is not in the clean
+        // (ParparVM) runtime; the worker exits as soon as the frame is captured.
         t.start();
     }
 
