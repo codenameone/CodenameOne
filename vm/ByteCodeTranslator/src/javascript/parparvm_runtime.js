@@ -4053,6 +4053,77 @@ function* cn1_ivN(target, mid, args) {
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
+// Synchronous virtual dispatch family (cn1_ivs0..4 / cn1_ivsN). Emitted
+// at INVOKEVIRTUAL / INVOKEINTERFACE call sites whose signature the
+// suspension analysis (exportedSuspendingSigs) proved has NO suspending
+// impl -- so the resolved override is a plain ``function`` returning a
+// value, and the caller need not be a generator. This is what lets a
+// method that only makes non-suspending virtual calls be emitted as a
+// plain ``function`` instead of ``function*`` (no ``yield*`` ceremony),
+// removing per-call generator allocation and shrinking the bundle while
+// keeping the green-thread model intact for genuinely-blocking paths.
+//
+// Defensive drive-once: if a target unexpectedly returns a generator (a
+// CHA-soundness gap -- e.g. a runtime-installed override the static
+// analysis didn't see, or the ``{}`` broken-receiver canvas no-op stubs
+// in cn1_ivResolve which are ``function*``), step it ONCE. A body that
+// never actually yields completes on the first next() so we return its
+// value safely; one that genuinely suspends in this sync context throws
+// a NAMED error rather than letting a raw generator object leak
+// downstream as the "result" (the silent-corruption failure mode of the
+// three earlier sync-dispatcher attempts).
+function cn1_ivsDrive(r, mid) {
+  if (r && typeof r.next === "function") {
+    const step = r.next();
+    if (!step.done) {
+      throw new Error("cn1_ivs: sync virtual dispatch reached a yielding method (CHA unsound): " + mid);
+    }
+    return step.value;
+  }
+  return r;
+}
+function cn1_ivsNpe() {
+  const ex = jvm.createException("java_lang_NullPointerException");
+  if (typeof ex.ctor === "function") {
+    const cr = ex.ctor(ex.object);
+    if (cr && typeof cr.next === "function") {
+      const s = cr.next();
+      if (!s.done) { throw new Error("cn1_ivs: NPE constructor yielded in sync dispatch"); }
+    }
+  }
+  throw ex.object;
+}
+function cn1_ivs0(target, mid) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target), mid);
+}
+function cn1_ivs1(target, mid, a0) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0), mid);
+}
+function cn1_ivs2(target, mid, a0, a1) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0, a1), mid);
+}
+function cn1_ivs3(target, mid, a0, a1, a2) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0, a1, a2), mid);
+}
+function cn1_ivs4(target, mid, a0, a1, a2, a3) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0, a1, a2, a3), mid);
+}
+function cn1_ivsN(target, mid, args) {
+  if (target == null) { cn1_ivsNpe(); }
+  const method = cn1_ivResolve(target, mid);
+  return cn1_ivsDrive(method.apply(null, [target].concat(args)), mid);
+}
+global.cn1_ivs0 = cn1_ivs0;
+global.cn1_ivs1 = cn1_ivs1;
+global.cn1_ivs2 = cn1_ivs2;
+global.cn1_ivs3 = cn1_ivs3;
+global.cn1_ivs4 = cn1_ivs4;
+global.cn1_ivsN = cn1_ivsN;
 global.cn1_iv0 = cn1_iv0;
 global.cn1_iv1 = cn1_iv1;
 global.cn1_iv2 = cn1_iv2;
@@ -5274,12 +5345,22 @@ bindNative([__NI_PREFIX + "callArray_java_lang_String_java_lang_String_java_lang
 if (VM_DIAG_ENABLED && typeof setInterval === "function") {
   let __cn1HbLastResumes = -1;
   let __cn1HbFrozenStreak = 0;
+  let __cn1HbTick = 0;
   setInterval(function() {
     try {
       const rc = jvm.__cn1ResumeCount | 0;
       const frozen = rc === __cn1HbLastResumes;
       __cn1HbLastResumes = rc;
       __cn1HbFrozenStreak = frozen ? (__cn1HbFrozenStreak + 1) : 0;
+      // Periodic full thread dump (every ~20 beats ~= 30s). The FROZEN dump
+      // below only covers total wedges (resume count stalled); a single
+      // parked thread with the EDT still ticking -- e.g. a runner waiting on
+      // a notify that never comes -- never trips it. The periodic dump shows
+      // every thread's wait target during such partial stalls.
+      __cn1HbTick++;
+      if (__cn1HbTick % 20 === 0) {
+        vmTrace("DIAG:WORKER_HB_THREADS:" + jvm.dumpThreadStates());
+      }
       vmTrace("DIAG:WORKER_HB:resumes=" + rc
         + ":runnable=" + (jvm.runnable ? jvm.runnable.length : -1)
         + ":draining=" + (jvm.draining ? 1 : 0)

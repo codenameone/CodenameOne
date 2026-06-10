@@ -3388,13 +3388,14 @@ final class JavascriptMethodGenerator {
             // ``resolveVirtual`` handles inheritance without per-class alias
             // entries.
             String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(invoke.getName(), invoke.getDesc());
+            boolean suspending = isInvokeSuspending(invoke);
             if (hasReturn) {
                 out.append("  {\n");
-                appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues);
+                appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending);
                 out.append("    ").append(ctx.push("__result")).append(";\n");
                 out.append("  }\n");
             } else {
-                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues);
+                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues, suspending);
             }
             return true;
         }
@@ -4799,6 +4800,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
 
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
+            // CHA verdict for this call site: a sync signature uses the
+            // non-generator ``cn1_ivs*`` family with no ``yield*`` (so a
+            // method whose every virtual call is sync can itself be a plain
+            // ``function``); a suspending signature keeps ``yield* cn1_iv*``.
+            boolean susp = isInvokeSuspending(invoke);
+            String iv = susp ? "cn1_iv" : "cn1_ivs";
+            String yk = susp ? "yield* " : "";
             // Fast path for 0-arg virtual dispatch: inline the
             // target pop into the iv0 call. Pops TOS inside the
             // invoke's arg list, so the full block collapses to a
@@ -4806,9 +4814,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // call sites.
             if (argCount == 0) {
                 if (hasReturn) {
-                    out.append("        stack.p(yield* cn1_iv0(stack.q(), \"").append(dispatchId).append("\"));\n");
+                    out.append("        stack.p(").append(yk).append(iv).append("0(stack.q(), \"").append(dispatchId).append("\"));\n");
                 } else {
-                    out.append("        yield* cn1_iv0(stack.q(), \"").append(dispatchId).append("\");\n");
+                    out.append("        ").append(yk).append(iv).append("0(stack.q(), \"").append(dispatchId).append("\");\n");
                 }
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
@@ -4816,9 +4824,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 1) {
                 out.append("        { let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv1(stack.q(), \"").append(dispatchId).append("\", __arg0));");
+                    out.append("stack.p(").append(yk).append(iv).append("1(stack.q(), \"").append(dispatchId).append("\", __arg0));");
                 } else {
-                    out.append("yield* cn1_iv1(stack.q(), \"").append(dispatchId).append("\", __arg0);");
+                    out.append(yk).append(iv).append("1(stack.q(), \"").append(dispatchId).append("\", __arg0);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4826,9 +4834,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 2) {
                 out.append("        { let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1));");
+                    out.append("stack.p(").append(yk).append(iv).append("2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1));");
                 } else {
-                    out.append("yield* cn1_iv2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1);");
+                    out.append(yk).append(iv).append("2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4836,9 +4844,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 3) {
                 out.append("        { let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2));");
+                    out.append("stack.p(").append(yk).append(iv).append("3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2));");
                 } else {
-                    out.append("yield* cn1_iv3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2);");
+                    out.append(yk).append(iv).append("3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4846,9 +4854,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 4) {
                 out.append("        { let __arg3 = stack.q(); let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3));");
+                    out.append("stack.p(").append(yk).append(iv).append("4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3));");
                 } else {
-                    out.append("yield* cn1_iv4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3);");
+                    out.append(yk).append(iv).append("4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4863,7 +4871,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             out.append("        {\n");
             appendInvocationArgumentBindings(out, argCount, "          ", "stack.q()");
             out.append("          let __target = stack.q();\n");
-            appendCompactVirtualDispatch(out, "          ", dispatchId, argCount, hasReturn, "__target", true);
+            appendCompactVirtualDispatch(out, "          ", dispatchId, argCount, hasReturn, "__target", true, isInvokeSuspending(invoke));
             out.append("          pc = ").append(index + 1).append("; break;\n");
             out.append("        }\n");
             return;
@@ -5015,32 +5023,46 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
      *                        the arg expressions directly (straight-line path).
      */
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
-            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack) {
-        appendCompactVirtualDispatch(out, indent, methodId, argCount, hasReturn, targetExpr, argsFromStack, null);
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, boolean suspending) {
+        appendCompactVirtualDispatch(out, indent, methodId, argCount, hasReturn, targetExpr, argsFromStack, null, suspending);
     }
 
+    /**
+     * @param suspending  CHA verdict for the dispatched signature. When true the
+     *                    call goes through the generator family
+     *                    ({@code yield* cn1_iv*}) so a blocking override can
+     *                    suspend the cooperative scheduler. When false the
+     *                    analysis proved every impl is synchronous, so we emit
+     *                    the synchronous family ({@code cn1_ivs*}, no
+     *                    {@code yield*}) -- this is what allows a caller that
+     *                    makes only non-suspending virtual calls to itself be a
+     *                    plain {@code function}.
+     */
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
-            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions) {
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
+            boolean suspending) {
+        String base = suspending ? "cn1_iv" : "cn1_ivs";
+        String yieldKw = suspending ? "yield* " : "";
         String helper;
         boolean variadic = false;
         switch (argCount) {
-            case 0: helper = "cn1_iv0"; break;
-            case 1: helper = "cn1_iv1"; break;
-            case 2: helper = "cn1_iv2"; break;
-            case 3: helper = "cn1_iv3"; break;
-            case 4: helper = "cn1_iv4"; break;
+            case 0: helper = base + "0"; break;
+            case 1: helper = base + "1"; break;
+            case 2: helper = base + "2"; break;
+            case 3: helper = base + "3"; break;
+            case 4: helper = base + "4"; break;
             default:
-                helper = "cn1_ivN";
+                helper = base + "N";
                 variadic = true;
                 break;
         }
         out.append(indent);
         if (hasReturn && argsFromStack) {
-            out.append("stack.p(yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("stack.p(").append(yieldKw).append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
         } else if (hasReturn) {
-            out.append("let __result = yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("let __result = ").append(yieldKw).append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
         } else {
-            out.append("yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append(yieldKw).append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
         }
         if (variadic) {
             out.append(", [");

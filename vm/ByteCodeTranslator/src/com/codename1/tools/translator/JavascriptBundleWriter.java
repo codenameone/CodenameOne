@@ -739,4 +739,47 @@ final class JavascriptBundleWriter {
             input.close();
         }
     }
+
+    /**
+     * Every {@code cn1_*} token referenced as a string literal by the
+     * hand-written bridge JS (parparvm_runtime.js, browser_bridge.js and
+     * the JavaScript port's port.js). These are names the bridge resolves
+     * by string at runtime -- and, in the {@code bindNative} /
+     * {@code bindCiFallback} case, REPLACES with {@code function*}
+     * overrides. The suspension analysis must treat the named methods as
+     * suspending: a translated caller that skipped {@code yield*} (because
+     * the static body looked synchronous) would receive the installed
+     * override's raw generator object as its "result" and the override
+     * body would never run.
+     */
+    static Set<String> collectBridgeReferencedCn1Tokens() {
+        Set<String> tokens = new HashSet<String>();
+        List<String> sources = new ArrayList<String>();
+        for (String res : new String[]{ "parparvm_runtime.js", "browser_bridge.js" }) {
+            try {
+                sources.add(loadResource(res));
+            } catch (IOException ignore) {
+                // resource absent -- skip
+            }
+        }
+        try {
+            Path webApp = locateJavaScriptPortWebApp();
+            if (webApp != null) {
+                Path portJs = webApp.resolve("port.js");
+                if (Files.exists(portJs)) {
+                    sources.add(new String(Files.readAllBytes(portJs), StandardCharsets.UTF_8));
+                }
+            }
+        } catch (Exception ignore) {
+            // port.js unavailable -- skip
+        }
+        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        for (String src : sources) {
+            java.util.regex.Matcher m = literal.matcher(src);
+            while (m.find()) {
+                tokens.add(m.group(1));
+            }
+        }
+        return tokens;
+    }
 }
