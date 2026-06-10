@@ -43,7 +43,8 @@
 #ifdef CN1_HAVE_WINRT
 
 #include <roapi.h>
-#include <string>
+#include <stdlib.h>
+#include <string.h>
 #include <wrl.h>
 #include <wrl/event.h>
 #include <wrl/wrappers/corewrappers.h>
@@ -102,8 +103,47 @@ static void cn1WinRtInit() {
     RoInitialize(RO_INIT_MULTITHREADED);
 }
 
-/* Appends the UTF-8 bytes of an HSTRING to `out` (empty HSTRING -> nothing). */
-static void cn1AppendHString(std::string& out, HSTRING h) {
+/* A minimal growable UTF-8 byte buffer. The port avoids the C++ STL (the MSVC STL
+ * headers hard-require a very recent Clang, which the cross-compile toolchain may
+ * predate), so contacts/share string building uses this instead of std::string. */
+typedef struct CN1Buf {
+    char* data;
+    size_t len;
+    size_t cap;
+} CN1Buf;
+
+static void cn1BufInit(CN1Buf* b) {
+    b->data = NULL;
+    b->len = 0;
+    b->cap = 0;
+}
+
+static void cn1BufAppendBytes(CN1Buf* b, const char* src, size_t n) {
+    if (b->len + n + 1 > b->cap) {
+        size_t want = (b->cap == 0 ? 256 : b->cap * 2);
+        while (want < b->len + n + 1) {
+            want *= 2;
+        }
+        char* grown = (char*) realloc(b->data, want);
+        if (grown == NULL) {
+            return;
+        }
+        b->data = grown;
+        b->cap = want;
+    }
+    if (src != NULL && n > 0) {
+        memcpy(b->data + b->len, src, n);
+    }
+    b->len += n;
+    b->data[b->len] = 0;
+}
+
+static void cn1BufAppendChar(CN1Buf* b, char c) {
+    cn1BufAppendBytes(b, &c, 1);
+}
+
+/* Appends the UTF-8 bytes of an HSTRING to the buffer (empty HSTRING -> nothing). */
+static void cn1AppendHString(CN1Buf* out, HSTRING h) {
     UINT32 len = 0;
     PCWSTR w = WindowsGetStringRawBuffer(h, &len);
     if (w == NULL || len == 0) {
@@ -113,9 +153,13 @@ static void cn1AppendHString(std::string& out, HSTRING h) {
     if (n <= 0) {
         return;
     }
-    size_t at = out.size();
-    out.resize(at + (size_t) n);
-    WideCharToMultiByte(CP_UTF8, 0, w, (int) len, &out[at], n, NULL, NULL);
+    char* tmp = (char*) malloc((size_t) n);
+    if (tmp == NULL) {
+        return;
+    }
+    WideCharToMultiByte(CP_UTF8, 0, w, (int) len, tmp, n, NULL, NULL);
+    cn1BufAppendBytes(out, tmp, (size_t) n);
+    free(tmp);
 }
 
 #endif /* CN1_HAVE_WINRT */
@@ -302,14 +346,15 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
     }
     unsigned int size = 0;
     contacts->get_Size(&size);
-    std::string blob;
+    CN1Buf blob;
+    cn1BufInit(&blob);
     for (unsigned int i = 0; i < size; i++) {
         ComPtr<IContact> c;
         if (FAILED(contacts->GetAt(i, &c)) || !c) {
             continue;
         }
         if (i > 0) {
-            blob.push_back('\x1e');
+            cn1BufAppendChar(&blob, '\x1e');
         }
         /* Name is on the base IContact; Id / Phones / Emails on IContact2. */
         HString name;
@@ -320,10 +365,10 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
         if (c2) {
             c2->get_Id(id.GetAddressOf());
         }
-        cn1AppendHString(blob, id.Get());
-        blob.push_back('\x1f');
-        cn1AppendHString(blob, name.Get());
-        blob.push_back('\x1f');
+        cn1AppendHString(&blob, id.Get());
+        cn1BufAppendChar(&blob, '\x1f');
+        cn1AppendHString(&blob, name.Get());
+        cn1BufAppendChar(&blob, '\x1f');
         /* first phone number */
         if (c2) {
             ComPtr<IVector<ContactPhone*>> phones;
@@ -335,12 +380,12 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
                     if (SUCCEEDED(phones->GetAt(0, &phone)) && phone) {
                         HString num;
                         phone->get_Number(num.GetAddressOf());
-                        cn1AppendHString(blob, num.Get());
+                        cn1AppendHString(&blob, num.Get());
                     }
                 }
             }
         }
-        blob.push_back('\x1f');
+        cn1BufAppendChar(&blob, '\x1f');
         /* first email */
         if (c2) {
             ComPtr<IVector<ContactEmail*>> emails;
@@ -352,13 +397,17 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
                     if (SUCCEEDED(emails->GetAt(0, &email)) && email) {
                         HString addr;
                         email->get_Address(addr.GetAddressOf());
-                        cn1AppendHString(blob, addr.Get());
+                        cn1AppendHString(&blob, addr.Get());
                     }
                 }
             }
         }
     }
-    return newStringFromCString(threadStateData, blob.c_str());
+    {
+        JAVA_OBJECT s = newStringFromCString(threadStateData, blob.data != NULL ? blob.data : "");
+        free(blob.data);
+        return s;
+    }
 #else
     return JAVA_NULL;
 #endif
@@ -373,20 +422,20 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
  * stashed in file-static state read by the (same-thread) DataRequested handler.
  * Shares text (the common case); image-file sharing is a later addition. */
 #ifdef CN1_HAVE_WINRT
-static std::wstring g_shareText;
-static std::wstring g_shareTitle;
+static WCHAR* g_shareTextW = NULL;
+static WCHAR* g_shareTitleW = NULL;
 static bool g_shareHandlerRegistered = false;
 static ComPtr<IDataTransferManager> g_shareDtm;
 #endif
 
 void cn1WinShareHandleMessage(WPARAM wParam) {
 #ifdef CN1_HAVE_WINRT
-    /* wParam carries [textW, titleW] copied by the caller; take ownership. */
+    /* wParam carries [textW, titleW] allocated by the caller; take ownership. */
     WCHAR** data = (WCHAR**) wParam;
-    g_shareText = data[0] != NULL ? data[0] : L"";
-    g_shareTitle = data[1] != NULL ? data[1] : L"";
-    if (data[0] != NULL) { free(data[0]); }
-    if (data[1] != NULL) { free(data[1]); }
+    if (g_shareTextW != NULL) { free(g_shareTextW); }
+    if (g_shareTitleW != NULL) { free(g_shareTitleW); }
+    g_shareTextW = data[0];
+    g_shareTitleW = data[1];
     free(data);
     if (cn1Win.hwnd == NULL) {
         return;
@@ -417,9 +466,9 @@ void cn1WinShareHandleMessage(WPARAM wParam) {
                     ComPtr<IDataPackagePropertySet> props;
                     if (SUCCEEDED(pkg->get_Properties(&props)) && props) {
                         props->put_Title(HStringReference(
-                                g_shareTitle.empty() ? L"Share" : g_shareTitle.c_str()).Get());
+                                (g_shareTitleW != NULL && g_shareTitleW[0] != 0) ? g_shareTitleW : L"Share").Get());
                     }
-                    pkg->SetText(HStringReference(g_shareText.c_str()).Get());
+                    pkg->SetText(HStringReference(g_shareTextW != NULL ? g_shareTextW : L"").Get());
                     return S_OK;
                 }).Get(),
             &token);
