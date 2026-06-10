@@ -101,6 +101,18 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// between (e.g. by `#showPopupDialog(Component)`).
     private boolean shownInFormMode;
 
+    /// The form the dialog should be hosted on, pinned by the popup entry points
+    /// (the form of the component passed to `#showPopupDialog(Component)`) and
+    /// consumed by `#show(int, int, int, int)` so the whole popup flow targets
+    /// one consistent form. When unset, `#resolveHostForm()` falls back to
+    /// `Display#getCurrentUpcoming()` rather than `Display#getCurrent()`:
+    /// during a form transition the latter still returns the outgoing form, so a
+    /// dialog shown right after `Form.show()` would silently attach to the form
+    /// that is leaving the screen and only materialize when that form is shown
+    /// again -- the "dialog never appears / appears later on another screen"
+    /// symptom of #5193.
+    private Form popupHostForm;
+
     private boolean pressedOutOfBounds;
     private ActionListener pressedListener;
     private ActionListener releasedListener;
@@ -289,10 +301,16 @@ public class InteractionDialog extends Container implements AbstractDialog {
             // left it, so it neither nukes siblings nor lingers empty. Use the
             // mode captured at show() time so we clean the pane the dialog was
             // actually added to even if formMode changed in the meantime.
+            // getComponentCount() can't be used for the emptiness check: while
+            // an animation is in progress (e.g. this dialog's own dispose
+            // animation) a sibling's add is only queued on the change queue and
+            // isn't counted, so the layer would be detached with the pending
+            // insert flushing into it later -- losing that dialog forever.
+            // getChildrenAsList(true) reflects queued inserts/removals.
             Container c = shownInFormMode
                     ? f.getFormLayeredPane(InteractionDialog.class, true)
                     : f.getLayeredPane(InteractionDialog.class, true);
-            if (c.getComponentCount() == 0) {
+            if (c.getChildrenAsList(true).isEmpty()) {
                 c.remove();
             }
             return;
@@ -302,6 +320,16 @@ public class InteractionDialog extends Container implements AbstractDialog {
             c.removeAll();
             c.remove();
         }
+    }
+
+    /// Resolves the form this dialog should be hosted on: the form pinned by the
+    /// popup entry points when available, otherwise the form that will actually
+    /// be on screen once any in-flight transition completes. See `#popupHostForm`.
+    private Form resolveHostForm() {
+        if (popupHostForm != null) {
+            return popupHostForm;
+        }
+        return Display.getInstance().getCurrentUpcoming();
     }
 
     private Container getLayeredPane(Form f) {
@@ -347,7 +375,12 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     public void resize(final int top, final int bottom, final int left, final int right) {
         if (!disposed) {
-            final Form f = Display.getInstance().getCurrent();
+            // prefer the form the dialog is actually showing on; during a form
+            // transition Display.getCurrent() may point at the outgoing form
+            Form f = getComponentForm();
+            if (f == null) {
+                f = resolveHostForm();
+            }
 
             Style unselectedStyle = getUnselectedStyle();
 
@@ -389,7 +422,8 @@ public class InteractionDialog extends Container implements AbstractDialog {
     public void show(int top, int bottom, int left, int right) {
         getUnselectedStyle().setOpacity(255);
         disposed = false;
-        Form f = Display.getInstance().getCurrent();
+        Form f = resolveHostForm();
+        popupHostForm = null;
         shownInFormMode = formMode;
         Style unselectedStyle = getUnselectedStyle();
 
@@ -858,7 +892,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
         setOwner(c);
-        showPopupDialog(componentPos);
+        // host the popup on the form the target component actually belongs to;
+        // Display.getCurrent() may still be the outgoing form while a transition
+        // is in flight, which would make the dialog appear to never show (#5193)
+        showPopupDialogImpl(componentPos, Display.getInstance().isPortrait(), f);
     }
 
     /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
@@ -890,10 +927,21 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
     private void showPopupDialogImpl(Rectangle rect, boolean bias) {
+        showPopupDialogImpl(rect, bias, null);
+    }
+
+    private void showPopupDialogImpl(Rectangle rect, boolean bias, Form hostForm) {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
         }
-        Form f = Display.getInstance().getCurrent();
+        Form f = hostForm;
+        if (f == null) {
+            f = resolveHostForm();
+        }
+        // pin the host form so the show(int, int, int, int) call at the end of
+        // this method (and any subclass override of it) targets the same form
+        // used for all the positioning math below
+        popupHostForm = f;
         Rectangle origRect = rect;
         rect = new Rectangle(rect);
         rect.setX(rect.getX() - getLayeredPane(f).getAbsoluteX());
