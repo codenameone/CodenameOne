@@ -29,28 +29,30 @@ import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.ui.Graphics;
 
-/// Renders a `PhysicsWorld`'s collision shapes, joints and bounding boxes onto a
-/// Codename One `com.codename1.ui.Graphics`, for debugging. It converts Box2D's
-/// meters (y up) to the world's pixels (y down) using the same scale and flip the
-/// rest of the wrapper uses, so the debug overlay lines up exactly with the sprites
-/// driven by the bodies.
+/// Internal Box2D `DebugDraw` adapter that renders a `PhysicsWorld`'s collision
+/// shapes, joints and bounding boxes onto a Codename One `com.codename1.ui.Graphics`.
+/// It converts Box2D's meters (y up) to the world's pixels (y down) using the same
+/// scale and flip the rest of the wrapper uses, so the debug overlay lines up exactly
+/// with the sprites driven by the bodies.
 ///
-/// You normally do not create this yourself -- call
-/// `PhysicsWorld#debugDraw(com.codename1.ui.Graphics)` from a component's `paint`,
-/// onto an off-screen `com.codename1.ui.Image`, or anywhere you have a `Graphics`.
-public class PhysicsDebugDraw extends DebugDraw {
+/// This class is package-private on purpose: it implements an engine-level callback
+/// interface whose methods speak in Box2D types (`Vec2`, `Color3f`, `Transform`), so
+/// it is not part of the public wrapper API. Drive it through
+/// `PhysicsWorld#debugDraw(com.codename1.ui.Graphics)` and tune it with
+/// `PhysicsWorld#setDebugFillAlpha(int)`.
+class PhysicsDebugDraw extends DebugDraw {
     private final PhysicsWorld world;
     private Graphics g;
     private int fillAlpha = 90;
 
     /// Creates a debug renderer for the given world.
-    public PhysicsDebugDraw(PhysicsWorld world) {
+    PhysicsDebugDraw(PhysicsWorld world) {
         super(new OBBViewportTransform());
         this.world = world;
     }
 
     /// Sets the alpha (0..255) used to fill solid shapes; outlines are always opaque.
-    public void setFillAlpha(int alpha) {
+    void setFillAlpha(int alpha) {
         this.fillAlpha = alpha;
     }
 

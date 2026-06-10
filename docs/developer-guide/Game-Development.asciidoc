@@ -498,6 +498,25 @@ boxes, circles or polygons (`createBox`, `createCircle`, `createPolygon`) and
 respond to `setLinearVelocity`, `applyForce`, `applyLinearImpulse`, `applyTorque`,
 `setBullet` (continuous collision for fast objects), `setFixedRotation` and more.
 
+For an arbitrary outline, `createShape(x, y, shape, type)` takes a Codename One
+`com.codename1.ui.geom.Shape` -- typically the same `com.codename1.ui.geom.GeneralPath`
+you would draw with -- and builds the collision fixtures from it, flattening any
+Bezier curves. Each subpath becomes a fixture (so a figure with several outlines is a
+compound body); a closed convex subpath of up to eight points becomes a solid polygon
+usable by any body type, while a concave, larger, or open subpath becomes a one-sided
+edge chain (ideal for static terrain). This lets the hit-shape and the drawn shape
+come from one piece of geometry:
+
+[source,java]
+----
+GeneralPath ramp = new GeneralPath();
+ramp.moveTo(0, 0);
+ramp.lineTo(240, 0);
+ramp.lineTo(240, 80);
+ramp.closePath();
+world.createShape(40, 380, ramp, BodyType.STATIC);   // collide with exactly what you draw
+----
+
 ==== Driving sprites from physics
 
 A body can drive a sprite directly. `Sprite` implements
@@ -568,9 +587,9 @@ When sprites and bodies drift apart it helps to see the raw simulation. Call
 `world.debugDraw(Graphics)` to overlay every fixture, joint and contact straight onto
 a Codename One `Graphics` -- shapes, centers of mass and bounding boxes -- in pixel
 space, with the y-axis flip already applied. Choose what to show with
-`setDebugDrawFlags(shapes, joints, boundingBoxes)`. Because it draws to an ordinary
-`Graphics` you can render it over a regular Codename One component, not only a
-`GameView`.
+`setDebugDrawFlags(shapes, joints, boundingBoxes)`, and soften the translucent shape
+fill with `setDebugFillAlpha(alpha)`. Because it draws to an ordinary `Graphics` you
+can render it over a regular Codename One component, not only a `GameView`.
 
 === Putting it together: Anatomy of a game
 

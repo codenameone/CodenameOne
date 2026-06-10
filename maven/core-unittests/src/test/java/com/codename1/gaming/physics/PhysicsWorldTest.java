@@ -1,6 +1,11 @@
 package com.codename1.gaming.physics;
 
 import com.codename1.gaming.Sprite;
+import com.codename1.gaming.physics.box2d.collision.shapes.ShapeType;
+import com.codename1.gaming.physics.box2d.dynamics.Fixture;
+import com.codename1.ui.geom.GeneralPath;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -122,5 +127,98 @@ class PhysicsWorldTest {
         w.setGravity(600, 0);   // gravity to the right, none vertically
         steps(w, 30);
         assertTrue(box.getX() > 105, "box should drift right; x=" + box.getX());
+    }
+
+    // ---- createShape: CN1 GeneralPath -> Box2D fixtures ------------------
+
+    private static List<ShapeType> fixtureTypes(PhysicsBody b) {
+        List<ShapeType> types = new ArrayList<ShapeType>();
+        for (Fixture f = b.getNativeBody().m_fixtureList; f != null; f = f.getNext()) {
+            types.add(f.getType());
+        }
+        return types;
+    }
+
+    @Test
+    void createShapeConvexClosedPathBecomesPolygon() {
+        PhysicsWorld w = new PhysicsWorld(0, 600);
+        GeneralPath square = new GeneralPath();
+        square.moveTo(-10, -10);
+        square.lineTo(10, -10);
+        square.lineTo(10, 10);
+        square.lineTo(-10, 10);
+        square.closePath();
+        PhysicsBody b = w.createShape(100, 100, square, BodyType.DYNAMIC);
+        List<ShapeType> types = fixtureTypes(b);
+        assertEquals(1, types.size(), "one closed subpath => one fixture");
+        assertEquals(ShapeType.POLYGON, types.get(0), "convex closed path => solid polygon");
+    }
+
+    @Test
+    void createShapeOpenPathBecomesChain() {
+        PhysicsWorld w = new PhysicsWorld(0, 600);
+        GeneralPath ramp = new GeneralPath();
+        ramp.moveTo(-50, 0);
+        ramp.lineTo(0, 20);
+        ramp.lineTo(50, 0);     // no closePath -> open chain
+        PhysicsBody b = w.createShape(0, 300, ramp, BodyType.STATIC);
+        List<ShapeType> types = fixtureTypes(b);
+        assertEquals(1, types.size());
+        assertEquals(ShapeType.CHAIN, types.get(0), "open path => one-sided chain");
+    }
+
+    @Test
+    void createShapeConcavePathBecomesChain() {
+        PhysicsWorld w = new PhysicsWorld(0, 600);
+        GeneralPath arrow = new GeneralPath();   // a concave chevron
+        arrow.moveTo(0, 0);
+        arrow.lineTo(10, 5);
+        arrow.lineTo(0, 10);
+        arrow.lineTo(4, 5);
+        arrow.closePath();
+        PhysicsBody b = w.createShape(0, 0, arrow, BodyType.STATIC);
+        assertEquals(ShapeType.CHAIN, fixtureTypes(b).get(0), "concave closed path => chain, not a wrong convex hull");
+    }
+
+    @Test
+    void createShapeMultipleSubpathsBecomesCompound() {
+        PhysicsWorld w = new PhysicsWorld(0, 600);
+        GeneralPath two = new GeneralPath();
+        two.moveTo(-20, -5);
+        two.lineTo(-10, -5);
+        two.lineTo(-10, 5);
+        two.lineTo(-20, 5);
+        two.closePath();
+        two.moveTo(10, -5);
+        two.lineTo(20, -5);
+        two.lineTo(20, 5);
+        two.lineTo(10, 5);
+        two.closePath();
+        PhysicsBody b = w.createShape(0, 0, two, BodyType.DYNAMIC);
+        assertEquals(2, fixtureTypes(b).size(), "two subpaths => a compound body with two fixtures");
+    }
+
+    @Test
+    void createShapeFloorActuallyCollides() {
+        // a wide static floor described as a GeneralPath; a dynamic box must rest on it
+        PhysicsWorld w = new PhysicsWorld(0, 600);
+        GeneralPath slab = new GeneralPath();
+        slab.moveTo(-150, -8);
+        slab.lineTo(150, -8);
+        slab.lineTo(150, 8);
+        slab.lineTo(-150, 8);
+        slab.closePath();
+        w.createShape(100, 300, slab, BodyType.STATIC);
+        PhysicsBody box = w.createBox(100, 100, 20, 20, BodyType.DYNAMIC);
+        steps(w, 180);
+        assertTrue(box.getY() > 150, "box should have fallen from y=100");
+        assertTrue(box.getY() < 300, "box must rest on the floor, not pass through; y=" + box.getY());
+    }
+
+    @Test
+    void setDebugFillAlphaIsSafeBeforeFirstDraw() {
+        PhysicsWorld w = new PhysicsWorld(0, 600);
+        w.setDebugFillAlpha(40);                 // before any debugDraw() -> must not throw
+        assertNotNull(w.getDebugDraw());          // renderer created lazily, package-private accessor
     }
 }

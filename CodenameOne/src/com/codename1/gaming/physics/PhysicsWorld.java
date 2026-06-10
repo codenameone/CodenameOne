@@ -22,9 +22,11 @@
  */
 package com.codename1.gaming.physics;
 
+import com.codename1.gaming.physics.box2d.collision.shapes.ChainShape;
 import com.codename1.gaming.physics.box2d.collision.shapes.CircleShape;
 import com.codename1.gaming.physics.box2d.collision.shapes.PolygonShape;
 import com.codename1.gaming.physics.box2d.callbacks.DebugDraw;
+import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 import com.codename1.gaming.physics.box2d.dynamics.BodyDef;
@@ -70,6 +72,7 @@ public class PhysicsWorld {
     private ContactDispatcher contactDispatcher;
     private PhysicsDebugDraw debugDraw;
     private int debugFlags = DebugDraw.e_shapeBit | DebugDraw.e_jointBit;
+    private int debugFillAlpha = 90;
 
     /// Creates a world with the given gravity in pixels per second squared. A
     /// positive y pulls bodies down the screen.
@@ -163,6 +166,57 @@ public class PhysicsWorld {
         PolygonShape shape = new PolygonShape();
         shape.set(verts, n);
         pb.addFixture(shape, type);
+        return pb;
+    }
+
+    /// Creates a body whose collision outline is a Codename One
+    /// `com.codename1.ui.geom.Shape` -- typically a
+    /// `com.codename1.ui.geom.GeneralPath` -- so you can describe a hit-shape with the
+    /// same geometry API you draw with. The shape's coordinates are pixel offsets
+    /// relative to the body center `(xPx, yPx)`; Bezier curves are flattened to line
+    /// segments.
+    ///
+    /// Each subpath becomes one fixture on the body (so a figure with several
+    /// disconnected outlines yields a compound body). A subpath is converted as
+    /// follows:
+    ///
+    /// - A closed, convex subpath of at most `Settings.maxPolygonVertices` (8) points
+    /// becomes a solid `PolygonShape` -- usable by bodies of any `BodyType`.
+    ///
+    /// - Any other subpath (concave, more than 8 points, or left open) becomes a
+    /// `ChainShape` -- an exact but one-sided edge outline. Chains are ideal for
+    /// `BodyType#STATIC` terrain; a dynamic body needs convex pieces to behave as a
+    /// solid, so split a concave dynamic shape into convex subpaths.
+    ///
+    /// For a single, simple convex hull `#createPolygon(float, float, float[], BodyType)`
+    /// is a lighter-weight alternative.
+    public PhysicsBody createShape(float xPx, float yPx, com.codename1.ui.geom.Shape shape, BodyType type) {
+        PhysicsBody pb = createBody(xPx, yPx, type);
+        List subpaths = PathFlattener.flatten(shape);
+        for (Object o : subpaths) {
+            PathFlattener.Subpath sub = (PathFlattener.Subpath) o;
+            int n = sub.xy.length / 2;
+            if (n < 2) {
+                continue;
+            }
+            Vec2[] verts = new Vec2[n];
+            for (int i = 0; i < n; i++) {
+                verts[i] = new Vec2(toMeters(sub.xy[i * 2]), -toMeters(sub.xy[i * 2 + 1]));
+            }
+            if (sub.closed && n >= 3 && n <= Settings.maxPolygonVertices && PathFlattener.isConvex(sub.xy, n)) {
+                PolygonShape shp = new PolygonShape();
+                shp.set(verts, n);
+                pb.addFixture(shp, type);
+            } else {
+                ChainShape chain = new ChainShape();
+                if (sub.closed && n >= 3) {
+                    chain.createLoop(verts, n);
+                } else {
+                    chain.createChain(verts, n);
+                }
+                pb.addFixture(chain, type);
+            }
+        }
         return pb;
     }
 
@@ -287,20 +341,30 @@ public class PhysicsWorld {
     /// `com.codename1.ui.Image`, or any other 2D drawing surface. See
     /// `#setDebugDrawFlags(boolean, boolean, boolean)` to choose what is drawn.
     public void debugDraw(Graphics g) {
-        if (debugDraw == null) {
-            debugDraw = new PhysicsDebugDraw(this);
-            world.setDebugDraw(debugDraw);
-        }
-        debugDraw.setFlags(debugFlags);
-        debugDraw.setGraphics(g);
+        PhysicsDebugDraw dd = getDebugDraw();
+        dd.setFlags(debugFlags);
+        dd.setGraphics(g);
         world.drawDebugData();
     }
 
-    /// The debug renderer used by `#debugDraw(com.codename1.ui.Graphics)`, created on
-    /// first use. Exposed so you can tune it (e.g. `PhysicsDebugDraw#setFillAlpha(int)`).
-    public PhysicsDebugDraw getDebugDraw() {
+    /// Sets the alpha (0..255) used to fill solid shapes in
+    /// `#debugDraw(com.codename1.ui.Graphics)`; shape outlines stay opaque. The
+    /// default (90) is a light translucent fill.
+    public void setDebugFillAlpha(int alpha) {
+        debugFillAlpha = alpha;
+        if (debugDraw != null) {
+            debugDraw.setFillAlpha(alpha);
+        }
+    }
+
+    /// The internal debug renderer, created on first use. Package-private because it
+    /// implements an engine-level callback in Box2D types; the public knobs are
+    /// `#debugDraw(com.codename1.ui.Graphics)`, `#setDebugDrawFlags(boolean, boolean,
+    /// boolean)` and `#setDebugFillAlpha(int)`.
+    PhysicsDebugDraw getDebugDraw() {
         if (debugDraw == null) {
             debugDraw = new PhysicsDebugDraw(this);
+            debugDraw.setFillAlpha(debugFillAlpha);
             world.setDebugDraw(debugDraw);
         }
         return debugDraw;
