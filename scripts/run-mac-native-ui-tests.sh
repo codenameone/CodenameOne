@@ -218,6 +218,10 @@ XCODE_BUILD_CMD=(
   "CODE_SIGN_IDENTITY="
   "CODE_SIGNING_REQUIRED=NO"
   "CODE_SIGNING_ALLOWED=NO"
+  # Optimize the translated C (Xcode Debug defaults to -O0) so the SIMD benchmark
+  # compares against auto-vectorized scalar -- honest and matching Windows /O2.
+  # Override with CN1_TEST_OPT_LEVEL (0/1/2/3/s).
+  "GCC_OPTIMIZATION_LEVEL=${CN1_TEST_OPT_LEVEL:-2}"
   build
 )
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
