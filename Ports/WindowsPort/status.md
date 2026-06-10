@@ -150,7 +150,15 @@ they stay honest until backed by a real implementation:
 - Push + local notifications (`sendLocalNotification`)
 - Vibrate (no desktop vibration motor)
 - System share, print
-- Contacts (WinRT — pending)
+
+**Contacts — implemented (WinRT).** `getAllContacts` / `getContactById` read the
+user's contacts via the WinRT `ContactStore` (`cn1_windows_winrt.cpp`, same
+`CN1_HAVE_WINRT` gate). One native call returns every contact as a delimited blob
+(id / name / phone / email) which the impl parses and briefly caches, so the
+base's id-then-fetch loop shares a single store read. Returns nothing when the
+store is inaccessible (no WinRT / access denied) -- honest, never fabricated.
+Compiles on the Windows ARM64 VM via the same proven WRL await pattern as
+biometric/location.
 
 **Location / GPS — implemented (WinRT).** `getLocationManager()` →
 `WindowsLocationManager`, backed by the WinRT `Geolocator`

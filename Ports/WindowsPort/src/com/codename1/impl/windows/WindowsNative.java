@@ -529,6 +529,17 @@ public final class WindowsNative {
      */
     public static native boolean locationGetCurrent(double[] out);
 
+    /* -------------------------------------------------- contacts (WinRT) */
+
+    /**
+     * Reads the user's contacts via the WinRT {@code ContactStore} and returns
+     * them as a single blob: records separated by {@code 0x1E}, fields (id, name,
+     * phone, email) by {@code 0x1F}. {@code null} when the store is inaccessible
+     * (no WinRT / access denied); empty string when there are simply no contacts.
+     * Blocks (call off the EDT).
+     */
+    public static native String contactsGetAll();
+
     // ---------------------------------------------------------------------
     // 3D / Direct3D 11 backend (com.codename1.gpu). Implemented in
     // nativeSources/cn1_windows_d3d.cpp. Every peer is an opaque long (a D3D

@@ -43,16 +43,21 @@
 #ifdef CN1_HAVE_WINRT
 
 #include <roapi.h>
+#include <string>
 #include <wrl.h>
 #include <wrl/event.h>
 #include <wrl/wrappers/corewrappers.h>
 #include <windows.foundation.h>
+#include <windows.foundation.collections.h>
 #include <windows.security.credentials.ui.h>
 #include <windows.devices.geolocation.h>
+#include <windows.applicationmodel.contacts.h>
 
 using namespace ABI::Windows::Foundation;
+using namespace ABI::Windows::Foundation::Collections;
 using namespace ABI::Windows::Security::Credentials::UI;
 using namespace ABI::Windows::Devices::Geolocation;
+using namespace ABI::Windows::ApplicationModel::Contacts;
 using namespace Microsoft::WRL;
 using namespace Microsoft::WRL::Wrappers;
 
@@ -92,6 +97,22 @@ static HRESULT cn1AwaitOp(IAsyncOperation<TOp>* op, TResultPtr result) {
  * skipped -- the CN1 worker threads are short-lived and re-initialise cheaply. */
 static void cn1WinRtInit() {
     RoInitialize(RO_INIT_MULTITHREADED);
+}
+
+/* Appends the UTF-8 bytes of an HSTRING to `out` (empty HSTRING -> nothing). */
+static void cn1AppendHString(std::string& out, HSTRING h) {
+    UINT32 len = 0;
+    PCWSTR w = WindowsGetStringRawBuffer(h, &len);
+    if (w == NULL || len == 0) {
+        return;
+    }
+    int n = WideCharToMultiByte(CP_UTF8, 0, w, (int) len, NULL, 0, NULL, NULL);
+    if (n <= 0) {
+        return;
+    }
+    size_t at = out.size();
+    out.resize(at + (size_t) n);
+    WideCharToMultiByte(CP_UTF8, 0, w, (int) len, &out[at], n, NULL, NULL);
 }
 
 #endif /* CN1_HAVE_WINRT */
@@ -240,6 +261,103 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_locationGetCurrent___doubl
 #else
     (void) outArr;
     return JAVA_FALSE;
+#endif
+}
+
+/* -------------------------------------------------------------- contacts
+ *
+ * Reads the user's contacts via the WinRT ContactStore and returns them as a
+ * single record-delimited blob: each contact is "id US name US phone US email"
+ * (field separator 0x1F, record separator 0x1E). The Java side parses it into CN1
+ * Contact objects. One native call avoids a chatty per-field bridge. Returns null
+ * when the store is inaccessible (no WinRT, or access denied) and an empty string
+ * when the store simply has no contacts -- both honest, never fabricated. */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+#ifdef CN1_HAVE_WINRT
+    cn1WinRtInit();
+    ComPtr<IContactManagerStatics2> statics;
+    if (FAILED(RoGetActivationFactory(
+            HStringReference(RuntimeClass_Windows_ApplicationModel_Contacts_ContactManager).Get(),
+            IID_PPV_ARGS(&statics)))) {
+        return JAVA_NULL;
+    }
+    ComPtr<IAsyncOperation<ContactStore*>> storeOp;
+    if (FAILED(statics->RequestStoreAsync(&storeOp))) {
+        return JAVA_NULL;
+    }
+    ComPtr<IContactStore> store;
+    if (FAILED(cn1AwaitOp(storeOp.Get(), store.GetAddressOf())) || !store) {
+        return JAVA_NULL;
+    }
+    ComPtr<IAsyncOperation<IVectorView<Contact*>*>> findOp;
+    if (FAILED(store->FindContactsAsync(&findOp))) {
+        return JAVA_NULL;
+    }
+    ComPtr<IVectorView<Contact*>> contacts;
+    if (FAILED(cn1AwaitOp(findOp.Get(), contacts.GetAddressOf())) || !contacts) {
+        return JAVA_NULL;
+    }
+    unsigned int size = 0;
+    contacts->get_Size(&size);
+    std::string blob;
+    for (unsigned int i = 0; i < size; i++) {
+        ComPtr<IContact> c;
+        if (FAILED(contacts->GetAt(i, &c)) || !c) {
+            continue;
+        }
+        if (i > 0) {
+            blob.push_back('\x1e');
+        }
+        /* Name is on the base IContact; Id / Phones / Emails on IContact2. */
+        HString name;
+        c->get_Name(name.GetAddressOf());
+        ComPtr<IContact2> c2;
+        c.As(&c2);
+        HString id;
+        if (c2) {
+            c2->get_Id(id.GetAddressOf());
+        }
+        cn1AppendHString(blob, id.Get());
+        blob.push_back('\x1f');
+        cn1AppendHString(blob, name.Get());
+        blob.push_back('\x1f');
+        /* first phone number */
+        if (c2) {
+            ComPtr<IVector<ContactPhone*>> phones;
+            if (SUCCEEDED(c2->get_Phones(&phones)) && phones) {
+                unsigned int pn = 0;
+                phones->get_Size(&pn);
+                if (pn > 0) {
+                    ComPtr<IContactPhone> phone;
+                    if (SUCCEEDED(phones->GetAt(0, &phone)) && phone) {
+                        HString num;
+                        phone->get_Number(num.GetAddressOf());
+                        cn1AppendHString(blob, num.Get());
+                    }
+                }
+            }
+        }
+        blob.push_back('\x1f');
+        /* first email */
+        if (c2) {
+            ComPtr<IVector<ContactEmail*>> emails;
+            if (SUCCEEDED(c2->get_Emails(&emails)) && emails) {
+                unsigned int en = 0;
+                emails->get_Size(&en);
+                if (en > 0) {
+                    ComPtr<IContactEmail> email;
+                    if (SUCCEEDED(emails->GetAt(0, &email)) && email) {
+                        HString addr;
+                        email->get_Address(addr.GetAddressOf());
+                        cn1AppendHString(blob, addr.Get());
+                    }
+                }
+            }
+        }
+    }
+    return newStringFromCString(threadStateData, blob.c_str());
+#else
+    return JAVA_NULL;
 #endif
 }
 

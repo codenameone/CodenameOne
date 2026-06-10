@@ -371,6 +371,69 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return locationManager;
     }
 
+    /* ------------------------------------------------------------ contacts
+     * Backed by the WinRT ContactStore (cn1_windows_winrt.cpp). One native call
+     * returns every contact as a delimited blob which is parsed and briefly
+     * cached here so getAllContacts() + the per-id getContactById() the base
+     * runs in a loop share a single store read. */
+    private java.util.HashMap<String, String[]> contactCache;
+
+    private java.util.HashMap<String, String[]> contacts() {
+        if (contactCache == null) {
+            contactCache = new java.util.HashMap<String, String[]>();
+            String blob = WindowsNative.contactsGetAll();
+            if (blob != null && blob.length() > 0) {
+                String[] records = blob.split("");
+                for (int i = 0; i < records.length; i++) {
+                    String[] f = records[i].split("", -1);
+                    if (f.length >= 1 && f[0].length() > 0) {
+                        contactCache.put(f[0], f);
+                    }
+                }
+            }
+        }
+        return contactCache;
+    }
+
+    @Override
+    public String[] getAllContacts(boolean withNumbers) {
+        java.util.HashMap<String, String[]> all = contacts();
+        java.util.ArrayList<String> ids = new java.util.ArrayList<String>();
+        for (String[] f : all.values()) {
+            // withNumbers filters to contacts that have a phone number.
+            if (!withNumbers || (f.length > 2 && f[2].length() > 0)) {
+                ids.add(f[0]);
+            }
+        }
+        return ids.toArray(new String[ids.size()]);
+    }
+
+    @Override
+    public com.codename1.contacts.Contact getContactById(String id) {
+        String[] f = contacts().get(id);
+        if (f == null) {
+            return null;
+        }
+        com.codename1.contacts.Contact c = new com.codename1.contacts.Contact();
+        c.setId(f[0]);
+        if (f.length > 1) {
+            c.setDisplayName(f[1]);
+        }
+        if (f.length > 2 && f[2].length() > 0) {
+            c.setPrimaryPhoneNumber(f[2]);
+            java.util.Hashtable phones = new java.util.Hashtable();
+            phones.put("mobile", f[2]);
+            c.setPhoneNumbers(phones);
+        }
+        if (f.length > 3 && f[3].length() > 0) {
+            c.setPrimaryEmail(f[3]);
+            java.util.Hashtable emails = new java.util.Hashtable();
+            emails.put("home", f[3]);
+            c.setEmails(emails);
+        }
+        return c;
+    }
+
     @Override
     public int getDisplayWidth() {
         return WindowsNative.getDisplayWidth();
