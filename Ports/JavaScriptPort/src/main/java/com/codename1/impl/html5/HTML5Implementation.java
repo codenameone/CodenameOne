@@ -3371,6 +3371,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     @Override
+    public boolean isSoundPoolSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        // A WebAudio backed pool gives true low latency, per voice volume/pan/rate;
+        // if WebAudio is unavailable this returns null and SoundPool uses the
+        // cross platform MediaManager fallback.
+        return WebAudioSoundPool.tryCreate(this, maxStreams);
+    }
+
+    @Override
     public Media createMedia(String uri, boolean isVideo, final Runnable onCompletion) throws IOException {
         return createMedia(uri, isVideo, null, onCompletion);
     }

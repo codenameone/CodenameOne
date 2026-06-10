@@ -58,6 +58,7 @@
 #include "java_lang_RuntimeException.h"
 #import "FillPolygon.h"
 #import "AudioPlayer.h"
+#import "CN1SoundPool.h"
 #import "DrawGradient.h"
 #ifdef CN1_USE_METAL
 #import "DrawMultiStopGradient.h"
@@ -2603,6 +2604,108 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
         return 0;
     }
     return com_codename1_impl_ios_IOSNative_createAudio;
+}
+
+// ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT maxStreams) {
+    __block JAVA_LONG result = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        result = (JAVA_LONG)((BRIDGE_CAST void*)[[CN1SoundPool alloc] initWithMaxStreams:maxStreams]);
+        POOL_END();
+    });
+    return result;
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_OBJECT b, JAVA_INT ringSize) {
+    __block JAVA_LONG result = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+#ifndef NEW_CODENAME_ONE_VM
+        org_xmlvm_runtime_XMLVMArray* byteArray = b;
+        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+        int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+        void* data = ((JAVA_ARRAY)b)->data;
+        int len = ((JAVA_ARRAY)b)->length;
+#endif
+        NSData* d = [NSData dataWithBytes:data length:len];
+        CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+        CN1Sound* s = [sp loadData:d ringSize:ringSize];
+        result = (JAVA_LONG)((BRIDGE_CAST void*)s);
+        POOL_END();
+    });
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_nativePlaySound___long_long_float_float_float_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound, JAVA_FLOAT volume, JAVA_FLOAT pan, JAVA_FLOAT rate, JAVA_INT loop) {
+    __block JAVA_INT result = -1;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+        CN1Sound* s = (BRIDGE_CAST CN1Sound*)((void *)sound);
+        result = [sp play:s volume:volume pan:pan rate:rate loop:loop];
+    });
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_nativeSetSoundVolume___long_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId, JAVA_FLOAT volume) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp setVoiceVolume:voiceId value:volume];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeSetSoundRate___long_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId, JAVA_FLOAT rate) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp setVoiceRate:voiceId value:rate];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeSetSoundPan___long_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId, JAVA_FLOAT pan) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp setVoicePan:voiceId value:pan];
+}
+
+void com_codename1_impl_ios_IOSNative_nativePauseSound___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp pauseVoice:voiceId];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeResumeSound___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp resumeVoice:voiceId];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeStopSound___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp stopVoice:voiceId];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeStopAllSounds___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp stopAll];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeAutoPauseSoundPool___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp autoPauseAll];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeAutoResumeSoundPool___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp autoResumeAll];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeUnloadSound___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    CN1Sound* s = (BRIDGE_CAST CN1Sound*)((void *)sound);
+    [sp unloadSound:s];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeReleaseSoundPool___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp stopAll];
+#ifndef CN1_USE_ARC
+    [sp release];
+#endif
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

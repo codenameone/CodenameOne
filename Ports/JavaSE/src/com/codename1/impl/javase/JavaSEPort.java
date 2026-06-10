@@ -12428,6 +12428,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public boolean isSoundPoolSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        try {
+            return new JavaSESoundPool(maxStreams);
+        } catch (Throwable t) {
+            // audio line unavailable (e.g. headless CI) -- fall back to the
+            // MediaManager based pool by reporting no native backend
+            return null;
+        }
+    }
+
     
     
     
@@ -15965,9 +15981,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             JavaSEGpuSurface surface;
             try {
                 Class<?> joglSurface = Class.forName("com.codename1.impl.javase.JavaSEJoglSurface");
-                surface = (JavaSEGpuSurface) joglSurface
-                        .getConstructor(com.codename1.gpu.RenderView.class)
-                        .newInstance(view);
+                // JavaSEJoglSurface and its constructor are package-private, so
+                // getConstructor() (public-only) cannot see it; use the declared
+                // constructor and make it accessible.
+                java.lang.reflect.Constructor<?> ctor =
+                        joglSurface.getDeclaredConstructor(com.codename1.gpu.RenderView.class);
+                ctor.setAccessible(true);
+                surface = (JavaSEGpuSurface) ctor.newInstance(view);
             } catch (Throwable t) {
                 Throwable cause = t instanceof java.lang.reflect.InvocationTargetException
                         && t.getCause() != null ? t.getCause() : t;

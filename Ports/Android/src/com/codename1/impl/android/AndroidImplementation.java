@@ -4078,6 +4078,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isSoundPoolSupported() {
+        return getContext() != null;
+    }
+
+    @Override
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        if (getContext() == null) {
+            return null;
+        }
+        return new com.codename1.media.GameSoundPool(this, maxStreams);
+    }
+
+    @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
         return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0, builder.isRedirectToAudioBuffer());
     }

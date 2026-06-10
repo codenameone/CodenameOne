@@ -4793,6 +4793,26 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Indicates whether this platform provides a native low latency sound pool
+    /// (backing `com.codename1.gaming.SoundPool`). The default implementation
+    /// returns false, in which case the gaming layer falls back to a
+    /// `MediaManager` based pool. Ports with a purpose built low latency audio API
+    /// (Android `SoundPool`, iOS `AVAudioEngine`, the desktop `javax.sound.sampled`
+    /// mixer, WebAudio) override this and `#createSoundPool(int)`.
+    public boolean isSoundPoolSupported() {
+        return false;
+    }
+
+    /// Creates a native low latency sound pool peer, or returns null when this
+    /// platform does not provide one (the default).
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxStreams`: the maximum number of simultaneously playing voices
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        return null;
+    }
+
     /// Creates media asynchronously.
     ///
     /// #### Parameters

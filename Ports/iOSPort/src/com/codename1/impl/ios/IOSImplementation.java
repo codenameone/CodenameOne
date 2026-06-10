@@ -4736,7 +4736,95 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return new IOSMedia(stream, mimeType, onCompletion);
     }
-        
+
+    @Override
+    public boolean isSoundPoolSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        return new IOSSoundPool(maxStreams);
+    }
+
+    /// Native low latency sound pool peer backed by CN1SoundPool.m (an AVAudioPlayer
+    /// ring per sound). Handles (pool, sound) are native pointers carried as longs.
+    class IOSSoundPool implements com.codename1.media.SoundPoolPeer {
+        private final long pool;
+        private final int ringSize;
+
+        IOSSoundPool(int maxStreams) {
+            this.pool = nativeInstance.nativeCreateSoundPool(maxStreams);
+            this.ringSize = Math.min(maxStreams, 4);
+        }
+
+        public Object loadSound(InputStream data, String mimeType) throws IOException {
+            byte[] bytes = com.codename1.io.Util.readInputStream(data);
+            com.codename1.io.Util.cleanup(data);
+            return Long.valueOf(nativeInstance.nativeLoadSound(pool, bytes, ringSize));
+        }
+
+        public Object loadSound(String uri) throws IOException {
+            InputStream in = getResourceAsStream(getClass(), uri);
+            if (in == null) {
+                throw new IOException("sound not found: " + uri);
+            }
+            return loadSound(in, null);
+        }
+
+        private long sound(Object s) {
+            return ((Long) s).longValue();
+        }
+
+        public int play(Object s, float volume, float pan, float rate, int loop) {
+            return nativeInstance.nativePlaySound(pool, sound(s), volume, pan, rate, loop);
+        }
+
+        public void setVolume(int voiceId, float volume) {
+            nativeInstance.nativeSetSoundVolume(pool, voiceId, volume);
+        }
+
+        public void setRate(int voiceId, float rate) {
+            nativeInstance.nativeSetSoundRate(pool, voiceId, rate);
+        }
+
+        public void setPan(int voiceId, float pan) {
+            nativeInstance.nativeSetSoundPan(pool, voiceId, pan);
+        }
+
+        public void pauseVoice(int voiceId) {
+            nativeInstance.nativePauseSound(pool, voiceId);
+        }
+
+        public void resumeVoice(int voiceId) {
+            nativeInstance.nativeResumeSound(pool, voiceId);
+        }
+
+        public void stopVoice(int voiceId) {
+            nativeInstance.nativeStopSound(pool, voiceId);
+        }
+
+        public void stopAll() {
+            nativeInstance.nativeStopAllSounds(pool);
+        }
+
+        public void autoPause() {
+            nativeInstance.nativeAutoPauseSoundPool(pool);
+        }
+
+        public void autoResume() {
+            nativeInstance.nativeAutoResumeSoundPool(pool);
+        }
+
+        public void unloadSound(Object s) {
+            nativeInstance.nativeUnloadSound(pool, sound(s));
+        }
+
+        public void release() {
+            nativeInstance.nativeReleaseSoundPool(pool);
+        }
+    }
+
     private static long createNativeMutableImage(int w, int h, int color) {
         return nativeInstance.createNativeMutableImage(w, h, color);
     }
