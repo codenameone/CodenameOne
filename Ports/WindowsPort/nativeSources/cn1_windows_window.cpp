@@ -410,6 +410,11 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             /* The tray icon's own callback (balloon click etc.). */
             cn1WinTrayHandleMessage(wParam, lParam);
             return 0;
+        case WM_CN1_SHARE:
+            /* Show the WinRT share UI on this (window-owning) thread
+             * (cn1_windows_winrt.cpp). */
+            cn1WinShareHandleMessage(wParam);
+            return 0;
         case WM_CTLCOLOREDIT: {
             /* Colour the native edit overlay to match the CN1 field it stands in
              * for; fall through to default when it is not our control. */

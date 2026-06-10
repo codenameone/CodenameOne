@@ -540,6 +540,15 @@ public final class WindowsNative {
      */
     public static native String contactsGetAll();
 
+    /* ----------------------------------------------------- share (WinRT) */
+
+    /**
+     * Shows the Windows share UI (WinRT {@code DataTransferManager}) for the given
+     * text + title, marshaled to the window thread. Returns false in headless /
+     * WinRT-less builds.
+     */
+    public static native boolean shareText(String text, String title);
+
     // ---------------------------------------------------------------------
     // 3D / Direct3D 11 backend (com.codename1.gpu). Implemented in
     // nativeSources/cn1_windows_d3d.cpp. Every peer is an opaque long (a D3D

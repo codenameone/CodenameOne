@@ -1792,6 +1792,23 @@ public class WindowsImplementation extends CodenameOneImplementation {
      * recipients, subject and body. Attachments are not expressible in a mailto:
      * URI, so only the textual content is passed.
      */
+    /* ----------------------------------------------------------- share
+     * WinRT DataTransferManager share UI (cn1_windows_winrt.cpp). Supported only
+     * on a WinRT build with a window; shares the text (the common case). */
+
+    @Override
+    public boolean isNativeShareSupported() {
+        // locationSupported() reports whether WinRT was compiled in (the gate the
+        // whole WinRT layer shares); the share UI also needs a host window.
+        return WindowsNative.locationSupported();
+    }
+
+    @Override
+    public void share(String text, String image, String mimeType, com.codename1.ui.geom.Rectangle sourceRect) {
+        String title = Display.getInstance().getProperty("AppName", "Share");
+        WindowsNative.shareText(text != null ? text : "", title);
+    }
+
     @Override
     public void sendMessage(String[] recipients, String subject, com.codename1.messaging.Message msg) {
         StringBuilder uri = new StringBuilder("mailto:");

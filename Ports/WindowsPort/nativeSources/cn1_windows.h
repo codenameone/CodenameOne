@@ -244,6 +244,13 @@ LRESULT cn1WinFileDialogHandleMessage(WPARAM wParam);
 void cn1WinNotifyHandleMessage(WPARAM wParam);
 void cn1WinTrayHandleMessage(WPARAM wParam, LPARAM lParam);
 
+/* System share via WinRT DataTransferManager (cn1_windows_winrt.cpp). ShowShareUI
+ * must run on the window-owning thread, so the EDT-facing shareText sends
+ * WM_CN1_SHARE to cn1Win.hwnd and cn1WinWndProc forwards it here. No-op stub when
+ * the port is built without WinRT. */
+#define WM_CN1_SHARE (WM_APP + 22)
+void cn1WinShareHandleMessage(WPARAM wParam);
+
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);
 void cn1WinBeginFrame(CN1Graphics* g);

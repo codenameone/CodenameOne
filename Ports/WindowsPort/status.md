@@ -139,9 +139,22 @@ enumeration + preview peer + still capture, surfaced honestly through
   scheduling only fires while the process is running -- there is no OS scheduler
   that survives app exit (a tracked limitation, not a desktop capability).
 
+**System share — implemented (WinRT).** `isNativeShareSupported()` /
+`share(...)` use the WinRT `DataTransferManager`: the EDT-facing `shareText`
+marshals to the window thread (`WM_CN1_SHARE`), where `IDataTransferManagerInterop`
+`GetForWindow` + `ShowShareUIForWindow` open the system share flyout for the
+unpackaged Win32 window and a `DataRequested` handler supplies the text/title
+(`cn1_windows_winrt.cpp`, same `CN1_HAVE_WINRT` gate). Shares text today (the
+common case); image-file sharing via `SetStorageItems` is a follow-up. Compiles
+(real + stub) on the Windows ARM64 VM; the flyout itself is interactive.
+
+**Print — not applicable.** Codename One core exposes no printing API (no
+`Printer` class or impl hook), so there is nothing for the port to override; this
+would require a new cross-platform printing API in core first.
+
 **Still unsupported (return null / no-op / `false`, never fabricated):** these
 are genuine hardware/OS-account capabilities that a desktop either lacks or that
-need WinRT/Media-Foundation work, so per the port's "real or unsupported" rule
+need further Media-Foundation work, so per the port's "real or unsupported" rule
 they stay honest until backed by a real implementation:
 
 - Location / GPS (`getLocationManager` → null)

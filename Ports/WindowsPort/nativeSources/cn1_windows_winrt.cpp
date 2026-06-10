@@ -52,12 +52,15 @@
 #include <windows.security.credentials.ui.h>
 #include <windows.devices.geolocation.h>
 #include <windows.applicationmodel.contacts.h>
+#include <windows.applicationmodel.datatransfer.h>
+#include <shobjidl_core.h>   /* IDataTransferManagerInterop */
 
 using namespace ABI::Windows::Foundation;
 using namespace ABI::Windows::Foundation::Collections;
 using namespace ABI::Windows::Security::Credentials::UI;
 using namespace ABI::Windows::Devices::Geolocation;
 using namespace ABI::Windows::ApplicationModel::Contacts;
+using namespace ABI::Windows::ApplicationModel::DataTransfer;
 using namespace Microsoft::WRL;
 using namespace Microsoft::WRL::Wrappers;
 
@@ -358,6 +361,96 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
     return newStringFromCString(threadStateData, blob.c_str());
 #else
     return JAVA_NULL;
+#endif
+}
+
+/* ----------------------------------------------------------------- share
+ *
+ * System share via the WinRT DataTransferManager. ShowShareUIForWindow needs the
+ * app's HWND (via the IDataTransferManagerInterop bridge, the unpackaged-Win32
+ * path) and must run on the window's own thread, so shareText posts WM_CN1_SHARE
+ * and cn1WinShareHandleMessage runs here on the pump thread. The text/title are
+ * stashed in file-static state read by the (same-thread) DataRequested handler.
+ * Shares text (the common case); image-file sharing is a later addition. */
+#ifdef CN1_HAVE_WINRT
+static std::wstring g_shareText;
+static std::wstring g_shareTitle;
+static bool g_shareHandlerRegistered = false;
+static ComPtr<IDataTransferManager> g_shareDtm;
+#endif
+
+void cn1WinShareHandleMessage(WPARAM wParam) {
+#ifdef CN1_HAVE_WINRT
+    /* wParam carries [textW, titleW] copied by the caller; take ownership. */
+    WCHAR** data = (WCHAR**) wParam;
+    g_shareText = data[0] != NULL ? data[0] : L"";
+    g_shareTitle = data[1] != NULL ? data[1] : L"";
+    if (data[0] != NULL) { free(data[0]); }
+    if (data[1] != NULL) { free(data[1]); }
+    free(data);
+    if (cn1Win.hwnd == NULL) {
+        return;
+    }
+    cn1WinRtInit();
+    ComPtr<IDataTransferManagerInterop> interop;
+    if (FAILED(RoGetActivationFactory(
+            HStringReference(RuntimeClass_Windows_ApplicationModel_DataTransfer_DataTransferManager).Get(),
+            IID_PPV_ARGS(&interop)))) {
+        return;
+    }
+    if (!g_shareHandlerRegistered) {
+        if (FAILED(interop->GetForWindow(cn1Win.hwnd, IID_PPV_ARGS(&g_shareDtm))) || !g_shareDtm) {
+            return;
+        }
+        EventRegistrationToken token;
+        g_shareDtm->add_DataRequested(
+            Callback<ITypedEventHandler<DataTransferManager*, DataRequestedEventArgs*>>(
+                [](IDataTransferManager*, IDataRequestedEventArgs* args) -> HRESULT {
+                    ComPtr<IDataRequest> req;
+                    if (FAILED(args->get_Request(&req)) || !req) {
+                        return S_OK;
+                    }
+                    ComPtr<IDataPackage> pkg;
+                    if (FAILED(req->get_Data(&pkg)) || !pkg) {
+                        return S_OK;
+                    }
+                    ComPtr<IDataPackagePropertySet> props;
+                    if (SUCCEEDED(pkg->get_Properties(&props)) && props) {
+                        props->put_Title(HStringReference(
+                                g_shareTitle.empty() ? L"Share" : g_shareTitle.c_str()).Get());
+                    }
+                    pkg->SetText(HStringReference(g_shareText.c_str()).Get());
+                    return S_OK;
+                }).Get(),
+            &token);
+        g_shareHandlerRegistered = true;
+    }
+    interop->ShowShareUIForWindow(cn1Win.hwnd);
+#else
+    (void) wParam;
+#endif
+}
+
+/* Java bridge: marshals the share request to the window thread. Returns false in
+ * headless / WinRT-less builds. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_shareText___java_lang_String_java_lang_String_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT textObj, JAVA_OBJECT titleObj) {
+#ifdef CN1_HAVE_WINRT
+    if (cn1Win.hwnd == NULL) {
+        return JAVA_FALSE;
+    }
+    WCHAR** data = (WCHAR**) malloc(2 * sizeof(WCHAR*));
+    if (data == NULL) {
+        return JAVA_FALSE;
+    }
+    data[0] = textObj != JAVA_NULL ? cn1WinJavaStringToWide(threadStateData, textObj, NULL) : NULL;
+    data[1] = titleObj != JAVA_NULL ? cn1WinJavaStringToWide(threadStateData, titleObj, NULL) : NULL;
+    PostMessageW(cn1Win.hwnd, WM_CN1_SHARE, (WPARAM) data, 0);
+    return JAVA_TRUE;
+#else
+    (void) textObj;
+    (void) titleObj;
+    return JAVA_FALSE;
 #endif
 }
 
