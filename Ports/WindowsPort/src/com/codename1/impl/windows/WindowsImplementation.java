@@ -287,6 +287,20 @@ public class WindowsImplementation extends CodenameOneImplementation {
         ((WindowsBrowserComponent) browserPeer).execute(javaScript);
     }
 
+    /* ----------------------------------------------- generic native peers */
+
+    // Wraps an app @NativeInterface-returned native widget (a child HWND boxed as
+    // a long[]) in a PeerComponent that places/sizes/shows the HWND over the
+    // lightweight component -- the generic peer-placement path (the analog of iOS
+    // NativeIPhoneView), used by native interfaces and the camera preview.
+    @Override
+    public com.codename1.ui.PeerComponent createNativePeer(Object nativeComponent) {
+        if (nativeComponent instanceof long[]) {
+            return new WindowsGenericPeer(nativeComponent);
+        }
+        return super.createNativePeer(nativeComponent);
+    }
+
     // Direct3D 11 backend for the portable 3D API (com.codename1.gpu). The
     // surface reports unsupported (createPeer returns null) when Direct3D cannot
     // be initialized, matching the port's "real data or unsupported" rule.
@@ -465,11 +479,20 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* --------------------------------------------------------------- camera */
 
+    // The richer com.codename1.camera CameraImpl (device camera API): a Media
+    // Foundation capture session with an image-based live preview peer, stills and
+    // a frame listener (WindowsCameraImpl). Video/flash/zoom/focus are honestly
+    // reported unsupported there (a generic desktop webcam exposes none via the
+    // source reader). The legacy Capture API capturePhoto below remains for the
+    // simple "take a photo" path.
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new WindowsCameraImpl();
+    }
+
     // Legacy Capture API: capturePhoto grabs a single real frame from the default
     // webcam via Media Foundation (cn1_windows_camera.cpp) -- the honest desktop
-    // snapshot, never synthetic. The richer com.codename1.camera CameraImpl (live
-    // preview peer / video) needs the generic native-peer placement the port does
-    // not have yet, so createCameraImpl() stays null.
+    // snapshot, never synthetic.
     @Override
     public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
         Thread t = new Thread(new Runnable() {

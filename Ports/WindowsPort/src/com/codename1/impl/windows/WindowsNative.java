@@ -556,6 +556,65 @@ public final class WindowsNative {
      */
     public static native int[] cameraCaptureFrame(int[] outDims);
 
+    /**
+     * Friendly names of the connected video capture devices, packed as
+     * {@code "name|external|0|0;name|external|0|0;..."} (the format
+     * {@link WindowsCameraImpl} parses into {@code CameraInfo}). Empty string when
+     * none / Media Foundation is unavailable.
+     */
+    public static native String cameraEnumerate();
+
+    /**
+     * Starts a continuous capture session on the given device index (a worker
+     * thread runs a Media Foundation source-reader loop, keeping the latest frame).
+     * {@code reqW/reqH} are preferred preview dimensions (best-effort). Returns an
+     * opaque session handle, or 0 if no camera / startup failed.
+     */
+    public static native long cameraSessionStart(int deviceIndex, int reqW, int reqH);
+
+    /** Stops the capture session, joins its worker thread and frees it. */
+    public static native void cameraSessionStop(long handle);
+
+    /** Pauses / resumes frame grabbing without tearing down the session. */
+    public static native void cameraSessionSetPaused(long handle, boolean paused);
+
+    /**
+     * Returns a copy of the most recent captured frame as a CN1 ARGB {@code int[]}
+     * (length width*height), filling {@code outDims[0]=width, [1]=height}.
+     * {@code null} until the first frame has arrived. The preview peer and the
+     * frame listener poll this.
+     */
+    public static native int[] cameraSessionLatestFrame(long handle, int[] outDims);
+
+    // ----------------------------------------------------------- native peers
+
+    /**
+     * Generic native-peer placement (implemented in cn1_windows_peer.cpp). The
+     * {@code peer} is an app-provided child HWND (boxed as a long) returned from a
+     * {@code @NativeInterface}; these reparent it onto the host window and
+     * move/size/show it to track the lightweight {@link com.codename1.ui.PeerComponent}.
+     */
+    public static native void peerInitialized(long peer, int x, int y, int w, int h);
+
+    /** Repositions / resizes the peer HWND to the component's absolute bounds. */
+    public static native void peerSetBounds(long peer, int x, int y, int w, int h);
+
+    /** Shows / hides the peer HWND (transition lightweight mode). */
+    public static native void peerSetVisible(long peer, boolean visible);
+
+    /** Hides and detaches the peer HWND (the app still owns its lifetime). */
+    public static native void peerDeinitialized(long peer);
+
+    /** Fills {@code out[0]=w, [1]=h} with the peer HWND's current size (0 if none). */
+    public static native void peerCalcPreferredSize(long peer, int dispW, int dispH, int[] out);
+
+    /**
+     * Captures the peer HWND to CN1 ARGB pixels via {@code PrintWindow} (length
+     * width*height), filling {@code outDims[0]=w, [1]=h}, for the offscreen
+     * screenshot / transition peer image. {@code null} on failure.
+     */
+    public static native int[] peerCaptureArgb(long peer, int[] outDims);
+
     // ---------------------------------------------------------------------
     // 3D / Direct3D 11 backend (com.codename1.gpu). Implemented in
     // nativeSources/cn1_windows_d3d.cpp. Every peer is an opaque long (a D3D
