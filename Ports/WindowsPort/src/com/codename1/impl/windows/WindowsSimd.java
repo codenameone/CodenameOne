@@ -123,4 +123,59 @@ public class WindowsSimd extends Simd {
 
     @Override
     public native void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length);
+
+    /* ------------------------------------------------ byte codec hot paths */
+    // Used by the Base64 SIMD codec and Image.createMask. Without these natives
+    // they fell through to the generic Simd scalar defaults (lane-scratch loops),
+    // which were slower than straight scalar -- so "SIMD on" lost. cn1_windows_simd.c
+    // implements them in C (NEON-vectorized on arm64, SSE2 byte-shifts on x64,
+    // scalar table lookups like IOSSimd).
+
+    @Override
+    public native void shl(byte[] src, int bits, byte[] dst, int offset, int length);
+
+    @Override
+    public native void shl(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length);
+
+    @Override
+    public native void shrLogical(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length);
+
+    @Override
+    public native void lookupBytes(byte[] table, byte[] indices, int indicesOffset, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void packIntToByteTruncate(int[] src, byte[] dst, int offset, int length);
+
+    @Override
+    public native void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, int length);
+
+    @Override
+    public native void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length);
+
+    @Override
+    public native void packBytesInterleaved3(byte[] src0, byte[] src1, byte[] src2, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void packBytesInterleaved3(byte[] src, int src0Offset, int src1Offset, int src2Offset, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void packBytesInterleaved4(byte[] src0, byte[] src1, byte[] src2, byte[] src3, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void packBytesInterleaved4(byte[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length);
+
+    @Override
+    public native int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int dst3Offset, int length);
 }

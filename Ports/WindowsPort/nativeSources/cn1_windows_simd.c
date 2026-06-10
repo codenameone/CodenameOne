@@ -625,4 +625,274 @@ JAVA_VOID com_codename1_impl_windows_WindowsSimd_blendByMaskTestNonzero___int_1A
     }
 }
 
+/* --------------------------------------------------------------------------
+ * Byte-manipulation kernels the Base64 SIMD codec and Image.createMask use
+ * (shl / shrLogical / lookupBytes / pack+unpack interleaved / packIntToByteTruncate).
+ * Before these existed they fell through to the generic Simd scalar defaults --
+ * lane-scratch loops with per-op method dispatch -- which were *slower* than the
+ * straight-line scalar codec, so "SIMD on" lost. A native C kernel (one call,
+ * tight loop) already beats that; arm64 additionally vectorizes the hot paths
+ * with NEON (mirroring IOSSimd.m), and x64 vectorizes the byte shifts with SSE2
+ * (which has no native byte shift -- emulate via 16-bit shift + per-byte mask).
+ * The table lookups stay scalar on both, exactly as IOSSimd does.
+ * ------------------------------------------------------------------------ */
+
+/* byte[] left shift by (bits & 7), src/dst may differ. */
+static void cn1SimdByteShl(JAVA_ARRAY_BYTE* s, int so, JAVA_ARRAY_BYTE* d, int dout, int bits, int length) {
+    int shift = bits & 7;
+    int i = 0;
+#if defined(CN1_SIMD_X64)
+    __m128i mask = _mm_set1_epi8((char) ((0xFF << shift) & 0xFF));
+    for (; i <= length - 16; i += 16) {
+        __m128i v = _mm_loadu_si128((const __m128i*) (s + so + i));
+        _mm_storeu_si128((__m128i*) (d + dout + i), _mm_and_si128(_mm_slli_epi16(v, shift), mask));
+    }
+#elif defined(CN1_SIMD_ARM64)
+    int8x16_t vshift = vdupq_n_s8((int8_t) shift);
+    for (; i <= length - 16; i += 16) {
+        vst1q_u8((uint8_t*) (d + dout + i), vshlq_u8(vld1q_u8((const uint8_t*) (s + so + i)), vshift));
+    }
+#endif
+    for (; i < length; i++) {
+        d[dout + i] = (JAVA_ARRAY_BYTE) (((uint8_t) s[so + i]) << shift);
+    }
+}
+
+/* byte[] logical right shift by (bits & 7). */
+static void cn1SimdByteShr(JAVA_ARRAY_BYTE* s, int so, JAVA_ARRAY_BYTE* d, int dout, int bits, int length) {
+    int shift = bits & 7;
+    int i = 0;
+#if defined(CN1_SIMD_X64)
+    __m128i mask = _mm_set1_epi8((char) ((0xFF >> shift) & 0xFF));
+    for (; i <= length - 16; i += 16) {
+        __m128i v = _mm_loadu_si128((const __m128i*) (s + so + i));
+        _mm_storeu_si128((__m128i*) (d + dout + i), _mm_and_si128(_mm_srli_epi16(v, shift), mask));
+    }
+#elif defined(CN1_SIMD_ARM64)
+    int8x16_t vneg = vdupq_n_s8((int8_t) (-shift));
+    for (; i <= length - 16; i += 16) {
+        vst1q_u8((uint8_t*) (d + dout + i), vshlq_u8(vld1q_u8((const uint8_t*) (s + so + i)), vneg));
+    }
+#endif
+    for (; i < length; i++) {
+        d[dout + i] = (JAVA_ARRAY_BYTE) (((uint8_t) s[so + i]) >> shift);
+    }
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_shl___byte_1ARRAY_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT bits,
+        JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    cn1SimdByteShl((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, offset,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, bits, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_shl___byte_1ARRAY_int_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
+        JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    cn1SimdByteShl((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, bits, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_shrLogical___byte_1ARRAY_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT bits,
+        JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    cn1SimdByteShr((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, offset,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, bits, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_shrLogical___byte_1ARRAY_int_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
+        JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    cn1SimdByteShr((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, bits, length);
+}
+
+/* dst[i] = (table[indices[i] & 0xff] when in range else 0); scalar, like IOSSimd. */
+static void cn1SimdLookup(JAVA_ARRAY_BYTE* t, int tableLen, JAVA_ARRAY_BYTE* idx, int io,
+                          JAVA_ARRAY_BYTE* d, int dout, int length) {
+    for (int i = 0; i < length; i++) {
+        int li = idx[io + i] & 0xff;
+        d[dout + i] = li < tableLen ? t[li] : 0;
+    }
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_lookupBytes___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT indices,
+        JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    cn1SimdLookup((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
+                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) indices)->data, offset,
+                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_lookupBytes___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT indices,
+        JAVA_INT indicesOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    cn1SimdLookup((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
+                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) indices)->data, indicesOffset,
+                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+}
+
+/* dst[i] = (byte) src[i]; int32 -> byte truncate. */
+static void cn1SimdPackIntToByte(JAVA_ARRAY_INT* s, int so, JAVA_ARRAY_BYTE* d, int dout, int length) {
+    for (int i = 0; i < length; i++) {
+        d[dout + i] = (JAVA_ARRAY_BYTE) (s[so + i] & 0xff);
+    }
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_packIntToByteTruncate___int_1ARRAY_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_OBJECT dst,
+        JAVA_INT offset, JAVA_INT length) {
+    cn1SimdPackIntToByte((JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data, offset,
+                         (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_packIntToByteTruncate___int_1ARRAY_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
+        JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    cn1SimdPackIntToByte((JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data, srcOffset,
+                         (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+}
+
+/* 3-way de-interleave: src is [a0 b0 c0 a1 b1 c1 ...] -> d0/d1/d2. */
+static void cn1SimdUnpack3(JAVA_ARRAY_BYTE* s, int so, JAVA_ARRAY_BYTE* d0, int o0,
+                           JAVA_ARRAY_BYTE* d1, int o1, JAVA_ARRAY_BYTE* d2, int o2, int length) {
+    int i = 0;
+#if defined(CN1_SIMD_ARM64)
+    for (; i <= length - 16; i += 16) {
+        uint8x16x3_t v = vld3q_u8((const uint8_t*) (s + so + i * 3));
+        vst1q_u8((uint8_t*) (d0 + o0 + i), v.val[0]);
+        vst1q_u8((uint8_t*) (d1 + o1 + i), v.val[1]);
+        vst1q_u8((uint8_t*) (d2 + o2 + i), v.val[2]);
+    }
+#endif
+    for (; i < length; i++) {
+        d0[o0 + i] = s[so + i * 3];
+        d1[o1 + i] = s[so + i * 3 + 1];
+        d2[o2 + i] = s[so + i * 3 + 2];
+    }
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_unpackBytesInterleaved3___byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
+        JAVA_OBJECT dst0, JAVA_OBJECT dst1, JAVA_OBJECT dst2, JAVA_INT length) {
+    cn1SimdUnpack3((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst0)->data, 0,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst1)->data, 0,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst2)->data, 0, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_unpackBytesInterleaved3___byte_1ARRAY_int_byte_1ARRAY_int_int_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
+        JAVA_OBJECT dst, JAVA_INT dst0Offset, JAVA_INT dst1Offset, JAVA_INT dst2Offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
+    cn1SimdUnpack3((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+                   d, dst0Offset, d, dst1Offset, d, dst2Offset, length);
+}
+
+/* 3-way interleave: d0/d1/d2 -> dst [a0 b0 c0 a1 b1 c1 ...]. */
+static void cn1SimdPack3(JAVA_ARRAY_BYTE* s0, int o0, JAVA_ARRAY_BYTE* s1, int o1,
+                         JAVA_ARRAY_BYTE* s2, int o2, JAVA_ARRAY_BYTE* d, int dout, int length) {
+    int i = 0;
+#if defined(CN1_SIMD_ARM64)
+    for (; i <= length - 16; i += 16) {
+        uint8x16x3_t v;
+        v.val[0] = vld1q_u8((const uint8_t*) (s0 + o0 + i));
+        v.val[1] = vld1q_u8((const uint8_t*) (s1 + o1 + i));
+        v.val[2] = vld1q_u8((const uint8_t*) (s2 + o2 + i));
+        vst3q_u8((uint8_t*) (d + dout + i * 3), v);
+    }
+#endif
+    for (; i < length; i++) {
+        d[dout + i * 3] = s0[o0 + i];
+        d[dout + i * 3 + 1] = s1[o1 + i];
+        d[dout + i * 3 + 2] = s2[o2 + i];
+    }
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_packBytesInterleaved3___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src0, JAVA_OBJECT src1,
+        JAVA_OBJECT src2, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    cn1SimdPack3((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src0)->data, 0,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src1)->data, 0,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src2)->data, 0,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_packBytesInterleaved3___byte_1ARRAY_int_int_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT src0Offset,
+        JAVA_INT src1Offset, JAVA_INT src2Offset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data;
+    cn1SimdPack3(s, src0Offset, s, src1Offset, s, src2Offset,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+}
+
+/* 4-way interleave. */
+static void cn1SimdPack4(JAVA_ARRAY_BYTE* s0, int o0, JAVA_ARRAY_BYTE* s1, int o1,
+                         JAVA_ARRAY_BYTE* s2, int o2, JAVA_ARRAY_BYTE* s3, int o3,
+                         JAVA_ARRAY_BYTE* d, int dout, int length) {
+    int i = 0;
+#if defined(CN1_SIMD_ARM64)
+    for (; i <= length - 16; i += 16) {
+        uint8x16x4_t v;
+        v.val[0] = vld1q_u8((const uint8_t*) (s0 + o0 + i));
+        v.val[1] = vld1q_u8((const uint8_t*) (s1 + o1 + i));
+        v.val[2] = vld1q_u8((const uint8_t*) (s2 + o2 + i));
+        v.val[3] = vld1q_u8((const uint8_t*) (s3 + o3 + i));
+        vst4q_u8((uint8_t*) (d + dout + i * 4), v);
+    }
+#endif
+    for (; i < length; i++) {
+        d[dout + i * 4] = s0[o0 + i];
+        d[dout + i * 4 + 1] = s1[o1 + i];
+        d[dout + i * 4 + 2] = s2[o2 + i];
+        d[dout + i * 4 + 3] = s3[o3 + i];
+    }
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_packBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src0, JAVA_OBJECT src1,
+        JAVA_OBJECT src2, JAVA_OBJECT src3, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    cn1SimdPack4((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src0)->data, 0,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src1)->data, 0,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src2)->data, 0,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src3)->data, 0,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+}
+JAVA_VOID com_codename1_impl_windows_WindowsSimd_packBytesInterleaved4___byte_1ARRAY_int_int_int_int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT src0Offset,
+        JAVA_INT src1Offset, JAVA_INT src2Offset, JAVA_INT src3Offset, JAVA_OBJECT dst,
+        JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data;
+    cn1SimdPack4(s, src0Offset, s, src1Offset, s, src2Offset, s, src3Offset,
+                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+}
+
+/* 4-way de-interleave with a table lookup on each byte. Matches the base Simd
+ * contract exactly: an out-of-range index resolves to 0, every quad is written,
+ * and the return value is the bitwise OR of all output bytes (the caller uses it
+ * to detect invalid input -- e.g. an 0x80 sentinel in the Base64 decode map). */
+static int cn1SimdUnpackLookup4(JAVA_ARRAY_BYTE* t, int tableLen, JAVA_ARRAY_BYTE* s, int so,
+                                JAVA_ARRAY_BYTE* d0, int o0, JAVA_ARRAY_BYTE* d1, int o1,
+                                JAVA_ARRAY_BYTE* d2, int o2, JAVA_ARRAY_BYTE* d3, int o3, int length) {
+    int orAll = 0;
+    for (int i = 0; i < length; i++) {
+        int b0 = s[so + i * 4] & 0xff, b1 = s[so + i * 4 + 1] & 0xff;
+        int b2 = s[so + i * 4 + 2] & 0xff, b3 = s[so + i * 4 + 3] & 0xff;
+        JAVA_ARRAY_BYTE v0 = b0 < tableLen ? t[b0] : (JAVA_ARRAY_BYTE) 0;
+        JAVA_ARRAY_BYTE v1 = b1 < tableLen ? t[b1] : (JAVA_ARRAY_BYTE) 0;
+        JAVA_ARRAY_BYTE v2 = b2 < tableLen ? t[b2] : (JAVA_ARRAY_BYTE) 0;
+        JAVA_ARRAY_BYTE v3 = b3 < tableLen ? t[b3] : (JAVA_ARRAY_BYTE) 0;
+        d0[o0 + i] = v0; d1[o1 + i] = v1; d2[o2 + i] = v2; d3[o3 + i] = v3;
+        orAll |= v0 | v1 | v2 | v3;
+    }
+    return orAll;
+}
+JAVA_INT com_codename1_impl_windows_WindowsSimd_unpackLookupBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT src,
+        JAVA_INT srcOffset, JAVA_OBJECT dst0, JAVA_OBJECT dst1, JAVA_OBJECT dst2, JAVA_OBJECT dst3, JAVA_INT length) {
+    return cn1SimdUnpackLookup4((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst0)->data, 0,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst1)->data, 0,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst2)->data, 0,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst3)->data, 0, length);
+}
+JAVA_INT com_codename1_impl_windows_WindowsSimd_unpackLookupBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int_int_int_int_int_R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT src,
+        JAVA_INT srcOffset, JAVA_OBJECT dst, JAVA_INT dst0Offset, JAVA_INT dst1Offset, JAVA_INT dst2Offset,
+        JAVA_INT dst3Offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
+    return cn1SimdUnpackLookup4((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
+                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+                   d, dst0Offset, d, dst1Offset, d, dst2Offset, d, dst3Offset, length);
+}
+
 #endif /* _WIN32 */
