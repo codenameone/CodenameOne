@@ -24,10 +24,19 @@ package com.codename1.gaming.physics;
 
 import com.codename1.gaming.physics.box2d.collision.shapes.CircleShape;
 import com.codename1.gaming.physics.box2d.collision.shapes.PolygonShape;
+import com.codename1.gaming.physics.box2d.callbacks.DebugDraw;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 import com.codename1.gaming.physics.box2d.dynamics.BodyDef;
 import com.codename1.gaming.physics.box2d.dynamics.World;
+import com.codename1.gaming.physics.box2d.dynamics.joints.DistanceJointDef;
+import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
+import com.codename1.gaming.physics.box2d.dynamics.joints.JointDef;
+import com.codename1.gaming.physics.box2d.dynamics.joints.MouseJointDef;
+import com.codename1.gaming.physics.box2d.dynamics.joints.PrismaticJointDef;
+import com.codename1.gaming.physics.box2d.dynamics.joints.RevoluteJointDef;
+import com.codename1.gaming.physics.box2d.dynamics.joints.WeldJointDef;
+import com.codename1.ui.Graphics;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,7 +66,10 @@ public class PhysicsWorld {
     private int velocityIterations = 8;
     private int positionIterations = 3;
     private final List bodies = new ArrayList();
+    private final List joints = new ArrayList();
     private ContactDispatcher contactDispatcher;
+    private PhysicsDebugDraw debugDraw;
+    private int debugFlags = DebugDraw.e_shapeBit | DebugDraw.e_jointBit;
 
     /// Creates a world with the given gravity in pixels per second squared. A
     /// positive y pulls bodies down the screen.
@@ -180,6 +192,118 @@ public class PhysicsWorld {
     /// the native world are in meters with y pointing up.
     public World getNativeWorld() {
         return world;
+    }
+
+    // ---- joints ----------------------------------------------------------
+
+    /// A pin/hinge joint: the two bodies rotate freely around the shared pixel anchor
+    /// (e.g. a wheel on an axle, a ragdoll elbow).
+    public PhysicsJoint createRevoluteJoint(PhysicsBody a, PhysicsBody b,
+            float anchorXPx, float anchorYPx) {
+        RevoluteJointDef def = new RevoluteJointDef();
+        def.initialize(a.getNativeBody(), b.getNativeBody(), point(anchorXPx, anchorYPx));
+        return addJoint(def, a, b);
+    }
+
+    /// A spring/rod joint that keeps the two pixel anchor points a fixed distance
+    /// apart. `frequencyHz` 0 makes it a rigid rod; a positive value makes it a
+    /// softer spring (with `dampingRatio` 0..1).
+    public PhysicsJoint createDistanceJoint(PhysicsBody a, PhysicsBody b,
+            float anchorAXPx, float anchorAYPx, float anchorBXPx, float anchorBYPx,
+            float frequencyHz, float dampingRatio) {
+        DistanceJointDef def = new DistanceJointDef();
+        def.initialize(a.getNativeBody(), b.getNativeBody(),
+                point(anchorAXPx, anchorAYPx), point(anchorBXPx, anchorBYPx));
+        def.frequencyHz = frequencyHz;
+        def.dampingRatio = dampingRatio;
+        return addJoint(def, a, b);
+    }
+
+    /// A weld joint: the two bodies are locked rigidly together at the pixel anchor
+    /// (as if glued).
+    public PhysicsJoint createWeldJoint(PhysicsBody a, PhysicsBody b,
+            float anchorXPx, float anchorYPx) {
+        WeldJointDef def = new WeldJointDef();
+        def.initialize(a.getNativeBody(), b.getNativeBody(), point(anchorXPx, anchorYPx));
+        return addJoint(def, a, b);
+    }
+
+    /// A prismatic (slider) joint: body `b` may only translate along the given pixel
+    /// axis relative to body `a` (e.g. a piston or an elevator).
+    public PhysicsJoint createPrismaticJoint(PhysicsBody a, PhysicsBody b,
+            float anchorXPx, float anchorYPx, float axisX, float axisY) {
+        PrismaticJointDef def = new PrismaticJointDef();
+        def.initialize(a.getNativeBody(), b.getNativeBody(),
+                point(anchorXPx, anchorYPx), new Vec2(axisX, -axisY));
+        return addJoint(def, a, b);
+    }
+
+    /// A mouse joint that pulls `target` toward a moving pixel point with a capped
+    /// force -- the basis for dragging a body with a finger. `ground` is any body
+    /// (typically a static one); update the point each frame with
+    /// `PhysicsJoint#setTarget(float, float)`.
+    public PhysicsJoint createMouseJoint(PhysicsBody ground, PhysicsBody target,
+            float targetXPx, float targetYPx, float maxForce) {
+        MouseJointDef def = new MouseJointDef();
+        def.bodyA = ground.getNativeBody();
+        def.bodyB = target.getNativeBody();
+        def.target.set(point(targetXPx, targetYPx));
+        def.maxForce = maxForce;
+        return addJoint(def, ground, target);
+    }
+
+    /// Removes a joint from the world.
+    public void destroyJoint(PhysicsJoint joint) {
+        world.destroyJoint(joint.getNativeJoint());
+        joints.remove(joint);
+    }
+
+    private PhysicsJoint addJoint(JointDef def, PhysicsBody a, PhysicsBody b) {
+        Joint j = world.createJoint(def);
+        PhysicsJoint pj = new PhysicsJoint(this, j, a, b);
+        joints.add(pj);
+        return pj;
+    }
+
+    private Vec2 point(float xPx, float yPx) {
+        return new Vec2(toMeters(xPx), -toMeters(yPx));
+    }
+
+    /// Selects what `#debugDraw(com.codename1.ui.Graphics)` renders. By default it
+    /// draws collision shapes and joints; bounding boxes are off.
+    public void setDebugDrawFlags(boolean shapes, boolean joints, boolean boundingBoxes) {
+        debugFlags = (shapes ? DebugDraw.e_shapeBit : 0)
+                | (joints ? DebugDraw.e_jointBit : 0)
+                | (boundingBoxes ? DebugDraw.e_aabbBit : 0);
+        if (debugDraw != null) {
+            debugDraw.setFlags(debugFlags);
+        }
+    }
+
+    /// Renders the world's collision shapes, joints and (optionally) bounding boxes
+    /// onto the given `com.codename1.ui.Graphics`, for debugging. Coordinates use the
+    /// same pixel scale and y-flip as the bodies, so the overlay lines up with the
+    /// sprites they drive. Call it from a component's `paint`, onto an off-screen
+    /// `com.codename1.ui.Image`, or any other 2D drawing surface. See
+    /// `#setDebugDrawFlags(boolean, boolean, boolean)` to choose what is drawn.
+    public void debugDraw(Graphics g) {
+        if (debugDraw == null) {
+            debugDraw = new PhysicsDebugDraw(this);
+            world.setDebugDraw(debugDraw);
+        }
+        debugDraw.setFlags(debugFlags);
+        debugDraw.setGraphics(g);
+        world.drawDebugData();
+    }
+
+    /// The debug renderer used by `#debugDraw(com.codename1.ui.Graphics)`, created on
+    /// first use. Exposed so you can tune it (e.g. `PhysicsDebugDraw#setFillAlpha(int)`).
+    public PhysicsDebugDraw getDebugDraw() {
+        if (debugDraw == null) {
+            debugDraw = new PhysicsDebugDraw(this);
+            world.setDebugDraw(debugDraw);
+        }
+        return debugDraw;
     }
 
     // ---- unit conversion -------------------------------------------------
