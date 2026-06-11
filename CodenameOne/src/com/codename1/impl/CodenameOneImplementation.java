@@ -59,6 +59,8 @@ import com.codename1.notifications.NotificationPermissionRequest;
 import com.codename1.notifications.NotificationPermissionResult;
 import com.codename1.background.ForegroundService;
 import com.codename1.background.WorkRequest;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.share.SharedContent;
 import com.codename1.share.ShareResult;
 import com.codename1.share.ShareResultListener;
@@ -7440,6 +7442,34 @@ public abstract class CodenameOneImplementation {
         share(text, image, mimeType, sourceRect);
         if (listener != null) {
             listener.onResult(ShareResult.sharedTo(null));
+        }
+    }
+
+    /// Indicates if the underlying platform can print documents through
+    /// [#print(String,String,PrintResultListener)].
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying platform handles printing.
+    public boolean isPrintingSupported() {
+        return false;
+    }
+
+    /// Print a document file through the platform printing system,
+    /// typically showing the native print dialog. The default
+    /// implementation reports failure since this base class has no
+    /// printing capability. Ports that can print override this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filePath`: path of the document in file system storage
+    ///
+    /// - `mimeType`: the document type, e.g. `application/pdf`, `image/png`
+    ///
+    /// - `listener`: callback for the print outcome. May be null.
+    public void print(String filePath, String mimeType, PrintResultListener listener) {
+        if (listener != null) {
+            listener.onResult(PrintResult.failed("Printing is not supported on this platform"));
         }
     }
 

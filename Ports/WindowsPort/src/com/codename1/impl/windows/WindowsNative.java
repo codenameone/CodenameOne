@@ -546,6 +546,28 @@ public final class WindowsNative {
      */
     public static native boolean shareText(String text, String title);
 
+    /* --------------------------------------------------------------- printing */
+
+    /**
+     * Prints a document file through the Win32 printing system: shows the modal
+     * system print dialog ({@code PrintDlgW}, run on the window-owning pump
+     * thread like {@link #fileDialog}), then rasterizes the document and spools
+     * it to the chosen printer's device context. {@code mimeType} selects the
+     * renderer -- {@code image/*} decodes through the port's WIC helper,
+     * {@code application/pdf} rasterizes each page via WinRT Windows.Data.Pdf
+     * at the printer's DPI. Blocks for the whole flow (call off the EDT).
+     * Returns 0 once the job was handed to the print spooler, 1 when the user
+     * cancelled the dialog, 2 on failure ({@link #printLastError()} carries a
+     * short description).
+     */
+    public static native int printDocument(String path, String mimeType, String jobName);
+
+    /**
+     * Short description of the most recent {@link #printDocument} failure, or
+     * {@code null} when the last request did not fail.
+     */
+    public static native String printLastError();
+
     /* ----------------------------------------------------------- camera */
 
     /**

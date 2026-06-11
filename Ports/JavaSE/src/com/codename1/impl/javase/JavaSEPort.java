@@ -36,6 +36,8 @@ import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.impl.javase.util.SwingUtils;
 import com.codename1.messaging.Message;
 import com.codename1.payment.PromotionalOffer;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -67,6 +69,10 @@ import java.awt.event.*;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.awt.print.PageFormat;
+import java.awt.print.Printable;
+import java.awt.print.PrinterException;
+import java.awt.print.PrinterJob;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.FilenameFilter;
@@ -166,6 +172,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.print.DocFlavor;
+import javax.print.DocPrintJob;
+import javax.print.PrintService;
+import javax.print.PrintServiceLookup;
+import javax.print.SimpleDoc;
+import javax.print.attribute.HashPrintRequestAttributeSet;
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -11951,6 +11963,143 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         } catch (Exception ex) {
             ex.printStackTrace();
+        }
+    }
+
+    /// Printing is available in the simulator whenever a display is attached;
+    /// the actual job goes through the desktop printing system via
+    /// [#print(String,String,PrintResultListener)].
+    public boolean isPrintingSupported() {
+        return !GraphicsEnvironment.isHeadless();
+    }
+
+    /// Prints a document file through the desktop printing system.
+    ///
+    /// Image files (`image/png`, `image/jpeg`, ...) are rendered with
+    /// `java.awt.print.PrinterJob` behind the native print dialog; the image
+    /// is scaled to fit the imageable page area while preserving its aspect
+    /// ratio. PDF files are handed to the OS through `Desktop.print` when
+    /// the desktop supports it, falling back to a `javax.print` service
+    /// that accepts PDF input streams. Since the OS owns the PDF flow,
+    /// `COMPLETED` for PDFs means "handed off" on a best-effort basis and
+    /// user cancellation cannot be observed.
+    ///
+    /// The flow runs on a background thread; the listener is invoked
+    /// exactly once from that thread and `Display` marshals it back to
+    /// the EDT.
+    public void print(final String filePath, final String mimeType, final PrintResultListener listener) {
+        new Thread(new Runnable() {
+            public void run() {
+                PrintResult result;
+                try {
+                    result = printImpl(filePath, mimeType);
+                } catch (Throwable t) {
+                    Log.e(t);
+                    result = PrintResult.failed("Print failed: " + t);
+                }
+                if (listener != null) {
+                    listener.onResult(result);
+                }
+            }
+        }, "CN1 Print Thread").start();
+    }
+
+    private PrintResult printImpl(String filePath, String mimeType) {
+        if (filePath == null) {
+            return PrintResult.failed("Print file path is null");
+        }
+        File file = new File(unfile(filePath));
+        if (!file.isFile()) {
+            return PrintResult.failed("Print file not found: " + filePath);
+        }
+        if (mimeType != null && mimeType.startsWith("image/")) {
+            return printImage(file);
+        }
+        if ("application/pdf".equals(mimeType)) {
+            return printPdf(file);
+        }
+        return PrintResult.failed("Unsupported print mime type: " + mimeType);
+    }
+
+    private PrintResult printImage(File file) {
+        final BufferedImage img;
+        try {
+            img = ImageIO.read(file);
+        } catch (IOException err) {
+            Log.e(err);
+            return PrintResult.failed("Failed to read image: " + err);
+        }
+        if (img == null) {
+            return PrintResult.failed("Unsupported image format: " + file.getName());
+        }
+        PrinterJob job = PrinterJob.getPrinterJob();
+        job.setJobName(file.getName());
+        job.setPrintable(new Printable() {
+            public int print(java.awt.Graphics graphics, PageFormat pageFormat, int pageIndex) {
+                if (pageIndex > 0) {
+                    return NO_SUCH_PAGE;
+                }
+                Graphics2D g2d = (Graphics2D) graphics;
+                g2d.translate(pageFormat.getImageableX(), pageFormat.getImageableY());
+                double scale = Math.min(pageFormat.getImageableWidth() / img.getWidth(),
+                        pageFormat.getImageableHeight() / img.getHeight());
+                int w = Math.max(1, (int) Math.round(img.getWidth() * scale));
+                int h = Math.max(1, (int) Math.round(img.getHeight() * scale));
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2d.drawImage(img, 0, 0, w, h, null);
+                return PAGE_EXISTS;
+            }
+        });
+        if (!job.printDialog()) {
+            return PrintResult.cancelled();
+        }
+        try {
+            job.print();
+            return PrintResult.completed();
+        } catch (PrinterException err) {
+            Log.e(err);
+            return PrintResult.failed("Print job failed: " + err.getMessage());
+        }
+    }
+
+    private PrintResult printPdf(File file) {
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.PRINT)) {
+            try {
+                Desktop.getDesktop().print(file);
+                return PrintResult.completed();
+            } catch (IOException err) {
+                Log.e(err);
+                // fall through to the javax.print path below
+            }
+        }
+        DocFlavor flavor = DocFlavor.INPUT_STREAM.PDF;
+        PrintService service = PrintServiceLookup.lookupDefaultPrintService();
+        if (service == null || !service.isDocFlavorSupported(flavor)) {
+            service = null;
+            PrintService[] services = PrintServiceLookup.lookupPrintServices(flavor, null);
+            if (services.length > 0) {
+                service = services[0];
+            }
+        }
+        if (service == null) {
+            return PrintResult.failed("No print service on this system accepts PDF documents");
+        }
+        InputStream in = null;
+        try {
+            in = new FileInputStream(file);
+            DocPrintJob printJob = service.createPrintJob();
+            printJob.print(new SimpleDoc(in, flavor, null), new HashPrintRequestAttributeSet());
+            return PrintResult.completed();
+        } catch (Exception err) {
+            Log.e(err);
+            return PrintResult.failed("Failed to print PDF: " + err.getMessage());
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignore) {
+                }
+            }
         }
     }
 

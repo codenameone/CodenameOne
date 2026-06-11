@@ -9302,6 +9302,60 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
     });
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return [UIPrintInteractionController isPrintingAvailable];
+}
+
+// Prints the file at path through UIPrintInteractionController and reports
+// the outcome to IOSImplementation.printDocumentCallback using the supplied
+// callbackId. Status codes mirror com.codename1.printing.PrintResult:
+// 1=COMPLETED, 2=CANCELLED, 3=FAILED.
+void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT mimeType, JAVA_INT callbackId) {
+    NSString* filePath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSString* mime = toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    int cbId = (int)callbackId;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSString* ns = fixFilePath(filePath);
+        NSURL* fileURL = [NSURL fileURLWithPath:ns];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:ns] || ![UIPrintInteractionController canPrintURL:fileURL]) {
+            JAVA_OBJECT jErrMsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"The document cannot be printed");
+            com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, 3, jErrMsg);
+            POOL_END();
+            return;
+        }
+        UIPrintInteractionController* printController = [UIPrintInteractionController sharedPrintController];
+        UIPrintInfo* printInfo = [UIPrintInfo printInfo];
+        printInfo.outputType = (mime != nil && [mime hasPrefix:@"image/"]) ? UIPrintInfoOutputPhoto : UIPrintInfoOutputGeneral;
+        printInfo.jobName = [ns lastPathComponent];
+        printController.printInfo = printInfo;
+        printController.printingItem = fileURL;
+        UIPrintInteractionCompletionHandler completionHandler = ^(UIPrintInteractionController *controller, BOOL completed, NSError *error) {
+            JAVA_INT status;
+            NSString* errMsg = nil;
+            if (error != nil) {
+                status = 3;
+                errMsg = [error localizedDescription];
+            } else if (completed) {
+                status = 1;
+            } else {
+                status = 2;
+            }
+            JAVA_OBJECT jErrMsg = errMsg != nil ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG errMsg) : JAVA_NULL;
+            com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, status, jErrMsg);
+        };
+        if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+            UIView* view = [CodenameOne_GLViewController instance].view;
+            CGRect sourceRect = CGRectMake(view.bounds.size.width / 2, view.bounds.size.height / 2, 1, 1);
+            [printController presentFromRect:sourceRect inView:view animated:YES completionHandler:completionHandler];
+        } else {
+            [printController presentAnimated:YES completionHandler:completionHandler];
+        }
+        POOL_END();
+        repaintUI();
+    });
+}
+
 
 extern BOOL isVKBAlwaysOpen();
 extern BOOL vkbAlwaysOpen;

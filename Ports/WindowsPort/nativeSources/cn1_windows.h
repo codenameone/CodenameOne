@@ -251,6 +251,14 @@ void cn1WinTrayHandleMessage(WPARAM wParam, LPARAM lParam);
 #define WM_CN1_SHARE (WM_APP + 22)
 void cn1WinShareHandleMessage(WPARAM wParam);
 
+/* System print dialog (cn1_windows_print.cpp). PrintDlgW is modal and must run
+ * on the window-owning pump thread, so the printing worker thread sends (not
+ * posts) WM_CN1_PRINTDLG to cn1Win.hwnd -- a blocking SendMessage that returns
+ * once the user has chosen a printer -- and cn1WinWndProc forwards it here. The
+ * document is then rasterized and spooled on the worker thread. */
+#define WM_CN1_PRINTDLG (WM_APP + 23)
+LRESULT cn1WinPrintDialogHandleMessage(WPARAM wParam);
+
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);
 void cn1WinBeginFrame(CN1Graphics* g);

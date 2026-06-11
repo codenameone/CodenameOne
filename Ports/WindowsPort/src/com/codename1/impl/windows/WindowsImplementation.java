@@ -27,6 +27,8 @@ import com.codename1.impl.WebSocketImpl;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
@@ -1882,6 +1884,75 @@ public class WindowsImplementation extends CodenameOneImplementation {
             uri.append(sep).append("body=").append(com.codename1.io.Util.encodeUrl(body));
         }
         WindowsNative.shellOpen(uri.toString());
+    }
+
+    /* --------------------------------------------------------------- printing
+     * Win32 printing (cn1_windows_print.cpp): the modal system print dialog
+     * (PrintDlgW) picks the printer, then the native layer rasterizes the
+     * document onto the printer DC -- WIC for images, the WinRT
+     * Windows.Data.Pdf renderer for PDFs. The blocking native call runs on a
+     * dedicated worker thread; Display marshals the listener onto the EDT. */
+
+    @Override
+    public boolean isPrintingSupported() {
+        // The Win32 print pipeline is always compiled in. A missing printer or
+        // host window (headless screenshot mode) surfaces honestly as a FAILED
+        // result with a message, exactly like a spooler error would.
+        return true;
+    }
+
+    /**
+     * Prints a document file through the Windows printing system behind the
+     * native print dialog. {@code COMPLETED} means the job was handed to the
+     * print spooler, {@code CANCELLED} that the user dismissed the dialog. The
+     * listener fires exactly once, from the worker thread; {@code Display}
+     * wraps it onto the EDT.
+     */
+    @Override
+    public void print(final String filePath, final String mimeType, final PrintResultListener listener) {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                PrintResult result;
+                try {
+                    result = printImpl(filePath, mimeType);
+                } catch (Throwable err) {
+                    err.printStackTrace();
+                    result = PrintResult.failed("Print failed: " + err);
+                }
+                if (listener != null) {
+                    listener.onResult(result);
+                }
+            }
+        }, "cn1-windows-print");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private PrintResult printImpl(String filePath, String mimeType) {
+        if (filePath == null) {
+            return PrintResult.failed("Print file path is null");
+        }
+        String path = stripFileUrl(filePath);
+        if (!WindowsNative.fileExists(path) || WindowsNative.fileIsDirectory(path)) {
+            return PrintResult.failed("Print file not found: " + filePath);
+        }
+        boolean pdf = "application/pdf".equals(mimeType);
+        if (!pdf && (mimeType == null || !mimeType.startsWith("image/"))) {
+            // Reject before any UI: showing the print dialog for a document we
+            // can't render would waste the user's choice.
+            return PrintResult.failed("Unsupported print mime type: " + mimeType);
+        }
+        String jobName = Display.getInstance().getProperty("AppName", "Codename One");
+        int status = WindowsNative.printDocument(path, mimeType, jobName);
+        if (status == 0) {
+            return PrintResult.completed();
+        }
+        if (status == 1) {
+            return PrintResult.cancelled();
+        }
+        String error = WindowsNative.printLastError();
+        return PrintResult.failed(error != null ? error : "Print failed");
     }
 
     /* -------------------------------------------------- native file picker

@@ -415,6 +415,11 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
              * (cn1_windows_winrt.cpp). */
             cn1WinShareHandleMessage(wParam);
             return 0;
+        case WM_CN1_PRINTDLG:
+            /* Modal system print dialog, run synchronously on this (pump) thread
+             * while the printing worker blocks in SendMessage
+             * (cn1_windows_print.cpp). */
+            return cn1WinPrintDialogHandleMessage(wParam);
         case WM_CTLCOLOREDIT: {
             /* Colour the native edit overlay to match the CN1 field it stands in
              * for; fall through to default when it is not our control. */
