@@ -37,6 +37,8 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.security.Biometrics;
 import com.codename1.security.SecureStorage;
 import com.codename1.share.ShareResult;
@@ -5272,6 +5274,53 @@ public final class Display extends CN1Constants {
             @Override
             public void onResult(final ShareResult result) {
                 final ShareResult r = result != null ? result : ShareResult.sharedTo(null);
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        finalListener.onResult(r);
+                    }
+                });
+            }
+        });
+    }
+
+    /// Indicates if the underlying platform can print documents through
+    /// [#print(String,String,PrintResultListener)].
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying platform handles printing.
+    public boolean isPrintingSupported() {
+        return impl.isPrintingSupported();
+    }
+
+    /// Print a document file through the platform printing system,
+    /// typically showing the native print dialog where the user picks a
+    /// printer and options. The outcome is reported through `listener` on
+    /// the EDT.
+    ///
+    /// All printing platforms accept PDF (`application/pdf`) and common
+    /// image types (`image/png`, `image/jpeg`); other mime types fail with
+    /// [PrintResult#STATUS_FAILED] on platforms that can't render them.
+    /// See [com.codename1.printing.Printer] for a friendlier facade.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filePath`: path of the document in [com.codename1.io.FileSystemStorage]
+    ///
+    /// - `mimeType`: the document type, e.g. `application/pdf`, `image/png`
+    ///
+    /// - `listener`: callback for the print outcome. May be null.
+    public void print(String filePath, String mimeType, PrintResultListener listener) {
+        if (listener == null) {
+            impl.print(filePath, mimeType, null);
+            return;
+        }
+        final PrintResultListener finalListener = listener;
+        impl.print(filePath, mimeType, new PrintResultListener() {
+            @Override
+            public void onResult(final PrintResult result) {
+                final PrintResult r = result != null ? result : PrintResult.completed();
                 callSerially(new Runnable() {
                     @Override
                     public void run() {

@@ -624,7 +624,15 @@ public final class IOSNative {
     // IOSImplementation.socialShareCallback(int, String, String) using
     // the supplied callbackId. Status: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
     native void socialShareWithCallback(String text, long imagePeer, Rectangle sourceRect, int callbackId);
-    
+
+    // Printing via UIPrintInteractionController
+    native boolean isPrintingAvailable();
+
+    // Prints the document at path and reports the outcome via
+    // IOSImplementation.printDocumentCallback(int, int, String) using
+    // the supplied callbackId. Status: 1=COMPLETED, 2=CANCELLED, 3=FAILED.
+    native void printDocument(String path, String mimeType, int callbackId);
+
     // facebook connect
     public native void facebookLogin(Object callback);
     public native boolean isFacebookLoggedIn();

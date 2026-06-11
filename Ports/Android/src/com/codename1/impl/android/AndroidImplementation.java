@@ -7928,6 +7928,295 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Intent.createChooser(shareIntent, "Share with...", pendingIntent.getIntentSender());
     }
 
+    /// Printing uses the Android print framework which requires API 19
+    /// and a foreground activity to host the print dialog.
+    @Override
+    public boolean isPrintingSupported() {
+        return android.os.Build.VERSION.SDK_INT >= 19 && getActivity() != null;
+    }
+
+    /// Print through the Android print framework. PDF files are streamed
+    /// verbatim into a `android.print.PrintDocumentAdapter`; images go
+    /// through the support library `PrintHelper` which scales them to the
+    /// page.
+    ///
+    /// Outcome reporting is best effort: the PDF path polls the returned
+    /// `android.print.PrintJob` and treats a queued/started job as
+    /// completed since Android offers no callback for the terminal job
+    /// state once it was handed to the print service. The image path
+    /// reports completed when `PrintHelper` finishes because it can't
+    /// distinguish a dismissed dialog from a printed page.
+    @Override
+    public void print(final String filePath, final String mimeType, final com.codename1.printing.PrintResultListener listener) {
+        final PrintResultDispatcher dispatcher = new PrintResultDispatcher(listener);
+        if (!isPrintingSupported()) {
+            dispatcher.fire(com.codename1.printing.PrintResult.failed(
+                    "Printing requires Android 4.4 or newer and a foreground activity"));
+            return;
+        }
+        if (filePath == null) {
+            dispatcher.fire(com.codename1.printing.PrintResult.failed("No file to print"));
+            return;
+        }
+        final File file = new File(removeFilePrefix(filePath));
+        if (!file.exists()) {
+            dispatcher.fire(com.codename1.printing.PrintResult.failed("File not found: " + filePath));
+            return;
+        }
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // PrintSupport touches android.print which only exists
+                    // on API 19+; the isPrintingSupported() gate above keeps
+                    // the class from loading on older devices.
+                    PrintSupport.startPrint(getActivity(), file, mimeType, dispatcher);
+                } catch (Throwable t) {
+                    dispatcher.fire(com.codename1.printing.PrintResult.failed(
+                            "Failed to start print job: " + t));
+                }
+            }
+        });
+    }
+
+    /// Delivers a [com.codename1.printing.PrintResult] to the listener at
+    /// most once. The listener may be null and results may arrive from any
+    /// thread; `Display` moves the callback onto the EDT.
+    private static final class PrintResultDispatcher {
+        private final com.codename1.printing.PrintResultListener listener;
+        private boolean fired;
+
+        PrintResultDispatcher(com.codename1.printing.PrintResultListener listener) {
+            this.listener = listener;
+        }
+
+        void fire(com.codename1.printing.PrintResult result) {
+            synchronized (this) {
+                if (fired) {
+                    return;
+                }
+                fired = true;
+            }
+            if (listener != null) {
+                listener.onResult(result);
+            }
+        }
+    }
+
+    /// All android.print framework access lives in this class so the
+    /// classes it references are only loaded behind the API 19 check in
+    /// [#print].
+    @TargetApi(19)
+    private static final class PrintSupport {
+
+        private static final int JOB_PENDING = 0;
+        private static final int JOB_COMPLETED = 1;
+        private static final int JOB_CANCELLED = 2;
+        private static final int JOB_FAILED = 3;
+
+        /// How long the poller waits for the print dialog/job to reach a
+        /// terminal state before giving up.
+        private static final long POLL_TIMEOUT = 15 * 60 * 1000L;
+        private static final long POLL_INTERVAL = 500;
+
+        /// Must run on the UI thread: `PrintManager.print` and
+        /// `PrintHelper.printBitmap` both require it.
+        static void startPrint(Activity activity, File file, String mimeType, PrintResultDispatcher dispatcher) {
+            String jobName = file.getName();
+            if ("application/pdf".equalsIgnoreCase(mimeType)) {
+                android.print.PrintManager printManager =
+                        (android.print.PrintManager) activity.getSystemService(Context.PRINT_SERVICE);
+                if (printManager == null) {
+                    dispatcher.fire(com.codename1.printing.PrintResult.failed("Print service unavailable"));
+                    return;
+                }
+                android.print.PrintJob job = printManager.print(jobName,
+                        new PdfFilePrintAdapter(jobName, file), null);
+                pollPrintJob(activity, job, dispatcher);
+            } else if (mimeType != null && mimeType.startsWith("image/")) {
+                printImage(activity, file, jobName, dispatcher);
+            } else {
+                dispatcher.fire(com.codename1.printing.PrintResult.failed(
+                        "Unsupported print document type: " + mimeType));
+            }
+        }
+
+        private static void printImage(Activity activity, File file, String jobName,
+                final PrintResultDispatcher dispatcher) {
+            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+            if (bitmap == null) {
+                dispatcher.fire(com.codename1.printing.PrintResult.failed(
+                        "Unable to decode image for printing"));
+                return;
+            }
+            android.support.v4.print.PrintHelper helper = new android.support.v4.print.PrintHelper(activity);
+            helper.setScaleMode(android.support.v4.print.PrintHelper.SCALE_MODE_FIT);
+            helper.printBitmap(jobName, bitmap, new android.support.v4.print.PrintHelper.OnPrintFinishCallback() {
+                @Override
+                public void onFinish() {
+                    // PrintHelper fires onFinish when the print flow ends
+                    // without exposing whether the user printed or
+                    // dismissed the dialog; report completed best effort.
+                    dispatcher.fire(com.codename1.printing.PrintResult.completed());
+                }
+            });
+        }
+
+        /// Watches the print job from a background thread and reports the
+        /// first terminal state. The job object must only be queried on
+        /// the UI thread, so every tick bounces through `runOnUiThread`.
+        private static void pollPrintJob(final Activity activity, final android.print.PrintJob job,
+                final PrintResultDispatcher dispatcher) {
+            Thread poller = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    long deadline = System.currentTimeMillis() + POLL_TIMEOUT;
+                    while (System.currentTimeMillis() < deadline) {
+                        try {
+                            Thread.sleep(POLL_INTERVAL);
+                        } catch (InterruptedException ignore) {
+                        }
+                        final int[] state = new int[]{JOB_PENDING};
+                        final boolean[] done = new boolean[1];
+                        final Object lock = new Object();
+                        activity.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                int s = JOB_PENDING;
+                                try {
+                                    if (job.isCancelled()) {
+                                        s = JOB_CANCELLED;
+                                    } else if (job.isFailed()) {
+                                        s = JOB_FAILED;
+                                    } else if (job.isCompleted()) {
+                                        s = JOB_COMPLETED;
+                                    } else if (job.isQueued() || job.isStarted() || job.isBlocked()) {
+                                        // The dialog phase is over and the
+                                        // job belongs to the print service;
+                                        // that is as "completed" as Android
+                                        // lets us observe reliably.
+                                        s = JOB_COMPLETED;
+                                    }
+                                } catch (Throwable t) {
+                                    s = JOB_FAILED;
+                                }
+                                synchronized (lock) {
+                                    state[0] = s;
+                                    done[0] = true;
+                                    lock.notifyAll();
+                                }
+                            }
+                        });
+                        synchronized (lock) {
+                            long waitUntil = System.currentTimeMillis() + 5000;
+                            while (!done[0] && System.currentTimeMillis() < waitUntil) {
+                                try {
+                                    lock.wait(POLL_INTERVAL);
+                                } catch (InterruptedException ignore) {
+                                }
+                            }
+                            if (!done[0]) {
+                                // UI thread didn't get to us; try again on
+                                // the next tick until the deadline passes.
+                                continue;
+                            }
+                        }
+                        switch (state[0]) {
+                            case JOB_COMPLETED:
+                                dispatcher.fire(com.codename1.printing.PrintResult.completed());
+                                return;
+                            case JOB_CANCELLED:
+                                dispatcher.fire(com.codename1.printing.PrintResult.cancelled());
+                                return;
+                            case JOB_FAILED:
+                                dispatcher.fire(com.codename1.printing.PrintResult.failed("Print job failed"));
+                                return;
+                            default:
+                                // still in the dialog phase, keep polling
+                        }
+                    }
+                    dispatcher.fire(com.codename1.printing.PrintResult.failed(
+                            "Timed out waiting for the print job status"));
+                }
+            }, "CN1PrintJobPoller");
+            poller.setDaemon(true);
+            poller.start();
+        }
+
+        /// Streams an existing PDF file into the print system unchanged.
+        /// Layout/write failures are routed through the framework
+        /// callbacks which fail the print job; the poller in
+        /// [#pollPrintJob] then reports the failure to the listener, so
+        /// the dispatcher still fires exactly once.
+        private static final class PdfFilePrintAdapter extends android.print.PrintDocumentAdapter {
+            private final String jobName;
+            private final File file;
+
+            PdfFilePrintAdapter(String jobName, File file) {
+                this.jobName = jobName;
+                this.file = file;
+            }
+
+            @Override
+            public void onLayout(android.print.PrintAttributes oldAttributes,
+                    android.print.PrintAttributes newAttributes,
+                    android.os.CancellationSignal cancellationSignal,
+                    LayoutResultCallback callback, Bundle extras) {
+                if (cancellationSignal != null && cancellationSignal.isCanceled()) {
+                    callback.onLayoutCancelled();
+                    return;
+                }
+                try {
+                    android.print.PrintDocumentInfo info = new android.print.PrintDocumentInfo.Builder(jobName)
+                            .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                            .setPageCount(android.print.PrintDocumentInfo.PAGE_COUNT_UNKNOWN)
+                            .build();
+                    callback.onLayoutFinished(info, !newAttributes.equals(oldAttributes));
+                } catch (Throwable t) {
+                    callback.onLayoutFailed(t.toString());
+                }
+            }
+
+            @Override
+            public void onWrite(android.print.PageRange[] pages,
+                    android.os.ParcelFileDescriptor destination,
+                    android.os.CancellationSignal cancellationSignal,
+                    WriteResultCallback callback) {
+                FileInputStream in = null;
+                FileOutputStream out = null;
+                try {
+                    in = new FileInputStream(file);
+                    out = new FileOutputStream(destination.getFileDescriptor());
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = in.read(buffer)) > -1) {
+                        if (cancellationSignal != null && cancellationSignal.isCanceled()) {
+                            callback.onWriteCancelled();
+                            return;
+                        }
+                        out.write(buffer, 0, count);
+                    }
+                    callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
+                } catch (Throwable t) {
+                    callback.onWriteFailed(t.toString());
+                } finally {
+                    if (in != null) {
+                        try {
+                            in.close();
+                        } catch (Throwable ignore) {
+                        }
+                    }
+                    if (out != null) {
+                        try {
+                            out.close();
+                        } catch (Throwable ignore) {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * @inheritDoc
      */

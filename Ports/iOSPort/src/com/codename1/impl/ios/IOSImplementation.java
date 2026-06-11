@@ -10095,6 +10095,54 @@ public class IOSImplementation extends CodenameOneImplementation {
         listener.onResult(result);
     }
 
+    @Override
+    public boolean isPrintingSupported() {
+        return nativeInstance.isPrintingAvailable();
+    }
+
+    @Override
+    public void print(String filePath, String mimeType, com.codename1.printing.PrintResultListener listener) {
+        int callbackId = registerPrintCallback(listener);
+        nativeInstance.printDocument(filePath, mimeType, callbackId);
+    }
+
+    // Pending print-result callbacks. Native code invokes
+    // printDocumentCallback(...) once per id.
+    private static final java.util.HashMap<Integer, com.codename1.printing.PrintResultListener> pendingPrintCallbacks = new java.util.HashMap<Integer, com.codename1.printing.PrintResultListener>();
+    private static int nextPrintCallbackId = 1;
+
+    private static synchronized int registerPrintCallback(com.codename1.printing.PrintResultListener l) {
+        int id = nextPrintCallbackId++;
+        pendingPrintCallbacks.put(Integer.valueOf(id), l);
+        return id;
+    }
+
+    /// Invoked from native code with the outcome of a print job. Public so
+    /// the VM-emitted symbol stays stable. `status` matches
+    /// [com.codename1.printing.PrintResult]: 1=COMPLETED, 2=CANCELLED, 3=FAILED.
+    public static void printDocumentCallback(int callbackId, int status, String errorMessage) {
+        com.codename1.printing.PrintResultListener listener;
+        synchronized (IOSImplementation.class) {
+            listener = pendingPrintCallbacks.remove(Integer.valueOf(callbackId));
+        }
+        if (listener == null) {
+            return;
+        }
+        com.codename1.printing.PrintResult result;
+        switch (status) {
+            case 1:
+                result = com.codename1.printing.PrintResult.completed();
+                break;
+            case 2:
+                result = com.codename1.printing.PrintResult.cancelled();
+                break;
+            default:
+                result = com.codename1.printing.PrintResult.failed(errorMessage);
+                break;
+        }
+        listener.onResult(result);
+    }
+
     private Purchase pur;
     private Vector purchasedItems;
 
