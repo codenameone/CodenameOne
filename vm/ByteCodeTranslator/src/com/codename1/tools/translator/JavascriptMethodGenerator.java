@@ -1107,6 +1107,25 @@ final class JavascriptMethodGenerator {
             s = applyVirtualRule(s,
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\); (pc = \\d+; break;) \\}",
                     "yield* cn1_iv2($1, \"$4\", $2, $3); $5");
+            // Rule 18: collapse the straight-line call-result temp.
+            //   { let __result = <call-expr>; X = __result; }
+            //     → X = <call-expr>;
+            // The temp is created and consumed in the same block with
+            // exactly one use, and a JS assignment fully evaluates its
+            // RHS before the store, so the rewrite cannot change
+            // semantics even when X also appears inside the call
+            // expression (``b = yield* cn1_iv0(b, ...)``). This is the
+            // single largest scaffolding pattern in the straight-line
+            // emitter's output (one per non-void invocation).
+            s = s.replaceAll(
+                    "\\{\\s*let __result = ((?:yield\\* )?[^;]+);\\s*([\\w\\$]+(?:\\[\\d+\\])?) = __result;\\s*\\}",
+                    "$2 = $1;");
+            // Rule 18b: identity copy-pair.
+            //   X = Y;  Y = X;     →  X = Y;
+            // The second statement re-stores Y's own value.
+            s = s.replaceAll(
+                    "(\\s)([\\w\\$]+) = ([\\w\\$]+);\\s+\\3 = \\2;",
+                    "$1$2 = $3;");
             // Rule 17: array load (AALOAD/IALOAD/BALOAD/CALOAD/SALOAD)
             // with inlined array + index pushes.
             //   stack.p(A); stack.p(I);
