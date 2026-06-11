@@ -1547,6 +1547,10 @@
             return;
           }
           advanced = true;
+          var idx = pendingFrameTicks.indexOf(tick);
+          if (idx >= 0) {
+            pendingFrameTicks.splice(idx, 1);
+          }
           remaining--;
           if (remaining <= 0) {
             resolve();
@@ -1554,12 +1558,25 @@
           }
           step();
         }
+        // Hidden/headless pages throttle BOTH rAF (stops entirely) and the
+        // setTimeout fallback (intensive wake-up batching), so register the
+        // tick for the external __cn1NudgeVm driver too -- a CDP-driven
+        // nudge resolves pending frame waits within its interval instead of
+        // stalling each settle for seconds.
+        pendingFrameTicks.push(tick);
         raf(tick);
         setTimeout(tick, 32);
       }
       step();
     });
   }
+  var pendingFrameTicks = [];
+  global.__cn1FlushFrameTicks = function() {
+    var ticks = pendingFrameTicks.splice(0, pendingFrameTicks.length);
+    for (var i = 0; i < ticks.length; i++) {
+      try { ticks[i](); } catch (_e) { /* tick is self-guarding */ }
+    }
+  };
 
   function shortSignatureFromImageData(img) {
     if (!img || !img.data || !img.data.length) {
@@ -2290,20 +2307,39 @@
             && typeof document !== 'undefined'
             && document.fonts
             && typeof document.fonts.add === 'function') {
-          var descriptor = "url('" + cssStringEscape(fontUrl) + "') format('"
-            + cssStringEscape(fontFormat) + "')";
-          var ff = new FontFace(fontName, descriptor);
-          ff.load().then(function(loaded) {
-            try { document.fonts.add(loaded); } catch (_err) {}
-            resolve({ loaded: true, path: 'FontFace' });
-          }, function(err) {
-            if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-              console.warn('PARPAR:DIAG:HOST:loadTrueTypeFont:FontFace:fail:fontName=' + fontName
-                + ':url=' + fontUrl
-                + ':error=' + String(err && err.message ? err.message : err));
+          // App-resource fonts (theme .ttf files) land at the bundle ROOT
+          // (the translator copies app resources top-level), while the
+          // port's own webapp fonts live under assets/. Try assets/ first
+          // (the historical layout), then fall back to the bare basename so
+          // root-level app fonts don't 404 (observed: Initializr's
+          // Inter-*.ttf 404ing under assets/ and the UI falling back to
+          // system fonts).
+          var candidates = [fontUrl];
+          if (fontUrl.indexOf('assets/') === 0) {
+            candidates.push(fontUrl.substring('assets/'.length));
+          }
+          var tryLoad = function(idx) {
+            if (idx >= candidates.length) {
+              resolve({ loaded: false, path: 'FontFace', error: 'all candidate paths failed' });
+              return;
             }
-            resolve({ loaded: false, path: 'FontFace', error: String(err && err.message ? err.message : err) });
-          });
+            var candidate = candidates[idx];
+            var descriptor = "url('" + cssStringEscape(candidate) + "') format('"
+              + cssStringEscape(fontFormat) + "')";
+            var ff = new FontFace(fontName, descriptor);
+            ff.load().then(function(loaded) {
+              try { document.fonts.add(loaded); } catch (_err) {}
+              resolve({ loaded: true, path: 'FontFace' });
+            }, function(err) {
+              if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                console.warn('PARPAR:DIAG:HOST:loadTrueTypeFont:FontFace:fail:fontName=' + fontName
+                  + ':url=' + candidate
+                  + ':error=' + String(err && err.message ? err.message : err));
+              }
+              tryLoad(idx + 1);
+            });
+          };
+          tryLoad(0);
           return;
         }
         if (typeof document !== 'undefined' && document.head) {
@@ -2719,6 +2755,11 @@
       try {
         worker.postMessage({ type: 'timer-wake' });
       } catch (e) { /* worker torn down */ }
+      try {
+        if (typeof global.__cn1FlushFrameTicks === 'function') {
+          global.__cn1FlushFrameTicks();
+        }
+      } catch (e) { /* frame ticks are self-guarding */ }
     };
     worker.onmessage = function(event) {
       handleVmMessage(event.data, worker);

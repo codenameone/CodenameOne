@@ -247,11 +247,15 @@ final class JavascriptBundleWriter {
         //    a renamed static native stub would bypass its override and return its
         //    placeholder (e.g. null) -> NPE. Scan the bundle AND the runtime sources
         //    so every bridge-resolved name keeps its canonical identifier.
-        java.util.List<String> stringScanSources = new java.util.ArrayList<String>(chunkStrings);
-        for (String runtimeSrc : loadRuntimeNameSources()) {
-            stringScanSources.add(runtimeSrc);
-        }
-        java.util.Set<String> stringTokens = collectStringLiteralCn1Tokens(stringScanSources);
+        // Chunks are machine-generated (no comments / prose), so the
+        // quote-state scanner is reliable there. The hand-written bridge JS
+        // (port.js etc.) is NOT safe for it: apostrophes inside comments
+        // desync the in-string tracker and real literals get missed -- which
+        // silently un-protected bindCiFallback targets and broke the
+        // screenshot runner (lambda2RunBridge:missingDispatch). Use the
+        // regex-based quoted-token collector for those sources instead.
+        java.util.Set<String> stringTokens = collectStringLiteralCn1Tokens(chunkStrings);
+        stringTokens.addAll(collectBridgeReferencedCn1Tokens());
         // installNativeBindings overrides BOTH global[name] and the CONSTRUCTED
         // global[name + "__impl"] (the static-method body) -- see parparvm_runtime.js.
         // The "__impl" variant never appears as a literal string, so add it for every
@@ -427,36 +431,6 @@ final class JavascriptBundleWriter {
             }
         }
         return tokens;
-    }
-
-    /**
-     * Returns the JS sources that resolve translated functions by name (the
-     * worker-side runtime + JS port) so their referenced {@code cn1_*} names are
-     * protected from renaming. Missing sources are skipped -- protecting fewer
-     * names only forgoes some size, it never produces an unsafe rename (the app
-     * bundle's own string scan still covers anything it references).
-     */
-    private static java.util.List<String> loadRuntimeNameSources() {
-        java.util.List<String> sources = new java.util.ArrayList<String>();
-        for (String res : new String[]{ "parparvm_runtime.js", "browser_bridge.js" }) {
-            try {
-                sources.add(loadResource(res));
-            } catch (IOException ignore) {
-                // resource absent -- skip
-            }
-        }
-        try {
-            Path webApp = locateJavaScriptPortWebApp();
-            if (webApp != null) {
-                Path portJs = webApp.resolve("port.js");
-                if (java.nio.file.Files.exists(portJs)) {
-                    sources.add(new String(java.nio.file.Files.readAllBytes(portJs), StandardCharsets.UTF_8));
-                }
-            }
-        } catch (Exception ignore) {
-            // port.js unavailable -- skip
-        }
-        return sources;
     }
 
     private static boolean isIdentChar(char d) {
