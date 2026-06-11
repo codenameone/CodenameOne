@@ -1,0 +1,10 @@
+# Arc antialiasing differs between the x64 and arm64 builds of Direct2D's
+# software rasterizer (screenshots render via a WIC bitmap render target, which
+# always uses the CPU rasterizer in d2d1.dll). This test strokes ~100 concentric
+# 1px arcs per cell, so nearly every painted pixel is an AA edge pixel and the
+# per-arch coverage rounding shows up here and nowhere else (124/125 tests match
+# bit-exactly across arches). Measured arm64-vs-baseline mismatch at channel
+# delta > 16 is 0.18%; a real arc regression (wrong sweep, missing arcs) blows
+# far past this.
+maxChannelDelta=16
+maxMismatchPercent=0.5
