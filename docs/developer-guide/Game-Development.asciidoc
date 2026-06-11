@@ -47,7 +47,7 @@ into 3D:
 in a grid; flipping one animates its horizontal scale through zero and swaps the
 image at the thin point, and taps are hit-tested against sprite bounds through
 `GameInput`. A compact illustration of flat 2D play with no camera tricks at all.
-Dissected in <<Case study: the card game (flat 2D)>>.
+Dissected in <<Case study: The card game (flat 2D)>>.
 * *`BoardGameSample`* -- *faux-3D* checkers on an isometric board. Every tile and
 piece is still a flat `Sprite`, but laying them out in an isometric (2:1 diamond)
 projection and raising the pieces off their tiles with a drop shadow gives a
@@ -55,7 +55,7 @@ convincing 3D look without any GPU 3D, perspective camera or models. The screen
 pixel-to-board-cell mapping (and its inverse, for picking) is the same math behind
 any isometric strategy or tycoon game; it also implements the full move/jump/chain
 /crown rules and a small AI so you can play it solo. Dissected in
-<<Case study: faux-3D checkers (isometric projection)>>.
+<<Case study: Faux-3D checkers (isometric projection)>>.
 
 The action samples are driven by the joystick and buttons in
 <<On-screen touch controls>>, so they're equally playable on a touch device and in
@@ -305,11 +305,11 @@ faces both ways -- no mirrored art needed (sprites are drawn double-sided for
 exactly this reason). `play()`, `pause()`, `stop()`, `setLooping(boolean)` and
 `setCurrentFrame(int)` control playback.
 
-=== Case study: the card game (flat 2D)
+=== Case study: The card game (flat 2D)
 
 image::img/game-cards.png[The Memory card game mid-flip: two matched pairs and one card face up,240]
 
-`CardGameSample` is Memory (Concentration): sixteen face-down cards in a 4x4
+`CardGameSample` is Memory (Concentration): sixteen face-down cards in a four-by-four
 grid, tap two and they stay up when they match, flip back when they don't. It's
 the smallest complete example of turn-based 2D play with `com.codename1.gaming`
 -- no joystick, no physics, no camera -- which makes the three techniques it does
@@ -368,16 +368,16 @@ before flipping a failed pair back, and a moves counter surfaced through the
 form title. Note the timer: in a game loop you don't schedule callbacks, you
 subtract `dt` from a countdown field each frame and act when it crosses zero.
 
-=== Case study: faux-3D checkers (isometric projection)
+=== Case study: Faux-3D checkers (isometric projection)
 
 image::img/game-board.png[Isometric checkers mid-game with a selected piece and a highlighted destination,240]
 
 `BoardGameSample` plays a full game of checkers -- moves, forced captures, chained
-jumps, crowning, and a small AI opponent -- on a board that looks convincingly 3D.
-But there is no perspective camera and no `Model` anywhere: every tile and piece
+jumps, crowning, and a small AI opponent -- on a board that looks convincingly 3D --
+yet there is no perspective camera and no `Model` anywhere: every tile and piece
 is a flat `Sprite`. The 3D impression comes entirely from *where* the flat art is
 placed, a technique (isometric or "2.5D" projection) that powered decades of
-strategy and tycoon games and still works beautifully on a GPU sprite pipeline.
+strategy and tycoon games and still works just as well on a GPU sprite pipeline.
 
 *The projection.* Board cell `(r, c)` maps to screen pixels by laying the grid out
 as 2:1 diamonds -- columns step right-and-down, rows step left-and-down:
