@@ -20,27 +20,67 @@ The open issue count is now below 350 (332 at the moment of this writing). That 
 
 We went over the issue tracker starting with the oldest issues and working our way back. You may recall that when we started tracking this, going under the 500-issue mark was a major milestone and that was just a few weeks back!
 
-## A note on contributions
-
-We stopped accepting community pull requests. We want to be precise about why, because it would be easy to read more into this than is there.
-
-This is **not** about AI-generated PRs. We are not policing how a contribution was written. 
-
-The real reason is mechanical: our CI does not run correctly against pull requests from forks. The screenshot pipeline, the device runners, and the protocol tests all need credentials and a setup that a forked PR cannot get, so a community PR cannot actually be validated by the same gates we hold our own work to. This isn't something we can easily solve without introducing major security vulnerabilities to our process. Recently, a change that looked completely safe slipped through and triggered a CI regression that took the builds down. That was on us, not on the contributor, but it convinced us that merging code we cannot fully run is the wrong trade.
-
-So the door is open the other way. **Please keep filing issues.** A clear issue with a test case is genuinely no trouble for us to pick up, and as the number above shows, we are actively working the tracker. If you have a fix in mind, describe it in the issue, attach the failing case, and we will carry it through CI ourselves.
-
-To everyone who has sent us patches over the years, and especially the people who contributed recently: thank you. The effort was real and appreciated, and this decision is about our pipeline, not your work. 
-
 ## What shipped this week
 
-The bigger items get their own deep-dive tutorials over the coming week. Short version:
+Every one of the bigger items has its own deep-dive tutorial. Here is the tour, with the links to the full posts.
 
-- **Native Mac builds.** The `macNative.enabled=true` build hint takes the same project through the iOS pipeline and emits a native Mac app. It pairs with a deeper desktop integration layer (native title bar, native menu bar, interactive scrollbars, desktop notifications), so a desktop target stops feeling like a phone in a window.
-- **WebSockets, gRPC, and GraphQL.** `com.codename1.io.WebSocket` is now in the core with no `cn1lib` required, and `cn1:generate-grpc` and `cn1:generate-graphql` join `cn1:generate-openapi` to turn a proto file or a GraphQL schema into a typed client. GraphQL subscriptions ride the new core WebSocket support, and enum binding landed in the JSON/XML mapper alongside them.
-- **A new advertising API.** A pluggable, format-complete `com.codename1.ads` subsystem replaces a pile of dead-end legacy mechanisms, with a modern AdMob reference provider.
-- **Background execution and push.** Constraint-based background work, foreground services, push topics, and much richer local notifications, all with full simulator support.
-- **Agent skills and a simpler Initializr.** Covered in this post below, since it is more about the tooling around your project than the framework inside it.
+### Your app is now a native Mac app
+
+One build hint, `macNative.enabled=true`, takes the exact same project through the iOS pipeline and emits a **real** native Mac app: no bundled JVM, the same Metal renderer and battle-tested ParparVM output as the iOS target. It pairs with a deeper desktop integration layer (native title bar, native menu bar, interactive scrollbars, desktop notifications), so a desktop target finally stops feeling like a phone in a window. This is the same Java code that produces the iOS and Android builds, running as a native Mac app:
+
+![A Codename One app running as a native Mac app](/blog/mac-native-builds-and-desktop-integration/mac-app.png)
+
+The full tutorial, including the new desktop menu and shortcut APIs and the Mac signing hints, is in [Your Codename One App, Now A Native Mac App](/blog/mac-native-builds-and-desktop-integration/).
+
+### WebSockets, gRPC, and GraphQL in the core
+
+`com.codename1.io.WebSocket` is now part of the framework with no `cn1lib` required, implemented natively on every port. A live connection is a fluent one-liner:
+
+```java
+WebSocket ws = WebSocket.build("wss://chat.example.com/room/general")
+    .onConnect(() -> Log.p("connected"))
+    .onTextMessage(text -> Display.getInstance()
+        .callSerially(() -> addBubble(text, false)))
+    .connect();
+```
+
+On top of that, `cn1:generate-grpc` and `cn1:generate-graphql` join `cn1:generate-openapi`, turning a proto file or a GraphQL schema into a typed client with no `protoc` and no HTTP plumbing. GraphQL subscriptions ride the new core WebSocket support, and enum binding landed in the JSON/XML mapper alongside them. The hands-on tutorial that builds a live chat and both typed clients is [WebSockets, gRPC, And GraphQL In The Core](/blog/websockets-grpc-and-graphql/).
+
+### A new advertising API
+
+Advertising support had quietly rotted across three dead-end legacy mechanisms. A pluggable, format-complete `com.codename1.ads` subsystem replaces all of them, with a modern AdMob reference provider, GDPR consent and iOS App Tracking Transparency built in, and a simulator placeholder provider so you can exercise every format without a device. A rewarded ad, the format people most often ask about, is now this short:
+
+```java
+RewardedAd ad = new RewardedAd("your-rewarded-ad-unit-id");
+ad.setAdListener(new AdListener() {
+    public void onLoaded() {
+        ad.show(reward ->
+            grantCoins(reward.getType(), reward.getAmount()));
+    }
+});
+ad.load();
+```
+
+The full story, including banners, native ads, app-open ads, and the provider SPI, is in [A New Advertising API, Built From The Ground Up](/blog/modern-advertising-api/).
+
+### Background execution and push
+
+Constraint-based background work, foreground services, push topics, shared-content handling, and a much richer local notification API, all of it usable in the simulator so you can debug these flows on your desktop. You describe what the work needs, not when to poll:
+
+```java
+WorkRequest req = WorkRequest.builder("daily-sync", SyncWorker.class)
+    .setRequiresNetwork(true)
+    .setRequiresCharging(true)
+    .setPeriodic(6 * 60 * 60 * 1000L)
+    .build();
+BackgroundWork.schedule(req);
+```
+
+The walkthrough, from progress notifications and inline replies to push topics and shared content, is [Background Work, Push Topics, And Richer Notifications](/blog/background-execution-and-push/).
+
+### Agent skills and a simpler Initializr
+
+Covered in this post right below, since it is more about the tooling around your project than the framework inside it.
 
 ## Building screens from screenshots, and a simpler Initializr
 
@@ -67,6 +107,18 @@ Several of these came straight out of the issue-tracker pass:
 - **Graphics.isVisible().** [PR #5129](https://github.com/codenameone/CodenameOne/pull/5129) adds a clip-intersection primitive so a zoomed canvas can cull off-screen content and skip the decode/scale. Closes [#3846](https://github.com/codenameone/CodenameOne/issues/3846).
 - **Screenshot block now covers peers.** [PR #5107](https://github.com/codenameone/CodenameOne/pull/5107): `ios.blockScreenshotsOnEnterBackground=true` was hiding the render surface but leaving peer components (such as a `BrowserComponent`'s `WKWebView`) visible in the app-switcher snapshot. Fixed.
 - **Better site search.** [PR #5090](https://github.com/codenameone/CodenameOne/pull/5090) sorts the on-site search index newest-first and stops the giant developer-guide page from crowding out every result. We also have dates visible next to blog post results in the search and a new highlight explaining we don't search the developer guide/Javadoc. 
+
+## A note on contributions
+
+We stopped accepting community pull requests. We want to be precise about why, because it would be easy to read more into this than is there.
+
+This is **not** about AI-generated PRs. We are not policing how a contribution was written. 
+
+The real reason is mechanical: our CI does not run correctly against pull requests from forks. The screenshot pipeline, the device runners, and the protocol tests all need credentials and a setup that a forked PR cannot get, so a community PR cannot actually be validated by the same gates we hold our own work to. This isn't something we can easily solve without introducing major security vulnerabilities to our process. Recently, a change that looked completely safe slipped through and triggered a CI regression that took the builds down. That was on us, not on the contributor, but it convinced us that merging code we cannot fully run is the wrong trade.
+
+So the door is open the other way. **Please keep filing issues.** A clear issue with a test case is genuinely no trouble for us to pick up, and as the number above shows, we are actively working the tracker. If you have a fix in mind, describe it in the issue, attach the failing case, and we will carry it through CI ourselves.
+
+To everyone who has sent us patches over the years, and especially the people who contributed recently: thank you. The effort was real and appreciated, and this decision is about our pipeline, not your work. 
 
 ## Upcoming attractions
 
