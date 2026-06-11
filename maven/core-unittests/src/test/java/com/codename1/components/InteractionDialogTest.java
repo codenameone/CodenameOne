@@ -2,9 +2,14 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.AnimationManager;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -12,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -494,5 +500,205 @@ class InteractionDialogTest extends UITestBase {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
         return type.cast(field.get(target));
+    }
+
+    /**
+     * Queue gate for the #5193 stackable test: a ComponentAnimation whose
+     * progress the test controls, used to force the form's AnimationManager
+     * into "animating" while a sibling dialog's insert gets queued.
+     */
+    private static final class ManualAnimation extends ComponentAnimation {
+        boolean inProgress = true;
+
+        @Override
+        public boolean isInProgress() {
+            return inProgress;
+        }
+
+        @Override
+        protected void updateState() {
+        }
+    }
+
+    @FormTest
+    void showDuringFormTransitionAttachesToDestinationForm() {
+        // Regression for #5193: show() anchored the dialog to
+        // Display.getCurrent(), which still returns the *outgoing* form
+        // while a form transition is queued (Form.show() is asynchronous).
+        // The dialog attached to the form leaving the screen, stayed
+        // invisible, and only materialized when that form was shown again
+        // ("the ID shows up at another screen"). show() must defer to the
+        // end of the transition and attach to the destination form.
+        Form outgoing = Display.getInstance().getCurrent();
+        Form destination = new Form("Destination", new BorderLayout());
+        destination.setTransitionInAnimator(
+                CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 150));
+        destination.show();
+        assertTrue(Display.getInstance().isInTransition(),
+                "test setup: a form transition must be in flight");
+
+        InteractionDialog dialog = new InteractionDialog("Deferred");
+        dialog.setAnimateShow(false);
+        dialog.show(10, 10, 10, 10);
+
+        // mid-transition the show is deferred: reported as showing but not
+        // attached to any form yet -- in particular not to the outgoing one
+        assertTrue(dialog.isShowing(),
+                "a deferred show must still report isShowing() so showDialog() keeps blocking");
+        assertNull(dialog.getComponentForm(),
+                "#5193: the dialog must not attach mid-transition (the current form is leaving the screen)");
+
+        DisplayTest.flushEdt();
+
+        assertSame(destination, Display.getInstance().getCurrent(),
+                "test setup: the transition must have completed");
+        assertTrue(dialog.isShowing(), "the deferred show must run once the transition completes");
+        assertSame(destination, dialog.getComponentForm(),
+                "#5193: the dialog must attach to the destination form, not " +
+                        (dialog.getComponentForm() == outgoing ? "the outgoing form" : "elsewhere"));
+        assertTrue(destination.getLayeredPane(InteractionDialog.class, true).contains(dialog));
+        dialog.dispose();
+    }
+
+    @FormTest
+    void showPopupDialogPinsTargetComponentFormDuringTransition() {
+        // Regression for #5193: showPopupDialog(Component) computed the
+        // target's form for the formMode check but then anchored the dialog
+        // to Display.getCurrent() anyway -- the outgoing form during a
+        // transition. The popup must host on the form the target component
+        // actually belongs to, immediately, with no deferral needed.
+        Form destination = new Form("Destination", new BorderLayout());
+        Label target = new Label("Target");
+        destination.add(BorderLayout.CENTER, target);
+        destination.setTransitionInAnimator(
+                CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 150));
+        destination.show();
+        assertTrue(Display.getInstance().isInTransition(),
+                "test setup: a form transition must be in flight");
+
+        InteractionDialog dialog = new InteractionDialog("Pinned");
+        dialog.setAnimateShow(false);
+        dialog.showPopupDialog(target);
+
+        assertSame(destination, dialog.getComponentForm(),
+                "#5193: the popup must attach to the target component's form even mid-transition");
+
+        DisplayTest.flushEdt();
+
+        assertTrue(dialog.isShowing());
+        assertSame(destination, dialog.getComponentForm());
+        dialog.dispose();
+    }
+
+    @FormTest
+    void showPopupDialogRectDefersDuringTransition() {
+        // Same #5193 anchor bug for the rect-based popup entry point: the
+        // positioning math ran against the outgoing form's layered pane.
+        // With no component to pin a form from, the popup must defer to the
+        // end of the transition like show() does.
+        Form destination = new Form("Destination", new BorderLayout());
+        destination.setTransitionInAnimator(
+                CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 150));
+        destination.show();
+        assertTrue(Display.getInstance().isInTransition(),
+                "test setup: a form transition must be in flight");
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setAnimateShow(false);
+        dialog.showPopupDialog(new Rectangle(20, 30, 80, 60));
+
+        assertTrue(dialog.isShowing(), "deferred popup must report isShowing()");
+        assertNull(dialog.getComponentForm(), "popup must not attach mid-transition");
+
+        DisplayTest.flushEdt();
+
+        assertSame(destination, dialog.getComponentForm(),
+                "#5193: the popup must end up on the destination form");
+        dialog.dispose();
+    }
+
+    @FormTest
+    void disposeDuringTransitionAbandonsDeferredShow() {
+        // A dialog disposed while its show is still deferred (waiting for a
+        // form transition to finish) must never materialize.
+        Form destination = new Form("Destination", new BorderLayout());
+        destination.setTransitionInAnimator(
+                CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 150));
+        destination.show();
+        assertTrue(Display.getInstance().isInTransition(),
+                "test setup: a form transition must be in flight");
+
+        InteractionDialog dialog = new InteractionDialog("Abandoned");
+        dialog.setAnimateShow(false);
+        dialog.show(0, 0, 0, 0);
+        assertTrue(dialog.isShowing());
+
+        dialog.dispose();
+        assertFalse(dialog.isShowing(), "dispose must clear the pending-show state");
+
+        DisplayTest.flushEdt();
+
+        assertFalse(dialog.isShowing(), "an abandoned deferred show must not run after the transition");
+        assertNull(dialog.getComponentForm(),
+                "#5193: a dialog disposed during the deferral window must never attach to a form");
+    }
+
+    @FormTest
+    void stackableDisposeKeepsSharedLayerWhenSiblingInsertQueued() throws Exception {
+        // Regression for #5193 (stackable mode): cleanupLayer decided to
+        // detach the shared class layer with getComponentCount() == 0, which
+        // does not see inserts that Container.insertComponentAt deferred to
+        // the animation queue. Real-world sequence: dialog B is shown while
+        // dialog A's blocking dispose animation runs (invokeAndBlock keeps
+        // serving EDT callbacks), so B's add is only queued; A's dispose
+        // then saw an "empty" layer, detached it, and B's queued insert
+        // later flushed into the detached container -- B was lost forever.
+        // This test reproduces the exact state deterministically: a queued
+        // sibling insert with zero real children at cleanup time.
+        InteractionDialog.setStackable(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            InteractionDialog first = new InteractionDialog("First");
+            first.setAnimateShow(false);
+            first.show(0, 0, 0, 0);
+            Container layer = form.getLayeredPane(InteractionDialog.class, true);
+            assertEquals(1, layer.getComponentCount(), "test setup: first dialog attached directly");
+
+            // force the AnimationManager into "animating" so the second
+            // dialog's insert is deferred onto the change queue
+            ManualAnimation gate = new ManualAnimation();
+            form.getAnimationManager().addAnimation(gate);
+
+            InteractionDialog second = new InteractionDialog("Second");
+            second.setAnimateShow(false);
+            second.show(0, 0, 0, 0);
+            assertEquals(1, layer.getComponentCount(), "test setup: second insert must be queued, not real");
+            assertEquals(2, layer.getChildrenAsList(true).size(),
+                    "test setup: the queued insert must be visible to getChildrenAsList(true)");
+
+            // finish the gate and pop only it from the serial animation
+            // queue, leaving the second dialog's insert pending -- the
+            // state the animateUnlayoutAndWait dispose flow reaches
+            gate.inProgress = false;
+            Method update = AnimationManager.class.getDeclaredMethod("updateAnimations");
+            update.setAccessible(true);
+            update.invoke(form.getAnimationManager());
+            assertFalse(form.getAnimationManager().isAnimating(),
+                    "test setup: manager idle with the sibling insert still queued");
+
+            first.dispose();
+
+            assertNotNull(layer.getParent(),
+                    "#5193: dispose must not detach the shared layer while a sibling's insert is queued");
+
+            DisplayTest.flushAnimations();
+            assertTrue(second.isShowing(),
+                    "#5193: the queued sibling dialog must materialize after the queue drains");
+            assertSame(form, second.getComponentForm(),
+                    "#5193: the sibling dialog must be attached to the form, not a detached layer");
+            second.dispose();
+        } finally {
+            InteractionDialog.setStackable(false);
+        }
     }
 }
