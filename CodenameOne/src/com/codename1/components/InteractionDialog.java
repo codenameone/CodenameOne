@@ -104,14 +104,23 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// The form the dialog should be hosted on, pinned by the popup entry points
     /// (the form of the component passed to `#showPopupDialog(Component)`) and
     /// consumed by `#show(int, int, int, int)` so the whole popup flow targets
-    /// one consistent form. When unset, `#resolveHostForm()` falls back to
-    /// `Display#getCurrentUpcoming()` rather than `Display#getCurrent()`:
-    /// during a form transition the latter still returns the outgoing form, so a
-    /// dialog shown right after `Form.show()` would silently attach to the form
-    /// that is leaving the screen and only materialize when that form is shown
-    /// again -- the "dialog never appears / appears later on another screen"
-    /// symptom of #5193.
+    /// one consistent form. When no form is pinned the show methods use
+    /// `Display#getCurrent()`, deferring themselves with `callSerially` while a
+    /// form transition is in flight: during a transition `getCurrent()` still
+    /// returns the outgoing form, so a dialog shown right after `Form.show()`
+    /// would silently attach to the form that is leaving the screen and only
+    /// materialize when that form is shown again -- the "dialog never appears /
+    /// appears later on another screen" symptom of #5193. The EDT doesn't
+    /// process serial calls while a transition is animating, so a deferred show
+    /// runs once the destination form has become the current form.
     private Form popupHostForm;
+
+    /// True while a show was deferred with `callSerially` because a form
+    /// transition was in flight (see `#popupHostForm`). Counted by
+    /// `#isShowing()` so `#showDialog()` keeps blocking through the deferral
+    /// window; cleared by dispose so a deferred show is abandoned if the dialog
+    /// was disposed before it ran.
+    private boolean pendingShow;
 
     private boolean pressedOutOfBounds;
     private ActionListener pressedListener;
@@ -323,13 +332,14 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
     /// Resolves the form this dialog should be hosted on: the form pinned by the
-    /// popup entry points when available, otherwise the form that will actually
-    /// be on screen once any in-flight transition completes. See `#popupHostForm`.
+    /// popup entry points when available, otherwise the current form. Callers
+    /// that can't pin a form must defer while a transition is in flight (see
+    /// `#popupHostForm`) since the current form is then about to leave the screen.
     private Form resolveHostForm() {
         if (popupHostForm != null) {
             return popupHostForm;
         }
-        return Display.getInstance().getCurrentUpcoming();
+        return Display.getInstance().getCurrent();
     }
 
     private Container getLayeredPane(Form f) {
@@ -419,9 +429,29 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `left`: space in pixels between the left of the screen and the form
     ///
     /// - `right`: space in pixels between the right of the screen and the form
-    public void show(int top, int bottom, int left, int right) {
+    public void show(final int top, final int bottom, final int left, final int right) {
         getUnselectedStyle().setOpacity(255);
         disposed = false;
+        if (popupHostForm == null && Display.getInstance().isInTransition()) {
+            // Display.getCurrent() still returns the outgoing form while a
+            // transition is in flight, so attaching now would put the dialog
+            // on the form that is leaving the screen where it stays invisible
+            // until that form is shown again (#5193). The EDT doesn't process
+            // serial calls while a transition is animating, so this re-runs
+            // once the destination form has become the current form.
+            pendingShow = true;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    pendingShow = false;
+                    if (!disposed) {
+                        show(top, bottom, left, right);
+                    }
+                }
+            });
+            return;
+        }
+        pendingShow = false;
         Form f = resolveHostForm();
         popupHostForm = null;
         shownInFormMode = formMode;
@@ -492,6 +522,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     @Override
     public void dispose() {
         disposed = true;
+        pendingShow = false;
         Container p = getParent();
         if (p != null) {
             Form f = p.getComponentForm();
@@ -596,6 +627,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     private void disposeTo(int direction, final Runnable onFinish) {
         disposed = true;
+        pendingShow = false;
         final Container p = getParent();
         if (p != null) {
             final Form f = p.getComponentForm();
@@ -677,7 +709,9 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// true if showing
     public boolean isShowing() {
-        return getParent() != null;
+        // pendingShow covers the window where show was deferred to the end of
+        // an in-flight form transition, so showDialog() keeps blocking
+        return pendingShow || getParent() != null;
     }
 
     /// Indicates whether show/dispose should be animated or not. When true (the default)
@@ -933,6 +967,25 @@ public class InteractionDialog extends Container implements AbstractDialog {
     private void showPopupDialogImpl(Rectangle rect, boolean bias, Form hostForm) {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
+        }
+        if (hostForm == null && Display.getInstance().isInTransition()) {
+            // see show(int, int, int, int): the current form is about to be
+            // replaced so the positioning math below would run against the
+            // outgoing form; defer until the destination form is current
+            disposed = false;
+            pendingShow = true;
+            final Rectangle deferredRect = rect;
+            final boolean deferredBias = bias;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    pendingShow = false;
+                    if (!disposed) {
+                        showPopupDialogImpl(deferredRect, deferredBias, null);
+                    }
+                }
+            });
+            return;
         }
         Form f = hostForm;
         if (f == null) {

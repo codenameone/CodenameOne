@@ -2546,23 +2546,15 @@ public final class Display extends CN1Constants {
         return impl.getCurrentForm();
     }
 
-    /// Returns the form that will be displayed once any in-flight form transition
-    /// completes. While a transition is queued or running `#getCurrent()` still
-    /// returns the outgoing form, which makes it easy to accidentally add overlays
-    /// (e.g. an `InteractionDialog`) to the form that is about to leave the
-    /// screen right after invoking `Form#show()`. This method returns the
-    /// transition's destination form in that case, otherwise it behaves like
-    /// `#getCurrent()`.
+    /// Same as getCurrent with the added exception of looking into the future
+    /// transitions and returning the last current in the transition (the upcoming
+    /// value for current)
     ///
     /// #### Returns
     ///
-    /// the upcoming form if a transition is pending, otherwise the form currently
-    /// displayed on the screen or null if no form is currently displayed
-    ///
-    /// #### Since
-    ///
-    /// 8.0
-    public Form getCurrentUpcoming() {
+    /// @return the form currently displayed on the screen or null if no form is
+    /// currently displayed
+    Form getCurrentUpcoming() {
         return getCurrentUpcomingForm(false);
     }
 
