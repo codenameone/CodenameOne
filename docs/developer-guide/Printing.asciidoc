@@ -1,0 +1,71 @@
+== Printing
+
+Codename One can hand a document to the platform printing system through the `com.codename1.printing` package. The API shows the native print dialog where the user picks a printer, adjusts options and confirms the job. It works on iOS (AirPrint), Android, desktop builds, the simulator, Windows and the JavaScript port.
+
+The document is a file in `FileSystemStorage` identified by its path and mime type. Every printing platform accepts PDF (`application/pdf`) and common image types (`image/png`, `image/jpeg`).
+
+=== Quick start: Print a PDF
+
+[source,java]
+----
+import com.codename1.printing.Printer;
+import com.codename1.printing.PrintResult;
+
+if (Printer.isPrintingSupported()) {
+    Printer.printPDF(reportPath, result -> {
+        if (result.isFailed()) {
+            ToastBar.showErrorMessage("Print failed: " + result.getError());
+        }
+    });
+}
+----
+
+`Printer.printPDF(path, listener)` is shorthand for `Printer.print(path, "application/pdf", listener)`. Use the general `print` variant for other document types, for example `Printer.print(photoPath, "image/jpeg", listener)`.
+
+Gate the call on `isPrintingSupported()`. When it returns `false` the listener receives a `FAILED` result without any UI appearing, so an unguarded call does no harm, but a well behaved app hides or disables its print button instead.
+
+=== Printing images
+
+`Printer.printImage(image, listener)` prints a `com.codename1.ui.Image` directly. The image is encoded to a temporary PNG file behind the scenes and the file is deleted once the print flow finishes:
+
+[source,java]
+----
+Image chart = renderChart();
+Printer.printImage(chart, result -> {
+    if (result.isFailed()) {
+        ToastBar.showErrorMessage("Print failed: " + result.getError());
+    }
+});
+----
+
+This pairs well with drawing on a mutable image, so you can compose a printable page (a receipt, a ticket, a chart) with the standard `Graphics` API and send it to paper without generating a PDF.
+
+=== Handling the result
+
+The listener receives a `PrintResult` on the EDT, exactly once per request. The listener may be `null` for fire-and-forget printing. There are three statuses:
+
+* `COMPLETED` – the job was handed to the platform printing system. Most platforms can't observe the physical printer, so this means "queued/sent," not "paper came out."
+* `CANCELLED` – the user dismissed the print dialog without printing, on platforms that can observe the dialog outcome.
+* `FAILED` – the job couldn't start or the printing system reported an error. `getError()` may carry a short platform message.
+
+Cancel detection is best-effort. iOS, Windows, PDF printing on Android and image printing in the simulator report `CANCELLED` reliably. Image printing on Android, PDF hand-off on the desktop and the browsers report `COMPLETED` once the job is posed, since their printing pipelines don't expose the user's choice.
+
+=== Permissions and the user gate
+
+Printing requires no permission, entitlement, manifest entry or build hint on any platform. This is safe because printing is always user-confirmed: the API can only pose the native print dialog, and nothing reaches a printer until the user approves the job there. In that sense it follows the same trust model as the share API.
+
+Silent printing - sending a job to a preselected printer without showing a dialog - isn't supported by design.
+
+Device policy can disable printing entirely, for example a managed Android work profile with the printing restriction or an iOS MDM profile that blocks AirPrint. Those cases surface as `isPrintingSupported()` returning `false` or as a `FAILED` result, so the result-handling code above covers them.
+
+=== Platform notes
+
+* iOS – `UIPrintInteractionController` presents the AirPrint sheet; on the iPad it appears as a popover. The completion handler reports completed, cancelled or failed.
+* Android – the `android.print` framework. PDFs stream through a `PrintDocumentAdapter`; images go through the support library `PrintHelper`, which reports completion but can't observe cancellation. Printing requires a foreground activity, so calls from background mode fail.
+* Desktop / simulator – images print through `java.awt.print.PrinterJob` with the native dialog; PDFs are handed to the operating system's default PDF print flow.
+* Windows (native port) – the Win32 print dialog with GDI rendering; PDF pages render through the `Windows.Data.Pdf` API at the printer's resolution.
+* JavaScript – the document loads into a hidden frame and prints through the browser's print dialog. Browsers don't report whether the user printed or cancelled, and PDF behavior varies with the browser's built-in viewer.
+
+=== Trying it in the simulator
+
+The `PrinterSample` in the samples project demonstrates both flows: it prints a generated image and downloads a small PDF to print. On the desktop the native print dialog of your operating system appears, which makes it a convenient way to test result handling - print to a file or preview instead of paper.
