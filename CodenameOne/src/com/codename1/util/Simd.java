@@ -27,6 +27,20 @@ public class Simd {
         return false;
     }
 
+    /// Returns true when *chained, fine-grained* byte shuffle/interleave pipelines
+    /// (as the Base64 SIMD codec uses: unpack/pack interleaved, byte shifts, table
+    /// lookups) are hardware-accelerated AND actually beat the compiler's
+    /// autovectorized scalar code. NEON platforms (iOS, Windows-on-Arm) return
+    /// true -- there the explicit codec is dramatically faster even at -O2. x86-64
+    /// returns false: its `/O2` autovectorizer already matches the scalar path and
+    /// SSE2 has no 3-way interleave, so the codec should stay scalar there. This is
+    /// distinct from {@link #isSupported()} -- the *fused* whole-array image ops
+    /// (alpha/mask blends) win on every platform and are gated on isSupported(),
+    /// not on this flag. Defaults to false (the generic scalar Simd).
+    public boolean isByteShuffleAccelerated() {
+        return false;
+    }
+
     /// Allocates an aligned memory block for efficient SIMD
     /// operations. All operations MUST be performed on aligned
     /// arrays and shouldn't use arrays created with `new`. Operations

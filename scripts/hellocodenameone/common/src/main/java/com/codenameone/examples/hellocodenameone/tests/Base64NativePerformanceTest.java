@@ -142,6 +142,10 @@ public class Base64NativePerformanceTest extends BaseTest {
 
             emitStat("Base64 payload size", payloadBytes.length + " bytes");
             emitStat("Base64 benchmark iterations", String.valueOf(ITERATIONS));
+            emitStat("Base64 SIMD byte path",
+                    (simd != null && simd.isSupported() && simd.isByteShuffleAccelerated())
+                            ? "active (NEON-accelerated)"
+                            : "gated to scalar (CPU autovectorizes scalar; explicit SIMD not beneficial here)");
             emitStat("Base64 CN1 encode", formatMs(cn1EncodeMs));
             emitStat("Base64 CN1 decode", formatMs(cn1DecodeMs));
             if (hasNative) {

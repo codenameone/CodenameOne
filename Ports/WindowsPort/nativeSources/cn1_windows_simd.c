@@ -65,6 +65,19 @@ static JAVA_ARRAY_BYTE cn1SimdSaturateByte(int value) {
     return (JAVA_ARRAY_BYTE) value;
 }
 
+/* Whether the chained byte-shuffle codec (Base64) should use the SIMD path. True
+ * on arm64 (NEON vld3/vst3 interleave wins); false on x86-64, where SSE2 has no
+ * 3-way interleave and /O2 already autovectorizes the scalar codec. A compile-time
+ * constant baked into the per-arch native library. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsSimd_isByteShuffleAccelerated___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if defined(CN1_SIMD_ARM64)
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 /* ------------------------------------------------------------------- int32 */
 
 JAVA_VOID com_codename1_impl_windows_WindowsSimd_add___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(

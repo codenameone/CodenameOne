@@ -44,6 +44,13 @@ public class WindowsSimd extends Simd {
         return true;
     }
 
+    /// arm64 (NEON): the chained byte-shuffle codec (Base64) wins, so use it.
+    /// x86-64: the /O2 autovectorizer already matches scalar and SSE2 has no 3-way
+    /// interleave, so the codec is slower there -- return false to keep it scalar.
+    /// The native returns a compile-time constant baked per architecture.
+    @Override
+    public native boolean isByteShuffleAccelerated();
+
     /* ----------------------------------------------------------------- int */
 
     @Override

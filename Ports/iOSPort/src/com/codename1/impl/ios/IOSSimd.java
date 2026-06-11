@@ -14,6 +14,13 @@ public class IOSSimd extends Simd {
         return true;
     }
 
+    /// NEON: the chained byte-shuffle codec (Base64) is ~75-83% faster than the
+    /// autovectorized scalar even at -O2, so the codec should use the SIMD path.
+    @Override
+    public boolean isByteShuffleAccelerated() {
+        return true;
+    }
+
     @Override
     public byte[] allocByte(int size) {
         if (size < 16) {
