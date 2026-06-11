@@ -190,6 +190,12 @@ static void installSignalHandlers() {
     self.window = window;
     self.window.rootViewController = [self cn1EnsureViewController];
     [self.window makeKeyAndVisible];
+    // The GL/Metal surface is still empty at the window's first Core
+    // Animation commit -- the EDT paints the first form much later -- so the
+    // system launch screen would be replaced by a black frame (issue #5210).
+    // Cover the window with a placeholder (light/dark system background +
+    // launch icon) that drawFrame fades out on the first content frame.
+    CN1ShowLaunchPlaceholder(self.window);
     [self cn1InstallTapGestureRecognizerIfNeeded];
 }
 

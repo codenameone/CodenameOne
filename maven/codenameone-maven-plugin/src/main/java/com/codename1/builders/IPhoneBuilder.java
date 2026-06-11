@@ -1201,6 +1201,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(CodenameOne_GLViewController, "//#define LOW_MEM_CAMERA", "#define LOW_MEM_CAMERA");
             }
 
+            if (request.getArg("ios.launchPlaceholder", "true").equals("false")) {
+                File glViewControllerM = new File(buildinRes, "CodenameOne_GLViewController.m");
+                replaceInFile(glViewControllerM, "//#define CN1_DISABLE_LAUNCH_PLACEHOLDER", "#define CN1_DISABLE_LAUNCH_PLACEHOLDER");
+            }
+
             if (request.getArg("ios.enableStatusBar7", "true").equals("false")) {
                 File CodenameOne_GLViewController = new File(buildinRes, "CodenameOne_GLViewController.m");
                 replaceInFile(CodenameOne_GLViewController, "int statusbarHeight = 20;", "int statusbarHeight = 0;");
@@ -3456,7 +3461,32 @@ public class IPhoneBuilder extends Executor {
             }
         }
         if (!"true".equals(request.getArg("ios.generateSplashScreens", "false"))) {
-            if (!inject.contains("UILaunchStoryboardName")) {
+            if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
+                // SplashBoard never renders the launch storyboard for scene-based
+                // CN1 apps -- the system animates from a black frame instead
+                // (issue #5210). The iOS 14+ UILaunchScreen generated launch
+                // screen does work under UIScene: system background color
+                // (light/dark aware) with the launch icon centered, matching the
+                // native launch placeholder the app shows until the first EDT
+                // frame. UILaunchStoryboardName must be OMITTED here: when both
+                // keys are present iOS prefers the storyboard, which is exactly
+                // the broken path (verified on the iOS 26 simulator with a cold
+                // SplashBoard cache). The ios.launchStoryboardName hint is
+                // therefore only honored with ios.uiscene=false; injecting
+                // either key via ios.plistInject overrides this default.
+                // UIImageName points at the loose Launch.Foreground.png in the
+                // bundle root (guaranteed by generateLaunchScreen); SplashBoard
+                // resolves it there but fails to render the same image from an
+                // actool compiled imageset, so do NOT move it into
+                // Images.xcassets.
+                if (!inject.contains("UILaunchScreen") && !inject.contains("UILaunchStoryboardName")) {
+                    inject += "\n<key>UILaunchScreen</key>\n"
+                            + "<dict>\n"
+                            + "    <key>UIImageName</key>\n"
+                            + "    <string>Launch.Foreground</string>\n"
+                            + "</dict>";
+                }
+            } else if (!inject.contains("UILaunchStoryboardName")) {
                 inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
             }
         }
@@ -4324,6 +4354,7 @@ public class IPhoneBuilder extends Executor {
             if (legacyLaunchImages.exists()) {
                 delTree(legacyLaunchImages);
             }
+
         }
         return true;
     }
