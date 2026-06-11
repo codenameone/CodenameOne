@@ -353,8 +353,74 @@ fi
 END_MARKER="CN1SS:SUITE:FINISHED"
 TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-1500}"
 START_TIME="$(date +%s)"
+
+# Stream the DeviceRunner's per-test suite markers (the stage logging added
+# for the iOS silent-timeout work in #5213) into the CI console as they
+# appear, so a wedged run shows exactly which test it died on instead of
+# timing out silently. The unified-log stream and the `open` stdout capture
+# both carry the markers; lock onto whichever produces them first to avoid
+# printing every line twice.
+PROGRESS_SRC=""
+PROGRESS_OFFSET=0
+SUITE_MARKER_REGEX="CN1SS:(INFO|ERR):suite|CN1SS:SUITE:"
+emit_suite_progress() {
+  if [ -z "$PROGRESS_SRC" ]; then
+    if [ -s "$TEST_LOG" ] && grep -qE "$SUITE_MARKER_REGEX" "$TEST_LOG" 2>/dev/null; then
+      PROGRESS_SRC="$TEST_LOG"
+    elif [ -s "$FALLBACK_LOG" ] && grep -qE "$SUITE_MARKER_REGEX" "$FALLBACK_LOG" 2>/dev/null; then
+      PROGRESS_SRC="$FALLBACK_LOG"
+    else
+      return 0
+    fi
+    rm_log "Streaming suite progress from $(basename "$PROGRESS_SRC")"
+  fi
+  local total
+  total="$(wc -l < "$PROGRESS_SRC" 2>/dev/null | tr -d '[:space:]' || echo 0)"
+  [ -n "$total" ] && [ "$total" -gt "$PROGRESS_OFFSET" ] || return 0
+  tail -n +"$(( PROGRESS_OFFSET + 1 ))" "$PROGRESS_SRC" 2>/dev/null \
+    | grep -E "$SUITE_MARKER_REGEX" \
+    | cut -c -300 \
+    | sed 's/^/[device-runner] /' || true
+  PROGRESS_OFFSET="$total"
+}
+
+# On a wedge (suite timeout) capture everything needed to diagnose it: the
+# last suite markers from both log channels and a native thread sample of
+# the stuck app (ParparVM emits readable com_codename1_* C symbols, so the
+# sample shows where the EDT is parked). The full sample lands in the
+# uploaded artifacts; the CN1-related frames are echoed to the console.
+dump_wedge_diagnostics() {
+  local src pid sample_file
+  rm_log "---- last suite markers before timeout ----"
+  for src in "$TEST_LOG" "$FALLBACK_LOG"; do
+    [ -s "$src" ] || continue
+    (grep -E "$SUITE_MARKER_REGEX" "$src" 2>/dev/null \
+      | tail -n 25 | cut -c -300 \
+      | sed "s|^|[$(basename "$src")] |") || true
+  done
+  pid="${RESOLVED_APP_PID:-}"
+  if [ -z "$pid" ] || ! kill -0 "$pid" >/dev/null 2>&1; then
+    pid="$(pgrep -x "$APP_PROCESS_NAME" 2>/dev/null | head -n 1 || true)"
+  fi
+  if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
+    sample_file="$ARTIFACTS_DIR/app-sample-timeout.txt"
+    rm_log "Sampling wedged app (pid=$pid) for 5s -> $(basename "$sample_file")"
+    sample "$pid" 5 -file "$sample_file" >/dev/null 2>&1 || true
+    if [ -s "$sample_file" ]; then
+      rm_log "---- CN1 frames in wedged-app sample (full sample in artifacts) ----"
+      (grep -E "com_codename1|java_lang_Thread|Thread_[0-9]+" "$sample_file" \
+        | head -n 40 | sed 's/^/[sample] /') || true
+    else
+      rm_log "Thread sample produced no output"
+    fi
+  else
+    rm_log "App process not running at timeout -- no thread sample possible"
+  fi
+}
+
 rm_log "Waiting for DeviceRunner completion marker ($END_MARKER) -- timeout ${TIMEOUT_SECONDS}s"
 while true; do
+  emit_suite_progress
   if [ -s "$FALLBACK_LOG" ] && grep -q "$END_MARKER" "$FALLBACK_LOG"; then
     rm_log "Detected completion marker in unified log"
     break
@@ -373,10 +439,13 @@ while true; do
   NOW="$(date +%s)"
   if [ $(( NOW - START_TIME )) -ge $TIMEOUT_SECONDS ]; then
     rm_log "STAGE:TIMEOUT -> DeviceRunner did not emit completion marker within ${TIMEOUT_SECONDS}s"
+    dump_wedge_diagnostics
     break
   fi
   sleep 5
 done
+# Flush any markers that landed between the last poll and loop exit.
+emit_suite_progress
 END_TIME=$(date +%s)
 echo "Test Execution : $(( (END_TIME - START_TIME) * 1000 )) ms" >> "$ARTIFACTS_DIR/mac-test-stats.txt"
 
