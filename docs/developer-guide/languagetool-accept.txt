@@ -105,6 +105,8 @@ andlib
 dumbing
 handcoded
 navigatable
+popover
+popovers
 
 # -----------------------------------------------------------------------------
 # Acronyms and product / framework names

@@ -22,7 +22,7 @@ if (Printer.isPrintingSupported()) {
 
 `Printer.printPDF(path, listener)` is shorthand for `Printer.print(path, "application/pdf", listener)`. Use the general `print` variant for other document types, for example `Printer.print(photoPath, "image/jpeg", listener)`.
 
-Gate the call on `isPrintingSupported()`. When it returns `false` the listener receives a `FAILED` result without any UI appearing, so an unguarded call does no harm, but a well behaved app hides or disables its print button instead.
+Gate the call on `isPrintingSupported()`. When it returns `false` the listener receives a `FAILED` result without any UI appearing, so an unguarded call does no harm, but a well-behaved app hides or disables its print button instead.
 
 === Printing images
 
