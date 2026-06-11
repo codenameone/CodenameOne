@@ -52,7 +52,7 @@ import java.io.OutputStream;
 ///     });
 /// }
 /// ```
-public class Printer {
+public final class Printer {
 
     private Printer() {
     }
@@ -98,8 +98,11 @@ public class Printer {
         final String path = fs.getAppHomePath() + "cn1-print-image-temp.png";
         try {
             OutputStream os = fs.openOutputStream(path);
-            ImageIO.getImageIO().save(image, os, ImageIO.FORMAT_PNG, 1);
-            os.close();
+            try {
+                ImageIO.getImageIO().save(image, os, ImageIO.FORMAT_PNG, 1);
+            } finally {
+                os.close();
+            }
         } catch (IOException err) {
             if (listener != null) {
                 listener.onResult(PrintResult.failed(err.toString()));
@@ -107,6 +110,7 @@ public class Printer {
             return;
         }
         print(path, "image/png", new PrintResultListener() {
+            @Override
             public void onResult(PrintResult result) {
                 fs.delete(path);
                 if (listener != null) {
