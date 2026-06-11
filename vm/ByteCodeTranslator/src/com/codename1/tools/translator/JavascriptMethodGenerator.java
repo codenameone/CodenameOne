@@ -3385,11 +3385,14 @@ final class JavascriptMethodGenerator {
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 out.append("  ").append(ctx.push("_S[\"" + owner + "\"][\"" + fieldName + "\"]")).append(";\n");
                 return true;
-            case Opcodes.PUTSTATIC:
+            case Opcodes.PUTSTATIC: {
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
+                String value = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
                 out.append("  _S[\"").append(owner).append("\"][\"").append(fieldName).append("\"] = ")
-                        .append(ctx.pop()).append(";\n");
+                        .append(value).append(";\n");
                 return true;
+            }
             case Opcodes.GETFIELD: {
                 String target = ctx.pop();
                 out.append("  ").append(ctx.push(target + "[\"" + propertyName + "\"]")).append(";\n");
@@ -3398,6 +3401,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.PUTFIELD: {
                 String value = ctx.pop();
                 String target = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
                 out.append("  ").append(target).append("[\"").append(propertyName).append("\"] = ").append(value).append(";\n");
                 return true;
             }
@@ -3439,6 +3443,11 @@ final class JavascriptMethodGenerator {
             default:
                 return false;
         }
+        // Field-read barrier: pendings consumed as args of THIS call
+        // evaluate inside the call statement (correct order); any other
+        // pending field read must materialise BEFORE the call, which may
+        // mutate the field it reads.
+        out.append(ctx.flushPendingFieldReads());
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
             // Straight-line INVOKEVIRTUAL / INVOKEINTERFACE: emit one cn1_iv*
             // helper call instead of __classDef/resolveVirtual boilerplate.
@@ -3535,6 +3544,7 @@ final class JavascriptMethodGenerator {
         // caller locals), so the single invalidation hook is
         // flushPendingLocal() called before those writes.
         private String[] pendingExpr = new String[8];
+        private boolean[] pendingIsField = new boolean[8];
 
         private static boolean isDeferrable(String expression) {
             if (expression == null || expression.isEmpty()) {
@@ -3572,7 +3582,14 @@ final class JavascriptMethodGenerator {
                 System.arraycopy(pendingExpr, 0, grown, 0, pendingExpr.length);
                 pendingExpr = grown;
             }
-            if (isDeferrable(expression)) {
+            boolean fieldRead = isDeferrableFieldRead(expression);
+            if (isDeferrable(expression) || fieldRead) {
+                if (sp >= pendingIsField.length) {
+                    boolean[] grown = new boolean[pendingExpr.length];
+                    System.arraycopy(pendingIsField, 0, grown, 0, pendingIsField.length);
+                    pendingIsField = grown;
+                }
+                pendingIsField[sp] = fieldRead;
                 pendingExpr[sp++] = expression;
                 if (sp > maxObservedStack) {
                     maxObservedStack = sp;
@@ -3614,16 +3631,68 @@ final class JavascriptMethodGenerator {
             return "s" + index;
         }
 
+        /// Instance/static field reads off a simple base are deferrable
+        /// BETWEEN mutation barriers: every invoke, PUTFIELD and PUTSTATIC
+        /// in the straight-line emitter calls flushPendingFieldReads()
+        /// first, so a deferred read can never float across a write that
+        /// could change its value. One hop only -- re-evaluation stays a
+        /// single property access.
+        private static boolean isDeferrableFieldRead(String expression) {
+            if (expression == null || expression.length() < 6 || expression.charAt(expression.length() - 1) != ']') {
+                return false;
+            }
+            int br = expression.indexOf("[\"");
+            if (br < 0 || expression.indexOf(']') != expression.length() - 1
+                    || expression.indexOf("[\"", br + 1) >= 0) {
+                return false;
+            }
+            String base = expression.substring(0, br);
+            if (base.charAt(0) != 'l' || base.length() < 2) {
+                return false;
+            }
+            for (int i = 1; i < base.length(); i++) {
+                if (!Character.isDigit(base.charAt(i))) {
+                    return false;
+                }
+            }
+            // body must be a quoted identifier: ["name"]
+            for (int i = br + 2; i < expression.length() - 2; i++) {
+                char c = expression.charAt(i);
+                if (!Character.isLetterOrDigit(c) && c != '_' && c != '$') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// Materialise every pending FIELD read into its slot. Called
+        /// before any statement that could mutate a field (calls, field
+        /// writes). Returns prelude statements to emit.
+        private String flushPendingFieldReads() {
+            StringBuilder prelude = new StringBuilder();
+            for (int i = 0; i < sp; i++) {
+                if (pendingExpr[i] != null && pendingIsField[i]) {
+                    prelude.append("  s").append(i).append(" = ").append(pendingExpr[i]).append(";\n");
+                    pendingExpr[i] = null;
+                    pendingIsField[i] = false;
+                }
+            }
+            return prelude.toString();
+        }
+
         /// Materialise any pending reads of local ``lN`` into their real
         /// slots BEFORE a write to that local. Returns the prelude
         /// statements to emit (empty when nothing was pending).
         private String flushPendingLocal(int localIndex) {
             String name = "l" + localIndex;
+            String fieldPrefix = name + "[";
             StringBuilder prelude = new StringBuilder();
             for (int i = 0; i < sp; i++) {
-                if (name.equals(pendingExpr[i])) {
-                    prelude.append("  s").append(i).append(" = ").append(name).append(";\n");
+                if (pendingExpr[i] != null
+                        && (name.equals(pendingExpr[i]) || pendingExpr[i].startsWith(fieldPrefix))) {
+                    prelude.append("  s").append(i).append(" = ").append(pendingExpr[i]).append(";\n");
                     pendingExpr[i] = null;
+                    pendingIsField[i] = false;
                 }
             }
             return prelude.toString();
