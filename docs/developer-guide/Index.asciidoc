@@ -385,6 +385,7 @@ public void start() {
 
 <5> The `show()` method places the `Form` on the screen. Only one `Form` can be shown at a time
 
+[[TitleAndLabelImage]]
 .Title and Label in the UI
 image::img/codenameone-hello-world-title-label.png[Title and Label in the UI,scaledwidth=50%]
 

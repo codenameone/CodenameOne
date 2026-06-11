@@ -1,3 +1,4 @@
+[[working-with-codename-one-sources]]
 == Working with Codename One sources
 
 The Codename One SDK is published as a Maven multi-module project. Building the

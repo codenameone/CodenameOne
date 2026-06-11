@@ -26,7 +26,7 @@ Here is the current list of supported arguments. Build hints change over time, s
 |true/false defaults to true - indicates whether to include the release version in the build
 
 |android.onDeviceDebug
-|Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable="true"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable="true"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it — release builds are unaffected. See the link:#_ondevice_debugging_android[On-Device Debugging (Android) chapter] for the full flow.
+|Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable="true"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable="true"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it — release builds are unaffected. See the <<On-Device Debugging (Android),On-Device Debugging (Android) chapter>> for the full flow.
 
 |android.installLocation
 |Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.
@@ -452,7 +452,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Boolean true/false defaults to false as of 5.0.  Enable legacy generation of splash screen images for use when launching the app. These have been replaced now by the new launch storyboards.
 
 |ios.onDeviceDebug
-|Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the link:#_ondevice_debugging_ios[On-Device Debugging chapter] for the full flow.
+|Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the <<On-Device Debugging (iOS),On-Device Debugging (iOS) chapter>> for the full flow.
 
 |ios.onDeviceDebug.proxyHost
 |Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.
@@ -768,42 +768,14 @@ Pass `null` to `AndroidNativeUtil.setPermissionPromptCallback()` to restore the 
 
 === On device debugging
 
-Codename One supports debugging applications on devices by using the natively generated project. All paid subscription levels include the ability to check an #Include Source# flag in the settings that returns a native OS project. You can debug that project in the respective native IDE.
+On-device debugging now has two dedicated chapters, one per platform:
 
-In iOS this is strait forward, open the project with Xcode and run it optionally disabling bitcode. Unzip the.bz2 file and open the `.xcworkspace` file if it's available otherwise open the `.xcodeproj` file inside the `dist` directory.
-
-IMPORTANT: The `.xcworkspace` is no longer exclusive to CocoaPods-based builds. Use it whenever it's generated, whether the project uses CocoaPods, Swift Package Manager, or both.
-
-With Android Studio this is sometimes as easy task as it's possible to actually open the Gradle project in Android Studio and run it. For example, due to the fragile nature of the Gradle project this stopped working for some builds and has been "flaky."
-
-==== Android Studio debugging (easy way)
-
-By default you should be able to open the Gradle project in Android Studio and run it. To get this to work open the Android Studio #Setting# and select Gradle *2.11*.
-
-.Gradle settings UI in Android Studio (notice you need Gradle 2.11 and not 2.8 as pictured here)
-image::img/gradle-settings.png[Gradle settings UI in Android Studio,scaledwidth=50%]
-
-If this works for you then you can ignore the section below.
-
-==== Android Studio debugging the hard way
-
-Sometimes the Gradle project might not work or this might fail with a change from Google.
-
-Here are steps that should work for everyone:
-
-. Check the include source flag in the IDE and send a build
-. Download the `sources.zip` result from the build server
-. Launch Android Studio and create a new project
-. Make sure to use the same package and app name as you did in the Codename One project, select to not create an activity
-. Unzip the `sources.zip` file and copy the `main` directory from its `src` directory to the Android Studio projects `src` directory make sure to overwrite files/directories.
-. Copy its `libs` directory on top of the existing libs
-. Copy the source Gradle dependencies content to the destination Gradle file
-. Connect your device and press the Debug button for the IDE
-
-NOTE: You might need to copy more Gradle file meta-data such as multi-dexing etc.
-
-You might not need to repeat the whole thing with every build. For example: it might be practical to copy the `userSources.jar` from the libs directory to get the latest version of your code. You can copy the `src/main` directory to get the latest up-to-date Android port.
-
+* <<On-Device Debugging (iOS)>> covers attaching a standard Java
+  debugger (IntelliJ, jdb, VS Code) to an iOS app running on a device or in the
+  native iOS simulator, as well as debugging the generated Xcode project natively.
+* <<On-Device Debugging (Android)>> covers the equivalent
+  adb/JDWP-based flow for Android devices and emulators, including wireless
+  debugging and debugging the generated Gradle project from Android Studio.
 
 === Native interfaces
 
