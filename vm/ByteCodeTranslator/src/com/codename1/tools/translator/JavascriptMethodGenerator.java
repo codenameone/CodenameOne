@@ -883,8 +883,8 @@ final class JavascriptMethodGenerator {
     private static String applyVirtualRule(String s, String pattern, String replacement) {
         s = s.replaceAll(pattern, replacement);
         return s.replaceAll(
-                pattern.replace("yield\\* cn1_iv", "cn1_ivs"),
-                replacement.replace("yield* cn1_iv", "cn1_ivs"));
+                pattern.replace("yield\\* _v", "_w"),
+                replacement.replace("yield* _v", "_w"));
     }
 
     private static String applyMethodPeephole(CharSequence body) {
@@ -976,20 +976,20 @@ final class JavascriptMethodGenerator {
                     "stack.p($1); stack.p($1);");
             // Rule 7: inline 0-arg virtual dispatch when the target
             // was just pushed.
-            //   stack.p(T); stack.p(yield* cn1_iv0(stack.q(), "mid"));
-            //     → stack.p(yield* cn1_iv0(T, "mid"));
+            //   stack.p(T); stack.p(yield* _v0(stack.q(), "mid"));
+            //     → stack.p(yield* _v0(T, "mid"));
             // T restricted to simple identifier+index shape.
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(yield\\* cn1_iv0\\(stack\\.q\\(\\), \"([^\"]+)\"\\)\\);",
-                    "stack.p(yield* cn1_iv0($1, \"$2\"));");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(yield\\* _v0\\(stack\\.q\\(\\), \"([^\"]+)\"\\)\\);",
+                    "stack.p(yield* _v0($1, \"$2\"));");
             // Rule 8: inline 1-arg virtual dispatch when target+arg
             // were just pushed.
             //   stack.p(T); stack.p(A);
-            //   { let __arg0 = stack.q(); stack.p(yield* cn1_iv1(stack.q(), "mid", __arg0)); pc = N; break; }
-            //     → stack.p(yield* cn1_iv1(T, "mid", A)); pc = N; break;
+            //   { let __arg0 = stack.q(); stack.p(yield* _v1(stack.q(), "mid", __arg0)); pc = N; break; }
+            //     → stack.p(yield* _v1(T, "mid", A)); pc = N; break;
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv1($1, \"$3\", $2)); $4");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v1($1, \"$3\", $2)); $4");
             // Rule 8b: extended arg pattern allowing ONE level of
             // balanced parens inside the arg push — captures common
             // shapes like ``_L("...")``, ``_O("...")``, ``_F(N)``,
@@ -1008,29 +1008,29 @@ final class JavascriptMethodGenerator {
             // setBgTransparency((int) f) → "Missing virtual method on
             // float" in Toolbar.show*SidemenuImpl.)
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv1($1, \"$3\", $2)); $4");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v1($1, \"$3\", $2)); $4");
             // Rule 9: same as Rule 8 but for void return.
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv1($1, \"$3\", $2); $4");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
+                    "yield* _v1($1, \"$3\", $2); $4");
             // Rule 9b: extended arg — balanced-parens variant of Rule 9.
             // See Rule 8b for the ``(?!stack\.q\()`` lookahead rationale.
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv1($1, \"$3\", $2); $4");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
+                    "yield* _v1($1, \"$3\", $2); $4");
             // Rule 10: 2-arg virtual with target + two args all pushed.
             //   stack.p(T); stack.p(A0); stack.p(A1);
-            //   { let __arg1 = stack.q(); let __arg0 = stack.q(); stack.p(yield* cn1_iv2(stack.q(), "mid", __arg0, __arg1)); pc = N; break; }
-            //     → stack.p(yield* cn1_iv2(T, "mid", A0, A1)); pc = N; break;
+            //   { let __arg1 = stack.q(); let __arg0 = stack.q(); stack.p(yield* _v2(stack.q(), "mid", __arg0, __arg1)); pc = N; break; }
+            //     → stack.p(yield* _v2(T, "mid", A0, A1)); pc = N; break;
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v2($1, \"$4\", $2, $3)); $5");
             // Rule 10c: 2-arg virtual with balanced-parens args.
             // See Rule 8b for the ``(?!stack\.q\()`` lookahead rationale.
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v2($1, \"$4\", $2, $3)); $5");
             // Rule 11: 0-arg INVOKESPECIAL with inline target.
             //   stack.p(T); stack.p(yield* $ctor(stack.q())); pc = N; break;
             //     → stack.p(yield* $ctor(T)); pc = N; break;
@@ -1086,27 +1086,27 @@ final class JavascriptMethodGenerator {
             // where the slot is overwritten.
             // Rule 15: 3-arg virtual with target + three args all pushed.
             //   stack.p(T); stack.p(A0); stack.p(A1); stack.p(A2);
-            //   { let __arg2=q; let __arg1=q; let __arg0=q; stack.p(yield* cn1_iv3(q, "mid", __arg0, __arg1, __arg2)); pc=N; break; }
-            //     → stack.p(yield* cn1_iv3(T, "mid", A0, A1, A2)); pc=N; break;
+            //   { let __arg2=q; let __arg1=q; let __arg0=q; stack.p(yield* _v3(q, "mid", __arg0, __arg1, __arg2)); pc=N; break; }
+            //     → stack.p(yield* _v3(T, "mid", A0, A1, A2)); pc=N; break;
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv3($1, \"$5\", $2, $3, $4)); $6");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v3($1, \"$5\", $2, $3, $4)); $6");
             // Rule 15b: void-return variant of Rule 15.
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv3($1, \"$5\", $2, $3, $4); $6");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* _v3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\); (pc = \\d+; break;) \\}",
+                    "yield* _v3($1, \"$5\", $2, $3, $4); $6");
             // Rule 16: 4-arg virtual with target + four args all pushed.
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv4($1, \"$6\", $2, $3, $4, $5)); $7");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v4($1, \"$6\", $2, $3, $4, $5)); $7");
             // Rule 16b: void-return variant of Rule 16.
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv4($1, \"$6\", $2, $3, $4, $5); $7");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* _v4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\); (pc = \\d+; break;) \\}",
+                    "yield* _v4($1, \"$6\", $2, $3, $4, $5); $7");
             // Rule 10b: void-return variant of Rule 10 (2-arg virtual).
             s = applyVirtualRule(s,
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv2($1, \"$4\", $2, $3); $5");
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* _v2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\); (pc = \\d+; break;) \\}",
+                    "yield* _v2($1, \"$4\", $2, $3); $5");
             // Rule 18: collapse the straight-line call-result temp.
             //   { let __result = <call-expr>; X = __result; }
             //     → X = <call-expr>;
@@ -1114,7 +1114,7 @@ final class JavascriptMethodGenerator {
             // exactly one use, and a JS assignment fully evaluates its
             // RHS before the store, so the rewrite cannot change
             // semantics even when X also appears inside the call
-            // expression (``b = yield* cn1_iv0(b, ...)``). This is the
+            // expression (``b = yield* _v0(b, ...)``). This is the
             // single largest scaffolding pattern in the straight-line
             // emitter's output (one per non-void invocation).
             s = s.replaceAll(
@@ -5014,7 +5014,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // method whose every virtual call is sync can itself be a plain
             // ``function``); a suspending signature keeps ``yield* cn1_iv*``.
             boolean susp = isInvokeSuspending(invoke);
-            String iv = susp ? "cn1_iv" : "cn1_ivs";
+            String iv = susp ? "_v" : "_w";
             String yk = susp ? "yield* " : "";
             // Fast path for 0-arg virtual dispatch: inline the
             // target pop into the iv0 call. Pops TOS inside the
@@ -5250,7 +5250,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
             int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
             boolean suspending) {
-        String base = suspending ? "cn1_iv" : "cn1_ivs";
+        String base = suspending ? "_v" : "_w";
         String yieldKw = suspending ? "yield* " : "";
         String helper;
         boolean variadic = false;

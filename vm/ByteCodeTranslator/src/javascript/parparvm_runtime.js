@@ -4244,6 +4244,14 @@ function cn1_ivsN(target, mid, args) {
   const method = cn1_ivResolve(target, mid);
   return cn1_ivsDrive(method.apply(null, [target].concat(args)), mid);
 }
+// Two/three-char aliases for the dispatch family: the helper name appears
+// at every INVOKEVIRTUAL / INVOKEINTERFACE call site (~42k in a real app),
+// so cn1_iv0 -> _v0 / cn1_ivs0 -> _w0 saves ~5 bytes per site (~200KB raw).
+// The long names stay exported for port.js / diagnostics.
+global._v0 = cn1_iv0; global._v1 = cn1_iv1; global._v2 = cn1_iv2;
+global._v3 = cn1_iv3; global._v4 = cn1_iv4; global._vN = cn1_ivN;
+global._w0 = cn1_ivs0; global._w1 = cn1_ivs1; global._w2 = cn1_ivs2;
+global._w3 = cn1_ivs3; global._w4 = cn1_ivs4; global._wN = cn1_ivsN;
 global.cn1_ivs0 = cn1_ivs0;
 global.cn1_ivs1 = cn1_ivs1;
 global.cn1_ivs2 = cn1_ivs2;
