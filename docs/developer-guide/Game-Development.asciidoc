@@ -47,13 +47,15 @@ into 3D:
 in a grid; flipping one animates its horizontal scale through zero and swaps the
 image at the thin point, and taps are hit-tested against sprite bounds through
 `GameInput`. A compact illustration of flat 2D play with no camera tricks at all.
+Dissected in <<Case study: The card game (flat 2D)>>.
 * *`BoardGameSample`* -- *faux-3D* checkers on an isometric board. Every tile and
 piece is still a flat `Sprite`, but laying them out in an isometric (2:1 diamond)
 projection and raising the pieces off their tiles with a drop shadow gives a
 convincing 3D look without any GPU 3D, perspective camera or models. The screen
 pixel-to-board-cell mapping (and its inverse, for picking) is the same math behind
 any isometric strategy or tycoon game; it also implements the full move/jump/chain
-/crown rules and a small AI so you can play it solo.
+/crown rules and a small AI so you can play it solo. Dissected in
+<<Case study: Faux-3D checkers (isometric projection)>>.
 
 The action samples are driven by the joystick and buttons in
 <<On-screen touch controls>>, so they're equally playable on a touch device and in
@@ -302,6 +304,142 @@ Setting a *negative scale* flips the sprite horizontally, so a single set of fra
 faces both ways -- no mirrored art needed (sprites are drawn double-sided for
 exactly this reason). `play()`, `pause()`, `stop()`, `setLooping(boolean)` and
 `setCurrentFrame(int)` control playback.
+
+=== Case study: The card game (flat 2D)
+
+image::img/game-cards.png[The Memory card game mid-flip: two matched pairs and one card face up,240]
+
+`CardGameSample` is Memory (Concentration): sixteen face-down cards in a four-by-four
+grid, tap two and they stay up when they match, flip back when they don't. It's
+the smallest complete example of turn-based 2D play with `com.codename1.gaming`
+-- no joystick, no physics, no camera -- which makes the three techniques it does
+use easy to see in isolation.
+
+*One sprite per card.* Each card is a `Sprite` positioned at its grid slot. There
+are exactly two images at any moment: the shared card-back image and the card's
+own face (all generated at runtime with `Image.createImage` and `Graphics` calls,
+so the sample needs no assets). Changing what a card shows is just
+`sprite.setImage(...)`.
+
+*A flip you can fake with scale.* A real card flip is a 3D rotation, but
+squeezing the sprite's horizontal scale through zero and swapping the image at
+the thin point reads exactly the same to the eye:
+
+[source,java]
+----
+// in the card's per-frame animation; flip runs 0 -> 1 over ~0.4s
+flip += dt * 5;
+float sx = Math.abs(1f - 2f * (float) flip);   // 1 -> 0 -> 1
+if (flip >= 0.5 && !showingFace) {
+    showingFace = true;
+    sprite.setImage(face);     // swap sides while the card is edge-on
+}
+sprite.setScale(Math.max(0.05f, sx), 1f);
+----
+
+This is the same negative/positive scale trick the scroller uses to flip its
+runner, driven over time to play as an animation.
+
+*Polled taps against sprite bounds.* There are no buttons to wire up;
+`update(double)` polls the `GameInput` edge state and hit-tests the tap against
+each card's bounding box:
+
+[source,java]
+----
+protected void update(double dt) {
+    // ... advance flip animations, count down the mismatch timer ...
+    if (getInput().wasPointerPressed()) {
+        int px = getInput().getPointerX();
+        int py = getInput().getPointerY();
+        for (int i = 0; i < cards.length; i++) {
+            Rectangle b = cards[i].sprite.getBounds();
+            if (b.contains(px, py)) {
+                flipUp(cards[i]);
+                break;
+            }
+        }
+    }
+}
+----
+
+The rest of the sample is a small state machine living in plain fields: the
+first and second face-up cards, a `mismatchTimer` that counts down in `update`
+before flipping a failed pair back, and a moves counter surfaced through the
+form title. Note the timer: in a game loop you don't schedule callbacks, you
+subtract `dt` from a countdown field each frame and act when it crosses zero.
+
+=== Case study: Faux-3D checkers (isometric projection)
+
+image::img/game-board.png[Isometric checkers mid-game with a selected piece and a highlighted destination,240]
+
+`BoardGameSample` plays a full game of checkers -- moves, forced captures, chained
+jumps, crowning, and a small AI opponent -- on a board that looks convincingly 3D --
+yet there is no perspective camera and no `Model` anywhere: every tile and piece
+is a flat `Sprite`. The 3D impression comes entirely from *where* the flat art is
+placed, a technique (isometric or "2.5D" projection) that powered decades of
+strategy and tycoon games and still works just as well on a GPU sprite pipeline.
+
+*The projection.* Board cell `(r, c)` maps to screen pixels by laying the grid out
+as 2:1 diamonds -- columns step right-and-down, rows step left-and-down:
+
+[source,java]
+----
+private float tileCenterX(int r, int c) {
+    return originX + (c - r) * (tileW / 2f);
+}
+
+private float tileCenterY(int r, int c) {
+    return originY + (c + r) * (tileH / 2f);   // tileH = tileW / 2
+}
+----
+
+*Picking is the inverse.* Because the mapping is linear it inverts with two
+divisions, turning a tap back into a board cell -- no per-tile hit testing
+required:
+
+[source,java]
+----
+private int[] pick(int px, int py) {
+    float a = (px - originX) / (tileW / 2f);   // = c - r
+    float b = (py - originY) / (tileH / 2f);   // = c + r
+    int c = Math.round((a + b) / 2f);
+    int r = Math.round((b - a) / 2f);
+    if (r < 0 || r >= N || c < 0 || c >= N) {
+        return null;                            // tap missed the board
+    }
+    return new int[]{r, c};
+}
+----
+
+*Depth from z-order.* Cells further down the screen must draw over the cells
+behind them, and within one cell the stacking is tile, then shadow, then
+selection/move markers, then the piece. Both rules collapse into a single
+number -- `(r + c)` strides the cells from back to front, and a small offset
+layers the sprites within a cell:
+
+[source,java]
+----
+// shadow sits flat on the tile, the piece floats above it
+addDynamic(shadow, cx, cy + tileH * 0.10f, (r + c) * 4 + 1, 0.5, 0.5);
+addDynamic(piece,  cx, cy - tileH * 0.30f, (r + c) * 4 + 3, 0.5, 0.62);
+----
+
+That pair of lines is also the whole "3D height" illusion: the piece is drawn
+raised off its tile while its shadow stays put, and the eye reads the gap as
+elevation. The piece art helps -- an elliptical top face over a darker side rim,
+again just `fillArc` calls on a runtime-generated image.
+
+*Rebuild, don't mutate.* After every move the sample throws away all its dynamic
+sprites (pieces, shadows, markers) and recreates them from the `board[][]` array
+in one `syncPieces()` pass. With a few dozen sprites this costs nothing, and it
+keeps the scene a pure function of the game state -- there is no way for the
+display to drift out of sync with the rules, which eliminates the whole class of
+"the board shows X but the game thinks Y" bugs. The game logic itself
+(`destinations`, forced captures, chaining, crowning) never touches a sprite; it
+reads and writes the `int[][]` board only.
+
+When fake 3D stops being enough -- you want the camera to move through the world
+rather than look at it -- the next section covers the real thing.
 
 === 3D and perspective
 
