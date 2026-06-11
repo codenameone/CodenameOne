@@ -622,7 +622,10 @@ public abstract class Base64 {
         boolean useSimd = simd.isSupported() && simd.isByteShuffleAccelerated();
         int simdEnd = useSimd ? end3 - SIMD_BYTE_LANES * 3 + 1 : si;
         byte[] scratch = simdEnd > si ? simd.allocaByte(SIMD_ENCODE_SCRATCH_BYTES) : null;
-        byte[] encodeMap = null, const03 = null, const0F = null, const3F = null;
+        byte[] encodeMap = null;
+        byte[] const03 = null;
+        byte[] const0F = null;
+        byte[] const3F = null;
         if (scratch != null) {
             encodeMap = getSimdEncodeMap(simd);
             const03 = getSimdConst03(simd);
