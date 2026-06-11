@@ -26,13 +26,13 @@ Every one of the bigger items has its own deep-dive tutorial. Here is the tour, 
 
 ### Your app is now a native Mac app
 
-One build hint, `macNative.enabled=true`, takes the exact same project through the iOS pipeline and emits a **real** native Mac app: no bundled JVM, the same Metal renderer and battle-tested ParparVM output as the iOS target. It pairs with a deeper desktop integration layer (native title bar, native menu bar, interactive scrollbars, desktop notifications), so a desktop target finally stops feeling like a phone in a window. This is the same Java code that produces the iOS and Android builds, running as a native Mac app:
+Your existing Codename One app can ship as a **100% native Mac app today, with zero porting effort**. No rewrite, no bundled JVM, no Electron shell: the project you already have produces a lean native Mac binary the same way it produces your iPhone app, on the same Metal renderer and battle-tested native pipeline. And it arrives feeling like a real Mac app, not a phone in a window: native title bar, native menu bar, interactive scrollbars, and desktop notifications come with it. This is the same Java code that produces the iOS and Android builds, running as a native Mac app:
 
 ![A Codename One app running as a native Mac app](/blog/mac-native-builds-and-desktop-integration/mac-app.png)
 
 The full tutorial, including the new desktop menu and shortcut APIs and the Mac signing hints, is in [Your Codename One App, Now A Native Mac App](/blog/mac-native-builds-and-desktop-integration/).
 
-### WebSockets, gRPC, and GraphQL in the core
+### WebSockets in the core
 
 `com.codename1.io.WebSocket` is now part of the framework with no `cn1lib` required, implemented natively on every port. A live connection is a fluent one-liner:
 
@@ -44,7 +44,43 @@ WebSocket ws = WebSocket.build("wss://chat.example.com/room/general")
     .connect();
 ```
 
-On top of that, `cn1:generate-grpc` and `cn1:generate-graphql` join `cn1:generate-openapi`, turning a proto file or a GraphQL schema into a typed client with no `protoc` and no HTTP plumbing. GraphQL subscriptions ride the new core WebSocket support, and enum binding landed in the JSON/XML mapper alongside them. The hands-on tutorial that builds a live chat and both typed clients is [WebSockets, gRPC, And GraphQL In The Core](/blog/websockets-grpc-and-graphql/).
+This is the foundation the GraphQL subscriptions below ride on, and it is trusted enough that our own screenshot CI uses it as the transport for device renders. The hands-on tutorial that builds a live chat with it is [WebSockets, gRPC, And GraphQL In The Core](/blog/websockets-grpc-and-graphql/).
+
+### A typed GraphQL client from your schema
+
+`cn1:generate-graphql` turns a GraphQL schema into a typed client: you declare an interface against your operations and the build emits the implementation, with zero HTTP plumbing on your side. A `@Subscription` gets you live server-pushed updates over the new core WebSocket:
+
+```java
+@GraphQLClient("https://swapi.example.com/graphql")
+public interface StarWarsApi {
+    @Query("query HeroName($episode: Episode) { hero(episode: $episode) { name } }")
+    void hero(@Var("episode") Episode episode,
+              OnComplete<GraphQLResponse<HeroData>> callback);
+
+    @Subscription("subscription OnReview($ep: Episode!) { reviewAdded(episode: $ep) { stars } }")
+    GraphQLSubscription onReview(@Var("ep") Episode ep,
+                                 GraphQLSubscription.Handler<ReviewData> handler);
+}
+```
+
+Note that `Episode` is a real enum: enum binding landed in the JSON/XML mapper alongside this work, fixing a long-standing gap for `@Mapped` users too. The full tutorial is in [WebSockets, gRPC, And GraphQL In The Core](/blog/websockets-grpc-and-graphql/).
+
+### gRPC clients with no protoc
+
+`cn1:generate-grpc` does the same for proto3. Point it at your `.proto` files and it generates the messages, the binary protobuf codecs, and the client, speaking the standard gRPC-Web wire protocol that works with Envoy and modern gRPC servers. There is no `protoc` to install and no native dependency; calling a service looks like this:
+
+```java
+GreeterGrpc g = GreeterGrpc.of("https://api.example.com");
+HelloRequest req = new HelloRequest();
+req.name = "world";
+g.sayHello(req, "Bearer " + token, response -> {
+    if (response.isOk()) {
+        renderGreeting(response.getResponseData().message);
+    }
+});
+```
+
+Together with `cn1:generate-openapi` and `cn1:generate-graphql`, this means a typed client for practically any backend is one Maven goal away. The walkthrough from proto file to running call is in [WebSockets, gRPC, And GraphQL In The Core](/blog/websockets-grpc-and-graphql/).
 
 ### A new advertising API
 
@@ -77,10 +113,6 @@ BackgroundWork.schedule(req);
 ```
 
 The walkthrough, from progress notifications and inline replies to push topics and shared content, is [Background Work, Push Topics, And Richer Notifications](/blog/background-execution-and-push/).
-
-### Agent skills and a simpler Initializr
-
-Covered in this post right below, since it is more about the tooling around your project than the framework inside it.
 
 ## Building screens from screenshots, and a simpler Initializr
 
