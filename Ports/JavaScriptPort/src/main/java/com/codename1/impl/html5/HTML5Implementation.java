@@ -1233,7 +1233,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         document = window.getDocument();
         canvas = (HTMLCanvasElement)document.createElement("canvas");
         outputCanvas = (HTMLCanvasElement)document.getElementById("codenameone-canvas");
-        outputCanvas.getStyle().setProperty("pointer-events", "none");
+        // The canvas must be hit-testable from the start: it boots with no
+        // active peers, and the per-event listeners installed later only
+        // flip pointer-events to "none" when the point is over a native
+        // peer. Booting with "none" relied on the window-level restore
+        // listener flipping it back on the first event -- but that restore
+        // round-trips through the worker bridge, so the initial pointer
+        // DOWN is always lost and the first gesture after load is silently
+        // swallowed (observed on the Initializr as scroll/drag doing
+        // nothing).
+        outputCanvas.getStyle().setProperty("pointer-events", "auto");
         peersContainer = (HTMLElement)document.createElement("div");
         peersContainer.setAttribute("id", "cn1-peers-container");
         outputCanvas.getParentNode().insertBefore(peersContainer, outputCanvas);

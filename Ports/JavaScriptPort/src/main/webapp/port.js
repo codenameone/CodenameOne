@@ -3413,6 +3413,7 @@ bindCiFallbackWithMethodId("Form.addComponentNullContentPaneGuard", formAddCompo
 
 const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
 const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
+const cn1ssBridgeCountsMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_jsBridgeCallCounts_R_java_lang_String";
 const baseTestCreateFormMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_createForm_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String_R_com_codename1_ui_Form";
 const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
 const baseTestFormSubclassClassId = "com_codenameone_examples_hellocodenameone_tests_BaseTest_1";
@@ -5126,6 +5127,19 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     }
   }
   return null;
+});
+
+// Bridge-call counters for BridgeBulkTransferGuardTest: large-volume
+// transfers must cost bridge calls proportional to operations, not bytes.
+bindCiFallback("Cn1ssDeviceRunnerHelper.jsBridgeCallCounts", [
+  cn1ssBridgeCountsMethodId,
+  cn1ssBridgeCountsMethodId + "__impl"
+], function*() {
+  // _L is the runtime's exported string-literal constructor (the same one
+  // every translated call site uses), so the return value is a real
+  // java.lang.String object.
+  return _L("jso=" + (jvm.__cn1JsoDispatchCount | 0)
+    + ":host=" + (jvm.__cn1HostCallCount | 0));
 });
 
 bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [

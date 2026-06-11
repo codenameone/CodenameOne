@@ -2175,20 +2175,24 @@ final class JavascriptMethodGenerator {
         if (hasTryCatch) {
             appendTryCatchTable(out, instructions, labelToIndex);
         }
-        // Cooperative budget yield. Opt-in via the system property
-        // ``parparvm.js.preemptYield=1``. When enabled, every
-        // generator-method invocation checks ``_Yc()`` (counter-amortised
-        // wall-clock test against ``__cn1TickStartedAt``) and yields
-        // ``_Yv = {op:"sleep",millis:0}`` when the budget is exceeded.
-        // Disabled by default while we tune the overhead; the runtime
-        // half of the machinery (``_Yc``/``_Yv``/``__cn1TickReset`` +
-        // the clinit-depth gate in ``ensureClassInitialized``) ships
-        // unconditionally so the gate can be flipped without a
-        // translator rebuild.
+        // Cooperative budget yield. ON by default; opt out with
+        // ``parparvm.js.preemptYield=0``. Every generator-method invocation
+        // checks ``_Yc()`` (counter-amortised wall-clock test against
+        // ``__cn1TickStartedAt``) and yields ``_Yv = {op:"sleep",millis:0}``
+        // when the budget is exceeded.
+        //
+        // Without it, a long synchronous stretch (the Initializr's boot-time
+        // layout/JSO work on worker-local wrappers) runs as ONE drain step:
+        // the worker's event loop starves for tens of seconds, host events
+        // queue, the heartbeat stops, and the canvas pointer-events restore
+        // handler never runs -- observed as "loads really slowly and ignores
+        // drags". The historical overhead concern is largely mooted by the
+        // sync-dispatch CHA: hot leaf methods are now plain functions that
+        // never reach this check.
         //
         // Sync (non-generator) methods skip this -- they cannot yield.
         if (methodSuspending && !"__CLINIT__".equals(method.getMethodName())
-                && Boolean.getBoolean("parparvm.js.preemptYield")) {
+                && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))) {
             out.append("  if(_Yc())yield _Yv;\n");
         }
         if (method.isSynchronizedMethod()) {

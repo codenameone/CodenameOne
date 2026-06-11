@@ -1464,6 +1464,10 @@ const jvm = {
     };
   },
   invokeJsoBridge(__cn1ThisObject, className, methodId, args) {
+    // Diagnostic counter consumed by the bridge-bulk-transfer guard test:
+    // per-element JSO dispatch in a data loop (e.g. a per-byte stream read)
+    // multiplies this by the payload SIZE and must be caught in CI.
+    this.__cn1JsoDispatchCount = (this.__cn1JsoDispatchCount | 0) + 1;
     const self = this;
     return (function*() {
       const receiver = self.unwrapJsValue(__cn1ThisObject);
@@ -2298,6 +2302,7 @@ const jvm = {
     });
   },
   invokeHostNative(symbol, args) {
+    this.__cn1HostCallCount = (this.__cn1HostCallCount | 0) + 1;
     return { op: this.protocol.messages.HOST_CALL, id: this.nextHostCallId++, symbol: symbol, args: args || [] };
   },
   // Arm the owning-object finalizer so the host releases ``hostResource``'s id
@@ -4124,37 +4129,50 @@ function* adaptVirtualResult(result) {
 // it was a generator) or return the value directly. Inlining halves
 // per-call allocator pressure on the hot virtual-dispatch path. Sync /
 // async resolution semantics are unchanged.
+// Budget check at every generator virtual dispatch: the per-method entry
+// check (emitted ``if(_Yc())yield _Yv``) cannot slice a loop that stays
+// INSIDE one method and only calls runtime functions -- e.g. the
+// Initializr's boot loop dispatching JSO-bridge methods via cn1_iv*,
+// which blocked the worker's event loop for 90s+ (no events, no timers,
+// no heartbeat, pointer input dead). _Yc is counter-amortised (clock
+// check every 256th call) so the hot-path cost is one increment+compare.
 function* cn1_iv0(target, mid) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv1(target, mid, a0) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv2(target, mid, a0, a1) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0, a1);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv3(target, mid, a0, a1, a2) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0, a1, a2);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv4(target, mid, a0, a1, a2, a3) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0, a1, a2, a3);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_ivN(target, mid, args) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const method = cn1_ivResolve(target, mid);
   const r = method.apply(null, [target].concat(args));
