@@ -3018,6 +3018,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.DSTORE:
             case Opcodes.ASTORE:
                 ctx.localsUsed[instruction.getValue()] = true;
+                out.append(ctx.flushPendingLocal(instruction.getValue()));
                 out.append("  l").append(instruction.getValue()).append(" = ").append(ctx.pop()).append(";\n");
                 return true;
             case Opcodes.POP:
@@ -3313,6 +3314,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.DSTORE:
             case Opcodes.ASTORE:
                 ctx.localsUsed[instruction.getIndex()] = true;
+                out.append(ctx.flushPendingLocal(instruction.getIndex()));
                 out.append("  l").append(instruction.getIndex()).append(" = ").append(ctx.pop()).append(";\n");
                 return true;
             default:
@@ -3522,7 +3524,63 @@ final class JavascriptMethodGenerator {
             this.nextTempId = 0;
         }
 
+        // Deferred-expression lowering: pushes of PURE, re-readable
+        // expressions (numeric/null constants and bare local reads) do
+        // not materialise an ``sN = expr;`` statement -- the expression
+        // itself is recorded and substituted at the consuming site. This
+        // is the stack-to-expression collapse the regex peepholes cannot
+        // do safely (they lack liveness): ``sN = l3; l4 = sN;`` becomes
+        // ``l4 = l3;`` at EMISSION time. Locals are only mutable via
+        // ISTORE/IINC inside a straight-line block (JS calls cannot touch
+        // caller locals), so the single invalidation hook is
+        // flushPendingLocal() called before those writes.
+        private String[] pendingExpr = new String[8];
+
+        private static boolean isDeferrable(String expression) {
+            if (expression == null || expression.isEmpty()) {
+                return false;
+            }
+            if ("null".equals(expression) || "true".equals(expression) || "false".equals(expression)) {
+                return true;
+            }
+            char c0 = expression.charAt(0);
+            if (c0 == 'l') {
+                for (int i = 1; i < expression.length(); i++) {
+                    if (!Character.isDigit(expression.charAt(i))) {
+                        return false;
+                    }
+                }
+                return expression.length() > 1;
+            }
+            // numeric literal (int/float, optional sign / n-suffix for longs)
+            int start = (c0 == '-') ? 1 : 0;
+            if (start >= expression.length()) {
+                return false;
+            }
+            for (int i = start; i < expression.length(); i++) {
+                char c = expression.charAt(i);
+                if (!Character.isDigit(c) && c != '.' && c != 'n' && c != 'e' && c != 'E' && c != '-' && c != '+') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private String push(String expression) {
+            if (sp >= pendingExpr.length) {
+                String[] grown = new String[pendingExpr.length * 2 + sp];
+                System.arraycopy(pendingExpr, 0, grown, 0, pendingExpr.length);
+                pendingExpr = grown;
+            }
+            if (isDeferrable(expression)) {
+                pendingExpr[sp++] = expression;
+                if (sp > maxObservedStack) {
+                    maxObservedStack = sp;
+                }
+                // Caller appends ";" -- an empty statement esbuild drops.
+                return "";
+            }
+            pendingExpr[sp] = null;
             String slot = "s" + sp++;
             if (sp > maxObservedStack) {
                 maxObservedStack = sp;
@@ -3535,6 +3593,11 @@ final class JavascriptMethodGenerator {
             if (sp < 0) {
                 throw new IllegalStateException("Straight-line JS lowering stack underflow");
             }
+            if (pendingExpr[sp] != null) {
+                String expr = pendingExpr[sp];
+                pendingExpr[sp] = null;
+                return expr;
+            }
             return "s" + sp;
         }
 
@@ -3543,7 +3606,27 @@ final class JavascriptMethodGenerator {
             if (index < 0) {
                 throw new IllegalStateException("Straight-line JS lowering stack underflow");
             }
+            // Constants / local reads are pure, so a peek (DUP family)
+            // can re-evaluate them at every use site.
+            if (pendingExpr[index] != null) {
+                return pendingExpr[index];
+            }
             return "s" + index;
+        }
+
+        /// Materialise any pending reads of local ``lN`` into their real
+        /// slots BEFORE a write to that local. Returns the prelude
+        /// statements to emit (empty when nothing was pending).
+        private String flushPendingLocal(int localIndex) {
+            String name = "l" + localIndex;
+            StringBuilder prelude = new StringBuilder();
+            for (int i = 0; i < sp; i++) {
+                if (name.equals(pendingExpr[i])) {
+                    prelude.append("  s").append(i).append(" = ").append(name).append(";\n");
+                    pendingExpr[i] = null;
+                }
+            }
+            return prelude.toString();
         }
 
         private int getMaxObservedStack() {
