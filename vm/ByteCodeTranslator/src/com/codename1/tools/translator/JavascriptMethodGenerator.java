@@ -2130,7 +2130,7 @@ final class JavascriptMethodGenerator {
         if ("__CLINIT__".equals(method.getMethodName())) {
             appendDeferredStaticFieldInitialization(out, cls);
         }
-        if (appendStraightLineMethodBody(out, regs, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName)) {
+        if (appendStraightLineMethodBody(out, regs, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName, labelToIndex)) {
             if (wrappedStaticMethod && shouldEmitStaticWrapper(method)) {
                 appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
             }
@@ -2780,10 +2780,8 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineMethodBody(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method,
-            List<Instruction> instructions, String jsMethodName) {
-        if (!isStraightLineEligible(method, instructions)) {
-            return false;
-        }
+            List<Instruction> instructions, String jsMethodName, Map<Label, Integer> labelToIndex) {
+        boolean plain = isStraightLineEligible(method, instructions);
         try {
             StringBuilder setup = new StringBuilder();
             StringBuilder instructionBody = new StringBuilder();
@@ -2818,11 +2816,15 @@ final class JavascriptMethodGenerator {
                     localIndex++;
                 }
             }
-            for (int i = 0; i < instructions.size(); i++) {
-                Instruction instruction = instructions.get(i);
-                if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
-                    return false;
+            if (plain) {
+                for (int i = 0; i < instructions.size(); i++) {
+                    Instruction instruction = instructions.get(i);
+                    if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
+                        return false;
+                    }
                 }
+            } else if (!appendStructuredInstructionBody(instructionBody, method, instructions, labelToIndex, ctx)) {
+                return false;
             }
             body.append(setup);
             // Stack slots and ``used but not arg-initialized`` locals
@@ -2842,7 +2844,7 @@ final class JavascriptMethodGenerator {
             // Cooperative budget yield -- straight-line variant. Opt-in
             // via ``parparvm.js.preemptYield``. See appendMethodImpl.
             if (method.isJavascriptSuspending() && !"__CLINIT__".equals(method.getMethodName())
-                    && Boolean.getBoolean("parparvm.js.preemptYield")) {
+                    && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))) {
                 body.append("  if(_Yc())yield _Yv;\n");
             }
             if (method.isSynchronizedMethod()) {
@@ -2895,6 +2897,160 @@ final class JavascriptMethodGenerator {
             from += len;
         }
         return false;
+    }
+
+    /**
+     * Structured body generation for methods whose CFG is acyclic-forward
+     * (if/else diamonds, early returns -- no loops, switches or exception
+     * tables): forward jumps become ``break B<n>;`` out of labeled blocks,
+     * eliminating the ``for(;;)switch(pc)`` state machine, its ``case``
+     * labels and ``pc = N; break;`` transitions, and letting these bodies
+     * share the straight-line deferred-expression lowering. Writes only the
+     * instruction body (the caller owns setup/declarations/wrapper) and
+     * returns false to fall back to the interpreter on anything unsupported,
+     * on a stack-depth mismatch at a merge point, or past the block budget.
+     */
+    private static boolean appendStructuredInstructionBody(StringBuilder bodyOut, BytecodeMethod method,
+            List<Instruction> instructions, Map<Label, Integer> labelToIndex, StraightLineContext ctx) {
+        if (method.isSynchronizedMethod() || labelToIndex == null) {
+            return false;
+        }
+        boolean hasJump = false;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (instruction instanceof SwitchInstruction || instruction instanceof TryCatch
+                    || instruction instanceof MultiArray) {
+                return false;
+            }
+            if (instruction instanceof Jump) {
+                hasJump = true;
+            }
+            if (instruction instanceof BasicInstruction) {
+                int opcode = ((BasicInstruction) instruction).getOpcode();
+                if (opcode == Opcodes.MONITORENTER || opcode == Opcodes.MONITOREXIT) {
+                    return false;
+                }
+            }
+        }
+        if (!hasJump) {
+            return false;
+        }
+        java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
+        int structuredBudget = Integer.getInteger("parparvm.js.structured.maxblocks", 64);
+        if (structuredBudget <= 0 || !isAcyclicForward(blocks) || blocks.size() > structuredBudget) {
+            return false;
+        }
+        java.util.Map<Integer, Integer> startToBlock = new java.util.HashMap<Integer, Integer>();
+        for (int b = 0; b < blocks.size(); b++) {
+            startToBlock.put(blocks.get(b).start, b);
+        }
+        java.util.TreeSet<Integer> targets = new java.util.TreeSet<Integer>();
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (instruction instanceof Jump) {
+                Integer t = labelToIndex.get(((Jump) instruction).getLabel());
+                Integer tb = t == null ? null : startToBlock.get((int) t);
+                if (tb == null) {
+                    return false;
+                }
+                targets.add(tb);
+            }
+        }
+        for (int t : targets.descendingSet()) {
+            bodyOut.append("  B").append(t).append(": {\n");
+        }
+        int[] entrySp = new int[blocks.size()];
+        java.util.Arrays.fill(entrySp, -1);
+        boolean reachable = true;
+        for (int b = 0; b < blocks.size(); b++) {
+            BasicBlock block = blocks.get(b);
+            if (targets.contains(b)) {
+                bodyOut.append("  }\n");
+                if (entrySp[b] >= 0) {
+                    if (reachable && ctx.sp != entrySp[b]) {
+                        return false;
+                    }
+                    ctx.sp = entrySp[b];
+                } else if (!reachable) {
+                    return false;
+                }
+                // Merge point: every inbound path flushed its pendings into
+                // slots; stale pendings from a dead fall-off path must not
+                // shadow them.
+                ctx.clearPendings();
+                reachable = true;
+            } else if (!reachable) {
+                continue;
+            }
+            for (int i = block.start; i < block.end; i++) {
+                Instruction instruction = instructions.get(i);
+                if (instruction instanceof Jump) {
+                    Jump jump = (Jump) instruction;
+                    Integer t = labelToIndex.get(jump.getLabel());
+                    int tb = startToBlock.get((int) t);
+                    String cond = structuredJumpCondition(jump.getOpcode(), ctx);
+                    if (cond == null && jump.getOpcode() != Opcodes.GOTO) {
+                        return false;
+                    }
+                    bodyOut.append(ctx.flushAllPending());
+                    if (entrySp[tb] < 0) {
+                        entrySp[tb] = ctx.sp;
+                    } else if (entrySp[tb] != ctx.sp) {
+                        return false;
+                    }
+                    if (jump.getOpcode() == Opcodes.GOTO) {
+                        if (tb != b + 1) {
+                            bodyOut.append("  break B").append(tb).append(";\n");
+                        }
+                        if (i == block.end - 1) {
+                            reachable = (tb == b + 1);
+                        }
+                    } else {
+                        bodyOut.append("  if (").append(cond).append(") break B").append(tb).append(";\n");
+                    }
+                    continue;
+                }
+                if (!appendStraightLineInstruction(bodyOut, method, instruction, ctx)) {
+                    return false;
+                }
+                if (isTerminatingInstruction(instruction) && i == block.end - 1) {
+                    reachable = false;
+                }
+            }
+            if (reachable && b + 1 < blocks.size() && targets.contains(b + 1)) {
+                bodyOut.append(ctx.flushAllPending());
+                if (entrySp[b + 1] < 0) {
+                    entrySp[b + 1] = ctx.sp;
+                } else if (entrySp[b + 1] != ctx.sp) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** JS condition for a conditional jump opcode, popping its operands. */
+    private static String structuredJumpCondition(int opcode, StraightLineContext ctx) {
+        switch (opcode) {
+            case Opcodes.GOTO: return null;
+            case Opcodes.IFEQ: return "(" + ctx.pop() + "|0) == 0";
+            case Opcodes.IFNE: return "(" + ctx.pop() + "|0) != 0";
+            case Opcodes.IFLT: return "(" + ctx.pop() + "|0) < 0";
+            case Opcodes.IFLE: return "(" + ctx.pop() + "|0) <= 0";
+            case Opcodes.IFGT: return "(" + ctx.pop() + "|0) > 0";
+            case Opcodes.IFGE: return "(" + ctx.pop() + "|0) >= 0";
+            case Opcodes.IFNULL: return ctx.pop() + " == null";
+            case Opcodes.IFNONNULL: return ctx.pop() + " != null";
+            case Opcodes.IF_ICMPEQ: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) == (" + b + "|0)"; }
+            case Opcodes.IF_ICMPNE: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) != (" + b + "|0)"; }
+            case Opcodes.IF_ICMPLT: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) < (" + b + "|0)"; }
+            case Opcodes.IF_ICMPLE: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) <= (" + b + "|0)"; }
+            case Opcodes.IF_ICMPGT: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) > (" + b + "|0)"; }
+            case Opcodes.IF_ICMPGE: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) >= (" + b + "|0)"; }
+            case Opcodes.IF_ACMPEQ: { String b = ctx.pop(), a = ctx.pop(); return a + " === " + b; }
+            case Opcodes.IF_ACMPNE: { String b = ctx.pop(), a = ctx.pop(); return a + " !== " + b; }
+            default: return null;
+        }
     }
 
     private static boolean isStraightLineEligible(BytecodeMethod method, List<Instruction> instructions) {
@@ -3680,6 +3836,35 @@ final class JavascriptMethodGenerator {
             return prelude.toString();
         }
 
+        /// Materialise EVERY pending expression into its slot. Required at
+        /// control-flow boundaries in the structured emitter: a value
+        /// deferred on one path must exist in its slot when paths merge.
+        /// Drop every pending expression WITHOUT materialising. Used when
+        /// entering a jump-target block: all inbound paths flushed their
+        /// pendings into slots before jumping/falling through, but a path
+        /// that ended in a return/throw may have left stale pendings below
+        /// sp that would otherwise shadow the real slot values at the merge.
+        private void clearPendings() {
+            for (int i = 0; i < pendingExpr.length; i++) {
+                pendingExpr[i] = null;
+                if (i < pendingIsField.length) {
+                    pendingIsField[i] = false;
+                }
+            }
+        }
+
+        private String flushAllPending() {
+            StringBuilder prelude = new StringBuilder();
+            for (int i = 0; i < sp; i++) {
+                if (pendingExpr[i] != null) {
+                    prelude.append("  s").append(i).append(" = ").append(pendingExpr[i]).append(";\n");
+                    pendingExpr[i] = null;
+                    pendingIsField[i] = false;
+                }
+            }
+            return prelude.toString();
+        }
+
         /// Materialise any pending reads of local ``lN`` into their real
         /// slots BEFORE a write to that local. Returns the prelude
         /// statements to emit (empty when nothing was pending).
@@ -4070,6 +4255,85 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // benefit from a pc pin anyway.
         }
         return false;
+    }
+
+    /**
+     * A basic block: a maximal straight-line instruction range [start, end)
+     * with successor block indices. Consumed by the structured
+     * (labeled-break) emitter that replaces the switch(pc) state machine for
+     * acyclic-forward CFGs.
+     */
+    static final class BasicBlock {
+        final int start;
+        int end;
+        final java.util.List<Integer> succs = new java.util.ArrayList<Integer>();
+        BasicBlock(int start) { this.start = start; }
+    }
+
+    /** Partition into basic blocks and wire successor edges. */
+    static java.util.List<BasicBlock> buildBasicBlocks(List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        int n = instructions.size();
+        boolean[] leader = new boolean[n + 1];
+        if (n > 0) {
+            leader[0] = true;
+        }
+        for (int i = 0; i < n; i++) {
+            Instruction instr = instructions.get(i);
+            if (instr instanceof Jump) {
+                Integer t = labelToIndex.get(((Jump) instr).getLabel());
+                if (t != null && t < n) {
+                    leader[t] = true;
+                }
+                if (i + 1 < n) {
+                    leader[i + 1] = true;
+                }
+            } else if (isTerminatingInstruction(instr) && i + 1 < n) {
+                leader[i + 1] = true;
+            }
+        }
+        java.util.List<BasicBlock> blocks = new java.util.ArrayList<BasicBlock>();
+        java.util.Map<Integer, Integer> startToBlock = new java.util.HashMap<Integer, Integer>();
+        BasicBlock cur = null;
+        for (int i = 0; i < n; i++) {
+            if (leader[i] || cur == null) {
+                if (cur != null) { cur.end = i; }
+                cur = new BasicBlock(i);
+                startToBlock.put(i, blocks.size());
+                blocks.add(cur);
+            }
+        }
+        if (cur != null) { cur.end = n; }
+        for (BasicBlock b : blocks) {
+            Instruction last = b.end > b.start ? instructions.get(b.end - 1) : null;
+            boolean addFallThrough = true;
+            if (last instanceof Jump) {
+                Integer t = labelToIndex.get(((Jump) last).getLabel());
+                if (t != null && startToBlock.containsKey((int) t)) {
+                    b.succs.add(startToBlock.get((int) t));
+                }
+                if (last.getOpcode() == Opcodes.GOTO) {
+                    addFallThrough = false;
+                }
+            } else if (last != null && isTerminatingInstruction(last)) {
+                addFallThrough = false;
+            }
+            if (addFallThrough && startToBlock.containsKey(b.end)) {
+                b.succs.add(startToBlock.get(b.end));
+            }
+        }
+        return blocks;
+    }
+
+    /** True when every edge goes to a strictly later block (no loops). */
+    static boolean isAcyclicForward(java.util.List<BasicBlock> blocks) {
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x <= i) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean isTerminatingInstruction(Instruction instruction) {

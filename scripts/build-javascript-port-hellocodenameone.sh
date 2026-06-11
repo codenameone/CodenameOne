@@ -270,6 +270,7 @@ bj_log "Running ByteCodeTranslator for HelloCodenameOne"
 # lambda2RunBridge:missingDispatch under minified builds).
 "$JAVA_BIN" -cp "$PARPARVM_COMPILER" \
   -Dcodename1.javascriptport.webapp="$PORT_ROOT/src/main/webapp" \
+  ${CN1_TRANSLATOR_OPTS:-} \
   com.codename1.tools.translator.ByteCodeTranslator \
   javascript \
   "$STAGE_CLASSES" \
