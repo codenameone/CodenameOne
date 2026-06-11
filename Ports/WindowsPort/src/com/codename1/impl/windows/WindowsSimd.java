@@ -44,12 +44,17 @@ public class WindowsSimd extends Simd {
         return true;
     }
 
-    /// arm64 (NEON): the chained byte-shuffle codec (Base64) wins, so use it.
-    /// x86-64: the /O2 autovectorizer already matches scalar and SSE2 has no 3-way
-    /// interleave, so the codec is slower there -- return false to keep it scalar.
-    /// The native returns a compile-time constant baked per architecture.
+    /// False on both Windows arches: x86-64 has no 3-way SSE2 interleave and its
+    /// /O2 autovectorizer already matches scalar; arm64 has the NEON interleave but
+    /// the codec's table lookups (unpackLookupBytesInterleaved4 / lookupBytes) are
+    /// scalar here (iOS uses NEON vqtbl), so base64 DECODE loses even though encode
+    /// wins -- net not a clear win. So keep the Base64 codec scalar on Windows;
+    /// only iOS/Mac (full NEON, 75-83% faster) enable it. The fused image kernels
+    /// are unaffected (gated on isSupported(), and they win on every arch).
     @Override
-    public native boolean isByteShuffleAccelerated();
+    public boolean isByteShuffleAccelerated() {
+        return false;
+    }
 
     /* ----------------------------------------------------------------- int */
 

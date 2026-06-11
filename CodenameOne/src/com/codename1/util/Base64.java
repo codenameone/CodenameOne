@@ -619,7 +619,7 @@ public abstract class Base64 {
         // scalar codec (NEON: iOS / Windows-arm64). On x86-64 the /O2 vectorizer
         // already matches it and SSE2 lacks a 3-way interleave, so gate to si and
         // let the scalar tail below encode everything.
-        boolean useSimd = simd != null && simd.isSupported() && simd.isByteShuffleAccelerated();
+        boolean useSimd = simd.isSupported() && simd.isByteShuffleAccelerated();
         int simdEnd = useSimd ? end3 - SIMD_BYTE_LANES * 3 + 1 : si;
         byte[] scratch = simdEnd > si ? simd.allocaByte(SIMD_ENCODE_SCRATCH_BYTES) : null;
         byte[] encodeMap = null, const03 = null, const0F = null, const3F = null;
@@ -734,7 +734,7 @@ public abstract class Base64 {
         int di = outOffset;
         // Gate the SIMD byte path to where it beats autovectorized scalar (NEON);
         // on x86-64 stay scalar (see encodeNoNewlineSimd).
-        boolean useSimd = simd != null && simd.isSupported() && simd.isByteShuffleAccelerated();
+        boolean useSimd = simd.isSupported() && simd.isByteShuffleAccelerated();
         int simdEnd = useSimd ? fullEnd - SIMD_BYTE_LANES * 4 + 1 : si;
         byte[] scratch = simdEnd > si ? simd.allocaByte(SIMD_DECODE_SCRATCH_BYTES) : null;
         byte[] decodeMap = scratch != null ? getSimdDecodeMap(simd) : null;
