@@ -89,7 +89,12 @@ typedef enum {
     CN1_EVENT_KEY_PRESSED = 4,
     CN1_EVENT_KEY_RELEASED = 5,
     CN1_EVENT_SIZE_CHANGED = 6,
-    CN1_EVENT_CLOSE = 7
+    CN1_EVENT_CLOSE = 7,
+    /* Mouse wheel: x/y are the cursor's client coordinates, keyCode carries the
+     * signed wheel delta in WHEEL_DELTA (120) units. The EDT turns it into a
+     * synthetic scroll gesture (see WindowsImplementation.drainInput). */
+    CN1_EVENT_MOUSE_WHEEL = 8,
+    CN1_EVENT_MOUSE_HWHEEL = 9
 } CN1EventType;
 
 typedef struct {
@@ -222,6 +227,29 @@ void cn1WinBrowserHandleMessage(WPARAM wParam, LPARAM lParam);
 void cn1WinEditHandleMessage(WPARAM wParam, LPARAM lParam);
 /* WM_CTLCOLOREDIT hook: colours the native edit control to match the CN1 field. */
 HBRUSH cn1WinEditCtlColor(HDC hdc, HWND control);
+
+/* Native file open/save dialog (cn1_windows_io.c). The common dialog is modal
+ * and must run on the thread that owns the window, so the EDT-facing fileDialog
+ * sends (not posts) WM_CN1_FILEDIALOG to cn1Win.hwnd -- a blocking SendMessage
+ * that returns once the user has chosen -- and cn1WinWndProc forwards it here. */
+#define WM_CN1_FILEDIALOG (WM_APP + 19)
+LRESULT cn1WinFileDialogHandleMessage(WPARAM wParam);
+
+/* Local notifications via Shell_NotifyIcon (cn1_windows_notify.c). A Timer on a
+ * worker thread posts WM_CN1_NOTIFY to the pump thread (which owns the tray icon)
+ * to display a balloon; cn1WinWndProc forwards both that and the tray's own
+ * callback message (WM_CN1_TRAY, sent when the user clicks the balloon) here. */
+#define WM_CN1_NOTIFY (WM_APP + 20)
+#define WM_CN1_TRAY   (WM_APP + 21)
+void cn1WinNotifyHandleMessage(WPARAM wParam);
+void cn1WinTrayHandleMessage(WPARAM wParam, LPARAM lParam);
+
+/* System share via WinRT DataTransferManager (cn1_windows_winrt.cpp). ShowShareUI
+ * must run on the window-owning thread, so the EDT-facing shareText sends
+ * WM_CN1_SHARE to cn1Win.hwnd and cn1WinWndProc forwards it here. No-op stub when
+ * the port is built without WinRT. */
+#define WM_CN1_SHARE (WM_APP + 22)
+void cn1WinShareHandleMessage(WPARAM wParam);
 
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);

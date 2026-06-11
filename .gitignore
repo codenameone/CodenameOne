@@ -121,3 +121,4 @@ package.json
 # Local diagnostic playwright scripts (sidemenu-test, initializr-test, etc.)
 /scripts/*-test.mjs
 
+.guest-scratch/

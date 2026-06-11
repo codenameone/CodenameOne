@@ -612,16 +612,26 @@ public abstract class Base64 {
             return 0;
         }
         Simd simd = Simd.get();
-        byte[] encodeMap = getSimdEncodeMap(simd);
-
-        byte[] const03 = getSimdConst03(simd);
-        byte[] const0F = getSimdConst0F(simd);
-        byte[] const3F = getSimdConst3F(simd);
         int end3 = inOffset + inLength - (inLength % 3);
         int si = inOffset;
         int di = outOffset;
-        int simdEnd = end3 - SIMD_BYTE_LANES * 3 + 1;
+        // Only take the SIMD byte path where it actually beats the autovectorized
+        // scalar codec (NEON: iOS / Windows-arm64). On x86-64 the /O2 vectorizer
+        // already matches it and SSE2 lacks a 3-way interleave, so gate to si and
+        // let the scalar tail below encode everything.
+        boolean useSimd = simd.isSupported() && simd.isByteShuffleAccelerated();
+        int simdEnd = useSimd ? end3 - SIMD_BYTE_LANES * 3 + 1 : si;
         byte[] scratch = simdEnd > si ? simd.allocaByte(SIMD_ENCODE_SCRATCH_BYTES) : null;
+        byte[] encodeMap = null;
+        byte[] const03 = null;
+        byte[] const0F = null;
+        byte[] const3F = null;
+        if (scratch != null) {
+            encodeMap = getSimdEncodeMap(simd);
+            const03 = getSimdConst03(simd);
+            const0F = getSimdConst0F(simd);
+            const3F = getSimdConst3F(simd);
+        }
 
         while (si < simdEnd) {
             simd.unpackBytesInterleaved3(in, si, scratch, SIMD_ENC_LANE0, SIMD_ENC_LANE1, SIMD_ENC_LANE2, SIMD_BYTE_LANES);
@@ -719,15 +729,18 @@ public abstract class Base64 {
             return 0;
         }
 
-        byte[] decodeMap = getSimdDecodeMap(simd);
         int[] decodeMapLocal = decodeMapInt;
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
         int fullEnd = inOffset + fullLen;
         int si = inOffset;
         int di = outOffset;
-        int simdEnd = fullEnd - SIMD_BYTE_LANES * 4 + 1;
+        // Gate the SIMD byte path to where it beats autovectorized scalar (NEON);
+        // on x86-64 stay scalar (see encodeNoNewlineSimd).
+        boolean useSimd = simd.isSupported() && simd.isByteShuffleAccelerated();
+        int simdEnd = useSimd ? fullEnd - SIMD_BYTE_LANES * 4 + 1 : si;
         byte[] scratch = simdEnd > si ? simd.allocaByte(SIMD_DECODE_SCRATCH_BYTES) : null;
+        byte[] decodeMap = scratch != null ? getSimdDecodeMap(simd) : null;
         while (si < simdEnd) {
             if (simd.unpackLookupBytesInterleaved4(decodeMap, in, si, scratch, SIMD_DEC_OUT0, SIMD_DEC_OUT1, SIMD_DEC_OUT2, SIMD_DEC_OUT3, SIMD_BYTE_LANES) < 0) {
                 return -1;

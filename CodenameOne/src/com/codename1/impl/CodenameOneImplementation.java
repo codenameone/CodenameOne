@@ -8103,8 +8103,116 @@ public abstract class CodenameOneImplementation {
         t.setIdentity();
     }
 
+    /// True while a scroll-wheel gesture started by `#pointerWheelMoved` is still
+    /// animating. The framework uses this to tell a wheel scroll apart from a
+    /// finger drag (e.g. it suppresses opening the native text editor mid-scroll).
+    private boolean scrollWheeling;
+
     public boolean isScrollWheeling() {
-        return false;
+        return scrollWheeling;
+    }
+
+    /// Maps a physical scroll-wheel / trackpad scroll into a Codename One scroll
+    /// gesture. Ports call this from their native wheel callback instead of
+    /// fabricating raw pointer (or key) events of their own, so the mapping lives
+    /// in one place and behaves identically everywhere.
+    ///
+    /// The shared implementation replays the scroll as a synthetic
+    /// press/drag/release over the component under `(x, y)` -- spread across a few
+    /// EDT cycles so Codename One's own drag/tensile/deceleration logic animates
+    /// it like a real drag rather than a single jump -- and temporarily makes that
+    /// component non-focusable so the synthetic press is not registered as a
+    /// click. While it runs `#isScrollWheeling` reports `true`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: pointer x in display coordinates
+    ///
+    /// - `y`: pointer y in display coordinates
+    ///
+    /// - `scrollX`: horizontal scroll amount in pixels (already converted from the
+    /// native notch count by the port); a positive value reveals content to the
+    /// left, as if the finger were dragged right
+    ///
+    /// - `scrollY`: vertical scroll amount in pixels; a positive value reveals
+    /// content above, as if the finger were dragged down
+    public void pointerWheelMoved(final int x, final int y, final int scrollX, final int scrollY) {
+        if (scrollX == 0 && scrollY == 0) {
+            return;
+        }
+        final Display d = Display.getInstance();
+        // Quarter the gesture across four EDT cycles: a single press->drag(full)
+        // ->release would read as a fling and overshoot, whereas stepped drags let
+        // the scroll container settle the way a finger drag does.
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    scrollWheeling = true;
+                    dragWheelStep(f, x, y, scrollX / 4, scrollY / 4, true, false);
+                }
+            }
+        });
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    dragWheelStep(f, x, y, scrollX / 2, scrollY / 2, false, false);
+                }
+            }
+        });
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    dragWheelStep(f, x, y, scrollX * 3 / 4, scrollY * 3 / 4, false, false);
+                }
+            }
+        });
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    dragWheelStep(f, x, y, scrollX, scrollY, false, true);
+                }
+                scrollWheeling = false;
+            }
+        });
+    }
+
+    /// One synthetic step of a `#pointerWheelMoved` gesture, on the EDT: optionally
+    /// presses, drags to the accumulated `(dx, dy)` offset, and optionally
+    /// releases. The component under the cursor is made non-focusable around the
+    /// step so the synthetic press is not turned into a selection/click.
+    private void dragWheelStep(Form f, int x, int y, int dx, int dy, boolean press, boolean release) {
+        Component cmp;
+        try {
+            cmp = f.getComponentAt(x, y);
+        } catch (Throwable t) {
+            // getComponentAt can transiently fault while the UI is mutating off-EDT.
+            cmp = null;
+        }
+        boolean unfocus = cmp != null && cmp.isFocusable();
+        if (unfocus) {
+            cmp.setFocusable(false);
+        }
+        try {
+            if (press) {
+                f.pointerPressed(x, y);
+            }
+            f.pointerDragged(x + dx, y + dy);
+            if (release) {
+                f.pointerReleased(x + dx, y + dy);
+            }
+        } finally {
+            if (unfocus) {
+                cmp.setFocusable(true);
+            }
+        }
     }
 
     /// Blocks or enables copy and paste in the entire app.

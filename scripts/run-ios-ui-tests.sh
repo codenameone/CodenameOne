@@ -518,6 +518,14 @@ if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
     "EXCLUDED_ARCHS=armv7 armv7s"
   )
 fi
+# Optimize the translated C (Xcode's Debug config defaults to -O0). With -O0 the
+# scalar baseline is unvectorized, so the SIMD benchmark overstates the speedup;
+# -O2 lets the compiler auto-vectorize scalar, making the SIMD-vs-scalar
+# comparison honest and apples-to-apples with the Windows /O2 build. Override with
+# CN1_TEST_OPT_LEVEL (0/1/2/3/s) to compare.
+CN1_TEST_OPT_LEVEL="${CN1_TEST_OPT_LEVEL:-2}"
+XCODE_BUILD_CMD+=("GCC_OPTIMIZATION_LEVEL=$CN1_TEST_OPT_LEVEL")
+ri_log "Building translated C at -O$CN1_TEST_OPT_LEVEL (GCC_OPTIMIZATION_LEVEL)"
 XCODE_BUILD_CMD+=(build)
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
   ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"

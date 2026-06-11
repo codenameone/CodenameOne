@@ -34,6 +34,9 @@
 
 #include "cn1_windows.h"
 #include <shlobj.h>
+#include <shellapi.h>  /* ShellExecuteW -- not pulled in by WIN32_LEAN_AND_MEAN */
+#include <commdlg.h>   /* GetOpenFileNameW / GetSaveFileNameW (comdlg32) */
+#include <dpapi.h>     /* CryptProtectData / CryptUnprotectData (crypt32) */
 #include <stdio.h>
 #include <wchar.h>
 
@@ -548,6 +551,184 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_clipboardGetText___R_java_l
     result = cn1WinWideToJavaString(threadStateData, wide);
     GlobalUnlock(data);
     CloseClipboard();
+    return result;
+}
+
+/* ----------------------------------------------------------- shell / launch */
+
+/*
+ * Hands a URI or filesystem path to the Windows shell (ShellExecuteW "open").
+ * The OS routes it to whatever handler the user has registered: http(s) -> the
+ * default browser, tel: -> the dialer, sms: -> the Messaging app, mailto: ->
+ * the mail client, a path -> its associated program. This is the honest desktop
+ * behaviour -- nothing is fabricated; if no handler is registered ShellExecuteW
+ * returns <= 32 and we report failure so the caller (e.g. dial / sendSMS) can
+ * surface it instead of pretending it worked. Returns JAVA_TRUE on success.
+ */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_shellOpen___java_lang_String_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    WCHAR* target;
+    HINSTANCE rc;
+    if (__cn1Arg1 == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    target = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, NULL);
+    if (target == NULL) {
+        return JAVA_FALSE;
+    }
+    rc = ShellExecuteW(cn1Win.hwnd, L"open", target, NULL, NULL, SW_SHOWNORMAL);
+    free(target);
+    /* ShellExecuteW returns a fake HINSTANCE > 32 on success, an error code <= 32
+     * otherwise (per the Win32 contract). */
+    return ((INT_PTR) rc) > 32 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/* ------------------------------------------------------- file open/save dialog */
+
+/*
+ * Cross-thread request for the modal file dialog. The EDT fills it, sends it to
+ * the pump thread (which owns the window) via WM_CN1_FILEDIALOG, and reads back
+ * `result` once SendMessage returns. The buffer lives on the EDT's stack, valid
+ * for the whole blocking call.
+ */
+typedef struct CN1FileDialogReq {
+    JAVA_INT save;   /* 1 = save dialog, 0 = open dialog        */
+    JAVA_INT type;   /* gallery type: 0 image, 1 video, 2 all   */
+    WCHAR* title;    /* dialog title (owned by caller), or NULL */
+    WCHAR result[MAX_PATH];
+} CN1FileDialogReq;
+
+/* OPENFILENAME filters are double-NUL-terminated "label\0pattern\0..." blocks.
+ * One static block per gallery type keeps the picker honest about what it shows. */
+static const WCHAR CN1_FILTER_IMAGE[] =
+        L"Images\0*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp\0All Files\0*.*\0";
+static const WCHAR CN1_FILTER_VIDEO[] =
+        L"Videos\0*.mp4;*.mov;*.avi;*.m4v;*.mkv;*.webm\0All Files\0*.*\0";
+static const WCHAR CN1_FILTER_ALL[] =
+        L"All Files\0*.*\0";
+
+/* Runs on the pump thread (dispatched from cn1WinWndProc on WM_CN1_FILEDIALOG).
+ * Shows the modal common dialog owned by the main window and writes the chosen
+ * path into req->result (empty on cancel). */
+LRESULT cn1WinFileDialogHandleMessage(WPARAM wp) {
+    CN1FileDialogReq* req = (CN1FileDialogReq*) wp;
+    OPENFILENAMEW ofn;
+    BOOL ok;
+    if (req == NULL) {
+        return 0;
+    }
+    req->result[0] = 0;
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = cn1Win.hwnd;
+    ofn.lpstrFile = req->result;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrTitle = req->title;
+    ofn.lpstrFilter = req->type == 1 ? CN1_FILTER_VIDEO
+            : (req->type == 0 ? CN1_FILTER_IMAGE : CN1_FILTER_ALL);
+    ofn.nFilterIndex = 1;
+    /* OFN_NOCHANGEDIR: a picker must not move the process's working directory. */
+    if (req->save) {
+        ofn.Flags = OFN_EXPLORER | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT;
+        ok = GetSaveFileNameW(&ofn);
+    } else {
+        ofn.Flags = OFN_EXPLORER | OFN_NOCHANGEDIR | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+        ok = GetOpenFileNameW(&ofn);
+    }
+    if (!ok) {
+        req->result[0] = 0;
+    }
+    return 0;
+}
+
+/*
+ * Shows a native file open/save dialog and returns the chosen path (or JAVA_NULL
+ * on cancel / headless). The dialog is modal and must run on the window-owning
+ * pump thread, so we hand it over with a *blocking* SendMessage: the EDT parks
+ * (yielding its thread state so the GC is never held up) until the user has
+ * chosen, exactly the desktop semantics callers expect from a picker.
+ */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileDialog___boolean_int_java_lang_String_R_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN save, JAVA_INT type, JAVA_OBJECT title) {
+    CN1FileDialogReq req;
+    /* Headless screenshot mode has no window to own the dialog. */
+    if (cn1Win.hwnd == NULL) {
+        return JAVA_NULL;
+    }
+    req.save = save ? 1 : 0;
+    req.type = type;
+    req.title = title != JAVA_NULL ? cn1WinJavaStringToWide(threadStateData, title, NULL) : NULL;
+    req.result[0] = 0;
+    CN1_YIELD_THREAD;
+    SendMessageW(cn1Win.hwnd, WM_CN1_FILEDIALOG, (WPARAM) &req, 0);
+    CN1_RESUME_THREAD;
+    if (req.title != NULL) {
+        free(req.title);
+    }
+    if (req.result[0] == 0) {
+        return JAVA_NULL;
+    }
+    return cn1WinWideToJavaString(threadStateData, req.result);
+}
+
+/* ------------------------------------------------- DPAPI secure storage */
+
+/*
+ * Windows Data Protection API (DPAPI). CryptProtectData encrypts a blob with a
+ * key derived from the current Windows user's logon credentials, so the
+ * ciphertext can only be decrypted by the same user on the same machine -- the
+ * OS-backed at-rest secret store the port's SecureStorage uses for non-prompting
+ * secrets (API keys / tokens read on every network call). CRYPTPROTECT_UI_FORBIDDEN
+ * keeps it fully non-interactive. The Java side persists the returned ciphertext
+ * through the normal CN1 Storage; only this crypto step is native. Returns the
+ * encrypted bytes, or JAVA_NULL on failure.
+ */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiProtect___byte_1ARRAY_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    DATA_BLOB in, out;
+    JAVA_OBJECT result;
+    if (__cn1Arg1 == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    in.cbData = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
+    in.pbData = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    out.cbData = 0;
+    out.pbData = NULL;
+    if (!CryptProtectData(&in, L"cn1securestorage", NULL, NULL, NULL,
+            CRYPTPROTECT_UI_FORBIDDEN, &out)) {
+        return JAVA_NULL;
+    }
+    result = allocArray(threadStateData, (int) out.cbData, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    if (result != JAVA_NULL) {
+        memcpy((*(JAVA_ARRAY) result).data, out.pbData, out.cbData);
+    }
+    LocalFree(out.pbData);
+    return result;
+}
+
+/* Inverse of dpapiProtect: decrypts a CryptProtectData blob for the current
+ * user, returning the plaintext bytes (JAVA_NULL if the blob is corrupt or was
+ * produced by a different user/machine). */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_dpapiUnprotect___byte_1ARRAY_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    DATA_BLOB in, out;
+    JAVA_OBJECT result;
+    if (__cn1Arg1 == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    in.cbData = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
+    in.pbData = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    out.cbData = 0;
+    out.pbData = NULL;
+    if (!CryptUnprotectData(&in, NULL, NULL, NULL, NULL,
+            CRYPTPROTECT_UI_FORBIDDEN, &out)) {
+        return JAVA_NULL;
+    }
+    result = allocArray(threadStateData, (int) out.cbData, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    if (result != JAVA_NULL) {
+        memcpy((*(JAVA_ARRAY) result).data, out.pbData, out.cbData);
+    }
+    LocalFree(out.pbData);
     return result;
 }
 
