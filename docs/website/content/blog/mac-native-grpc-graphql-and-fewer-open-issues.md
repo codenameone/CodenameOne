@@ -26,9 +26,9 @@ Every one of the bigger items has its own deep-dive tutorial. Here is the tour, 
 
 ### Your app is now a native Mac app
 
-Your existing Codename One app can ship as a **100% native Mac app today, with zero porting effort**. No rewrite, no bundled JVM, no Electron shell: the project you already have produces a lean native Mac binary the same way it produces your iPhone app, on the same Metal renderer and battle-tested native pipeline. And it arrives feeling like a real Mac app, not a phone in a window: native title bar, native menu bar, interactive scrollbars, and desktop notifications come with it. This is the same Java code that produces the iOS and Android builds, running as a native Mac app:
+Your existing Codename One app can ship as a **100% native Mac app today, with zero porting effort**. No rewrite, no bundled JVM, no Electron shell: the project you already have produces a lean native Mac binary the same way it produces your iPhone app, on the same Metal renderer and battle-tested native pipeline. And it arrives feeling like a real Mac app, not a phone in a window: native title bar, native menu bar, interactive scrollbars, and desktop notifications come with it. Two of this week's features in one shot: the sample below uses the new advertising API covered later in this post, running as a native Mac app from the same Java code that produces the iOS and Android builds:
 
-![A Codename One app running as a native Mac app](/blog/mac-native-builds-and-desktop-integration/mac-app.png)
+![The advertising API sample running as a native Mac app](/blog/mac-native-builds-and-desktop-integration/mac-app.png)
 
 The full tutorial, including the new desktop menu and shortcut APIs and the Mac signing hints, is in [Your Codename One App, Now A Native Mac App](/blog/mac-native-builds-and-desktop-integration/).
 
