@@ -83,7 +83,7 @@ Input is pollable, the way game code wants it. `getInput()` exposes level state 
 
 `Sprite` carries position, anchor, rotation, scale, and alpha, plus an axis-aligned bounding box for simple overlap tests. `SpriteSheet` slices a packed texture into cached frames, `AnimatedSprite` plays them back, and `Scene` holds everything in z-order with a camera, so scrolling a level means moving the camera and not repositioning the world.
 
-It matters where those sprites run. `GameView` extends the `RenderView` from [the portable 3D API](/blog/portable-3d-graphics-api/), so sprites are not painted pixel by pixel on the CPU: each one is a textured quad composited by the GPU, through Metal on iOS and Mac, OpenGL ES on Android, WebGL on the web, Direct3D 11 on native Windows, and OpenGL through JOGL in the simulator. A sprite's rotation, scale, and alpha are transform and blend parameters the GPU applies for free, which is why a scene full of spinning, fading, overlapping sprites holds full frame rate, and why the starfield sample below can animate seventy twinkling stars plus particles without breaking a sweat. Where no GPU backend exists, the same code falls back to the software renderer, so correctness never depends on the hardware.
+It matters where those sprites run. `GameView` extends the `RenderView` from [the portable 3D API](/blog/portable-3d-graphics-api/), so sprites are not painted pixel by pixel on the CPU: each one is a textured quad composited by the GPU, through Metal on iOS and Mac, OpenGL ES on Android, WebGL on the web, Direct3D 11 on native Windows, and OpenGL through JOGL in the simulator. A sprite's rotation, scale, and alpha are transformation and blending parameters the GPU applies for free, which is why a scene full of spinning, fading, overlapping sprites holds full frame rate, and why the starfield sample below can animate seventy twinkling stars plus particles without breaking a sweat. Where no GPU backend exists, the same code falls back to the software renderer, so correctness never depends on the hardware.
 
 Because the surface is the 3D surface, the same `GameView` also scales up to real 3D: a `GameCamera` in perspective mode, `Model` instances for meshes, and billboarded sprites that always face the camera. There is no separate "3D mode" to migrate to later; mixing flat sprites and 3D models in one scene is the normal case.
 
@@ -110,27 +110,27 @@ Each platform backs this with its native low-latency path: `android.media.SoundP
 
 ## What can you build?
 
-The repository ships six game samples, each a complete, playable game in a few hundred lines, and each generating every pixel of its art and every sound at runtime, so there are no assets to manage. They double as a tour of the API, one genre at a time. All of the screenshots below are the actual samples running in the simulator.
+The repository ships six game samples, each a complete, playable game in a few hundred lines, and each generating every pixel of its art and every sound at runtime, so there are no assets to manage. They double as a tour of the API, one genre at a time. Every capture below is the actual sample being played in the simulator.
 
 [CasualGameSample](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/CasualGameSample) is an arena collector: pilot a ship around a starfield with the on-screen joystick, scoop up spinning gems, dodge drifting asteroids. It exercises the breadth of the 2D layer: many sprites in one `Scene`, per-sprite animation, particle bursts, collision, and a `TouchControls` joystick that drives the same `GameInput` a keyboard would.
 
-![The casual arena collector sample](/blog/game-development-api-box2d/casual-game.png)
+![The casual arena collector sample, the ship patrolling the starfield](/blog/game-development-api-box2d/casual-game.gif)
 
 [ScrollerGameSample](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/ScrollerGameSample) is the side-scroller hello world: run, jump, collect coins. The `Scene` camera follows the player so the level slides past, an `AnimatedSprite` walk cycle flips to face the run direction, and a cheap parallax backdrop (fixed sun, drifting clouds, half-speed hills) sells the depth. Its gravity is a few hand-rolled lines, proof you don't need the physics engine for a platformer feel.
 
-![The side-scroller sample](/blog/game-development-api-box2d/scroller-game.png)
+![The side-scroller sample, running, jumping, and collecting coins](/blog/game-development-api-box2d/scroller-game.gif)
 
 [CardGameSample](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/CardGameSample) is Memory (Concentration): a sprite per card, a horizontal flip animation that swaps the face at the midpoint, tap hit-testing through `GameInput`, and a small game state machine. The structure transfers directly to any card or tile game.
 
-![The memory card game sample](/blog/game-development-api-box2d/card-game.png)
+![The memory card game sample, flipping cards into a match, a mismatch, and another match](/blog/game-development-api-box2d/card-game.gif)
 
 [BoardGameSample](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/BoardGameSample) is checkers against a small built-in AI, on an isometric board. Every tile and piece is a flat `Sprite`, but the 2:1 diamond projection and raised pieces give a convincing 3D look with no camera or models, the classic "faux 3D" trick, and the cell-to-pixel mapping it demonstrates underlies every isometric game.
 
-![The isometric checkers sample](/blog/game-development-api-box2d/board-game.png)
+![The isometric checkers sample, trading moves with the built-in AI](/blog/game-development-api-box2d/board-game.gif)
 
 [Gaming3DDemoSample](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/Gaming3DDemoSample) crosses into real 3D: a lit, spinning model on a ground plane, a ring of billboarded coin sprites that always face the orbiting perspective camera, and touch controls, in about two hundred lines.
 
-![The 3D gaming demo sample](/blog/game-development-api-box2d/gaming-3d.png)
+![The 3D gaming demo sample, the camera orbiting a lit model and billboarded coins](/blog/game-development-api-box2d/gaming-3d.gif)
 
 And [GamingDemoSample](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/GamingDemoSample) is the physics demo this post opened with: Box2D bodies, linked sprites, and a `SoundPool` blip whose pitch varies per drop.
 
@@ -140,7 +140,7 @@ The new [Game Development chapter](/developer-guide/#_game_development) in the d
 
 If you build something with this, we genuinely want to see it, and if you hit a wall, [file an issue](https://github.com/codenameone/CodenameOne/issues) with the smallest game that reproduces it.
 
-Yesterday's post covered [the portable 3D API](/blog/portable-3d-graphics-api/) this is built on, and the [release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index. {{< post-link path="/blog/native-windows-port-no-jvm" text="Tomorrow's post" >}} turns your Java into a native Windows executable with no JVM.
+Yesterday's post covered [the portable 3D API](/blog/portable-3d-graphics-api/) this is built on, and the [release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index. Your Java becomes a native Windows executable with no JVM in {{< post-link path="/blog/native-windows-port-no-jvm" text="tomorrow's post" >}}.
 
 ---
 

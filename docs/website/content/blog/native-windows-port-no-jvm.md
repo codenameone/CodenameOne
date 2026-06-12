@@ -69,7 +69,7 @@ A regular build returns x64 and arm64 release executables; set the `windows.debu
 
 There is history here for long-time followers. Codename One has shipped Windows apps before, through UWP and through the JVM-bundled desktop target. This port replaces neither today, but it is the first time the output is what those old forum threads were really asking for: one file, native code, no runtime, double-click and it runs.
 
-Yesterday's post covered [the game development API](/blog/game-development-api-box2d/), and the [release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index. {{< post-link path="/blog/printing-and-apple-wallet" text="Tomorrow's post" >}} wraps up the week with printing and Apple Wallet.
+Yesterday's post covered [the game development API](/blog/game-development-api-box2d/), and the [release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index. The week wraps up with printing and Apple Wallet in {{< post-link path="/blog/printing-and-apple-wallet" text="tomorrow's post" >}}.
 
 ---
 

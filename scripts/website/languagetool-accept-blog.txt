@@ -55,3 +55,7 @@ foldables?
 
 # Community author names.
 Francesco Galgani
+Catto
+
+# Game-development vocabulary.
+[Ss]tarfields?

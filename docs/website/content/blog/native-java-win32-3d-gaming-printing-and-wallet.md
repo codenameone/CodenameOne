@@ -51,7 +51,7 @@ And it isn't limited to primitives. A binary glTF model authored in any 3D tool 
 
 ![A glTF model rendered by the portable 3D API on the native Mac target](/blog/portable-3d-graphics-api/boombox-mac.png)
 
-On iOS the vertex buffers are SIMD-aligned so the data is handed to Metal with no copy in between. The `RenderView` hosting all of this is a regular component, so a 3D view drops into a normal form next to buttons and text. {{< post-link path="/blog/portable-3d-graphics-api" text="Tomorrow's post" >}} walks through the whole API.
+On iOS the vertex buffers are SIMD-aligned so the data is handed to Metal with no copy in between. The `RenderView` hosting all of this is a regular component, so a 3D view drops into a normal form next to buttons and text. We walk through the whole API in {{< post-link path="/blog/portable-3d-graphics-api" text="tomorrow's post" >}}.
 
 ### Game development in the core
 
@@ -86,7 +86,7 @@ To be clear about what this is, because "Java on Windows" carries old associatio
 
 ![A Codename One app rendering natively on Windows via Direct2D](/blog/native-windows-port-no-jvm/chatview-windows.png)
 
-People have been asking how to turn Java into a real `.exe` since the late nineties, and the modern answer, GraalVM, is a tool designed for a different purpose. {{< post-link path="/blog/native-windows-port-no-jvm" text="Monday's post" >}} covers the architecture, the history, and how this completes the native desktop story that the Mac target started.
+People have been asking how to turn Java into a real `.exe` since the late nineties, and the modern answer, GraalVM, is a tool designed for a different purpose. The architecture, the history, and how this completes the native desktop story the Mac target started are all in {{< post-link path="/blog/native-windows-port-no-jvm" text="Monday's post" >}}.
 
 ### Printing and Apple Wallet
 
