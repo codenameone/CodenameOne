@@ -546,11 +546,22 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
             memset(tmpAllObjectsInHeap + sizeOfAllObjectsInHeap, 0, sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
             memcpy(tmpAllObjectsInHeap, allObjectsInHeap, sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
             sizeOfAllObjectsInHeap *= 2;
+            // Defer freeing the replaced array by one growth cycle: the sweep and the
+            // reference-counting removal path read allObjectsInHeap without taking the
+            // critical section, so an immediate free can pull the array out from under
+            // an in-flight read. Growths double the capacity so they are rare, and at
+            // most one stale array is retained.
+            if(oldAllObjectsInHeap != 0) {
+                free(oldAllObjectsInHeap);
+            }
             oldAllObjectsInHeap = allObjectsInHeap;
             allObjectsInHeap = tmpAllObjectsInHeap;
-            allObjectsInHeap[currentSizeOfAllObjectsInHeap] = obj;
+            // record the real slot -- leaving pos at -1 here left the object's
+            // __heapPosition unset, so a later reference-counted free could not null
+            // its slot and the sweep would dereference the dangling pointer.
+            pos = currentSizeOfAllObjectsInHeap;
+            allObjectsInHeap[pos] = obj;
             currentSizeOfAllObjectsInHeap++;
-            free(oldAllObjectsInHeap);
         } else {
             allObjectsInHeap[pos] = obj;
         }
@@ -628,23 +639,37 @@ void codenameOneGCMark() {
                     }
                 }
                 
-                // place allocations from the local thread into the global heap list
-                if (!t->lightweightThread) {
-                    // For native threads, we need to actually lock them while we traverse the 
-                    // heap allocations because we can't use the usual locking mechanisms on
-                    // them.
-                    lockThreadHeapMutex();
-                }
-                for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
-                    JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
-                    if(obj) {
-                        t->pendingHeapAllocations[heapTrav] = 0;
-                        placeObjectInHeapCollection(obj);
+                // place allocations from the local thread into the global heap list.
+                // The critical section serializes this migration against
+                // markDeadThread/collectThreadResources: the pause-wait above ends when
+                // threadActive drops, but a thread that finishes runImpl drops
+                // threadActive through markDeadThread, so without the lock both sides
+                // migrate the same pendingHeapAllocations concurrently -- double-placing
+                // objects and racing placeObjectInHeapCollection's grow-and-free of
+                // allObjectsInHeap (double free / use-after-free, observed as random
+                // SIGSEGV or a libmalloc abort that wedges the VM). If the slot no
+                // longer holds this thread it died and markDeadThread already migrated
+                // everything under this same lock; skip.
+                lockCriticalSection();
+                if(allThreads[iter] == t) {
+                    if (!t->lightweightThread) {
+                        // For native threads, we need to actually lock them while we traverse the
+                        // heap allocations because we can't use the usual locking mechanisms on
+                        // them.
+                        lockThreadHeapMutex();
+                    }
+                    for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
+                        JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
+                        if(obj) {
+                            t->pendingHeapAllocations[heapTrav] = 0;
+                            placeObjectInHeapCollection(obj);
+                        }
+                    }
+                    if (!t->lightweightThread) {
+                        unlockThreadHeapMutex();
                     }
                 }
-                if (!t->lightweightThread) {
-                    unlockThreadHeapMutex();
-                }
+                unlockCriticalSection();
                 
                 // this is a thread that allocates a lot and might demolish RAM. We will hold it until the sweep is finished...
                 
