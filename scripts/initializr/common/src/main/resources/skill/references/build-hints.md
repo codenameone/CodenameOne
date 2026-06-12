@@ -40,6 +40,7 @@ When in doubt, search the developer guide for the exact key name — there are h
 | `codename1.arg.ios.statusbar_hidden=true` | Hide the iOS status bar. |
 | `codename1.arg.ios.beforeFinishLaunching=...` | Native code inserted before iOS's `application:didFinishLaunchingWithOptions:` returns. |
 | `codename1.arg.ios.newStorageLocation=true` | Use modern iOS storage paths (recommended for new apps). |
+| `codename1.arg.ios.wallet.extension=true` | Generate an Apple Wallet issuer-provisioning extension (iOS 14+). See *Apple Wallet issuer provisioning* below. |
 
 ## Android
 
@@ -86,6 +87,21 @@ codename1.arg.ios.NSSiriUsageDescription=Trigger app actions from Siri shortcuts
 Any `ios.NS<Key>UsageDescription` key is forwarded into the generated `Info.plist`. App Store builds reject location, camera, microphone, photos, contacts, etc. without the matching description. See [Apple's CocoaKeys reference](https://developer.apple.com/library/content/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html) for the complete key catalog.
 
 `ios.plistInject` remains the escape hatch for raw XML snippets that don't have a dedicated `ios.NS*` hint.
+
+## Apple Wallet issuer provisioning (iOS)
+
+Card issuers can surface their cards inside the iOS Wallet app via a *non-UI issuer-provisioning extension* (plus an optional login-UI extension). Setting these hints makes the iOS build auto-generate the Objective-C extension target(s), wire the entitlements, and share data with the host app through an App Group. The host app publishes pass entries via the new `com.codename1.payment.WalletExtension` / `WalletPassEntry` Java API; the generated extension answers Wallet's ~100 ms status callback from that shared data.
+
+| Hint (`codename1.arg.` prefix) | Effect |
+| --- | --- |
+| `ios.wallet.extension=true` | **Enable.** Emit the issuer-provisioning extension. |
+| `ios.wallet.appGroup=group.com.example.app` | **Required.** Shared App Group ID (must start with `group.`) the host app and extension exchange pass data through. |
+| `ios.wallet.issuerEndpoint=https://...` | **Required.** Your HTTPS issuer endpoint that returns the encrypted pass payload. |
+| `ios.wallet.includeUI=true` | Also generate the login-UI extension (set `ios.wallet.authEndpoint=...` for its login URL). |
+| `ios.wallet.nonuiExtensionName=...` / `ios.wallet.uiExtensionName=...` | Override the default extension target names. |
+| `ios.wallet.*Inject=...raw ObjC...` | Inject custom Objective-C at marker points (`generateRequestInject`, `generateResponseInject`, `statusInject`, `uiViewDidLoadInject`, etc.) in the generated extension code. |
+
+This is an advanced, issuer-only feature — most apps never need it. The compiled native code is gated behind a build define, so leaving the hints unset is a no-op.
 
 ## JavaScript / web
 
