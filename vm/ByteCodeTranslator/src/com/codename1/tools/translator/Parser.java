@@ -285,6 +285,20 @@ public class Parser extends ClassVisitor {
         }
     }
 
+    // Inverted index over the native sources for O(1) "is this symbol referenced
+    // by native code" queries (see NativeSymbolIndex). Built lazily and cached
+    // against the nativeSources array identity, mirroring the per-method memo in
+    // BytecodeMethod.isMethodUsedByNative.
+    private static NativeSymbolIndex nativeSymbolIndex;
+    private static String[] nativeSymbolIndexSources;
+    public static NativeSymbolIndex getNativeSymbolIndex(String[] nativeSources) {
+        if (nativeSymbolIndex == null || nativeSymbolIndexSources != nativeSources) {
+            nativeSymbolIndex = new NativeSymbolIndex(nativeSources);
+            nativeSymbolIndexSources = nativeSources;
+        }
+        return nativeSymbolIndex;
+    }
+
     private static final ArrayList<String> constantPool = new ArrayList<>();
     
     public static ByteCodeClass getClassObject(String name) {
