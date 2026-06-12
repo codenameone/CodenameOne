@@ -187,6 +187,7 @@ final class JavascriptBundleWriter {
         }
         minifyGeneratedIdentifiers(chunkStrings);
         aliasHotCn1Identifiers(chunkStrings);
+        mangleDispatchIds(chunkStrings, classes);
 
         int leadCount = chunkStrings.size() - 1;
         for (int i = 0; i < leadCount; i++) {
@@ -319,6 +320,152 @@ final class JavascriptBundleWriter {
         }
         for (int i = 0; i < chunkStrings.size(); i++) {
             chunkStrings.set(i, renameTokens(chunkStrings.get(i), map));
+        }
+    }
+
+
+    /**
+     * Mangles signature-based dispatch-id STRING VALUES
+     * ({@code "cn1_s_<method>_<sig>"}, avg ~40 chars, ~13k occurrences /
+     * ~650 KB) to short {@code "$s<n>"} strings, consistently across the
+     * methods-map keys in {@code _Z({m:{...}})} class defs and every
+     * call-site / hoisted-const occurrence. Dispatch is a closed world
+     * inside the bundle -- {@code jvm.resolveVirtual} just matches the
+     * call-site string against the map key -- so any consistent renaming
+     * is sound EXCEPT where a name crosses the bundle boundary:
+     *
+     * <ul>
+     * <li>JSO-bridge dispatch ids: {@code invokeJsoBridge} derives the
+     *     host member name from the id, and the mangle sidecar manifest
+     *     protects them -- excluded via the same class walk that builds
+     *     {@code jso-bridge-dispatch-ids.txt};</li>
+     * <li>ids referenced (or constructed by prefix) in the runtime /
+     *     port.js / browser bridge sources -- bindNative targets,
+     *     fallback overrides, the screenshot runner's constructed
+     *     lambda ids;</li>
+     * <li>dispatch ids of native methods: {@code overrideMethodMaps}
+     *     reconstructs {@code "cn1_s_" + ...} from the bound name at
+     *     runtime, so their map keys must keep canonical spelling.</li>
+     * </ul>
+     *
+     * Kill switch: {@code -Dparparvm.js.manglesigs.off}.
+     */
+    private static void mangleDispatchIds(List<String> chunkStrings, List<ByteCodeClass> classes) {
+        // OPT-IN ONLY (-Dparparvm.js.manglesigs=1): measured a mere ~22 KB
+        // (the _q hoist already deduplicates these strings, so the win is
+        // just shorter hoist-table values) while a missed bridge-resolved
+        // id wedges the screenshot suite at boot. Not worth the fragility
+        // as a default; kept for future work on the exclusion set.
+        if (!"1".equals(System.getProperty("parparvm.js.manglesigs"))) {
+            return;
+        }
+        // 1. Collect every quoted cn1_s_* literal across the chunks.
+        java.util.regex.Pattern lit = java.util.regex.Pattern.compile("\"(cn1_s_[A-Za-z0-9_]+)\"");
+        Map<String, Integer> counts = new HashMap<String, Integer>();
+        for (String chunk : chunkStrings) {
+            java.util.regex.Matcher m = lit.matcher(chunk);
+            while (m.find()) {
+                String id = m.group(1);
+                Integer c = counts.get(id);
+                counts.put(id, c == null ? 1 : c + 1);
+            }
+        }
+        if (counts.isEmpty()) {
+            return;
+        }
+        // 2. Exclusions.
+        Set<String> excluded = new HashSet<String>();
+        Map<String, ByteCodeClass> byName = new HashMap<String, ByteCodeClass>();
+        for (ByteCodeClass cls : classes) {
+            byName.put(cls.getClsName(), cls);
+        }
+        for (ByteCodeClass cls : classes) {
+            boolean jso = isJsoBridgeClass(cls, byName);
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated()) {
+                    continue;
+                }
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) {
+                    continue;
+                }
+                if (jso || m.isNative()) {
+                    excluded.add(JavascriptNameUtil.dispatchMethodIdentifier(name, desc));
+                }
+            }
+        }
+        Set<String> bridgeTokens = collectBridgeReferencedCn1Tokens();
+        List<String> bridgePrefixes = new ArrayList<String>();
+        for (String t : bridgeTokens) {
+            if (t.startsWith("cn1_s_")) {
+                excluded.add(t);
+                if (t.length() >= 10) {
+                    bridgePrefixes.add(t); // runtime-constructed extensions keep canonical too
+                }
+            } else if (t.startsWith("cn1_")) {
+                // bindNative / bindCiFallback override targets are FULL method
+                // ids; overrideMethodMaps reconstructs their dispatch id at
+                // runtime as "cn1_s_" + name minus the longest matching class
+                // prefix. Mirror that derivation so the override's map key
+                // keeps its canonical spelling.
+                String stripped = t.endsWith("__impl") ? t.substring(0, t.length() - 6) : t;
+                String bestClass = null;
+                for (String clsName : byName.keySet()) {
+                    String prefix = "cn1_" + clsName + "_";
+                    if (stripped.startsWith(prefix)
+                            && (bestClass == null || clsName.length() > bestClass.length())) {
+                        bestClass = clsName;
+                    }
+                }
+                if (bestClass != null) {
+                    excluded.add("cn1_s_" + stripped.substring(("cn1_" + bestClass + "_").length()));
+                }
+            }
+        }
+        List<String> winners = new ArrayList<String>();
+        outer:
+        for (String id : counts.keySet()) {
+            if (excluded.contains(id)) {
+                continue;
+            }
+            for (String pre : bridgePrefixes) {
+                if (id.length() > pre.length() && id.startsWith(pre)
+                        && (pre.endsWith("_") || id.charAt(pre.length()) == '_')) {
+                    continue outer;
+                }
+            }
+            winners.add(id);
+        }
+        if (winners.isEmpty()) {
+            return;
+        }
+        // Deterministic: highest total byte weight gets the shortest id.
+        Collections.sort(winners, (x, y) -> {
+            long sx = (long) counts.get(x) * x.length();
+            long sy = (long) counts.get(y) * y.length();
+            if (sx != sy) {
+                return Long.compare(sy, sx);
+            }
+            return x.compareTo(y);
+        });
+        Map<String, String> map = new HashMap<String, String>(winners.size() * 2);
+        int idx = 0;
+        for (String w : winners) {
+            map.put('"' + w + '"', "\"$s" + base26(idx++) + '"');
+        }
+        // 3. Rewrite quoted occurrences across every chunk in one scan.
+        java.util.regex.Pattern any = java.util.regex.Pattern.compile("\"cn1_s_[A-Za-z0-9_]+\"");
+        for (int i = 0; i < chunkStrings.size(); i++) {
+            String chunk = chunkStrings.get(i);
+            java.util.regex.Matcher m = any.matcher(chunk);
+            StringBuffer sb = new StringBuffer(chunk.length());
+            while (m.find()) {
+                String repl = map.get(m.group());
+                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(repl != null ? repl : m.group()));
+            }
+            m.appendTail(sb);
+            chunkStrings.set(i, sb.toString());
         }
     }
 
