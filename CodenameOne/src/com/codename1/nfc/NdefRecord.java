@@ -256,6 +256,13 @@ public final class NdefRecord {
     /// URI (re-expanding the leading prefix code). Returns `null` if the
     /// record is not a recognised URI record.
     public String getUriPayload() {
+        // Absolute-URI records carry the URI in the type field and may have
+        // an empty payload, so this branch must run before the payload-length
+        // guard below (which only the well-known URI form needs -- its prefix
+        // code lives in payload[0]).
+        if (tnf == TNF_ABSOLUTE_URI) {
+            return fromUtf8(type, 0, type.length);
+        }
         if (payload.length < 1) {
             return null;
         }
@@ -264,9 +271,6 @@ public final class NdefRecord {
             String p = prefix < URI_PREFIXES.length ? URI_PREFIXES[prefix]
                     : "";
             return p + fromUtf8(payload, 1, payload.length - 1);
-        }
-        if (tnf == TNF_ABSOLUTE_URI) {
-            return fromUtf8(type, 0, type.length);
         }
         return null;
     }
