@@ -2937,8 +2937,66 @@ final class JavascriptMethodGenerator {
         }
         java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
         int structuredBudget = Integer.getInteger("parparvm.js.structured.maxblocks", 64);
-        if (structuredBudget <= 0 || !isAcyclicForward(blocks) || blocks.size() > structuredBudget) {
+        if (structuredBudget <= 0 || blocks.size() > structuredBudget) {
             return false;
+        }
+        // Natural-loop regions: every back-edge must target a single header h,
+        // with the region [h, lastBackSource] properly nested against every
+        // other region, and no forward jump may enter a region anywhere but
+        // its header (irreducible flow bails to the interpreter).
+        java.util.TreeMap<Integer, Integer> loopEnd = new java.util.TreeMap<Integer, Integer>();
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x <= i) {
+                    Integer cur = loopEnd.get(x);
+                    if (cur == null || cur < i) {
+                        loopEnd.put(x, i);
+                    }
+                }
+            }
+        }
+        // Debug bisection: parparvm.js.structured.loopskip=K,M structures a
+        // loop-containing method only when hash(name)%M != K.
+        String onlySpec = System.getProperty("parparvm.js.structured.looponly");
+        if (onlySpec != null && !loopEndProbeEmpty(instructions, labelToIndex)
+                && !(method.getMethodName() + method.getSignature()).contains(onlySpec)) {
+            return false;
+        }
+        String keepSpec = System.getProperty("parparvm.js.structured.loopkeep");
+        if (keepSpec != null && !loopEndProbeEmpty(instructions, labelToIndex)) {
+            int comma = keepSpec.indexOf(',');
+            int k = Integer.parseInt(keepSpec.substring(0, comma));
+            int mm = Integer.parseInt(keepSpec.substring(comma + 1));
+            int hh = Math.abs((method.getMethodName() + method.getSignature()).hashCode());
+            if (hh % mm != k) {
+                return false;
+            }
+            System.err.println("[structured-loopkeep] " + method.getMethodName() + method.getSignature());
+        }
+        int loopSpanBudget = Integer.getInteger("parparvm.js.structured.maxloopspan", 64);
+        for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+            if (r.getValue() - r.getKey() + 1 > loopSpanBudget) {
+                return false;
+            }
+        }
+        for (java.util.Map.Entry<Integer, Integer> a : loopEnd.entrySet()) {
+            for (java.util.Map.Entry<Integer, Integer> c : loopEnd.entrySet()) {
+                int h1 = a.getKey(), e1 = a.getValue(), h2 = c.getKey(), e2 = c.getValue();
+                if (h1 < h2 && h2 <= e1 && e2 > e1) {
+                    return false; // partial overlap
+                }
+            }
+        }
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x > i) {
+                    for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+                        if (x > r.getKey() && x <= r.getValue() && (i < r.getKey() || i > r.getValue())) {
+                            return false; // jump into a loop body from outside
+                        }
+                    }
+                }
+            }
         }
         java.util.Map<Integer, Integer> startToBlock = new java.util.HashMap<Integer, Integer>();
         for (int b = 0; b < blocks.size(); b++) {
@@ -2956,15 +3014,83 @@ final class JavascriptMethodGenerator {
                 targets.add(tb);
             }
         }
-        for (int t : targets.descendingSet()) {
-            bodyOut.append("  B").append(t).append(": {\n");
+        // Forward jumps to a loop header from before the loop enter via a
+        // pre-header label closing right before the for(;;) opens.
+        java.util.TreeSet<Integer> preHeaderTargets = new java.util.TreeSet<Integer>();
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x > i && loopEnd.containsKey(x)) {
+                    preHeaderTargets.add(x);
+                }
+            }
         }
+        // Labeled blocks must nest WITH the loop structure: a target inside a
+        // loop region opens its label right after that loop's for(;;) brace,
+        // not at the function top (otherwise the target's close brace would
+        // sever the for). ownerOf(t) = innermost loop region containing t
+        // (header excluded -- the header IS the loop), or -1 for the root.
+        java.util.Map<Integer, java.util.List<Integer>> ownedLabels = new java.util.HashMap<Integer, java.util.List<Integer>>();
+        for (int t : targets) {
+            if (loopEnd.containsKey(t)) {
+                continue; // headers use the loop's own label / pre-header label
+            }
+            int owner = -1;
+            for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+                if (t > r.getKey() && t <= r.getValue()
+                        && (owner < 0 || r.getKey() > owner)) {
+                    owner = r.getKey();
+                }
+            }
+            java.util.List<Integer> list = ownedLabels.get(owner);
+            if (list == null) {
+                list = new java.util.ArrayList<Integer>();
+                ownedLabels.put(owner, list);
+            }
+            list.add(t);
+        }
+        // Pre-header labels belong to the header's OWN owner region.
+        java.util.Map<Integer, java.util.List<Integer>> ownedPre = new java.util.HashMap<Integer, java.util.List<Integer>>();
+        for (int t : preHeaderTargets) {
+            int owner = -1;
+            for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+                if (t > r.getKey() && t <= r.getValue()
+                        && (owner < 0 || r.getKey() > owner)) {
+                    owner = r.getKey();
+                }
+            }
+            java.util.List<Integer> list = ownedPre.get(owner);
+            if (list == null) {
+                list = new java.util.ArrayList<Integer>();
+                ownedPre.put(owner, list);
+            }
+            list.add(t);
+        }
+        appendRegionLabels(bodyOut, ownedLabels.get(-1), ownedPre.get(-1));
         int[] entrySp = new int[blocks.size()];
         java.util.Arrays.fill(entrySp, -1);
         boolean reachable = true;
         for (int b = 0; b < blocks.size(); b++) {
             BasicBlock block = blocks.get(b);
-            if (targets.contains(b)) {
+            if (preHeaderTargets.contains(b)) {
+                bodyOut.append("  }\n");
+            }
+            if (loopEnd.containsKey(b)) {
+                if (targets.contains(b) && entrySp[b] >= 0) {
+                    if (reachable && ctx.sp != entrySp[b]) {
+                        return false;
+                    }
+                    ctx.sp = entrySp[b];
+                } else if (!reachable) {
+                    return false;
+                }
+                ctx.clearPendings();
+                reachable = true;
+                if (entrySp[b] < 0) {
+                    entrySp[b] = ctx.sp;
+                }
+                bodyOut.append("  B").append(b).append(": for(;;) {\n");
+                appendRegionLabels(bodyOut, ownedLabels.get(b), ownedPre.get(b));
+            } else if (targets.contains(b)) {
                 bodyOut.append("  }\n");
                 if (entrySp[b] >= 0) {
                     if (reachable && ctx.sp != entrySp[b]) {
@@ -2998,15 +3124,25 @@ final class JavascriptMethodGenerator {
                     } else if (entrySp[tb] != ctx.sp) {
                         return false;
                     }
+                    String go;
+                    if (loopEnd.containsKey(tb) && tb <= b) {
+                        // back edge / jump to enclosing loop header
+                        go = "continue B" + tb;
+                    } else if (loopEnd.containsKey(tb)) {
+                        // forward entry to a loop's top from before it
+                        go = "break P" + tb;
+                    } else {
+                        go = "break B" + tb;
+                    }
                     if (jump.getOpcode() == Opcodes.GOTO) {
                         if (tb != b + 1) {
-                            bodyOut.append("  break B").append(tb).append(";\n");
+                            bodyOut.append("  ").append(go).append(";\n");
                         }
                         if (i == block.end - 1) {
                             reachable = (tb == b + 1);
                         }
                     } else {
-                        bodyOut.append("  if (").append(cond).append(") break B").append(tb).append(";\n");
+                        bodyOut.append("  if (").append(cond).append(") ").append(go).append(";\n");
                     }
                     continue;
                 }
@@ -3017,7 +3153,30 @@ final class JavascriptMethodGenerator {
                     reachable = false;
                 }
             }
-            if (reachable && b + 1 < blocks.size() && targets.contains(b + 1)) {
+            // Close every loop region ending at this block (inner first).
+            java.util.List<Integer> closing = new java.util.ArrayList<Integer>();
+            for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+                if (r.getValue() == b) {
+                    closing.add(r.getKey());
+                }
+            }
+            java.util.Collections.sort(closing, java.util.Collections.reverseOrder());
+            for (int h : closing) {
+                boolean bottomBreak = reachable;
+                if (bottomBreak) {
+                    // Falling off the bottom of for(;;) would loop; exit instead.
+                    bodyOut.append(ctx.flushAllPending());
+                    bodyOut.append("  break B").append(h).append(";\n");
+                }
+                bodyOut.append("  }\n");
+                // Right after the for(;;) close, control arrives ONLY via the
+                // synthesized bottom break (jumps from inside the loop to
+                // later blocks use those blocks' own labels). Without one,
+                // this point is unreachable until the next labeled target.
+                reachable = bottomBreak;
+                ctx.clearPendings();
+            }
+            if (reachable && b + 1 < blocks.size() && targets.contains(b + 1) && !loopEnd.containsKey(b + 1)) {
                 bodyOut.append(ctx.flushAllPending());
                 if (entrySp[b + 1] < 0) {
                     entrySp[b + 1] = ctx.sp;
@@ -3027,6 +3186,39 @@ final class JavascriptMethodGenerator {
             }
         }
         return true;
+    }
+
+    private static boolean loopEndProbeEmpty(List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x <= i) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** Open the labeled blocks owned by one region, deepest target first
+     * (B-labels for plain forward targets, P-labels for pre-header entries),
+     * interleaved in descending block order so closes pop in block order. */
+    private static void appendRegionLabels(StringBuilder bodyOut,
+            java.util.List<Integer> labels, java.util.List<Integer> preLabels) {
+        java.util.TreeMap<Integer, String> merged = new java.util.TreeMap<Integer, String>();
+        if (labels != null) {
+            for (int t : labels) {
+                merged.put(t, "B");
+            }
+        }
+        if (preLabels != null) {
+            for (int t : preLabels) {
+                merged.put(t, "P");
+            }
+        }
+        for (java.util.Map.Entry<Integer, String> e : merged.descendingMap().entrySet()) {
+            bodyOut.append("  ").append(e.getValue()).append(e.getKey()).append(": {\n");
+        }
     }
 
     /** JS condition for a conditional jump opcode, popping its operands. */
@@ -3101,6 +3293,12 @@ final class JavascriptMethodGenerator {
         if (instruction instanceof IInc) {
             IInc iinc = (IInc) instruction;
             ctx.localsUsed[iinc.getVar()] = true;
+            // IINC writes the local exactly like the store opcodes do: any
+            // deferred pending read of lN (or a field path based on it) must
+            // materialise BEFORE the increment, or expressions like
+            // ``data[off + i++]`` read the post-increment value (observed as
+            // the UTF-8 decoder skipping byte 0 and wedging boot).
+            out.append(ctx.flushPendingLocal(iinc.getVar()));
             out.append("  l").append(iinc.getVar()).append(" = (l").append(iinc.getVar()).append(" || 0) + ")
                     .append(iinc.getAmount()).append(";\n");
             return true;

@@ -3082,6 +3082,9 @@ const jvm = {
         this.enqueue(thread);
         return;
       }
+      if (VM_DIAG_ENABLED && millis > 5000) {
+        try { vmTrace("DIAG:LONG_SLEEP:millis=" + millis + ":stack=" + String(new Error().stack).split("\n").slice(1, 10).join("<")); } catch (_e) {}
+      }
       const entry = { kind: "sleep", thread: thread, wakeAt: this.schedulerNow() + millis, cancelled: false };
       thread.waiting = { op: "sleep", entry: entry };
       this._scheduleTimedWakeup(entry);
