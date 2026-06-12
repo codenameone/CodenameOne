@@ -81,17 +81,23 @@ The model ships as a regular project resource, so the same asset loads on every 
 | Android | OpenGL ES 2 via a `GLSurfaceView` peer |
 | Web (JavaScript port) | WebGL on a canvas peer, reusing the core GLSL generator |
 | Windows native | Direct3D 11, HLSL generated and compiled at runtime |
-| Simulator (JavaSE) | A dependency-free software rasterizer |
+| Simulator (JavaSE) | OpenGL via JOGL by default, with a pure-Java software rasterizer as the fallback |
 
-The simulator backend deserves a note: it is a complete depth-buffered, perspective-correct, textured, lit rasterizer written in plain Java. That keeps the simulator free of native dependencies and, just as important, makes 3D rendering deterministic so our screenshot test suite can gate it in CI on every platform.
+The simulator's fallback deserves a note: it is a complete depth-buffered, perspective-correct, textured, lit rasterizer written in plain Java. When OpenGL isn't available, headless CI machines for instance, rendering keeps working and stays deterministic, which is how our screenshot test suite gates 3D output on every platform.
 
 On iOS there is one more trick. Vertex and index buffers are backed by SIMD-aligned arrays, so the mesh data sits at a fixed, aligned C address that is handed to Metal directly with no intermediate copy. Java arrays in, GPU buffers out, nothing in between.
+
+## Two levels of API
+
+The hybrid design goes deeper than materials. Most applications stay on the high level: `Mesh`, `Material`, `Camera`, `Light`, and `Primitives`, with `Matrix4` providing the usual transform helpers (perspective, look-at, rotation, scaling, multiplication) as plain `float[16]` arrays with no object churn per frame.
+
+Underneath sits a command layer for people who know exactly what they want. `VertexBuffer` and `IndexBuffer` hold your geometry, `VertexFormat` describes its layout through typed `VertexAttribute` usages (position, normal, texture coordinates, color), and `Texture` exposes wrap and filter modes. `RenderState` controls depth testing, culling, and blend modes per draw call. Everything funnels through `GraphicsDevice`, which is the one object a `Renderer` ever talks to, and `GpuCapabilities` reports what the device underneath can actually do, maximum texture size for instance, so you can scale content to the hardware.
+
+Two details matter for performance. Pipelines are cached by descriptor, so a thousand draws with the same material compile one shader, not a thousand. And rendering is on-demand by default: a static scene renders when something changes (`requestRender()`), while `setContinuous(true)` switches to a steady frame loop for animation. On-demand is the difference between a 3D product view that sips battery and one that drains it.
 
 ## Designed to degrade
 
 Not every environment has a GPU backend. `RenderView.isSupported()` tells you whether real 3D is available, and where it isn't the view renders a placeholder rather than failing. The seam into the platform layer mirrors how `BrowserComponent` works internally, so ports that don't implement 3D simply report it as unsupported and everything else keeps running.
-
-The hybrid design goes deeper than materials. There is a low-level command layer (vertex buffers, index buffers, textures, render state, draw calls) for people who know exactly what they want, and high-level helpers (`Mesh`, `Material`, `Camera`, `Light`, `Primitives`) for everyone else. The "3D Graphics and Shaders" chapter in the developer guide covers both levels.
 
 ## This is a foundation
 
@@ -99,7 +105,7 @@ A portable 3D API is useful on its own, for product viewers, data visualization,
 
 If you render something and it doesn't look right on one of the backends, please [file an issue](https://github.com/codenameone/CodenameOne/issues) with the model or code attached. Five GPU backends mean five ways for an edge case to hide, and real reports are how the generators improve.
 
-[Friday's release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index of this week's posts. Tomorrow's post builds games on top of this API.
+The new [3D Graphics and Shaders chapter](/developer-guide/#_3d_graphics_and_shaders) in the developer guide covers both API levels in depth, including the shader generation model and per-platform notes. [Friday's release post](/blog/native-java-win32-3d-gaming-printing-and-wallet/) has the full index of this week's posts, and {{< post-link path="/blog/game-development-api-box2d" text="tomorrow's post" >}} builds games on top of this API.
 
 ---
 

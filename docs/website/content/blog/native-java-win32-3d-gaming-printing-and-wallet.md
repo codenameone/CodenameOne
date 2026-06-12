@@ -51,7 +51,7 @@ And it isn't limited to primitives. A binary glTF model authored in any 3D tool 
 
 ![A glTF model rendered by the portable 3D API on the native Mac target](/blog/portable-3d-graphics-api/boombox-mac.png)
 
-On iOS the vertex buffers are SIMD-aligned so the data is handed to Metal with no copy in between. The `RenderView` hosting all of this is a regular component, so a 3D view drops into a normal form next to buttons and text. Tomorrow's post walks through the whole API.
+On iOS the vertex buffers are SIMD-aligned so the data is handed to Metal with no copy in between. The `RenderView` hosting all of this is a regular component, so a 3D view drops into a normal form next to buttons and text. {{< post-link path="/blog/portable-3d-graphics-api" text="Tomorrow's post" >}} walks through the whole API.
 
 ### Game development in the core
 
@@ -76,17 +76,17 @@ No render code in sight: the linked sprites track their physics bodies and the s
 
 ![The gaming API physics demo, Box2D bodies driving sprites](/blog/game-development-api-box2d/gaming-demo.gif)
 
-The physics engine is JBox2D repackaged under `com.codename1.gaming.physics.box2d`, with an idiomatic wrapper that keeps your code in screen pixels and hides the meters and the flipped y-axis. Because everything is pure Java where it matters, it runs unchanged on every target, including iOS. The full tutorial lands on Sunday.
+The physics engine is JBox2D repackaged under `com.codename1.gaming.physics.box2d`, with an idiomatic wrapper that keeps your code in screen pixels and hides the meters and the flipped y-axis. Because everything is pure Java where it matters, it runs unchanged on every target, including iOS. For years we said no to gaming APIs in Codename One; {{< post-link path="/blog/game-development-api-box2d" text="Sunday's full tutorial" >}} also explains what changed our mind.
 
 ### Your Java app as a native Windows executable, no JVM
 
 The new Windows target translates your Java/Kotlin bytecode to C through ParparVM, compiles it with `clang-cl`, and links a standalone Win32 `.exe`. Rendering is Direct2D, text is DirectWrite, networking is WinHTTP, the browser component is WebView2, and there is no JVM anywhere: not bundled, not downloaded, not required on the user's machine. A hello world is around 5MB and the full Initializr app is around 13MB. One cloud build produces **both x64 and arm64** executables.
 
-This is the same app from the same code base, rendered by Direct2D and DirectWrite on Windows:
+To be clear about what this is, because "Java on Windows" carries old associations: there is no Swing here, no AWT, no JavaFX, and no bundled runtime. It is the full Codename One framework compiled to native code, and everything in it works there, including the new printing API and the 3D layer. This is the same app from the same code base, rendered by Direct2D and DirectWrite on Windows:
 
 ![A Codename One app rendering natively on Windows via Direct2D](/blog/native-windows-port-no-jvm/chatview-windows.png)
 
-People have been asking how to turn Java into a real `.exe` since the late nineties, and the modern answer, GraalVM, solves a different problem than we do. Monday's post covers the architecture, the history, and why our executables are a fraction of the size.
+People have been asking how to turn Java into a real `.exe` since the late nineties, and the modern answer, GraalVM, is a tool designed for a different purpose. {{< post-link path="/blog/native-windows-port-no-jvm" text="Monday's post" >}} covers the architecture, the history, and how this completes the native desktop story that the Mac target started.
 
 ### Printing and Apple Wallet
 
@@ -110,7 +110,7 @@ ios.wallet.appGroup=group.com.mybank.app
 ios.wallet.issuerEndpoint=https://api.mybank.com/wallet/provision
 ```
 
-Your app publishes its card list through the new `WalletExtension` API and the extension picks it up from the shared App Group. Both features get the full treatment on Tuesday.
+Your app publishes its card list through the new `WalletExtension` API and the extension picks it up from the shared App Group. Both features get the full treatment in {{< post-link path="/blog/printing-and-apple-wallet" text="Tuesday's post" >}}.
 
 ## Behind the scenes: the build cloud was rebuilt
 
@@ -147,12 +147,12 @@ Valid values are `light`, `dark`, and `auto`. It's safe to call in the construct
 
 ## Upcoming attractions
 
-Four tutorials follow this post, one per day:
+Four tutorials follow this post, one per day; each link below goes live on its day:
 
-- **Saturday.** The portable 3D graphics API. PR [#5151](https://github.com/codenameone/CodenameOne/pull/5151).
-- **Sunday.** Game development in the core, including Box2D physics. PR [#5166](https://github.com/codenameone/CodenameOne/pull/5166).
-- **Monday.** The native Windows port. PRs [#5144](https://github.com/codenameone/CodenameOne/pull/5144), [#5209](https://github.com/codenameone/CodenameOne/pull/5209).
-- **Tuesday.** Printing and Apple Wallet. PRs [#5217](https://github.com/codenameone/CodenameOne/pull/5217), [#5227](https://github.com/codenameone/CodenameOne/pull/5227).
+- **Saturday.** {{< post-link path="/blog/portable-3d-graphics-api" text="The portable 3D graphics API" >}}. PR [#5151](https://github.com/codenameone/CodenameOne/pull/5151).
+- **Sunday.** {{< post-link path="/blog/game-development-api-box2d" text="Game development in the core, including Box2D physics" >}}. PR [#5166](https://github.com/codenameone/CodenameOne/pull/5166).
+- **Monday.** {{< post-link path="/blog/native-windows-port-no-jvm" text="The native Windows port" >}}. PRs [#5144](https://github.com/codenameone/CodenameOne/pull/5144), [#5209](https://github.com/codenameone/CodenameOne/pull/5209).
+- **Tuesday.** {{< post-link path="/blog/printing-and-apple-wallet" text="Printing and Apple Wallet" >}}. PRs [#5217](https://github.com/codenameone/CodenameOne/pull/5217), [#5227](https://github.com/codenameone/CodenameOne/pull/5227).
 
 ## Wrapping up
 

@@ -40,7 +40,7 @@ What backs the API on each platform:
 
 That last row is worth a beat: the printing API shipped in the same week as [the native Windows port](/blog/native-windows-port-no-jvm/) and already covers it, dialog, spooling, PDF rasterization and all.
 
-One honest caveat that the JavaDoc spells out per method: "completed" means the document was handed to the printing system. Some platforms don't expose what happened inside the native dialog afterward, so completion there is reported best-effort. Design your UX around handing off, not around confirming pages hit paper.
+One caveat the JavaDoc spells out per method: "completed" means the document was handed to the printing system. Some platforms don't expose what happened inside the native dialog afterward, so completion there is reported best-effort. Design your UX around handing off, not around confirming pages hit paper.
 
 There is a `PrinterSample` in the repository that prints a generated image and a downloaded PDF if you want a starting point.
 
