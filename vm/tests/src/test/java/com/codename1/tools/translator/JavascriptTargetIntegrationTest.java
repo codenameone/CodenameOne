@@ -537,6 +537,16 @@ class JavascriptTargetIntegrationTest {
 
     static void runJavascriptTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         Class<?> translatorClass = ByteCodeTranslator.class;
+        // The fixtures assert on canonical ``cn1_*`` / Java method names in
+        // the emitted bundle; the whole-bundle identifier renamer and the
+        // call-site alias pass legitimately erase those names in production
+        // output. Translate the fixtures with both passes off so the
+        // name-based assertions keep testing what they were written for
+        // (that each construct TRANSLATES) rather than the minifier.
+        String prevMinify = System.getProperty("parparvm.js.minify.idents.off");
+        String prevAlias = System.getProperty("parparvm.js.alias.off");
+        System.setProperty("parparvm.js.minify.idents.off", "1");
+        System.setProperty("parparvm.js.alias.off", "1");
         try {
             java.lang.reflect.Field verboseField = translatorClass.getField("verbose");
             boolean originalVerbose = verboseField.getBoolean(null);
@@ -565,6 +575,16 @@ class JavascriptTargetIntegrationTest {
                 verboseField.setBoolean(null, originalVerbose);
             }
         } finally {
+            if (prevMinify == null) {
+                System.clearProperty("parparvm.js.minify.idents.off");
+            } else {
+                System.setProperty("parparvm.js.minify.idents.off", prevMinify);
+            }
+            if (prevAlias == null) {
+                System.clearProperty("parparvm.js.alias.off");
+            } else {
+                System.setProperty("parparvm.js.alias.off", prevAlias);
+            }
             Parser.cleanup();
         }
     }

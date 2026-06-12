@@ -2841,6 +2841,17 @@ final class JavascriptMethodGenerator {
                     }
                 }
                 return false;
+            } else {
+                String dump = System.getProperty("parparvm.js.structured.dump");
+                if (dump != null && !dump.isEmpty()
+                        && (cls.getClsName() + "." + method.getMethodName()).contains(dump)) {
+                    try {
+                        java.nio.file.Files.write(
+                                java.nio.file.Paths.get("/tmp/cn1-dump-" + cls.getClsName() + "." + method.getMethodName() + ".js"),
+                                instructionBody.toString().getBytes("UTF-8"));
+                    } catch (Exception ignore) {
+                    }
+                }
             }
             body.append(setup);
             // Stack slots and ``used but not arg-initialized`` locals
@@ -3074,6 +3085,18 @@ final class JavascriptMethodGenerator {
             List<Instruction> instructions, Map<Label, Integer> labelToIndex, StraightLineContext ctx) {
         if (method.isSynchronizedMethod() || labelToIndex == null) {
             return _sb(method, instructions, "L2919");
+        }
+        // Bisection knob: comma-separated substrings matched against
+        // ``<class>.<method>``; matches fall back to the interpreter.
+        String skip = System.getProperty("parparvm.js.structured.skip");
+        if (skip != null && !skip.isEmpty()) {
+            String id = (currentEmissionClass != null ? currentEmissionClass.getClsName() : "?")
+                    + "." + method.getMethodName();
+            for (String part : skip.split(",")) {
+                if (!part.isEmpty() && id.contains(part)) {
+                    return _sb(method, instructions, "SKIP_KNOB");
+                }
+            }
         }
         boolean hasJump = false;
         for (int i = 0; i < instructions.size(); i++) {

@@ -186,6 +186,7 @@ final class JavascriptBundleWriter {
             chunkStrings.add(c.toString());
         }
         minifyGeneratedIdentifiers(chunkStrings);
+        aliasHotCn1Identifiers(chunkStrings);
 
         int leadCount = chunkStrings.size() - 1;
         for (int i = 0; i < leadCount; i++) {
@@ -337,6 +338,366 @@ final class JavascriptBundleWriter {
      * names are excluded from {@code map} (see caller) and their string spellings
      * must be left intact. Tokens are {@code [A-Za-z0-9_$]} runs.
      */
+    /**
+     * Call-site aliasing for the {@code cn1_*} identifiers the renamer must
+     * NOT touch (constructors / clinits resolved via {@code global["cn1_"+...]},
+     * names string-referenced by the bridge, native override targets). Those
+     * keep their canonical GLOBAL name -- but every in-code call site can go
+     * through a short alias instead: {@code $Ja=cn1_long_name} once, then
+     * {@code $Ja(...)} at each of the N call sites. At ~1.7 MB these
+     * unminified tokens are the single largest bundle contributor.
+     *
+     * <p>Late binding is preserved: the emitted {@code __cn1Al} registry maps
+     * canonical name to alias, and every code path that reassigns a
+     * {@code cn1_*} global (installNativeBindings in the runtime, bindNative /
+     * bindCiFallback in port.js) refreshes the alias through
+     * {@code global.__cn1RefreshAlias}. Definition sites and string literals
+     * keep the canonical spelling.
+     *
+     * <p>Kill switch: {@code -Dparparvm.js.alias.off}.
+     */
+    private static void aliasHotCn1Identifiers(java.util.List<String> chunkStrings) {
+        if (System.getProperty("parparvm.js.alias.off") != null) {
+            return;
+        }
+        // Bundle-defined tokens alias by direct reference (function
+        // hoisting); runtime-bound names (native impls installed by the
+        // bridge AFTER the app chunks load) alias via a ``global.`` read --
+        // a property access cannot throw ReferenceError on a missing name,
+        // and installNativeBindings refreshes the alias when the real
+        // implementation lands. Aliased call sites only execute once the
+        // app runs, which is strictly after bindings install.
+        java.util.regex.Pattern defPattern = java.util.regex.Pattern.compile(
+                "function\\*?\\s+(cn1_[A-Za-z0-9_]+)\\s*\\(");
+        java.util.Set<String> defs = new java.util.HashSet<String>();
+        for (String chunk : chunkStrings) {
+            java.util.regex.Matcher m = defPattern.matcher(chunk);
+            while (m.find()) {
+                defs.add(m.group(1));
+            }
+        }
+        // Count call-site occurrences (outside strings, not the def itself).
+        java.util.Map<String, Integer> counts = new java.util.HashMap<String, Integer>();
+        for (String chunk : chunkStrings) {
+            countCn1CallSites(chunk, null, counts);
+        }
+        // Pick winners: net saving must clear the alias-table overhead.
+        java.util.List<String> winners = new java.util.ArrayList<String>();
+        for (java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
+            String t = e.getKey();
+            int n = e.getValue();
+            int aliasLen = 4; // estimate; actual $J + base26
+            int saving = n * (t.length() - aliasLen)
+                    - (2 * t.length() + 2 * aliasLen + 16); // var decl + registry entry
+            if (n >= 2 && saving > 64) {
+                winners.add(t);
+            }
+        }
+        if (winners.isEmpty()) {
+            return;
+        }
+        // Deterministic order: biggest saving first gets the shortest alias.
+        java.util.Collections.sort(winners, (x, y) -> {
+            long sx = (long) counts.get(x) * x.length();
+            long sy = (long) counts.get(y) * y.length();
+            if (sx != sy) {
+                return Long.compare(sy, sx);
+            }
+            return x.compareTo(y);
+        });
+        java.util.Map<String, String> aliasMap = new java.util.LinkedHashMap<String, String>();
+        int idx = 0;
+        // Bisection knob: cap how many (saving-ranked) names alias.
+        int aliasMax = Integer.getInteger("parparvm.js.alias.max", Integer.MAX_VALUE);
+        for (String w : winners) {
+            if (idx >= aliasMax) {
+                break;
+            }
+            aliasMap.put(w, "$J" + base26(idx++));
+        }
+        for (int i = 0; i < chunkStrings.size(); i++) {
+            chunkStrings.set(i, renameCallSites(chunkStrings.get(i), aliasMap));
+        }
+        StringBuilder tail = new StringBuilder();
+        tail.append("\nvar __cn1Al={");
+        boolean first = true;
+        for (java.util.Map.Entry<String, String> e : aliasMap.entrySet()) {
+            if (!first) {
+                tail.append(',');
+            }
+            first = false;
+            tail.append('"').append(e.getKey()).append("\":\"").append(e.getValue()).append('"');
+        }
+        tail.append("};\n");
+        for (java.util.Map.Entry<String, String> e : aliasMap.entrySet()) {
+            tail.append("var ").append(e.getValue()).append('=');
+            if (!defs.contains(e.getKey())) {
+                // runtime-bound: avoid ReferenceError on the load-time read
+                tail.append("global.");
+            }
+            tail.append(e.getKey()).append(";\n");
+        }
+        int last = chunkStrings.size() - 1;
+        chunkStrings.set(last, chunkStrings.get(last) + tail);
+    }
+
+    private static String base26(int n) {
+        StringBuilder sb = new StringBuilder();
+        n++;
+        while (n > 0) {
+            n--;
+            sb.insert(0, (char) ('a' + (n % 26)));
+            n /= 26;
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Count cn1_* tokens outside string literals, excluding definition
+     * sites, property positions, and -- critically -- TOP-LEVEL statement
+     * positions: the alias vars initialise in the LAST chunk's tail, so a
+     * reference executed during an earlier chunk's evaluation (``_Z({...,
+     * c: cn1_X___CLINIT__})`` registrations and similar) would read the
+     * hoisted-but-unassigned alias as ``undefined``. Only sites inside a
+     * function body (which run strictly after every chunk has evaluated)
+     * may alias.
+     */
+    private static void countCn1CallSites(String src, java.util.Set<String> defs,
+            java.util.Map<String, Integer> counts) {
+        int n = src.length();
+        int i = 0;
+        char inString = 0;
+        int functionDepth = 0;
+        boolean[] braceIsFunction = new boolean[256];
+        int braceDepth = 0;
+        while (i < n) {
+            char c = src.charAt(i);
+            if (inString != 0) {
+                if (c == '\\' && i + 1 < n) {
+                    i += 2;
+                    continue;
+                }
+                if (c == inString) {
+                    inString = 0;
+                }
+                i++;
+                continue;
+            }
+            if (c == '"' || c == '\'' || c == '`') {
+                inString = c;
+                i++;
+                continue;
+            }
+            if (c == '{') {
+                boolean fnBody = isFunctionBodyOpen(src, i);
+                if (braceDepth < braceIsFunction.length) {
+                    braceIsFunction[braceDepth] = fnBody;
+                }
+                braceDepth++;
+                if (fnBody) {
+                    functionDepth++;
+                }
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                braceDepth--;
+                if (braceDepth >= 0 && braceDepth < braceIsFunction.length && braceIsFunction[braceDepth]) {
+                    functionDepth--;
+                    braceIsFunction[braceDepth] = false;
+                }
+                i++;
+                continue;
+            }
+            if (c == 'c' && src.startsWith("cn1_", i)
+                    && (i == 0 || !isIdentChar(src.charAt(i - 1)))) {
+                int j = i + 4;
+                while (j < n && isIdentChar(src.charAt(j))) {
+                    j++;
+                }
+                String token = src.substring(i, j);
+                if (functionDepth > 0
+                        && (defs == null || defs.contains(token)) && !isDefSite(src, i) && !isPropertyPosition(src, i, j)) {
+                    Integer cur = counts.get(token);
+                    counts.put(token, cur == null ? 1 : cur + 1);
+                }
+                i = j;
+                continue;
+            }
+            i++;
+        }
+    }
+
+    /**
+     * True when the ``{`` at {@code i} opens a function BODY: the
+     * preceding non-space char is the ``)`` of a parameter list whose
+     * opener is preceded by ``function`` (possibly with ``*`` and a
+     * name). Object literals, blocks, and control-flow braces return
+     * false.
+     */
+    private static boolean isFunctionBodyOpen(String src, int i) {
+        int k = i - 1;
+        while (k >= 0 && Character.isWhitespace(src.charAt(k))) {
+            k--;
+        }
+        if (k < 0 || src.charAt(k) != ')') {
+            return false;
+        }
+        int depth = 0;
+        while (k >= 0) {
+            char d = src.charAt(k);
+            if (d == ')') {
+                depth++;
+            } else if (d == '(') {
+                depth--;
+                if (depth == 0) {
+                    break;
+                }
+            }
+            k--;
+        }
+        k--;
+        while (k >= 0 && Character.isWhitespace(src.charAt(k))) {
+            k--;
+        }
+        // optional function name
+        while (k >= 0 && isIdentChar(src.charAt(k))) {
+            k--;
+        }
+        while (k >= 0 && Character.isWhitespace(src.charAt(k))) {
+            k--;
+        }
+        if (k >= 0 && src.charAt(k) == '*') {
+            k--;
+            while (k >= 0 && Character.isWhitespace(src.charAt(k))) {
+                k--;
+            }
+        }
+        return k >= 7 && src.regionMatches(k - 7, "function", 0, 8)
+                && (k == 7 || !isIdentChar(src.charAt(k - 8)));
+    }
+
+    private static boolean isIdentChar(char d) {
+        return (d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z')
+                || (d >= '0' && d <= '9') || d == '_' || d == '$';
+    }
+
+    /**
+     * True when the token is a member access ({@code obj.cn1_x}) or an
+     * object-literal key ({@code cn1_x: ...}) -- property NAMES must keep
+     * their canonical spelling; only variable references may alias.
+     */
+    private static boolean isPropertyPosition(String src, int i, int j) {
+        int k = i - 1;
+        while (k >= 0 && (src.charAt(k) == ' ' || src.charAt(k) == '\t' || src.charAt(k) == '\n')) {
+            k--;
+        }
+        if (k >= 0 && src.charAt(k) == '.') {
+            return true;
+        }
+        int m = j;
+        while (m < src.length() && (src.charAt(m) == ' ' || src.charAt(m) == '\t')) {
+            m++;
+        }
+        return m < src.length() && src.charAt(m) == ':';
+    }
+
+    /** True when the token starting at {@code i} is preceded by the function keyword. */
+    private static boolean isDefSite(String src, int i) {
+        int k = i - 1;
+        while (k >= 0 && (src.charAt(k) == ' ' || src.charAt(k) == '\t' || src.charAt(k) == '\n')) {
+            k--;
+        }
+        if (k >= 0 && src.charAt(k) == '*') {
+            k--;
+            while (k >= 0 && (src.charAt(k) == ' ' || src.charAt(k) == '\t')) {
+                k--;
+            }
+        }
+        return k >= 7 && src.regionMatches(k - 7, "function", 0, 8)
+                && (k == 7 || !isIdentChar(src.charAt(k - 8)));
+    }
+
+    /**
+     * Rewrite alias-mapped cn1_* tokens outside strings, sparing
+     * definition sites, property positions, and top-level statement
+     * positions (see countCn1CallSites for why top-level must keep the
+     * canonical name).
+     */
+    private static String renameCallSites(String src, java.util.Map<String, String> aliasMap) {
+        int n = src.length();
+        StringBuilder out = new StringBuilder(n);
+        int i = 0;
+        char inString = 0;
+        int functionDepth = 0;
+        boolean[] braceIsFunction = new boolean[256];
+        int braceDepth = 0;
+        while (i < n) {
+            char c = src.charAt(i);
+            if (inString != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < n) {
+                    out.append(src.charAt(i + 1));
+                    i += 2;
+                    continue;
+                }
+                if (c == inString) {
+                    inString = 0;
+                }
+                i++;
+                continue;
+            }
+            if (c == '"' || c == '\'' || c == '`') {
+                inString = c;
+                out.append(c);
+                i++;
+                continue;
+            }
+            if (c == '{') {
+                boolean fnBody = isFunctionBodyOpen(src, i);
+                if (braceDepth < braceIsFunction.length) {
+                    braceIsFunction[braceDepth] = fnBody;
+                }
+                braceDepth++;
+                if (fnBody) {
+                    functionDepth++;
+                }
+                out.append(c);
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                braceDepth--;
+                if (braceDepth >= 0 && braceDepth < braceIsFunction.length && braceIsFunction[braceDepth]) {
+                    functionDepth--;
+                    braceIsFunction[braceDepth] = false;
+                }
+                out.append(c);
+                i++;
+                continue;
+            }
+            if (c == 'c' && src.startsWith("cn1_", i)
+                    && (i == 0 || !isIdentChar(src.charAt(i - 1)))) {
+                int j = i + 4;
+                while (j < n && isIdentChar(src.charAt(j))) {
+                    j++;
+                }
+                String token = src.substring(i, j);
+                String alias = aliasMap.get(token);
+                if (alias != null && functionDepth > 0 && !isDefSite(src, i) && !isPropertyPosition(src, i, j)) {
+                    out.append(alias);
+                } else {
+                    out.append(token);
+                }
+                i = j;
+                continue;
+            }
+            out.append(c);
+            i++;
+        }
+        return out.toString();
+    }
+
     private static String renameTokens(String src, java.util.Map<String, String> map) {
         int n = src.length();
         StringBuilder out = new StringBuilder(n);
@@ -431,11 +792,6 @@ final class JavascriptBundleWriter {
             }
         }
         return tokens;
-    }
-
-    private static boolean isIdentChar(char d) {
-        return (d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z')
-                || (d >= '0' && d <= '9') || d == '_' || d == '$';
     }
 
     /**

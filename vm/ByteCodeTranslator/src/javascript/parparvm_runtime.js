@@ -4747,6 +4747,7 @@ function bindNative(names, fn) {
     jvm.nativeMethods[name] = fn;
     global[name] = fn;
     jvm[name] = fn;
+    refreshCn1Alias(name, fn);
     installVirtualOverride(name);
   }
   for (let i = 0; i < names.length; i++) {
@@ -4847,6 +4848,7 @@ function installNativeBindings() {
     }
     global[name] = nativeFn;
     jvm[name] = nativeFn;
+    refreshCn1Alias(name, nativeFn);
     overrideMethodMaps(name, nativeFn);
     if (!name.endsWith("__impl")) {
       const implName = name + "__impl";
@@ -4858,9 +4860,25 @@ function installNativeBindings() {
       }
       global[name + "__impl"] = nativeFn;
       jvm[name + "__impl"] = nativeFn;
+      refreshCn1Alias(implName, nativeFn);
     }
   }
 }
+// Call-site aliasing support: the bundle writer rewrites hot ``cn1_*``
+// call sites to short ``$J*`` aliases and emits an ``__cn1Al`` registry
+// (canonical name -> alias). Any code path that reassigns a ``cn1_*``
+// global MUST refresh the alias through here or aliased call sites keep
+// invoking the stale original.
+function refreshCn1Alias(name, fn) {
+  const al = global.__cn1Al;
+  if (al) {
+    const alias = al[name];
+    if (alias) {
+      global[alias] = fn;
+    }
+  }
+}
+global.__cn1RefreshAlias = refreshCn1Alias;
 installCompatibilityClasses();
 function getQueryParameter(name) {
   const loc = (global.window || global).location;

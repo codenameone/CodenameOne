@@ -379,6 +379,7 @@ function aliasGlobalToImpl(symbol) {
     return false;
   }
   global[symbol] = impl;
+  cn1RefreshAlias(symbol, impl);
   emitDiagLine("PARPAR:DIAG:INIT:aliasGlobalToImpl=" + symbol);
   return true;
 }
@@ -630,6 +631,7 @@ function wrapGlobalGeneratorWithDiag(symbol, marker) {
   };
   wrapped.__cn1DiagWrapped = true;
   global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
   return true;
 }
 
@@ -730,6 +732,19 @@ function ensureKotlinUnitShim() {
 }
 ensureKotlinUnitShim();
 
+
+// Bundle call-site aliasing: hot cn1_* call sites go through short $J*
+// aliases (see JavascriptBundleWriter.aliasHotCn1Identifiers). Whenever
+// port.js reassigns a cn1_* global, refresh the alias too or aliased
+// call sites keep invoking the replaced function.
+function cn1RefreshAlias(symbol, fn) {
+  if (typeof global.__cn1RefreshAlias === "function") {
+    global.__cn1RefreshAlias(symbol, fn);
+  } else if (global.__cn1Al && global.__cn1Al[symbol]) {
+    global[global.__cn1Al[symbol]] = fn;
+  }
+}
+
 function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
   if (typeof global[symbol] === "function") {
     return false;
@@ -742,6 +757,7 @@ function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
     }
     return null;
   };
+  cn1RefreshAlias(symbol, global[symbol]);
   emitCiFallbackMarker(marker, "ENABLED");
   emitDiagLine("PARPAR:DIAG:INIT:missingGlobalDelegate:" + symbol + "->" + delegateSymbol);
   return true;
@@ -2453,6 +2469,7 @@ function installGlobalArrayReturnCoerce(symbol, className, marker) {
   };
   wrapped.__cn1ArrayReturnCoerceWrapped = true;
   global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
   if (jvm && jvm.classes && jvm.classes[className] && jvm.classes[className].methods && typeof jvm.classes[className].methods[symbol] === "function") {
     jvm.classes[className].methods[symbol] = wrapped;
   }
@@ -3254,6 +3271,7 @@ function installGlobalIllegalStateBypass(symbol, marker) {
   };
   wrapped.__cn1IllegalStateBypassWrapped = true;
   global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
   if (jvm && jvm.classes && jvm.classes["com_codename1_ui_Form"] && jvm.classes["com_codename1_ui_Form"].methods && typeof jvm.classes["com_codename1_ui_Form"].methods[symbol] === "function") {
     jvm.classes["com_codename1_ui_Form"].methods[symbol] = wrapped;
   }
@@ -3744,6 +3762,7 @@ const html5HideSplashWorkerSymbol = "cn1_com_codename1_impl_html5_HTML5Implement
     return null;
   };
   global[html5HideSplashWorkerSymbol] = replacement;
+  cn1RefreshAlias(html5HideSplashWorkerSymbol, replacement);
   if (jvm && jvm.nativeMethods) {
     jvm.nativeMethods["cn1_s_hideSplash"] = replacement;
     jvm.nativeMethods[html5HideSplashWorkerSymbol] = replacement;
@@ -4741,6 +4760,8 @@ const cn1ssWs = {
   queue: [],      // {test, bytes} buffered while the socket is still connecting
   pending: 0      // sent-but-unacked frames, for an optional flush at suite end
 };
+cn1RefreshAlias(hashMapComputeHashCodeMethodId, global[hashMapComputeHashCodeMethodId]);
+cn1RefreshAlias(hashMapComputeHashCodeImplMethodId, global[hashMapComputeHashCodeImplMethodId]);
 
 function cn1ssWsHost() {
   try {
