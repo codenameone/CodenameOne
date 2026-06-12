@@ -2826,6 +2826,15 @@ final class JavascriptMethodGenerator {
                 }
             } else if (!appendStructuredInstructionBody(instructionBody, method, instructions, labelToIndex, ctx)) {
                 return false;
+            } else if (!structuredBodyIsWellFormed(instructionBody.toString())) {
+                // The region machinery produced structurally invalid JS
+                // (mispaired braces / severed try) -- fall back to the
+                // interpreter rather than ship a file esbuild can't parse.
+                if (System.getProperty("parparvm.js.trydiag") != null) {
+                    System.err.println("[trydiag] MALFORMED " + cls.getClsName() + "." + method.getMethodName()
+                            + method.getSignature());
+                }
+                return false;
             }
             body.append(setup);
             // Stack slots and ``used but not arg-initialized`` locals
@@ -2940,6 +2949,100 @@ final class JavascriptMethodGenerator {
     }
 
     /**
+     * Emission-time structural validation of a generated method body:
+     * simulates the JS block structure ({@code {}} nesting plus
+     * {@code try}/{@code catch}/{@code finally} pairing) the same way a
+     * parser would, skipping string literals. The structured emitter's
+     * region machinery has had label-ownership/close-ordering defects
+     * that produced syntactically invalid JS; because the build's
+     * esbuild pass reports such breakage only as a WARNING and ships
+     * the file unminified, an invalid method must never leave the
+     * translator. A method whose body fails this check falls back to
+     * the interpreter (and is reported under {@code parparvm.js.trydiag}).
+     */
+    static boolean structuredBodyIsWellFormed(String body) {
+        // 'T' = open try block, 'C' = open catch/finally block, 'B' = any other block
+        java.util.ArrayDeque<Character> stack = new java.util.ArrayDeque<Character>();
+        int n = body.length();
+        int i = 0;
+        while (i < n) {
+            char c = body.charAt(i);
+            if (c == '"' || c == '\'') {
+                char quote = c;
+                i++;
+                while (i < n) {
+                    char d = body.charAt(i);
+                    if (d == '\\') {
+                        i += 2;
+                        continue;
+                    }
+                    if (d == quote) {
+                        break;
+                    }
+                    i++;
+                }
+                i++;
+                continue;
+            }
+            if (c == '{') {
+                // look back for the keyword introducing this block
+                int j = i - 1;
+                while (j >= 0 && Character.isWhitespace(body.charAt(j))) {
+                    j--;
+                }
+                char kind = 'B';
+                if (j >= 2 && body.charAt(j) == 'y' && body.charAt(j - 1) == 'r' && body.charAt(j - 2) == 't'
+                        && (j < 3 || !Character.isLetterOrDigit(body.charAt(j - 3)))) {
+                    kind = 'T';
+                } else if (j >= 0 && body.charAt(j) == ')') {
+                    // could be catch(...) { -- check the word before the parens
+                    int k = j;
+                    int depth = 0;
+                    while (k >= 0) {
+                        char d = body.charAt(k);
+                        if (d == ')') depth++;
+                        else if (d == '(') { depth--; if (depth == 0) break; }
+                        k--;
+                    }
+                    k--;
+                    while (k >= 0 && Character.isWhitespace(body.charAt(k))) k--;
+                    if (k >= 4 && body.regionMatches(k - 4, "catch", 0, 5)) {
+                        kind = 'C';
+                    }
+                } else if (j >= 6 && body.regionMatches(j - 6, "finally", 0, 7)) {
+                    kind = 'C';
+                }
+                stack.push(kind);
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                if (stack.isEmpty()) {
+                    return false;
+                }
+                char kind = stack.pop();
+                // a try block's close must be followed by catch or finally
+                int j = i + 1;
+                while (j < n && Character.isWhitespace(body.charAt(j))) {
+                    j++;
+                }
+                boolean catchNext = j + 5 <= n && body.regionMatches(j, "catch", 0, 5);
+                boolean finallyNext = j + 7 <= n && body.regionMatches(j, "finally", 0, 7);
+                if (kind == 'T' && !catchNext && !finallyNext) {
+                    return false;
+                }
+                if (kind != 'T' && (catchNext || finallyNext)) {
+                    return false;
+                }
+                i++;
+                continue;
+            }
+            i++;
+        }
+        return stack.isEmpty();
+    }
+
+    /**
      * True when a branch from {@code fromBlock} to {@code toBlock} crosses
      * INTO some try region's span {@code [start, endExcl)} from outside it.
      * Such a branch cannot be expressed with the structured emission's
@@ -2976,7 +3079,14 @@ final class JavascriptMethodGenerator {
             if (instruction instanceof BasicInstruction) {
                 int opcode = ((BasicInstruction) instruction).getOpcode();
                 if (opcode == Opcodes.MONITORENTER || opcode == Opcodes.MONITOREXIT) {
-                    return _sb(method, instructions, "L2934");
+                    // ``_me`` can yield the cooperative scheduler, so a
+                    // monitor in a sync-classified body has nowhere to
+                    // suspend -- that combination stays interpreted
+                    // (the interpreter has the same constraint, so it
+                    // should never occur; bail defensively).
+                    if (!method.isJavascriptSuspending()) {
+                        return _sb(method, instructions, "L2934");
+                    }
                 }
             }
         }
@@ -3103,8 +3213,21 @@ final class JavascriptMethodGenerator {
             Integer sB = sI == null ? null : startToBlock.get((int) sI);
             Integer eB = eI == null ? null : startToBlock.get((int) eI);
             Integer hB = hI == null ? null : startToBlock.get((int) hI);
+            if (sB != null && hB != null && sB.equals(hB) && tc.getType() == null) {
+                // javac's self-protecting cleanup entry ([h, x) -> h, type
+                // any): it guards the synchronized handler's own
+                // ``monitorexit; athrow`` against a throwing monitorexit by
+                // re-dispatching to itself -- which would loop forever if it
+                // ever fired. Our ``_mx`` only throws for unowned monitors
+                // (impossible for compiler-balanced blocks), so the entry is
+                // unreachable; skip it instead of bailing the whole method.
+                continue;
+            }
             if (sB == null || eB == null || hB == null || eB <= sB || (hB >= sB && hB < eB)) {
-                return _sb(method, instructions, "L3062"); // not block aligned / handler inside its range
+                return _sb(method, instructions, "L3062"
+                        + ":s" + (sB == null ? "?" : sB) + ":e" + (eB == null ? "?" : eB)
+                        + ":h" + (hB == null ? "?" : hB)
+                        + ":t" + (tc.getType() == null ? "any" : "typed")); // not block aligned / handler inside its range
             }
             long key = ((long) sB << 32) | (eB & 0xffffffffL);
             java.util.List<int[]> hs = tryRanges.get(key);
@@ -3899,6 +4022,24 @@ final class JavascriptMethodGenerator {
             case Opcodes.ATHROW:
                 out.append("  throw ").append(ctx.pop()).append(";\n");
                 return true;
+            case Opcodes.MONITORENTER: {
+                // ``_me`` may yield (contended monitor / cooperative
+                // hand-off), so this opcode only reaches here in
+                // suspending bodies (the eligibility scan bails sync
+                // ones). Pending field reads materialise first: the
+                // enter is a synchronization point and another green
+                // thread may have run since they were deferred.
+                String target = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
+                out.append("  yield* _me(").append(target).append(");\n");
+                return true;
+            }
+            case Opcodes.MONITOREXIT: {
+                String target = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
+                out.append("  _mx(").append(target).append(");\n");
+                return true;
+            }
             case Opcodes.ARRAYLENGTH:
                 return emitUnary(out, ctx, "%s.length");
             case Opcodes.AALOAD:
