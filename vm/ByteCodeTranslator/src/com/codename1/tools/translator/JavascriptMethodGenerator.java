@@ -2819,7 +2819,7 @@ final class JavascriptMethodGenerator {
             if (plain) {
                 for (int i = 0; i < instructions.size(); i++) {
                     Instruction instruction = instructions.get(i);
-                    if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
+                    if (!appendStraightLineInstruction(instructionBody, method, instructions, i, ctx)) {
                         return false;
                     }
                 }
@@ -2910,6 +2910,8 @@ final class JavascriptMethodGenerator {
      * returns false to fall back to the interpreter on anything unsupported,
      * on a stack-depth mismatch at a merge point, or past the block budget.
      */
+    private static int structuredSwitchOrdinal = 0;
+
     private static boolean appendStructuredInstructionBody(StringBuilder bodyOut, BytecodeMethod method,
             List<Instruction> instructions, Map<Label, Integer> labelToIndex, StraightLineContext ctx) {
         if (method.isSynchronizedMethod() || labelToIndex == null) {
@@ -2918,11 +2920,10 @@ final class JavascriptMethodGenerator {
         boolean hasJump = false;
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
-            if (instruction instanceof SwitchInstruction || instruction instanceof TryCatch
-                    || instruction instanceof MultiArray) {
+            if (instruction instanceof TryCatch || instruction instanceof MultiArray) {
                 return false;
             }
-            if (instruction instanceof Jump) {
+            if (instruction instanceof Jump || instruction instanceof SwitchInstruction) {
                 hasJump = true;
             }
             if (instruction instanceof BasicInstruction) {
@@ -2957,6 +2958,37 @@ final class JavascriptMethodGenerator {
         }
         // Debug bisection: parparvm.js.structured.loopskip=K,M structures a
         // loop-containing method only when hash(name)%M != K.
+        boolean hasSwitchInstr = false;
+        for (int i = 0; i < instructions.size(); i++) {
+            if (instructions.get(i) instanceof SwitchInstruction) {
+                hasSwitchInstr = true;
+                break;
+            }
+        }
+        String swKeep = System.getProperty("parparvm.js.structured.switchkeep");
+        if (hasSwitchInstr) {
+            Integer swMax = Integer.getInteger("parparvm.js.structured.switchmax");
+            if (swMax != null) {
+                int ord = ++structuredSwitchOrdinal;
+                if (ord > swMax) {
+                    return false;
+                }
+                System.err.println("[structured-switch-ordinal] " + ord + " " + method.getMethodName() + method.getSignature());
+            }
+            if ("0".equals(System.getProperty("parparvm.js.structured.switch", "1"))) {
+                return false;
+            }
+            if (swKeep != null) {
+                int comma = swKeep.indexOf(',');
+                int k = Integer.parseInt(swKeep.substring(0, comma));
+                int mm = Integer.parseInt(swKeep.substring(comma + 1));
+                int hh = Math.abs((method.getMethodName() + method.getSignature()).hashCode());
+                if (hh % mm != k) {
+                    return false;
+                }
+                System.err.println("[structured-switchkeep] " + method.getMethodName() + method.getSignature());
+            }
+        }
         String onlySpec = System.getProperty("parparvm.js.structured.looponly");
         if (onlySpec != null && !loopEndProbeEmpty(instructions, labelToIndex)
                 && !(method.getMethodName() + method.getSignature()).contains(onlySpec)) {
@@ -3012,6 +3044,23 @@ final class JavascriptMethodGenerator {
                     return false;
                 }
                 targets.add(tb);
+            } else if (instruction instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) instruction;
+                java.util.List<Label> swLabels = new java.util.ArrayList<Label>();
+                if (sw.getDefaultLabel() != null) {
+                    swLabels.add(sw.getDefaultLabel());
+                }
+                if (sw.getLabels() != null) {
+                    swLabels.addAll(java.util.Arrays.asList(sw.getLabels()));
+                }
+                for (Label l : swLabels) {
+                    Integer t = l == null ? null : labelToIndex.get(l);
+                    Integer tb = t == null ? null : startToBlock.get((int) t);
+                    if (tb == null) {
+                        return false;
+                    }
+                    targets.add(tb);
+                }
             }
         }
         // Forward jumps to a loop header from before the loop enter via a
@@ -3124,16 +3173,7 @@ final class JavascriptMethodGenerator {
                     } else if (entrySp[tb] != ctx.sp) {
                         return false;
                     }
-                    String go;
-                    if (loopEnd.containsKey(tb) && tb <= b) {
-                        // back edge / jump to enclosing loop header
-                        go = "continue B" + tb;
-                    } else if (loopEnd.containsKey(tb)) {
-                        // forward entry to a loop's top from before it
-                        go = "break P" + tb;
-                    } else {
-                        go = "break B" + tb;
-                    }
+                    String go = structuredGoto(tb, b, loopEnd);
                     if (jump.getOpcode() == Opcodes.GOTO) {
                         if (tb != b + 1) {
                             bodyOut.append("  ").append(go).append(";\n");
@@ -3146,7 +3186,39 @@ final class JavascriptMethodGenerator {
                     }
                     continue;
                 }
-                if (!appendStraightLineInstruction(bodyOut, method, instruction, ctx)) {
+                if (instruction instanceof SwitchInstruction) {
+                    SwitchInstruction sw = (SwitchInstruction) instruction;
+                    String sel = ctx.pop();
+                    bodyOut.append(ctx.flushAllPending());
+                    bodyOut.append("  switch ((").append(sel).append(")|0) {\n");
+                    int[] keys = sw.getKeys();
+                    Label[] swl = sw.getLabels();
+                    for (int ki = 0; swl != null && ki < swl.length; ki++) {
+                        Integer t = swl[ki] == null ? null : labelToIndex.get(swl[ki]);
+                        int tb = startToBlock.get((int) t);
+                        if (entrySp[tb] < 0) {
+                            entrySp[tb] = ctx.sp;
+                        } else if (entrySp[tb] != ctx.sp) {
+                            return false;
+                        }
+                        int key = (keys != null && ki < keys.length) ? keys[ki] : ki;
+                        bodyOut.append("  case ").append(key).append(": ")
+                               .append(structuredGoto(tb, b, loopEnd)).append(";\n");
+                    }
+                    Integer dT = sw.getDefaultLabel() == null ? null : labelToIndex.get(sw.getDefaultLabel());
+                    int db = startToBlock.get((int) dT);
+                    if (entrySp[db] < 0) {
+                        entrySp[db] = ctx.sp;
+                    } else if (entrySp[db] != ctx.sp) {
+                        return false;
+                    }
+                    bodyOut.append("  default: ").append(structuredGoto(db, b, loopEnd)).append(";\n  }\n");
+                    if (i == block.end - 1) {
+                        reachable = false;
+                    }
+                    continue;
+                }
+                if (!appendStraightLineInstruction(bodyOut, method, instructions, i, ctx)) {
                     return false;
                 }
                 if (isTerminatingInstruction(instruction) && i == block.end - 1) {
@@ -3198,6 +3270,17 @@ final class JavascriptMethodGenerator {
             }
         }
         return true;
+    }
+
+    /** break/continue statement reaching block tb from block b. */
+    private static String structuredGoto(int tb, int b, java.util.TreeMap<Integer, Integer> loopEnd) {
+        if (loopEnd.containsKey(tb) && tb <= b) {
+            return "continue B" + tb;   // back edge to enclosing loop header
+        }
+        if (loopEnd.containsKey(tb)) {
+            return "break P" + tb;      // forward entry to a loop's top
+        }
+        return "break B" + tb;
     }
 
     /** Open the labeled blocks owned by one region, deepest target first
@@ -3279,8 +3362,9 @@ final class JavascriptMethodGenerator {
         return true;
     }
 
-    private static boolean appendStraightLineInstruction(StringBuilder out, BytecodeMethod method, Instruction instruction,
-            StraightLineContext ctx) {
+    private static boolean appendStraightLineInstruction(StringBuilder out, BytecodeMethod method,
+            List<Instruction> instructions, int index, StraightLineContext ctx) {
+        Instruction instruction = instructions.get(index);
         if (instruction instanceof LabelInstruction || instruction instanceof LineNumber || instruction instanceof LocalVariable) {
             return true;
         }
@@ -3313,7 +3397,7 @@ final class JavascriptMethodGenerator {
             return appendStraightLineFieldInstruction(out, (Field) instruction, ctx);
         }
         if (instruction instanceof Invoke) {
-            return appendStraightLineInvokeInstruction(out, (Invoke) instruction, ctx);
+            return appendStraightLineInvokeInstruction(out, (Invoke) instruction, instructions, index, ctx);
         }
         return false;
     }
@@ -3626,20 +3710,35 @@ final class JavascriptMethodGenerator {
 
     private static boolean emitBinary(StringBuilder out, StraightLineContext ctx, String format, boolean repeatedArgs) {
         String b = ctx.pop();
+        boolean bPending = ctx.lastPopWasPending;
+        boolean bField = ctx.lastPopHadField;
         String a = ctx.pop();
+        boolean aPending = ctx.lastPopWasPending;
+        boolean aField = ctx.lastPopHadField;
         String expr;
         if (repeatedArgs) {
             expr = String.format(format, a, b, a, b, a, b);
         } else {
             expr = String.format(format, a, b);
         }
-        out.append("  ").append(ctx.push(expr)).append(";\n");
+        if (aPending && bPending && !repeatedArgs) {
+            out.append("  ").append(ctx.pushComposite(expr, aField || bField)).append(";\n");
+        } else {
+            out.append("  ").append(ctx.push(expr)).append(";\n");
+        }
         return true;
     }
 
     private static boolean emitUnary(StringBuilder out, StraightLineContext ctx, String format) {
         String value = ctx.pop();
-        out.append("  ").append(ctx.push(String.format(format, value))).append(";\n");
+        boolean vPending = ctx.lastPopWasPending;
+        boolean vField = ctx.lastPopHadField;
+        String expr = String.format(format, value);
+        if (vPending) {
+            out.append("  ").append(ctx.pushComposite(expr, vField)).append(";\n");
+        } else {
+            out.append("  ").append(ctx.push(expr)).append(";\n");
+        }
         return true;
     }
 
@@ -3770,7 +3869,84 @@ final class JavascriptMethodGenerator {
         }
     }
 
-    private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
+    /**
+     * True when the value-returning invoke at {@code index} may be DEFERRED
+     * as an expression (executed at its consumption site) instead of
+     * materialised into a slot. Sound iff every instruction between the call
+     * and the consumption of its value is pure and reorder-safe relative to
+     * the call: local loads, constants (incl. interned-string LDC -- the
+     * intern-table touch is unobservable), and pure arithmetic / compare /
+     * convert ops. Field/static/array reads are excluded (the deferred call
+     * may write them), as are other invokes, monitors, jumps into the window
+     * and stack-shuffling DUP/POP forms. The scan tracks the virtual stack
+     * depth of the call's value; consumption by a store / return / putfield
+     * / array-store / jump-condition / further composition ends the window.
+     */
+    private static boolean canDeferInvokeResult(List<Instruction> instructions, int index) {
+        int depth = 0; // our value sits at relative depth 0 from the top
+        for (int i = index + 1; i < instructions.size() && i < index + 10; i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof LabelInstruction || in instanceof LineNumber || in instanceof LocalVariable) {
+                continue;
+            }
+            int op = in.getOpcode();
+            if (in instanceof VarOp || in instanceof Ldc) {
+                if (op >= Opcodes.ILOAD && op <= Opcodes.ALOAD || op == Opcodes.BIPUSH || op == Opcodes.SIPUSH
+                        || in instanceof Ldc) {
+                    depth++;
+                    continue;
+                }
+                if (op >= Opcodes.ISTORE && op <= Opcodes.ASTORE) {
+                    return depth == 0; // consumed by the store (or bail)
+                }
+                return false;
+            }
+            if (in instanceof BasicInstruction) {
+                // pure const pushes
+                if (op >= Opcodes.ACONST_NULL && op <= Opcodes.DCONST_1) {
+                    depth++;
+                    continue;
+                }
+                // pure binary arithmetic / shifts / compares: pop 2 push 1
+                if (op >= Opcodes.IADD && op <= Opcodes.DREM
+                        || op >= Opcodes.ISHL && op <= Opcodes.LXOR
+                        || op >= Opcodes.LCMP && op <= Opcodes.DCMPG) {
+                    if (depth == 0) {
+                        depth = 0; // our value folds into the composite; result is the new top
+                        continue;
+                    }
+                    if (depth == 1) {
+                        depth = 0; // we are the deeper operand of the fold
+                        continue;
+                    }
+                    depth -= 1;
+                    continue;
+                }
+                // pure unary / conversions: pop 1 push 1
+                if (op >= Opcodes.INEG && op <= Opcodes.DNEG
+                        || op >= Opcodes.I2L && op <= Opcodes.I2S) {
+                    continue;
+                }
+                if (op >= Opcodes.IRETURN && op <= Opcodes.ARETURN) {
+                    return depth == 0;
+                }
+                return false;
+            }
+            if (in instanceof Jump) {
+                // consumed inside the branch condition only if on top
+                int jop = in.getOpcode();
+                if (jop != Opcodes.GOTO && depth <= 1) {
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke,
+            List<Instruction> instructions, int index, StraightLineContext ctx) {
         String declaredOwner = invoke.getOwner();
         String directOwner = resolveDirectInvokeOwner(invoke);
         String owner = JavascriptNameUtil.sanitizeClassName(directOwner);
@@ -3812,10 +3988,31 @@ final class JavascriptMethodGenerator {
             String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(invoke.getName(), invoke.getDesc());
             boolean suspending = isInvokeSuspending(invoke);
             if (hasReturn) {
-                out.append("  {\n");
-                appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending);
-                out.append("    ").append(ctx.push("__result")).append(";\n");
-                out.append("  }\n");
+                if (canDeferInvokeResult(instructions, index)) {
+                    StringBuilder callExpr = new StringBuilder();
+                    callExpr.append(suspending ? "(yield* " : "(").append(suspending ? "_v" : "_w")
+                            .append(argValues.length <= 4 ? String.valueOf(argValues.length) : "N")
+                            .append("(").append(target).append(", \"").append(dispatchId).append("\"");
+                    if (argValues.length > 4) {
+                        callExpr.append(", [");
+                        for (int ai = 0; ai < argValues.length; ai++) {
+                            if (ai > 0) callExpr.append(", ");
+                            callExpr.append(argValues[ai]);
+                        }
+                        callExpr.append("]");
+                    } else {
+                        for (int ai = 0; ai < argValues.length; ai++) {
+                            callExpr.append(", ").append(argValues[ai]);
+                        }
+                    }
+                    callExpr.append("))");
+                    out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
+                } else {
+                    out.append("  {\n");
+                    appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending);
+                    out.append("    ").append(ctx.push("__result")).append(";\n");
+                    out.append("  }\n");
+                }
             } else {
                 appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues, suspending);
             }
@@ -3841,6 +4038,25 @@ final class JavascriptMethodGenerator {
         // ``yield*`` ceremony so the cooperative scheduler can interleave
         // them with other threads.
         String yieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
+        if (hasReturn && canDeferInvokeResult(instructions, index)) {
+            StringBuilder callExpr = new StringBuilder();
+            callExpr.append("(").append(yieldPrefix).append(invokedName).append("(");
+            boolean firstArg = true;
+            if (target != null) {
+                callExpr.append(target);
+                firstArg = false;
+            }
+            for (int ai = 0; ai < argValues.length; ai++) {
+                if (!firstArg) {
+                    callExpr.append(", ");
+                }
+                firstArg = false;
+                callExpr.append(argValues[ai]);
+            }
+            callExpr.append("))");
+            out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
+            return true;
+        }
         if (hasReturn) {
             out.append("  { let __result = ").append(yieldPrefix).append(invokedName).append("(");
         } else {
@@ -3899,6 +4115,11 @@ final class JavascriptMethodGenerator {
         // flushPendingLocal() called before those writes.
         private String[] pendingExpr = new String[8];
         private boolean[] pendingIsField = new boolean[8];
+        // True when the most recent pop() returned a deferred (pure) pending
+        // rather than a slot name -- consumed by the composite-expression
+        // builder in emitBinary/emitUnary.
+        private boolean lastPopWasPending;
+        private boolean lastPopHadField;
 
         private static boolean isDeferrable(String expression) {
             if (expression == null || expression.isEmpty()) {
@@ -3966,10 +4187,45 @@ final class JavascriptMethodGenerator {
             }
             if (pendingExpr[sp] != null) {
                 String expr = pendingExpr[sp];
+                lastPopWasPending = true;
+                lastPopHadField = pendingIsField[sp];
                 pendingExpr[sp] = null;
+                pendingIsField[sp] = false;
                 return expr;
             }
+            lastPopWasPending = false;
+            lastPopHadField = false;
             return "s" + sp;
+        }
+
+        /// SSA-lite composite building: defer a PURE expression composed from
+        /// two popped pendings instead of materialising a slot, so chains
+        /// like ``s0=l1[f]; s1=s0+l2; l3=s1*4`` collapse to
+        /// ``l3=((l1[f]+l2)*4)``. Only pending operands compose (a slot-name
+        /// operand at index >= our position could be overwritten by a later
+        /// push before consumption); the field flag propagates so the call /
+        /// field-write barriers still flush; a length cap bounds re-evaluation
+        /// cost from DUP-family re-reads and pathological nesting.
+        private String pushComposite(String expr, boolean hasField) {
+            if (expr.length() > 120) {
+                return push(expr);
+            }
+            if (sp >= pendingExpr.length) {
+                String[] grown = new String[pendingExpr.length * 2 + sp];
+                System.arraycopy(pendingExpr, 0, grown, 0, pendingExpr.length);
+                pendingExpr = grown;
+            }
+            if (sp >= pendingIsField.length) {
+                boolean[] grown = new boolean[pendingExpr.length];
+                System.arraycopy(pendingIsField, 0, grown, 0, pendingIsField.length);
+                pendingIsField = grown;
+            }
+            pendingIsField[sp] = hasField;
+            pendingExpr[sp++] = expr;
+            if (sp > maxObservedStack) {
+                maxObservedStack = sp;
+            }
+            return "";
         }
 
         private String peek(int depth) {
@@ -4034,6 +4290,30 @@ final class JavascriptMethodGenerator {
             return prelude.toString();
         }
 
+        /// True when ``word`` appears in ``expr`` NOT followed/preceded by an
+        /// identifier character (so l1 does not match l12 or al1).
+        private static boolean containsWord(String expr, String word) {
+            int from = 0;
+            int wl = word.length();
+            while (true) {
+                int at = expr.indexOf(word, from);
+                if (at < 0) {
+                    return false;
+                }
+                boolean leftOk = at == 0 || !isIdentCharCtx(expr.charAt(at - 1));
+                int end = at + wl;
+                boolean rightOk = end >= expr.length() || !isIdentCharCtx(expr.charAt(end));
+                if (leftOk && rightOk) {
+                    return true;
+                }
+                from = at + 1;
+            }
+        }
+
+        private static boolean isIdentCharCtx(char c) {
+            return Character.isLetterOrDigit(c) || c == '_' || c == '$';
+        }
+
         /// Materialise EVERY pending expression into its slot. Required at
         /// control-flow boundaries in the structured emitter: a value
         /// deferred on one path must exist in its slot when paths merge.
@@ -4068,11 +4348,9 @@ final class JavascriptMethodGenerator {
         /// statements to emit (empty when nothing was pending).
         private String flushPendingLocal(int localIndex) {
             String name = "l" + localIndex;
-            String fieldPrefix = name + "[";
             StringBuilder prelude = new StringBuilder();
             for (int i = 0; i < sp; i++) {
-                if (pendingExpr[i] != null
-                        && (name.equals(pendingExpr[i]) || pendingExpr[i].startsWith(fieldPrefix))) {
+                if (pendingExpr[i] != null && containsWord(pendingExpr[i], name)) {
                     prelude.append("  s").append(i).append(" = ").append(pendingExpr[i]).append(";\n");
                     pendingExpr[i] = null;
                     pendingIsField[i] = false;
@@ -4485,6 +4763,19 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 if (i + 1 < n) {
                     leader[i + 1] = true;
                 }
+            } else if (instr instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) instr;
+                if (sw.getDefaultLabel() != null) {
+                    Integer d = labelToIndex.get(sw.getDefaultLabel());
+                    if (d != null && d < n) { leader[d] = true; }
+                }
+                if (sw.getLabels() != null) {
+                    for (Label l : sw.getLabels()) {
+                        Integer d = l == null ? null : labelToIndex.get(l);
+                        if (d != null && d < n) { leader[d] = true; }
+                    }
+                }
+                if (i + 1 < n) { leader[i + 1] = true; }
             } else if (isTerminatingInstruction(instr) && i + 1 < n) {
                 leader[i + 1] = true;
             }
@@ -4512,6 +4803,19 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 if (last.getOpcode() == Opcodes.GOTO) {
                     addFallThrough = false;
                 }
+            } else if (last instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) last;
+                if (sw.getDefaultLabel() != null) {
+                    Integer d = labelToIndex.get(sw.getDefaultLabel());
+                    if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                }
+                if (sw.getLabels() != null) {
+                    for (Label l : sw.getLabels()) {
+                        Integer d = l == null ? null : labelToIndex.get(l);
+                        if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                    }
+                }
+                addFallThrough = false;
             } else if (last != null && isTerminatingInstruction(last)) {
                 addFallThrough = false;
             }

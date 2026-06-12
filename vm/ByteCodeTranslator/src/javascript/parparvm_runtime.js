@@ -2765,6 +2765,11 @@ const jvm = {
             continue;
           }
           this.handleYield(thread, result.value);
+        if (this.__cn1BreakBurst) {
+          this.__cn1BreakBurst = false;
+          this.scheduleDrain();
+          break;
+        }
         } catch (threadErr) {
           // An uncaught exception in a green thread TERMINATES THAT THREAD
           // (Java semantics: Thread.run() unwinds, other threads keep running)
@@ -3070,6 +3075,11 @@ const jvm = {
     }
     if (!yielded || !yielded.op) {
       this.enqueue(thread, yielded);
+      return;
+    }
+    if (yielded.op === "byield") {
+      this.runnable.unshift(thread);
+      this.__cn1BreakBurst = true;
       return;
     }
     if (yielded.op === "sleep") {
@@ -3583,7 +3593,15 @@ global.__cn1TickReset = __cn1TickReset;
 // the wall clock and resets/yields if the budget has elapsed. The
 // counter is reset to zero when drain() restarts a generator step,
 // so fresh steps start fast again.
-const _Yv = { op: "sleep", millis: 0 };
+// Budget yield is a DISTINCT op from sleep(0): it must give the HOST event
+// loop a turn (timers, postMessage, rendering) but resume the SAME green
+// thread before any sibling, preserving the port's historical cooperative
+// atomicity. CN1 code written for the never-preempting JS/TeaVM ports
+// shares unsynchronised static state (StyleParser/CSSBorder caches etc.)
+// across call stretches; interleaving siblings at arbitrary dispatch
+// points surfaced those latent races as nondeterministic boot failures
+// (the flaky "Failed to load CSS border" -> downstream NPE).
+const _Yv = { op: "byield" };
 const __cn1TickStride = 256;
 let __cn1TickCounter = 0;
 function _Yc() {
