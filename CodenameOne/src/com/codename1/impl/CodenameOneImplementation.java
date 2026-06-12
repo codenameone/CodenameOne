@@ -10389,6 +10389,42 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Returns true if the platform supports publishing data to a Wallet
+    /// issuer-provisioning extension (iOS only). Defaults to false.
+    public boolean isWalletExtensionSupported() {
+        return false;
+    }
+
+    /// Removes all published Wallet extension pass entries from one of the
+    /// two lists. No-op on platforms without Wallet extension support.
+    ///
+    /// #### Parameters
+    ///
+    /// - `remote`: true for the Apple Watch list, false for the iPhone list
+    public void walletExtensionClearPassEntries(boolean remote) {
+    }
+
+    /// Appends one pass entry to the published Wallet extension list. No-op
+    /// on platforms without Wallet extension support.
+    public void walletExtensionAddPassEntry(boolean remote, String identifier, String title,
+            String cardholderName, String accountSuffix, String network, String description, byte[] artPng) {
+    }
+
+    /// Sets the Wallet extension requires-authentication flag. No-op on
+    /// platforms without Wallet extension support.
+    public void walletExtensionSetRequiresAuthentication(boolean requiresAuthentication) {
+    }
+
+    /// Publishes the Wallet extension auth token, or removes it when null.
+    /// No-op on platforms without Wallet extension support.
+    public void walletExtensionSetAuthToken(String token) {
+    }
+
+    /// Clears all published Wallet extension data. No-op on platforms
+    /// without Wallet extension support.
+    public void walletExtensionClear() {
+    }
+
     /// Delivers shared content to the running application instance. onReceivedSharedContent
     /// is defined on com.codename1.system.Lifecycle, so apps that handle shared content
     /// extend Lifecycle; non-Lifecycle apps cannot override it and are skipped. The

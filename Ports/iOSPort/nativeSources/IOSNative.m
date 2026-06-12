@@ -11663,6 +11663,197 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang
     return com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String(CN1_THREAD_STATE_PASS_ARG me, appGroupId);
 }
 
+// --- Wallet issuer-provisioning extension support ---------------------------
+// The app publishes pass entries / auth token into the shared App Group where
+// the generated Wallet extensions (see the ios.wallet.* build hints) read
+// them. The group id comes from the CN1WalletAppGroup Info.plist key injected
+// by the build.
+//
+// The implementation is compiled in only when the build needs it - the
+// ios.wallet.extension build hint is enabled or the app references
+// com.codename1.payment.WalletExtension - because dormant wallet-looking
+// code in unrelated apps can trigger questions during Apple review. The
+// build flips the define below; the #else stubs keep the linker happy.
+//#define CN1_INCLUDE_WALLET
+
+#ifdef CN1_INCLUDE_WALLET
+
+static NSString *cn1WalletGroupId() {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1WalletAppGroup"];
+    return ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) ? (NSString *)v : nil;
+}
+
+static NSUserDefaults *cn1WalletGroupDefaults() {
+    NSString *group = cn1WalletGroupId();
+    return group == nil ? nil : [[NSUserDefaults alloc] initWithSuiteName:group];
+}
+
+static NSURL *cn1WalletGroupArtDir(BOOL create) {
+    NSString *group = cn1WalletGroupId();
+    if (group == nil) {
+        return nil;
+    }
+    NSURL *container = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:group];
+    if (container == nil) {
+        return nil;
+    }
+    NSURL *dir = [container URLByAppendingPathComponent:@"cn1wallet" isDirectory:YES];
+    if (create) {
+        [[NSFileManager defaultManager] createDirectoryAtURL:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    return dir;
+}
+
+static NSString *cn1WalletEntriesKey(JAVA_BOOLEAN remote) {
+    return remote ? @"cn1.wallet.remotePassEntries" : @"cn1.wallet.passEntries";
+}
+
+// Removes one list and deletes the card-art files its entries reference. Art
+// files are uniquely named per entry so this never breaks the other list.
+static void cn1WalletClearEntries(JAVA_BOOLEAN remote) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    NSString *key = cn1WalletEntriesKey(remote);
+    NSArray *entries = [defaults arrayForKey:key];
+    NSURL *artDir = cn1WalletGroupArtDir(NO);
+    for (id entry in entries) {
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString *art = ((NSDictionary *)entry)[@"art"];
+        if (art != nil && artDir != nil) {
+            [[NSFileManager defaultManager] removeItemAtURL:[artDir URLByAppendingPathComponent:art] error:nil];
+        }
+    }
+    [defaults removeObjectForKey:key];
+    [defaults synchronize];
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (cn1WalletGroupId() == nil) {
+        return JAVA_FALSE;
+    }
+    if (@available(iOS 14, *)) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isWalletExtensionSupported___R_boolean(CN1_THREAD_STATE_PASS_ARG me);
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClearPassEntries___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote) {
+    cn1WalletClearEntries(remote);
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionAddPassEntry___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT cardholderName, JAVA_OBJECT accountSuffix, JAVA_OBJECT network, JAVA_OBJECT description, JAVA_OBJECT artPng) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil || identifier == JAVA_NULL || artPng == JAVA_NULL) {
+        return;
+    }
+    NSURL *artDir = cn1WalletGroupArtDir(YES);
+    if (artDir == nil) {
+        return;
+    }
+    NSString *artName = [[[NSUUID UUID] UUIDString] stringByAppendingString:@".png"];
+    NSData *artData = arrayToData(artPng);
+    if (artData == nil || ![artData writeToURL:[artDir URLByAppendingPathComponent:artName] atomically:YES]) {
+        return;
+    }
+    NSMutableDictionary *entry = [NSMutableDictionary dictionary];
+    entry[@"identifier"] = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
+    entry[@"art"] = artName;
+    if (title != JAVA_NULL) {
+        entry[@"title"] = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    }
+    if (cardholderName != JAVA_NULL) {
+        entry[@"cardholderName"] = toNSString(CN1_THREAD_STATE_PASS_ARG cardholderName);
+    }
+    if (accountSuffix != JAVA_NULL) {
+        entry[@"accountSuffix"] = toNSString(CN1_THREAD_STATE_PASS_ARG accountSuffix);
+    }
+    if (network != JAVA_NULL) {
+        entry[@"network"] = toNSString(CN1_THREAD_STATE_PASS_ARG network);
+    }
+    if (description != JAVA_NULL) {
+        entry[@"description"] = toNSString(CN1_THREAD_STATE_PASS_ARG description);
+    }
+    NSString *key = cn1WalletEntriesKey(remote);
+    NSArray *existing = [defaults arrayForKey:key];
+    NSMutableArray *updated = existing != nil ? [existing mutableCopy] : [NSMutableArray array];
+    [updated addObject:entry];
+    [defaults setObject:updated forKey:key];
+    [defaults synchronize];
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetRequiresAuthentication___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN requiresAuthentication) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    [defaults setBool:(requiresAuthentication ? YES : NO) forKey:@"cn1.wallet.requiresAuthentication"];
+    [defaults synchronize];
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetAuthToken___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    if (token == JAVA_NULL) {
+        [defaults removeObjectForKey:@"cn1.wallet.authToken"];
+    } else {
+        [defaults setObject:toNSString(CN1_THREAD_STATE_PASS_ARG token) forKey:@"cn1.wallet.authToken"];
+    }
+    [defaults synchronize];
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    cn1WalletClearEntries(JAVA_FALSE);
+    cn1WalletClearEntries(JAVA_TRUE);
+    [defaults removeObjectForKey:@"cn1.wallet.authToken"];
+    [defaults removeObjectForKey:@"cn1.wallet.requiresAuthentication"];
+    [defaults synchronize];
+    NSURL *artDir = cn1WalletGroupArtDir(NO);
+    if (artDir != nil) {
+        [[NSFileManager defaultManager] removeItemAtURL:artDir error:nil];
+    }
+}
+
+#else // CN1_INCLUDE_WALLET
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClearPassEntries___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionAddPassEntry___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT cardholderName, JAVA_OBJECT accountSuffix, JAVA_OBJECT network, JAVA_OBJECT description, JAVA_OBJECT artPng) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetRequiresAuthentication___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN requiresAuthentication) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetAuthToken___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+
+#endif // CN1_INCLUDE_WALLET
+
 // BEGIN IOSImplementation native code, this is used to optimize various "heavy" IOSImplementation methods
 
 #define DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(xpositionToDraw, ypositionToDraw)                 JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s); \

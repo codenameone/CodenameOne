@@ -463,6 +463,39 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |ios.onDeviceDebug.waitForAttach
 |Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.
 
+|ios.wallet.extension
+|Boolean true/false defaults to false. Generates an Apple Wallet issuer provisioning extension (the "From apps on your iPhone" flow in the Wallet app) and embeds it in the build. Requires `ios.wallet.appGroup` and `ios.wallet.issuerEndpoint`. See the <<Apple Wallet Extension,Apple Wallet Extension chapter>>.
+
+|ios.wallet.appGroup
+|App Group id starting with `group.` shared by the app and the generated Wallet extensions. The app publishes pass entries into this group through `com.codename1.payment.WalletExtension` and the group is added to the app and extension entitlements automatically. Required when `ios.wallet.extension=true`.
+
+|ios.wallet.issuerEndpoint
+|HTTPS URL of the issuer backend endpoint that produces the encrypted provisioning payload. The generated extension POSTs Apple's certificates/nonce plus the card identifier and auth token there as JSON. Required when `ios.wallet.extension=true`.
+
+|ios.wallet.includeUI
+|Boolean true/false defaults to false. Also generates the Wallet authorization UI extension - a login form shown inside the Wallet app when the app reports that authentication is required. Requires `ios.wallet.authEndpoint`.
+
+|ios.wallet.authEndpoint
+|HTTPS URL the generated login UI extension POSTs `{"username","password"}` to; the JSON response's `token` is stored in the App Group for the provisioning request. Required when `ios.wallet.includeUI=true`.
+
+|ios.wallet.nonuiExtensionName / ios.wallet.uiExtensionName
+|Names of the generated extension targets, also used as the bundle id suffix (`<package>.<name>`). Default `WalletNonUIExtension` / `WalletUIExtension`. The matching App IDs must be registered with the payment-pass-provisioning entitlement and listed by the card network.
+
+|ios.wallet.nonuiProvisioningProfile / ios.wallet.uiProvisioningProfile
+|Cloud device builds only. File name of the extension's `.mobileprovision` placed under `common/src/main/resources`. The profile must match the app's distribution certificate and carry the `com.apple.developer.payment-pass-provisioning` entitlement; the build keeps it out of the app bundle.
+
+|ios.wallet.nonuiProvisioningURL / ios.wallet.uiProvisioningURL
+|Cloud device builds only. URL fallback for the extension provisioning profile when it isn't bundled in resources, mirroring `ios.notificationServiceExtensionProvisioningURL`.
+
+|ios.wallet.nonui.buildSettings.SETTING / ios.wallet.ui.buildSettings.SETTING
+|Extra Xcode build settings applied to the generated extension targets, for example `ios.wallet.nonui.buildSettings.DEVELOPMENT_TEAM=ABCD123456`. Applied last so they override the generated defaults.
+
+|ios.wallet.nonuiImportsInject, ios.wallet.statusInject, ios.wallet.passEntriesInject, ios.wallet.remotePassEntriesInject, ios.wallet.generateRequestInject, ios.wallet.generateResponseInject, ios.wallet.uiImportsInject, ios.wallet.uiViewDidLoadInject, ios.wallet.uiAuthRequestInject, ios.wallet.uiAuthResponseInject
+|Objective-C code injected at the matching marker comment in the generated Wallet extension sources, for custom behavior at each callback (for example adding fields to the issuer endpoint payload in `generateRequestInject`). See the <<Apple Wallet Extension,Apple Wallet Extension chapter>>.
+
+|ios.appext.NAME.provisioningURL
+|Cloud device builds only. URL of the provisioning profile for a generic app extension dropped into `ios/app_extensions/NAME/`, used when the extension folder doesn't bundle a `.mobileprovision` itself. The profile is installed on the build machine and added to the export options per bundle id.
+
 |codename1.mac.appid
 |Mac Native cloud builds only. The Mac bundle identifier registered in App Store Connect / Apple Developer. Distinct from `codename1.ios.appid` because Apple treats the iOS and Mac App Store records as separate products. Required for cloud Mac builds.
 
