@@ -62,6 +62,12 @@ public class Parser extends ClassVisitor {
     public static void cleanup() {
         nativeSources = null;
         classes.clear();
+        // classes is cleared in place (same List reference), so the name index's
+        // (reference, size) guard cannot detect a subsequent same-size refill across
+        // translation runs in the same JVM (e.g. the unit tests). Invalidate it here.
+        classIndexMap = null;
+        classIndexSource = null;
+        classIndexSize = -1;
         dependencyGraph.clear();
         BytecodeMethod.setDependencyGraph(null);
         ByteCodeClass.cleanup();
