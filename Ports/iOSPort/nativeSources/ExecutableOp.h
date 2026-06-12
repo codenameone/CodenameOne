@@ -60,8 +60,12 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
     // Phase 3: render target for this op. nil = screen drawable (default,
     // existing GL/Metal screen pipeline). non-nil = a mutable image whose
     // backing MTLTexture should receive this op. drawFrame walks the queue
-    // and switches encoders when target changes between ops.
-    __unsafe_unretained GLUIImage *target;
+    // and switches encoders when target changes between ops. Retained by
+    // setTarget (released in dealloc) -- the main-thread drain runs after
+    // the EDT enqueued the op, so an unretained target could be deallocated
+    // in between. Plain ivar = __strong under ARC, manual retain otherwise,
+    // matching the ops' image ivars (e.g. DrawImage.img).
+    GLUIImage *target;
 #endif
 }
 

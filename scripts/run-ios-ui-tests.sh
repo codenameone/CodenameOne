@@ -730,6 +730,39 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   echo "App Install : $(( (INSTALL_END - INSTALL_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
 
+# Timestamp marker so crash reports written during this run can be picked
+# out of ~/Library/Logs/DiagnosticReports afterwards (find -newer). The
+# simulator app is a host process, so its crash reports land on the host.
+LAUNCH_MARKER="$ARTIFACTS_DIR/.launch-marker"
+touch "$LAUNCH_MARKER"
+APP_EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE_PATH/Info.plist" 2>/dev/null || true)"
+
+# When the suite times out the app is usually not idle: ParparVM's
+# SignalHandler (CodenameOne_GLAppDelegate.m) converts SIGSEGV into a Java
+# NPE and returns, so a thread that faulted outside a Java try frame
+# re-executes the faulting instruction forever ("We had a signal 11" spam
+# in the device log). The simulator app is a plain host process, so a
+# `sample` taken at timeout contains the exact faulting stack (and, for
+# genuine deadlocks, every thread's wait state).
+capture_hang_diagnostics() {
+  local pid spam
+  if [ -n "$APP_EXECUTABLE_NAME" ]; then
+    pid="$(pgrep -x "$APP_EXECUTABLE_NAME" 2>/dev/null | head -n 1 || true)"
+  else
+    pid=""
+  fi
+  if [ -n "$pid" ]; then
+    ri_log "Sampling hung app (pid=$pid) -> app-hang-sample.txt"
+    sample "$pid" 5 -file "$ARTIFACTS_DIR/app-hang-sample.txt" >/dev/null 2>&1 || true
+  else
+    ri_log "No live ${APP_EXECUTABLE_NAME:-<unknown>} process found to sample"
+  fi
+  spam="$(grep -c 'We had a signal' "$TEST_LOG" 2>/dev/null || echo 0)"
+  if [ "${spam:-0}" -gt 0 ]; then
+    ri_log "Signal-handler loop detected: ${spam} 'We had a signal' lines in device log (a crashed thread is spinning in ParparVM's SignalHandler; see app-hang-sample.txt for the faulting stack)"
+  fi
+}
+
 END_MARKER="CN1SS:SUITE:FINISHED"
 # Per-suite budget (seconds). The 300 -> 600 bump from earlier landed
 # back when the suite was ~37 tests; it has since grown to ~90, and the
@@ -750,6 +783,7 @@ while true; do
   NOW="$(date +%s)"
   if [ $(( NOW - START_TIME )) -ge $TIMEOUT_SECONDS ]; then
     ri_log "STAGE:TIMEOUT -> DeviceRunner did not emit completion marker within ${TIMEOUT_SECONDS}s"
+    capture_hang_diagnostics
     break
   fi
   sleep 5
@@ -768,6 +802,17 @@ xcrun simctl spawn "$SIM_DEVICE_ID" \
   log show --style syslog --last 30m \
   --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
   > "$FALLBACK_LOG" 2>/dev/null || true
+
+# Collect any crash reports the OS wrote for the app during this run
+# (simulator app crashes report to the host's DiagnosticReports).
+CRASH_REPORT_DIR="$HOME/Library/Logs/DiagnosticReports"
+if [ -d "$CRASH_REPORT_DIR" ] && [ -n "$APP_EXECUTABLE_NAME" ]; then
+  while IFS= read -r crash_file; do
+    [ -n "$crash_file" ] || continue
+    ri_log "Collected crash report: $(basename "$crash_file")"
+    cp -f "$crash_file" "$ARTIFACTS_DIR/" 2>/dev/null || true
+  done < <(find "$CRASH_REPORT_DIR" -maxdepth 1 -name "${APP_EXECUTABLE_NAME}*" -newer "$LAUNCH_MARKER" 2>/dev/null)
+fi
 
 BASE64_STATS_FILE="$ARTIFACTS_DIR/base64-performance-stats.txt"
 extract_base64_stats "$BASE64_STATS_FILE" "$TEST_LOG" "$FALLBACK_LOG"
