@@ -94,6 +94,7 @@ public class IPhoneBuilder extends Executor {
     private String buildVersion;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
+    private boolean usesWalletApi;
     private boolean usesCryptoAPI;
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
@@ -705,6 +706,12 @@ public class IPhoneBuilder extends Executor {
                     }
                     if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
                         usesPurchaseAPI = true;
+                    }
+                    // Wallet issuer-provisioning natives are only compiled in when
+                    // the app actually references the API (or enables the extension
+                    // via the ios.wallet.extension hint) - see CN1_INCLUDE_WALLET.
+                    if (!usesWalletApi && cls.indexOf("com/codename1/payment/Wallet") == 0) {
+                        usesWalletApi = true;
                     }
                     if (cls.indexOf("com/codename1/security/") == 0) {
                         // com.codename1.security contains two distinct API
@@ -1663,6 +1670,17 @@ public class IPhoneBuilder extends Executor {
             } catch (IOException ex) {
                 log("Failed to Update Objective-C source files to activate notifications flag");
                 throw new BuildException("Failed to update Objective-C source files to activate notifications flag", ex);
+            }
+        }
+
+        // The Wallet issuer-provisioning natives in IOSNative.m stay dormant
+        // (#else stubs) unless the app needs them: unused wallet-looking code
+        // in the binary can trigger questions during Apple review.
+        if (usesWalletApi || "true".equals(request.getArg("ios.wallet.extension", "false"))) {
+            try {
+                replaceInFile(new File(buildinRes, "IOSNative.m"), "//#define CN1_INCLUDE_WALLET", "#define CN1_INCLUDE_WALLET");
+            } catch (IOException ex) {
+                throw new BuildException("Failed to update Objective-C source files to activate the wallet flag", ex);
             }
         }
 

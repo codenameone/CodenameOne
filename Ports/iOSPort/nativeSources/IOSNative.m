@@ -11668,6 +11668,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang
 // the generated Wallet extensions (see the ios.wallet.* build hints) read
 // them. The group id comes from the CN1WalletAppGroup Info.plist key injected
 // by the build.
+//
+// The implementation is compiled in only when the build needs it - the
+// ios.wallet.extension build hint is enabled or the app references
+// com.codename1.payment.WalletExtension - because dormant wallet-looking
+// code in unrelated apps can trigger questions during Apple review. The
+// build flips the define below; the #else stubs keep the linker happy.
+//#define CN1_INCLUDE_WALLET
+
+#ifdef CN1_INCLUDE_WALLET
 
 static NSString *cn1WalletGroupId() {
     id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1WalletAppGroup"];
@@ -11817,6 +11826,33 @@ void com_codename1_impl_ios_IOSNative_walletExtensionClear__(CN1_THREAD_STATE_MU
         [[NSFileManager defaultManager] removeItemAtURL:artDir error:nil];
     }
 }
+
+#else // CN1_INCLUDE_WALLET
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClearPassEntries___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionAddPassEntry___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT cardholderName, JAVA_OBJECT accountSuffix, JAVA_OBJECT network, JAVA_OBJECT description, JAVA_OBJECT artPng) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetRequiresAuthentication___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN requiresAuthentication) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetAuthToken___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+
+#endif // CN1_INCLUDE_WALLET
 
 // BEGIN IOSImplementation native code, this is used to optimize various "heavy" IOSImplementation methods
 

@@ -488,10 +488,10 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Cloud device builds only. URL fallback for the extension provisioning profile when it isn't bundled in resources, mirroring `ios.notificationServiceExtensionProvisioningURL`.
 
 |ios.wallet.nonui.buildSettings.SETTING / ios.wallet.ui.buildSettings.SETTING
-|Extra Xcode build settings applied to the generated extension targets, e.g. `ios.wallet.nonui.buildSettings.DEVELOPMENT_TEAM=ABCD123456`. Applied last so they override the generated defaults.
+|Extra Xcode build settings applied to the generated extension targets, for example `ios.wallet.nonui.buildSettings.DEVELOPMENT_TEAM=ABCD123456`. Applied last so they override the generated defaults.
 
 |ios.wallet.nonuiImportsInject, ios.wallet.statusInject, ios.wallet.passEntriesInject, ios.wallet.remotePassEntriesInject, ios.wallet.generateRequestInject, ios.wallet.generateResponseInject, ios.wallet.uiImportsInject, ios.wallet.uiViewDidLoadInject, ios.wallet.uiAuthRequestInject, ios.wallet.uiAuthResponseInject
-|Objective-C code injected at the matching marker comment in the generated Wallet extension sources, for custom behavior at each callback (e.g. adding fields to the issuer endpoint payload in `generateRequestInject`). See the <<Apple Wallet Extension,Apple Wallet Extension chapter>>.
+|Objective-C code injected at the matching marker comment in the generated Wallet extension sources, for custom behavior at each callback (for example adding fields to the issuer endpoint payload in `generateRequestInject`). See the <<Apple Wallet Extension,Apple Wallet Extension chapter>>.
 
 |ios.appext.NAME.provisioningURL
 |Cloud device builds only. URL of the provisioning profile for a generic app extension dropped into `ios/app_extensions/NAME/`, used when the extension folder doesn't bundle a `.mobileprovision` itself. The profile is installed on the build machine and added to the export options per bundle id.

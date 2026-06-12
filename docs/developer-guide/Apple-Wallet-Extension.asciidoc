@@ -21,11 +21,11 @@ Because the extensions run in a separate process, they can't call into your Java
 Before any of this works you need approvals that only Apple and your card network can grant:
 
 * The `com.apple.developer.payment-pass-provisioning` entitlement is restricted. Apple grants it per app on request (see the In-App Provisioning documentation on the Apple developer site). After approval, enable it under the App ID's *Additional Capabilities* tab for the app *and for each extension App ID*.
-* Each extension needs its own App ID (e.g. `com.mybank.app.WalletNonUIExtension`) and its own provisioning profile carrying the entitlement.
+* Each extension needs its own App ID (for example `com.mybank.app.WalletNonUIExtension`) and its own provisioning profile carrying the entitlement.
 * The card network/PNO pass metadata must list the extension App IDs in `associatedApplicationIdentifiers`, otherwise Wallet never invokes the extensions.
 * The extensions require iOS 14. The generated extension targets set their own deployment target, so your app can still target an older iOS version.
 
-=== Mode 1: generate the extensions from build hints
+=== Mode 1: Generate the extensions from build hints
 
 Add these build hints to the iOS build:
 
@@ -122,7 +122,7 @@ Alternatively, host them at URLs the build server can reach and supply `ios.wall
 
 In local builds ("ios-source" target) no profile hints are needed - you sign the generated Xcode project in Xcode as usual.
 
-=== Mode 2: bring your own extension
+=== Mode 2: Bring your own extension
 
 If you already have Xcode extension targets - from an issuer SDK vendor or an existing native app - skip the `ios.wallet.*` hints and drop each extension into the generic app extension mechanism instead. Create `ios/app_extensions/MyWalletExtension/` in your project containing:
 

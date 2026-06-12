@@ -6126,8 +6126,7 @@ public final class Display extends CN1Constants {
     public void walletExtensionSetPassEntries(boolean remote, com.codename1.payment.WalletPassEntry[] entries) {
         impl.walletExtensionClearPassEntries(remote);
         if (entries != null) {
-            for (int i = 0; i < entries.length; i++) {
-                com.codename1.payment.WalletPassEntry e = entries[i];
+            for (com.codename1.payment.WalletPassEntry e : entries) {
                 if (e == null) {
                     continue;
                 }
