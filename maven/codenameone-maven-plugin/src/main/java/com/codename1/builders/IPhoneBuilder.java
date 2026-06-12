@@ -293,6 +293,14 @@ public class IPhoneBuilder extends Executor {
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
+        if (request.getArg("ios.deployment_target", null) == null) {
+            // No explicit deployment target. Default to iOS 14 so the
+            // UILaunchScreen-based launch screen injected for UIScene builds
+            // satisfies App Store validation: apps supporting iPad
+            // multitasking must provide a launch storyboard, or UILaunchScreen
+            // when MinimumOSVersion is 14 or higher.
+            addMinDeploymentTarget("14.0");
+        }
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
@@ -3600,8 +3608,17 @@ public class IPhoneBuilder extends Executor {
             "true")) {
             multitasking = false;
         }
-        
-        
+        if (multitasking && useMetal && getDeploymentTargetInt(request) < 14) {
+            // An explicit ios.deployment_target below 14 cannot satisfy the
+            // App Store launch screen rule for iPad multitasking apps via the
+            // UILaunchScreen key (it only counts when MinimumOSVersion is 14
+            // or higher), so opt out of multitasking instead of producing a
+            // bundle that fails upload validation.
+            log("ios.deployment_target is below 14; implicitly disabling iPad multitasking (UIRequiresFullScreen) so the launch screen passes App Store validation. Set ios.deployment_target=14.0 or higher to keep multitasking support.");
+            multitasking = false;
+        }
+
+
         if (!multitasking || xcodeVersion < 9) {
             if (inject.indexOf("UIRequiresFullScreen") < 0) {
                 // Temporary workaround to disable iPad multitasking support.
