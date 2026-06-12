@@ -107,9 +107,18 @@ class JavascriptOpcodeCoverageTest {
         // pair. Verify the call shape made it through, and that the
         // classDef fast path + resolveVirtual fallback are still present
         // (they migrated, not removed — see the runtime assertions).
+        // The structured emitter spells the helpers through their short
+        // runtime aliases (``_v0``.. generator / ``_w0``.. sync); the
+        // interpreter path keeps the long ``cn1_iv*`` names. Which one a
+        // fixture method gets depends on the bytecode shape the compiling
+        // JDK produced, so accept the whole family.
         assertTrue(translatedApp.contains("cn1_iv0(") || translatedApp.contains("cn1_iv1(")
-                        || translatedApp.contains("cn1_iv2(") || translatedApp.contains("cn1_iv3("),
-                "Virtual/interface dispatch should route through the cn1_iv* helper family");
+                        || translatedApp.contains("cn1_iv2(") || translatedApp.contains("cn1_iv3(")
+                        || translatedApp.contains("_v0(") || translatedApp.contains("_v1(")
+                        || translatedApp.contains("_v2(") || translatedApp.contains("_v3(")
+                        || translatedApp.contains("_w0(") || translatedApp.contains("_w1(")
+                        || translatedApp.contains("_w2(") || translatedApp.contains("_w3("),
+                "Virtual/interface dispatch should route through the cn1_iv*/_v*/_w* helper family");
         assertTrue(runtime.contains("const classDef = target.__classDef;")
                         && runtime.contains("classDef && classDef.methods ? classDef.methods[mid]"),
                 "Runtime virtual dispatch helper should use an exact-class method-table fast path");

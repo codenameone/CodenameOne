@@ -1049,8 +1049,17 @@ final class JavascriptMethodGenerator {
             // Chains further through iteration (sN=X; sN=sN.a; sN=sN.b
             // → sN=X.a.b). Matches only simple slot-to-slot flow where
             // the next statement reads and writes the SAME slot.
+            // ``yield*`` binds the whole postfix expression, so fusing a
+            // subscript onto a ``yield* f(...)`` result MUST parenthesise:
+            // ``s0 = yield* f()["p"]`` subscripts the GENERATOR OBJECT
+            // (undefined) and throws "yield* undefined is not iterable" at
+            // runtime -- this killed the invokeAndBlock thread-pool loop
+            // (RunnableWrapper.run case 4) and wedged every waiter.
             s = s.replaceAll(
-                    "(\\s+s(\\d+) = )([^;]+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
+                    "(\\s+s(\\d+) = )(yield\\*? [^;]+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
+                    "$1($3)$4;");
+            s = s.replaceAll(
+                    "(\\s+s(\\d+) = )((?:(?!yield)[^;])+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
                     "$1$3$4;");
             // Rule 14: straight-line slot-to-return chain.
             //   sN = EXPR; return sN;
@@ -2847,7 +2856,8 @@ final class JavascriptMethodGenerator {
                         && (cls.getClsName() + "." + method.getMethodName()).contains(dump)) {
                     try {
                         java.nio.file.Files.write(
-                                java.nio.file.Paths.get("/tmp/cn1-dump-" + cls.getClsName() + "." + method.getMethodName() + ".js"),
+                                java.nio.file.Paths.get("/tmp/cn1-dump-" + cls.getClsName() + "." + method.getMethodName()
+                                        + "_" + Integer.toHexString(method.getSignature().hashCode()) + ".js"),
                                 instructionBody.toString().getBytes("UTF-8"));
                     } catch (Exception ignore) {
                     }
@@ -3072,7 +3082,9 @@ final class JavascriptMethodGenerator {
             // strictly INSIDE: a branch to the region's START block is
             // ordinary try entry and is routed through a pre-try P label
             // (mirroring loop pre-headers), so it is allowed here.
-            boolean toIn = toBlock > s[0] && toBlock < s[1];
+            boolean toIn = "0".equals(System.getProperty("parparvm.js.structured.pretry"))
+                    ? (toBlock >= s[0] && toBlock < s[1])
+                    : (toBlock > s[0] && toBlock < s[1]);
             boolean fromIn = fromBlock >= s[0] && fromBlock < s[1];
             if (toIn && !fromIn) {
                 return true;
@@ -3116,7 +3128,9 @@ final class JavascriptMethodGenerator {
                     // suspend -- that combination stays interpreted
                     // (the interpreter has the same constraint, so it
                     // should never occur; bail defensively).
-                    if (!method.isJavascriptSuspending()) {
+                    // Kill switch: parparvm.js.structured.monitors=0.
+                    if (!method.isJavascriptSuspending()
+                            || "0".equals(System.getProperty("parparvm.js.structured.monitors"))) {
                         return _sb(method, instructions, "L2934");
                     }
                 }
@@ -3250,7 +3264,9 @@ final class JavascriptMethodGenerator {
             Integer sB = sI == null ? null : startToBlock.get((int) sI);
             Integer eB = eI == null ? null : startToBlock.get((int) eI);
             Integer hB = hI == null ? null : startToBlock.get((int) hI);
-            if (sB != null && hB != null && sB.equals(hB) && tc.getType() == null) {
+            if (sB != null && hB != null && eB != null && sB.equals(hB) && eB == sB + 1
+                    && tc.getType() == null
+                    && !"0".equals(System.getProperty("parparvm.js.structured.selfentry"))) {
                 // javac's self-protecting cleanup entry ([h, x) -> h, type
                 // any): it guards the synchronized handler's own
                 // ``monitorexit; athrow`` against a throwing monitorexit by
