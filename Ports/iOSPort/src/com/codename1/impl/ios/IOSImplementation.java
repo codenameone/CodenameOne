@@ -10792,6 +10792,41 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
 
+    @Override
+    public boolean isWalletExtensionSupported() {
+        return nativeInstance.isWalletExtensionSupported();
+    }
+
+    @Override
+    public void walletExtensionClearPassEntries(boolean remote) {
+        nativeInstance.walletExtensionClearPassEntries(remote);
+    }
+
+    @Override
+    public void walletExtensionAddPassEntry(boolean remote, String identifier, String title,
+            String cardholderName, String accountSuffix, String network, String description, byte[] artPng) {
+        if (identifier == null || identifier.length() == 0 || artPng == null || artPng.length == 0) {
+            return;
+        }
+        nativeInstance.walletExtensionAddPassEntry(remote, identifier, title,
+                cardholderName, accountSuffix, network, description, artPng);
+    }
+
+    @Override
+    public void walletExtensionSetRequiresAuthentication(boolean requiresAuthentication) {
+        nativeInstance.walletExtensionSetRequiresAuthentication(requiresAuthentication);
+    }
+
+    @Override
+    public void walletExtensionSetAuthToken(String token) {
+        nativeInstance.walletExtensionSetAuthToken(token);
+    }
+
+    @Override
+    public void walletExtensionClear() {
+        nativeInstance.walletExtensionClear();
+    }
+
     /// Invoked from native (on app activation) with the JSON payload written by the share
     /// extension. Parses it into a SharedContent and dispatches to the app.
     public static void fireSharedContentFromNative(String json) {

@@ -826,6 +826,31 @@ public final class IOSNative {
     /// shared App Group user defaults. Returns a JSON string or null if there is none.
     native String getPendingSharedContent(String appGroupId);
 
+    // --- Wallet issuer-provisioning extension (PassKit) ---------------------
+    // The App Group id is read natively from the CN1WalletAppGroup Info.plist
+    // key injected by the build when ios.wallet.extension is enabled.
+
+    /// True on iOS 14+ when the CN1WalletAppGroup Info.plist key is present.
+    native boolean isWalletExtensionSupported();
+
+    /// Removes all published pass entries from the iPhone (remote=false) or
+    /// Apple Watch (remote=true) list, including their card-art files.
+    native void walletExtensionClearPassEntries(boolean remote);
+
+    /// Appends one pass entry to the shared App Group suite and writes its
+    /// card art PNG into the group container.
+    native void walletExtensionAddPassEntry(boolean remote, String identifier, String title,
+            String cardholderName, String accountSuffix, String network, String description, byte[] artPng);
+
+    /// Sets the requires-authentication flag read by the extension's status callback.
+    native void walletExtensionSetRequiresAuthentication(boolean requiresAuthentication);
+
+    /// Stores the auth token forwarded to the issuer endpoint; null removes it.
+    native void walletExtensionSetAuthToken(String token);
+
+    /// Clears all wallet extension data from the App Group.
+    native void walletExtensionClear();
+
     // --- Biometrics (LocalAuthentication.framework) -------------------------
 
     /** True when LAContext.canEvaluatePolicy(deviceOwnerAuthenticationWithBiometrics) succeeds. */

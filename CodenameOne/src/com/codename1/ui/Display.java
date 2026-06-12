@@ -6108,6 +6108,54 @@ public final class Display extends CN1Constants {
         return impl.isReceiveSharedContentSupported();
     }
 
+    /// Returns true if the platform supports publishing data to a Wallet
+    /// issuer-provisioning extension. Used internally by
+    /// `com.codename1.payment.WalletExtension`.
+    public boolean isWalletExtensionSupported() {
+        return impl.isWalletExtensionSupported();
+    }
+
+    /// Publishes the Wallet extension pass entries, replacing the previous
+    /// list. Used internally by `com.codename1.payment.WalletExtension`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `remote`: true for the Apple Watch list, false for the iPhone list
+    ///
+    /// - `entries`: the available cards; null or empty clears the list
+    public void walletExtensionSetPassEntries(boolean remote, com.codename1.payment.WalletPassEntry[] entries) {
+        impl.walletExtensionClearPassEntries(remote);
+        if (entries != null) {
+            for (int i = 0; i < entries.length; i++) {
+                com.codename1.payment.WalletPassEntry e = entries[i];
+                if (e == null) {
+                    continue;
+                }
+                impl.walletExtensionAddPassEntry(remote, e.getIdentifier(), e.getTitle(),
+                        e.getCardholderName(), e.getPrimaryAccountSuffix(), e.getPaymentNetwork(),
+                        e.getLocalizedDescription(), e.getArtPng());
+            }
+        }
+    }
+
+    /// Sets the Wallet extension requires-authentication flag. Used
+    /// internally by `com.codename1.payment.WalletExtension`.
+    public void walletExtensionSetRequiresAuthentication(boolean requiresAuthentication) {
+        impl.walletExtensionSetRequiresAuthentication(requiresAuthentication);
+    }
+
+    /// Publishes the Wallet extension auth token. Used internally by
+    /// `com.codename1.payment.WalletExtension`.
+    public void walletExtensionSetAuthToken(String token) {
+        impl.walletExtensionSetAuthToken(token);
+    }
+
+    /// Clears all published Wallet extension data. Used internally by
+    /// `com.codename1.payment.WalletExtension`.
+    public void walletExtensionClear() {
+        impl.walletExtensionClear();
+    }
+
     /// Subscribes the device to a push topic. Used internally by
     /// `com.codename1.push.Push`.
     ///

@@ -87,6 +87,8 @@ include::Advertising.asciidoc[]
 
 include::Monetization.asciidoc[]
 
+include::Apple-Wallet-Extension.asciidoc[]
+
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
 
