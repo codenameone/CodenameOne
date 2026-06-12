@@ -202,30 +202,86 @@ class OpenAiClientTest extends UITestBase {
         assertEquals("ok", r.value.getText());
     }
 
-    // ---- chat error / parse-failure handling -------------------------
+    // ---- chat error handling -----------------------------------------
     //
-    // Under the mock transport an HTTP error code never throws (the
-    // framework reads the body because configureRequest sets
-    // readResponseForErrors=true and the client suppresses
-    // handleErrorResponseCode), so chat() runs its normal postResponse
-    // parse over whatever body the server returned. The OpenAiSseDecoder
-    // status->ErrorType mapping (mapErrorStatic) only fires from
-    // handleException, which requires a genuine transport exception the
-    // in-tree mock cannot raise -- noted as unreachable here.
+    // configureRequest sets readResponseForErrors=true and the client
+    // suppresses handleErrorResponseCode, so the framework routes HTTP
+    // 4xx/5xx through postResponse() (never handleException). postResponse
+    // inspects the status code and routes errors through
+    // OpenAiSseDecoder.mapErrorStatic so a typed LlmException is surfaced
+    // instead of an error envelope being mis-parsed as an empty success.
 
     @Test
-    void chatParsesErrorEnvelopeLenientlyAsEmptyResponse() {
-        // A well-formed JSON error body has no "choices", so the lenient
-        // non-streaming parser yields an empty assistant message rather
-        // than failing.
+    void chatSurfaces401AsAuthError() {
         mock(CHAT_URL, 401,
                 "{\"error\":{\"code\":\"invalid_api_key\",\"message\":\"bad key\"}}");
         Outcome<ChatResponse> r = await(client().chat(userChat("hi")));
-        assertNull(r.error);
-        assertNotNull(r.value);
-        assertEquals("", r.value.getText());
-        assertEquals("stop", r.value.getFinishReason());
-        assertTrue(r.value.getToolCalls().isEmpty());
+        assertNull(r.value);
+        assertInstanceOf(LlmException.class, r.error);
+        LlmException ex = (LlmException) r.error;
+        assertEquals(LlmException.ErrorType.AUTH, ex.getType());
+        assertEquals(401, ex.getHttpStatus());
+        assertEquals("invalid_api_key", ex.getProviderErrorCode());
+        assertEquals("bad key", ex.getMessage());
+    }
+
+    @Test
+    void chatSurfaces429AsRateLimit() {
+        mock(CHAT_URL, 429,
+                "{\"error\":{\"message\":\"slow down\"}}");
+        Outcome<ChatResponse> r = await(client().chat(userChat("hi")));
+        assertNull(r.value);
+        assertInstanceOf(LlmException.class, r.error);
+        assertEquals(LlmException.ErrorType.RATE_LIMIT, ((LlmException) r.error).getType());
+    }
+
+    @Test
+    void chatSurfacesGeneric400AsInvalidRequest() {
+        mock(CHAT_URL, 400, "{\"error\":{\"message\":\"bad request\"}}");
+        Outcome<ChatResponse> r = await(client().chat(userChat("hi")));
+        assertNull(r.value);
+        assertEquals(LlmException.ErrorType.INVALID_REQUEST,
+                ((LlmException) r.error).getType());
+    }
+
+    @Test
+    void chatSurfaces500AsServerError() {
+        mock(CHAT_URL, 500, "{\"error\":{\"message\":\"boom\"}}");
+        Outcome<ChatResponse> r = await(client().chat(userChat("hi")));
+        assertNull(r.value);
+        assertEquals(LlmException.ErrorType.SERVER, ((LlmException) r.error).getType());
+    }
+
+    @Test
+    void chatSurfaces503AsModelOverloaded() {
+        mock(CHAT_URL, 503, "{\"error\":{\"message\":\"overloaded\"}}");
+        Outcome<ChatResponse> r = await(client().chat(userChat("hi")));
+        assertNull(r.value);
+        assertEquals(LlmException.ErrorType.MODEL_OVERLOADED,
+                ((LlmException) r.error).getType());
+    }
+
+    @Test
+    void chatMapsContextLengthExceededRegardlessOfStatus() {
+        mock(CHAT_URL, 400,
+                "{\"error\":{\"code\":\"context_length_exceeded\","
+                        + "\"message\":\"too many tokens\"}}");
+        Outcome<ChatResponse> r = await(client().chat(userChat("hi")));
+        assertNull(r.value);
+        assertEquals(LlmException.ErrorType.CONTEXT_LENGTH,
+                ((LlmException) r.error).getType());
+    }
+
+    @Test
+    void chatSurfaces200WithErrorEnvelopeAsError() {
+        // Some OpenAI-compatible servers answer HTTP 200 with an {"error":...}
+        // body; that must still surface as an LlmException, not a blank reply.
+        mock(CHAT_URL, 200,
+                "{\"error\":{\"code\":\"server_error\",\"message\":\"oops\"}}");
+        Outcome<ChatResponse> r = await(client().chat(userChat("hi")));
+        assertNull(r.value);
+        assertInstanceOf(LlmException.class, r.error);
+        assertEquals("oops", ((LlmException) r.error).getMessage());
     }
 
     @Test
@@ -292,6 +348,17 @@ class OpenAiClientTest extends UITestBase {
         assertNotNull(r.value);
         assertTrue(r.value.getData().isEmpty());
         assertNull(r.value.getUsage());
+    }
+
+    @Test
+    void embedSurfacesHttpErrorAsTypedException() {
+        // The same error-routing fix applies to the embeddings endpoint.
+        mock(EMBED_URL, 401,
+                "{\"error\":{\"code\":\"invalid_api_key\",\"message\":\"bad key\"}}");
+        Outcome<EmbeddingResponse> r = await(client().embed(EmbeddingRequest.of("embed-1", "x")));
+        assertNull(r.value);
+        assertInstanceOf(LlmException.class, r.error);
+        assertEquals(LlmException.ErrorType.AUTH, ((LlmException) r.error).getType());
     }
 
     // ---- helpers -----------------------------------------------------

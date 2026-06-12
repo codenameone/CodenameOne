@@ -839,9 +839,16 @@ public abstract class Base64 {
         if (size <= 0) {
             return new byte[0];
         }
-        Simd simd = Simd.get();
-        if (simd.isSupported() && size >= 16) {
-            return simd.allocByte(size);
+        try {
+            Simd simd = Simd.get();
+            if (simd.isSupported() && size >= 16) {
+                return simd.allocByte(size);
+            }
+        } catch (Throwable t) {
+            // The platform may not be initialized yet -- Base64 is a pure
+            // utility that can run before Display starts, on background
+            // threads, or in tests. Fall back to a plain array (mirrors
+            // VertexBuffer.allocAligned).
         }
         return new byte[size];
     }
