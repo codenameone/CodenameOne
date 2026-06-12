@@ -496,10 +496,21 @@ class JavascriptTargetIntegrationTest {
         // The bytecode-level INVOKEVIRTUAL emission simply calls the
         // ``cn1_iv*`` helper, which consults the runtime cache. Assert
         // that virtual dispatch still runs through that helper family.
+        // The structured emitter spells the helpers through their short
+        // runtime aliases (``_v*`` generator / ``_w*`` sync); the
+        // interpreter path keeps the long ``cn1_iv*`` names. Which one a
+        // fixture method gets depends on the bytecode shape the compiling
+        // JDK produced, so accept the whole family.
         assertTrue(methodBody.contains("cn1_iv0(") || methodBody.contains("cn1_iv1(")
                         || methodBody.contains("cn1_iv2(") || methodBody.contains("cn1_iv3(")
-                        || methodBody.contains("cn1_iv4(") || methodBody.contains("cn1_ivN("),
-                "Interpreter-mode virtual dispatch should route through the cn1_iv* helper family");
+                        || methodBody.contains("cn1_iv4(") || methodBody.contains("cn1_ivN(")
+                        || methodBody.contains("_v0(") || methodBody.contains("_v1(")
+                        || methodBody.contains("_v2(") || methodBody.contains("_v3(")
+                        || methodBody.contains("_v4(") || methodBody.contains("_vN(")
+                        || methodBody.contains("_w0(") || methodBody.contains("_w1(")
+                        || methodBody.contains("_w2(") || methodBody.contains("_w3(")
+                        || methodBody.contains("_w4(") || methodBody.contains("_wN("),
+                "Virtual dispatch should route through the cn1_iv*/_v*/_w* helper family");
     }
 
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {
