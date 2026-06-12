@@ -53,7 +53,7 @@ RenderView view = new RenderView(new Renderer() {
 form.add(BorderLayout.CENTER, view);
 ```
 
-`RenderView` is a regular Codename One component. It participates in layout, sits next to buttons and labels, and the form around it keeps working exactly as before. This is a textured variant of the same code running on an iPhone through Metal:
+`RenderView` is a regular Codename One component. It participates in layout, sits next to buttons and labels, and the surrounding form keeps working exactly as before. This is a textured variant of the same code running on an iPhone through Metal:
 
 ![A textured cube rendered through Metal on iOS](/blog/portable-3d-graphics-api/textured-cube-ios.png)
 

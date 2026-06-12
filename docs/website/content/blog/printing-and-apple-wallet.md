@@ -40,7 +40,7 @@ What backs the API on each platform:
 
 That last row is worth a beat: the printing API shipped in the same week as [the native Windows port](/blog/native-windows-port-no-jvm/) and already covers it, dialog, spooling, PDF rasterization and all.
 
-One honest caveat that the JavaDoc spells out per method: "completed" means the document was handed to the printing system. Some platforms don't expose what happened inside the native dialog afterwards, so completion there is reported best-effort. Design your UX around handing off, not around confirming pages hit paper.
+One honest caveat that the JavaDoc spells out per method: "completed" means the document was handed to the printing system. Some platforms don't expose what happened inside the native dialog afterward, so completion there is reported best-effort. Design your UX around handing off, not around confirming pages hit paper.
 
 There is a `PrinterSample` in the repository that prints a generated image and a downloaded PDF if you want a starting point.
 
@@ -60,7 +60,7 @@ With those set, the iOS build generates Apple's extension pair as fixed, framewo
 
 ### How it works under the hood
 
-Wallet extensions run in a separate process under a 100 millisecond response deadline, so they cannot spin up your Java code. The design splits the work: your app publishes its card data ahead of time through the new `com.codename1.payment.WalletExtension` API, and the extension reads it from the shared App Group when Wallet asks.
+Wallet extensions run in a separate process under a 100-millisecond response deadline, so they cannot spin up your Java code. The design splits the work: your app publishes its card data ahead of time through the new `com.codename1.payment.WalletExtension` API, and the extension reads it from the shared App Group when Wallet asks.
 
 ```java
 if (WalletExtension.isSupported()) {

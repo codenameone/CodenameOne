@@ -44,9 +44,9 @@ The desktop details that make an app feel native are in place too. Mouse-wheel s
 
 ## How complete is it?
 
-The port is new, and it should be treated as such; we expect to be shooting down teething issues over the coming weeks, and we want to hear about every one of them. With that said, it is far more complete than "new port" usually implies. The same screenshot test suite that gates iOS, Android, the web, and the Mac target runs against the Windows port in CI on every change, on both x64 and arm64 runners, with more than 120 screenshot baselines covering components, themes, transitions, graphics, charts, and the 3D API. Almost anything that is viable for a desktop app is expected to work.
+The port is new, and it should be treated as such; we expect to be shooting down teething issues over the coming weeks, and we want to hear about every one of them. With that said, it covers far more ground than "new port" usually implies. The same screenshot test suite that gates iOS, Android, the web, and the Mac target runs against the Windows port in CI on every change, on both x64 and arm64 runners, with more than 120 screenshot baselines covering components, themes, transitions, graphics, charts, and the 3D API. Almost anything that is viable for a desktop app is expected to work.
 
-Where a capability genuinely doesn't exist on a desktop machine, the port follows a strict honesty rule: phone-hardware APIs (camera-as-sensor flows, GPS-grade location, contacts, push, biometrics) report themselves as unsupported rather than fabricating data. Your existing cross-platform feature detection keeps working.
+Where a capability genuinely doesn't exist on a desktop machine, the port follows a strict honesty rule: phone-hardware APIs (camera-as-sensor flows, GPS-grade location, contacts, push, biometrics) report themselves as unsupported rather than fabricating data. Existing cross-platform feature-detection code keeps working.
 
 ## Building one
 

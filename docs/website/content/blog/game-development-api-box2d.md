@@ -69,7 +69,7 @@ game.start();
 
 ## The game loop
 
-`GameView` drives its loop through the existing animation system, so it cooperates with the rest of the UI instead of fighting it. It manages the framerate while running and restores the global value when it stops, and it releases everything automatically when the view is detached from the form.
+`GameView` drives its loop through the existing animation system, so it cooperates with the rest of the UI instead of fighting it. It manages the frame rate while running and restores the global value when it stops, and it releases everything automatically when the view is detached from the form.
 
 For deterministic simulation there is a fixed-timestep mode: set `setFixedTimestep(1.0 / 60)` and `update` is called with exactly that delta as often as needed, with `getInterpolationAlpha()` available for smooth rendering between simulation steps. This is the standard pattern for physics-driven games, and it is one method call here.
 
