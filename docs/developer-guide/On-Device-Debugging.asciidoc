@@ -248,6 +248,34 @@ of two to three times slower than a release build — this is
 normal and matches the overhead of `-g`-style debugging on
 other native VMs.
 
+=== Debugging the generated Xcode project natively
+
+The JDWP flow above keeps you at the Java level. For native-level work --
+stepping through Objective-C sources, debugging a native interface, chasing a
+crash inside the VM, or profiling with Instruments -- debug the generated Xcode
+project directly:
+
+* *Local build*: `mvn cn1:buildIosXcodeProject` writes the complete Xcode
+  project under `target/...-ios-source/`.
+* *Cloud build*: check the *Include Source* flag in Codename One Settings before
+  sending the build, and download the sources result from the build server.
+
+Open the `.xcworkspace` file if one was generated, otherwise the `.xcodeproj`,
+and run on a device or the native iOS simulator from Xcode as you would any iOS
+app.
+
+IMPORTANT: The `.xcworkspace` is no longer exclusive to CocoaPods-based builds.
+Use it whenever it's generated, whether the project uses CocoaPods, Swift
+Package Manager, or both.
+
+Inside Xcode you get LLDB and Instruments against the real binary. Your Java
+code appears as the C sources ParparVM generated from it -- a Java method like
+`com.mycompany.MyClass.doStuff(int)` becomes a C function named along the lines
+of `com_mycompany_MyClass_doStuff___int`, so symbolic breakpoints on the
+translated code work too. The native-IDE path and the JDWP path are
+complementary: use Xcode for native frames and profiling, the JDWP proxy for
+source-level Java debugging.
+
 === Troubleshooting
 
 ==== The proxy reports "device disconnected" before the breakpoint fires

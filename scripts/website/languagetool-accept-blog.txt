@@ -52,3 +52,10 @@ foldables?
 
 # WebSocket spec term (Sec-WebSocket-Protocol negotiation).
 [Ss]ubprotocols?
+
+# Community author names.
+Francesco Galgani
+Catto
+
+# Game-development vocabulary.
+[Ss]tarfields?

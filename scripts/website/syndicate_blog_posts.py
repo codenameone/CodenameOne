@@ -25,6 +25,7 @@ library available.
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import json
 import os
@@ -34,7 +35,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +58,20 @@ CN1_BLURB = (
 # Hugo-only tail blocks that should not be syndicated.
 _HUGO_FOOTER_RE = re.compile(r"\n\s*---\s*\n+##\s*Discussion\b.*\Z", re.DOTALL | re.IGNORECASE)
 _HUGO_SHORTCODE_RE = re.compile(r"\{\{<[^>]*>\}\}|\{\{%[^%]*%\}\}")
+
+# Paired Mermaid shortcode: {{< mermaid >}} <diagram> {{< /mermaid >}} (and the
+# {{% mermaid %}} variant). The website renders these client-side with
+# mermaid.js, which the syndication targets cannot do. We must handle these
+# before _HUGO_SHORTCODE_RE runs: that regex only strips the open/close tags and
+# would otherwise leave the diagram source ("flowchart LR ...") inline as raw
+# text in the syndicated post.
+_MERMAID_BLOCK_RE = re.compile(
+    r"\{\{[<%]\s*mermaid\b[^%>]*[%>]\}\}(.*?)\{\{[<%]\s*/\s*mermaid\s*[%>]\}\}",
+    re.DOTALL,
+)
+
+# mermaid.ink renders a diagram to an image from a url-safe-base64 path segment.
+MERMAID_INK_BASE = "https://mermaid.ink/img"
 
 DEVTO_TAGS = ["java", "mobile", "android", "ios"]
 
@@ -214,14 +229,29 @@ def select_candidate(
     today: dt.date,
     floor: dt.date,
     min_age_days: int,
+    platform_filters: dict[str, Callable[[Post], bool]] | None = None,
 ) -> Post | None:
+    """Pick the oldest eligible post still pending on at least one platform.
+
+    ``platform_filters`` maps a platform name to a predicate deciding whether
+    that platform wants a given post at all (e.g. foojay only takes the weekly
+    Friday post). A post a platform does not want is treated as already
+    satisfied for that platform, so it can never block the rotation.
+    """
     cutoff = today - dt.timedelta(days=min_age_days)
+
+    def pending(post: Post, platform: str) -> bool:
+        wanted = platform_filters.get(platform) if platform_filters else None
+        if wanted is not None and not wanted(post):
+            return False
+        return not state.is_syndicated(post.slug, platform)
+
     for post in posts:
         if post.date <= floor:
             continue
         if post.date > cutoff:
             continue
-        if all(state.is_syndicated(post.slug, p) for p in platforms):
+        if not any(pending(post, p) for p in platforms):
             continue
         return post
     return None
@@ -258,9 +288,40 @@ def insert_blurb(body: str, blurb: str) -> str:
     return "\n".join(lines[:i] + insertion + lines[i:])
 
 
+def mermaid_image_url(diagram: str) -> str:
+    """Build a mermaid.ink PNG URL for a Mermaid ``diagram``.
+
+    mermaid.ink decodes the path segment as the raw graph source, so url-safe
+    base64 of the UTF-8 diagram is all that is required. ``type=png`` forces PNG
+    (the bare path can fall back to JPEG) and ``bgColor`` keeps it opaque on
+    platforms with dark backgrounds. The default (light) theme matches the
+    website's default Mermaid rendering.
+    """
+    encoded = base64.urlsafe_b64encode(diagram.encode("utf-8")).decode("ascii")
+    return f"{MERMAID_INK_BASE}/{encoded}?type=png&bgColor=ffffff"
+
+
+def render_mermaid_as_images(body: str) -> str:
+    """Replace Hugo Mermaid shortcode blocks with rendered-image Markdown.
+
+    Each ``{{< mermaid >}}...{{< /mermaid >}}`` block becomes a Markdown image
+    pointing at a mermaid.ink-rendered PNG, so syndicated readers see the chart
+    instead of its raw source. The replacement sits between the surrounding
+    blank lines of the original block, so it renders as a standalone image.
+    """
+    def repl(match: "re.Match[str]") -> str:
+        diagram = match.group(1).strip()
+        if not diagram:
+            return ""
+        return f"![Diagram]({mermaid_image_url(diagram)})"
+
+    return _MERMAID_BLOCK_RE.sub(repl, body)
+
+
 def render_syndicated_body(post: Post) -> str:
     body = post.body.strip("\n")
     body = _HUGO_FOOTER_RE.sub("", body)
+    body = render_mermaid_as_images(body)
     body = _HUGO_SHORTCODE_RE.sub("", body).rstrip()
     body = absolutize_links(body)
     body = insert_blurb(body, CN1_BLURB)

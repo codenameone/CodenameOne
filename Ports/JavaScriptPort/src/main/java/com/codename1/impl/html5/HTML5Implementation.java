@@ -43,6 +43,8 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.push.PushCallback;
 import com.codename1.teavm.ext.localforage.LocalForage;
 import com.codename1.teavm.ext.localforage.LocalForage.ItemSavedListener;
@@ -3379,6 +3381,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
     
+    @Override
+    public boolean isSoundPoolSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        // A WebAudio backed pool gives true low latency, per voice volume/pan/rate;
+        // if WebAudio is unavailable this returns null and SoundPool uses the
+        // cross platform MediaManager fallback.
+        return WebAudioSoundPool.tryCreate(this, maxStreams);
+    }
+
     @Override
     public Media createMedia(String uri, boolean isVideo, final Runnable onCompletion) throws IOException {
         return createMedia(uri, isVideo, null, onCompletion);
@@ -9775,8 +9790,133 @@ public class HTML5Implementation extends CodenameOneImplementation {
             super.share(text, image, mimeType, sourceRect);
         }
     }
-    
-    
+
+    /// Printing works by loading the document into a hidden iframe and
+    /// invoking the browser print dialog, so it is always available.
+    @Override
+    public boolean isPrintingSupported() {
+        return true;
+    }
+
+    /// Print a document by loading it into a hidden iframe as a blob
+    /// object URL and invoking the browser print dialog on the iframe's
+    /// content window.
+    ///
+    /// Browsers don't reliably expose whether the user printed or
+    /// dismissed the dialog: where the iframe fires `afterprint` the
+    /// result is reported as completed when the dialog closes, otherwise
+    /// completed is reported on a best-effort basis shortly after
+    /// `print()` is invoked. Cancellation is therefore reported as
+    /// completed on this port.
+    ///
+    /// PDF documents print through the browser's built-in PDF viewer and
+    /// behavior varies between browsers; Firefox may print a blank or
+    /// placeholder page for PDF iframes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filePath`: path of the document in file system storage
+    ///
+    /// - `mimeType`: the document type, e.g. `application/pdf`, `image/png`
+    ///
+    /// - `listener`: callback for the print outcome. May be null.
+    @Override
+    public void print(final String filePath, final String mimeType, final PrintResultListener listener) {
+        final boolean[] fired = new boolean[1];
+        new Thread(new Runnable() {
+            public void run() {
+                String url;
+                try {
+                    Blob blob = openFileAsBlob(filePath);
+                    if (mimeType != null && !Objects.equals(blob.getType(), mimeType)) {
+                        blob = BlobUtil.toType(blob, mimeType);
+                    }
+                    url = BlobUtil.createObjectURL(blob);
+                    if (url == null) {
+                        firePrintResult(listener, PrintResult.failed("Object URLs are not supported in this browser"), fired);
+                        return;
+                    }
+                } catch (Exception ex) {
+                    Log.e(ex);
+                    firePrintResult(listener, PrintResult.failed(ex.getMessage()), fired);
+                    return;
+                }
+                printObjectURL_(url, new PrintFrameCallback() {
+                    public void onResult(final boolean completed, final String error) {
+                        // Hop off the JS callback context before touching
+                        // Codename One code, matching the other JSFunctor
+                        // callbacks in this class.
+                        new Thread(new Runnable() {
+                            public void run() {
+                                if (completed) {
+                                    firePrintResult(listener, PrintResult.completed(), fired);
+                                } else {
+                                    firePrintResult(listener, PrintResult.failed(error), fired);
+                                }
+                            }
+                        }).start();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /// Reports a print result exactly once. The native print script fires
+    /// its callback at most once, but the load/afterprint/fallback paths
+    /// plus the Java-side error paths share this guard so the listener
+    /// can never be invoked twice.
+    private static void firePrintResult(PrintResultListener listener, PrintResult result, boolean[] fired) {
+        synchronized (fired) {
+            if (fired[0]) {
+                return;
+            }
+            fired[0] = true;
+        }
+        if (listener != null) {
+            listener.onResult(result);
+        }
+    }
+
+    @JSFunctor
+    private static interface PrintFrameCallback extends JSObject {
+        public void onResult(boolean completed, String error);
+    }
+
+    // Loads the object URL into a hidden iframe, prints it and reports the
+    // outcome through the callback. The iframe and the object URL are kept
+    // alive for 60 seconds (or until afterprint) because print dialogs read
+    // the frame content lazily.
+    @JSBody(params = {"url", "callback"}, script =
+            "var done = false;\n"
+            + "var cleaned = false;\n"
+            + "var iframe = null;\n"
+            + "var finish = function(ok, msg) { if (done) return; done = true; callback(ok, msg); };\n"
+            + "var cleanup = function() {\n"
+            + "    if (cleaned) return; cleaned = true;\n"
+            + "    try { var u = (typeof URL !== 'undefined' && URL) ? URL : ((typeof window !== 'undefined' && window.webkitURL) ? window.webkitURL : null); if (u) u.revokeObjectURL(url); } catch (e) {}\n"
+            + "    try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}\n"
+            + "};\n"
+            + "if (typeof document === 'undefined' || !document.body) { finish(false, 'Printing requires a browser document context'); return; }\n"
+            + "iframe = document.createElement('iframe');\n"
+            + "iframe.style.cssText = 'position:fixed;visibility:hidden;right:0;bottom:0;width:0;height:0;border:0';\n"
+            + "iframe.onload = function() {\n"
+            + "    try {\n"
+            + "        var win = iframe.contentWindow;\n"
+            + "        try { win.addEventListener('afterprint', function() { finish(true, null); setTimeout(cleanup, 0); }); } catch (e) {}\n"
+            + "        win.focus();\n"
+            + "        win.print();\n"
+            + "        setTimeout(function() { finish(true, null); }, 1000);\n"
+            + "    } catch (e) {\n"
+            + "        finish(false, '' + e);\n"
+            + "        cleanup();\n"
+            + "    }\n"
+            + "};\n"
+            + "iframe.onerror = function() { finish(false, 'Failed to load document for printing'); cleanup(); };\n"
+            + "iframe.src = url;\n"
+            + "document.body.appendChild(iframe);\n"
+            + "setTimeout(cleanup, 60000);")
+    private native static void printObjectURL_(String url, PrintFrameCallback callback);
+
     private static interface CancelableEvent extends Event {
         @JSProperty
         public boolean isDefaultPrevented();

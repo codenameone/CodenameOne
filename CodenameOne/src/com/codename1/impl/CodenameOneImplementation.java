@@ -59,6 +59,8 @@ import com.codename1.notifications.NotificationPermissionRequest;
 import com.codename1.notifications.NotificationPermissionResult;
 import com.codename1.background.ForegroundService;
 import com.codename1.background.WorkRequest;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.share.SharedContent;
 import com.codename1.share.ShareResult;
 import com.codename1.share.ShareResultListener;
@@ -4793,6 +4795,26 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Indicates whether this platform provides a native low latency sound pool
+    /// (backing `com.codename1.gaming.SoundPool`). The default implementation
+    /// returns false, in which case the gaming layer falls back to a
+    /// `MediaManager` based pool. Ports with a purpose built low latency audio API
+    /// (Android `SoundPool`, iOS `AVAudioEngine`, the desktop `javax.sound.sampled`
+    /// mixer, WebAudio) override this and `#createSoundPool(int)`.
+    public boolean isSoundPoolSupported() {
+        return false;
+    }
+
+    /// Creates a native low latency sound pool peer, or returns null when this
+    /// platform does not provide one (the default).
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxStreams`: the maximum number of simultaneously playing voices
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        return null;
+    }
+
     /// Creates media asynchronously.
     ///
     /// #### Parameters
@@ -7423,6 +7445,34 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    /// Indicates if the underlying platform can print documents through
+    /// [#print(String,String,PrintResultListener)].
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying platform handles printing.
+    public boolean isPrintingSupported() {
+        return false;
+    }
+
+    /// Print a document file through the platform printing system,
+    /// typically showing the native print dialog. The default
+    /// implementation reports failure since this base class has no
+    /// printing capability. Ports that can print override this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filePath`: path of the document in file system storage
+    ///
+    /// - `mimeType`: the document type, e.g. `application/pdf`, `image/png`
+    ///
+    /// - `listener`: callback for the print outcome. May be null.
+    public void print(String filePath, String mimeType, PrintResultListener listener) {
+        if (listener != null) {
+            listener.onResult(PrintResult.failed("Printing is not supported on this platform"));
+        }
+    }
+
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 
     /// Called before internal paint of component starts
@@ -8083,8 +8133,116 @@ public abstract class CodenameOneImplementation {
         t.setIdentity();
     }
 
+    /// True while a scroll-wheel gesture started by `#pointerWheelMoved` is still
+    /// animating. The framework uses this to tell a wheel scroll apart from a
+    /// finger drag (e.g. it suppresses opening the native text editor mid-scroll).
+    private boolean scrollWheeling;
+
     public boolean isScrollWheeling() {
-        return false;
+        return scrollWheeling;
+    }
+
+    /// Maps a physical scroll-wheel / trackpad scroll into a Codename One scroll
+    /// gesture. Ports call this from their native wheel callback instead of
+    /// fabricating raw pointer (or key) events of their own, so the mapping lives
+    /// in one place and behaves identically everywhere.
+    ///
+    /// The shared implementation replays the scroll as a synthetic
+    /// press/drag/release over the component under `(x, y)` -- spread across a few
+    /// EDT cycles so Codename One's own drag/tensile/deceleration logic animates
+    /// it like a real drag rather than a single jump -- and temporarily makes that
+    /// component non-focusable so the synthetic press is not registered as a
+    /// click. While it runs `#isScrollWheeling` reports `true`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: pointer x in display coordinates
+    ///
+    /// - `y`: pointer y in display coordinates
+    ///
+    /// - `scrollX`: horizontal scroll amount in pixels (already converted from the
+    /// native notch count by the port); a positive value reveals content to the
+    /// left, as if the finger were dragged right
+    ///
+    /// - `scrollY`: vertical scroll amount in pixels; a positive value reveals
+    /// content above, as if the finger were dragged down
+    public void pointerWheelMoved(final int x, final int y, final int scrollX, final int scrollY) {
+        if (scrollX == 0 && scrollY == 0) {
+            return;
+        }
+        final Display d = Display.getInstance();
+        // Quarter the gesture across four EDT cycles: a single press->drag(full)
+        // ->release would read as a fling and overshoot, whereas stepped drags let
+        // the scroll container settle the way a finger drag does.
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    scrollWheeling = true;
+                    dragWheelStep(f, x, y, scrollX / 4, scrollY / 4, true, false);
+                }
+            }
+        });
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    dragWheelStep(f, x, y, scrollX / 2, scrollY / 2, false, false);
+                }
+            }
+        });
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    dragWheelStep(f, x, y, scrollX * 3 / 4, scrollY * 3 / 4, false, false);
+                }
+            }
+        });
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = d.getCurrent();
+                if (f != null) {
+                    dragWheelStep(f, x, y, scrollX, scrollY, false, true);
+                }
+                scrollWheeling = false;
+            }
+        });
+    }
+
+    /// One synthetic step of a `#pointerWheelMoved` gesture, on the EDT: optionally
+    /// presses, drags to the accumulated `(dx, dy)` offset, and optionally
+    /// releases. The component under the cursor is made non-focusable around the
+    /// step so the synthetic press is not turned into a selection/click.
+    private void dragWheelStep(Form f, int x, int y, int dx, int dy, boolean press, boolean release) {
+        Component cmp;
+        try {
+            cmp = f.getComponentAt(x, y);
+        } catch (Throwable t) {
+            // getComponentAt can transiently fault while the UI is mutating off-EDT.
+            cmp = null;
+        }
+        boolean unfocus = cmp != null && cmp.isFocusable();
+        if (unfocus) {
+            cmp.setFocusable(false);
+        }
+        try {
+            if (press) {
+                f.pointerPressed(x, y);
+            }
+            f.pointerDragged(x + dx, y + dy);
+            if (release) {
+                f.pointerReleased(x + dx, y + dy);
+            }
+        } finally {
+            if (unfocus) {
+                cmp.setFocusable(true);
+            }
+        }
     }
 
     /// Blocks or enables copy and paste in the entire app.
@@ -10229,6 +10387,42 @@ public abstract class CodenameOneImplementation {
     /// Returns true if the platform can receive shared content from other apps.
     public boolean isReceiveSharedContentSupported() {
         return false;
+    }
+
+    /// Returns true if the platform supports publishing data to a Wallet
+    /// issuer-provisioning extension (iOS only). Defaults to false.
+    public boolean isWalletExtensionSupported() {
+        return false;
+    }
+
+    /// Removes all published Wallet extension pass entries from one of the
+    /// two lists. No-op on platforms without Wallet extension support.
+    ///
+    /// #### Parameters
+    ///
+    /// - `remote`: true for the Apple Watch list, false for the iPhone list
+    public void walletExtensionClearPassEntries(boolean remote) {
+    }
+
+    /// Appends one pass entry to the published Wallet extension list. No-op
+    /// on platforms without Wallet extension support.
+    public void walletExtensionAddPassEntry(boolean remote, String identifier, String title,
+            String cardholderName, String accountSuffix, String network, String description, byte[] artPng) {
+    }
+
+    /// Sets the Wallet extension requires-authentication flag. No-op on
+    /// platforms without Wallet extension support.
+    public void walletExtensionSetRequiresAuthentication(boolean requiresAuthentication) {
+    }
+
+    /// Publishes the Wallet extension auth token, or removes it when null.
+    /// No-op on platforms without Wallet extension support.
+    public void walletExtensionSetAuthToken(String token) {
+    }
+
+    /// Clears all published Wallet extension data. No-op on platforms
+    /// without Wallet extension support.
+    public void walletExtensionClear() {
     }
 
     /// Delivers shared content to the running application instance. onReceivedSharedContent

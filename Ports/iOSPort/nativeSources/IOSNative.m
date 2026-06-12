@@ -58,6 +58,7 @@
 #include "java_lang_RuntimeException.h"
 #import "FillPolygon.h"
 #import "AudioPlayer.h"
+#import "CN1SoundPool.h"
 #import "DrawGradient.h"
 #ifdef CN1_USE_METAL
 #import "DrawMultiStopGradient.h"
@@ -2603,6 +2604,108 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
         return 0;
     }
     return com_codename1_impl_ios_IOSNative_createAudio;
+}
+
+// ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT maxStreams) {
+    __block JAVA_LONG result = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        result = (JAVA_LONG)((BRIDGE_CAST void*)[[CN1SoundPool alloc] initWithMaxStreams:maxStreams]);
+        POOL_END();
+    });
+    return result;
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_OBJECT b, JAVA_INT ringSize) {
+    __block JAVA_LONG result = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+#ifndef NEW_CODENAME_ONE_VM
+        org_xmlvm_runtime_XMLVMArray* byteArray = b;
+        JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+        int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+        void* data = ((JAVA_ARRAY)b)->data;
+        int len = ((JAVA_ARRAY)b)->length;
+#endif
+        NSData* d = [NSData dataWithBytes:data length:len];
+        CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+        CN1Sound* s = [sp loadData:d ringSize:ringSize];
+        result = (JAVA_LONG)((BRIDGE_CAST void*)s);
+        POOL_END();
+    });
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_nativePlaySound___long_long_float_float_float_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound, JAVA_FLOAT volume, JAVA_FLOAT pan, JAVA_FLOAT rate, JAVA_INT loop) {
+    __block JAVA_INT result = -1;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+        CN1Sound* s = (BRIDGE_CAST CN1Sound*)((void *)sound);
+        result = [sp play:s volume:volume pan:pan rate:rate loop:loop];
+    });
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_nativeSetSoundVolume___long_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId, JAVA_FLOAT volume) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp setVoiceVolume:voiceId value:volume];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeSetSoundRate___long_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId, JAVA_FLOAT rate) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp setVoiceRate:voiceId value:rate];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeSetSoundPan___long_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId, JAVA_FLOAT pan) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp setVoicePan:voiceId value:pan];
+}
+
+void com_codename1_impl_ios_IOSNative_nativePauseSound___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp pauseVoice:voiceId];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeResumeSound___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp resumeVoice:voiceId];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeStopSound___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_INT voiceId) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp stopVoice:voiceId];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeStopAllSounds___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp stopAll];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeAutoPauseSoundPool___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp autoPauseAll];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeAutoResumeSoundPool___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp autoResumeAll];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeUnloadSound___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    CN1Sound* s = (BRIDGE_CAST CN1Sound*)((void *)sound);
+    [sp unloadSound:s];
+}
+
+void com_codename1_impl_ios_IOSNative_nativeReleaseSoundPool___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool) {
+    CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
+    [sp stopAll];
+#ifndef CN1_USE_ARC
+    [sp release];
+#endif
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getVolume__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -9199,6 +9302,60 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
     });
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return [UIPrintInteractionController isPrintingAvailable];
+}
+
+// Prints the file at path through UIPrintInteractionController and reports
+// the outcome to IOSImplementation.printDocumentCallback using the supplied
+// callbackId. Status codes mirror com.codename1.printing.PrintResult:
+// 1=COMPLETED, 2=CANCELLED, 3=FAILED.
+void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT mimeType, JAVA_INT callbackId) {
+    NSString* filePath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSString* mime = toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
+    int cbId = (int)callbackId;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSString* ns = fixFilePath(filePath);
+        NSURL* fileURL = [NSURL fileURLWithPath:ns];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:ns] || ![UIPrintInteractionController canPrintURL:fileURL]) {
+            JAVA_OBJECT jErrMsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"The document cannot be printed");
+            com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, 3, jErrMsg);
+            POOL_END();
+            return;
+        }
+        UIPrintInteractionController* printController = [UIPrintInteractionController sharedPrintController];
+        UIPrintInfo* printInfo = [UIPrintInfo printInfo];
+        printInfo.outputType = (mime != nil && [mime hasPrefix:@"image/"]) ? UIPrintInfoOutputPhoto : UIPrintInfoOutputGeneral;
+        printInfo.jobName = [ns lastPathComponent];
+        printController.printInfo = printInfo;
+        printController.printingItem = fileURL;
+        UIPrintInteractionCompletionHandler completionHandler = ^(UIPrintInteractionController *controller, BOOL completed, NSError *error) {
+            JAVA_INT status;
+            NSString* errMsg = nil;
+            if (error != nil) {
+                status = 3;
+                errMsg = [error localizedDescription];
+            } else if (completed) {
+                status = 1;
+            } else {
+                status = 2;
+            }
+            JAVA_OBJECT jErrMsg = errMsg != nil ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG errMsg) : JAVA_NULL;
+            com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, status, jErrMsg);
+        };
+        if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+            UIView* view = [CodenameOne_GLViewController instance].view;
+            CGRect sourceRect = CGRectMake(view.bounds.size.width / 2, view.bounds.size.height / 2, 1, 1);
+            [printController presentFromRect:sourceRect inView:view animated:YES completionHandler:completionHandler];
+        } else {
+            [printController presentAnimated:YES completionHandler:completionHandler];
+        }
+        POOL_END();
+        repaintUI();
+    });
+}
+
 
 extern BOOL isVKBAlwaysOpen();
 extern BOOL vkbAlwaysOpen;
@@ -11505,6 +11662,197 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appGroupId) {
     return com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String(CN1_THREAD_STATE_PASS_ARG me, appGroupId);
 }
+
+// --- Wallet issuer-provisioning extension support ---------------------------
+// The app publishes pass entries / auth token into the shared App Group where
+// the generated Wallet extensions (see the ios.wallet.* build hints) read
+// them. The group id comes from the CN1WalletAppGroup Info.plist key injected
+// by the build.
+//
+// The implementation is compiled in only when the build needs it - the
+// ios.wallet.extension build hint is enabled or the app references
+// com.codename1.payment.WalletExtension - because dormant wallet-looking
+// code in unrelated apps can trigger questions during Apple review. The
+// build flips the define below; the #else stubs keep the linker happy.
+//#define CN1_INCLUDE_WALLET
+
+#ifdef CN1_INCLUDE_WALLET
+
+static NSString *cn1WalletGroupId() {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1WalletAppGroup"];
+    return ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) ? (NSString *)v : nil;
+}
+
+static NSUserDefaults *cn1WalletGroupDefaults() {
+    NSString *group = cn1WalletGroupId();
+    return group == nil ? nil : [[NSUserDefaults alloc] initWithSuiteName:group];
+}
+
+static NSURL *cn1WalletGroupArtDir(BOOL create) {
+    NSString *group = cn1WalletGroupId();
+    if (group == nil) {
+        return nil;
+    }
+    NSURL *container = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:group];
+    if (container == nil) {
+        return nil;
+    }
+    NSURL *dir = [container URLByAppendingPathComponent:@"cn1wallet" isDirectory:YES];
+    if (create) {
+        [[NSFileManager defaultManager] createDirectoryAtURL:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    return dir;
+}
+
+static NSString *cn1WalletEntriesKey(JAVA_BOOLEAN remote) {
+    return remote ? @"cn1.wallet.remotePassEntries" : @"cn1.wallet.passEntries";
+}
+
+// Removes one list and deletes the card-art files its entries reference. Art
+// files are uniquely named per entry so this never breaks the other list.
+static void cn1WalletClearEntries(JAVA_BOOLEAN remote) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    NSString *key = cn1WalletEntriesKey(remote);
+    NSArray *entries = [defaults arrayForKey:key];
+    NSURL *artDir = cn1WalletGroupArtDir(NO);
+    for (id entry in entries) {
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString *art = ((NSDictionary *)entry)[@"art"];
+        if (art != nil && artDir != nil) {
+            [[NSFileManager defaultManager] removeItemAtURL:[artDir URLByAppendingPathComponent:art] error:nil];
+        }
+    }
+    [defaults removeObjectForKey:key];
+    [defaults synchronize];
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (cn1WalletGroupId() == nil) {
+        return JAVA_FALSE;
+    }
+    if (@available(iOS 14, *)) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isWalletExtensionSupported___R_boolean(CN1_THREAD_STATE_PASS_ARG me);
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClearPassEntries___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote) {
+    cn1WalletClearEntries(remote);
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionAddPassEntry___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT cardholderName, JAVA_OBJECT accountSuffix, JAVA_OBJECT network, JAVA_OBJECT description, JAVA_OBJECT artPng) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil || identifier == JAVA_NULL || artPng == JAVA_NULL) {
+        return;
+    }
+    NSURL *artDir = cn1WalletGroupArtDir(YES);
+    if (artDir == nil) {
+        return;
+    }
+    NSString *artName = [[[NSUUID UUID] UUIDString] stringByAppendingString:@".png"];
+    NSData *artData = arrayToData(artPng);
+    if (artData == nil || ![artData writeToURL:[artDir URLByAppendingPathComponent:artName] atomically:YES]) {
+        return;
+    }
+    NSMutableDictionary *entry = [NSMutableDictionary dictionary];
+    entry[@"identifier"] = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
+    entry[@"art"] = artName;
+    if (title != JAVA_NULL) {
+        entry[@"title"] = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    }
+    if (cardholderName != JAVA_NULL) {
+        entry[@"cardholderName"] = toNSString(CN1_THREAD_STATE_PASS_ARG cardholderName);
+    }
+    if (accountSuffix != JAVA_NULL) {
+        entry[@"accountSuffix"] = toNSString(CN1_THREAD_STATE_PASS_ARG accountSuffix);
+    }
+    if (network != JAVA_NULL) {
+        entry[@"network"] = toNSString(CN1_THREAD_STATE_PASS_ARG network);
+    }
+    if (description != JAVA_NULL) {
+        entry[@"description"] = toNSString(CN1_THREAD_STATE_PASS_ARG description);
+    }
+    NSString *key = cn1WalletEntriesKey(remote);
+    NSArray *existing = [defaults arrayForKey:key];
+    NSMutableArray *updated = existing != nil ? [existing mutableCopy] : [NSMutableArray array];
+    [updated addObject:entry];
+    [defaults setObject:updated forKey:key];
+    [defaults synchronize];
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetRequiresAuthentication___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN requiresAuthentication) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    [defaults setBool:(requiresAuthentication ? YES : NO) forKey:@"cn1.wallet.requiresAuthentication"];
+    [defaults synchronize];
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetAuthToken___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    if (token == JAVA_NULL) {
+        [defaults removeObjectForKey:@"cn1.wallet.authToken"];
+    } else {
+        [defaults setObject:toNSString(CN1_THREAD_STATE_PASS_ARG token) forKey:@"cn1.wallet.authToken"];
+    }
+    [defaults synchronize];
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    NSUserDefaults *defaults = cn1WalletGroupDefaults();
+    if (defaults == nil) {
+        return;
+    }
+    cn1WalletClearEntries(JAVA_FALSE);
+    cn1WalletClearEntries(JAVA_TRUE);
+    [defaults removeObjectForKey:@"cn1.wallet.authToken"];
+    [defaults removeObjectForKey:@"cn1.wallet.requiresAuthentication"];
+    [defaults synchronize];
+    NSURL *artDir = cn1WalletGroupArtDir(NO);
+    if (artDir != nil) {
+        [[NSFileManager defaultManager] removeItemAtURL:artDir error:nil];
+    }
+}
+
+#else // CN1_INCLUDE_WALLET
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isWalletExtensionSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClearPassEntries___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionAddPassEntry___boolean_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN remote, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT cardholderName, JAVA_OBJECT accountSuffix, JAVA_OBJECT network, JAVA_OBJECT description, JAVA_OBJECT artPng) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetRequiresAuthentication___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN requiresAuthentication) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionSetAuthToken___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+}
+
+void com_codename1_impl_ios_IOSNative_walletExtensionClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+
+#endif // CN1_INCLUDE_WALLET
 
 // BEGIN IOSImplementation native code, this is used to optimize various "heavy" IOSImplementation methods
 

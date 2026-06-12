@@ -1,0 +1,14 @@
+{{- /*
+  Link to another blog post only if that post exists in the current build.
+
+  Production builds exclude future-dated posts, so a hard link to an
+  unpublished follow-up would 404 until its date. This shortcode renders a
+  plain-text fallback instead, and the daily scheduled site rebuild turns it
+  into a real link once the target post's publish date arrives. PR previews
+  build with HUGO_BUILD_FUTURE, so every link is live there.
+
+  Usage (named params): path="/blog/some-slug" text="tomorrow's post"
+*/ -}}
+{{- $path := .Get "path" -}}
+{{- $text := .Get "text" -}}
+{{- with site.GetPage $path -}}<a href="{{ .RelPermalink }}">{{ $text | default .Title }}</a>{{- else -}}{{ $text }}{{- end -}}

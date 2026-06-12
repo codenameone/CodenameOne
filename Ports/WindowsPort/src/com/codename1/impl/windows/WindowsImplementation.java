@@ -27,6 +27,8 @@ import com.codename1.impl.WebSocketImpl;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
@@ -65,6 +67,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int EVENT_KEY_RELEASED = 5;
     private static final int EVENT_SIZE_CHANGED = 6;
     private static final int EVENT_CLOSE = 7;
+    private static final int EVENT_MOUSE_WHEEL = 8;
+    private static final int EVENT_MOUSE_HWHEEL = 9;
+
+    // One mouse-wheel notch is WHEEL_DELTA (120). Windows defaults to scrolling
+    // three lines per notch; * 5 then converted through the screen DPI gives a
+    // comfortable per-notch pixel travel that scales with the display, matching
+    // the JavaSE desktop port's feel.
+    private static final int WHEEL_DELTA = 120;
 
     private long windowGraphicsPeer;
     private Long windowGraphics;
@@ -279,6 +289,20 @@ public class WindowsImplementation extends CodenameOneImplementation {
         ((WindowsBrowserComponent) browserPeer).execute(javaScript);
     }
 
+    /* ----------------------------------------------- generic native peers */
+
+    // Wraps an app @NativeInterface-returned native widget (a child HWND boxed as
+    // a long[]) in a PeerComponent that places/sizes/shows the HWND over the
+    // lightweight component -- the generic peer-placement path (the analog of iOS
+    // NativeIPhoneView), used by native interfaces and the camera preview.
+    @Override
+    public com.codename1.ui.PeerComponent createNativePeer(Object nativeComponent) {
+        if (nativeComponent instanceof long[]) {
+            return new WindowsGenericPeer(nativeComponent);
+        }
+        return super.createNativePeer(nativeComponent);
+    }
+
     // Direct3D 11 backend for the portable 3D API (com.codename1.gpu). The
     // surface reports unsupported (createPeer returns null) when Direct3D cannot
     // be initialized, matching the port's "real data or unsupported" rule.
@@ -311,6 +335,115 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
         return gpuImpl;
+    }
+
+    // SIMD acceleration: SSE2 (x64) / NEON (arm64) backed vector kernels, the
+    // x86/ARM analog of the iOS IOSSimd/NEON layer. WindowsSimd.isSupported()
+    // returns true and the hot-path operations run native intrinsics; ops it does
+    // not override fall back to the portable Simd scalar loop (still correct).
+    @Override
+    public com.codename1.util.Simd createSimd() {
+        return new WindowsSimd();
+    }
+
+    // DPAPI-backed secure storage (the desktop analog of the iOS keychain /
+    // Android EncryptedSharedPreferences non-prompting store). Used by the
+    // networking layer to read API keys / tokens at rest; see WindowsSecureStorage.
+    private com.codename1.security.SecureStorage secureStorage;
+
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new WindowsSecureStorage();
+        }
+        return secureStorage;
+    }
+
+    // Windows Hello biometric authentication (WinRT UserConsentVerifier). Reports
+    // unsupported honestly when no Hello hardware is present or WinRT is absent.
+    private com.codename1.security.Biometrics biometrics;
+
+    @Override
+    public com.codename1.security.Biometrics getBiometrics() {
+        if (biometrics == null) {
+            biometrics = new WindowsBiometrics();
+        }
+        return biometrics;
+    }
+
+    // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE
+    // honestly when Windows location is disabled / denied.
+    private com.codename1.location.LocationManager locationManager;
+
+    @Override
+    public com.codename1.location.LocationManager getLocationManager() {
+        if (locationManager == null) {
+            locationManager = new WindowsLocationManager();
+        }
+        return locationManager;
+    }
+
+    /* ------------------------------------------------------------ contacts
+     * Backed by the WinRT ContactStore (cn1_windows_winrt.cpp). One native call
+     * returns every contact as a delimited blob which is parsed and briefly
+     * cached here so getAllContacts() + the per-id getContactById() the base
+     * runs in a loop share a single store read. */
+    private java.util.HashMap<String, String[]> contactCache;
+
+    private java.util.HashMap<String, String[]> contacts() {
+        if (contactCache == null) {
+            contactCache = new java.util.HashMap<String, String[]>();
+            String blob = WindowsNative.contactsGetAll();
+            if (blob != null && blob.length() > 0) {
+                String[] records = blob.split("");
+                for (int i = 0; i < records.length; i++) {
+                    String[] f = records[i].split("", -1);
+                    if (f.length >= 1 && f[0].length() > 0) {
+                        contactCache.put(f[0], f);
+                    }
+                }
+            }
+        }
+        return contactCache;
+    }
+
+    @Override
+    public String[] getAllContacts(boolean withNumbers) {
+        java.util.HashMap<String, String[]> all = contacts();
+        java.util.ArrayList<String> ids = new java.util.ArrayList<String>();
+        for (String[] f : all.values()) {
+            // withNumbers filters to contacts that have a phone number.
+            if (!withNumbers || (f.length > 2 && f[2].length() > 0)) {
+                ids.add(f[0]);
+            }
+        }
+        return ids.toArray(new String[ids.size()]);
+    }
+
+    @Override
+    public com.codename1.contacts.Contact getContactById(String id) {
+        String[] f = contacts().get(id);
+        if (f == null) {
+            return null;
+        }
+        com.codename1.contacts.Contact c = new com.codename1.contacts.Contact();
+        c.setId(f[0]);
+        if (f.length > 1) {
+            c.setDisplayName(f[1]);
+        }
+        if (f.length > 2 && f[2].length() > 0) {
+            c.setPrimaryPhoneNumber(f[2]);
+            java.util.Hashtable phones = new java.util.Hashtable();
+            phones.put("mobile", f[2]);
+            c.setPhoneNumbers(phones);
+        }
+        if (f.length > 3 && f[3].length() > 0) {
+            c.setPrimaryEmail(f[3]);
+            java.util.Hashtable emails = new java.util.Hashtable();
+            emails.put("home", f[3]);
+            c.setEmails(emails);
+        }
+        return c;
     }
 
     @Override
@@ -348,12 +481,54 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* --------------------------------------------------------------- camera */
 
-    // No camera backend is provided: the port does not yet access the host's
-    // webcam, so createCameraImpl() inherits the base null (Camera.isSupported()
-    // returns false) rather than returning fabricated frames. A real device port
-    // must surface real hardware or report unsupported -- never synthetic data
-    // that could reach a shipping app. Real Media Foundation webcam capture is a
-    // tracked gap (see Ports/WindowsPort/status.md).
+    // The richer com.codename1.camera CameraImpl (device camera API): a Media
+    // Foundation capture session with an image-based live preview peer, stills and
+    // a frame listener (WindowsCameraImpl). Video/flash/zoom/focus are honestly
+    // reported unsupported there (a generic desktop webcam exposes none via the
+    // source reader). The legacy Capture API capturePhoto below remains for the
+    // simple "take a photo" path.
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new WindowsCameraImpl();
+    }
+
+    // Legacy Capture API: capturePhoto grabs a single real frame from the default
+    // webcam via Media Foundation (cn1_windows_camera.cpp) -- the honest desktop
+    // snapshot, never synthetic.
+    @Override
+    public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String result = null;
+                try {
+                    int[] dims = new int[2];
+                    int[] argb = WindowsNative.cameraCaptureFrame(dims);
+                    if (argb != null && dims[0] > 0 && dims[1] > 0) {
+                        byte[] png = WindowsNative.encodeArgbToPng(argb, dims[0], dims[1]);
+                        String path = WindowsNative.storageDir() + getFileSystemSeparator()
+                                + "cn1photo" + System.currentTimeMillis() + ".png";
+                        OutputStream os = openOutputStream(path);
+                        os.write(png);
+                        os.close();
+                        result = "file://" + path.replace('\\', '/');
+                    }
+                } catch (Throwable err) {
+                    err.printStackTrace();
+                }
+                final com.codename1.ui.events.ActionEvent ev = result != null
+                        ? new com.codename1.ui.events.ActionEvent(result) : null;
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        response.actionPerformed(ev);
+                    }
+                });
+            }
+        }, "cn1-windows-capturephoto");
+        t.setDaemon(true);
+        t.start();
+    }
 
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
@@ -421,6 +596,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 case EVENT_SIZE_CHANGED:
                     sizeChanged(x, y);
                     break;
+                case EVENT_MOUSE_WHEEL:
+                    // key carries the signed wheel delta (multiple of WHEEL_DELTA).
+                    // A forward (positive) notch reveals content above, i.e. drags
+                    // the finger down -> positive scrollY. Map through the shared
+                    // CodenameOneImplementation.pointerWheelMoved scroll gesture.
+                    pointerWheelMoved(x, y, 0, wheelUnits(key));
+                    break;
+                case EVENT_MOUSE_HWHEEL:
+                    // A positive horizontal notch tilts right (scrolls content
+                    // left), i.e. drags the finger left -> negative scrollX.
+                    pointerWheelMoved(x, y, -wheelUnits(key), 0);
+                    break;
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();
                     break;
@@ -428,6 +615,98 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     break;
             }
         }
+        // A clicked notification balloon hands its id back here; deliver it to the
+        // app's LocalNotificationCallback like the mobile ports do.
+        String clicked = WindowsNative.notificationPollClicked();
+        if (clicked != null) {
+            dispatchLocalNotification(clicked);
+        }
+    }
+
+    /* --------------------------------------------------- local notifications
+     * Desktop semantic (mirrors the JavaSE port): while the app runs, a Timer
+     * fires the notification at its scheduled time and Shell_NotifyIcon shows a
+     * tray balloon; clicking it dispatches the id to the app's
+     * LocalNotificationCallback. */
+    private java.util.Timer localNotificationsTimer;
+    private final java.util.HashMap<String, java.util.TimerTask> localNotifications =
+            new java.util.HashMap<String, java.util.TimerTask>();
+
+    @Override
+    public void scheduleLocalNotification(final com.codename1.notifications.LocalNotification notif,
+            long firstTime, int repeat) {
+        if (localNotificationsTimer == null) {
+            localNotificationsTimer = new java.util.Timer();
+        }
+        java.util.TimerTask old = localNotifications.get(notif.getId());
+        if (old != null) {
+            old.cancel();
+        }
+        java.util.TimerTask task = new java.util.TimerTask() {
+            @Override
+            public void run() {
+                WindowsNative.showNotification(notif.getId(), notif.getAlertTitle(), notif.getAlertBody());
+            }
+        };
+        localNotifications.put(notif.getId(), task);
+        long period = repeatPeriod(repeat);
+        if (period <= 0) {
+            localNotificationsTimer.schedule(task, new Date(firstTime));
+        } else {
+            localNotificationsTimer.schedule(task, new Date(firstTime), period);
+        }
+    }
+
+    @Override
+    public void cancelLocalNotification(String notificationId) {
+        java.util.TimerTask task = localNotifications.remove(notificationId);
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    private static long repeatPeriod(int repeat) {
+        switch (repeat) {
+            case com.codename1.notifications.LocalNotification.REPEAT_MINUTE:
+                return 60 * 1000L;
+            case com.codename1.notifications.LocalNotification.REPEAT_HOUR:
+                return 60 * 60 * 1000L;
+            case com.codename1.notifications.LocalNotification.REPEAT_DAY:
+                return 24 * 60 * 60 * 1000L;
+            case com.codename1.notifications.LocalNotification.REPEAT_WEEK:
+                return 7 * 24 * 60 * 60 * 1000L;
+            default:
+                return 0L;
+        }
+    }
+
+    private void dispatchLocalNotification(final String notificationId) {
+        Object app = getCurrentApplicationInstance();
+        if (app instanceof com.codename1.notifications.LocalNotificationCallback) {
+            final com.codename1.notifications.LocalNotificationCallback cb =
+                    (com.codename1.notifications.LocalNotificationCallback) app;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    cb.localNotificationReceived(notificationId);
+                }
+            });
+        }
+    }
+
+    /**
+     * Converts a raw Win32 wheel delta (a signed multiple of {@link #WHEEL_DELTA})
+     * into a pixel scroll distance for {@link #pointerWheelMoved}. Scaled through
+     * the real screen DPI so one notch travels a comparable physical distance at
+     * any density.
+     */
+    private int wheelUnits(int delta) {
+        int notches = delta / WHEEL_DELTA;
+        if (notches == 0) {
+            // Sub-notch high-resolution wheels still deliver a fraction of travel.
+            notches = delta > 0 ? 1 : -1;
+        }
+        return notches * convertToPixels(15, true);
     }
 
     @Override
@@ -1510,6 +1789,203 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return super.getPasteDataFromClipboard();
     }
 
+    /* ----------------------------------------------------- shell launches
+     * dial / sendSMS / sendMessage / execute all defer to the Windows shell
+     * (ShellExecuteW) so they hand off to whatever handler the user actually has
+     * registered (browser, dialer, Messaging, mail client). Nothing is
+     * fabricated: an absent handler reports false / does nothing rather than
+     * pretending to have launched, in keeping with the port's "real or
+     * unsupported" rule. */
+
+    /**
+     * Opens the given URL with the default registered handler (browser for
+     * http(s), the associated app for other schemes / file paths).
+     */
+    @Override
+    public void execute(String url) {
+        if (url != null) {
+            WindowsNative.shellOpen(url);
+        }
+    }
+
+    /**
+     * Opens the Windows dialer for the number via a {@code tel:} URI. Desktops
+     * without a registered dialer simply do nothing (shellOpen reports false).
+     */
+    @Override
+    public void dial(String phoneNumber) {
+        if (phoneNumber != null) {
+            WindowsNative.shellOpen("tel:" + phoneNumber.trim());
+        }
+    }
+
+    /**
+     * Composes an SMS through the platform Messaging app via an {@code sms:} URI
+     * (with the body pre-filled). This is interactive on Windows -- the user
+     * confirms in the Messaging app -- so {@link #getSMSSupport()} reports
+     * {@code SMS_INTERACTIVE}.
+     */
+    @Override
+    public void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException {
+        String uri = "sms:" + (phoneNumber == null ? "" : phoneNumber.trim());
+        if (message != null && message.length() > 0) {
+            uri += "?body=" + com.codename1.io.Util.encodeUrl(message);
+        }
+        if (!WindowsNative.shellOpen(uri)) {
+            throw new IOException("No SMS handler is registered on this device");
+        }
+    }
+
+    @Override
+    public int getSMSSupport() {
+        return Display.SMS_INTERACTIVE;
+    }
+
+    /**
+     * Opens the platform mail client through a {@code mailto:} URI carrying the
+     * recipients, subject and body. Attachments are not expressible in a mailto:
+     * URI, so only the textual content is passed.
+     */
+    /* ----------------------------------------------------------- share
+     * WinRT DataTransferManager share UI (cn1_windows_winrt.cpp). Supported only
+     * on a WinRT build with a window; shares the text (the common case). */
+
+    @Override
+    public boolean isNativeShareSupported() {
+        // The WinRT DataTransferManager share UI is always compiled in; it just
+        // needs a host window (absent only in headless screenshot mode).
+        return getDisplayWidth() > 0;
+    }
+
+    @Override
+    public void share(String text, String image, String mimeType, com.codename1.ui.geom.Rectangle sourceRect) {
+        String title = Display.getInstance().getProperty("AppName", "Share");
+        WindowsNative.shareText(text != null ? text : "", title);
+    }
+
+    @Override
+    public void sendMessage(String[] recipients, String subject, com.codename1.messaging.Message msg) {
+        StringBuilder uri = new StringBuilder("mailto:");
+        if (recipients != null) {
+            for (int i = 0; i < recipients.length; i++) {
+                if (i > 0) {
+                    uri.append(',');
+                }
+                uri.append(recipients[i]);
+            }
+        }
+        char sep = '?';
+        if (subject != null && subject.length() > 0) {
+            uri.append(sep).append("subject=").append(com.codename1.io.Util.encodeUrl(subject));
+            sep = '&';
+        }
+        String body = msg != null ? msg.getContent() : null;
+        if (body != null && body.length() > 0) {
+            uri.append(sep).append("body=").append(com.codename1.io.Util.encodeUrl(body));
+        }
+        WindowsNative.shellOpen(uri.toString());
+    }
+
+    /* --------------------------------------------------------------- printing
+     * Win32 printing (cn1_windows_print.cpp): the modal system print dialog
+     * (PrintDlgW) picks the printer, then the native layer rasterizes the
+     * document onto the printer DC -- WIC for images, the WinRT
+     * Windows.Data.Pdf renderer for PDFs. The blocking native call runs on a
+     * dedicated worker thread; Display marshals the listener onto the EDT. */
+
+    @Override
+    public boolean isPrintingSupported() {
+        // The Win32 print pipeline is always compiled in. A missing printer or
+        // host window (headless screenshot mode) surfaces honestly as a FAILED
+        // result with a message, exactly like a spooler error would.
+        return true;
+    }
+
+    /**
+     * Prints a document file through the Windows printing system behind the
+     * native print dialog. {@code COMPLETED} means the job was handed to the
+     * print spooler, {@code CANCELLED} that the user dismissed the dialog. The
+     * listener fires exactly once, from the worker thread; {@code Display}
+     * wraps it onto the EDT.
+     */
+    @Override
+    public void print(final String filePath, final String mimeType, final PrintResultListener listener) {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                PrintResult result;
+                try {
+                    result = printImpl(filePath, mimeType);
+                } catch (Throwable err) {
+                    err.printStackTrace();
+                    result = PrintResult.failed("Print failed: " + err);
+                }
+                if (listener != null) {
+                    listener.onResult(result);
+                }
+            }
+        }, "cn1-windows-print");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private PrintResult printImpl(String filePath, String mimeType) {
+        if (filePath == null) {
+            return PrintResult.failed("Print file path is null");
+        }
+        String path = stripFileUrl(filePath);
+        if (!WindowsNative.fileExists(path) || WindowsNative.fileIsDirectory(path)) {
+            return PrintResult.failed("Print file not found: " + filePath);
+        }
+        boolean pdf = "application/pdf".equals(mimeType);
+        if (!pdf && (mimeType == null || !mimeType.startsWith("image/"))) {
+            // Reject before any UI: showing the print dialog for a document we
+            // can't render would waste the user's choice.
+            return PrintResult.failed("Unsupported print mime type: " + mimeType);
+        }
+        String jobName = Display.getInstance().getProperty("AppName", "Codename One");
+        int status = WindowsNative.printDocument(path, mimeType, jobName);
+        if (status == 0) {
+            return PrintResult.completed();
+        }
+        if (status == 1) {
+            return PrintResult.cancelled();
+        }
+        String error = WindowsNative.printLastError();
+        return PrintResult.failed(error != null ? error : "Print failed");
+    }
+
+    /* -------------------------------------------------- native file picker
+     * The desktop file picker is the honest gallery on Windows: a real
+     * IFileOpenDialog-class common dialog filtered to the requested media type,
+     * rather than the framework's in-app FileTree fallback. The native dialog is
+     * modal and returns the chosen path synchronously, which is delivered through
+     * the listener exactly like every other port. Multi-select gallery types are
+     * not offered here (isGalleryTypeSupported reports them unsupported), so they
+     * keep the cross-platform fallback. */
+
+    @Override
+    public void openGallery(com.codename1.ui.events.ActionListener response, int type) {
+        if (!isGalleryTypeSupported(type)) {
+            throw new IllegalArgumentException("Gallery type " + type + " not supported on this platform.");
+        }
+        String title = type == Display.GALLERY_VIDEO ? "Select a video" : "Select a picture";
+        String path = WindowsNative.fileDialog(false, type, title);
+        com.codename1.ui.events.ActionEvent result = null;
+        if (path != null) {
+            // Hand back a file:// URL the port's FileSystemStorage understands
+            // (openInputStream strips the scheme); forward slashes keep it a valid
+            // path for the native CreateFileW calls.
+            result = new com.codename1.ui.events.ActionEvent("file://" + path.replace('\\', '/'));
+        }
+        response.actionPerformed(result);
+    }
+
+    @Override
+    public void openImageGallery(com.codename1.ui.events.ActionListener response) {
+        openGallery(response, Display.GALLERY_IMAGE);
+    }
+
     @Override
     public boolean isTouchDevice() {
         return false;
@@ -1889,6 +2365,33 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return null;
         }
         return new WindowsMedia(peer, onCompletion);
+    }
+
+    /* ---------------------------------------------------- audio recording
+     * waveIn-backed PCM WAV recorder (cn1_windows_audiorec.c). createMediaRecorder
+     * returns a Media whose play() starts capturing from the default microphone
+     * and pause()/cleanup() finalizes the file. */
+
+    @Override
+    public Media createMediaRecorder(String path, String mimeType) throws IOException {
+        if (path == null) {
+            return null;
+        }
+        return new WindowsAudioRecorder(path, 0, 0);
+    }
+
+    @Override
+    public Media createMediaRecorder(com.codename1.media.MediaRecorderBuilder builder) throws IOException {
+        if (builder == null || builder.getPath() == null) {
+            return null;
+        }
+        return new WindowsAudioRecorder(builder.getPath(), builder.getSamplingRate(), builder.getAudioChannels());
+    }
+
+    @Override
+    public String[] getAvailableRecordingMimeTypes() {
+        // waveIn produces 16-bit PCM WAV, which the port's MF playback also decodes.
+        return new String[]{"audio/wav"};
     }
 
     /** English long month names; index 0 = January. */
