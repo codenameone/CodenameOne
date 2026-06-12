@@ -411,12 +411,10 @@ public class ByteCodeClass {
     }
     
     private ByteCodeClass findClass(String s, List<ByteCodeClass> lst) {
-        for(ByteCodeClass c : lst) {
-            if(c.clsName.equals(s)) {
-                return c;
-            }
-        }
-        return null;
+        // lst is always Parser.classes here (markDependencies -> markDependent), so
+        // the shared name index gives the same first-match result in O(1) instead of
+        // the old O(N) scan that ran per dependency per class during marking.
+        return Parser.getClassObject(s);
     }
     
     public void updateAllDependencies() {

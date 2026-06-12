@@ -86,13 +86,7 @@ public class Parser extends ClassVisitor {
     }
     
     private static ByteCodeClass getClassByName(String name) {
-        name = name.replace('/', '_').replace('$', '_');
-        for(ByteCodeClass bc : classes) {
-            if(bc.getClsName().equals(name)) {
-                return bc;
-            }
-        }
-        return null;
+        return classIndex().get(name.replace('/', '_').replace('$', '_'));
     }
 
     /**
@@ -301,13 +295,34 @@ public class Parser extends ClassVisitor {
 
     private static final ArrayList<String> constantPool = new ArrayList<>();
     
-    public static ByteCodeClass getClassObject(String name) {
-        for(ByteCodeClass cls : classes) {
-            if(cls.getClsName().equals(name)) {
-                return cls;
+    // Name -> class index, replacing the O(N) linear scans that getClassObject /
+    // getClassByName / ByteCodeClass.findClass used to do. Those run per dependency
+    // per class during the dead-code cull, so the scans were O(N^2) per pass.
+    // Rebuilt lazily when `classes` changes. `classes` is only ever reassigned (new
+    // reference) or grown in place via add()/cleared -- it is never mutated to a
+    // same-reference, same-size, different-content state -- so the (reference, size)
+    // pair uniquely identifies its state and makes this self-correcting.
+    private static HashMap<String, ByteCodeClass> classIndexMap;
+    private static List<ByteCodeClass> classIndexSource;
+    private static int classIndexSize;
+    private static HashMap<String, ByteCodeClass> classIndex() {
+        if (classIndexMap == null || classIndexSource != classes || classIndexSize != classes.size()) {
+            HashMap<String, ByteCodeClass> m = new HashMap<String, ByteCodeClass>(classes.size() * 2);
+            for (ByteCodeClass cls : classes) {
+                // first-wins, matching the old "return the first match" linear scan
+                if (!m.containsKey(cls.getClsName())) {
+                    m.put(cls.getClsName(), cls);
+                }
             }
+            classIndexMap = m;
+            classIndexSource = classes;
+            classIndexSize = classes.size();
         }
-        return null;
+        return classIndexMap;
+    }
+
+    public static ByteCodeClass getClassObject(String name) {
+        return classIndex().get(name);
     }
     
     /**
