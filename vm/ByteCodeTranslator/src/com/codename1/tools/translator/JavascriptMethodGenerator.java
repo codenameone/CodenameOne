@@ -2833,6 +2833,12 @@ final class JavascriptMethodGenerator {
                 if (System.getProperty("parparvm.js.trydiag") != null) {
                     System.err.println("[trydiag] MALFORMED " + cls.getClsName() + "." + method.getMethodName()
                             + method.getSignature());
+                    try {
+                        java.nio.file.Files.write(
+                                java.nio.file.Paths.get("/tmp/cn1-malformed-" + cls.getClsName() + "." + method.getMethodName() + ".js"),
+                                instructionBody.toString().getBytes("UTF-8"));
+                    } catch (Exception ignore) {
+                    }
                 }
                 return false;
             }
@@ -3201,6 +3207,11 @@ final class JavascriptMethodGenerator {
         // other and with loop regions, handlers outside their own range.
         java.util.LinkedHashMap<Long, java.util.List<int[]>> tryRanges = new java.util.LinkedHashMap<Long, java.util.List<int[]>>();
         java.util.List<String> tryTypes = new java.util.ArrayList<String>();
+        // Loop headers reached by a FORWARD branch (jump, switch case, or
+        // catch dispatch) need a pre-header label P<h> closing right
+        // before the for(;;) opens -- structuredGoto emits ``break P<h>``
+        // for those.
+        java.util.TreeSet<Integer> preHeaderTargets = new java.util.TreeSet<Integer>();
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
             if (!(instruction instanceof TryCatch)) {
@@ -3237,6 +3248,9 @@ final class JavascriptMethodGenerator {
             }
             hs.add(new int[]{ hB, tryTypes.size() });
             tryTypes.add(tc.getType() == null ? null : JavascriptNameUtil.runtimeTypeName(tc.getType()));
+            if (hB > eB - 1 && loopEnd.containsKey(hB)) {
+                preHeaderTargets.add(hB); // catch dispatch jumps forward to a loop header
+            }
         }
         // nesting: try-vs-try and try-vs-loop must not partially overlap
         java.util.List<int[]> regionList = new java.util.ArrayList<int[]>();
@@ -3296,6 +3310,9 @@ final class JavascriptMethodGenerator {
                     return _sb(method, instructions, "TRY_ENTER");
                 }
                 targets.add(tb);
+                if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                    preHeaderTargets.add(tb);
+                }
             } else if (instruction instanceof SwitchInstruction) {
                 SwitchInstruction sw = (SwitchInstruction) instruction;
                 java.util.List<Label> swLabels = new java.util.ArrayList<Label>();
@@ -3315,19 +3332,16 @@ final class JavascriptMethodGenerator {
                         return _sb(method, instructions, "TRY_ENTER_SW");
                     }
                     targets.add(tb);
+                    if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                        preHeaderTargets.add(tb);
+                    }
                 }
             }
         }
-        // Forward jumps to a loop header from before the loop enter via a
-        // pre-header label closing right before the for(;;) opens.
-        java.util.TreeSet<Integer> preHeaderTargets = new java.util.TreeSet<Integer>();
-        for (int i = 0; i < blocks.size(); i++) {
-            for (int x : blocks.get(i).succs) {
-                if (x > i && loopEnd.containsKey(x)) {
-                    preHeaderTargets.add(x);
-                }
-            }
-        }
+        // (preHeaderTargets is populated above from actual forward
+        // branches; plain fall-through into a loop header needs no
+        // pre-header label, and creating one anyway broke close/open
+        // pairing when a try region opened at the header itself.)
         // Labeled blocks must nest WITH the loop structure: a target inside a
         // loop region opens its label right after that loop's for(;;) brace,
         // not at the function top (otherwise the target's close brace would
@@ -3357,7 +3371,10 @@ final class JavascriptMethodGenerator {
             for (long[] r : openByStart) {
                 long lo = r[0], hi = r[1];
                 boolean inside = r[2] == 1 ? (t >= lo && t <= hi) : (t > lo && t <= hi);
-                if (inside && (hi - lo) < bestSpan) {
+                // strict < keeps the first match on ties, so equal-span
+                // tries must win explicitly (the try nests INSIDE the loop
+                // on an exact-span tie -- see the opens sort).
+                if (inside && ((hi - lo) < bestSpan || ((hi - lo) == bestSpan && r[2] == 1))) {
                     bestSpan = hi - lo;
                     owner = (int) (r[2] == 1 ? -2 - r[3] : lo); // tries encode as -2-tryIdx
                 }
@@ -3413,7 +3430,15 @@ final class JavascriptMethodGenerator {
                     opens.add(r);
                 }
             }
-            java.util.Collections.sort(opens, (x, y) -> Long.compare(y[1], x[1]));
+            // Outermost (largest endIncl) first. A try CAN share both
+            // bounds with a loop (try/finally wrapping exactly the loop
+            // body, e.g. GeneralPath.toString) -- on that tie the try is
+            // consistently the INNER region: loop opens first here, try
+            // closes first below, and label ownership prefers the try.
+            java.util.Collections.sort(opens, (x, y) -> {
+                int c = Long.compare(y[1], x[1]);
+                return c != 0 ? c : Long.compare(x[2], y[2]);
+            });
             boolean loopOpensHere = loopEnd.containsKey(b);
             if (loopOpensHere) {
                 if (targets.contains(b) && entrySp[b] >= 0) {
@@ -3543,7 +3568,12 @@ final class JavascriptMethodGenerator {
                     closing.add(r);
                 }
             }
-            java.util.Collections.sort(closing, (x, y) -> Long.compare(y[0], x[0]));
+            // Innermost (largest start) first; on an exact-span tie the
+            // try closes before the loop (mirror of the open order above).
+            java.util.Collections.sort(closing, (x, y) -> {
+                int c = Long.compare(y[0], x[0]);
+                return c != 0 ? c : Long.compare(y[2], x[2]);
+            });
             for (long[] reg : closing) {
                 if (reg[2] == 1) {
                     if (reachable) {
