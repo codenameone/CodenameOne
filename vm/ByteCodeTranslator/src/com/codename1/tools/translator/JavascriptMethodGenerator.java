@@ -2800,6 +2800,7 @@ final class JavascriptMethodGenerator {
                 ctx.initializedClasses.add(walk.getClsName());
                 walk = walk.getBaseClassObject();
             }
+            ctx.captureInitializedClassesSeed();
             if (!method.isStatic()) {
                 setup.append("  let l0 = __cn1ThisObject;\n");
                 ctx.localsInitialized[0] = true;
@@ -2912,34 +2913,84 @@ final class JavascriptMethodGenerator {
      */
     private static int structuredSwitchOrdinal = 0;
 
+    /**
+     * Structured-emission bail helper: returns false, and when the
+     * ``parparvm.js.trydiag`` property is set prints WHY a method
+     * containing an exception table fell back to the interpreter
+     * (tagged with the bail site's source line). Temporary tuning
+     * aid for the try/catch structuring rollout; zero cost unless
+     * the property is set.
+     */
+    private static boolean _sb(BytecodeMethod method, List<Instruction> instructions, String why) {
+        if (System.getProperty("parparvm.js.trydiag") != null) {
+            boolean hasTry = false;
+            for (int i = 0; i < instructions.size(); i++) {
+                if (instructions.get(i) instanceof TryCatch) {
+                    hasTry = true;
+                    break;
+                }
+            }
+            if (hasTry) {
+                System.err.println("[trydiag] " + why + " "
+                        + (currentEmissionClass != null ? currentEmissionClass.getClsName() : "?")
+                        + "." + method.getMethodName());
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when a branch from {@code fromBlock} to {@code toBlock} crosses
+     * INTO some try region's span {@code [start, endExcl)} from outside it.
+     * Such a branch cannot be expressed with the structured emission's
+     * label placement (the target label sits inside the ``try {`` block,
+     * out of scope at the source), so the method must fall back to the
+     * interpreter.
+     */
+    private static boolean branchEntersTryRegion(java.util.List<long[]> trySpans, int fromBlock, int toBlock) {
+        for (long[] s : trySpans) {
+            boolean toIn = toBlock >= s[0] && toBlock < s[1];
+            boolean fromIn = fromBlock >= s[0] && fromBlock < s[1];
+            if (toIn && !fromIn) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean appendStructuredInstructionBody(StringBuilder bodyOut, BytecodeMethod method,
             List<Instruction> instructions, Map<Label, Integer> labelToIndex, StraightLineContext ctx) {
         if (method.isSynchronizedMethod() || labelToIndex == null) {
-            return false;
+            return _sb(method, instructions, "L2919");
         }
         boolean hasJump = false;
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
-            if (instruction instanceof TryCatch || instruction instanceof MultiArray) {
-                return false;
+            if (instruction instanceof MultiArray) {
+                return _sb(method, instructions, "L2925");
             }
-            if (instruction instanceof Jump || instruction instanceof SwitchInstruction) {
+            if (instruction instanceof Jump || instruction instanceof SwitchInstruction
+                    || instruction instanceof TryCatch) {
                 hasJump = true;
             }
             if (instruction instanceof BasicInstruction) {
                 int opcode = ((BasicInstruction) instruction).getOpcode();
                 if (opcode == Opcodes.MONITORENTER || opcode == Opcodes.MONITOREXIT) {
-                    return false;
+                    return _sb(method, instructions, "L2934");
                 }
             }
         }
         if (!hasJump) {
-            return false;
+            return _sb(method, instructions, "L2939");
         }
         java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
-        int structuredBudget = Integer.getInteger("parparvm.js.structured.maxblocks", 64);
+        // 256 covers the try/catch-heavy long tail (the largest
+        // CN1 methods sit around ~200 blocks); beyond that the
+        // emission-time nesting checks get quadratic-ish and the
+        // interpreter fallback is fine for the rare giant.
+        int structuredBudget = Integer.getInteger("parparvm.js.structured.maxblocks", 256);
         if (structuredBudget <= 0 || blocks.size() > structuredBudget) {
-            return false;
+            return _sb(method, instructions, "L2948");
         }
         // Natural-loop regions: every back-edge must target a single header h,
         // with the region [h, lastBackSource] properly nested against every
@@ -2971,12 +3022,12 @@ final class JavascriptMethodGenerator {
             if (swMax != null) {
                 int ord = ++structuredSwitchOrdinal;
                 if (ord > swMax) {
-                    return false;
+                    return _sb(method, instructions, "L2980");
                 }
                 System.err.println("[structured-switch-ordinal] " + ord + " " + method.getMethodName() + method.getSignature());
             }
             if ("0".equals(System.getProperty("parparvm.js.structured.switch", "1"))) {
-                return false;
+                return _sb(method, instructions, "L2985");
             }
             if (swKeep != null) {
                 int comma = swKeep.indexOf(',');
@@ -2984,7 +3035,7 @@ final class JavascriptMethodGenerator {
                 int mm = Integer.parseInt(swKeep.substring(comma + 1));
                 int hh = Math.abs((method.getMethodName() + method.getSignature()).hashCode());
                 if (hh % mm != k) {
-                    return false;
+                    return _sb(method, instructions, "L2993");
                 }
                 System.err.println("[structured-switchkeep] " + method.getMethodName() + method.getSignature());
             }
@@ -2992,7 +3043,7 @@ final class JavascriptMethodGenerator {
         String onlySpec = System.getProperty("parparvm.js.structured.looponly");
         if (onlySpec != null && !loopEndProbeEmpty(instructions, labelToIndex)
                 && !(method.getMethodName() + method.getSignature()).contains(onlySpec)) {
-            return false;
+            return _sb(method, instructions, "L3001");
         }
         String keepSpec = System.getProperty("parparvm.js.structured.loopkeep");
         if (keepSpec != null && !loopEndProbeEmpty(instructions, labelToIndex)) {
@@ -3001,21 +3052,21 @@ final class JavascriptMethodGenerator {
             int mm = Integer.parseInt(keepSpec.substring(comma + 1));
             int hh = Math.abs((method.getMethodName() + method.getSignature()).hashCode());
             if (hh % mm != k) {
-                return false;
+                return _sb(method, instructions, "L3010");
             }
             System.err.println("[structured-loopkeep] " + method.getMethodName() + method.getSignature());
         }
-        int loopSpanBudget = Integer.getInteger("parparvm.js.structured.maxloopspan", 64);
+        int loopSpanBudget = Integer.getInteger("parparvm.js.structured.maxloopspan", 256);
         for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
             if (r.getValue() - r.getKey() + 1 > loopSpanBudget) {
-                return false;
+                return _sb(method, instructions, "L3017");
             }
         }
         for (java.util.Map.Entry<Integer, Integer> a : loopEnd.entrySet()) {
             for (java.util.Map.Entry<Integer, Integer> c : loopEnd.entrySet()) {
                 int h1 = a.getKey(), e1 = a.getValue(), h2 = c.getKey(), e2 = c.getValue();
                 if (h1 < h2 && h2 <= e1 && e2 > e1) {
-                    return false; // partial overlap
+                    return _sb(method, instructions, "L3024"); // partial overlap
                 }
             }
         }
@@ -3024,7 +3075,7 @@ final class JavascriptMethodGenerator {
                 if (x > i) {
                     for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
                         if (x > r.getKey() && x <= r.getValue() && (i < r.getKey() || i > r.getValue())) {
-                            return false; // jump into a loop body from outside
+                            return _sb(method, instructions, "L3033"); // jump into a loop body from outside
                         }
                     }
                 }
@@ -3034,14 +3085,92 @@ final class JavascriptMethodGenerator {
         for (int b = 0; b < blocks.size(); b++) {
             startToBlock.put(blocks.get(b).start, b);
         }
-        java.util.TreeSet<Integer> targets = new java.util.TreeSet<Integer>();
+        // Exception ranges: group handlers per (startBlock, endBlock) range in
+        // table order (JVM semantics: first matching entry wins). Structured
+        // form requires block-aligned ranges that nest properly with each
+        // other and with loop regions, handlers outside their own range.
+        java.util.LinkedHashMap<Long, java.util.List<int[]>> tryRanges = new java.util.LinkedHashMap<Long, java.util.List<int[]>>();
+        java.util.List<String> tryTypes = new java.util.ArrayList<String>();
         for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (!(instruction instanceof TryCatch)) {
+                continue;
+            }
+            TryCatch tc = (TryCatch) instruction;
+            Integer sI = tc.getStart() == null ? null : labelToIndex.get(tc.getStart());
+            Integer eI = tc.getEnd() == null ? null : labelToIndex.get(tc.getEnd());
+            Integer hI = tc.getHandler() == null ? null : labelToIndex.get(tc.getHandler());
+            Integer sB = sI == null ? null : startToBlock.get((int) sI);
+            Integer eB = eI == null ? null : startToBlock.get((int) eI);
+            Integer hB = hI == null ? null : startToBlock.get((int) hI);
+            if (sB == null || eB == null || hB == null || eB <= sB || (hB >= sB && hB < eB)) {
+                return _sb(method, instructions, "L3062"); // not block aligned / handler inside its range
+            }
+            long key = ((long) sB << 32) | (eB & 0xffffffffL);
+            java.util.List<int[]> hs = tryRanges.get(key);
+            if (hs == null) {
+                hs = new java.util.ArrayList<int[]>();
+                tryRanges.put(key, hs);
+            }
+            hs.add(new int[]{ hB, tryTypes.size() });
+            tryTypes.add(tc.getType() == null ? null : JavascriptNameUtil.runtimeTypeName(tc.getType()));
+        }
+        // nesting: try-vs-try and try-vs-loop must not partially overlap
+        java.util.List<int[]> regionList = new java.util.ArrayList<int[]>();
+        for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+            regionList.add(new int[]{ r.getKey(), r.getValue() });
+        }
+        for (Long key : tryRanges.keySet()) {
+            regionList.add(new int[]{ (int) (key >> 32), (int) (key & 0xffffffffL) - 1 });
+        }
+        for (int[] r1 : regionList) {
+            for (int[] r2 : regionList) {
+                if (r1[0] < r2[0] && r2[0] <= r1[1] && r2[1] > r1[1]) {
+                    return _sb(method, instructions, "L3084");
+                }
+            }
+        }
+        java.util.TreeSet<Integer> targets = new java.util.TreeSet<Integer>();
+        for (Long key : tryRanges.keySet()) {
+            for (int[] h : tryRanges.get(key)) {
+                targets.add(h[0]); // handlers are goto targets for the catch dispatch
+            }
+        }
+        // Jump/switch targets, with try-boundary validation: a target's
+        // label lives lexically INSIDE the ``try {`` of any region that
+        // contains it, so a branch whose source is OUTSIDE that region
+        // cannot reach the label (JS label scoping) -- the emitted
+        // ``break B<t>`` would be a SyntaxError. This includes branches
+        // to the region's start block (its label opens after ``try {``,
+        // unlike loop headers which get a pre-header P label). Bail to
+        // the interpreter on any outside->inside branch.
+        java.util.List<long[]> trySpans = new java.util.ArrayList<long[]>();
+        for (Long key : tryRanges.keySet()) {
+            trySpans.add(new long[]{ (int) (key >> 32), (int) (key & 0xffffffffL) });
+        }
+        // Catch dispatch is emitted at the region's close (lexically at
+        // its last block): it too must not branch INTO a different try.
+        for (int ti = 0; ti < trySpans.size(); ti++) {
+            for (int[] h : tryRanges.get((((long) trySpans.get(ti)[0]) << 32) | (trySpans.get(ti)[1] & 0xffffffffL))) {
+                if (branchEntersTryRegion(trySpans, (int) trySpans.get(ti)[1] - 1, h[0])) {
+                    return _sb(method, instructions, "TRY_ENTER_H");
+                }
+            }
+        }
+        int srcBlock = 0;
+        for (int i = 0; i < instructions.size(); i++) {
+            while (srcBlock + 1 < blocks.size() && i >= blocks.get(srcBlock).end) {
+                srcBlock++;
+            }
             Instruction instruction = instructions.get(i);
             if (instruction instanceof Jump) {
                 Integer t = labelToIndex.get(((Jump) instruction).getLabel());
                 Integer tb = t == null ? null : startToBlock.get((int) t);
                 if (tb == null) {
-                    return false;
+                    return _sb(method, instructions, "L3100");
+                }
+                if (branchEntersTryRegion(trySpans, srcBlock, tb)) {
+                    return _sb(method, instructions, "TRY_ENTER");
                 }
                 targets.add(tb);
             } else if (instruction instanceof SwitchInstruction) {
@@ -3057,7 +3186,10 @@ final class JavascriptMethodGenerator {
                     Integer t = l == null ? null : labelToIndex.get(l);
                     Integer tb = t == null ? null : startToBlock.get((int) t);
                     if (tb == null) {
-                        return false;
+                        return _sb(method, instructions, "L3116");
+                    }
+                    if (branchEntersTryRegion(trySpans, srcBlock, tb)) {
+                        return _sb(method, instructions, "TRY_ENTER_SW");
                     }
                     targets.add(tb);
                 }
@@ -3078,16 +3210,33 @@ final class JavascriptMethodGenerator {
         // not at the function top (otherwise the target's close brace would
         // sever the for). ownerOf(t) = innermost loop region containing t
         // (header excluded -- the header IS the loop), or -1 for the root.
+        // Region model spanning loops AND try-ranges for label ownership and
+        // open/close ordering. Key = start*100000+endIncl (unique per region;
+        // a loop and a try sharing exact bounds is impossible since the try
+        // end is exclusive-aligned to a leader after the loop's back edge).
+        java.util.List<long[]> openByStart = new java.util.ArrayList<long[]>(); // {start, endIncl, isTry, tryKeyIdx}
+        java.util.List<Long> tryKeys = new java.util.ArrayList<Long>(tryRanges.keySet());
+        for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+            openByStart.add(new long[]{ r.getKey(), r.getValue(), 0, -1 });
+        }
+        for (int ti = 0; ti < tryKeys.size(); ti++) {
+            long key = tryKeys.get(ti);
+            openByStart.add(new long[]{ (int) (key >> 32), (int) (key & 0xffffffffL) - 1, 1, ti });
+        }
         java.util.Map<Integer, java.util.List<Integer>> ownedLabels = new java.util.HashMap<Integer, java.util.List<Integer>>();
         for (int t : targets) {
             if (loopEnd.containsKey(t)) {
                 continue; // headers use the loop's own label / pre-header label
             }
+            // innermost region containing t = smallest span; -1 = function root.
             int owner = -1;
-            for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
-                if (t > r.getKey() && t <= r.getValue()
-                        && (owner < 0 || r.getKey() > owner)) {
-                    owner = r.getKey();
+            long bestSpan = Long.MAX_VALUE;
+            for (long[] r : openByStart) {
+                long lo = r[0], hi = r[1];
+                boolean inside = r[2] == 1 ? (t >= lo && t <= hi) : (t > lo && t <= hi);
+                if (inside && (hi - lo) < bestSpan) {
+                    bestSpan = hi - lo;
+                    owner = (int) (r[2] == 1 ? -2 - r[3] : lo); // tries encode as -2-tryIdx
                 }
             }
             java.util.List<Integer> list = ownedLabels.get(owner);
@@ -3097,14 +3246,22 @@ final class JavascriptMethodGenerator {
             }
             list.add(t);
         }
-        // Pre-header labels belong to the header's OWN owner region.
+        // Pre-header labels belong to the header's OWN owner region --
+        // the innermost LOOP OR TRY containing the header. Considering
+        // only loops here put a P label at function top when the loop
+        // sat inside a try: the P's close (fired at loop-header entry)
+        // then paired with the ``try {`` brace instead, severing it
+        // (observed as esbuild ``Expected "finally"``).
         java.util.Map<Integer, java.util.List<Integer>> ownedPre = new java.util.HashMap<Integer, java.util.List<Integer>>();
         for (int t : preHeaderTargets) {
             int owner = -1;
-            for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
-                if (t > r.getKey() && t <= r.getValue()
-                        && (owner < 0 || r.getKey() > owner)) {
-                    owner = r.getKey();
+            long bestSpan = Long.MAX_VALUE;
+            for (long[] r : openByStart) {
+                long lo = r[0], hi = r[1];
+                boolean inside = r[2] == 1 ? (t >= lo && t <= hi) : (t > lo && t <= hi);
+                if (inside && (hi - lo) < bestSpan) {
+                    bestSpan = hi - lo;
+                    owner = (int) (r[2] == 1 ? -2 - r[3] : lo);
                 }
             }
             java.util.List<Integer> list = ownedPre.get(owner);
@@ -3120,44 +3277,73 @@ final class JavascriptMethodGenerator {
         boolean reachable = true;
         for (int b = 0; b < blocks.size(); b++) {
             BasicBlock block = blocks.get(b);
+            boolean emitDeadBlock = false;
             if (preHeaderTargets.contains(b)) {
                 bodyOut.append("  }\n");
             }
-            if (loopEnd.containsKey(b)) {
+            // Open every region starting at this block, outermost (largest
+            // endIncl) first; each open is followed by the labels it owns so
+            // the brace structure nests with breaks/continues.
+            java.util.List<long[]> opens = new java.util.ArrayList<long[]>();
+            for (long[] r : openByStart) {
+                if (r[0] == b) {
+                    opens.add(r);
+                }
+            }
+            java.util.Collections.sort(opens, (x, y) -> Long.compare(y[1], x[1]));
+            boolean loopOpensHere = loopEnd.containsKey(b);
+            if (loopOpensHere) {
                 if (targets.contains(b) && entrySp[b] >= 0) {
                     if (reachable && ctx.sp != entrySp[b]) {
-                        return false;
+                        return _sb(method, instructions, "L3213");
                     }
                     ctx.sp = entrySp[b];
                 } else if (!reachable) {
-                    return false;
+                    return _sb(method, instructions, "L3217");
                 }
                 ctx.clearPendings();
+                ctx.resetInitializedClasses();
                 reachable = true;
                 if (entrySp[b] < 0) {
                     entrySp[b] = ctx.sp;
                 }
-                bodyOut.append("  B").append(b).append(": for(;;) {\n");
-                appendRegionLabels(bodyOut, ownedLabels.get(b), ownedPre.get(b));
             } else if (targets.contains(b)) {
+                // Close this target's labeled block BEFORE any region opening
+                // here, so a try{ opening at a merge point nests inside the
+                // newly entered scope rather than being severed by the close.
                 bodyOut.append("  }\n");
                 if (entrySp[b] >= 0) {
                     if (reachable && ctx.sp != entrySp[b]) {
-                        return false;
+                        return _sb(method, instructions, "L3232");
                     }
                     ctx.sp = entrySp[b];
                 } else if (!reachable) {
-                    return false;
+                    return _sb(method, instructions, "L3236");
                 }
-                // Merge point: every inbound path flushed its pendings into
-                // slots; stale pendings from a dead fall-off path must not
-                // shadow them.
                 ctx.clearPendings();
+                ctx.resetInitializedClasses();
                 reachable = true;
+            } else if (!reachable && opens.isEmpty()) {
+                // Dead straight-line block: emit nothing for its
+                // instructions, but DO fall through to the region-close
+                // scan below -- a try/loop region whose last block is
+                // unreachable still needs its ``} catch``/``}`` emitted,
+                // or the brace structure is severed (observed as
+                // ``Expected "finally" but found "B6"`` from esbuild).
+                emitDeadBlock = true;
             } else if (!reachable) {
-                continue;
+                return _sb(method, instructions, "L3244"); // region opens at an unreachable block -- bail
             }
-            for (int i = block.start; i < block.end; i++) {
+            for (long[] r : opens) {
+                if (r[2] == 1) {
+                    bodyOut.append("  try {\n");
+                    appendRegionLabels(bodyOut, ownedLabels.get((int) (-2 - r[3])), ownedPre.get((int) (-2 - r[3])));
+                } else {
+                    bodyOut.append("  B").append(b).append(": for(;;) {\n");
+                    appendRegionLabels(bodyOut, ownedLabels.get(b), ownedPre.get(b));
+                }
+            }
+            for (int i = block.start; !emitDeadBlock && i < block.end; i++) {
                 Instruction instruction = instructions.get(i);
                 if (instruction instanceof Jump) {
                     Jump jump = (Jump) instruction;
@@ -3165,13 +3351,13 @@ final class JavascriptMethodGenerator {
                     int tb = startToBlock.get((int) t);
                     String cond = structuredJumpCondition(jump.getOpcode(), ctx);
                     if (cond == null && jump.getOpcode() != Opcodes.GOTO) {
-                        return false;
+                        return _sb(method, instructions, "L3263");
                     }
                     bodyOut.append(ctx.flushAllPending());
                     if (entrySp[tb] < 0) {
                         entrySp[tb] = ctx.sp;
                     } else if (entrySp[tb] != ctx.sp) {
-                        return false;
+                        return _sb(method, instructions, "L3269");
                     }
                     String go = structuredGoto(tb, b, loopEnd);
                     if (jump.getOpcode() == Opcodes.GOTO) {
@@ -3199,7 +3385,7 @@ final class JavascriptMethodGenerator {
                         if (entrySp[tb] < 0) {
                             entrySp[tb] = ctx.sp;
                         } else if (entrySp[tb] != ctx.sp) {
-                            return false;
+                            return _sb(method, instructions, "L3297");
                         }
                         int key = (keys != null && ki < keys.length) ? keys[ki] : ki;
                         bodyOut.append("  case ").append(key).append(": ")
@@ -3210,7 +3396,7 @@ final class JavascriptMethodGenerator {
                     if (entrySp[db] < 0) {
                         entrySp[db] = ctx.sp;
                     } else if (entrySp[db] != ctx.sp) {
-                        return false;
+                        return _sb(method, instructions, "L3308");
                     }
                     bodyOut.append("  default: ").append(structuredGoto(db, b, loopEnd)).append(";\n  }\n");
                     if (i == block.end - 1) {
@@ -3219,21 +3405,55 @@ final class JavascriptMethodGenerator {
                     continue;
                 }
                 if (!appendStraightLineInstruction(bodyOut, method, instructions, i, ctx)) {
-                    return false;
+                    return _sb(method, instructions, "L3317");
                 }
                 if (isTerminatingInstruction(instruction) && i == block.end - 1) {
                     reachable = false;
                 }
             }
-            // Close every loop region ending at this block (inner first).
-            java.util.List<Integer> closing = new java.util.ArrayList<Integer>();
-            for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
-                if (r.getValue() == b) {
-                    closing.add(r.getKey());
+            // Close every region ending at this block, innermost (largest
+            // start) first; loop closes synthesize the bottom break, try
+            // closes emit the catch dispatch chain.
+            java.util.List<long[]> closing = new java.util.ArrayList<long[]>();
+            for (long[] r : openByStart) {
+                if (r[1] == b) {
+                    closing.add(r);
                 }
             }
-            java.util.Collections.sort(closing, java.util.Collections.reverseOrder());
-            for (int h : closing) {
+            java.util.Collections.sort(closing, (x, y) -> Long.compare(y[0], x[0]));
+            for (long[] reg : closing) {
+                if (reg[2] == 1) {
+                    if (reachable) {
+                        bodyOut.append(ctx.flushAllPending());
+                    }
+                    long key = tryKeys.get((int) reg[3]);
+                    // the catch writes the exception into s0 -- make sure the
+                    // slot is declared even if normal flow never uses it
+                    if (ctx.maxObservedStack < 1) {
+                        ctx.maxObservedStack = 1;
+                    }
+                    bodyOut.append("  } catch(__e) {\n");
+                    for (int[] hdl : tryRanges.get(key)) {
+                        int hB = hdl[0];
+                        String type = tryTypes.get(hdl[1]);
+                        if (entrySp[hB] < 0) {
+                            entrySp[hB] = 1;
+                        } else if (entrySp[hB] != 1) {
+                            return _sb(method, instructions, "L3351");
+                        }
+                        bodyOut.append("  { const __t = _Ex(__e, ")
+                               .append(type == null ? "null" : "\"" + type + "\"")
+                               .append("); if (__t !== null) { s0 = __t; ")
+                               .append(structuredGoto(hB, b, loopEnd)).append("; } }\n");
+                    }
+                    bodyOut.append("  throw __e;\n  }\n");
+                    // control continues after the catch only via try-body
+                    // fallthrough; reachable is unchanged.
+                    ctx.clearPendings();
+                    ctx.resetInitializedClasses();
+                    continue;
+                }
+                int h = (int) reg[0];
                 boolean bottomBreak = reachable;
                 if (bottomBreak) {
                     // Falling off the bottom of for(;;) would loop; exit instead.
@@ -3247,13 +3467,14 @@ final class JavascriptMethodGenerator {
                 // this point is unreachable until the next labeled target.
                 reachable = bottomBreak;
                 ctx.clearPendings();
+                ctx.resetInitializedClasses();
             }
             if (reachable && b + 1 < blocks.size() && targets.contains(b + 1) && !loopEnd.containsKey(b + 1)) {
                 bodyOut.append(ctx.flushAllPending());
                 if (entrySp[b + 1] < 0) {
                     entrySp[b + 1] = ctx.sp;
                 } else if (entrySp[b + 1] != ctx.sp) {
-                    return false;
+                    return _sb(method, instructions, "L3386");
                 }
             }
         }
@@ -3366,6 +3587,14 @@ final class JavascriptMethodGenerator {
             List<Instruction> instructions, int index, StraightLineContext ctx) {
         Instruction instruction = instructions.get(index);
         if (instruction instanceof LabelInstruction || instruction instanceof LineNumber || instruction instanceof LocalVariable) {
+            return true;
+        }
+        if (instruction instanceof TryCatch) {
+            // Exception-table marker, not executable code. The structured
+            // emitter consumed the whole table up front (tryRanges) and
+            // bails before reaching here when any entry is unsupported;
+            // plain straight-line bodies can't contain one (the eligibility
+            // scan rejects methods with exception tables).
             return true;
         }
         if (instruction instanceof BasicInstruction) {
@@ -4090,6 +4319,16 @@ final class JavascriptMethodGenerator {
         private final boolean[] localsInitialized;
         private final boolean[] localsUsed;
         private final Set<String> initializedClasses;
+        // Snapshot of ``initializedClasses`` taken after the
+        // always-sound seeding (containing class + ancestors).
+        // ``_I`` elision via ``initializedClasses`` is only sound
+        // while the earlier emission DOMINATES the later site, which
+        // holds inside one basic block but not across merge points --
+        // an ``_I`` emitted in one conditional arm must not elide the
+        // ``_I`` in a sibling arm. The structured walk calls
+        // ``resetInitializedClasses()`` at every block entry where it
+        // already clears pendings, restoring this seed.
+        private final Set<String> initializedClassesSeed;
         private int sp;
         private int maxObservedStack;
         private int nextTempId;
@@ -4098,6 +4337,7 @@ final class JavascriptMethodGenerator {
             this.localsInitialized = new boolean[Math.max(1, maxLocals)];
             this.localsUsed = new boolean[Math.max(1, maxLocals)];
             this.initializedClasses = new HashSet<String>();
+            this.initializedClassesSeed = new HashSet<String>();
             this.sp = 0;
             this.maxObservedStack = 0;
             this.nextTempId = 0;
@@ -4329,6 +4569,23 @@ final class JavascriptMethodGenerator {
                     pendingIsField[i] = false;
                 }
             }
+        }
+
+        /// Capture the always-sound ``_I`` elision seed (containing
+        /// class + ancestors). Called once after seeding, before any
+        /// instruction is emitted.
+        private void captureInitializedClassesSeed() {
+            initializedClassesSeed.clear();
+            initializedClassesSeed.addAll(initializedClasses);
+        }
+
+        /// Drop every ``_I`` elision entry that doesn't hold by the
+        /// JVM-spec guarantee. Called at merge-point / handler /
+        /// loop-header entry, where an entry added on one incoming
+        /// path no longer dominates the code that follows.
+        private void resetInitializedClasses() {
+            initializedClasses.clear();
+            initializedClasses.addAll(initializedClassesSeed);
         }
 
         private String flushAllPending() {
@@ -4776,6 +5033,12 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     }
                 }
                 if (i + 1 < n) { leader[i + 1] = true; }
+            } else if (instr instanceof TryCatch) {
+                TryCatch tc = (TryCatch) instr;
+                for (Label l : new Label[]{ tc.getStart(), tc.getEnd(), tc.getHandler() }) {
+                    Integer d = l == null ? null : labelToIndex.get(l);
+                    if (d != null && d < n) { leader[d] = true; }
+                }
             } else if (isTerminatingInstruction(instr) && i + 1 < n) {
                 leader[i + 1] = true;
             }

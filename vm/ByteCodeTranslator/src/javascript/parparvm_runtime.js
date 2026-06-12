@@ -1012,13 +1012,20 @@ const jvm = {
       throw new Error("Unknown class " + className);
     }
     if (cls.initialized || cls.initializing) {
+      if (VM_DIAG_ENABLED && !cls.initialized && className === "com_codename1_ui_Display") {
+        try { vmTrace("DIAG:CLINIT_REENTRY:" + className + ":stack=" + String(new Error().stack).split("\n").slice(1, 14).join("<")); } catch (_e) {}
+      }
       return;
     }
     cls.initializing = true;
     if (cls.baseClass) {
       this.ensureClassInitialized(cls.baseClass);
     }
-    cls.initialized = true;
+    // NOTE: ``initialized`` is only set after the clinit completes
+    // successfully (see end of this function). Re-entrant reads from
+    // within the clinit early-return on ``initializing`` above. If the
+    // clinit throws, the class stays uninitialized and the next _I
+    // retries instead of silently running with half-written statics.
     const clinitMethodId = "cn1_" + className + "___CLINIT__";
     const clinit = this.nativeMethods[clinitMethodId] || cls.clinit;
     if (clinit) {
@@ -1037,6 +1044,9 @@ const jvm = {
       } catch (e) {
         jvm.__cn1ClinitDepth--;
         cls.initializing = false;
+        if (VM_DIAG_ENABLED) {
+          try { vmTrace("DIAG:CLINIT_THREW:" + className + ":err=" + String(e && e.message || e).slice(0, 120) + ":stack=" + String(e && e.stack || new Error().stack).split("\n").slice(0, 12).join("<")); } catch (_e2) {}
+        }
         throw e;
       }
       // A clinit declared synchronous by the translator returns a
@@ -1066,6 +1076,12 @@ const jvm = {
             }
             step = result.next();
           }
+        } catch (e) {
+          cls.initializing = false;
+          if (VM_DIAG_ENABLED) {
+            try { vmTrace("DIAG:CLINIT_THREW:" + className + ":err=" + String(e && e.message || e).slice(0, 120)); } catch (_e2) {}
+          }
+          throw e;
         } finally {
           jvm.__cn1ClinitDepth--;
         }
@@ -1074,6 +1090,7 @@ const jvm = {
       }
     }
     cls.initializing = false;
+    cls.initialized = true;
   },
   newObject(className) {
     this.ensureClassInitialized(className);
@@ -3911,6 +3928,14 @@ function wrapRawJsErrorAsRuntimeException(err) {
     return err;
   }
 }
+// Structured-emitter catch dispatch: returns the WRAPPED throwable when
+// ``err`` is assignable to ``type`` (null = catch-all), else null. Same
+// matching rules as findExceptionHandler, expressed per-handler so a real
+// JS try/catch can chain handler tests without a pc table.
+global._Ex = function(err, type) {
+  const w = wrapRawJsErrorAsRuntimeException(err);
+  return jvm.findExceptionHandler([{ s: 0, e: 1, t: type == null ? undefined : type }], 0, w) ? w : null;
+};
 global._E = function(table, pc, err, stack) {
   const h = jvm.findExceptionHandler(table, pc, err);
   if (!h) throw err;
@@ -4630,6 +4655,15 @@ function* throwInterruptedException() {
   throw ex.object;
 }
 function* throwNullPointerException() {
+  if (VM_DIAG_ENABLED) {
+    try {
+      const dc = jvm.classes["com_codename1_ui_Display"];
+      vmTrace("DIAG:NPE_THROWN:displayInit=" + (dc ? (dc.initialized ? 1 : 0) : -1)
+        + ":displayIniting=" + (dc ? (dc.initializing ? 1 : 0) : -1)
+        + ":instanceSet=" + ((jvm.staticFieldsFor && 0) || (typeof _S !== "undefined" && _S["com_codename1_ui_Display"] && _S["com_codename1_ui_Display"]["INSTANCE"] != null ? 1 : 0))
+        + ":stack=" + String(new Error().stack).split("\n").slice(1, 16).join("<"));
+    } catch (_e) {}
+  }
   const ex = jvm.createException("java_lang_NullPointerException");
   if (typeof ex.ctor === "function") {
     yield* adaptVirtualResult(ex.ctor(ex.object));
