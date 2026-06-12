@@ -22,6 +22,7 @@
  */
 package com.codename1.util;
 
+import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -29,21 +30,13 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Pure-logic tests for {@link Base64}. Deliberately a plain test (it does NOT
- * extend {@code UITestBase} and never initializes {@code Display}) so that the
- * encode/decode paths run with no platform present.
- *
- * <p>This is also the regression guard for the pre-init crash: {@code Base64}
- * routes its output allocation through {@code allocByteMaybeSimd}, which calls
- * {@code Simd.get()} -> {@code Display.getInstance().getSimd()}. Before the fix
- * that raised a raw {@code NullPointerException} when {@code Display} was not
- * yet initialized; the allocation now falls back to a plain array (mirroring
- * {@code VertexBuffer.allocAligned}). The SIMD allocation branch only triggers
- * when the output buffer is &gt;= 16 bytes, so the larger inputs below exercise
- * exactly that path. Run this class in isolation to be sure no other test has
- * initialized {@code Display} first.</p>
+ * Correctness tests for {@link Base64}. Extends {@code UITestBase} so the
+ * platform is initialized (the SIMD-accelerated allocation path used for
+ * outputs &gt;= 16 bytes resolves through {@code Display}). Covers the
+ * encode / encodeNoNewline / encodeUrlSafe / decode entry points across every
+ * length-mod-3 case and the &gt;= 16-byte SIMD path.
  */
-class Base64Test {
+class Base64Test extends UITestBase {
 
     private static byte[] ascii(String s) {
         return s.getBytes(StandardCharsets.US_ASCII);
@@ -64,9 +57,8 @@ class Base64Test {
 
     @Test
     void encodeAndDecodeRoundTripAcrossLengths() {
-        // Covers every length-mod-3 case and, crucially, inputs whose encoded
-        // output is >= 16 bytes -- the SIMD-allocation branch that previously
-        // crashed before Display was initialized.
+        // Covers every length-mod-3 case and inputs whose encoded output is
+        // >= 16 bytes (the SIMD-allocation branch).
         for (int len = 0; len <= 64; len++) {
             byte[] in = new byte[len];
             for (int i = 0; i < len; i++) {
@@ -89,7 +81,7 @@ class Base64Test {
 
     @Test
     void encodeUrlSafeDropsPaddingAndUsesUrlAlphabet() {
-        // 0xFB 0xEF 0xFF -> standard "++//" territory; url-safe maps + -> -,
+        // 0xFB 0xEF 0xFF lands in "+/" territory; url-safe maps + -> -,
         // / -> _ and strips '=' padding.
         byte[] in = {(byte) 0xfb, (byte) 0xef, (byte) 0xff};
         String standard = Base64.encodeNoNewline(in);
