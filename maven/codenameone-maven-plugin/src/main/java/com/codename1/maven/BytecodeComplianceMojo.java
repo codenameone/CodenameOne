@@ -31,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -195,11 +196,50 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             return true;
         }
         try {
-            return getSourcesModificationTime(true) > complianceOutputFile.lastModified();
+            long lastCheck = complianceOutputFile.lastModified();
+            if (getSourcesModificationTime(true) > lastCheck) {
+                return true;
+            }
+            if (lastCheckFailed()) {
+                // A failure report is not a completed check. Without this a
+                // rerun with unchanged sources would skip straight past the
+                // violations that just failed the build.
+                return true;
+            }
+            // The invocation rewrites and the class-version cap mutate the
+            // compiled classes in place, so gating on source mtimes alone is
+            // not enough: a later compile pass can regenerate target/classes
+            // with unchanged sources (e.g. another `mvn package` re-running
+            // javac), silently shedding the rewrites. Shipping such classes
+            // breaks device builds -- the iOS translator emits calls to
+            // virtual_java_lang_String_replaceAll etc. that ParparVM's
+            // JavaAPI never declares. Re-run whenever any compiled class is
+            // newer than the last check; the marker is written after the
+            // rewrites, so an up-to-date output tree stays skippable.
+            return getCompiledClassesModificationTime() > lastCheck;
         } catch (IOException ex) {
-            getLog().error("Failed to check sources modification time for compliance check", ex);
+            getLog().error("Failed to check sources/classes modification time for compliance check", ex);
             return true;
         }
+    }
+
+    private boolean lastCheckFailed() throws IOException {
+        String content = FileUtils.readFileToString(complianceOutputFile, "UTF-8");
+        return content.startsWith(FAILURE_REPORT_HEADER);
+    }
+
+    private static final FilenameFilter CLASS_FILES_FILTER = (dir, name) -> name.endsWith(".class");
+
+    private long getCompiledClassesModificationTime() {
+        long mTime = lastModifiedRecursive(new File(project.getBuild().getOutputDirectory()), CLASS_FILES_FILTER);
+        // With kotlin.compiler.incremental the Kotlin compiler writes to its
+        // own output tree which executeImpl copies into the output directory,
+        // so fresh classes can sit there before any copy has happened.
+        File kotlinIncrementalOutputDir = new File(path(project.getBuild().getDirectory(), "kotlin-ic", "compile", "classes"));
+        if (kotlinIncrementalOutputDir.exists()) {
+            mTime = Math.max(mTime, lastModifiedRecursive(kotlinIncrementalOutputDir, CLASS_FILES_FILTER));
+        }
+        return mTime;
     }
 
     private void writeComplianceSuccess(String message, int rewrittenClassCount) throws MojoExecutionException {
@@ -216,9 +256,11 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         }
     }
 
+    private static final String FAILURE_REPORT_HEADER = "Codename One compliance check failed.";
+
     private void writeComplianceReport(List<Violation> violations, File outputDir, List<File> dependencyJars, int rewrittenClassCount) throws MojoExecutionException {
         StringBuilder report = new StringBuilder();
-        report.append("Codename One compliance check failed.\n");
+        report.append(FAILURE_REPORT_HEADER).append("\n");
         report.append("Project: ").append(project.getName()).append("\n");
         report.append("Output classes: ").append(outputDir.getAbsolutePath()).append("\n");
         report.append("Dependency jars scanned: ").append(dependencyJars.size()).append("\n");
