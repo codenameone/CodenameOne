@@ -3058,7 +3058,10 @@ final class JavascriptMethodGenerator {
      */
     private static boolean branchEntersTryRegion(java.util.List<long[]> trySpans, int fromBlock, int toBlock) {
         for (long[] s : trySpans) {
-            boolean toIn = toBlock >= s[0] && toBlock < s[1];
+            // strictly INSIDE: a branch to the region's START block is
+            // ordinary try entry and is routed through a pre-try P label
+            // (mirroring loop pre-headers), so it is allowed here.
+            boolean toIn = toBlock > s[0] && toBlock < s[1];
             boolean fromIn = fromBlock >= s[0] && fromBlock < s[1];
             if (toIn && !fromIn) {
                 return true;
@@ -3248,8 +3251,22 @@ final class JavascriptMethodGenerator {
             }
             hs.add(new int[]{ hB, tryTypes.size() });
             tryTypes.add(tc.getType() == null ? null : JavascriptNameUtil.runtimeTypeName(tc.getType()));
-            if (hB > eB - 1 && loopEnd.containsKey(hB)) {
-                preHeaderTargets.add(hB); // catch dispatch jumps forward to a loop header
+        }
+        // Start blocks of every try region: forward branches to one are
+        // ordinary try entry, expressed as ``break P<start>`` against a
+        // pre-try label closing right before the ``try {`` opens.
+        java.util.TreeSet<Integer> tryStarts = new java.util.TreeSet<Integer>();
+        for (Long key : tryRanges.keySet()) {
+            tryStarts.add((int) (key >> 32));
+        }
+        // Catch dispatch is a forward branch too: register pre-labels for
+        // handlers that are loop headers or try starts.
+        for (Long key : tryRanges.keySet()) {
+            int eIncl = (int) (key & 0xffffffffL) - 1;
+            for (int[] h : tryRanges.get(key)) {
+                if (h[0] > eIncl && (loopEnd.containsKey(h[0]) || tryStarts.contains(h[0]))) {
+                    preHeaderTargets.add(h[0]);
+                }
             }
         }
         // nesting: try-vs-try and try-vs-loop must not partially overlap
@@ -3269,8 +3286,16 @@ final class JavascriptMethodGenerator {
         }
         java.util.TreeSet<Integer> targets = new java.util.TreeSet<Integer>();
         for (Long key : tryRanges.keySet()) {
+            int eIncl = (int) (key & 0xffffffffL) - 1;
             for (int[] h : tryRanges.get(key)) {
-                targets.add(h[0]); // handlers are goto targets for the catch dispatch
+                // Handlers are goto targets for the catch dispatch -- except
+                // ones routed through a pre-try P label (forward dispatch to
+                // another try's start): those must NOT get a B label, or the
+                // target close at the handler block severs the try it opens.
+                if (h[0] > eIncl && tryStarts.contains(h[0]) && !loopEnd.containsKey(h[0])) {
+                    continue;
+                }
+                targets.add(h[0]);
             }
         }
         // Jump/switch targets, with try-boundary validation: a target's
@@ -3309,9 +3334,15 @@ final class JavascriptMethodGenerator {
                 if (branchEntersTryRegion(trySpans, srcBlock, tb)) {
                     return _sb(method, instructions, "TRY_ENTER");
                 }
-                targets.add(tb);
-                if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                if (tryStarts.contains(tb) && !loopEnd.containsKey(tb) && tb > srcBlock) {
+                    // pre-try entry: P label only, no B label (a target close
+                    // at the try start would sever the enclosing block)
                     preHeaderTargets.add(tb);
+                } else {
+                    targets.add(tb);
+                    if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                        preHeaderTargets.add(tb);
+                    }
                 }
             } else if (instruction instanceof SwitchInstruction) {
                 SwitchInstruction sw = (SwitchInstruction) instruction;
@@ -3331,9 +3362,13 @@ final class JavascriptMethodGenerator {
                     if (branchEntersTryRegion(trySpans, srcBlock, tb)) {
                         return _sb(method, instructions, "TRY_ENTER_SW");
                     }
-                    targets.add(tb);
-                    if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                    if (tryStarts.contains(tb) && !loopEnd.containsKey(tb) && tb > srcBlock) {
                         preHeaderTargets.add(tb);
+                    } else {
+                        targets.add(tb);
+                        if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                            preHeaderTargets.add(tb);
+                        }
                     }
                 }
             }
@@ -3398,7 +3433,9 @@ final class JavascriptMethodGenerator {
             long bestSpan = Long.MAX_VALUE;
             for (long[] r : openByStart) {
                 long lo = r[0], hi = r[1];
-                boolean inside = r[2] == 1 ? (t >= lo && t <= hi) : (t > lo && t <= hi);
+                // strictly t > lo for BOTH kinds: a pre-label wraps code
+                // BEFORE its block, so a region starting AT t cannot own it.
+                boolean inside = t > lo && t <= hi;
                 if (inside && (hi - lo) < bestSpan) {
                     bestSpan = hi - lo;
                     owner = (int) (r[2] == 1 ? -2 - r[3] : lo);
@@ -3420,6 +3457,20 @@ final class JavascriptMethodGenerator {
             boolean emitDeadBlock = false;
             if (preHeaderTargets.contains(b)) {
                 bodyOut.append("  }\n");
+                // try-start pre-targets are NOT in ``targets`` (no B label),
+                // so the stack-depth phi check happens here. Loop headers
+                // re-validate in the loopOpensHere branch; idempotent.
+                if (entrySp[b] >= 0) {
+                    if (reachable && ctx.sp != entrySp[b]) {
+                        return _sb(method, instructions, "PRE_SP");
+                    }
+                    if (!reachable) {
+                        ctx.sp = entrySp[b];
+                        ctx.clearPendings();
+                        ctx.resetInitializedClasses();
+                        reachable = true;
+                    }
+                }
             }
             // Open every region starting at this block, outermost (largest
             // endIncl) first; each open is followed by the labels it owns so
@@ -3507,7 +3558,7 @@ final class JavascriptMethodGenerator {
                     } else if (entrySp[tb] != ctx.sp) {
                         return _sb(method, instructions, "L3269");
                     }
-                    String go = structuredGoto(tb, b, loopEnd);
+                    String go = structuredGoto(tb, b, loopEnd, tryStarts);
                     if (jump.getOpcode() == Opcodes.GOTO) {
                         if (tb != b + 1) {
                             bodyOut.append("  ").append(go).append(";\n");
@@ -3537,7 +3588,7 @@ final class JavascriptMethodGenerator {
                         }
                         int key = (keys != null && ki < keys.length) ? keys[ki] : ki;
                         bodyOut.append("  case ").append(key).append(": ")
-                               .append(structuredGoto(tb, b, loopEnd)).append(";\n");
+                               .append(structuredGoto(tb, b, loopEnd, tryStarts)).append(";\n");
                     }
                     Integer dT = sw.getDefaultLabel() == null ? null : labelToIndex.get(sw.getDefaultLabel());
                     int db = startToBlock.get((int) dT);
@@ -3546,7 +3597,7 @@ final class JavascriptMethodGenerator {
                     } else if (entrySp[db] != ctx.sp) {
                         return _sb(method, instructions, "L3308");
                     }
-                    bodyOut.append("  default: ").append(structuredGoto(db, b, loopEnd)).append(";\n  }\n");
+                    bodyOut.append("  default: ").append(structuredGoto(db, b, loopEnd, tryStarts)).append(";\n  }\n");
                     if (i == block.end - 1) {
                         reachable = false;
                     }
@@ -3597,7 +3648,7 @@ final class JavascriptMethodGenerator {
                         bodyOut.append("  { const __t = _Ex(__e, ")
                                .append(type == null ? "null" : "\"" + type + "\"")
                                .append("); if (__t !== null) { s0 = __t; ")
-                               .append(structuredGoto(hB, b, loopEnd)).append("; } }\n");
+                               .append(structuredGoto(hB, b, loopEnd, tryStarts)).append("; } }\n");
                     }
                     bodyOut.append("  throw __e;\n  }\n");
                     // control continues after the catch only via try-body
@@ -3647,12 +3698,16 @@ final class JavascriptMethodGenerator {
     }
 
     /** break/continue statement reaching block tb from block b. */
-    private static String structuredGoto(int tb, int b, java.util.TreeMap<Integer, Integer> loopEnd) {
+    private static String structuredGoto(int tb, int b, java.util.TreeMap<Integer, Integer> loopEnd,
+            java.util.TreeSet<Integer> tryStarts) {
         if (loopEnd.containsKey(tb) && tb <= b) {
             return "continue B" + tb;   // back edge to enclosing loop header
         }
         if (loopEnd.containsKey(tb)) {
             return "break P" + tb;      // forward entry to a loop's top
+        }
+        if (tryStarts.contains(tb) && tb > b) {
+            return "break P" + tb;      // forward entry at a try region's start
         }
         return "break B" + tb;
     }
