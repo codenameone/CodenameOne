@@ -290,6 +290,21 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-10T15:03:39+00:00"
       }
+    },
+    "mac-native-grpc-graphql-and-fewer-open-issues": {
+      "devto": {
+        "id": 3883353,
+        "url": "https://dev.to/codenameone/mac-native-builds-live-protocols-and-open-issues-under-350-1fj5",
+        "syndicated_at": "2026-06-12T14:02:19+00:00"
+      },
+      "foojay": {
+        "id": 124224,
+        "url": "https://foojay.io/wp-admin/post.php?post=124224&action=edit",
+        "preview_url": "https://foojay.io/?p=124224",
+        "featured_media_id": 124223,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-12T14:03:17+00:00"
+      }
     }
   }
 }
