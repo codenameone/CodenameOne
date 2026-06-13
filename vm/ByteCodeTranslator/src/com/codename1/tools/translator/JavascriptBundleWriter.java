@@ -188,6 +188,7 @@ final class JavascriptBundleWriter {
         minifyGeneratedIdentifiers(chunkStrings);
         aliasHotCn1Identifiers(chunkStrings);
         mangleDispatchIds(chunkStrings, classes);
+        mangleInstanceFieldProps(chunkStrings, classes);
 
         int leadCount = chunkStrings.size() - 1;
         for (int i = 0; i < leadCount; i++) {
@@ -586,6 +587,105 @@ final class JavascriptBundleWriter {
         }
         int last = chunkStrings.size() - 1;
         chunkStrings.set(last, chunkStrings.get(last) + tail);
+    }
+
+    /**
+     * Mangles INSTANCE-field property names ({@code cn1_<class>_<field>},
+     * ~4.4k of them, ~240KB of hoist-table declarations) to short
+     * {@code "$f<n>"} strings, consistently across the {@code f:[[prop,
+     * desc]]} class-def entries and every {@code obj["cn1_<class>_<field>"]}
+     * access site. The property NAME is an arbitrary bundle-internal
+     * object key -- {@code initInstanceFields} just copies whatever string
+     * the class def lists, and every access reads the same key -- so any
+     * consistent renaming is sound. Static fields use a different scheme
+     * ({@code _S["class"][rawName]}, not the {@code cn1_} prop form) and
+     * are untouched.
+     *
+     * <p>Exclusions: a field the JS bridge pokes by its {@code cn1_} name
+     * (caught by {@link #collectBridgeReferencedCn1Tokens()}) keeps its
+     * canonical name -- the host accesses {@code obj["cn1_..."]} directly,
+     * not through the bundle's renaming. Kill switch:
+     * {@code -Dparparvm.js.manglefields.off}.
+     *
+     * <p>Runs before {@code hoistStringConstants}, so a still-hot mangled
+     * name is re-aliased to {@code _qN} by the hoist pass as usual.
+     */
+    private static void mangleInstanceFieldProps(List<String> chunkStrings, List<ByteCodeClass> classes) {
+        // OPT-IN ONLY (-Dparparvm.js.manglefields=1). Mangling instance
+        // field property names is a large win (~278KB scoped to non-java_*
+        // classes) but UNSAFE as a default: the runtime and port.js
+        // fallback shims poke instance fields of both java_* core classes
+        // AND CN1 UI classes (Component/Form/Display internals) by name
+        // through paths the literal bridge-token scan cannot fully
+        // capture, and a missed field fails SILENTLY (HashMap lookup
+        // miss, or a wait/notify deadlock when a sync flag splits) rather
+        // than with a diagnosable error. Until the host-poked field set is
+        // exhaustively enumerated, keep this off by default. The java_*
+        // scope exclusion below + the bridge-token exclusion catch the
+        // known cases but are not proven complete.
+        if (!"1".equals(System.getProperty("parparvm.js.manglefields"))) {
+            return;
+        }
+        // Authoritative set: every instance field declared in any class,
+        // as the cn1_<class>_<field> property the emitter uses.
+        Set<String> props = new HashSet<String>();
+        for (ByteCodeClass c : classes) {
+            if (c == null || c.getClsName() == null) {
+                continue;
+            }
+            // Exclude java_* core classes wholesale: the runtime
+            // (parparvm_runtime.js) and host fast-paths access String /
+            // StringBuilder / collection internals by name through paths
+            // the literal bridge-token scan does not fully capture (named
+            // const refs, inherited Entry fields, etc.), and a single
+            // missed field corrupts e.g. HashMap lookups. CN1/app classes
+            // -- which hold the vast majority of fields -- are not
+            // runtime-field-coupled and remain manglable.
+            String cn = c.getClsName();
+            if (cn.startsWith("java_") || cn.startsWith("javax_")) {
+                continue;
+            }
+            for (ByteCodeField f : c.getFields()) {
+                if (f == null || f.isStaticField() || f.getFieldName() == null) {
+                    continue;
+                }
+                props.add(JavascriptNameUtil.fieldProperty(c.getClsName(), f.getFieldName()));
+            }
+        }
+        if (props.isEmpty()) {
+            return;
+        }
+        // Exclude bridge-poked field names (host accesses them by literal
+        // cn1_ key, not through this renaming).
+        props.removeAll(collectBridgeReferencedCn1Tokens());
+        if (props.isEmpty()) {
+            return;
+        }
+        // Deterministic ordering for stable output across runs.
+        List<String> ordered = new ArrayList<String>(props);
+        Collections.sort(ordered);
+        Map<String, String> map = new HashMap<String, String>(ordered.size() * 2);
+        int idx = 0;
+        for (String prop : ordered) {
+            map.put('"' + prop + '"', "\"$f" + base26(idx++) + '"');
+        }
+        // Single quoted-occurrence rewrite per chunk. Field props appear
+        // ONLY as quoted strings (bracket access + f: def entries), never
+        // as code identifiers, so a string-literal match is exact and
+        // cannot collide with method-id / class-name tokens (those carry a
+        // signature suffix the field-prop set never contains).
+        java.util.regex.Pattern any = java.util.regex.Pattern.compile("\"cn1_[A-Za-z0-9_]+\"");
+        for (int i = 0; i < chunkStrings.size(); i++) {
+            String chunk = chunkStrings.get(i);
+            java.util.regex.Matcher m = any.matcher(chunk);
+            StringBuffer sb = new StringBuffer(chunk.length());
+            while (m.find()) {
+                String repl = map.get(m.group());
+                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(repl != null ? repl : m.group()));
+            }
+            m.appendTail(sb);
+            chunkStrings.set(i, sb.toString());
+        }
     }
 
     private static String base26(int n) {
