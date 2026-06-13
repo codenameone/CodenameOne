@@ -960,6 +960,7 @@ public class Parser extends ClassVisitor {
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)) {
                 private String defaultConcrete;
                 private String winConcrete;
+                private String linuxConcrete;
 
                 @Override
                 public void visit(String name, Object value) {
@@ -967,6 +968,8 @@ public class Parser extends ClassVisitor {
                         defaultConcrete = (String) value;
                     } else if ("win".equals(name) && value instanceof String) {
                         winConcrete = (String) value;
+                    } else if ("linux".equals(name) && value instanceof String) {
+                        linuxConcrete = (String) value;
                     }
                     super.visit(name, value);
                 }
@@ -974,14 +977,22 @@ public class Parser extends ClassVisitor {
                 @Override
                 public void visitEnd() {
                     // Pick the concrete implementation for the active translation
-                    // target: the native Windows build uses @Concrete.win(), every
-                    // other target uses @Concrete.name() (the iOS pipeline). When
-                    // building Windows and no win() is given (e.g. IOSSimd, which
-                    // has only an iOS specialization), leave the concrete unset so
-                    // the portable base class is translated instead of pulling in
-                    // the absent iOS class.
-                    String concrete = "win".equals(ByteCodeClass.getConcreteTarget())
-                            ? winConcrete : defaultConcrete;
+                    // target: the native Windows build uses @Concrete.win(), the
+                    // native Linux build uses @Concrete.linux(), every other target
+                    // uses @Concrete.name() (the iOS pipeline). When building
+                    // Windows/Linux and no win()/linux() is given (e.g. IOSSimd,
+                    // which has only an iOS specialization), leave the concrete
+                    // unset so the portable base class is translated instead of
+                    // pulling in the absent iOS class.
+                    String target = ByteCodeClass.getConcreteTarget();
+                    String concrete;
+                    if ("win".equals(target)) {
+                        concrete = winConcrete;
+                    } else if ("linux".equals(target)) {
+                        concrete = linuxConcrete;
+                    } else {
+                        concrete = defaultConcrete;
+                    }
                     if (concrete != null && concrete.length() > 0) {
                         cls.setConcreteClass(concrete.replace('.', '/'));
                     }

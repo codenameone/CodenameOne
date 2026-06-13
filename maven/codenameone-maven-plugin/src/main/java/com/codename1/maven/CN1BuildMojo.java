@@ -684,6 +684,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     // Native ParparVM Windows build (clang-cl). Distinct from the
                     // JVM-bundled "windows-desktop" (javase) target.
                     doWindowsNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if ("local-linux-device".equals(buildTarget)) {
+                    // Native ParparVM Linux build (GTK3/Cairo, CMake/Ninja). Distinct
+                    // from the JVM-bundled "linux-desktop" (javase) target.
+                    doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
@@ -1288,6 +1292,64 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 getLog().error("Windows builder log:\n" + builderLog);
             }
             throw new MojoExecutionException("Failed to build Windows app", ex);
+        } finally {
+            e.cleanup();
+        }
+    }
+
+    /**
+     * Local native Linux build via {@link LinuxNativeBuilder}: translates the app
+     * with ParparVM's linux target and compiles it with CMake/Ninja for the
+     * selected architecture ({@code linux.arch}). Mirrors the Windows local-build
+     * wiring. The native compile only succeeds on Linux with the GTK3 dev stack +
+     * pkg-config present (and, for musl targets, a {@code zig}/musl toolchain);
+     * elsewhere the builder fails fast with a clear message.
+     */
+    private void doLinuxNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+        LinuxNativeBuilder e = new LinuxNativeBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "linux-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        r.setVersion(props.getProperty("codename1.version"));
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setType("linux");
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String currentKey = key.substring("codename1.arg.".length());
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new MojoExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, props.getProperty(key));
+            }
+        }
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.build(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("Linux builder log:\n" + builderLog);
+                }
+                throw new MojoExecutionException("Linux native build failed");
+            }
+            if (e.getLinuxExecutable() != null) {
+                getLog().info("Built native Linux executable: " + e.getLinuxExecutable().getAbsolutePath());
+            }
+        } catch (org.apache.tools.ant.BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("Linux builder log:\n" + builderLog);
+            }
+            throw new MojoExecutionException("Failed to build Linux app", ex);
         } finally {
             e.cleanup();
         }

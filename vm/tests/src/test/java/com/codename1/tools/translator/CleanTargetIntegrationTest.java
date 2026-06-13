@@ -1214,7 +1214,7 @@ class CleanTargetIntegrationTest {
         }
     }
 
-    private static int countPngFiles(Path dir) throws IOException {
+    static int countPngFiles(Path dir) throws IOException {
         int n = 0;
         try (java.util.stream.Stream<Path> s = Files.list(dir)) {
             for (Path p : (Iterable<Path>) s::iterator) {

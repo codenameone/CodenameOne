@@ -69,6 +69,7 @@
         <module>android</module>
         <module>ios</module>
         <module>windows</module>
+        <module>linux</module>
         <module>parparvm</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>

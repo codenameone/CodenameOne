@@ -1,0 +1,186 @@
+== Working with the native Linux port
+
+The native Linux port compiles a Codename One app to a real, standalone Linux
+executable -- a single ELF binary with *no JVM and no runtime dependencies of its
+own* (it dynamically links the system GTK stack). It's the Linux analog of the
+iOS and native Windows ports: the same ParparVM pipeline that turns your Java/
+Kotlin bytecode into C and then into a native binary, here targeting Linux with
+GCC/Clang and rendering through GTK3 / Cairo / Pango.
+
+This is distinct from the long-standing *Linux desktop* build, which packages the
+app to run on a Java Virtual Machine (see <<_native_linux_vs_the_desktop_jvm_app_vs_the_jar>>
+for a practical comparison). The native port needs no JVM on the target machine.
+
+NOTE: Consult the port's `Ports/LinuxPort/status.md` for the current capability
+matrix. The port is feature-complete -- it renders, runs, edits text, plays media,
+embeds a browser and drives 3D -- but a handful of paths (camera, microphone,
+printer, biometrics) need real hardware to exercise fully.
+
+=== How it works (the technology stack)
+
+The port reuses Codename One's portable architecture and swaps in a GTK3 / Cairo
+implementation layer:
+
+- *ParparVM "clean" C target.* The same VM that powers iOS and Windows translates
+  your app + the Codename One core + the minimal Java runtime to C. A CMake project
+  is generated and compiled with *cc/clang* + *Ninja* into a native ELF. There is
+  no bytecode interpreter and no JNI -- your code *is* the native binary.
+- *Concurrent garbage collector.* ParparVM's non-blocking GC runs natively, the
+  same collector used on iOS and Windows.
+- *Cairo + Pango + GdkPixbuf.* All 2D graphics (primitives, gradients, clipping,
+  affine transforms, images) go through Cairo; glyph layout, measurement and
+  rasterization use Pango (with FontConfig/FreeType, so bundled fonts -- including
+  the material icon font -- register and render); image decode/encode uses
+  GdkPixbuf. The windowing and native peers (text editing, browser, video) are
+  GTK3 widgets layered over a Cairo drawing surface.
+- *OpenGL ES 3.0 (EGL).* The portable 3D API (`com.codename1.gpu`) renders
+  offscreen through an EGL context + GLES 3.0, reading the frame back as an image
+  -- the same model as the iOS/Windows 3D backends.
+- *GStreamer* backs `Media` playback, audio recording and camera capture;
+  *WebKitGTK* backs `BrowserComponent`; *libsecret* (GNOME Keyring) backs secure
+  storage; *libnotify* backs local notifications; *GeoClue* backs location.
+- *libcurl* backs networking; raw sockets and WebSockets use POSIX sockets.
+- *Single self-contained executable.* There is no `.app`-style bundle directory,
+  so the app's classpath resources -- the theme `.res`, images, localization, the
+  material icon font -- are embedded directly into the ELF (via a generated
+  assembly stub that `.incbin`s each resource into `.rodata`) and read back at
+  runtime through `getResourceAsStream`. The result is one file you can copy and
+  run; only the shared GTK libraries are resolved from the system.
+
+=== Building a native Linux app
+
+A native Linux build runs through the `codenameone-maven-plugin` like every other
+target. Unlike the Windows port -- which is cross-compiled on Linux and run on
+Windows -- the Linux port's *build host is the run host*: there is no
+cross-compile step, so one Linux machine both builds and runs the binary.
+
+Build it locally with:
+
+[source,bash]
+----
+mvn -pl common package -Dcodename1.platform=linux -Dcodename1.buildTarget=local-linux-device cn1:build
+----
+
+The builder translates the app to C with ParparVM's `linux` app type, generates a
+CMake project that links the GTK stack via `pkg-config`, and builds it with
+CMake + Ninja, producing the ELF.
+
+==== Build-host dependencies
+
+The native compile needs the GTK development stack and the capability libraries
+the port links. On Debian/Ubuntu:
+
+[source,bash]
+----
+sudo apt-get install -y \
+  cmake ninja-build pkg-config \
+  libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \
+  libfontconfig1-dev libfreetype-dev libcurl4-openssl-dev \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
+  libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev
+----
+
+On Alpine these are the `-dev` packages of the same libraries; on Fedora the
+`*-devel` equivalents. The target machine that *runs* the binary only needs the
+runtime libraries (the non-`-dev` packages), which are present on any standard
+desktop.
+
+==== Architecture and musl
+
+Both *x64* and *arm64* are supported; pick the target with the `linux.arch` build
+hint. Because there is no cross-compile, the simplest path is to build on a host of
+the target architecture (GitHub hosts both -- see _Continuous integration_ below).
+
+The translated runtime and your app's C are built against *musl* by default when a
+musl toolchain is selected, for a lean, self-contained binary; the GTK stack is
+always dynamically linked (it cannot be statically linked). On a musl host
+(Alpine) the native `cc` already links musl. To target musl from a glibc host, set
+`linux.toolchain=zig` (or point `linux.cc` at a `zig cc` wrapper / `musl-gcc`); the
+builder selects the matching `*-linux-musl` triple.
+
+=== Build hints
+
+The native Linux port adds the build hints below (all use the `linux.` prefix).
+
+.Native Linux port build hints
+|===
+|Name |Description
+
+|linux.arch
+|Target CPU architecture for the ELF: `x64` (default) or `arm64`. Synonyms
+`x86_64`/`amd64` and `aarch64` are accepted.
+
+|linux.debug
+|`true`/`false` (default `false`). When `false`, the ELF is optimized and
+*stripped*. Set `true` to keep debug symbols (`RelWithDebInfo`) so a native crash
+address can be symbolized while developing. Optimizations stay on either way.
+
+|linux.toolchain
+|Set to `zig` to build with `zig cc` (a self-contained cross-compiler that ships
+the musl sysroot), so a glibc host can emit a musl binary for the selected arch.
+
+|linux.cc
+|Override the C compiler CMake uses (e.g. a `zig cc` wrapper, `musl-gcc`, or a
+cross `cc`). Takes precedence over `linux.toolchain`. Also settable via the
+`CN1_CC` environment variable.
+|===
+
+=== Optimized and stripped by default
+
+The shipping build is optimized and stripped (`-s`): no debug information is
+embedded. Setting `linux.debug=true` keeps the symbols (`RelWithDebInfo`) so a
+faulting address can be turned back into a function name and source line. The build
+stays optimized either way.
+
+=== Continuous integration and screenshot testing
+
+The port is exercised in CI by the `linux-build-run.yml` workflow, which gives it
+the same two-architecture screenshot coverage the native Windows port has. On each
+of *x86_64* (`ubuntu-latest`) and *arm64* (`ubuntu-24.04-arm`) it builds the
+framework + the `hellocodenameone` screenshot suite, translates and native-builds
+the ELF, runs it headless under Xvfb (with Mesa software GL for the 3D tests), and
+captures every screenshot over the cn1ss WebSocket. A `compare-comment` job diffs
+each architecture's PNGs against its in-repo baseline
+(`scripts/linux/screenshots` for x64, `scripts/linux/screenshots-arm` for arm64)
+and posts them to the pull request.
+
+The build + run logic lives in `CleanTargetLinuxIntegrationTest` (translate with
+the `linux` app type, native CMake/Ninja build, run + capture), the Linux
+counterpart of the Windows cases in `CleanTargetIntegrationTest`.
+
+=== Native Linux vs. the desktop (JVM) app vs. the jar
+
+[cols="1,1,1,1",options="header"]
+|===
+| |Native Linux port |Linux desktop build |Executable jar
+
+|Needs a JVM on the target?
+|*No* -- a native ELF
+|Yes (a bundled JRE)
+|Yes (any installed JRE)
+
+|What ships
+|One ELF + the system GTK libraries
+|App + a packaged JRE
+|A single `.jar`
+
+|Rendering
+|GTK3 / Cairo / Pango (native)
+|Java2D on the JVM
+|Java2D on the JVM
+
+|Startup / footprint
+|Native, small
+|JVM startup, large
+|JVM startup
+
+|How it's built
+|ParparVM -> C -> ELF (CMake/Ninja)
+|`javase` packaging
+|`javase` packaging
+|===
+
+The native port is the right choice when you want a true native Linux binary with
+no JVM dependency; the desktop build remains the convenient path for development
+and for environments where shipping a JRE is acceptable.

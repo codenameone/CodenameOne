@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!--
+    Artifacts:
+
+    1. codenameone-linux-8.0-SNAPSHOT.jar
+        The src directory compiled (the GTK/Cairo platform implementation). No native
+        compilation happens here; the C in nativeSources is compiled by ParparVM's
+        "linux" clean-target build (CMake/Ninja + gcc/clang/zig) on Linux.
+    2. codenameone-linux-8.0-SNAPSHOT-bundle.jar
+        Zip with LinuxPort.jar and nativelinux.jar in the root, mirroring the
+        Windows port bundle. Consumed by the build pipeline to supply the port
+        classes and the native sources to the translator.
+    -->
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-linux</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Codename One Linux Port</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>6</maven.compiler.source>
+        <maven.compiler.target>6</maven.compiler.target>
+        <src.dir>../../Ports/LinuxPort/src</src.dir>
+        <codename1.nativelinux.dir>../../Ports/LinuxPort/nativeSources</codename1.nativelinux.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>${src.dir}</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>${src.dir}</directory>
+                <excludes><exclude>**/*.java</exclude></excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <!-- The port has no built-in native look, so its native theme is
+                         the full material theme (the same one Android ships). Stage it
+                         as a classpath resource (linuxNativeTheme.res) so the linux
+                         translator target embeds it into the binary and the
+                         getResourceAsStream call in installNativeTheme() serves it
+                         straight from the executable. Mirrors how the Windows port
+                         carries windowsNativeTheme.res. Staged at prepare-package so it
+                         is in target/classes before the jar is built (into LinuxPort.jar
+                         for the build target) and visible to the screenshot harness,
+                         which reads target/classes directly. -->
+                    <execution>
+                        <id>stage-native-theme</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy file="${project.basedir}/../../Themes/AndroidMaterialTheme.res"
+                                      tofile="${project.build.outputDirectory}/linuxNativeTheme.res"
+                                      overwrite="true" failonerror="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/codenameone/linuxport-bundle"/>
+                                <zip destfile="${project.build.directory}/codenameone/linuxport-bundle/nativelinux.jar">
+                                    <fileset dir="${codename1.nativelinux.dir}"/>
+                                </zip>
+                                <copy file="${project.build.directory}/${project.build.finalName}.jar" tofile="${project.build.directory}/codenameone/linuxport-bundle/LinuxPort.jar" overwrite="true"/>
+                                <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
+                                    <fileset dir="${project.build.directory}/codenameone/linuxport-bundle"/>
+                                </zip>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-artifacts</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/${project.build.finalName}-bundle.jar</file>
+                                    <type>jar</type>
+                                    <classifier>bundle</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
