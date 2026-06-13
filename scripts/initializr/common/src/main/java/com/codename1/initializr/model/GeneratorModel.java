@@ -127,9 +127,18 @@ public class GeneratorModel {
                 writeProjectZipToStorage(filePath);
             } catch (IOException retryErr) {
                 Log.e(retryErr);
+                // Don't assume quota-exhaustion: any failure building or streaming the
+                // project zip (e.g. a ZipException while reading a bundled template zip)
+                // lands here too. Surface the real cause so it isn't misdiagnosed as a
+                // full disk, and keep the storage hint as a secondary possibility.
+                String detail = retryErr.getMessage();
+                if (detail == null || detail.length() == 0) {
+                    detail = retryErr.getClass().getName();
+                }
                 ToastBar.showErrorMessage(
-                        "Browser storage is full. Open your browser settings, clear site "
-                                + "data for this page, then try again.");
+                        "Couldn't generate the project: " + detail
+                                + ". If your browser storage is full, clear site data for "
+                                + "this page and try again.");
                 return;
             }
         }
