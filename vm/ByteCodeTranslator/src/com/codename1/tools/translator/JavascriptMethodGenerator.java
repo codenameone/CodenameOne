@@ -75,6 +75,22 @@ final class JavascriptMethodGenerator {
     // class-specific function identifier at the call site, not
     // the class's ``methods`` table.
     private static volatile java.util.Set<String> referencedDispatchIds = null;
+    // Monomorphic-devirtualization map: dispatch id (class-free
+    // name+desc) -> the single concrete implementation's JS function
+    // identifier, for dispatch ids that have EXACTLY ONE concrete
+    // surviving implementation across the whole program. A virtual call
+    // to such an id can only ever resolve to that one body (an override
+    // would be a second concrete impl -> not monomorphic), so the
+    // emitter calls the impl directly via the ``_dv*`` / ``_dw*`` helper
+    // family (which preserves the null-receiver NPE and the
+    // drive-once semantics of ``_v*`` / ``_w*`` but skips the
+    // dispatch-id string lookup). Because a fully-devirtualized id is
+    // no longer counted in ``referencedDispatchIds``, its ``m:``
+    // methods-map entry is pruned and its now-unreferenced dispatch-id
+    // string drops out of the ``_q`` hoist table -- the bulk of the
+    // win. JSO-bridge types are excluded (they dispatch host-side via
+    // the m: map). Kill switch: ``-Dparparvm.js.devirt.off``.
+    private static volatile java.util.Map<String, String> monomorphicDispatch = null;
     // The class whose method is currently being emitted. Used by
     // ``appendInterpreterEnsureClassInitialized`` to elide
     // ``_I("X")`` when ``X`` is the containing class or one of
@@ -128,6 +144,12 @@ final class JavascriptMethodGenerator {
         // the set with the raw declared owner AND every ancestor
         // that has a field by the same name. Over-approximation is
         // safe: we never accidentally drop a referenced field.
+        // Monomorphic-devirtualization map must be computed BEFORE the
+        // dispatch-reference scan so that scan can skip ids that will be
+        // devirtualized (and thus need no m: entry / dispatch-id string).
+        java.util.Map<String, String> monoDispatch = computeMonomorphicDispatch(allClasses, index);
+        monomorphicDispatch = monoDispatch;
+
         java.util.Set<String> fieldRefs = new java.util.HashSet<String>();
         java.util.Set<String> instanceRefs = new java.util.HashSet<String>();
         java.util.Set<String> dispatchRefs = new java.util.HashSet<String>();
@@ -143,7 +165,16 @@ final class JavascriptMethodGenerator {
                         if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
                             com.codename1.tools.translator.bytecodes.Invoke inv =
                                     (com.codename1.tools.translator.bytecodes.Invoke) instr;
-                            dispatchRefs.add(JavascriptNameUtil.dispatchMethodIdentifier(inv.getName(), inv.getDesc()));
+                            String did = JavascriptNameUtil.dispatchMethodIdentifier(inv.getName(), inv.getDesc());
+                            // A monomorphic id is devirtualized at every call
+                            // site (direct ``_dv*`` / ``_dw*`` call), so it
+                            // never participates in runtime virtual dispatch
+                            // and needs no m: entry. Leaving it out of
+                            // dispatchRefs is what prunes the entry + drops
+                            // the dispatch-id string.
+                            if (!monoDispatch.containsKey(did)) {
+                                dispatchRefs.add(did);
+                            }
                         }
                     }
                     if (instr instanceof com.codename1.tools.translator.bytecodes.Field) {
@@ -201,6 +232,225 @@ final class JavascriptMethodGenerator {
         referencedStaticFields = fieldRefs;
         referencedInstanceFields = instanceRefs;
         referencedDispatchIds = dispatchRefs;
+        if (System.getProperty("parparvm.js.devirtdiag") != null) {
+            emitDevirtDiagnostics(allClasses, index);
+        }
+    }
+
+    /**
+     * Build the dispatch-id -> single-impl-function map (see
+     * {@link #monomorphicDispatch}). A dispatch id qualifies iff it has
+     * exactly one concrete (non-abstract, non-native, non-eliminated)
+     * instance-method body across all surviving classes, and that body
+     * is not on a JSO-bridge type. Native / JSO impls force the id
+     * out (host-bound / host-dispatched). Returns an empty map when the
+     * kill switch ``-Dparparvm.js.devirt.off`` is set.
+     */
+    private static java.util.Map<String, String> computeMonomorphicDispatch(
+            List<ByteCodeClass> allClasses, Map<String, ByteCodeClass> index) {
+        java.util.Map<String, String> result = new java.util.HashMap<String, String>();
+        if (System.getProperty("parparvm.js.devirt.off") != null) {
+            return result;
+        }
+        // Soundness requires the "declared exactly once program-wide"
+        // rule, NOT merely "one surviving concrete body". A subclass
+        // override that RTA pruned (because it judged the override
+        // unreachable) leaves a single concrete body behind, but an
+        // instance of that subclass still dispatches the inherited /
+        // base body at runtime -- so counting only non-eliminated
+        // concrete methods can wrongly call the base impl on a subtype
+        // receiver (observed: a devirtualized hasFocus()/predicate
+        // returning the wrong value steered Component.getStyle() down a
+        // null-returning branch -> NPE in getInnerHeight). So count
+        // EVERY declaration of a name+desc across ALL classes
+        // (concrete, abstract, native, eliminated, interface); a
+        // dispatch id is devirtualizable only when its signature is
+        // declared in exactly one class, and that one declaration is a
+        // concrete non-native non-JSO instance method.
+        java.util.Map<String, Integer> declCount = new java.util.HashMap<String, Integer>();
+        for (ByteCodeClass c : allClasses) {
+            if (c == null) continue;
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isStatic() || m.isConstructor()) continue;
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) continue;
+                if ("__INIT__".equals(name) || "__CLINIT__".equals(name)) continue;
+                String did = JavascriptNameUtil.dispatchMethodIdentifier(name, desc);
+                Integer cur = declCount.get(did);
+                declCount.put(did, cur == null ? 1 : cur + 1);
+            }
+        }
+        for (ByteCodeClass c : allClasses) {
+            if (c == null) continue;
+            boolean jso = isJsoBridgeType(c, index);
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isEliminated() || m.isStatic() || m.isAbstract()
+                        || m.isConstructor() || m.isNative()) {
+                    continue;
+                }
+                if (jso) continue;
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) continue;
+                if ("__INIT__".equals(name) || "__CLINIT__".equals(name)) continue;
+                String did = JavascriptNameUtil.dispatchMethodIdentifier(name, desc);
+                Integer total = declCount.get(did);
+                if (total != null && total == 1) {
+                    result.put(did, jsMethodIdentifier(c, m));
+                }
+            }
+        }
+        // Host-dispatched methods must keep their m: entry: the JS bridge
+        // (port.js / runtime) resolves them via
+        // ``jvm.resolveVirtual(recv.__class, dispatchId)`` or
+        // ``classDef.methods[id]`` -- NOT by an in-bundle INVOKEVIRTUAL --
+        // so pruning the entry breaks host dispatch ("Missing virtual
+        // method ... on ..."). Exclude every dispatch id the bridge
+        // references, either as a literal ``cn1_s_*`` string or derived
+        // from a referenced full ``cn1_<class>_<method>_<sig>`` id (strip
+        // the longest matching class prefix, mirroring the runtime's
+        // overrideMethodMaps). The screenshot-runner callbacks
+        // (Cn1ssDeviceRunner.awaitTestCompletion / finalizeTest), event
+        // handlers, toString/getMessage etc. all flow through here.
+        java.util.Set<String> bridge = JavascriptBundleWriter.collectBridgeReferencedCn1Tokens();
+        for (String t : bridge) {
+            if (t == null) continue;
+            if (t.startsWith("cn1_s_")) {
+                result.remove(t);
+            } else if (t.startsWith("cn1_")) {
+                String stripped = t.endsWith("__impl") ? t.substring(0, t.length() - 6) : t;
+                String best = null;
+                for (String clsName : index.keySet()) {
+                    String prefix = "cn1_" + clsName + "_";
+                    if (stripped.startsWith(prefix)
+                            && (best == null || clsName.length() > best.length())) {
+                        best = clsName;
+                    }
+                }
+                if (best != null) {
+                    result.remove("cn1_s_" + stripped.substring(("cn1_" + best + "_").length()));
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * One-shot sizing diagnostic (``-Dparparvm.js.devirtdiag``) for the
+     * two architecture-preserving density levers. Prints, to stderr:
+     * (1) virtual call sites whose dispatch-id has exactly one concrete
+     * surviving implementation across the whole program -- the
+     * monomorphic-devirtualization-eligible sites, which could drop the
+     * runtime ``_v*(t,"id")`` resolution and (when no polymorphic use
+     * remains) the dispatch-id string from the table; (2) trivial
+     * synchronous method bodies (field getter / setter / const return)
+     * -- inline candidates that would remove the whole function def plus
+     * its call ceremony. Cost: a tally pass; emits nothing unless the
+     * property is set.
+     */
+    private static void emitDevirtDiagnostics(List<ByteCodeClass> allClasses, Map<String, ByteCodeClass> index) {
+        // concrete-impl count per dispatch-id (name+desc), and virtual
+        // call-site count per dispatch-id.
+        java.util.Map<String, Integer> implCount = new java.util.HashMap<String, Integer>();
+        java.util.Map<String, Integer> callSites = new java.util.HashMap<String, Integer>();
+        int virtualCallSites = 0;
+        int trivialGetters = 0, trivialSetters = 0, trivialConst = 0;
+        long trivialBytesEst = 0;
+        for (ByteCodeClass c : allClasses) {
+            if (c == null) continue;
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isEliminated()) continue;
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name != null && desc != null
+                        && !"__INIT__".equals(name) && !"__CLINIT__".equals(name)
+                        && !m.isStatic()) {
+                    String did = JavascriptNameUtil.dispatchMethodIdentifier(name, desc);
+                    Integer cur = implCount.get(did);
+                    implCount.put(did, cur == null ? 1 : cur + 1);
+                }
+                List<Instruction> insns = m.getInstructions();
+                if (insns == null) continue;
+                int kind = trivialBodyKind(insns);
+                if (kind == 1) { trivialGetters++; trivialBytesEst += 40; }
+                else if (kind == 2) { trivialSetters++; trivialBytesEst += 45; }
+                else if (kind == 3) { trivialConst++; trivialBytesEst += 30; }
+                for (Instruction instr : insns) {
+                    if (instr instanceof com.codename1.tools.translator.bytecodes.Invoke) {
+                        int op = instr.getOpcode();
+                        if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
+                            com.codename1.tools.translator.bytecodes.Invoke inv =
+                                    (com.codename1.tools.translator.bytecodes.Invoke) instr;
+                            String did = JavascriptNameUtil.dispatchMethodIdentifier(inv.getName(), inv.getDesc());
+                            Integer cur = callSites.get(did);
+                            callSites.put(did, cur == null ? 1 : cur + 1);
+                            virtualCallSites++;
+                        }
+                    }
+                }
+            }
+        }
+        int monoSites = 0, monoDispatchIds = 0;
+        for (java.util.Map.Entry<String, Integer> e : callSites.entrySet()) {
+            Integer impls = implCount.get(e.getKey());
+            if (impls != null && impls == 1) {
+                monoSites += e.getValue();
+                monoDispatchIds++;
+            }
+        }
+        System.err.println("[devirtdiag] virtual call sites total=" + virtualCallSites
+                + " monomorphic-eligible=" + monoSites
+                + " (over " + monoDispatchIds + " single-impl dispatch-ids)");
+        System.err.println("[devirtdiag] inline candidates: getters=" + trivialGetters
+                + " setters=" + trivialSetters + " const=" + trivialConst
+                + " ~" + (trivialBytesEst / 1024) + "KB of trivial bodies");
+    }
+
+    /** 0=not trivial, 1=getter (ALOAD0;GETFIELD;xRETURN), 2=setter, 3=const return. */
+    private static int trivialBodyKind(List<Instruction> insns) {
+        java.util.List<Instruction> ops = new java.util.ArrayList<Instruction>();
+        for (Instruction i : insns) {
+            if (i instanceof com.codename1.tools.translator.bytecodes.LabelInstruction
+                    || i instanceof com.codename1.tools.translator.bytecodes.LineNumber
+                    || i instanceof com.codename1.tools.translator.bytecodes.LocalVariable) {
+                continue;
+            }
+            ops.add(i);
+        }
+        if (ops.size() == 3
+                && isVarOp(ops.get(0), Opcodes.ALOAD)
+                && ops.get(1) instanceof com.codename1.tools.translator.bytecodes.Field
+                && ops.get(1).getOpcode() == Opcodes.GETFIELD
+                && isReturn(ops.get(2))) {
+            return 1;
+        }
+        if (ops.size() == 4
+                && isVarOp(ops.get(0), Opcodes.ALOAD)
+                && (ops.get(1) instanceof com.codename1.tools.translator.bytecodes.VarOp)
+                && ops.get(2) instanceof com.codename1.tools.translator.bytecodes.Field
+                && ops.get(2).getOpcode() == Opcodes.PUTFIELD
+                && ops.get(3).getOpcode() == Opcodes.RETURN) {
+            return 2;
+        }
+        if (ops.size() == 2 && isReturn(ops.get(1))) {
+            int op0 = ops.get(0).getOpcode();
+            if (op0 == Opcodes.ACONST_NULL || (op0 >= Opcodes.ICONST_M1 && op0 <= Opcodes.DCONST_1)
+                    || ops.get(0) instanceof com.codename1.tools.translator.bytecodes.Ldc) {
+                return 3;
+            }
+        }
+        return 0;
+    }
+
+    private static boolean isVarOp(Instruction i, int opcode) {
+        return i instanceof com.codename1.tools.translator.bytecodes.VarOp && i.getOpcode() == opcode;
+    }
+
+    private static boolean isReturn(Instruction i) {
+        int op = i.getOpcode();
+        return op == Opcodes.IRETURN || op == Opcodes.LRETURN || op == Opcodes.FRETURN
+                || op == Opcodes.DRETURN || op == Opcodes.ARETURN;
     }
 
     /**
@@ -4487,10 +4737,15 @@ final class JavascriptMethodGenerator {
             boolean suspending = isInvokeSuspending(invoke);
             if (hasReturn) {
                 if (canDeferInvokeResult(instructions, index)) {
+                    // Monomorphic devirtualization (see appendCompactVirtualDispatch):
+                    // direct ``_dv*`` / ``_dw*`` call to the single impl when known.
+                    String monoImpl = monomorphicDispatch == null ? null : monomorphicDispatch.get(dispatchId);
+                    String devBase = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+                    String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
                     StringBuilder callExpr = new StringBuilder();
-                    callExpr.append(suspending ? "(yield* " : "(").append(suspending ? "_v" : "_w")
+                    callExpr.append(suspending ? "(yield* " : "(").append(devBase)
                             .append(argValues.length <= 4 ? String.valueOf(argValues.length) : "N")
-                            .append("(").append(target).append(", \"").append(dispatchId).append("\"");
+                            .append("(").append(target).append(", ").append(devSecond);
                     if (argValues.length > 4) {
                         callExpr.append(", [");
                         for (int ai = 0; ai < argValues.length; ai++) {
@@ -6312,7 +6567,18 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // method whose every virtual call is sync can itself be a plain
             // ``function``); a suspending signature keeps ``yield* cn1_iv*``.
             boolean susp = isInvokeSuspending(invoke);
-            String iv = susp ? "_v" : "_w";
+            // Monomorphic devirtualization (interpreter inline arity 0-4
+            // path). Mirrors appendCompactVirtualDispatch: a single-impl
+            // dispatch id calls the impl directly via ``_dv*`` / ``_dw*``
+            // (impl fn bareword as 2nd arg) instead of the string lookup.
+            // CRITICAL: this path MUST devirtualize whenever the id was
+            // pruned from the virtual-dispatch table (m: entry dropped by
+            // referencedDispatchIds), or the string-based _v*/_w* call
+            // would resolve to a now-missing m: entry ("Missing virtual
+            // method ...").
+            String monoImpl = monomorphicDispatch == null ? null : monomorphicDispatch.get(dispatchId);
+            String iv = monoImpl != null ? (susp ? "_dv" : "_dw") : (susp ? "_v" : "_w");
+            String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
             String yk = susp ? "yield* " : "";
             // Fast path for 0-arg virtual dispatch: inline the
             // target pop into the iv0 call. Pops TOS inside the
@@ -6321,9 +6587,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // call sites.
             if (argCount == 0) {
                 if (hasReturn) {
-                    out.append("        stack.p(").append(yk).append(iv).append("0(stack.q(), \"").append(dispatchId).append("\"));\n");
+                    out.append("        stack.p(").append(yk).append(iv).append("0(stack.q(), ").append(ivSecond).append("));\n");
                 } else {
-                    out.append("        ").append(yk).append(iv).append("0(stack.q(), \"").append(dispatchId).append("\");\n");
+                    out.append("        ").append(yk).append(iv).append("0(stack.q(), ").append(ivSecond).append(");\n");
                 }
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
@@ -6331,9 +6597,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 1) {
                 out.append("        { let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(").append(yk).append(iv).append("1(stack.q(), \"").append(dispatchId).append("\", __arg0));");
+                    out.append("stack.p(").append(yk).append(iv).append("1(stack.q(), ").append(ivSecond).append(", __arg0));");
                 } else {
-                    out.append(yk).append(iv).append("1(stack.q(), \"").append(dispatchId).append("\", __arg0);");
+                    out.append(yk).append(iv).append("1(stack.q(), ").append(ivSecond).append(", __arg0);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -6341,9 +6607,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 2) {
                 out.append("        { let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(").append(yk).append(iv).append("2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1));");
+                    out.append("stack.p(").append(yk).append(iv).append("2(stack.q(), ").append(ivSecond).append(", __arg0, __arg1));");
                 } else {
-                    out.append(yk).append(iv).append("2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1);");
+                    out.append(yk).append(iv).append("2(stack.q(), ").append(ivSecond).append(", __arg0, __arg1);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -6351,9 +6617,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 3) {
                 out.append("        { let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(").append(yk).append(iv).append("3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2));");
+                    out.append("stack.p(").append(yk).append(iv).append("3(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2));");
                 } else {
-                    out.append(yk).append(iv).append("3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2);");
+                    out.append(yk).append(iv).append("3(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -6361,9 +6627,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 4) {
                 out.append("        { let __arg3 = stack.q(); let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(").append(yk).append(iv).append("4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3));");
+                    out.append("stack.p(").append(yk).append(iv).append("4(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2, __arg3));");
                 } else {
-                    out.append(yk).append(iv).append("4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3);");
+                    out.append(yk).append(iv).append("4(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2, __arg3);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -6548,7 +6814,19 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
             int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
             boolean suspending) {
-        String base = suspending ? "_v" : "_w";
+        // Monomorphic devirtualization: a dispatch id with exactly one
+        // concrete impl resolves to that body for any receiver, so call
+        // it directly through the ``_dv*`` / ``_dw*`` family (impl
+        // function passed by reference instead of the dispatch-id
+        // string looked up at runtime). Preserves the null-receiver NPE
+        // and drive-once semantics; the second argument becomes the
+        // (bareword) impl function id, not a quoted dispatch id.
+        java.util.Map<String, String> mono = monomorphicDispatch;
+        String monoImpl = mono == null ? null : mono.get(methodId);
+        String base = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+        // The second helper argument: bareword impl fn for devirt, else
+        // the quoted dispatch-id string.
+        String secondArg = monoImpl != null ? monoImpl : ("\"" + methodId + "\"");
         String yieldKw = suspending ? "yield* " : "";
         String helper;
         boolean variadic = false;
@@ -6565,11 +6843,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
         out.append(indent);
         if (hasReturn && argsFromStack) {
-            out.append("stack.p(").append(yieldKw).append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("stack.p(").append(yieldKw).append(helper).append("(").append(targetExpr).append(", ").append(secondArg);
         } else if (hasReturn) {
-            out.append("let __result = ").append(yieldKw).append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("let __result = ").append(yieldKw).append(helper).append("(").append(targetExpr).append(", ").append(secondArg);
         } else {
-            out.append(yieldKw).append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append(yieldKw).append(helper).append("(").append(targetExpr).append(", ").append(secondArg);
         }
         if (variadic) {
             out.append(", [");

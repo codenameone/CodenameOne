@@ -4290,6 +4290,90 @@ function cn1_ivsN(target, mid, args) {
   const method = cn1_ivResolve(target, mid);
   return cn1_ivsDrive(method.apply(null, [target].concat(args)), mid);
 }
+// Monomorphic-devirtualization dispatch family (_dv0.._dv4/_dvN
+// suspending, _dw0.._dw4/_dwN sync). The translator emits these at
+// INVOKEVIRTUAL / INVOKEINTERFACE call sites whose dispatch id has
+// exactly one concrete implementation program-wide: the resolved
+// override can only ever be that one body, so instead of the
+// dispatch-id-string + resolveVirtual lookup the translator passes the
+// impl FUNCTION directly. Semantics are identical to _v* / _w* minus
+// the lookup: the null-receiver NPE and the drive-once contract are
+// preserved. This lets the dispatch-id string drop from the _q table
+// and the method's m: entry be pruned (it no longer participates in
+// runtime virtual dispatch). The ``fn`` argument is a bareword
+// function reference (minified/aliased in lockstep with its def), not
+// a string.
+function* _dv0(t, fn) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv1(t, fn, a0) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv2(t, fn, a0, a1) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0, a1);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv3(t, fn, a0, a1, a2) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0, a1, a2);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv4(t, fn, a0, a1, a2, a3) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0, a1, a2, a3);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dvN(t, fn, args) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn.apply(null, [t].concat(args));
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function _dw0(t, fn) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t), "");
+}
+function _dw1(t, fn, a0) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0), "");
+}
+function _dw2(t, fn, a0, a1) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0, a1), "");
+}
+function _dw3(t, fn, a0, a1, a2) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0, a1, a2), "");
+}
+function _dw4(t, fn, a0, a1, a2, a3) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0, a1, a2, a3), "");
+}
+function _dwN(t, fn, args) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn.apply(null, [t].concat(args)), "");
+}
+global._dv0 = _dv0; global._dv1 = _dv1; global._dv2 = _dv2;
+global._dv3 = _dv3; global._dv4 = _dv4; global._dvN = _dvN;
+global._dw0 = _dw0; global._dw1 = _dw1; global._dw2 = _dw2;
+global._dw3 = _dw3; global._dw4 = _dw4; global._dwN = _dwN;
+
 // Two/three-char aliases for the dispatch family: the helper name appears
 // at every INVOKEVIRTUAL / INVOKEINTERFACE call site (~42k in a real app),
 // so cn1_iv0 -> _v0 / cn1_ivs0 -> _w0 saves ~5 bytes per site (~200KB raw).
