@@ -3160,10 +3160,25 @@ final class JavascriptMethodGenerator {
             for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
                 body.append("  let s").append(i).append(";\n");
             }
-            // Cooperative budget yield -- straight-line variant. Opt-in
-            // via ``parparvm.js.preemptYield``. See appendMethodImpl.
+            // Cooperative budget yield -- straight-line / structured
+            // variant. The preamble lets the scheduler preempt
+            // long-running cooperative code so the worker event loop
+            // breathes (the boot-loop 90s-freeze fix). A method whose CFG
+            // has NO back-edge does bounded work and returns promptly --
+            // it cannot itself starve the loop, and if it's hot its
+            // caller's loop carries the preemption -- so the preamble is
+            // emitted ONLY for methods that contain a loop (back-edge).
+            // The known starvation bug was a spinning LOOP, not recursion
+            // (infinite recursion stack-overflows rather than hangs), so
+            // this is safe against it. Plain straight-line bodies (no
+            // jumps) never have a back-edge. Kill switch
+            // ``parparvm.js.preemptYield=0`` disables entirely;
+            // ``parparvm.js.preemptYield.allmethods=1`` restores the
+            // emit-everywhere behaviour for comparison.
             if (method.isJavascriptSuspending() && !"__CLINIT__".equals(method.getMethodName())
-                    && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))) {
+                    && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))
+                    && (methodHasBackEdge(instructions, labelToIndex)
+                        || "1".equals(System.getProperty("parparvm.js.preemptYield.allmethods")))) {
                 body.append("  if(_Yc())yield _Yv;\n");
             }
             if (method.isSynchronizedMethod()) {
@@ -5639,6 +5654,37 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
         }
         return blocks;
+    }
+
+    /**
+     * True when the method's control-flow graph contains a back-edge
+     * (a loop). Used to decide whether the cooperative-preemption
+     * preamble is needed: only loop-bearing methods can spin long
+     * enough to starve the worker event loop. Returns false for plain
+     * straight-line bodies (no jumps) and acyclic-forward structured
+     * bodies. Conservative on parse failure (returns true) so a method
+     * we can't analyse keeps its preamble.
+     */
+    private static boolean methodHasBackEdge(List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        if (labelToIndex == null) {
+            return true;
+        }
+        boolean anyJump = false;
+        for (Instruction instr : instructions) {
+            if (instr instanceof Jump || instr instanceof SwitchInstruction) {
+                anyJump = true;
+                break;
+            }
+        }
+        if (!anyJump) {
+            return false; // no branches -> straight line -> no loop
+        }
+        try {
+            java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
+            return !isAcyclicForward(blocks);
+        } catch (RuntimeException analysisFailed) {
+            return true;
+        }
     }
 
     /** True when every edge goes to a strictly later block (no loops). */
