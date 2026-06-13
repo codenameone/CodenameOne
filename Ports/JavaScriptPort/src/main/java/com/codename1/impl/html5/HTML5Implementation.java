@@ -1553,8 +1553,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     completePressInFlight();
                     return;
                 }
-                onMouseMoveHandle = EventUtil.addEventListener(peersContainer, "mousemove", onMouseMove, true);
-                onPointerMoveHandle = EventUtil.addEventListener(peersContainer, "pointermove", onMouseMove, true);
+                onMouseMoveHandle = EventUtil.addEventListener(outputCanvas, "mousemove", onMouseMove, true);
+                onPointerMoveHandle = EventUtil.addEventListener(outputCanvas, "pointermove", onMouseMove, true);
 
                 pointerState.setLastMousePosition(x, y);
                 // ``mouseDown=true`` already set at handler entry — see comment
@@ -1624,8 +1624,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 pointerState.setMouseDown(false);
 
-                EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
-                EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
+                EventUtil.removeEventListener(outputCanvas, "mousemove", onMouseMoveHandle, true);
+                EventUtil.removeEventListener(outputCanvas, "pointermove", onPointerMoveHandle, true);
 
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
@@ -1711,8 +1711,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (touchDecision.shouldCancelMouseTracking()) {
                     debugLog("[touchStart] mouseIsDown");
                     pointerState.setMouseDown(false);
-                    EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
-                    EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
+                    EventUtil.removeEventListener(outputCanvas, "mousemove", onMouseMoveHandle, true);
+                    EventUtil.removeEventListener(outputCanvas, "pointermove", onPointerMoveHandle, true);
                     pointerState.setTouchDown(false);
                 }
                 pointerState.setTouchDown(true);
@@ -1720,7 +1720,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 pointerState.setTouches(x, y);
                 
-                onTouchMoveHandle = EventUtil.addEventListener(peersContainer, "touchmove", onTouchMove, true);
+                onTouchMoveHandle = EventUtil.addEventListener(outputCanvas, "touchmove", onTouchMove, true);
                 
                 callSerially(new Runnable() {
 
@@ -1791,7 +1791,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 pointerState.setGrabbedDrag(false);
                 
                 TouchEvent me = (TouchEvent)evt;
-                EventUtil.removeEventListener(peersContainer, "touchmove", onTouchMoveHandle, true); 
+                EventUtil.removeEventListener(outputCanvas, "touchmove", onTouchMoveHandle, true); 
                 installBacksideHooksInUserInteraction();
                 nativeCallSerially(new Runnable() {
                     @Override
@@ -1844,7 +1844,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 if (JavaScriptInputCoordinator.shouldCancelTouchMove(pointerState.isMouseDown())) {
                     pointerState.setTouchDown(false);
-                    EventUtil.removeEventListener(peersContainer, "touchmove", onTouchMoveHandle, true);
+                    EventUtil.removeEventListener(outputCanvas, "touchmove", onTouchMoveHandle, true);
                     return;
                 }
                 
@@ -1874,8 +1874,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 if (JavaScriptInputCoordinator.shouldCancelMouseMove(pointerState.isTouchDown())) {
                     pointerState.setMouseDown(false);
-                    EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
-                    EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
+                    EventUtil.removeEventListener(outputCanvas, "mousemove", onMouseMoveHandle, true);
+                    EventUtil.removeEventListener(outputCanvas, "pointermove", onPointerMoveHandle, true);
                     return;
                 }
                 
@@ -2054,10 +2054,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
 
             };
+        // Bind pointer/touch/wheel input to the CANVAS, not ``peersContainer``.
+        // The canvas is the top, full-screen render surface; ``peersContainer``
+        // is a full-screen overlay deliberately parked BEHIND it (style.css
+        // ``#cn1-peers-container { z-index: -1000 }``) so native peers can show
+        // through transparent regions of the canvas (see ``hitTest`` /
+        // ``copyEventsToNativePeers``). A listener on the buried peers container
+        // never receives a click that lands on the canvas, so binding input
+        // there froze ALL pointer input on desktop. The canvas is the element
+        // the browser actually delivers these events to.
         JavaScriptEventWiring.registerPeerPointerEvents(new JavaScriptEventWiring.ElementRegistrar() {
             @Override
             public void add(String eventName, Object listener, boolean capture) {
-                peersContainer.addEventListener(eventName, (EventListener) listener, capture);
+                outputCanvas.addEventListener(eventName, (EventListener) listener, capture);
             }
         }, !debugFlag("disableMousedown"), !debugFlag("disableMouseup"), !debugFlag("disableTouchstart"),
                 !debugFlag("disableTouchend"), !debugFlag("disableWheel"), getWheelEventType(),
