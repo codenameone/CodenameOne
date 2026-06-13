@@ -117,8 +117,20 @@ class JavascriptOpcodeCoverageTest {
                         || translatedApp.contains("_v0(") || translatedApp.contains("_v1(")
                         || translatedApp.contains("_v2(") || translatedApp.contains("_v3(")
                         || translatedApp.contains("_w0(") || translatedApp.contains("_w1(")
-                        || translatedApp.contains("_w2(") || translatedApp.contains("_w3("),
-                "Virtual/interface dispatch should route through the cn1_iv*/_v*/_w* helper family");
+                        || translatedApp.contains("_w2(") || translatedApp.contains("_w3(")
+                        || translatedApp.contains("_dv0(")
+                        || translatedApp.contains("_dv1(")
+                        || translatedApp.contains("_dv2(")
+                        || translatedApp.contains("_dv3(")
+                        || translatedApp.contains("_dv4(")
+                        || translatedApp.contains("_dvN(")
+                        || translatedApp.contains("_dw0(")
+                        || translatedApp.contains("_dw1(")
+                        || translatedApp.contains("_dw2(")
+                        || translatedApp.contains("_dw3(")
+                        || translatedApp.contains("_dw4(")
+                        || translatedApp.contains("_dwN("),
+                "Virtual/interface dispatch should route through the cn1_iv*/_v*/_w*/_dv*/_dw* helper family");
         assertTrue(runtime.contains("const classDef = target.__classDef;")
                         && runtime.contains("classDef && classDef.methods ? classDef.methods[mid]"),
                 "Runtime virtual dispatch helper should use an exact-class method-table fast path");
