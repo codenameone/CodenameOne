@@ -718,18 +718,35 @@ public class JavaScriptBuilder extends Executor {
                                           String version) throws Exception {
         Map<String, String> env = new HashMap<String, String>();
         log("Running ByteCodeTranslator (javascript target) for " + mainClass);
-        return exec(tmpDir, env, -1,
-                "java", "-Xmx512m", "-cp", compilerJar.getAbsolutePath(),
-                "com.codename1.tools.translator.ByteCodeTranslator",
-                "javascript",
-                stageClasses.getAbsolutePath(),
-                translatorOut.getAbsolutePath(),
-                translatorAppName,
-                packageName,
-                mainClass,
-                version == null ? "1.0" : version,
-                "ios",
-                "none");
+        java.util.List<String> cmd = new java.util.ArrayList<String>();
+        cmd.add("java");
+        cmd.add("-Xmx512m");
+        // Pass through extra translator JVM options (e.g. -Dparparvm.js.*
+        // size/diagnostic knobs and kill switches) from the
+        // CN1_TRANSLATOR_OPTS environment variable. The forked JVM does
+        // not inherit the Maven process's -D properties, so this is the
+        // only way to reach the translator for bisection / tuning.
+        String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
+        if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
+            for (String opt : translatorOpts.trim().split("\\s+")) {
+                if (!opt.isEmpty()) {
+                    cmd.add(opt);
+                }
+            }
+        }
+        cmd.add("-cp");
+        cmd.add(compilerJar.getAbsolutePath());
+        cmd.add("com.codename1.tools.translator.ByteCodeTranslator");
+        cmd.add("javascript");
+        cmd.add(stageClasses.getAbsolutePath());
+        cmd.add(translatorOut.getAbsolutePath());
+        cmd.add(translatorAppName);
+        cmd.add(packageName);
+        cmd.add(mainClass);
+        cmd.add(version == null ? "1.0" : version);
+        cmd.add("ios");
+        cmd.add("none");
+        return exec(tmpDir, env, -1, cmd.toArray(new String[0]));
     }
 
     private File locateDistDir(File translatorOut, String translatorAppName) {
