@@ -47,7 +47,7 @@ form.add(BorderLayout.CENTER, col);
 | `SpanLabel` | Multi-line wrapped text | Use for descriptions/copy |
 | `Button` | Tappable button | `.pressed` UIID variant for press state |
 | `TextField` | Single-line input | Use `TextField.setUIID("InitializrField")` to apply CSS |
-| `TextArea` | Multi-line input | |
+| `TextArea` | Multi-line input | `setGrowByContent(true)` grows the field to fit its text reliably *while editing* (not just after focus leaves). |
 | `TextComponent` | Material-Design–style input — floating label, optional description / error message, optional action icon | The right default for new form inputs. See *TextComponent* below. |
 | `Picker` | Native picker (date/time/string/list) | Reads as a button, opens a native sheet on mobile. **Use this instead of `ComboBox`.** |
 | `Switch` / `CheckBox` / `RadioButton` | Toggles | RadioButton requires a `ButtonGroup` |
@@ -60,9 +60,19 @@ form.add(BorderLayout.CENTER, col);
 | `InfiniteProgress` | Activity spinner | |
 | `Dialog` | Modal popup | `Dialog.show(...)` blocks current EDT pump |
 | `Toolbar` | Top bar | Already on every Form |
-| `BrowserComponent` | Embedded WebView | Use sparingly; ParparVM/iOS WebView has caveats |
+| `BrowserComponent` | Embedded WebView | Use sparingly; ParparVM/iOS WebView has caveats. See *BrowserComponent appearance* below. |
 
 **Note on `ComboBox`**: It exists but is **not recommended** in CN1. The dropdown rendering is awkward on touch screens and behaves inconsistently across platforms. Use `Picker` (set `pickerType` to `Display.PICKER_TYPE_STRINGS` for a string-list picker) — it opens a native sheet on iOS, a Material dialog on Android, and a normal popup in the simulator. `ComboBox` is kept only for legacy ports of Swing apps.
+
+### BrowserComponent appearance (light/dark)
+
+On iOS you can pin the WebView's appearance (the `prefers-color-scheme` the page sees and the native form-control rendering) instead of letting it follow the device:
+
+```java
+browser.setProperty(BrowserComponent.BROWSER_PROPERTY_INTERFACE_STYLE, "light"); // "light" | "dark" | "auto"
+```
+
+`"auto"` (the default) follows the device theme. Honored on iOS WKWebView; other platforms ignore it. Useful when your embedded HTML is only styled for one mode and you don't want the system flipping it.
 
 ### Package locations — don't trust autocomplete to find these
 
@@ -225,6 +235,28 @@ ToastBar.showMessage("Saved!", FontImage.MATERIAL_CHECK);
 ```
 
 For confirmation flows prefer `Dialog.show(...)` overloads — they map to native sheets on iOS. `ToastBar` is the only built-in non-blocking notification.
+
+### `InteractionDialog` — a non-blocking, movable dialog
+
+`com.codename1.components.InteractionDialog` is a dialog that does **not** block the EDT and lets the user keep interacting with the form behind it (toolbars, lists). Use it for floating panels, in-place editors, or a popover that should coexist with the screen.
+
+```java
+import com.codename1.components.InteractionDialog;
+
+InteractionDialog dlg = new InteractionDialog("Filters");
+dlg.setLayout(BoxLayout.y());
+dlg.add(new Switch("Unread only"));
+dlg.add(new Button("Apply") {{ addActionListener(e -> dlg.dispose()); }});
+// position + size in pixels; show() leaves the rest of the form live
+dlg.show(top, left, bottom, right);
+```
+
+**Stackable mode** (global opt-in): by default, disposing one `InteractionDialog` runs `removeAll()` on the shared layered pane and wipes any *other* interaction dialog still on screen. If your app shows two at once, enable stackable mode once at startup so siblings survive — later-shown dialogs simply layer on top, and the shared pane is cleared only when the last one closes:
+
+```java
+InteractionDialog.setStackable(true);     // app-wide; default is false (back-compatible)
+boolean on = InteractionDialog.isStackable();
+```
 
 ## Styling: UIIDs over inline styles
 

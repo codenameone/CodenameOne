@@ -50,7 +50,7 @@ The runtime authoritative reference is also published as JavaDoc: <https://www.c
 
 Codename One's `java-runtime` jar contains a curated slice of the JDK. Roughly:
 
-- **`java.lang`** — primitive boxes, `String`, `StringBuilder`, `Math`, `Number`, `Throwable`, `Object`, `Runnable`, `Thread` (but see threading note below), `Comparable`, etc. No `Class.forName(String)` style dynamic dispatch — class names are obfuscated.
+- **`java.lang`** — primitive boxes, `String`, `StringBuilder`, `Math`, `Number`, `Throwable`, `Object`, `Runnable`, `Thread` (but see threading note below), `Comparable`, etc. No `Class.forName(String)` style dynamic dispatch — class names are obfuscated. `System.currentTimeMillis()` and `System.nanoTime()` both work on every port — `nanoTime()` is now backed by a real monotonic clock across all ParparVM targets (iOS, JavaScript, native Windows), so it's safe for frame timing / elapsed-time measurement.
 - **`java.io`** — `InputStream`, `OutputStream`, `Reader`, `Writer`, `ByteArrayInput/OutputStream`, `BufferedReader`, `BufferedWriter`, `DataInputStream`, `DataOutputStream`, `IOException`, `PrintStream`. Use these for stream-based IO over `Storage` / `FileSystemStorage` handles.
 - **`java.util`** — `ArrayList`, `LinkedList`, `HashMap`, `LinkedHashMap`, `TreeMap`, `HashSet`, `LinkedHashSet`, `TreeSet`, `Collections`, `Iterator`, `Comparator`, `Arrays`, `Date`, `Calendar`, `TimeZone`, `Hashtable`, `Vector`, `Stack`, `Random`, `UUID`, `Properties`. Most idiomatic collection code Just Works.
 - **`java.text`** — partial (`DecimalFormat`, `NumberFormat`, basic `MessageFormat`); **`java.text.SimpleDateFormat` is partial** — prefer `com.codename1.l10n.SimpleDateFormat`.

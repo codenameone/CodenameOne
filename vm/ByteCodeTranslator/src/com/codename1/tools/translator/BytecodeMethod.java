@@ -587,25 +587,21 @@ public class BytecodeMethod implements SignatureSet {
 
 
 
-        // check native code
+        // check native code: O(|symbol|) lookups against the inverted index instead
+        // of an O(native_bytes) substring scan per method. Semantics are identical --
+        // the index answers "is X a substring of the native source text".
         StringBuilder b = new StringBuilder();
         this.appendFunctionPointer(b);
         String str = b.toString();
-        boolean foundClassName = false;
-        for(String s : nativeSources) {
-            if (cls != null && !foundClassName && s.contains(clsName)) {
-                // For later we record whether the class is used.
-                foundClassName = true;
+        NativeSymbolIndex idx = Parser.getNativeSymbolIndex(nativeSources);
+        if (idx.contains(str)) {
+            usedByNative = true;
+            if (cls != null) {
+                cls.setUsedByNative(true);
             }
-            if(s.contains(str)) {
-                usedByNative = true;
-                if (cls != null) {
-                    cls.setUsedByNative(true);
-                }
-                return true;
-            }
+            return true;
         }
-        if (!foundClassName && cls != null) {
+        if (cls != null && !idx.contains(clsName)) {
             // We didn't find the class at all.
             // Let's record that as it will save us time
             // when looking up other methods in this class.
