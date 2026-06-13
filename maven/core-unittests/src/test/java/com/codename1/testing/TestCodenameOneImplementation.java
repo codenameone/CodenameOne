@@ -871,6 +871,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return nativeBrowserWindowSize;
     }
 
+    private com.codename1.impl.CameraImpl cameraImpl;
+
+    /**
+     * Installs the {@link com.codename1.impl.CameraImpl} backend that
+     * {@link com.codename1.camera.Camera} sees through
+     * {@code Display.getCameraBackend()}. Pass {@code null} (the default) to
+     * model a platform with no low-level camera support.
+     */
+    public void setCameraImpl(com.codename1.impl.CameraImpl cameraImpl) {
+        this.cameraImpl = cameraImpl;
+    }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return cameraImpl;
+    }
+
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
         if(this.browserComponent == null) {
@@ -1143,6 +1160,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mutableImagesFast = true;
         largerTextEnabled = false;
         largerTextScale = 1f;
+        cameraImpl = null;
     }
 
     public List<Object> getCleanupCalls() {
