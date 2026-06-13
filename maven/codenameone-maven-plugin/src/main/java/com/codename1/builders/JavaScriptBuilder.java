@@ -776,11 +776,26 @@ public class JavaScriptBuilder extends Executor {
                 Files.copy(c.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         }
+        // Every TrueType font the app loads is fetched by the host from
+        // ``assets/<name>`` (HTML5Implementation.loadTrueTypeFont ->
+        // port.js, which mirrors getResourceAsStream's assets/ rewrite).
+        // The translator emits bundled fonts (the material-design icon
+        // font AND any CSS-merged theme fonts such as the Initializr's
+        // Inter-*.ttf) at the dist ROOT, so move EVERY root *.ttf into
+        // assets/ -- not just material-design-font.ttf. Leaving them at
+        // the root made the app 404 on assets/Inter-*.ttf and fall back
+        // to the browser default face. CN1Resource.res and other non-font
+        // root files are untouched.
         File assetsDir = new File(distDir, "assets");
         assetsDir.mkdirs();
-        File md = new File(distDir, "material-design-font.ttf");
-        if (md.isFile() && !new File(assetsDir, md.getName()).isFile()) {
-            Files.move(md.toPath(), new File(assetsDir, md.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        File[] rootFiles = distDir.listFiles();
+        if (rootFiles != null) {
+            for (File rf : rootFiles) {
+                if (rf.isFile() && rf.getName().toLowerCase().endsWith(".ttf")) {
+                    File dest = new File(assetsDir, rf.getName());
+                    Files.move(rf.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
         }
     }
 
