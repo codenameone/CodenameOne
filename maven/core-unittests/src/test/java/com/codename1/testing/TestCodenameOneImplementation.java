@@ -871,6 +871,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return nativeBrowserWindowSize;
     }
 
+    private com.codename1.impl.CameraImpl cameraImpl;
+
+    /**
+     * Installs the {@link com.codename1.impl.CameraImpl} backend that
+     * {@link com.codename1.camera.Camera} sees through
+     * {@code Display.getCameraBackend()}. Pass {@code null} (the default) to
+     * model a platform with no low-level camera support.
+     */
+    public void setCameraImpl(com.codename1.impl.CameraImpl cameraImpl) {
+        this.cameraImpl = cameraImpl;
+    }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return cameraImpl;
+    }
+
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
         if(this.browserComponent == null) {
@@ -1143,6 +1160,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mutableImagesFast = true;
         largerTextEnabled = false;
         largerTextScale = 1f;
+        cameraImpl = null;
+        platformName = "test";
     }
 
     public List<Object> getCleanupCalls() {
@@ -2906,9 +2925,21 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
 
+    private String platformName = "test";
+
+    /**
+     * Overrides the value returned by {@link #getPlatformName()} (default
+     * {@code "test"}). Lets tests model a specific platform -- e.g. {@code "se"}
+     * to exercise simulator-only code paths. Reset to {@code "test"} by
+     * {@link #reset()}.
+     */
+    public void setPlatformName(String platformName) {
+        this.platformName = platformName == null ? "test" : platformName;
+    }
+
     @Override
     public String getPlatformName() {
-        return "test";
+        return platformName;
     }
 
     @Override
