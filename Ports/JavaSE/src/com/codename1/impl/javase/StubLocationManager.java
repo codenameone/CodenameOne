@@ -22,7 +22,7 @@
  */
 package com.codename1.impl.javase;
 
-import static com.codename1.impl.javase.JavaSEPort.locSimulation;
+import com.codename1.impl.javase.simulator.tools.SimulatorTools;
 import com.codename1.io.Log;
 import com.codename1.location.Geofence;
 import com.codename1.location.GeofenceListener;
@@ -46,7 +46,7 @@ import java.util.prefs.Preferences;
  *
  * @author Chen
  */
-class StubLocationManager extends LocationManager {
+public class StubLocationManager extends LocationManager {
 
     private Timer geofenceTimer;
     private TimerTask geofenceTask;
@@ -72,11 +72,8 @@ class StubLocationManager extends LocationManager {
         loc.setDirection(p.getFloat("direction", 0));
         loc.setVelocity(p.getFloat("velocity",50));
         loc.setStatus(p.getInt("state", AVAILABLE));
-        if(locSimulation==null) {
-                locSimulation = new LocationSimulation();
-        }
-        JavaSEPort.locSimulation.setMeasUnit(p.getInt("unit", LocationSimulation.E_MeasUnit_Metric));
-        JavaSEPort.locSimulation.setLocation(loc);
+        SimulatorTools.getOrCreateLocationSimulation().setMeasUnit(p.getInt("unit", LocationSimulation.E_MeasUnit_Metric));
+        SimulatorTools.getOrCreateLocationSimulation().setLocation(loc);
     }
 
     private void checkLocationRegistration() {
@@ -146,12 +143,12 @@ class StubLocationManager extends LocationManager {
                                 Location loc;
                                 try {
                                     loc = getCurrentLocation();
-                                    if (JavaSEPort.locSimulation == null) {
+                                    if (SimulatorTools.getLocationSimulation() == null) {
                                         loc.setLongitude(loc.getLongitude() + 0.001);
                                         loc.setLatitude(loc.getLatitude() + +0.001);                                        
                                     } else {
-                                        loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
-                                        loc.setLatitude(JavaSEPort.locSimulation.getLatitude());                                        
+                                        loc.setLongitude(SimulatorTools.getLocationSimulation().getLongitude());
+                                        loc.setLatitude(SimulatorTools.getLocationSimulation().getLatitude());                                        
                                     } 
                                     
                                     // Do exits first
@@ -243,14 +240,14 @@ class StubLocationManager extends LocationManager {
     @Override
     public Location getCurrentLocation() throws IOException {
         checkLocationRegistration();
-        if (JavaSEPort.locSimulation != null) {
-            loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
-            loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
-            loc.setAccuracy(JavaSEPort.locSimulation.getAccuracy());
-            loc.setAltitude(JavaSEPort.locSimulation.getAltitude());
-            loc.setDirection(JavaSEPort.locSimulation.getDirection());
-            loc.setVelocity(JavaSEPort.locSimulation.getVelocity());
-            loc.setStatus(JavaSEPort.locSimulation.getState());
+        if (SimulatorTools.getLocationSimulation() != null) {
+            loc.setLatitude(SimulatorTools.getLocationSimulation().getLatitude());
+            loc.setLongitude(SimulatorTools.getLocationSimulation().getLongitude());
+            loc.setAccuracy(SimulatorTools.getLocationSimulation().getAccuracy());
+            loc.setAltitude(SimulatorTools.getLocationSimulation().getAltitude());
+            loc.setDirection(SimulatorTools.getLocationSimulation().getDirection());
+            loc.setVelocity(SimulatorTools.getLocationSimulation().getVelocity());
+            loc.setStatus(SimulatorTools.getLocationSimulation().getState());
         }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
@@ -259,14 +256,14 @@ class StubLocationManager extends LocationManager {
     @Override
     public Location getLastKnownLocation() {
         checkLocationRegistration();
-        if (JavaSEPort.locSimulation != null) {
-            loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
-            loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
-            loc.setAccuracy(JavaSEPort.locSimulation.getAccuracy());
-            loc.setAltitude(JavaSEPort.locSimulation.getAltitude());
-            loc.setDirection(JavaSEPort.locSimulation.getDirection());
-            loc.setVelocity(JavaSEPort.locSimulation.getVelocity());
-            loc.setStatus(JavaSEPort.locSimulation.getState());
+        if (SimulatorTools.getLocationSimulation() != null) {
+            loc.setLatitude(SimulatorTools.getLocationSimulation().getLatitude());
+            loc.setLongitude(SimulatorTools.getLocationSimulation().getLongitude());
+            loc.setAccuracy(SimulatorTools.getLocationSimulation().getAccuracy());
+            loc.setAltitude(SimulatorTools.getLocationSimulation().getAltitude());
+            loc.setDirection(SimulatorTools.getLocationSimulation().getDirection());
+            loc.setVelocity(SimulatorTools.getLocationSimulation().getVelocity());
+            loc.setStatus(SimulatorTools.getLocationSimulation().getState());
         }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
@@ -286,11 +283,11 @@ class StubLocationManager extends LocationManager {
                         Location loc;
                         try {
                             loc = getCurrentLocation();
-                            if (JavaSEPort.locSimulation == null) {
+                            if (SimulatorTools.getLocationSimulation() == null) {
                                 loc.setLongitude(loc.getLongitude() + 0.001);
                                 loc.setLatitude(loc.getLatitude() + +0.001);                                
                             }else{
-                                int s = JavaSEPort.locSimulation.getState();
+                                int s = SimulatorTools.getLocationSimulation().getState();
                                 if(s != StubLocationManager.super.getStatus()){
                                     l.providerStateChanged(s);
                                     setStatus(s);
@@ -320,8 +317,8 @@ class StubLocationManager extends LocationManager {
     @Override
     public int getStatus() {
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
-        if (JavaSEPort.locSimulation != null) {
-            int s = JavaSEPort.locSimulation.getState();
+        if (SimulatorTools.getLocationSimulation() != null) {
+            int s = SimulatorTools.getLocationSimulation().getState();
             setStatus(s);
             p.putInt("lastGoodLocationStat", s);
             return s;

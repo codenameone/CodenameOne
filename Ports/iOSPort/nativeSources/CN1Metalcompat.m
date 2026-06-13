@@ -25,8 +25,12 @@
 #import "CN1Metalcompat.h"
 #import "CN1MetalPipelineCache.h"
 #import "CN1MetalGlyphAtlas.h"
+#ifndef CN1_SIM_DESKTOP
+// The desktop simulator build has no UIKit; this file references METALView
+// and the view controller only in comments, so the imports are skipped there
 #import "METALView.h"
 #import "CodenameOne_GLViewController.h"
+#endif
 #import "GLUIImage.h"
 #import <CoreText/CoreText.h>
 
@@ -271,8 +275,51 @@ void CN1MetalRotate(float angle, float x, float y, float z) {
 
 // --------------- Clip state ---------------
 
+#ifdef CN1_SIM_DESKTOP
+// The desktop simulator hosts several Codename One universes (the shell
+// chrome and the isolated app) in one framebuffer. Each universe's draws are
+// confined to its window region even when an op "opens" the scissor
+// (polygon fills, cached text paths) - without this floor those draws
+// bleed over the neighboring universe's pixels.
+static int cn1simUniverseX = 0;
+static int cn1simUniverseY = 0;
+static int cn1simUniverseW = 0x7fffffff;
+static int cn1simUniverseH = 0x7fffffff;
+
+void CN1SimSetUniverseClip(int x, int y, int w, int h) {
+    cn1simUniverseX = x;
+    cn1simUniverseY = y;
+    cn1simUniverseW = w;
+    cn1simUniverseH = h;
+}
+#endif
+
 void CN1MetalSetScissor(int x, int y, int width, int height) {
     if (activeEncoder == nil) return;
+#ifdef CN1_SIM_DESKTOP
+    if (width <= 0 || height <= 0) {
+        // "disable clipping" means the whole universe region, never the
+        // neighbors' pixels
+        x = 0;
+        y = 0;
+        width = currentFramebufferWidth;
+        height = currentFramebufferHeight;
+    }
+    {
+        long ix2 = MIN((long) x + width, (long) cn1simUniverseX + cn1simUniverseW);
+        long iy2 = MIN((long) y + height, (long) cn1simUniverseY + cn1simUniverseH);
+        int ix = MAX(x, cn1simUniverseX);
+        int iy = MAX(y, cn1simUniverseY);
+        x = ix;
+        y = iy;
+        width = (int) MAX(0, ix2 - ix);
+        height = (int) MAX(0, iy2 - iy);
+        if (width <= 0 || height <= 0) {
+            [activeEncoder setScissorRect:(MTLScissorRect) {0, 0, 1, 1}];
+            return;
+        }
+    }
+#else
     if (width <= 0 || height <= 0) {
         // Disable clipping: set scissor to full framebuffer.
         [activeEncoder setScissorRect:(MTLScissorRect){
@@ -282,6 +329,7 @@ void CN1MetalSetScissor(int x, int y, int width, int height) {
         }];
         return;
     }
+#endif
     // Clamp to framebuffer; Metal requires scissor to be within the
     // attachment bounds or it fails the render pass.
     int fx = MAX(0, x);

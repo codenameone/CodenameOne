@@ -94,6 +94,14 @@ public class Simulator {
         }
         System.setProperty("NSHighResolutionCapable", "true");
 
+        // Simulator tool proxies (network monitor, performance monitor, location
+        // simulation) are layered over the implementation as decorators created by
+        // ImplementationFactory. Enabled by default under the simulator only;
+        // pass -Dcn1.simulator.decorators=false to disable the decorator chain.
+        if (System.getProperty("cn1.simulator.decorators") == null) {
+            System.setProperty("cn1.simulator.decorators", "true");
+        }
+
         // Register framework-level BuildHintEditor schema defaults (see
         // Ports/JavaSE/src/com/codename1/impl/javase/BuildHintSchemaDefaults)
         // before any code reads codename1.arg.{{*}} system properties.

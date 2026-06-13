@@ -553,7 +553,7 @@ public class PerformanceMonitor extends javax.swing.JFrame {
         }
     }
     
-    void clearRect(int x, int y, int width, int height) {
+    public void clearRect(int x, int y, int width, int height) {
         if(trackDrawing && trackedDrawing != null) {
             trackedDrawing.addRow(new Object[] {
                 "clearRect(" + x + ", " + y + ", " + width + ", " + height + ")",

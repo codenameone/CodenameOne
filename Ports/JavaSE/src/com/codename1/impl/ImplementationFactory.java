@@ -65,44 +65,43 @@ public class ImplementationFactory {
     
     /**
      * Factory method to create the implementation instance
-     * 
+     *
      * @return a newly created implementation instance
      */
     public Object createImplementation() {
-        boolean cefSupported = false;
-        boolean fxSupported = false;
-        try {
-            Class.forName("javafx.embed.swing.JFXPanel");
-            fxSupported = true;
-        } catch (Throwable ex) {}
-        
-        try {
-            Class.forName("org.cef.CefApp");
-            cefSupported = true;
-        } catch (Throwable ex){}
-        
-        String implementation = System.getProperty("cn1.javase.implementation", "");
-        
-        if (implementation.equalsIgnoreCase("cef") && cefSupported) {
-            // We will use CEF
-            return new JavaCEFSEPort();
+        return decorate(createPortImplementation());
+    }
+
+    /**
+     * Wraps the port implementation with the simulator tool decorator chain when
+     * running under the simulator (Simulator.main sets cn1.simulator.decorators).
+     * Plain desktop apps and unit tests get the undecorated port implementation.
+     *
+     * @param impl the raw port implementation
+     * @return the implementation Display should use, possibly decorated
+     */
+    protected CodenameOneImplementation decorate(CodenameOneImplementation impl) {
+        if (Boolean.getBoolean("cn1.simulator.decorators")) {
+            // Network monitor wraps the condition simulator so captured
+            // timings include the simulated latency
+            impl = new com.codename1.impl.javase.simulator.proxy.NetworkMonitorProxy(
+                    new com.codename1.impl.javase.simulator.proxy.NetworkConditionSimulator(
+                            new com.codename1.impl.javase.simulator.proxy.PerformanceMonitorProxy(
+                                    new com.codename1.impl.javase.simulator.proxy.SimulatorLocationProxy(impl))));
         }
-        if (implementation.equalsIgnoreCase("fx") && fxSupported) {
-            return new JavaFXSEPort();
-        }
-        if (implementation.equalsIgnoreCase("jmf")) {
-            return new JavaJMFSEPort();
-        }
-        if ("".equals(implementation)) {
-            if (cefSupported) {
-                return new JavaCEFSEPort();
-            } else if (fxSupported) {
-                return new JavaFXSEPort();
-            } else {
-                return new JavaJMFSEPort();
-            }
-        }
-        
-        return new JavaJMFSEPort();
+        return impl;
+    }
+
+    /**
+     * Creates the underlying port implementation without any simulator
+     * decoration. The implementation comes from the active simulator backend:
+     * the Swing JavaSEPort family by default (CEF, FX or JMF based on
+     * availability and the cn1.javase.implementation system property) or a
+     * native rendering backend selected via cn1.simulator.backend.
+     *
+     * @return a newly created port implementation instance
+     */
+    protected CodenameOneImplementation createPortImplementation() {
+        return com.codename1.impl.javase.simulator.backend.BackendRegistry.getActive().createImplementation();
     }
 }

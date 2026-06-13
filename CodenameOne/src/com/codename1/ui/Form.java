@@ -2652,11 +2652,16 @@ public class Form extends Container {
     void initComponentImpl() {
         super.initComponentImpl();
         dragged = null;
-        if (Display.getInstance().isNativeCommands()) {
-            Display.impl.setNativeCommands(menuBar.getCommands());
-        } else if (isDesktopNativeChrome() && toolbar != null) {
-            // bridge the (hidden) toolbar's commands to the native desktop menu bar
-            Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+        // dialogs render their commands as in-dialog buttons; pushing them to
+        // the native desktop menu bar would wipe the underlying form's menu
+        // for the dialog's lifetime (and beyond - nothing re-pushes on dispose)
+        if (!(this instanceof Dialog)) {
+            if (Display.getInstance().isNativeCommands()) {
+                Display.impl.setNativeCommands(menuBar.getCommands());
+            } else if (isDesktopNativeChrome() && toolbar != null) {
+                // bridge the (hidden) toolbar's commands to the native desktop menu bar
+                Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+            }
         }
         if (getParent() != null) {
             Form f = getParent().getComponentForm();

@@ -32,6 +32,8 @@ import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
 import com.codename1.impl.javase.simulator.*;
+import com.codename1.impl.javase.simulator.host.DeviceSkin;
+import com.codename1.impl.javase.simulator.tools.SimulatorTools;
 import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.impl.javase.util.SwingUtils;
 import com.codename1.messaging.Message;
@@ -808,26 +810,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     private File storageDir;
     // skin related variables
     private boolean portrait = true;
-    private BufferedImage portraitSkin;
-    private BufferedImage landscapeSkin;
-    private boolean roundedSkin;
-    private Rectangle safeAreaPortrait = null;
-    private Rectangle safeAreaLandscape = null;
-    private Map<java.awt.Point, Integer> portraitSkinHotspots;
-    private java.awt.Rectangle portraitScreenCoordinates;
-    private Map<java.awt.Point, Integer> landscapeSkinHotspots;
-    private java.awt.Rectangle landscapeScreenCoordinates;
+    private final DeviceSkin deviceSkin = new DeviceSkin();
     private static Class clsInstance;
-    private BufferedImage header;
-    private BufferedImage headerLandscape;
     private String platformName = "ios";
     private String[] platformOverrides = new String[0];
-    private static NetworkMonitor netMonitor;
     private ComponentTreeInspector componentTreeInspector;
-    private static PerformanceMonitor perfMonitor;
-    static LocationSimulation locSimulation;
-    static PushSimulator pushSimulation;
-    private static boolean blockMonitors;
     private static boolean useAppFrame = Boolean.getBoolean("cn1.simulator.useAppFrame");
     static {
         try {
@@ -865,9 +852,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private boolean includeHeaderInScreenshot = true;
     private boolean includeSkinInScreenshot = false;
-
-    private boolean slowConnectionMode;
-    private boolean disconnectedMode;
 
     private static boolean exposeFilesystem;
 
@@ -1400,22 +1384,33 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     
+    /**
+     * @deprecated use {@link SimulatorTools#blockMonitors()}
+     */
     public static void blockMonitors() {
-        blockMonitors = true;
+        SimulatorTools.blockMonitors();
     }
 
     public static void useAppFrame() {
         useAppFrame = true;
     }
 
+    private static NetworkMonitor netMonitor() {
+        return SimulatorTools.getNetworkMonitor();
+    }
+
+    private static PerformanceMonitor perfMonitor() {
+        return SimulatorTools.getPerformanceMonitor();
+    }
+
     static void disableNetworkMonitor() {
-        netMonitor = null;
+        SimulatorTools.setNetworkMonitor(null);
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         pref.putBoolean("NetworkMonitor", false);
     }
 
     static void disablePerformanceMonitor() {
-        perfMonitor = null;
+        SimulatorTools.setPerformanceMonitor(null);
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         pref.putBoolean("PerformanceMonitor", false);
     }
@@ -1452,25 +1447,69 @@ public class JavaSEPort extends CodenameOneImplementation {
         defaultInitTarget = o;
     }
 
-    private Map<java.awt.Point, Integer> getSkinHotspots() {
-        if (portrait) {
-            return portraitSkinHotspots;
+    /**
+     * @return the skin model used by the simulator chrome (device frame,
+     * hotspots, screen region, safe areas)
+     */
+    public DeviceSkin getDeviceSkin() {
+        return deviceSkin;
+    }
+
+    /**
+     * @return the Swing component displaying the running app's screen, or
+     * null before init. Exposed for the simulator backend SPI; the canvas
+     * inner class itself is not part of the public API.
+     */
+    public javax.swing.JComponent getCanvasComponent() {
+        return canvas;
+    }
+
+    /**
+     * Converts CN1 display coordinates to canvas component coordinates - the
+     * inverse of the canvas's pointer-event scaling. Used by the simulator
+     * backend SPI to inject synthetic input events.
+     *
+     * @param displayX horizontal position in display coordinates
+     * @param displayY vertical position in display coordinates
+     * @return the equivalent position on the canvas component
+     */
+    public java.awt.Point displayToCanvasCoordinate(int displayX, int displayY) {
+        if (canvas != null && getScreenCoordinates() != null) {
+            return new java.awt.Point(
+                    (int) ((displayX + getScreenCoordinates().x + canvas.x) * zoomLevel / retinaScale),
+                    (int) ((displayY + getScreenCoordinates().y + canvas.y) * zoomLevel / retinaScale));
         }
-        return landscapeSkinHotspots;
+        return new java.awt.Point((int) (displayX / retinaScale), (int) (displayY / retinaScale));
+    }
+
+    /**
+     * Converts canvas component coordinates to CN1 display coordinates,
+     * mirroring the canvas's pointer-event scaling. Used by the simulator
+     * backend SPI to observe input events.
+     *
+     * @param canvasX horizontal position on the canvas component
+     * @param canvasY vertical position on the canvas component
+     * @return the equivalent position in display coordinates
+     */
+    public java.awt.Point canvasToDisplayCoordinate(int canvasX, int canvasY) {
+        if (canvas != null && getScreenCoordinates() != null) {
+            return new java.awt.Point(
+                    (int) (retinaScale * canvasX / zoomLevel - (getScreenCoordinates().x + canvas.x)),
+                    (int) (retinaScale * canvasY / zoomLevel - (getScreenCoordinates().y + canvas.y)));
+        }
+        return new java.awt.Point((int) (canvasX * retinaScale), (int) (canvasY * retinaScale));
+    }
+
+    private Map<java.awt.Point, Integer> getSkinHotspots() {
+        return deviceSkin.getHotspots(portrait);
     }
 
     public java.awt.Rectangle getScreenCoordinates() {
-        if (portrait) {
-            return portraitScreenCoordinates;
-        }
-        return landscapeScreenCoordinates;
+        return deviceSkin.getScreenCoordinates(portrait);
     }
 
     private BufferedImage getSkin() {
-        if (portrait) {
-            return portraitSkin;
-        }
-        return landscapeSkin;
+        return deviceSkin.getSkin(portrait);
     }
 
     public static void setAutoAdjustFontSize(boolean autoAdjustFontSize_) {
@@ -1997,8 +2036,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 boolean desktopSkin = pref.getBoolean("desktopSkin", false);
                 if(desktopSkin) {
-                    safeAreaLandscape = null;
-                    safeAreaPortrait = null;
+                    deviceSkin.setSafeAreas(null, null);
                     h.remove("@paintsTitleBarBool");
                 }
                 injectDesktopThemeConstants(h);
@@ -2544,7 +2582,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     painted = true;
                 }
                 
-                if(roundedSkin) {
+                if(deviceSkin.isRoundedSkin()) {
                     Graphics2D bg = buffer.createGraphics();
                     BufferedImage skin = getSkin();
                     bg.drawImage(skin, -(int) ((getScreenCoordinates().getX()) * zoomLevel), -(int) ((getScreenCoordinates().getY()) * zoomLevel), 
@@ -3465,57 +3503,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         return System.getProperty("skin") != null || System.getProperty("dskin") != null;
     }
 
-    private void initializeCoordinates(BufferedImage map, Properties props, Map<Point, Integer> coordinates, java.awt.Rectangle screenPosition) {
-        int[] buffer = new int[map.getWidth() * map.getHeight()];
-        map.getRGB(0, 0, map.getWidth(), map.getHeight(), buffer, 0, map.getWidth());
-        int screenX1 = Integer.MAX_VALUE;
-        int screenY1 = Integer.MAX_VALUE;
-        int screenX2 = 0;
-        int screenY2 = 0;
-        for (int iter = 0; iter < buffer.length; iter++) {
-            int pixel = buffer[iter];
-            // white pixels are blank 
-            if (pixel != 0xffffffff) {
-                int x = iter % map.getWidth();
-                int y = iter / map.getWidth();
-
-                // black pixels represent the screen region
-                if (pixel == 0xff000000) {
-                    if (x < screenX1) {
-                        screenX1 = x;
-                    }
-                    if (y < screenY1) {
-                        screenY1 = y;
-                    }
-                    if (x > screenX2) {
-                        screenX2 = x;
-                    }
-                    if (y > screenY2) {
-                        screenY2 = y;
-                    }
-                } else {
-                    String prop = "c" + Integer.toHexString(0xffffff & pixel);
-                    String val = props.getProperty(prop);
-                    int code = 0;
-                    if (val == null) {
-                        val = props.getProperty("x" + Integer.toHexString(pixel));
-                        if (val == null) {
-                            continue;
-                        }
-                        code = Integer.parseInt(val, 16);
-                    } else {
-                        code = Integer.parseInt(val);
-                    }
-                    coordinates.put(new Point(x, y), code);
-                }
-            }
-        }
-        double scale = 1.0; // retinaScale
-        screenPosition.x = (int)(screenX1 / scale);
-        screenPosition.y = (int)(screenY1 / scale); 
-        screenPosition.width = (int)((screenX2 - screenX1 + 1)/scale);
-        screenPosition.height = (int)((screenY2 - screenY1 + 1)/scale);
-    }
 
     private static void readFully(InputStream i, byte b[]) throws IOException {
         readFully(i, b, 0, b.length);
@@ -3714,17 +3701,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             while (e != null) {
                 String name = e.getName();
                 if (name.equals("skin.png")) {
-                    portraitSkin = ImageIO.read(z);
+                    deviceSkin.setPortraitSkin(ImageIO.read(z));
                     e = z.getNextEntry();
                     continue;
                 }
                 if (name.equals("header.png")) {
-                    header = ImageIO.read(z);
+                    deviceSkin.setHeader(ImageIO.read(z));
                     e = z.getNextEntry();
                     continue;
                 }
                 if (name.equals("header_l.png")) {
-                    headerLandscape = ImageIO.read(z);
+                    deviceSkin.setHeaderLandscape(ImageIO.read(z));
                     e = z.getNextEntry();
                     continue;
                 }
@@ -3734,7 +3721,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     continue;
                 }
                 if (name.equals("skin_l.png")) {
-                    landscapeSkin = ImageIO.read(z);
+                    deviceSkin.setLandscapeSkin(ImageIO.read(z));
                     e = z.getNextEntry();
                     continue;
                 }
@@ -3807,11 +3794,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
 
-            portraitSkinHotspots = new HashMap<Point, Integer>();
-            portraitScreenCoordinates = new Rectangle();
+            Map<Point, Integer> portraitSkinHotspots = new HashMap<Point, Integer>();
+            Rectangle portraitScreenCoordinates = new Rectangle();
 
-            landscapeSkinHotspots = new HashMap<Point, Integer>();
-            landscapeScreenCoordinates = new Rectangle();
+            Map<Point, Integer> landscapeSkinHotspots = new HashMap<Point, Integer>();
+            Rectangle landscapeScreenCoordinates = new Rectangle();
+            Rectangle safeAreaPortrait = null;
+            Rectangle safeAreaLandscape = null;
             boolean roundScreen = props.getProperty("roundScreen", "false").equalsIgnoreCase("true");
             boolean hasSafeAreaProps =
                     props.getProperty("safePortraitX") != null ||
@@ -3847,10 +3836,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Integer.parseInt(props.getProperty("safeLandscapeWidth", ""+landscapeScreenCoordinates.width)),
                         Integer.parseInt(props.getProperty("safeLandscapeHeight", ""+landscapeScreenCoordinates.height))
                 );
-                roundedSkin = true;
+                deviceSkin.setRoundedSkin(true);
             } else {
-                initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
-                initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+                DeviceSkin.parseSkinMap(map, props, portraitSkinHotspots, portraitScreenCoordinates);
+                DeviceSkin.parseSkinMap(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
                 if (hasSafeAreaProps) {
                     safeAreaPortrait = new Rectangle();
                     safeAreaLandscape = new Rectangle();
@@ -3868,7 +3857,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     );
                 }
             }
-
+            deviceSkin.setHotspots(portraitSkinHotspots, landscapeSkinHotspots);
+            deviceSkin.setScreenCoordinates(portraitScreenCoordinates, landscapeScreenCoordinates);
+            deviceSkin.setSafeAreas(safeAreaPortrait, safeAreaLandscape);
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -4021,17 +4012,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public com.codename1.ui.geom.Rectangle getDisplaySafeArea(com.codename1.ui.geom.Rectangle rect) {
-        if (!isSimulator() || safeAreaPortrait == null || safeAreaLandscape == null) {
+        if (!isSimulator() || deviceSkin.getSafeArea(true) == null || deviceSkin.getSafeArea(false) == null) {
             return super.getDisplaySafeArea(rect);
         }
         if (rect == null) {
             rect = new com.codename1.ui.geom.Rectangle();
         }
-        if (portrait) {
-            rect.setBounds((int)safeAreaPortrait.getX(), (int)safeAreaPortrait.getY(), (int)safeAreaPortrait.getWidth(), (int)safeAreaPortrait.getHeight());
-        } else {
-            rect.setBounds((int)safeAreaLandscape.getX(), (int)safeAreaLandscape.getY(), (int)safeAreaLandscape.getWidth(), (int)safeAreaLandscape.getHeight());
-        }
+        Rectangle safeArea = deviceSkin.getSafeArea(portrait);
+        rect.setBounds((int)safeArea.getX(), (int)safeArea.getY(), (int)safeArea.getWidth(), (int)safeArea.getHeight());
         return rect;
     }
     
@@ -4509,9 +4497,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             final Form frm = Display.getInstance().getCurrent();
             BufferedImage headerImageTmp;
             if (isPortrait()) {
-                headerImageTmp = header;
+                headerImageTmp = deviceSkin.getHeader();
             } else {
-                headerImageTmp = headerLandscape;
+                headerImageTmp = deviceSkin.getHeaderLandscape();
             }
             if (!includeHeaderInScreenshot) {
                 headerImageTmp = null;
@@ -4585,9 +4573,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             final Form frm = Display.getInstance().getCurrent();
             BufferedImage headerImageTmp;
             if (isPortrait()) {
-                headerImageTmp = header;
+                headerImageTmp = deviceSkin.getHeader();
             } else {
-                headerImageTmp = headerLandscape;
+                headerImageTmp = deviceSkin.getHeaderLandscape();
             }
             if (!includeHeaderInScreenshot) {
                 headerImageTmp = null;
@@ -4999,9 +4987,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 final Form frm = Display.getInstance().getCurrent();
                 BufferedImage headerImageTmp;
                 if (isPortrait()) {
-                    headerImageTmp = header;
+                    headerImageTmp = deviceSkin.getHeader();
                 } else {
-                    headerImageTmp = headerLandscape;
+                    headerImageTmp = deviceSkin.getHeaderLandscape();
                 }
                 if (!includeHeaderInScreenshot) {
                     headerImageTmp = null;
@@ -5071,9 +5059,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 final Form frm = Display.getInstance().getCurrent();
                 BufferedImage headerImageTmp;
                 if (isPortrait()) {
-                    headerImageTmp = header;
+                    headerImageTmp = deviceSkin.getHeader();
                 } else {
-                    headerImageTmp = headerLandscape;
+                    headerImageTmp = deviceSkin.getHeaderLandscape();
                 }
                 if (!includeHeaderInScreenshot) {
                     headerImageTmp = null;
@@ -5159,7 +5147,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public void actionPerformed(ActionEvent ae) {
-                if (netMonitor == null) {
+                if (netMonitor() == null) {
                     showNetworkMonitor();
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     pref.putBoolean("NetworkMonitor", true);
@@ -5295,14 +5283,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         proxy.dispose();
 
-                        if (netMonitor != null) {
-                            netMonitor.dispose();
-                            netMonitor = null;
-                        }
-                        if (perfMonitor != null) {
-                            perfMonitor.dispose();
-                            perfMonitor = null;
-                        }
+                        SimulatorTools.disposeNetworkMonitor();
+                        SimulatorTools.disposePerformanceMonitor();
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -5337,8 +5319,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         regularConnection.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                slowConnectionMode = false;
-                disconnectedMode = false;
+                SimulatorTools.setSlowConnectionMode(false);
+                SimulatorTools.setDisconnectedMode(false);
                 pref.putInt("connectionStatus", 0);
             }
         });
@@ -5348,8 +5330,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         slowConnection.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                slowConnectionMode = true;
-                disconnectedMode = false;
+                SimulatorTools.setSlowConnectionMode(true);
+                SimulatorTools.setDisconnectedMode(false);
                 pref.putInt("connectionStatus", 1);
             }
         });
@@ -5359,8 +5341,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         disconnected.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                slowConnectionMode = false;
-                disconnectedMode = true;
+                SimulatorTools.setSlowConnectionMode(false);
+                SimulatorTools.setDisconnectedMode(true);
                 pref.putInt("connectionStatus", 2);
             }
         });
@@ -5377,11 +5359,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 break;
             case 1:
                 slowConnection.setSelected(true);
-                slowConnectionMode = true;
+                SimulatorTools.setSlowConnectionMode(true);
                 break;
             case 2:
                 disconnected.setSelected(true);
-                disconnectedMode = true;
+                SimulatorTools.setDisconnectedMode(true);
                 break;
         }
 
@@ -5556,10 +5538,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         locationSim.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                if(locSimulation==null) {
-                        locSimulation = new LocationSimulation();
-                }
-                locSimulation.setVisible(true);
+                SimulatorTools.getOrCreateLocationSimulation().setVisible(true);
             }
         });
         simulateMenu.add(locationSim);
@@ -5568,11 +5547,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         pushSim.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                if(pushSimulation == null) {
-                        pushSimulation = new PushSimulator();
-                }
                 pref.putBoolean("PushSimulator", true);
-                pushSimulation.setVisible(true);
+                SimulatorTools.getOrCreatePushSimulator().setVisible(true);
             }
         });
         simulateMenu.add(pushSim);
@@ -5879,7 +5855,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             @Override
             public void actionPerformed(ActionEvent ae) {
-                if (perfMonitor == null) {
+                if (perfMonitor() == null) {
                     showPerformanceMonitor();
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     pref.putBoolean("PerformanceMonitor", true);
@@ -6311,14 +6287,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 picker.setVisible(true);
                 String file = picker.getFile();
                 if (file != null) {
-                    if (netMonitor != null) {
-                        netMonitor.dispose();
-                        netMonitor = null;
-                    }
-                    if (perfMonitor != null) {
-                        perfMonitor.dispose();
-                        perfMonitor = null;
-                    }
+                    SimulatorTools.disposeNetworkMonitor();
+                    SimulatorTools.disposePerformanceMonitor();
                     String path = picker.getDirectory() + File.separator + file;
                     File picked = new File(path);
                     if (picked.exists()) {
@@ -6506,14 +6476,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 !desktopSkinActive && skinPath.equals(currentSkin));
         item.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ae) {
-                if (netMonitor != null) {
-                    netMonitor.dispose();
-                    netMonitor = null;
-                }
-                if (perfMonitor != null) {
-                    perfMonitor.dispose();
-                    perfMonitor = null;
-                }
+                SimulatorTools.disposeNetworkMonitor();
+                SimulatorTools.disposePerformanceMonitor();
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 pref.putBoolean("desktopSkin", false);
                 String mainClass = System.getProperty("MainClass");
@@ -6531,14 +6495,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void switchDesktopSkin(JFrame frm, boolean uwp) {
-        if (netMonitor != null) {
-            netMonitor.dispose();
-            netMonitor = null;
-        }
-        if (perfMonitor != null) {
-            perfMonitor.dispose();
-            perfMonitor = null;
-        }
+        SimulatorTools.disposeNetworkMonitor();
+        SimulatorTools.disposePerformanceMonitor();
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         pref.putBoolean("desktopSkin", true);
         pref.putBoolean("uwpDesktopSkin", uwp);
@@ -6822,14 +6780,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 }                                
                             }
                         }
-                        if (netMonitor != null) {
-                            netMonitor.dispose();
-                            netMonitor = null;
-                        }
-                        if (perfMonitor != null) {
-                            perfMonitor.dispose();
-                            perfMonitor = null;
-                        }
+                        SimulatorTools.disposeNetworkMonitor();
+                        SimulatorTools.disposePerformanceMonitor();
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
                             pref.put("skin", DEFAULT_SKIN);
@@ -6887,17 +6839,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
     private void showNetworkMonitor() {
-        if (netMonitor == null) {
-            netMonitor = new NetworkMonitor();
+        if (netMonitor() == null) {
+            SimulatorTools.setNetworkMonitor(new NetworkMonitor());
             if (appFrame == null) {
 
-                netMonitor.showInNewWindow();
+                netMonitor().showInNewWindow();
 
             } else {
                 AppPanel existing = appFrame.getAppPanelById("NetworkMonitor");
                 if (existing == null) {
-                    netMonitor = new NetworkMonitor();
-                    existing = new AppPanel("NetworkMonitor", "Network Monitor", netMonitor);
+                    SimulatorTools.setNetworkMonitor(new NetworkMonitor());
+                    existing = new AppPanel("NetworkMonitor", "Network Monitor", netMonitor());
                     existing.setPreferredFrame(AppFrame.FrameLocation.BottomPanel);
                     existing.setScrollable(false, true);
                     appFrame.add(existing);
@@ -6921,11 +6873,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void showPerformanceMonitor() {
-        if (perfMonitor == null) {
-            perfMonitor = new PerformanceMonitor();
-            perfMonitor.pack();
-            perfMonitor.setLocationByPlatform(true);
-            perfMonitor.setVisible(true);
+        if (perfMonitor() == null) {
+            SimulatorTools.setPerformanceMonitor(new PerformanceMonitor());
+            perfMonitor().pack();
+            perfMonitor().setLocationByPlatform(true);
+            perfMonitor().setVisible(true);
         }
     }
 
@@ -7634,10 +7586,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }, 250);
 
         Display.deinitialize();
-        if (netMonitor != null) {
-            netMonitor.dispose();
-            netMonitor = null;
-        }
+        SimulatorTools.disposeNetworkMonitor();
         NetworkManager.getInstance().shutdownSync();
         try {
 
@@ -7746,8 +7695,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
-            safeAreaLandscape = null;
-            safeAreaPortrait = null;
+            deviceSkin.setSafeAreas(null, null);
             Toolkit tk = Toolkit.getDefaultToolkit();
             setDefaultPixelMilliRatio(tk.getScreenResolution() / 25.4 * getRetinaScale());
             pixelMilliRatio = getDefaultPixelMilliRatio();
@@ -7815,7 +7763,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         };
         delayedTasksTimer.schedule(delayedTimerTask, 1000L);
 
-        if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
+        if (!SimulatorTools.isMonitorsBlocked() && pref.getBoolean("NetworkMonitor", false)) {
 
             delayedTasks.add(new Runnable() {
                 public void run() {
@@ -7875,11 +7823,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
         }
-        if (!blockMonitors && pref.getBoolean("PushSimulator", false)) {
-            pushSimulation = new PushSimulator();
-            pushSimulation.setVisible(true);
+        if (!SimulatorTools.isMonitorsBlocked() && pref.getBoolean("PushSimulator", false)) {
+            SimulatorTools.getOrCreatePushSimulator().setVisible(true);
         }
-        if (!blockMonitors && pref.getBoolean("PerformanceMonitor", false)) {
+        if (!SimulatorTools.isMonitorsBlocked() && pref.getBoolean("PerformanceMonitor", false)) {
             showPerformanceMonitor();
         }
         if (defaultInitTarget != null && m == null) {
@@ -9234,21 +9181,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private BufferedImage createTrackableBufferedImage(final int width, final int height, int type) {
-        if (perfMonitor != null) {
-            BufferedImage i = new BufferedImage(width, height, type) {
-
-                public void finalize() throws Throwable {
-                    super.finalize();
-                    if (perfMonitor != null) {
-                        perfMonitor.removeImageRAM(width * height * 4);
-                    }
-                }
-            };
-            perfMonitor.addImageRAM(width * height * 4);
-            return i;
-        } else {
-            return new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        }
+        return new BufferedImage(width, height, type);
     }
 
     /**
@@ -9257,30 +9190,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object createImage(int[] rgb, final int width, final int height) {
         BufferedImage i = createTrackableBufferedImage(width, height);
         i.setRGB(0, 0, width, height, rgb, 0, width);
-        if (perfMonitor != null) {
-            perfMonitor.printToLog("Created RGB image width: " + width + " height: " + height
-                    + " size (bytes) " + (width * height * 4));
-        }
         return i;
-    }
-
-    private BufferedImage cloneTrackableBufferedImage(BufferedImage b) {
-        final int width = b.getWidth();
-        final int height = b.getHeight();
-        BufferedImage n = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB) {
-
-            public void finalize() throws Throwable {
-                super.finalize();
-                if (perfMonitor != null) {
-                    perfMonitor.removeImageRAM(width * height * 4);
-                }
-            }
-        };
-        Graphics2D g2d = n.createGraphics();
-        g2d.drawImage(b, 0, 0, canvas);
-        g2d.dispose();
-        perfMonitor.addImageRAM(width * height * 4);
-        return n;
     }
 
     /**
@@ -9303,11 +9213,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             // prevents a security exception due to a JDK bug which for some stupid reason chooses
             // to create a temporary file in the spi of Image IO
             BufferedImage b = ImageIO.read(new MemoryCacheImageInputStream(i));
-            if (perfMonitor != null) {
-                b = cloneTrackableBufferedImage(b);
-                perfMonitor.printToLog("Created path image " + path + " width: " + b.getWidth() + " height: " + b.getHeight()
-                        + " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
-            }
             return b;
         } catch (Throwable t) {
             t.printStackTrace();
@@ -9321,11 +9226,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object createImage(InputStream i) throws IOException {
         try {
             BufferedImage b = ImageIO.read(i);
-            if (perfMonitor != null) {
-                b = cloneTrackableBufferedImage(b);
-                perfMonitor.printToLog("Created InputStream image width: " + b.getWidth() + " height: " + b.getHeight()
-                        + " size (bytes) " + (b.getWidth() * b.getHeight() * 4));
-            }
             return b;
         } catch (Throwable t) {
             t.printStackTrace();
@@ -9338,10 +9238,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public Object createMutableImage(int width, int height, int fillColor) {
         checkEDT();
-        if (perfMonitor != null) {
-            perfMonitor.printToLog("Created mutable image width: " + width + " height: " + height
-                    + " size (bytes) " + (width * height * 4));
-        }
         int a = (fillColor >> 24) & 0xff;
         if (a == 0xff) {
             BufferedImage b = createTrackableBufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -9375,12 +9271,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object createImage(byte[] bytes, int offset, int len) {
         try {
             BufferedImage b = ImageIO.read(new ByteArrayInputStream(bytes, offset, len));
-            if (perfMonitor != null) {
-                b = cloneTrackableBufferedImage(b);
-                perfMonitor.printToLog("Created data image width: " + b.getWidth() + " height: " + b.getHeight()
-                        + " data size (bytes) " + bytes.length
-                        + " unpacked size (bytes) " + (b.getWidth() * b.getHeight() * 4));
-            }
             return b;
         } catch (IOException ex) {
             // never happens
@@ -9427,12 +9317,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         BufferedImage image = (BufferedImage) nativeImage;
         int srcWidth = image.getWidth();
         int srcHeight = image.getHeight();
-
-        if (perfMonitor != null) {
-            perfMonitor.printToLog("Scaling image from width: " + srcWidth + " height: " + srcHeight
-                    + " to width: " + width + " height: " + height
-                    + " size (bytes) " + (width * height * 4));
-        }
 
         // no need to scale
         if (srcWidth == width && srcHeight == height) {
@@ -9687,9 +9571,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.setClip(x, y, width, height);        
-        if (perfMonitor != null) {
-            perfMonitor.setClip(x, y, width, height);
-        }
     }
 
     /**
@@ -9716,9 +9597,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.clipRect(x, y, width, height);
-        if (perfMonitor != null) {
-            perfMonitor.clipRect(x, y, width, height);
-        }
     }
 
     
@@ -9801,9 +9679,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawLine(x1, y1, x2, y2);
-        if (perfMonitor != null) {
-            perfMonitor.drawLine(x1, y1, x2, y2);
-        }
     }
     
     public boolean drawingNativePeer;
@@ -9903,9 +9778,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillRect(x, y, w, h);
-        if (perfMonitor != null) {
-            perfMonitor.fillRect(x, y, w, h);
-        }
     }
 
     @Override
@@ -9915,9 +9787,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         Composite c = nativeGraphics.getComposite();
         nativeGraphics.setComposite(AlphaComposite.Clear);
         nativeGraphics.fillRect(x, y, width, height);
-        if (perfMonitor != null) {
-            perfMonitor.clearRect(x, y, width, height);
-        }
         nativeGraphics.setComposite(c);
     }
     
@@ -9938,9 +9807,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawRect(x, y, width, height);
-        if (perfMonitor != null) {
-            perfMonitor.drawRect(x, y, width, height);
-        }
     }
 
     /**
@@ -9950,9 +9816,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
-        if (perfMonitor != null) {
-            perfMonitor.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
-        }
     }
 
     /**
@@ -9962,9 +9825,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
-        if (perfMonitor != null) {
-            perfMonitor.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
-        }
     }
 
     /**
@@ -9974,9 +9834,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillArc(x, y, width, height, startAngle, arcAngle);
-        if (perfMonitor != null) {
-            perfMonitor.fillArc(x, y, width, height, startAngle, arcAngle);
-        }
     }
 
     @Override
@@ -10093,9 +9950,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawArc(x, y, width, height, startAngle, arcAngle);
-        if (perfMonitor != null) {
-            perfMonitor.drawArc(x, y, width, height, startAngle, arcAngle);
-        }
     }
 
     /**
@@ -10105,9 +9959,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.setColor(new Color(RGB));
-        if (perfMonitor != null) {
-            perfMonitor.setColor(RGB);
-        }
     }
 
     /**
@@ -10130,9 +9981,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D nativeGraphics = getGraphics(graphics);
         float a = ((float) alpha) / 255.0f;
         nativeGraphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a));
-        if (perfMonitor != null) {
-            perfMonitor.setAlpha(alpha);
-        }
     }
 
     /**
@@ -10277,16 +10125,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (origFont != fnt) {
             nativeGraphics.setFont(origFont);
         }
-        if (perfMonitor != null) {
-            perfMonitor.drawString(str, x, y);
-        }
-    }
-
-    @Override
-    public void drawingEncodedImage(EncodedImage img) {
-        if (perfMonitor != null && !img.isLocked()) {
-            perfMonitor.printToLog("Drawing unlocked image: " + img.getImageName());
-        }
     }
 
     /**
@@ -10296,9 +10134,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawImage((BufferedImage) img, x, y, null);
-        if (perfMonitor != null) {
-            perfMonitor.drawImage(img, x, y);
-        }
     }
 
     /**
@@ -10308,9 +10143,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.drawImage((BufferedImage) img, x, y, w, h, null);
-        if (perfMonitor != null) {
-            perfMonitor.drawImage(img, x, y, w, h);
-        }
     }
 
     /**
@@ -10320,9 +10152,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         nativeGraphics.fillPolygon(new int[]{x1, x2, x3}, new int[]{y1, y2, y3}, 3);
-        if (perfMonitor != null) {
-            perfMonitor.fillTriangle(x1, y1, x2, y2, x3, y3);
-        }
     }
     private BufferedImage cache;
 
@@ -10337,9 +10166,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         cache.setRGB(0, 0, w, h, rgbData, offset, w);
         nativeGraphics.drawImage(cache, x, y, null);
-        if (perfMonitor != null) {
-            perfMonitor.drawRGB(rgbData, offset, x, y, w, h, processAlpha);
-        }
     }
 
     NativeScreenGraphics ng;
@@ -10536,9 +10362,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int stringWidth(final Object nativeFont, final String str) {
-        if (perfMonitor != null) {
-            perfMonitor.stringWidth(nativeFont, str);
-        }
         checkEDT();
         if(str == null) {
             return 0;
@@ -10553,9 +10376,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int charWidth(Object nativeFont, char ch) {
-        if (perfMonitor != null) {
-            perfMonitor.charWidth(nativeFont, ch);
-        }
         checkEDT();
         String strch = ""+ch;
         java.awt.Font fnt = fallback(font(nativeFont), strch);
@@ -12449,7 +12269,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isDesktop() {
-        return portraitSkin == null;
+        return deviceSkin.getPortraitSkin() == null;
     }
     
     public static void setTablet(boolean b) {
@@ -12538,9 +12358,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
-        if(disconnectedMode && url.toLowerCase().startsWith("http")) {
-            throw new IOException("Unreachable");
-        }
         if(url.toLowerCase().startsWith("http:"))  {
             if(!warnAboutHttpChecked) {
                 warnAboutHttpChecked = true;
@@ -12573,14 +12390,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         con.setDoInput(read);
         con.setDoOutput(write);
-        if (netMonitor != null) {
-            NetworkRequestObject nr = new NetworkRequestObject();
-            if (nr != null) {
-                nr.setUrl(url);
-                nr.setTimeSent(System.currentTimeMillis());
-            }
-            netMonitor.addRequest(con, nr);
-        }
         return con;
     }
 
@@ -12600,16 +12409,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     @Override
-    public void addConnectionToQueue(ConnectionRequest req) {
-        super.addConnectionToQueue(req);
-        if (netMonitor != null) {
-            NetworkRequestObject o = new NetworkRequestObject();
-            o.setTimeQueued(System.currentTimeMillis());
-            netMonitor.addQueuedRequest(req, o);
-        }
-    }
-
-    @Override
     public void setInsecure(Object connection, boolean insecure) {
         if (insecure) {
             if (connection instanceof HttpsURLConnection) {
@@ -12627,25 +12426,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     
-    @Override
-    public void setConnectionId(Object connection, int id) {
-        super.setConnectionId(connection, id); 
-        if (netMonitor != null && connection instanceof URLConnection) {
-            NetworkRequestObject queuedRequest = netMonitor.findQueuedRequest(id);
-            if (queuedRequest != null) {
-                NetworkRequestObject existingRequest = netMonitor.getByConnection((URLConnection)connection);
-                if (existingRequest != null) {
-                    existingRequest.setTimeQueued(queuedRequest.getTimeQueued());
-                } else {
-                    netMonitor.addRequest((URLConnection)connection, queuedRequest);
-                }
-                netMonitor.removeQueuedRequest(queuedRequest);
-            }
-        }
-    }
-    
-    
-   
     /**
      * @inheritDoc
      */
@@ -12724,37 +12504,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             con.setRequestProperty(key, val);
         }
-        updateRequestHeaders(con);
     }
-    
+
     /**
      * @inheritDoc
      */
-    public void setChunkedStreamingMode(Object connection, int bufferLen){    
+    public void setChunkedStreamingMode(Object connection, int bufferLen){
         HttpURLConnection con = ((HttpURLConnection) connection);
         con.setChunkedStreamingMode(bufferLen);
-    }
-    
-
-    private void updateRequestHeaders(HttpURLConnection con) {
-        if (netMonitor != null) {
-            NetworkRequestObject nr = netMonitor.getByConnection(con);
-            if (nr != null) {
-                String requestHeaders = "";
-                Map<String, List<String>> props = con.getRequestProperties();
-                for (String header : props.keySet()) {
-                    requestHeaders += header + "=" + props.get(header) + "\n";
-                }
-                nr.setHeaders(requestHeaders);
-            }
-        }
-    }
-    
-    private NetworkRequestObject getByConnection(URLConnection con) {
-        if(netMonitor != null) {
-            return netMonitor.getByConnection((URLConnection) con);
-        }
-        return null;
     }
 
     /**
@@ -12765,36 +12522,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             FileOutputStream fc = new FileOutputStream(unfile((String) connection));
             BufferedOutputStream o = new BufferedOutputStream(fc, (String) connection);
             return o;
-        }
-        if (netMonitor != null || slowConnectionMode || disconnectedMode) {
-            final NetworkRequestObject nr = getByConnection((URLConnection) connection);
-            if (nr != null || slowConnectionMode || disconnectedMode) {
-                if(disconnectedMode) {
-                    throw new IOException("Unreachable");
-                }
-                if(nr != null) {
-                    nr.setRequestBody("");
-                }
-                HttpURLConnection con = (HttpURLConnection) connection;
-                OutputStream o = new BufferedOutputStream(con.getOutputStream()) {
-
-                    public void write(byte b[], int off, int len) throws IOException {
-                        super.write(b, off, len);
-                        if(nr != null) {
-                            nr.setRequestBody(nr.getRequestBody() + new String(b, off, len));
-                        }
-                        if(slowConnectionMode) {
-                            try {
-                                Thread.sleep(250);
-                            } catch(Exception e) {}
-                        }
-                        if(disconnectedMode) {
-                            throw new IOException("Unreachable");
-                        }
-                    }
-                };
-                return o;
-            }
         }
         return new BufferedOutputStream(((URLConnection) connection).getOutputStream());
     }
@@ -12820,78 +12547,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedInputStream o = new BufferedInputStream(fc, (String) connection);
             return o;
         }
-        if (netMonitor != null || slowConnectionMode || disconnectedMode) {
-            final NetworkRequestObject nr = getByConnection((URLConnection) connection);
-            if (nr != null || slowConnectionMode || disconnectedMode) {
-                if(slowConnectionMode) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch(Exception e) {}
-                }
-                if (nr != null) {
-                    nr.setTimeServerResponse(System.currentTimeMillis());
-                }
-                if(disconnectedMode) {
-                    throw new IOException("Unreachable");
-                }
-                HttpURLConnection con = (HttpURLConnection) connection;
-                String headers = "";
-                Map<String, List<String>> map = con.getHeaderFields();
-                for (String header : map.keySet()) {
-                    headers += header + "=" + map.get(header) + "\n";
-                }
-                if(nr != null) {
-                    nr.setResponseHeaders(headers);
-                    nr.setResponseBody("");
-                }
-                InputStream is;
-                if(con.getResponseCode() >= 200 && con.getResponseCode() < 300){
-                    is = con.getInputStream();
-                }else{
-                    is = con.getErrorStream();
-                }
-                boolean isText = false;
-                String contentType = con.getContentType();
-                if (contentType != null) {
-                    if (contentType.startsWith("text/") || contentType.contains("json") || contentType.contains("css") || contentType.contains("javascript")) {
-                        isText = true;
-                    }
-                }
-                final boolean fIsText = isText;
-                InputStream i = new BufferedInputStream(is) {
-
-                    public synchronized int read(byte b[], int off, int len)
-                            throws IOException {
-                        int s = super.read(b, off, len);
-                        if(nr != null) {
-                            if (fIsText && s > -1) {
-                                nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
-                            }
-                        }
-                        if(slowConnectionMode) {
-                            try {
-                                Thread.sleep(len);
-                            } catch(Exception e) {}
-                        }
-                        if(disconnectedMode) {
-                            throw new IOException("Unreachable");
-                        }
-                        return s;
-                    }
-
-                    @Override
-                    public void close() throws IOException {
-                        super.close();
-                        if (nr != null) {
-                            nr.setTimeComplete(System.currentTimeMillis());
-                        }
-                    }
-                    
-                    
-                };
-                return i;
-            }
-        }
         if(connection instanceof HttpURLConnection) {
             HttpURLConnection ht = (HttpURLConnection)connection;
             if(ht.getResponseCode() < 400) {
@@ -12907,12 +12562,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setHttpMethod(Object connection, String method) throws IOException {
-        if (netMonitor != null) {
-            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
-            if (nr != null) {
-                nr.setMethod(method.toUpperCase());
-            }
-        }
         if(method.equalsIgnoreCase("patch")) {
             allowPatch((HttpURLConnection) connection);
         }
@@ -12967,13 +12616,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 mtd = "POST";
             }
             ((HttpURLConnection) connection).setRequestMethod(mtd);
-
-            if (netMonitor != null) {
-                NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
-                if (nr != null) {
-                    nr.setMethod(mtd);
-                }
-            }
         } catch (IOException err) {
             // an exception here doesn't make sense
             err.printStackTrace();
@@ -12984,24 +12626,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getResponseCode(Object connection) throws IOException {
-        int code = ((HttpURLConnection) connection).getResponseCode();
-        if (netMonitor != null || slowConnectionMode || disconnectedMode) {
-            if(slowConnectionMode) {
-                try {
-                    Thread.sleep(250);
-                } catch(Exception e) {}
-            }
-            if(disconnectedMode) {
-                throw new IOException("Unreachable");
-            }
-            if(netMonitor != null) {
-                NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
-                if (nr != null) {
-                    nr.setResponseCode("" + code);
-                }
-            }
-        }
-        return code;
+        return ((HttpURLConnection) connection).getResponseCode();
     }
 
     /**
@@ -13015,14 +12640,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public int getContentLength(Object connection) {
-        int contentLength = ((HttpURLConnection) connection).getContentLength();
-        if (netMonitor != null) {
-            NetworkRequestObject nr = netMonitor.getByConnection((URLConnection) connection);
-            if (nr != null) {
-                nr.setContentLength("" + contentLength);
-            }
-        }
-        return contentLength;
+        return ((HttpURLConnection) connection).getContentLength();
     }
 
     /**
@@ -13428,7 +13046,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return null;
         }
         // the location simulation should ONLY apply to the simulator and not to JavaSE port, designer etc.
-        if(portraitSkin != null) {
+        if(deviceSkin.getPortraitSkin() != null) {
             return StubLocationManager.getLocationManager();
         }
         return new LocationManager() {
@@ -14140,27 +13758,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.getResourceAsStream(cls, resource);
     }
 
-    @Override
-    public void beforeComponentPaint(Component c, Graphics g) {
-        if (perfMonitor != null) {
-            perfMonitor.beforeComponentPaint(c);
-        }
-    }
-
-    @Override
-    public void afterComponentPaint(Component c, Graphics g) {
-        if (perfMonitor != null) {
-            perfMonitor.afterComponentPaint(c);
-        }
-    }
-    
-    @Override
-    public void nothingWithinComponentPaint(Component c) {
-        if (perfMonitor != null) {
-            perfMonitor.nothingWithinComponentPaint(c);
-        }
-    }
-    
     private L10NManager l10n;
 
     /**
@@ -14638,7 +14235,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         super.registerPush(meta, noFallback);
         
-        if(pushSimulation != null && pushSimulation.isVisible()) {
+        if(SimulatorTools.getPushSimulator() != null && SimulatorTools.getPushSimulator().isVisible()) {
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {

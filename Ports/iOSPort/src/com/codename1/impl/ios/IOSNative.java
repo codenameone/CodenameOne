@@ -72,6 +72,30 @@ public final class IOSNative {
     native long scale(long peer, int width, int height);
     native void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip);
     native void setNativeClippingGlobal(int x, int y, int width, int height, boolean firstClip);
+    // desktop simulator only: confines ALL subsequent draws (including ops
+    // that "open" the scissor) to the given window region; each simulator
+    // universe sets its bounds at the start of its flush. No-op on devices.
+    native void setUniverseClipGlobal(int x, int y, int width, int height);
+    // desktop simulator only: one-shot path fill/stroke (GeneralPath
+    // commands + coords, window-translated) rasterized natively. stroke=false
+    // fills; stroke=true strokes with the given pen. No-op on devices.
+    native void nativeShapeGlobalSim(byte[] commands, int commandsLen,
+            float[] points, int pointsLen, int color, int alpha, boolean stroke,
+            float lineWidth, int capStyle, int joinStyle, float miterLimit,
+            int translateX, int translateY);
+    // desktop simulator only: CoreGraphics-backed mutable images (form
+    // transition buffers, Image.createImage(w,h)). No-ops on devices, which
+    // use the Metal mutable-texture pipeline instead.
+    native long createMutableImageSim(int w, int h, int argb);
+    native void mutableClipSim(long peer, int x, int y, int w, int h);
+    native void mutableFillRectSim(long peer, int color, int alpha, int x, int y, int w, int h);
+    native void mutableDrawLineSim(long peer, int color, int alpha, int x1, int y1, int x2, int y2);
+    native void mutableDrawStringSim(long peer, long fontPeer, int color, int alpha, String str, int x, int y);
+    native void mutableDrawImageSim(long peer, long imgPeer, int alpha, int x, int y, int w, int h);
+    native void mutableShapeSim(long peer, byte[] commands, int commandsLen, float[] points,
+            int pointsLen, int color, int alpha, boolean stroke, float lineWidth,
+            int capStyle, int joinStyle, float miterLimit);
+    native void mutableFinishSim(long peer);
     native void setAntiAliasedMutable(boolean antialiased) ;
 
     native void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2);

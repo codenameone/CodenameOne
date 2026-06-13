@@ -142,6 +142,21 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
     if (_states[pipeline] != nil) return _states[pipeline];
 
     id<MTLLibrary> library = [_device newDefaultLibrary];
+#ifdef CN1_SIM_DESKTOP
+    // Desktop simulator: the dylib lives in a JVM process whose main bundle
+    // has no default.metallib; load the library compiled by the simulator
+    // build from the path published in the environment instead.
+    if (library == nil) {
+        const char *libPath = getenv("CN1_SIM_METALLIB");
+        if (libPath != NULL) {
+            NSError *libErr = nil;
+            library = [_device newLibraryWithFile:[NSString stringWithUTF8String:libPath] error:&libErr];
+            if (library == nil) {
+                NSLog(@"CN1MetalPipelineCache: failed to load CN1_SIM_METALLIB %s: %@", libPath, libErr);
+            }
+        }
+    }
+#endif
     if (library == nil) {
         NSLog(@"CN1MetalPipelineCache: device has no default.metallib — is CN1MetalShaders.metal in the Xcode project?");
         return nil;

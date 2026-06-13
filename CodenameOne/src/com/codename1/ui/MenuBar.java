@@ -242,8 +242,12 @@ public class MenuBar extends Container implements ActionListener {
     public int getCommandBehavior() {
         int i = Display.getInstance().getCommandBehavior();
         if (Display.getInstance().getImplementation().getSoftkeyCount() == 0) {
+            // native commands render in the platform menu bar (desktop
+            // simulators, Mac Catalyst) - never force the in-form button bar
+            // for them; a native-menu platform has no soft keys by definition
             if (i != Display.COMMAND_BEHAVIOR_BUTTON_BAR && i != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
-                    && i != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT && i != Display.COMMAND_BEHAVIOR_ICS) {
+                    && i != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT && i != Display.COMMAND_BEHAVIOR_ICS
+                    && i != Display.COMMAND_BEHAVIOR_NATIVE) {
                 return Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK;
             }
             return i;
@@ -489,7 +493,12 @@ public class MenuBar extends Container implements ActionListener {
     private void updateCommands() {
         int commandBehavior = getCommandBehavior();
         if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
-            Display.getInstance().getImplementation().setNativeCommands(commands);
+            // dialog commands are rendered as in-dialog buttons - replacing
+            // the native desktop menu with them would wipe the underlying
+            // form's menu for good (nothing re-pushes it on dispose)
+            if (!(parent instanceof Dialog)) {
+                Display.getInstance().getImplementation().setNativeCommands(commands);
+            }
             return;
         }
         if (commandBehavior >= Display.COMMAND_BEHAVIOR_BUTTON_BAR) {

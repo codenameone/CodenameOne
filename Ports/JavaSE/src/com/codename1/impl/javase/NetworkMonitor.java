@@ -29,9 +29,9 @@ import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.net.URLConnection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -44,7 +44,11 @@ import javax.swing.event.ListSelectionListener;
  */
 public class NetworkMonitor extends javax.swing.JPanel implements Scrollable {
 
-    private Map<URLConnection, NetworkRequestObject> requests = new HashMap<URLConnection, NetworkRequestObject>();
+    // Keyed by the opaque connection object returned by
+    // CodenameOneImplementation.connect - a URLConnection for the Swing port,
+    // an arbitrary handle for native backends. Identity keying matches how the
+    // implementation hands the same object back on each call.
+    private Map<Object, NetworkRequestObject> requests = new IdentityHashMap<Object, NetworkRequestObject>();
     private Map<ConnectionRequest, NetworkRequestObject> queuedRequests = new HashMap<ConnectionRequest, NetworkRequestObject>();
     private JFrame frame;
     /** Creates new form NetworkMonitor */
@@ -144,7 +148,7 @@ public class NetworkMonitor extends javax.swing.JPanel implements Scrollable {
         }
     }
 
-    public synchronized void addRequest(URLConnection con, NetworkRequestObject r) {
+    public synchronized void addRequest(Object con, NetworkRequestObject r) {
         requests.put(con, r);
         ((DefaultListModel)request.getModel()).addElement(r);
     }
@@ -180,7 +184,7 @@ public class NetworkMonitor extends javax.swing.JPanel implements Scrollable {
         return queuedRequests.get(req);
     }
     
-    public synchronized NetworkRequestObject getByConnection(URLConnection con) {
+    public synchronized NetworkRequestObject getByConnection(Object con) {
         return requests.get(con);
     }
     

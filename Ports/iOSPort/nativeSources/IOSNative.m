@@ -891,6 +891,49 @@ void com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_
     //XMLVM_END_WRAPPER
 }
 
+#ifndef CN1_SIM_DESKTOP
+// Desktop-simulator concept (each simulator universe confines its draws to
+// its window region); a device renders a single app full screen - no-op.
+// The simulator provides its own strong implementation.
+void com_codename1_impl_ios_IOSNative_setUniverseClipGlobal___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
+{
+}
+
+// Desktop-simulator one-shot shape rasterization; devices use the
+// alpha-mask shape pipeline instead - no-op.
+void com_codename1_impl_ios_IOSNative_nativeShapeGlobalSim___byte_1ARRAY_int_float_1ARRAY_int_int_int_boolean_float_int_int_float_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT commands, JAVA_INT commandsLen, JAVA_OBJECT points, JAVA_INT pointsLen, JAVA_INT color, JAVA_INT alpha, JAVA_BOOLEAN stroke, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT miterLimit, JAVA_INT translateX, JAVA_INT translateY)
+{
+}
+
+// Desktop-simulator CoreGraphics mutable images; devices use the Metal
+// mutable-texture pipeline - no-ops.
+JAVA_LONG com_codename1_impl_ios_IOSNative_createMutableImageSim___int_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT w, JAVA_INT h, JAVA_INT argb)
+{
+    return 0;
+}
+void com_codename1_impl_ios_IOSNative_mutableClipSim___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
+{
+}
+void com_codename1_impl_ios_IOSNative_mutableFillRectSim___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT color, JAVA_INT alpha, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
+{
+}
+void com_codename1_impl_ios_IOSNative_mutableDrawLineSim___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT color, JAVA_INT alpha, JAVA_INT x1, JAVA_INT y1, JAVA_INT x2, JAVA_INT y2)
+{
+}
+void com_codename1_impl_ios_IOSNative_mutableDrawStringSim___long_long_int_int_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_LONG fontPeer, JAVA_INT color, JAVA_INT alpha, JAVA_OBJECT str, JAVA_INT x, JAVA_INT y)
+{
+}
+void com_codename1_impl_ios_IOSNative_mutableDrawImageSim___long_long_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_LONG imgPeer, JAVA_INT alpha, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
+{
+}
+void com_codename1_impl_ios_IOSNative_mutableShapeSim___long_byte_1ARRAY_int_float_1ARRAY_int_int_int_boolean_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT commands, JAVA_INT commandsLen, JAVA_OBJECT points, JAVA_INT pointsLen, JAVA_INT color, JAVA_INT alpha, JAVA_BOOLEAN stroke, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT miterLimit)
+{
+}
+void com_codename1_impl_ios_IOSNative_mutableFinishSim___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer)
+{
+}
+#endif
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMaskGlobalImpl(JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h);
 void com_codename1_impl_ios_IOSNative_setNativeClippingMaskGlobal___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
 {
