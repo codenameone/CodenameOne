@@ -1131,10 +1131,38 @@ final class JavascriptMethodGenerator {
      * across both applications.
      */
     private static String applyVirtualRule(String s, String pattern, String replacement) {
+        // (1) suspending + (2) sync, quoted dispatch-id forms (_v* / _w*).
         s = s.replaceAll(pattern, replacement);
-        return s.replaceAll(
+        s = s.replaceAll(
                 pattern.replace("yield\\* _v", "_w"),
                 replacement.replace("yield* _v", "_w"));
+        // (3) suspending + (4) sync, MONOMORPHIC-DEVIRT forms (_dv* / _dw*).
+        // Devirtualized call sites pass the impl FUNCTION (a bareword) as
+        // the 2nd argument instead of a quoted dispatch-id, so they don't
+        // match the _v*/_w* peephole shapes above and would otherwise stay
+        // uncollapsed (the operand-push fold is lost -> ~90KB on a real
+        // app). Derive the devirt rule from the suspending rule by (a)
+        // swapping the helper prefix ``_v`` -> ``_dv`` and (b) swapping the
+        // quoted dispatch-id capture ``"([^"]+)"`` for a bareword capture
+        // ``([\w$]+)`` in the pattern, and un-quoting the corresponding
+        // ``"$N"`` emit in the replacement. Group numbering is preserved
+        // (the bareword swap keeps exactly one capture in the same spot),
+        // so ``$N`` back-references still resolve. Only rules that actually
+        // contain a quoted dispatch-id capture get a meaningful variant;
+        // others produce a pattern that simply never matches.
+        if (pattern.contains("\"([^\"]+)\"")) {
+            String dvPattern = pattern
+                    .replace("yield\\* _v", "yield\\* _dv")
+                    .replace("\"([^\"]+)\"", "([\\w$]+)");
+            String dvReplacement = replacement
+                    .replace("yield* _v", "yield* _dv")
+                    .replaceAll("\"(\\$\\d+)\"", "$1");
+            s = s.replaceAll(dvPattern, dvReplacement);
+            s = s.replaceAll(
+                    dvPattern.replace("yield\\* _dv", "_dw"),
+                    dvReplacement.replace("yield* _dv", "_dw"));
+        }
+        return s;
     }
 
     private static String applyMethodPeephole(CharSequence body) {
