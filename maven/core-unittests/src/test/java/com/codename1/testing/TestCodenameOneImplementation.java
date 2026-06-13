@@ -1161,6 +1161,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         largerTextEnabled = false;
         largerTextScale = 1f;
         cameraImpl = null;
+        platformName = "test";
     }
 
     public List<Object> getCleanupCalls() {
@@ -2924,9 +2925,21 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
 
+    private String platformName = "test";
+
+    /**
+     * Overrides the value returned by {@link #getPlatformName()} (default
+     * {@code "test"}). Lets tests model a specific platform -- e.g. {@code "se"}
+     * to exercise simulator-only code paths. Reset to {@code "test"} by
+     * {@link #reset()}.
+     */
+    public void setPlatformName(String platformName) {
+        this.platformName = platformName == null ? "test" : platformName;
+    }
+
     @Override
     public String getPlatformName() {
-        return "test";
+        return platformName;
     }
 
     @Override
