@@ -1,20 +1,15 @@
 == Working with the native Linux port
 
 The native Linux port compiles a Codename One app to a real, standalone Linux
-executable -- a single ELF binary with *no JVM and no runtime dependencies of its
-own* (it dynamically links the system GTK stack). It's the Linux analog of the
-iOS and native Windows ports: the same ParparVM pipeline that turns your Java/
-Kotlin bytecode into C and then into a native binary, here targeting Linux with
-GCC/Clang and rendering through GTK3 / Cairo / Pango.
+executable -- a single ELF binary that runs with *no JVM*. It's the Linux analog
+of the iOS and native Windows ports: the same ParparVM pipeline that turns your
+Java/Kotlin bytecode into C and then into a native binary, here targeting Linux
+and rendering through GTK3 / Cairo / Pango.
 
 This is distinct from the long-standing *Linux desktop* build, which packages the
-app to run on a Java Virtual Machine (see <<_native_linux_vs_the_desktop_jvm_app_vs_the_jar>>
-for a practical comparison). The native port needs no JVM on the target machine.
-
-NOTE: Consult the port's `Ports/LinuxPort/status.md` for the current capability
-matrix. The port is feature-complete -- it renders, runs, edits text, plays media,
-embeds a browser and drives 3D -- but a handful of paths (camera, microphone,
-printer, biometrics) need real hardware to exercise fully.
+app to run on a Java Virtual Machine (see
+<<_native_linux_vs_the_desktop_jvm_app_vs_the_jar>> for a practical comparison).
+The native port needs no JVM on the target machine.
 
 === How it works (the technology stack)
 
@@ -23,38 +18,64 @@ implementation layer:
 
 - *ParparVM "clean" C target.* The same VM that powers iOS and Windows translates
   your app + the Codename One core + the minimal Java runtime to C. A CMake project
-  is generated and compiled with *cc/clang* + *Ninja* into a native ELF. There is
+  is generated and compiled with `cc`/Clang + *Ninja* into a native ELF. There is
   no bytecode interpreter and no JNI -- your code *is* the native binary.
-- *Concurrent garbage collector.* ParparVM's non-blocking GC runs natively, the
-  same collector used on iOS and Windows.
 - *Cairo + Pango + GdkPixbuf.* All 2D graphics (primitives, gradients, clipping,
   affine transforms, images) go through Cairo; glyph layout, measurement and
   rasterization use Pango (with FontConfig/FreeType, so bundled fonts -- including
   the material icon font -- register and render); image decode/encode uses
-  GdkPixbuf. The windowing and native peers (text editing, browser, video) are
-  GTK3 widgets layered over a Cairo drawing surface.
-- *OpenGL ES 3.0 (EGL).* The portable 3D API (`com.codename1.gpu`) renders
-  offscreen through an EGL context + GLES 3.0, reading the frame back as an image
-  -- the same model as the iOS/Windows 3D backends.
-- *GStreamer* backs `Media` playback, audio recording and camera capture;
-  *WebKitGTK* backs `BrowserComponent`; *libsecret* (GNOME Keyring) backs secure
-  storage; *libnotify* backs local notifications; *GeoClue* backs location.
-- *libcurl* backs networking; raw sockets and WebSockets use POSIX sockets.
+  GdkPixbuf. Windowing and native peers (text editing, browser, video) are GTK3
+  widgets layered over the Cairo drawing surface.
+- *OpenGL ES (EGL)* backs the portable 3D API (`com.codename1.gpu`); *GStreamer*
+  backs `Media` playback, audio recording and the camera; *WebKitGTK* backs
+  `BrowserComponent`; *libsecret* backs secure storage; *libnotify* backs local
+  notifications; *GeoClue* backs location; *libcurl* and POSIX sockets back
+  networking.
 - *Single self-contained executable.* There is no `.app`-style bundle directory,
   so the app's classpath resources -- the theme `.res`, images, localization, the
-  material icon font -- are embedded directly into the ELF (via a generated
-  assembly stub that `.incbin`s each resource into `.rodata`) and read back at
-  runtime through `getResourceAsStream`. The result is one file you can copy and
-  run; only the shared GTK libraries are resolved from the system.
+  material icon font -- are embedded directly into the ELF and read back at
+  runtime through `getResourceAsStream`. The result is one file you copy and run.
+
+=== Why GTK3 (and not GTK4)
+
+The port targets *GTK3*. GTK4 is not a drop-in successor -- the two are
+deliberately parallel-installable because they are source- and ABI-incompatible
+(different sonames, renamed and removed APIs), so an app links one or the other,
+not both. We chose GTK3 for *reach*: it has shipped on effectively every Linux
+desktop since 2011 (the GTK3 runtime is present, directly or transitively, on
+virtually any machine with a graphical session), whereas GTK4 (2020 onward) is
+common on recent GNOME systems but not universal -- older LTS releases, lighter
+desktops and many enterprise/embedded images still carry only GTK3. Linking GTK3
+maximizes the set of machines your binary runs on out of the box. (GTK is
+dynamically linked, so a future GTK4 build would be a separate target rather than
+a flag; we will revisit it when GTK4's footprint is as universal as GTK3's.)
+
+=== Why the binary links musl, not glibc
+
+The translated runtime and your app's C are built against *musl* libc, statically
+linked into the binary, while the GTK stack is dynamically linked. That split is
+deliberate, and it is what makes the executable portable.
+
+A glibc-linked binary is tied to the *exact glibc version of the machine that
+built it*: glibc versions its symbols, so a binary built on a current distro
+fails to even start on an older one with the familiar `version 'GLIBC_2.34' not
+found` error. That makes the libc -- the one library every program depends on --
+the single most fragile external dependency a native Linux binary has. musl
+sidesteps this entirely: it is small and designed to be statically linked, so the
+C runtime travels *inside* the executable. There is no glibc version to match, no
+"works on my distro" surprise -- the binary just runs.
+
+The GTK libraries themselves stay dynamically linked (the GTK stack is large and
+not designed to be statically linked, and every desktop already ships it with a
+stable ABI), so the binary resolves `libgtk-3`, Cairo, Pango, etc. from the system
+at startup. The net effect: the fragile part (libc) is baked in, and the part
+that is genuinely a platform service (the desktop toolkit) is shared -- a single
+small ELF that "just works" across distributions.
 
 === Building a native Linux app
 
 A native Linux build runs through the `codenameone-maven-plugin` like every other
-target. Unlike the Windows port -- which is cross-compiled on Linux and run on
-Windows -- the Linux port's *build host is the run host*: there is no
-cross-compile step, so one Linux machine both builds and runs the binary.
-
-Build it locally with:
+target. Build it with:
 
 [source,bash]
 ----
@@ -62,8 +83,8 @@ mvn -pl common package -Dcodename1.platform=linux -Dcodename1.buildTarget=local-
 ----
 
 The builder translates the app to C with ParparVM's `linux` app type, generates a
-CMake project that links the GTK stack via `pkg-config`, and builds it with
-CMake + Ninja, producing the ELF.
+CMake project that links the GTK stack via `pkg-config`, builds it with CMake +
+Ninja, and produces the ELF.
 
 ==== Build-host dependencies
 
@@ -81,23 +102,23 @@ sudo apt-get install -y \
   libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev
 ----
 
-On Alpine these are the `-dev` packages of the same libraries; on Fedora the
-`*-devel` equivalents. The target machine that *runs* the binary only needs the
-runtime libraries (the non-`-dev` packages), which are present on any standard
-desktop.
+The `*-dev` packages are needed on the *build* host. The machine that *runs* the
+binary only needs the corresponding runtime libraries, which any standard desktop
+already has.
 
-==== Architecture and musl
+==== Architecture and cross-compiling
 
 Both *x64* and *arm64* are supported; pick the target with the `linux.arch` build
-hint. Because there is no cross-compile, the simplest path is to build on a host of
-the target architecture (GitHub hosts both -- see _Continuous integration_ below).
+hint. The build is a *native* compile -- it produces a binary for the host
+architecture by default, so the straightforward way to get both is to build on a
+machine of each.
 
-The translated runtime and your app's C are built against *musl* by default when a
-musl toolchain is selected, for a lean, self-contained binary; the GTK stack is
-always dynamically linked (it cannot be statically linked). On a musl host
-(Alpine) the native `cc` already links musl. To target musl from a glibc host, set
-`linux.toolchain=zig` (or point `linux.cc` at a `zig cc` wrapper / `musl-gcc`); the
-builder selects the matching `*-linux-musl` triple.
+You can also *cross-compile* -- and you may well want to, for example producing an
+arm64 binary from an x64 build host. The translated C is architecture-independent,
+and the toolchain selected for the musl link (`zig cc`) is itself a
+cross-compiler, so it can emit a binary for a different CPU from the one it runs
+on. Point `linux.cc` at a cross `zig cc` wrapper for the target triple (or set
+`linux.toolchain=zig` together with `linux.arch`) to cross-build.
 
 === Build hints
 
@@ -108,46 +129,35 @@ The native Linux port adds the build hints below (all use the `linux.` prefix).
 |Name |Description
 
 |linux.arch
-|Target CPU architecture for the ELF: `x64` (default) or `arm64`. Synonyms
+|Target CPU architecture for the ELF: `x64` (default) or `arm64`. The synonyms
 `x86_64`/`amd64` and `aarch64` are accepted.
 
 |linux.debug
 |`true`/`false` (default `false`). When `false`, the ELF is optimized and
-*stripped*. Set `true` to keep debug symbols (`RelWithDebInfo`) so a native crash
-address can be symbolized while developing. Optimizations stay on either way.
+*stripped* (no debug info). Set `true` to keep symbols (`RelWithDebInfo`) so a
+native crash address can be turned back into a function name and source line while
+developing. Optimizations stay on either way.
 
 |linux.toolchain
-|Set to `zig` to build with `zig cc` (a self-contained cross-compiler that ships
-the musl sysroot), so a glibc host can emit a musl binary for the selected arch.
+|Set to `zig` to build with `zig cc` -- a self-contained cross-compiler that ships
+the musl sysroot -- so a glibc host can emit the musl binary (and cross-compile to
+a different `linux.arch`).
 
 |linux.cc
-|Override the C compiler CMake uses (e.g. a `zig cc` wrapper, `musl-gcc`, or a
-cross `cc`). Takes precedence over `linux.toolchain`. Also settable via the
-`CN1_CC` environment variable.
+|Override the C compiler CMake uses (for example a `zig cc` wrapper for a specific
+target triple, a `musl-gcc`, or a cross `cc`). Takes precedence over
+`linux.toolchain`; also settable through the `CN1_CC` environment variable.
 |===
+
+The full cross-platform build-hints reference is in the
+link:#_sending_arguments_to_the_build_server[Advanced topics chapter].
 
 === Optimized and stripped by default
 
-The shipping build is optimized and stripped (`-s`): no debug information is
-embedded. Setting `linux.debug=true` keeps the symbols (`RelWithDebInfo`) so a
-faulting address can be turned back into a function name and source line. The build
-stays optimized either way.
-
-=== Continuous integration and screenshot testing
-
-The port is exercised in CI by the `linux-build-run.yml` workflow, which gives it
-the same two-architecture screenshot coverage the native Windows port has. On each
-of *x86_64* (`ubuntu-latest`) and *arm64* (`ubuntu-24.04-arm`) it builds the
-framework + the `hellocodenameone` screenshot suite, translates and native-builds
-the ELF, runs it headless under Xvfb (with Mesa software GL for the 3D tests), and
-captures every screenshot over the cn1ss WebSocket. A `compare-comment` job diffs
-each architecture's PNGs against its in-repo baseline
-(`scripts/linux/screenshots` for x64, `scripts/linux/screenshots-arm` for arm64)
-and posts them to the pull request.
-
-The build + run logic lives in `CleanTargetLinuxIntegrationTest` (translate with
-the `linux` app type, native CMake/Ninja build, run + capture), the Linux
-counterpart of the Windows cases in `CleanTargetIntegrationTest`.
+The shipping build is optimized and stripped: no debug information is embedded, so
+the single self-contained executable stays as small as the translated code allows.
+Setting `linux.debug=true` keeps the symbols so a faulting address can be
+symbolized during development; the build stays optimized either way.
 
 === Native Linux vs. the desktop (JVM) app vs. the jar
 
@@ -161,7 +171,7 @@ counterpart of the Windows cases in `CleanTargetIntegrationTest`.
 |Yes (any installed JRE)
 
 |What ships
-|One ELF + the system GTK libraries
+|One small ELF + the system GTK libraries
 |App + a packaged JRE
 |A single `.jar`
 

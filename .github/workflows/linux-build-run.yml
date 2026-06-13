@@ -1,15 +1,23 @@
-# Native Linux (GTK3) build + run pipeline. Unlike the Windows port -- which is
-# cross-compiled on Linux and run on a Windows runner -- the Linux port's build
-# host IS the run host, so each runner does the whole thing: build the framework
-# + the hellocodenameone screenshot suite, translate it with ParparVM's "linux"
-# app type, native-build the ELF (CMake/Ninja, GTK3/Cairo/Pango/WebKitGTK/
-# GStreamer/EGL), run it headless under Xvfb and capture the suite over the cn1ss
-# WebSocket. Runs on BOTH architectures GitHub hosts natively -- x86_64
-# (ubuntu-latest) and arm64 (ubuntu-24.04-arm) -- so the port gets the same
-# two-arch screenshot coverage the native Windows port has.
+# Native Linux (GTK3) build + run pipeline. The Linux port builds natively on the
+# runner -- no cross-compile -- so each architecture both builds and runs the
+# binary. It runs on BOTH architectures GitHub hosts natively: x86_64
+# (ubuntu-latest) and arm64 (ubuntu-24.04-arm), giving the port the same two-arch
+# screenshot coverage the native Windows port has.
 #
-# Two jobs:
-#   build-run (matrix x64 + arm64) -> builds + runs the suite, uploads PNGs/arch
+# The hellocodenameone screenshot suite is compiled by the codenameone maven
+# plugin, which depends on CEF -- and CEF has no linux-arm64 build, so the plugin
+# (hence the suite's *.class) only builds on x64. The translated C is
+# architecture-independent, so the suite classes are built once on x64 and shared;
+# each arch then builds only core + the Linux port (which build fine on arm64),
+# translates the shared classes with the "linux" app type, native-builds the ELF
+# (CMake/Ninja), runs it headless under Xvfb and captures the suite over the cn1ss
+# WebSocket.
+#
+# Jobs:
+#   prepare-suite (x64)            -> builds the plugin + hellocodenameone-common,
+#                                     uploads the suite + ads-mock classes
+#   build-run (matrix x64 + arm64) -> core + Linux port, translate + build + run,
+#                                     uploads PNGs/arch
 #   compare-comment (ubuntu)       -> diffs each arch vs its in-repo baseline,
 #                                     posts the PR comment
 name: Linux native build + run (GTK3, x64 + arm64)
@@ -39,8 +47,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Build the codenameone maven plugin (it needs CEF, which is x64-only on Linux)
+  # and the hellocodenameone screenshot suite, then publish the suite + ads-mock
+  # *.class. These are architecture-independent (they are translated to C later),
+  # so both arch legs translate from these same classes.
+  prepare-suite:
+    name: build suite classes (x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Xvfb
+        run: |
+          set -e
+          sudo apt-get update
+          # The CN1 CSS compiler renders via CEF/AWT and throws HeadlessException
+          # without a display, so the common build runs under a virtual X server.
+          sudo apt-get install -y --no-install-recommends xvfb
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '17' }
+      - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Restore JDK 8 as the active JDK
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+
+      - name: Build plugin + cn1-ads-mock (JDK 8)
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
+            -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+
+      - name: Build hellocodenameone-common (JDK 17)
+        run: |
+          set -e
+          export JAVA_HOME="$JDK_17_HOME"
+          Xvfb :99 -screen 0 1600x1200x24 >/tmp/xvfb-build.log 2>&1 &
+          export DISPLAY=:99
+          sleep 2
+          mkdir -p "$HOME/.codenameone"
+          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
+          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+
+      - name: Package suite classes
+        run: |
+          set -e
+          tar czf suite-classes.tgz \
+            scripts/hellocodenameone/common/target/classes \
+            maven/cn1-ads-mock/target/classes
+      - name: Upload suite classes
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-suite-classes
+          path: suite-classes.tgz
+          retention-days: 1
+
   build-run:
     name: build + run suite (${{ matrix.arch }})
+    needs: prepare-suite
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -60,8 +131,7 @@ jobs:
       # registration), libcurl (HTTP), GStreamer (media/camera/audio), WebKitGTK
       # (browser), libsecret (secure storage), libnotify (notifications), GeoClue
       # (location), libepoxy + EGL/GLES + the Mesa software driver (the offscreen
-      # 3D backend). Plus CMake/Ninja, Xvfb (the suite renders into a real GTK
-      # window) and a font so Pango has something to lay out.
+      # 3D backend). Plus CMake/Ninja, Xvfb and a font for Pango to lay out.
       - name: Install the GTK build stack + toolchain
         run: |
           set -e
@@ -75,9 +145,6 @@ jobs:
             libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
             libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri
 
-      # JDK matrix the translator harness auto-discovers (JDK_*_HOME). JDK 8 is
-      # restored last as the active JAVA_HOME (it builds codename1-core and is
-      # what the core/port modules target); JDK 17 builds the sample app.
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '8' }
@@ -94,28 +161,21 @@ jobs:
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '8' }
 
-      # Build codename1-core + the Linux port, the codenameone maven plugin (runs
-      # transcode-svg / css / annotation processing during the sample build) and
-      # cn1-ads-mock (a sample dependency) -- the inputs the translate step stages.
-      - name: Build core + Linux port + plugin (JDK 8)
+      # Build codename1-core + the Linux port only -- NOT the CEF-dependent maven
+      # plugin -- so this step works on arm64 too. The suite classes the translator
+      # also needs come from the prepare-suite artifact below.
+      - name: Build core + Linux port (JDK 8)
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux,codenameone-maven-plugin,cn1-ads-mock -am \
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
-      # Build hellocodenameone-common (the Kotlin/Java app + every *ScreenshotTest)
-      # with JDK 17 under Xvfb (the CSS compiler renders via CEF/AWT and throws
-      # HeadlessException without a display).
-      - name: Build hellocodenameone-common (JDK 17)
-        run: |
-          set -e
-          export JAVA_HOME="$JDK_17_HOME"
-          Xvfb :99 -screen 0 1600x1200x24 >/tmp/xvfb-build.log 2>&1 &
-          export DISPLAY=:99
-          sleep 2
-          mkdir -p "$HOME/.codenameone"
-          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
-          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+      - name: Download suite classes
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-suite-classes
+      - name: Unpack suite classes
+        run: tar xzf suite-classes.tgz
 
       # Translate the suite with the "linux" app type, native-build the ELF
       # (CMake/Ninja), run it under Xvfb and capture the suite over the cn1ss
@@ -148,7 +208,7 @@ jobs:
 
   # Diffs each arch's screenshots against its in-repo baseline (x64 ->
   # scripts/linux/screenshots, arm64 -> scripts/linux/screenshots-arm) and posts
-  # them to the PR. Report-only until the baselines are seeded (see the README in
+  # them to the PR. Report-only until the baselines are seeded (see the READMEs in
   # those dirs); flip CN1SS_FAIL_ON_MISMATCH=1 to gate once seeded.
   compare-comment:
     name: screenshot-comment
@@ -184,11 +244,6 @@ jobs:
 
       - name: Post screenshots to PR
         shell: bash
-        env:
-          CN1SS_COMMENT_MARKER: '<!-- CN1SS_LINUX_COMMENT -->'
-          CN1SS_COMMENT_LOG_PREFIX: '[linux-gtk]'
-          CN1SS_PREVIEW_SUBDIR: 'linux'
-          CN1SS_SUCCESS_MESSAGE: 'Native Linux port (GTK3/Cairo/Pango, ParparVM bytecode-to-C, no JVM): the hellocodenameone screenshot suite rendered by a native ELF built + run on the GitHub Linux runner, for x86_64 and arm64. Compared against the in-repo baselines in scripts/linux/screenshots (x64) and scripts/linux/screenshots-arm (arm64).'
         run: |
           set -e
           source scripts/lib/cn1ss.sh
@@ -208,7 +263,9 @@ jobs:
             echo "Posting ${#entries[@]} screenshot(s) for $arch (baseline $REF)"
             mkdir -p "$ART/previews-$arch"
             CN1SS_COMMENT_MARKER="<!-- CN1SS_LINUX_${arch}_COMMENT -->" \
+            CN1SS_COMMENT_LOG_PREFIX="[linux-gtk-$arch]" \
             CN1SS_PREVIEW_SUBDIR="linux-$arch" \
+            CN1SS_SUCCESS_MESSAGE="Native Linux port ($arch), GTK3/Cairo/Pango, ParparVM bytecode-to-C (no JVM): the hellocodenameone screenshot suite rendered by a native ELF built + run on the GitHub $arch runner. Baseline: $REF." \
             cn1ss_process_and_report \
               "Native Linux port ($arch)" \
               "$ART/compare-$arch.json" "$ART/summary-$arch.txt" "$ART/comment-$arch.md" \
