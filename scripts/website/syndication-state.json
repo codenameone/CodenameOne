@@ -323,6 +323,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-12T15:04:19+00:00"
       }
+    },
+    "mac-native-builds-and-desktop-integration": {
+      "devto": {
+        "id": 3891796,
+        "url": "https://dev.to/codenameone/your-codename-one-app-now-a-native-mac-app-4gio",
+        "syndicated_at": "2026-06-13T13:33:30+00:00"
+      }
     }
   }
 }
