@@ -2846,7 +2846,7 @@ final class JavascriptMethodGenerator {
                         java.nio.file.Files.write(
                                 java.nio.file.Paths.get("/tmp/cn1-malformed-" + cls.getClsName() + "." + method.getMethodName() + ".js"),
                                 instructionBody.toString().getBytes("UTF-8"));
-                    } catch (Exception dumpFailure) {
+                    } catch (java.io.IOException | RuntimeException dumpFailure) {
                         // diagnostics only -- report and continue
                         System.err.println("[trydiag] dump failed: " + dumpFailure);
                     }
@@ -2861,7 +2861,7 @@ final class JavascriptMethodGenerator {
                                 java.nio.file.Paths.get("/tmp/cn1-dump-" + cls.getClsName() + "." + method.getMethodName()
                                         + "_" + Integer.toHexString(method.getSignature().hashCode()) + ".js"),
                                 instructionBody.toString().getBytes("UTF-8"));
-                    } catch (Exception dumpFailure) {
+                    } catch (java.io.IOException | RuntimeException dumpFailure) {
                         // diagnostics only -- report and continue
                         System.err.println("[trydiag] dump failed: " + dumpFailure);
                     }

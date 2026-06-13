@@ -1526,8 +1526,9 @@ final class JavascriptBundleWriter {
                     sources.add(new String(Files.readAllBytes(portJs), StandardCharsets.UTF_8));
                 }
             }
-        } catch (Exception ignore) {
-            // port.js unavailable -- skip
+        } catch (IOException | RuntimeException portJsUnavailable) {
+            // port.js unavailable -- skip (bridge-name protection degrades
+            // to the in-bundle string scan only)
         }
         java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
         for (String src : sources) {
