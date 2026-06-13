@@ -237,9 +237,25 @@ public final class IOSNative {
     native void cleanupAudio(long peer);
 
     native long createAudio(String uri, Runnable onCompletion);
-    
+
     native long createAudio(byte[] data, Runnable onCompletion);
-    
+
+    // ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
+    native long nativeCreateSoundPool(int maxStreams);
+    native long nativeLoadSound(long pool, byte[] data, int ringSize);
+    native int nativePlaySound(long pool, long sound, float volume, float pan, float rate, int loop);
+    native void nativeSetSoundVolume(long pool, int voiceId, float volume);
+    native void nativeSetSoundRate(long pool, int voiceId, float rate);
+    native void nativeSetSoundPan(long pool, int voiceId, float pan);
+    native void nativePauseSound(long pool, int voiceId);
+    native void nativeResumeSound(long pool, int voiceId);
+    native void nativeStopSound(long pool, int voiceId);
+    native void nativeStopAllSounds(long pool);
+    native void nativeAutoPauseSoundPool(long pool);
+    native void nativeAutoResumeSoundPool(long pool);
+    native void nativeUnloadSound(long pool, long sound);
+    native void nativeReleaseSoundPool(long pool);
+
     native float getVolume();
 
     native void setVolume(float vol);
@@ -632,7 +648,15 @@ public final class IOSNative {
     // IOSImplementation.socialShareCallback(int, String, String) using
     // the supplied callbackId. Status: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
     native void socialShareWithCallback(String text, long imagePeer, Rectangle sourceRect, int callbackId);
-    
+
+    // Printing via UIPrintInteractionController
+    native boolean isPrintingAvailable();
+
+    // Prints the document at path and reports the outcome via
+    // IOSImplementation.printDocumentCallback(int, int, String) using
+    // the supplied callbackId. Status: 1=COMPLETED, 2=CANCELLED, 3=FAILED.
+    native void printDocument(String path, String mimeType, int callbackId);
+
     // facebook connect
     public native void facebookLogin(Object callback);
     public native boolean isFacebookLoggedIn();
@@ -825,6 +849,31 @@ public final class IOSNative {
     /// Reads and clears any shared content payload written by the share extension into the
     /// shared App Group user defaults. Returns a JSON string or null if there is none.
     native String getPendingSharedContent(String appGroupId);
+
+    // --- Wallet issuer-provisioning extension (PassKit) ---------------------
+    // The App Group id is read natively from the CN1WalletAppGroup Info.plist
+    // key injected by the build when ios.wallet.extension is enabled.
+
+    /// True on iOS 14+ when the CN1WalletAppGroup Info.plist key is present.
+    native boolean isWalletExtensionSupported();
+
+    /// Removes all published pass entries from the iPhone (remote=false) or
+    /// Apple Watch (remote=true) list, including their card-art files.
+    native void walletExtensionClearPassEntries(boolean remote);
+
+    /// Appends one pass entry to the shared App Group suite and writes its
+    /// card art PNG into the group container.
+    native void walletExtensionAddPassEntry(boolean remote, String identifier, String title,
+            String cardholderName, String accountSuffix, String network, String description, byte[] artPng);
+
+    /// Sets the requires-authentication flag read by the extension's status callback.
+    native void walletExtensionSetRequiresAuthentication(boolean requiresAuthentication);
+
+    /// Stores the auth token forwarded to the issuer endpoint; null removes it.
+    native void walletExtensionSetAuthToken(String token);
+
+    /// Clears all wallet extension data from the App Group.
+    native void walletExtensionClear();
 
     // --- Biometrics (LocalAuthentication.framework) -------------------------
 

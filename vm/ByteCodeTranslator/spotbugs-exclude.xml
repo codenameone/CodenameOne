@@ -102,7 +102,12 @@
         <Bug pattern="EQ_GETCLASS_AND_CLASS_CONSTANT" />
     </Match>
 
-    <!-- Parser ingests input files and uses the same CLI-exit pattern. -->
+    <!--
+    Parser ingests input files and uses the same CLI-exit pattern. The native-symbol
+    and name->class indexes are lazily built static caches; they are safe here because
+    the translator runs single-threaded across one translation run (same rationale as
+    the ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD exclusions above).
+    -->
     <Match>
         <Class name="~com\.codename1\.tools\.translator\.Parser(\$.*)?" />
         <Or>
@@ -111,6 +116,8 @@
             <Bug pattern="OS_OPEN_STREAM_EXCEPTION_PATH" />
             <Bug pattern="OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE" />
             <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+            <Bug pattern="LI_LAZY_INIT_STATIC" />
+            <Bug pattern="LI_LAZY_INIT_UPDATE_STATIC" />
         </Or>
     </Match>
 

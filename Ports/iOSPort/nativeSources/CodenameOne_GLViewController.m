@@ -81,6 +81,101 @@
 
 
 //#define CN1_USE_SPLASH_SCREEN
+//#define CN1_DISABLE_LAUNCH_PLACEHOLDER
+
+// Launch placeholder: covers the GL/Metal layer from the moment the window
+// becomes key until the EDT presents its first content frame. The window's
+// first Core Animation commit happens long before Display.init and the first
+// form paint, so without this the system launch screen is replaced by a black
+// surface for a noticeable moment (issue #5210). The placeholder mirrors the
+// default launch storyboard -- Launch.Foreground.png centered at natural
+// size -- over a background that tracks light/dark mode, then fades out when
+// drawFrame presents the first frame that actually executed draw ops.
+// Opt out with the ios.launchPlaceholder=false build hint.
+static UIView *cn1LaunchPlaceholderView = nil;
+static BOOL cn1LaunchPlaceholderDone = NO;
+
+void CN1DismissLaunchPlaceholder(void) {
+    cn1LaunchPlaceholderDone = YES;
+    if (cn1LaunchPlaceholderView == nil) {
+        return;
+    }
+    UIView *placeholder = cn1LaunchPlaceholderView;
+    cn1LaunchPlaceholderView = nil;
+    [UIView animateWithDuration:0.15 animations:^{
+        placeholder.alpha = 0;
+    } completion:^(BOOL finished) {
+        [placeholder removeFromSuperview];
+#ifndef CN1_USE_ARC
+        [placeholder release];
+#endif
+    }];
+}
+
+void CN1ShowLaunchPlaceholder(UIWindow *window) {
+#if defined(CN1_DISABLE_LAUNCH_PLACEHOLDER) || defined(CN1_USE_SPLASH_SCREEN) || TARGET_OS_MACCATALYST
+    // A Mac window appears instantly, and CN1_USE_SPLASH_SCREEN draws its own
+    // splash directly into the GL surface; in both cases the placeholder
+    // would only hide content.
+#else
+    if (cn1LaunchPlaceholderDone || cn1LaunchPlaceholderView != nil || window == nil) {
+        return;
+    }
+    UIView *placeholder = [[UIView alloc] initWithFrame:window.bounds];
+    placeholder.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    placeholder.userInteractionEnabled = NO;
+    if (@available(iOS 13.0, *)) {
+        placeholder.backgroundColor = [UIColor systemBackgroundColor];
+    } else {
+        placeholder.backgroundColor = [UIColor whiteColor];
+    }
+    // Prefer the image the launch storyboard shows, rendered the same way
+    // (centered at natural size, matching its contentMode=center image view)
+    // so the handoff from the system launch screen is seamless. Fall back to
+    // the primary app icon when it isn't bundled, e.g. a custom storyboard.
+    UIImage *icon = [UIImage imageNamed:@"Launch.Foreground.png"];
+    BOOL isRawIcon = NO;
+    if (icon == nil) {
+        NSDictionary *icons = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleIcons"];
+        NSArray *iconFiles = [[icons objectForKey:@"CFBundlePrimaryIcon"] objectForKey:@"CFBundleIconFiles"];
+        if ([iconFiles isKindOfClass:[NSArray class]] && [iconFiles count] > 0) {
+            icon = [UIImage imageNamed:(NSString*)[iconFiles lastObject]];
+        }
+        isRawIcon = YES;
+    }
+    if (icon != nil) {
+        UIImageView *iconView = [[UIImageView alloc] initWithImage:icon];
+        if (isRawIcon) {
+            // Bundle icons are square PNGs without the home-screen mask;
+            // round them so the placeholder reads as "the app icon".
+            CGFloat side = MIN(icon.size.width, icon.size.height);
+            side = MIN(side, (CGFloat)152);
+            iconView.frame = CGRectMake(0, 0, side, side);
+            iconView.contentMode = UIViewContentModeScaleAspectFill;
+            iconView.layer.cornerRadius = side * 0.2237f;
+            iconView.layer.masksToBounds = YES;
+            if (@available(iOS 13.0, *)) {
+                iconView.layer.cornerCurve = kCACornerCurveContinuous;
+            }
+        }
+        iconView.center = CGPointMake(CGRectGetMidX(placeholder.bounds), CGRectGetMidY(placeholder.bounds));
+        iconView.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin
+                | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
+        [placeholder addSubview:iconView];
+#ifndef CN1_USE_ARC
+        [iconView release];
+#endif
+    }
+    [window addSubview:placeholder];
+    // the static keeps ownership; released when the dismissal fade completes
+    cn1LaunchPlaceholderView = placeholder;
+    // Safety net: if the first frame never presents (EDT wedged before the
+    // first paint) drop the placeholder rather than masking the app forever.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        CN1DismissLaunchPlaceholder();
+    });
+#endif
+}
 
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
 // needs a source rect that the java API doesn't pass through.
@@ -3782,6 +3877,7 @@ BOOL prefersStatusBarHidden = NO;
 #endif
     [[self eaglView] setFramebuffer];
     GLErrorLog;
+    BOOL drewContentOps = NO;
     if(currentTarget != nil) {
         if([currentTarget count] > 0) {
             [ClipRect setDrawRect:rect];
@@ -3838,11 +3934,17 @@ BOOL prefersStatusBarHidden = NO;
                 if (opTarget != nil && !mutableEncoderOpen) continue;
                 [ex executeWithClipping];
                 GLErrorLog;
+                if (opTarget == nil) {
+                    // Screen-targeted op: this present puts real content on
+                    // the GL layer (a drain of only mutable-image ops doesn't).
+                    drewContentOps = YES;
+                }
             }
             if (mutableEncoderOpen) {
                 CN1MetalEndMutableImageDraw(currentDrainTarget);
             }
 #else
+            drewContentOps = YES;
             for(ExecutableOp* ex in cp) {
                 [ex executeWithClipping];
                 //[ex executeWithLog];
@@ -3919,9 +4021,14 @@ BOOL prefersStatusBarHidden = NO;
         }
     }
     GLErrorLog;
-    
+
     [[self eaglView] presentFramebuffer];
     GLErrorLog;
+    if (drewContentOps && !cn1LaunchPlaceholderDone) {
+        // First frame with real content is on screen -- fade out the launch
+        // placeholder installed by cn1InstallRootViewControllerIntoWindow.
+        CN1DismissLaunchPlaceholder();
+    }
 }
 
 

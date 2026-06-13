@@ -22,6 +22,7 @@
  */
 package com.codename1.builders;
 
+import com.codename1.util.IOSWalletExtensionBuilder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -93,6 +94,7 @@ public class IPhoneBuilder extends Executor {
     private String buildVersion;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
+    private boolean usesWalletApi;
     private boolean usesCryptoAPI;
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
@@ -291,6 +293,14 @@ public class IPhoneBuilder extends Executor {
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
+        if (request.getArg("ios.deployment_target", null) == null) {
+            // No explicit deployment target. Default to iOS 14 so the
+            // UILaunchScreen-based launch screen injected for UIScene builds
+            // satisfies App Store validation: apps supporting iPad
+            // multitasking must provide a launch storyboard, or UILaunchScreen
+            // when MinimumOSVersion is 14 or higher.
+            addMinDeploymentTarget("14.0");
+        }
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
@@ -704,6 +714,12 @@ public class IPhoneBuilder extends Executor {
                     }
                     if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
                         usesPurchaseAPI = true;
+                    }
+                    // Wallet issuer-provisioning natives are only compiled in when
+                    // the app actually references the API (or enables the extension
+                    // via the ios.wallet.extension hint) - see CN1_INCLUDE_WALLET.
+                    if (!usesWalletApi && cls.indexOf("com/codename1/payment/Wallet") == 0) {
+                        usesWalletApi = true;
                     }
                     if (cls.indexOf("com/codename1/security/") == 0) {
                         // com.codename1.security contains two distinct API
@@ -1201,6 +1217,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(CodenameOne_GLViewController, "//#define LOW_MEM_CAMERA", "#define LOW_MEM_CAMERA");
             }
 
+            if (request.getArg("ios.launchPlaceholder", "true").equals("false")) {
+                File glViewControllerM = new File(buildinRes, "CodenameOne_GLViewController.m");
+                replaceInFile(glViewControllerM, "//#define CN1_DISABLE_LAUNCH_PLACEHOLDER", "#define CN1_DISABLE_LAUNCH_PLACEHOLDER");
+            }
+
             if (request.getArg("ios.enableStatusBar7", "true").equals("false")) {
                 File CodenameOne_GLViewController = new File(buildinRes, "CodenameOne_GLViewController.m");
                 replaceInFile(CodenameOne_GLViewController, "int statusbarHeight = 20;", "int statusbarHeight = 0;");
@@ -1657,6 +1678,17 @@ public class IPhoneBuilder extends Executor {
             } catch (IOException ex) {
                 log("Failed to Update Objective-C source files to activate notifications flag");
                 throw new BuildException("Failed to update Objective-C source files to activate notifications flag", ex);
+            }
+        }
+
+        // The Wallet issuer-provisioning natives in IOSNative.m stay dormant
+        // (#else stubs) unless the app needs them: unused wallet-looking code
+        // in the binary can trigger questions during Apple review.
+        if (usesWalletApi || "true".equals(request.getArg("ios.wallet.extension", "false"))) {
+            try {
+                replaceInFile(new File(buildinRes, "IOSNative.m"), "//#define CN1_INCLUDE_WALLET", "#define CN1_INCLUDE_WALLET");
+            } catch (IOException ex) {
+                throw new BuildException("Failed to update Objective-C source files to activate the wallet flag", ex);
             }
         }
 
@@ -2388,18 +2420,38 @@ public class IPhoneBuilder extends Executor {
                 throw new BuildException("Failed to normalize iOS asset catalogs", ex);
             }
             stopwatch.split("Post-VM Setup");
-            if (runPods) {
+            boolean walletExtensionEnabled = "true".equals(request.getArg("ios.wallet.extension", "false"));
+            if (walletExtensionEnabled) {
+                if (!request.getArg("ios.wallet.appGroup", "").startsWith("group.")
+                        || request.getArg("ios.wallet.issuerEndpoint", "").length() == 0) {
+                    log("The ios.wallet.extension build hint requires both of the following build hints:\n"
+                            + "  ios.wallet.appGroup={App Group id starting with 'group.' shared by the app and the Wallet extensions}\n"
+                            + "  ios.wallet.issuerEndpoint={HTTPS URL of the issuer endpoint that produces the encrypted pass payload}");
+                    return false;
+                }
+                if ("true".equals(request.getArg("ios.wallet.includeUI", "false"))
+                        && request.getArg("ios.wallet.authEndpoint", "").length() == 0) {
+                    log("The ios.wallet.includeUI build hint requires the ios.wallet.authEndpoint={HTTPS URL of the login endpoint} build hint");
+                    return false;
+                }
+            }
+            // Wallet extensions and .ios.appext archives mutate the Xcode project through the
+            // ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
+            boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled || hasAppExtensionArchives(resDir);
+            if (needsXcodeProjectMutation) {
                 try {
                     List<File> podSpecFileList = new ArrayList<File>();
-                    for (File podSpec : podSpecs.listFiles()) {
-                        if (podSpec.getName().startsWith(".")) {
-                            continue;
-                        }
-                        File distDir = new File(tmpFile, "dist");
-                        File targetF = new File(distDir, podSpec.getName());
-                        Files.move(podSpec.toPath(), targetF.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        podSpecFileList.add(targetF);
+                    if (runPods) {
+                        for (File podSpec : podSpecs.listFiles()) {
+                            if (podSpec.getName().startsWith(".")) {
+                                continue;
+                            }
+                            File distDir = new File(tmpFile, "dist");
+                            File targetF = new File(distDir, podSpec.getName());
+                            Files.move(podSpec.toPath(), targetF.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            podSpecFileList.add(targetF);
 
+                        }
                     }
 
                     String deploymentTargetStr = "";
@@ -2514,7 +2566,10 @@ public class IPhoneBuilder extends Executor {
 
 
 
-                            sb.append("\nservice_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
+                            // Guarded so the post-dependency re-run of fix_xcode_schemes.rb
+                            // doesn't create duplicate extension targets.
+                            sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
+                                    + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
                                     + "xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|e| \n"
                                     + "  e.build_settings['PROVISIONING_PROFILE']='$(APP_PROVISIONING_PROFILE)'\n"
                                     + "  e.build_settings['CODE_SIGN_ENTITLEMENTS']='$(APP_CODE_SIGN_ENTITLEMENTS)'\n"
@@ -2522,9 +2577,10 @@ public class IPhoneBuilder extends Executor {
                                     //+ "service_target.frameworks_build_phase.add_file_reference(xcproj.files.find{|e|e.path.include? 'UserNotifications.framework'})\n"
                                     + "service_group = xcproj.new_group('" + extensionName + "')\n");
                             appendFilesToXcodeProjGroup(sb, appExtension, "service_group", "service_target", appExtension.getParentFile());
-                            sb.append("xcproj.targets.find{|e|e.name==main_class_name}.add_dependency(service_target)\n"
+                            sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                                    + "main_app_target.add_dependency(service_target)\n"
                                     + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('" + extensionName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
-                                    + "embed_phase=xcproj.targets.find{|e| e.name=='" + request.getMainClass() + "'}.new_copy_files_build_phase('Embed App Extensions')\n"
+                                    + "embed_phase = main_app_target.copy_files_build_phases.find{|p| p.name=='Embed App Extensions'} || main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
                                     + "embed_phase.build_action_mask = \"2147483647\"\n"
                                     + "embed_phase.dst_subfolder_spec = \"13\"\n"
                                     + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
@@ -2534,6 +2590,7 @@ public class IPhoneBuilder extends Executor {
                                 sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
                             }
                             sb.append("}\n");
+                            sb.append("end\n");
 
 
 
@@ -2541,6 +2598,10 @@ public class IPhoneBuilder extends Executor {
                         if (appExtensions.length > 0) {
                             sb.append("xcproj.save(project_file)\n");
                         }
+                    }
+
+                    if (walletExtensionEnabled) {
+                        appendWalletExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
                     }
 
                     String installLocalizedStrings = "";
@@ -2672,10 +2733,11 @@ public class IPhoneBuilder extends Executor {
                     exec(hooksDir, "chmod", "0755", fixSchemesFile.getAbsolutePath());
                     exec(hooksDir, "echo", fixSchemesFile.getAbsolutePath());
                     if (!exec(hooksDir, fixSchemesFile.getAbsolutePath())) {
-                        log("Failed to fix xcode project schemes.  Make sure you have Cocoapods installed. ");
+                        log("Failed to fix xcode project schemes.  Make sure you have the xcodeproj ruby gem installed (gem install xcodeproj; it is also bundled with Cocoapods). ");
                         return false;
                     }
 
+                    if (runPods) {
                     if (!exec(new File(tmpFile, "dist"), podTimeout, pod, "init")) {
                         log("Failed to run "+pod+" init.  Make sure you have Cocoapods installed.");
                         return false;
@@ -2795,8 +2857,9 @@ public class IPhoneBuilder extends Executor {
                             }
                         }
                     }
+                    } // end if (runPods)
                 } catch (Exception ex) {
-                    throw new BuildException("Failed to generate PodFile", ex);
+                    throw new BuildException("Failed to update the generated Xcode project", ex);
                 }
                 stopwatch.split("CocoaPods");
             }
@@ -3055,7 +3118,8 @@ public class IPhoneBuilder extends Executor {
                 sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
                 if (f.getName().endsWith(".m") || f.getName().endsWith(".swift")) {
                     sb.append(serviceTargetVarName).append(".add_file_references([fileref])\n");
-                } else if (!f.getName().endsWith("Info.plist") && !f.getName().endsWith(".entitlements")){
+                } else if (!f.getName().endsWith("Info.plist") && !f.getName().endsWith(".entitlements")
+                        && !f.getName().endsWith(".h") && !f.getName().endsWith(".mobileprovision")){
                     sb.append(serviceTargetVarName).append(".add_resources([fileref])\n");
                 }
             } else {
@@ -3291,6 +3355,105 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    private boolean hasAppExtensionArchives(File sourceDirectory) {
+        File[] children = sourceDirectory == null ? null : sourceDirectory.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File f : children) {
+            if (f.getName().endsWith(".ios.appext")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final String[][] WALLET_INJECTION_HINTS = {
+        {"ios.wallet.nonuiImportsInject", IOSWalletExtensionBuilder.MARKER_NONUI_IMPORTS},
+        {"ios.wallet.statusInject", IOSWalletExtensionBuilder.MARKER_STATUS},
+        {"ios.wallet.passEntriesInject", IOSWalletExtensionBuilder.MARKER_PASS_ENTRIES},
+        {"ios.wallet.remotePassEntriesInject", IOSWalletExtensionBuilder.MARKER_REMOTE_PASS_ENTRIES},
+        {"ios.wallet.generateRequestInject", IOSWalletExtensionBuilder.MARKER_GENERATE_REQUEST},
+        {"ios.wallet.generateResponseInject", IOSWalletExtensionBuilder.MARKER_GENERATE_RESPONSE},
+        {"ios.wallet.uiImportsInject", IOSWalletExtensionBuilder.MARKER_UI_IMPORTS},
+        {"ios.wallet.uiViewDidLoadInject", IOSWalletExtensionBuilder.MARKER_UI_VIEWDIDLOAD},
+        {"ios.wallet.uiAuthRequestInject", IOSWalletExtensionBuilder.MARKER_UI_AUTH_REQUEST},
+        {"ios.wallet.uiAuthResponseInject", IOSWalletExtensionBuilder.MARKER_UI_AUTH_RESPONSE},
+    };
+
+    /**
+     * Generates the Apple Wallet issuer-provisioning extension folders under dist/
+     * and appends the ruby that wires them into the generated Xcode project as
+     * app_extension targets. Driven by the ios.wallet.* build hints.
+     */
+    private void appendWalletExtensionTargets(StringBuilder sb, BuildRequest request, File distDir) throws IOException {
+        IOSWalletExtensionBuilder walletBuilder = new IOSWalletExtensionBuilder()
+                .setAppGroupId(request.getArg("ios.wallet.appGroup", ""))
+                .setIssuerEndpoint(request.getArg("ios.wallet.issuerEndpoint", ""))
+                .setAuthEndpoint(request.getArg("ios.wallet.authEndpoint", ""))
+                .setNonUIExtensionName(request.getArg("ios.wallet.nonuiExtensionName", "WalletNonUIExtension"))
+                .setUIExtensionName(request.getArg("ios.wallet.uiExtensionName", "WalletUIExtension"));
+        for (String[] hintAndMarker : WALLET_INJECTION_HINTS) {
+            walletBuilder.setInjection(hintAndMarker[1], request.getArg(hintAndMarker[0], null));
+        }
+
+        String nonUIName = walletBuilder.getNonUIExtensionName();
+        IOSWalletExtensionBuilder.writeFileMap(walletBuilder.buildNonUIFileMap(), new File(distDir, nonUIName));
+        appendWalletExtensionRuby(sb, request, nonUIName, distDir, "ios.wallet.nonui.buildSettings.");
+        log("Adding Wallet issuer-provisioning extension target " + nonUIName);
+
+        if ("true".equals(request.getArg("ios.wallet.includeUI", "false"))) {
+            String uiName = walletBuilder.getUIExtensionName();
+            IOSWalletExtensionBuilder.writeFileMap(walletBuilder.buildUIFileMap(), new File(distDir, uiName));
+            appendWalletExtensionRuby(sb, request, uiName, distDir, "ios.wallet.ui.buildSettings.");
+            log("Adding Wallet issuer-provisioning authorization UI extension target " + uiName);
+        }
+        sb.append("xcproj.save(project_file)\n");
+    }
+
+    private void appendWalletExtensionRuby(StringBuilder sb, BuildRequest request, String extensionName, File distDir, String buildSettingsHintPrefix) {
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." + extensionName);
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("INFOPLIST_FILE", extensionName + "/Info.plist");
+        buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", extensionName + "/" + extensionName + ".entitlements");
+        // PKIssuerProvisioningExtensionHandler requires iOS 14; the extension target
+        // keeps its own deployment target even when the app targets lower.
+        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", "14.0");
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
+        buildSettingsMap.put("SKIP_INSTALL", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        for (String key : request.getArgs()) {
+            if (key.startsWith(buildSettingsHintPrefix)) {
+                buildSettingsMap.put(key.substring(buildSettingsHintPrefix.length()), request.getArg(key, ""));
+            }
+        }
+        // The whole fragment is guarded so re-running the script (the build
+        // re-executes fix_xcode_schemes.rb after dependency integration)
+        // doesn't create duplicate targets.
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
+                + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '14.0')\n"
+                + "service_target.add_system_framework('PassKit')\n"
+                + "service_group = xcproj.new_group('" + extensionName + "')\n");
+        appendFilesToXcodeProjGroup(sb, new File(distDir, extensionName), "service_group", "service_target", distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(service_target)\n"
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('" + extensionName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| p.name=='Embed App Extensions'} || main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_phase.add_file_reference(fileref)\n"
+                + "service_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+        }
+        sb.append("}\n");
+        sb.append("end\n");
+    }
+
     private File[] extractAppExtensions(File sourceDirectory, File targetDirectory) throws IOException {
         if (sourceDirectory == null || !sourceDirectory.isDirectory()) {
             throw new IllegalArgumentException("extractAppExtensions sourceDirectory must be an existing directory but received "+sourceDirectory);
@@ -3445,8 +3608,17 @@ public class IPhoneBuilder extends Executor {
             "true")) {
             multitasking = false;
         }
-        
-        
+        if (multitasking && useMetal && getDeploymentTargetInt(request) < 14) {
+            // An explicit ios.deployment_target below 14 cannot satisfy the
+            // App Store launch screen rule for iPad multitasking apps via the
+            // UILaunchScreen key (it only counts when MinimumOSVersion is 14
+            // or higher), so opt out of multitasking instead of producing a
+            // bundle that fails upload validation.
+            log("ios.deployment_target is below 14; implicitly disabling iPad multitasking (UIRequiresFullScreen) so the launch screen passes App Store validation. Set ios.deployment_target=14.0 or higher to keep multitasking support.");
+            multitasking = false;
+        }
+
+
         if (!multitasking || xcodeVersion < 9) {
             if (inject.indexOf("UIRequiresFullScreen") < 0) {
                 // Temporary workaround to disable iPad multitasking support.
@@ -3456,7 +3628,32 @@ public class IPhoneBuilder extends Executor {
             }
         }
         if (!"true".equals(request.getArg("ios.generateSplashScreens", "false"))) {
-            if (!inject.contains("UILaunchStoryboardName")) {
+            if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
+                // SplashBoard never renders the launch storyboard for scene-based
+                // CN1 apps -- the system animates from a black frame instead
+                // (issue #5210). The iOS 14+ UILaunchScreen generated launch
+                // screen does work under UIScene: system background color
+                // (light/dark aware) with the launch icon centered, matching the
+                // native launch placeholder the app shows until the first EDT
+                // frame. UILaunchStoryboardName must be OMITTED here: when both
+                // keys are present iOS prefers the storyboard, which is exactly
+                // the broken path (verified on the iOS 26 simulator with a cold
+                // SplashBoard cache). The ios.launchStoryboardName hint is
+                // therefore only honored with ios.uiscene=false; injecting
+                // either key via ios.plistInject overrides this default.
+                // UIImageName points at the loose Launch.Foreground.png in the
+                // bundle root (guaranteed by generateLaunchScreen); SplashBoard
+                // resolves it there but fails to render the same image from an
+                // actool compiled imageset, so do NOT move it into
+                // Images.xcassets.
+                if (!inject.contains("UILaunchScreen") && !inject.contains("UILaunchStoryboardName")) {
+                    inject += "\n<key>UILaunchScreen</key>\n"
+                            + "<dict>\n"
+                            + "    <key>UIImageName</key>\n"
+                            + "    <string>Launch.Foreground</string>\n"
+                            + "</dict>";
+                }
+            } else if (!inject.contains("UILaunchStoryboardName")) {
                 inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
             }
         }
@@ -3622,6 +3819,14 @@ public class IPhoneBuilder extends Executor {
         String shareAppGroup = request.getArg("ios.shareAppGroup", null);
         if (shareAppGroup != null && shareAppGroup.trim().length() > 0 && !inject.contains("CN1ShareAppGroup")) {
             inject += "\n<key>CN1ShareAppGroup</key><string>" + shareAppGroup.trim() + "</string>";
+        }
+
+        // Wallet issuer-provisioning: com.codename1.payment.WalletExtension reads this App Group
+        // suite to publish pass entries for the generated Wallet extensions. See ios.wallet.* hints.
+        String walletAppGroup = request.getArg("ios.wallet.appGroup", null);
+        if ("true".equals(request.getArg("ios.wallet.extension", "false"))
+                && walletAppGroup != null && walletAppGroup.trim().length() > 0 && !inject.contains("CN1WalletAppGroup")) {
+            inject += "\n<key>CN1WalletAppGroup</key><string>" + walletAppGroup.trim() + "</string>";
         }
 
         BufferedReader infoReader = new BufferedReader(new InputStreamReader(
@@ -3976,15 +4181,27 @@ public class IPhoneBuilder extends Executor {
                 + "                NSString *cn1PrefLang = [cn1PrefLangs objectAtIndex:0];\n"
                 + "                NSArray *cn1LangParts = [cn1PrefLang componentsSeparatedByCharactersInSet:\n"
                 + "                    [NSCharacterSet characterSetWithCharactersInString:@\"-_\"]];\n"
-                + "                if (cn1LangParts.count >= 2) {\n"
+                + "                NSString *cn1Lang = [[cn1LangParts objectAtIndex:0] lowercaseString];\n"
+                + "                // The device region (Settings > General > Region) takes precedence\n"
+                + "                // over the region embedded in the language variant (e.g. en-GB), so\n"
+                + "                // a UAE-region user with English (UK) still gets cn1_icon_en_AE.\n"
+                + "                NSString *cn1DeviceRegion = [[NSLocale currentLocale] objectForKey:NSLocaleCountryCode];\n"
+                + "                if (cn1DeviceRegion.length == 2) {\n"
                 + "                    NSString *cn1Key = [NSString stringWithFormat:@\"%@_%@\",\n"
-                + "                        [[cn1LangParts objectAtIndex:0] lowercaseString],\n"
-                + "                        [[cn1LangParts objectAtIndex:1] uppercaseString]];\n"
+                + "                        cn1Lang, [cn1DeviceRegion uppercaseString]];\n"
                 + "                    cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
                 + "                }\n"
-                + "                if (cn1TargetIcon == nil && cn1LangParts.count >= 1) {\n"
-                + "                    NSString *cn1Key = [[cn1LangParts objectAtIndex:0] lowercaseString];\n"
-                + "                    cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "                if (cn1TargetIcon == nil && cn1LangParts.count >= 2) {\n"
+                + "                    // lastObject skips script subtags such as the Hans in zh-Hans-CN\n"
+                + "                    NSString *cn1LangRegion = [cn1LangParts lastObject];\n"
+                + "                    if (cn1LangRegion.length == 2) {\n"
+                + "                        NSString *cn1Key = [NSString stringWithFormat:@\"%@_%@\",\n"
+                + "                            cn1Lang, [cn1LangRegion uppercaseString]];\n"
+                + "                        cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "                    }\n"
+                + "                }\n"
+                + "                if (cn1TargetIcon == nil) {\n"
+                + "                    cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Lang];\n"
                 + "                }\n"
                 + "            }\n"
                 + "            BOOL cn1NeedsUpdate = (cn1TargetIcon == nil && cn1CurrentIcon != nil)\n"
@@ -4324,6 +4541,7 @@ public class IPhoneBuilder extends Executor {
             if (legacyLaunchImages.exists()) {
                 delTree(legacyLaunchImages);
             }
+
         }
         return true;
     }

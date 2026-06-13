@@ -34,6 +34,7 @@ public class OrientationLockScreenshotTest extends BaseTest {
                     revalidate();
                     UITimer.timer(1500, false, this, () -> {
                         revalidate();
+                        markCaptureStarted();
                         Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
                             CN.lockOrientation(true);
                             waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);

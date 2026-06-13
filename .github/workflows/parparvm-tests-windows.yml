@@ -483,14 +483,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # Posts the captured PNG(s) as a PR comment using the shared CN1SS machinery.
-  # Runs on Linux -- where that posting path is exercised by the other ports --
-  # so the Windows jobs only have to produce and upload the images. Depends on
-  # both arch legs; the arm64 leg is continue-on-error so a missing arm64 image
-  # never blocks the comment (the x64 image is always posted).
-  windows-port-screenshot-comment:
-    name: screenshot-comment
-    needs: [windows-port-screenshot, windows-port-screenshot-arm64]
+  # Per-architecture PR comments. x64 (Intel/AMD) and arm64 (Apple Silicon / Arm)
+  # post SEPARATE comments with DISTINCT markers, each depending only on its own
+  # screenshot leg -- so a failure or re-run in one architecture's pipeline never
+  # overrides or hides the other's result (the previous single combined comment
+  # showed only x64 and was skipped entirely if the x64 leg failed). Each comment
+  # carries that arch's own benchmark table (SSE2 on x64, NEON on arm64).
+  windows-port-screenshot-comment-x64:
+    name: screenshot-comment (x64)
+    needs: windows-port-screenshot
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -503,67 +504,98 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      # Download both arch legs into separate dirs; the arm64 artifact may be
-      # absent if that experimental leg failed -- the comment still posts x64.
       - name: Download x64 screenshot artifact
         uses: actions/download-artifact@v4
         with:
           name: windows-port-screenshot-raw-x64
-          path: artifacts/windows-port/raw-x64
-
-      - name: Download arm64 screenshot artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-port-screenshot-raw-arm64
-          path: artifacts/windows-port/raw-arm64
-
-      - name: Post screenshot to PR
+          path: artifacts/windows-port/raw
+      - name: Post x64 screenshots to PR
         shell: bash
         env:
-          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_COMMENT -->'
-          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port]'
-          CN1SS_PREVIEW_SUBDIR: 'windows-native'
-          CN1SS_SUCCESS_MESSAGE: 'Native Windows port: full hellocodenameone screenshot suite, rendered offscreen with Direct2D/DirectWrite (x64). Compared against the in-repo baseline in scripts/windows/screenshots; every tile has a baseline, so any difference posts as "changed" for review.'
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_X64_COMMENT -->'
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port x64]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-native-x64'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port (x64 / Intel-AMD): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, SSE2 SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'
         run: |
           set -e
           ART="artifacts/windows-port"
-          # Post the x64 suite (the gate). Each captured PNG is named <test>.png;
-          # use that as the cn1ss entry name. arm64 stays an uploaded artifact (the
-          # full suite is ~112 images -- too many to post both legs inline).
           entries=()
-          if [ -d "$ART/raw-x64" ]; then
-            for f in "$ART"/raw-x64/*.png; do
+          if [ -d "$ART/raw" ]; then
+            for f in "$ART"/raw/*.png; do
               [ -f "$f" ] || continue
-              name=$(basename "$f" .png)
-              entries+=("$name=$f")
+              entries+=("$(basename "$f" .png)=$f")
             done
           fi
-          if [ ${#entries[@]} -eq 0 ]; then
-            echo "No screenshots were produced; skipping PR comment."
-            exit 0
-          fi
-          echo "Posting ${#entries[@]} screenshot(s)"
+          if [ ${#entries[@]} -eq 0 ]; then echo "No x64 screenshots; skipping comment."; exit 0; fi
+          echo "Posting ${#entries[@]} x64 screenshot(s)"
           mkdir -p "$ART/previews"
+          cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
-          # Compare against the in-repo baseline (scripts/windows/screenshots).
-          # ProcessScreenshots marks each captured image matched / changed / new
-          # vs that reference and renders the diff into the PR comment. A mismatch
-          # is reported, not fatal (the helper only returns non-zero on its own
-          # tool failures), so a rendering regression shows up for review without
-          # blocking the gate. Every tile now has a baseline, so differences post
-          # as "changed" rather than "new".
           REF_DIR="$(pwd)/scripts/windows/screenshots"
           cn1ss_process_and_report \
-            "Native Windows port" \
+            "Native Windows port (x64)" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$REF_DIR" "$ART/previews" "$ART" \
+            "${entries[@]}"
+
+  windows-port-screenshot-comment-arm64:
+    name: screenshot-comment (arm64)
+    needs: windows-port-screenshot-arm64
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Download arm64 screenshot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-screenshot-raw-arm64
+          path: artifacts/windows-port/raw
+      - name: Post arm64 screenshots to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_ARM64_COMMENT -->'
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port arm64]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-native-arm64'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port (arm64 / Apple Silicon - Arm): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, NEON SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          entries=()
+          if [ -d "$ART/raw" ]; then
+            for f in "$ART"/raw/*.png; do
+              [ -f "$f" ] || continue
+              entries+=("$(basename "$f" .png)=$f")
+            done
+          fi
+          if [ ${#entries[@]} -eq 0 ]; then echo "No arm64 screenshots; skipping comment."; exit 0; fi
+          echo "Posting ${#entries[@]} arm64 screenshot(s)"
+          mkdir -p "$ART/previews"
+          cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
+          cn1ss_process_and_report \
+            "Native Windows port (arm64)" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
             "$REF_DIR" "$ART/previews" "$ART" \
             "${entries[@]}"

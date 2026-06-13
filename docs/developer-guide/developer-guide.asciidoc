@@ -67,6 +67,8 @@ include::graphics.asciidoc[]
 
 include::3D-Graphics.asciidoc[]
 
+include::Game-Development.asciidoc[]
+
 include::Events.asciidoc[]
 
 include::io.asciidoc[]
@@ -84,6 +86,8 @@ include::Testing-with-JUnit.adoc[]
 include::Advertising.asciidoc[]
 
 include::Monetization.asciidoc[]
+
+include::Apple-Wallet-Extension.asciidoc[]
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
@@ -105,6 +109,8 @@ include::Annotation-SQLite-ORM.asciidoc[]
 include::Ai-And-Speech.asciidoc[]
 
 include::Near-Field-Communication.asciidoc[]
+
+include::Printing.asciidoc[]
 
 include::Network-Connectivity.asciidoc[]
 

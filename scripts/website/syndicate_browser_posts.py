@@ -292,6 +292,12 @@ class FoojayAdapter:
     def is_configured() -> bool:
         return bool(os.environ.get("FOOJAY_USER") and os.environ.get("FOOJAY_PASSWORD"))
 
+    @staticmethod
+    def accepts(post: Post) -> bool:
+        # foojay only receives the weekly Friday digest post; the deep-dive
+        # posts published on other weekdays are not syndicated there.
+        return post.date.weekday() == 4
+
     def login(self, page) -> None:
         page.goto(self.LOGIN_URL, wait_until="domcontentloaded")
         _find_first(page, self.USER_SELECTORS).fill(os.environ["FOOJAY_USER"])
@@ -1174,7 +1180,9 @@ def main(argv: list[str]) -> int:
     posts = discover_posts(blog_dir)
     state = State.load(state_file)
     platform_names = [a.name for a in adapters]
-    candidate = select_candidate(posts, state, platform_names, today, floor, args.min_age_days)
+    platform_filters = {a.name: a.accepts for a in adapters if hasattr(a, "accepts")}
+    candidate = select_candidate(posts, state, platform_names, today, floor, args.min_age_days,
+                                 platform_filters=platform_filters)
     if candidate is None and not args.validate_only:
         print("No syndication candidate found today.")
         return 0
@@ -1191,6 +1199,11 @@ def main(argv: list[str]) -> int:
     failures: list[str] = []
 
     for adapter in adapters:
+        wanted = platform_filters.get(adapter.name)
+        if wanted is not None and not wanted(candidate) and not args.validate_only:
+            print(f"  [{adapter.name}] post not accepted by this platform "
+                  f"(published {candidate.date.strftime('%A')}); skipping.")
+            continue
         if state.is_syndicated(candidate.slug, adapter.name) and not args.validate_only:
             print(f"  [{adapter.name}] already syndicated; skipping.")
             continue

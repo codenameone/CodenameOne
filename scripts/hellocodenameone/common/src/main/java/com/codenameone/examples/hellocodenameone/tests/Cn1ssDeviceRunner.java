@@ -266,6 +266,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
+            new SimdBenchmarkTest(),
+            new SecureStorageTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission
             // prompts). Self-skips on iOS / Android / JS where the open
@@ -300,6 +302,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     };
 
     private static BaseTest prependedTest;
+
+    /// Index of the test that has consumed its one-shot silent-timeout retry
+    /// (see finalizeTest). -1 until the first retry fires; comparing against
+    /// the index guarantees at most one retry per test so a genuinely broken
+    /// test still fails after ~2x its timeout instead of looping.
+    private int retriedTestIndex = -1;
 
     public static void addTest(BaseTest test) {
         prependedTest = test;
@@ -474,7 +482,26 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         try {
             testClass.cleanup();
             if (timedOut) {
-                log("CN1SS:ERR:suite test=" + testName + " failed due to timeout waiting for DONE");
+                log("CN1SS:ERR:suite test=" + testName + " failed due to timeout waiting for DONE stage="
+                        + testClass.getCaptureStage());
+                if (shouldRetryAfterSilentTimeout(index, testClass)) {
+                    // The test timed out without EVER requesting a capture and
+                    // without reporting a failure: the show -> settle-timer ->
+                    // screenshot chain was silently swallowed. Observed on the
+                    // iOS Metal CI job (graphics-fill-shape produced no PNG, no
+                    // error, while the very next test rendered fine ~2s later),
+                    // i.e. a transient render-pipeline stall rather than a bug
+                    // in the test itself. The pipeline is healthy again by the
+                    // time the timeout poll fires, so one re-run reliably
+                    // recovers the screenshot instead of failing the whole job
+                    // on a missing tile.
+                    retriedTestIndex = index;
+                    log("CN1SS:WARN:suite test=" + testName
+                            + " retrying once: timed out before any capture started");
+                    testClass.resetForRetry();
+                    runNextTest(index);
+                    return;
+                }
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testName + " failed: " + testClass.getFailMessage());
             } else if (!testClass.shouldTakeScreenshot()) {
@@ -490,6 +517,26 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         // doesn't match the reference screenshot name (e.g. "graphics-affine-scale")
         // and breaks iOS/Android comparison results.
         continueToNext.run();
+    }
+
+    /// A retry is only safe when the timeout was truly silent. Gates:
+    /// - one retry per test (retriedTestIndex);
+    /// - native ports only: on HTML5 the suite advancement is co-driven by
+    ///   port.js (runCn1ssResolvedTest dispatches per index) and known-bad
+    ///   tests are parked via its forced-timeout lists, so a Java-side rerun
+    ///   would fight that machinery;
+    /// - no failure was reported (a real failure should surface, not retry);
+    /// - no capture was started (an in-flight capture could emit after the
+    ///   rerun's form is up and ship the wrong pixels under this test's name);
+    /// - the test actually takes a screenshot (non-screenshot tests may have
+    ///   side effects that aren't safe to repeat, and a missing tile is the
+    ///   only failure mode this retry exists to prevent).
+    private boolean shouldRetryAfterSilentTimeout(int index, BaseTest testClass) {
+        return retriedTestIndex != index
+                && !"HTML5".equals(Display.getInstance().getPlatformName())
+                && !testClass.isFailed()
+                && !testClass.isCaptureStarted()
+                && testClass.shouldTakeScreenshot();
     }
 
     private void finishSuite() {

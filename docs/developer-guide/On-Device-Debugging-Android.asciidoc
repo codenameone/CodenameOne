@@ -269,6 +269,30 @@ Without a source path, breakpoints in framework classes still trigger
 and locals / fields still read — you'll just see "Sources not found"
 in the editor when stepping into framework code.
 
+=== Debugging the generated Gradle project from Android Studio
+
+Everything above drives a Codename One-built APK through `adb`. The
+alternative is to open the generated Android project itself in Android
+Studio and use it like any native Android app — useful when you're
+debugging native interface code, working on the Android port, or want
+Android Studio's profiler and layout inspector:
+
+* *Local build*: `mvn cn1:buildAndroidGradleProject` writes a complete
+  Gradle project under `target/...-android-source/`. Open that directory
+  in Android Studio (current versions open it directly — no Gradle
+  version fiddling required), connect a device, and press *Debug*.
+* *Cloud build*: check the *Include Source* flag in Codename One
+  Settings before sending the build, then download the sources result
+  from the build server and open it the same way.
+
+When iterating, regenerate the project rather than hand-merging files —
+the generated project is a build artifact, not a source of truth.
+
+For native C/C++ added through the NDK, attach Android Studio's LLDB to
+the process; as noted in <<What you can step through>>, the LLDB and
+JDWP attaches are independent and can run side by side against one
+device.
+
 === Troubleshooting
 
 ==== "No Android device is online"

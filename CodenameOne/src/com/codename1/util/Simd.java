@@ -13,7 +13,7 @@ import com.codename1.annotations.Concrete;
 import com.codename1.ui.CN;
 
 /// Portable SIMD API with Java fallback implementations.
-@Concrete(name = "com.codename1.impl.ios.IOSSimd")
+@Concrete(name = "com.codename1.impl.ios.IOSSimd", win = "com.codename1.impl.windows.WindowsSimd")
 public class Simd {
     /// Returns the singleton instance of the Simd class. Equivalent to `CN.getSimd();`
     public static Simd get() {
@@ -24,6 +24,20 @@ public class Simd {
     /// if this returns false the APIs in this class would still work
     /// using fallback loop code
     public boolean isSupported() {
+        return false;
+    }
+
+    /// Returns true when *chained, fine-grained* byte shuffle/interleave pipelines
+    /// (as the Base64 SIMD codec uses: unpack/pack interleaved, byte shifts, table
+    /// lookups) are hardware-accelerated AND actually beat the compiler's
+    /// autovectorized scalar code. NEON platforms (iOS, Windows-on-Arm) return
+    /// true -- there the explicit codec is dramatically faster even at -O2. x86-64
+    /// returns false: its `/O2` autovectorizer already matches the scalar path and
+    /// SSE2 has no 3-way interleave, so the codec should stay scalar there. This is
+    /// distinct from {@link #isSupported()} -- the *fused* whole-array image ops
+    /// (alpha/mask blends) win on every platform and are gated on isSupported(),
+    /// not on this flag. Defaults to false (the generic scalar Simd).
+    public boolean isByteShuffleAccelerated() {
         return false;
     }
 

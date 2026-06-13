@@ -2112,6 +2112,9 @@ public class AndroidGradleBuilder extends Executor {
             } else {
                 //try to remove the background for the icon, because android 5 will mask the nottification icon
                 //with white
+                //keep iconImage itself pristine: processLocalizedIcons below reuses it as the
+                //fallback launcher icon, which must not have the transparency keying applied
+                BufferedImage notifIconImage = iconImage;
                 if (Integer.parseInt(targetNumber) >= 21) {
                     //notification small icon
                     Image img = makeColorTransparent(iconImage, new Color(iconImage.getRGB(2, 2)));
@@ -2119,9 +2122,9 @@ public class AndroidGradleBuilder extends Executor {
                     Graphics2D bGr = notifSmallIcon.createGraphics();
                     bGr.drawImage(img, 0, 0, null);
                     bGr.dispose();
-                    iconImage = notifSmallIcon;
+                    notifIconImage = notifSmallIcon;
                 }
-                createIconFile(new File(drawableDir, "ic_stat_notify.png"), iconImage, 24, 24);
+                createIconFile(new File(drawableDir, "ic_stat_notify.png"), notifIconImage, 24, 24);
             }
 
             processLocalizedIcons(assetsDir, resDir, enableAdaptiveIcons, iconImage);

@@ -218,6 +218,10 @@ XCODE_BUILD_CMD=(
   "CODE_SIGN_IDENTITY="
   "CODE_SIGNING_REQUIRED=NO"
   "CODE_SIGNING_ALLOWED=NO"
+  # Optimize the translated C (Xcode Debug defaults to -O0) so the SIMD benchmark
+  # compares against auto-vectorized scalar -- honest and matching Windows /O2.
+  # Override with CN1_TEST_OPT_LEVEL (0/1/2/3/s).
+  "GCC_OPTIMIZATION_LEVEL=${CN1_TEST_OPT_LEVEL:-2}"
   build
 )
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
@@ -320,6 +324,10 @@ pkill -x "$APP_PROCESS_NAME" >/dev/null 2>&1 || true
 sleep 1
 
 rm_log "Launching Mac Catalyst app via LaunchServices: $APP_BUNDLE_PATH"
+# Timestamp marker so crash reports written during this run can be picked
+# out of ~/Library/Logs/DiagnosticReports afterwards (find -newer).
+LAUNCH_MARKER="$SCREENSHOT_TMP_DIR/.launch-marker"
+touch "$LAUNCH_MARKER"
 LAUNCH_START=$(date +%s)
 # `open -W -n -F` waits for the app to terminate, forces a fresh
 # instance, and skips state restoration. `--stdout / --stderr` pipe the
@@ -350,6 +358,28 @@ else
   rm_log "Warning: could not resolve pid for $APP_PROCESS_NAME"
 fi
 
+# When the suite times out the app is usually not idle: ParparVM's
+# SignalHandler (CodenameOne_GLAppDelegate.m) converts SIGSEGV into a Java
+# NPE and returns, so a thread that faulted outside a Java try frame
+# re-executes the faulting instruction forever -- that is the "We had a
+# signal 11" spam seen in device-runner.log when the suite "hangs". A
+# process sample taken at timeout therefore contains the exact faulting
+# stack (and, for genuine deadlocks, every thread's wait state).
+capture_hang_diagnostics() {
+  local pid spam
+  pid="$(pgrep -x "$APP_PROCESS_NAME" 2>/dev/null | head -n 1 || true)"
+  if [ -n "$pid" ]; then
+    rm_log "Sampling hung app (pid=$pid) -> app-hang-sample.txt"
+    sample "$pid" 5 -file "$ARTIFACTS_DIR/app-hang-sample.txt" >/dev/null 2>&1 || true
+  else
+    rm_log "No live $APP_PROCESS_NAME process found to sample"
+  fi
+  spam="$(grep -c 'We had a signal' "$TEST_LOG" 2>/dev/null || echo 0)"
+  if [ "${spam:-0}" -gt 0 ]; then
+    rm_log "Signal-handler loop detected: ${spam} 'We had a signal' lines in app stdout (a crashed thread is spinning in ParparVM's SignalHandler; see app-hang-sample.txt for the faulting stack)"
+  fi
+}
+
 END_MARKER="CN1SS:SUITE:FINISHED"
 TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-1500}"
 START_TIME="$(date +%s)"
@@ -373,6 +403,7 @@ while true; do
   NOW="$(date +%s)"
   if [ $(( NOW - START_TIME )) -ge $TIMEOUT_SECONDS ]; then
     rm_log "STAGE:TIMEOUT -> DeviceRunner did not emit completion marker within ${TIMEOUT_SECONDS}s"
+    capture_hang_diagnostics
     break
   fi
   sleep 5
@@ -408,6 +439,19 @@ if kill -0 "$APP_PID" >/dev/null 2>&1; then
 fi
 wait "$APP_PID" 2>/dev/null || true
 APP_PID=0
+
+# Collect any crash reports the OS wrote for the app during this run
+# (covers the case where the process died outright instead of spinning in
+# the signal handler -- LaunchServices apps report to DiagnosticReports,
+# not to our stdout pipe).
+CRASH_REPORT_DIR="$HOME/Library/Logs/DiagnosticReports"
+if [ -d "$CRASH_REPORT_DIR" ]; then
+  while IFS= read -r crash_file; do
+    [ -n "$crash_file" ] || continue
+    rm_log "Collected crash report: $(basename "$crash_file")"
+    cp -f "$crash_file" "$ARTIFACTS_DIR/" 2>/dev/null || true
+  done < <(find "$CRASH_REPORT_DIR" -maxdepth 1 -name "${APP_PROCESS_NAME}*" -newer "$LAUNCH_MARKER" 2>/dev/null)
+fi
 
 # The app has exited; stop the WebSocket server and adopt whatever it
 # received. The server wrote one <test>.png per delivered screenshot into
