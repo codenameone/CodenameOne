@@ -776,22 +776,37 @@ public class JavaScriptBuilder extends Executor {
                 Files.copy(c.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         }
-        // Every TrueType font the app loads is fetched by the host from
-        // ``assets/<name>`` (HTML5Implementation.loadTrueTypeFont ->
-        // port.js, which mirrors getResourceAsStream's assets/ rewrite).
-        // The translator emits bundled fonts (the material-design icon
-        // font AND any CSS-merged theme fonts such as the Initializr's
-        // Inter-*.ttf) at the dist ROOT, so move EVERY root *.ttf into
-        // assets/ -- not just material-design-font.ttf. Leaving them at
-        // the root made the app 404 on assets/Inter-*.ttf and fall back
-        // to the browser default face. CN1Resource.res and other non-font
-        // root files are untouched.
+        // getResourceAsStream resources are fetched by the host from
+        // ``assets/<name>`` FIRST (port.js mirrors getResourceAsStream's
+        // assets/ rewrite), falling back to the dist root only if that
+        // 404s. The translator emits these bundled resources at the dist
+        // ROOT, so locally the root fallback hides the problem -- but the
+        // deployed website serves the app from a path where only assets/
+        // is reliably present, so the root fallback also 404s and the
+        // resource read fails. Relocate the resources the app fetches at
+        // runtime into assets/ so the FIRST fetch succeeds everywhere:
+        //   * TrueType fonts (material-design icon font + CSS-merged theme
+        //     fonts such as Initializr's Inter-*.ttf),
+        //   * the Initializr generator's template archives (*.zip) and
+        //     pom templates (*-pom.xml), e.g. common.zip, idea.zip,
+        //     eclipse.zip, barebones-*.zip / barebones-pom.xml -- without
+        //     these, clicking "Generate Project" 404s the templates and
+        //     fails (previously misreported as "Browser storage is full").
+        // index.html, *.js, manifest.json, *.res and the generic pom.xml
+        // (maven artifact metadata, not a template) are left at the root.
         File assetsDir = new File(distDir, "assets");
         assetsDir.mkdirs();
         File[] rootFiles = distDir.listFiles();
         if (rootFiles != null) {
             for (File rf : rootFiles) {
-                if (rf.isFile() && rf.getName().toLowerCase().endsWith(".ttf")) {
+                if (!rf.isFile()) {
+                    continue;
+                }
+                String lower = rf.getName().toLowerCase();
+                boolean relocate = lower.endsWith(".ttf")
+                        || lower.endsWith(".zip")
+                        || lower.endsWith("-pom.xml");
+                if (relocate) {
                     File dest = new File(assetsDir, rf.getName());
                     Files.move(rf.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
