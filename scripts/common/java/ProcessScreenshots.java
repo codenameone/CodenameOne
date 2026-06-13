@@ -58,8 +58,10 @@ public class ProcessScreenshots {
             double maxMismatchPercent
     ) throws IOException {
         List<Map<String, Object>> results = new ArrayList<>();
+        java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
+            deliveredTests.add(testName);
             Path actualPath = entry.getValue();
             Path expectedPath = referenceDir.resolve(testName + ".png");
             Map<String, Object> record = new LinkedHashMap<>();
@@ -106,6 +108,38 @@ public class ProcessScreenshots {
                 }
             }
             results.add(record);
+        }
+        // The reference directory is the manifest of every screenshot a healthy
+        // run MUST produce. The loop above only sees screenshots the suite
+        // actually delivered, so a golden whose actual was never delivered -- the
+        // signature of a suite that hung or crashed partway -- would otherwise
+        // leave no record at all, and the report/comment would describe a clean
+        // "N matched" pass over just the survivors while the suite was in fact
+        // incomplete. Walk the goldens that no delivered actual covered and
+        // record each as missing_actual so the comparison JSON, the rendered
+        // summary, the PR comment and the shell-level count-regression guard all
+        // agree on the same reality. (See scripts/lib/cn1ss.sh cn1ss_count_*.)
+        if (referenceDir != null && Files.isDirectory(referenceDir)) {
+            List<String> missingTests = new ArrayList<>();
+            try (java.util.stream.Stream<Path> goldens = Files.list(referenceDir)) {
+                goldens.filter(Files::isRegularFile)
+                        .map(p -> p.getFileName().toString())
+                        .filter(n -> n.endsWith(".png"))
+                        .map(n -> n.substring(0, n.length() - ".png".length()))
+                        .filter(name -> !deliveredTests.contains(name))
+                        .forEach(missingTests::add);
+            }
+            Collections.sort(missingTests);
+            for (String testName : missingTests) {
+                Path expectedPath = referenceDir.resolve(testName + ".png");
+                Map<String, Object> record = new LinkedHashMap<>();
+                record.put("test", testName);
+                record.put("actual_path", "");
+                record.put("expected_path", expectedPath.toString());
+                record.put("status", "missing_actual");
+                record.put("message", "No screenshot was delivered for this golden (the test did not run, hung, or the suite crashed before reaching it).");
+                results.add(record);
+            }
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("results", results);
