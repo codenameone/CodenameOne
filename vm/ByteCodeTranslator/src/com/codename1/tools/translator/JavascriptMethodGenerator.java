@@ -4175,6 +4175,40 @@ final class JavascriptMethodGenerator {
         return false;
     }
 
+    // Category-aware DUP emission. The JVM dup opcodes are defined over operand
+    // stack SLOTS (a long/double occupies two), but the JS backend models a
+    // long/double as a SINGLE stack entry. ASM frame analysis (Parser) resolves
+    // each dup into ENTRY terms: duplicate the top ``nDup`` entries and reinsert
+    // the copy beneath the next ``nSkip`` entries. This covers all category-1
+    // and category-2 forms of DUP2/DUP2_X1/DUP2_X2/DUP_X2 uniformly.
+    //
+    // Without this, e.g. ``totalIn = totalOut = 0L`` (a dup2_x1 of a long over a
+    // ref) was emitted with the category-1 three-value shuffle, swapping object
+    // and value on the second store -- so the field never got written.
+    private static void emitDup(StringBuilder out, StraightLineContext ctx, int nDup, int nSkip) {
+        int total = nDup + nSkip;
+        String[] temps = new String[total];
+        // temps[0] = topmost value (first popped).
+        for (int i = 0; i < total; i++) {
+            String v = ctx.pop();
+            String t = ctx.nextTemp("__dup");
+            out.append("  let ").append(t).append(" = ").append(v).append(";\n");
+            temps[i] = t;
+        }
+        // Bottom copy of the duplicated entries (restore original bottom->top order).
+        for (int i = nDup - 1; i >= 0; i--) {
+            out.append("  ").append(ctx.push(temps[i])).append(";\n");
+        }
+        // The skipped entries, in original order.
+        for (int i = total - 1; i >= nDup; i--) {
+            out.append("  ").append(ctx.push(temps[i])).append(";\n");
+        }
+        // Top copy of the duplicated entries.
+        for (int i = nDup - 1; i >= 0; i--) {
+            out.append("  ").append(ctx.push(temps[i])).append(";\n");
+        }
+    }
+
     private static boolean appendStraightLineBasicInstruction(StringBuilder out, BytecodeMethod method, BasicInstruction instruction,
             StraightLineContext ctx) {
         switch (instruction.getOpcode()) {
@@ -4236,6 +4270,17 @@ final class JavascriptMethodGenerator {
                 ctx.pop();
                 return true;
             case Opcodes.POP2:
+                // POP2 pops two SLOTS: one category-2 value (long/double) or two
+                // category-1 values. The JS backend models a long/double as ONE
+                // entry, so popping a fixed two entries discards an extra value
+                // when the top is category-2. getDupNDup() carries the resolved
+                // entry count (1 or 2) from ASM frame analysis; -1 = legacy.
+                if (instruction.getDupNDup() >= 0) {
+                    for (int i = 0; i < instruction.getDupNDup(); i++) {
+                        ctx.pop();
+                    }
+                    return true;
+                }
                 ctx.pop();
                 ctx.pop();
                 return true;
@@ -4259,6 +4304,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP_X2: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
@@ -4275,6 +4324,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP2: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String t1 = ctx.nextTemp("__dup");
@@ -4288,6 +4341,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP2_X1: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
@@ -4305,6 +4362,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP2_X2: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
