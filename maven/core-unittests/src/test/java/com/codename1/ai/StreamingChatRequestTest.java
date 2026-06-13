@@ -22,15 +22,14 @@
  */
 package com.codename1.ai;
 
-import com.codename1.io.NetworkManager;
 import com.codename1.junit.UITestBase;
-import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.DisplayTest;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Collections;
 import java.util.List;
@@ -42,17 +41,20 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Exercises the provider-agnostic SSE plumbing in {@link StreamingChatRequest}
  * (line reassembly, {@code data:} extraction, the {@code [DONE]} sentinel,
- * clean completion, and HTTP-error mapping) by running a concrete subclass
- * through the mock network layer with a recording {@link StreamingChatRequest.SseDecoder}.
+ * clean completion, and HTTP-error mapping) by feeding a controlled response
+ * body straight into {@code readResponse} with a recording
+ * {@link StreamingChatRequest.SseDecoder}.
+ *
+ * <p>The request is driven directly rather than through {@code NetworkManager}
+ * so the test is deterministic and never depends on the network worker thread
+ * (the blocking enqueue path can deadlock under some JDKs). {@code readResponse}
+ * is {@code protected} and reachable here because the test shares the
+ * {@code com.codename1.ai} package; the subclass overrides {@code getResponseCode}
+ * to select the HTTP status under test.
  */
 class StreamingChatRequestTest extends UITestBase {
 
     private static final String URL = "http://sse.test/v1/stream";
-
-    @AfterEach
-    void clearMocks() {
-        TestCodenameOneImplementation.getInstance().clearNetworkMocks();
-    }
 
     private static byte[] utf8(String s) {
         try {
@@ -62,7 +64,7 @@ class StreamingChatRequestTest extends UITestBase {
         }
     }
 
-    /** Records every event/finish/error the framework routes to it. */
+    /** Records every event/finish/error the request routes to it. */
     private static final class RecordingDecoder implements StreamingChatRequest.SseDecoder {
         final List<String> events = new CopyOnWriteArrayList<String>();
         final ChatResponse finishResponse =
@@ -91,16 +93,19 @@ class StreamingChatRequestTest extends UITestBase {
         }
     }
 
-    /** Minimal concrete request used purely to drive the abstract base class. */
+    /** Minimal concrete request that lets the test pick the HTTP status. */
     private static final class TestStreamingChatRequest extends StreamingChatRequest {
-        TestStreamingChatRequest(StreamingListener listener,
-                                 AsyncResource<ChatResponse> result,
-                                 SseDecoder decoder) {
+        private final int status;
+
+        TestStreamingChatRequest(int status, StreamingListener listener,
+                                 AsyncResource<ChatResponse> result, SseDecoder decoder) {
             super(URL, utf8("{}"), listener, result, decoder);
-            // Suppress the framework's default unhandled-error dialog so the
-            // 4xx/5xx path reaches StreamingChatRequest.readResponse() (which
-            // opts into reading the error body) instead of blocking on a modal.
-            setFailSilently(true);
+            this.status = status;
+        }
+
+        @Override
+        public int getResponseCode() {
+            return status;
         }
     }
 
@@ -115,10 +120,9 @@ class StreamingChatRequestTest extends UITestBase {
         }
     }
 
-    /** Runs a request against a mock SSE response and returns once settled. */
+    /** Feeds {@code body} through {@code readResponse} at the given status and
+     * returns once the result settles. */
     private Outcome run(int status, String body, RecordingDecoder decoder) {
-        TestCodenameOneImplementation.getInstance()
-                .addNetworkMockResponse(URL, status, status == 200 ? "OK" : "ERR", utf8(body));
         AsyncResource<ChatResponse> result = new AsyncResource<ChatResponse>();
         final AtomicReference<ChatResponse> value = new AtomicReference<ChatResponse>();
         final AtomicReference<Throwable> error = new AtomicReference<Throwable>();
@@ -132,21 +136,21 @@ class StreamingChatRequestTest extends UITestBase {
             }
         });
         StreamingListener listener = new StreamingListener.Adapter();
-        TestStreamingChatRequest req = new TestStreamingChatRequest(listener, result, decoder);
-        NetworkManager.getInstance().addToQueueAndWait(req);
+        TestStreamingChatRequest req = new TestStreamingChatRequest(status, listener, result, decoder);
+        try {
+            req.readResponse(new ByteArrayInputStream(utf8(body)));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
-        int budget = 8000;
+        // completeWith / failWith marshal the settle onto the EDT via callSerially.
+        int budget = 200;
         while (!result.isDone() && budget > 0) {
             DisplayTest.flushEdt();
-            try {
-                Thread.sleep(5);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            budget -= 5;
+            budget--;
         }
         DisplayTest.flushEdt();
-        assertTrue(result.isDone(), "streaming request did not settle within the timeout");
+        assertTrue(result.isDone(), "streaming request did not settle");
         return new Outcome(value.get(), error.get());
     }
 
