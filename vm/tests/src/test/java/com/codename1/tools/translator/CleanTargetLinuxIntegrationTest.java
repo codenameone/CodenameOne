@@ -87,6 +87,79 @@ class CleanTargetLinuxIntegrationTest {
     }
 
     /**
+     * An interactive windowed feature-test demo launcher. Unlike the headless
+     * suite, this opens a real window exercising the native-peer / dlopen'd
+     * features that are hard to test automatically: single-line + multi-line text
+     * editing (GtkEntry/GtkTextView), the WebKit browser, GStreamer media playback
+     * + audio recording, and camera capture. Each risky action is wrapped so a
+     * missing device/lib degrades to an on-screen message instead of a crash.
+     */
+    static String linuxDemoLauncherSource() {
+        return "import com.codename1.ui.*;\n" +
+                "import com.codename1.ui.events.*;\n" +
+                "import com.codename1.ui.layouts.*;\n" +
+                "import com.codename1.ui.plaf.UIManager;\n" +
+                "import com.codename1.components.SpanLabel;\n" +
+                "import com.codename1.media.Media;\n" +
+                "import com.codename1.media.MediaManager;\n" +
+                "import com.codename1.capture.Capture;\n" +
+                "import com.codename1.impl.linux.LinuxImplementation;\n" +
+                "public class LinuxHelloMain {\n" +
+                "  static Form home;\n" +
+                "  public static void main(String[] args) {\n" +
+                "    Display.init(null);\n" +
+                "    Display.getInstance().callSerially(new Runnable(){ public void run(){ build(); } });\n" +
+                "    LinuxImplementation.runMainEventLoop();\n" +
+                "  }\n" +
+                "  static void toast(String s){ try { Dialog.show(\"Result\", s, \"OK\", null); } catch(Throwable t){ t.printStackTrace(); } }\n" +
+                "  static void build(){\n" +
+                "    home = new Form(\"Codename One - Linux Feature Test\", BoxLayout.y());\n" +
+                "    home.add(new SpanLabel(\"Native GTK3/Cairo build. Each button exercises a native-peer / dlopen'd feature.\"));\n" +
+                "    home.add(new Label(\"Single-line text (GtkEntry):\"));\n" +
+                "    home.add(new TextField(\"edit me\"));\n" +
+                "    home.add(new Label(\"Multi-line text (GtkTextView):\"));\n" +
+                "    home.add(new TextArea(\"multiple\\nlines\\nof editable\\ntext\", 4, 30));\n" +
+                "    Button browser = new Button(\"Open browser (WebKit)\");\n" +
+                "    browser.addActionListener(new ActionListener(){ public void actionPerformed(ActionEvent e){\n" +
+                "      try {\n" +
+                "        Form bf = new Form(\"Browser\", new BorderLayout());\n" +
+                "        Button back = new Button(\"< Back\");\n" +
+                "        back.addActionListener(new ActionListener(){ public void actionPerformed(ActionEvent ev){ home.showBack(); } });\n" +
+                "        bf.add(BorderLayout.NORTH, back);\n" +
+                "        BrowserComponent bc = new BrowserComponent();\n" +
+                "        bc.setURL(\"https://www.codenameone.com\");\n" +
+                "        bf.add(BorderLayout.CENTER, bc);\n" +
+                "        bf.show();\n" +
+                "      } catch(Throwable t){ toast(\"Browser unavailable: \" + t); }\n" +
+                "    } });\n" +
+                "    home.add(browser);\n" +
+                "    Button play = new Button(\"Play audio (GStreamer)\");\n" +
+                "    play.addActionListener(new ActionListener(){ public void actionPerformed(ActionEvent e){\n" +
+                "      try {\n" +
+                "        Media m = MediaManager.createMedia(\"https://www.codenameone.com/img/audio/test.mp3\", false);\n" +
+                "        m.play();\n" +
+                "        toast(\"Playing (duration \" + m.getDuration() + \"ms)\");\n" +
+                "      } catch(Throwable t){ toast(\"Media playback unavailable: \" + t); }\n" +
+                "    } });\n" +
+                "    home.add(play);\n" +
+                "    Button rec = new Button(\"Record audio (GStreamer)\");\n" +
+                "    rec.addActionListener(new ActionListener(){ public void actionPerformed(ActionEvent e){\n" +
+                "      try { String p = Capture.captureAudio(); toast(p == null ? \"Recording cancelled\" : (\"Recorded to: \" + p)); }\n" +
+                "      catch(Throwable t){ toast(\"Audio recording unavailable: \" + t); }\n" +
+                "    } });\n" +
+                "    home.add(rec);\n" +
+                "    Button cam = new Button(\"Capture photo (camera)\");\n" +
+                "    cam.addActionListener(new ActionListener(){ public void actionPerformed(ActionEvent e){\n" +
+                "      try { String p = Capture.capturePhoto(); toast(p == null ? \"Capture cancelled\" : (\"Captured: \" + p)); }\n" +
+                "      catch(Throwable t){ toast(\"Camera unavailable: \" + t); }\n" +
+                "    } });\n" +
+                "    home.add(cam);\n" +
+                "    home.show();\n" +
+                "  }\n" +
+                "}\n";
+    }
+
+    /**
      * Translates the real hellocodenameone screenshot suite (app + Kotlin stdlib +
      * core + the Linux port + JavaAPI + the port's nativeSources) into a CMake dist
      * with the {@code linux} app type and returns the dist root. Pure Java
@@ -94,6 +167,11 @@ class CleanTargetLinuxIntegrationTest {
      * {@code translateHelloSuiteDist}.
      */
     static Path translateHelloSuiteDistLinux() throws Exception {
+        return translateHelloSuiteDistLinux(linuxHelloLauncherSource());
+    }
+
+    /** As above but with a caller-supplied {@code LinuxHelloMain} launcher source. */
+    static Path translateHelloSuiteDistLinux(String launcherSource) throws Exception {
         Path coreClasses = Paths.get("..", "..", "maven", "core", "target", "classes").normalize().toAbsolutePath();
         Path portClasses = Paths.get("..", "..", "maven", "linux", "target", "classes").normalize().toAbsolutePath();
         Path commonClasses = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
@@ -131,7 +209,7 @@ class CleanTargetLinuxIntegrationTest {
         Path sourceDir = Files.createTempDirectory("linuxhello-sources");
         Path classesDir = Files.createTempDirectory("linuxhello-classes");
         Path javaApiDir = Files.createTempDirectory("linuxhello-japi");
-        Files.write(sourceDir.resolve("LinuxHelloMain.java"), linuxHelloLauncherSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("LinuxHelloMain.java"), launcherSource.getBytes(StandardCharsets.UTF_8));
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
         String cp = coreClasses + java.io.File.pathSeparator + portClasses
@@ -179,7 +257,12 @@ class CleanTargetLinuxIntegrationTest {
      * (the C compiler the runner provides; {@code cc} by default). Returns the ELF.
      */
     static Path buildHelloCodenameOneElf() throws Exception {
-        Path cmakeRoot = translateHelloSuiteDistLinux();
+        return buildHelloCodenameOneElf(linuxHelloLauncherSource());
+    }
+
+    /** As above but for a caller-supplied launcher (e.g. the interactive demo). */
+    static Path buildHelloCodenameOneElf(String launcherSource) throws Exception {
+        Path cmakeRoot = translateHelloSuiteDistLinux(launcherSource);
         Path buildDir = cmakeRoot.resolve("build");
         Files.createDirectories(buildDir);
         String cc = System.getenv().getOrDefault("CN1_CC", "cc");
@@ -333,36 +416,33 @@ class CleanTargetLinuxIntegrationTest {
             server.destroy();
         }
 
-        // Best-effort: also emit a *windowed* demo ELF -- one that builds and shows
-        // a Form instead of driving the cn1ss suite -- by splicing the generated
-        // launcher and relinking the objects we already compiled (a fast relink, no
-        // re-translation). Runs only when CN1_LINUX_DEMO_OUT is set and we built
-        // from source (a dist is present to splice). Wrapped so it can never fail
-        // the suite test.
+        // Best-effort: also emit the interactive *feature-test demo* ELF -- a real
+        // windowed app exercising the native-peer features (text editing, WebKit
+        // browser, GStreamer media/recording, camera) -- by translating the demo
+        // launcher and building it the same way (zig old-glibc via CN1_CC). A fresh
+        // translation rather than a relink, since the demo introduces its own
+        // classes. Runs only when CN1_LINUX_DEMO_OUT is set; wrapped so it can never
+        // fail the suite test.
         String demoOut = System.getenv("CN1_LINUX_DEMO_OUT");
         if (demoOut != null && !demoOut.trim().isEmpty()
                 && (prebuilt == null || prebuilt.trim().isEmpty())) {
             try {
-                Path buildDir = elf.getParent();
-                Path launcher = buildDir.getParent().resolve("LinuxHelloMain-src").resolve("LinuxHelloMain.c");
-                spliceWindowedDemoLauncher(launcher);
-                CleanTargetIntegrationTest.runCommand(
-                        Arrays.asList("cmake", "--build", buildDir.toString()), buildDir.getParent());
+                Path demoElf = buildHelloCodenameOneElf(linuxDemoLauncherSource());
                 Path dest = Paths.get(demoOut.trim());
                 if (dest.getParent() != null) { Files.createDirectories(dest.getParent()); }
-                Files.copy(elf, dest, StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(demoElf, dest, StandardCopyOption.REPLACE_EXISTING);
                 dest.toFile().setExecutable(true);
                 // Ship the split-out symbol companion next to it (Release builds
                 // emit <exe>.debug via objcopy) so a crash address can be turned
                 // back into a Java method/line with addr2line/gdb.
-                Path elfDebug = Paths.get(elf.toString() + ".debug");
-                if (Files.exists(elfDebug)) {
-                    Files.copy(elfDebug, Paths.get(dest.toString() + ".debug"), StandardCopyOption.REPLACE_EXISTING);
+                Path demoDebug = Paths.get(demoElf.toString() + ".debug");
+                if (Files.exists(demoDebug)) {
+                    Files.copy(demoDebug, Paths.get(dest.toString() + ".debug"), StandardCopyOption.REPLACE_EXISTING);
                 }
                 System.out.println("CN1_LINUX_DEMO_ELF=" + dest.toAbsolutePath()
                         + " (" + (Files.size(dest) / 1024) + "KB)");
             } catch (Throwable t) {
-                System.out.println("Windowed demo build failed (non-fatal): " + t);
+                System.out.println("Interactive demo build failed (non-fatal): " + t);
             }
         }
     }
