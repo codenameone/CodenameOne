@@ -1444,38 +1444,47 @@ JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
 
 JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     int err = 0;
-    // we need to synchronize the mutex initialization since there might be a race condition here
-    if(!obj->__codenameOneThreadData) {
-        // double locking to avoid race condition and improve performance
+    // Double-checked locking for the lazily allocated per-object monitor. The fast-path
+    // read MUST be an acquire load and the publishing store (inside the critical section)
+    // MUST be a release store: otherwise a second thread can observe the
+    // __codenameOneThreadData pointer the instant malloc() returns -- before
+    // pthread_mutex_init() has run on it -- and then pthread_mutex_lock() an
+    // uninitialized mutex. On ARM's weak memory model that hangs forever (observed as the
+    // EDT wedged in monitorEnter while logging an exception, which freezes the whole app).
+    // Build the struct fully, init its mutex/condition, and only then publish the pointer.
+    struct CN1ThreadData* data = (struct CN1ThreadData*)__atomic_load_n(&obj->__codenameOneThreadData, __ATOMIC_ACQUIRE);
+    if(!data) {
         lockCriticalSection();
-        if(!obj->__codenameOneThreadData) {
-            obj->__codenameOneThreadData = malloc(sizeof(struct CN1ThreadData));
-            memset(obj->__codenameOneThreadData, 0, sizeof(struct CN1ThreadData));
-            pthread_mutex_init(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex, NULL);
-            pthread_cond_init(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, NULL);
+        data = (struct CN1ThreadData*)obj->__codenameOneThreadData;
+        if(!data) {
+            data = malloc(sizeof(struct CN1ThreadData));
+            memset(data, 0, sizeof(struct CN1ThreadData));
+            pthread_mutex_init(&data->__codenameOneMutex, NULL);
+            pthread_cond_init(&data->__codenameOneCondition, NULL);
+            __atomic_store_n(&obj->__codenameOneThreadData, data, __ATOMIC_RELEASE);
         }
         unlockCriticalSection();
-        err = pthread_mutex_lock(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
-        ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = threadStateData->threadId;
-        ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
+        err = pthread_mutex_lock(&data->__codenameOneMutex);
+        data->ownerThread = threadStateData->threadId;
+        data->counter++;
     } else {
         JAVA_LONG own = threadStateData->threadId;
-        JAVA_LONG currentlyHeldBy = ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread;
-        
+        JAVA_LONG currentlyHeldBy = data->ownerThread;
+
         // we already own the lock...
         if(currentlyHeldBy == own) {
-            ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
+            data->counter++;
             return;
         }
         threadStateData->threadActive = JAVA_FALSE;
-        err = pthread_mutex_lock(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
-        ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter++;
-        ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = own;
+        err = pthread_mutex_lock(&data->__codenameOneMutex);
+        data->counter++;
+        data->ownerThread = own;
         while (threadStateData->threadBlockedByGC) {
             usleep(100);
         }
         threadStateData->threadActive = JAVA_TRUE;
-        
+
 
     }
     //printf("Locking mutex %i started from %@", (int)obj->__codenameOneMutex, [NSThread callStackSymbols]);
