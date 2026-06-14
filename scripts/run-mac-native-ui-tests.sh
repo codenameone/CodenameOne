@@ -367,6 +367,7 @@ fi
 # stack (and, for genuine deadlocks, every thread's wait state).
 capture_hang_diagnostics() {
   local pid spam
+  report_inflight_test
   pid="$(pgrep -x "$APP_PROCESS_NAME" 2>/dev/null | head -n 1 || true)"
   if [ -n "$pid" ]; then
     rm_log "Sampling hung app (pid=$pid) -> app-hang-sample.txt"
@@ -380,8 +381,97 @@ capture_hang_diagnostics() {
   fi
 }
 
+# Report the screenshot test that was in flight when the app died. Every test
+# logs "CN1SS:INFO:suite starting test=<name>" before it runs and
+# "CN1SS:INFO:suite finished test=<name>" after; the test whose start has no
+# matching finish is the one that crashed. This single line turns an opaque
+# "delivered N of 128" into "it died in <test>", which is the first thing you
+# need to know to fix a flaky mid-suite crash.
+report_inflight_test() {
+  local started finished
+  started="$(grep -hoE 'suite starting test=[^ ]+' "$TEST_LOG" "$FALLBACK_LOG" 2>/dev/null \
+              | sed -E 's/.*test=//' | tail -n 1)"
+  finished="$(grep -hoE 'suite finished test=[^ ]+' "$TEST_LOG" "$FALLBACK_LOG" 2>/dev/null \
+               | sed -E 's/.*test=//' | tail -n 1)"
+  if [ -n "$started" ] && [ "$started" != "$finished" ]; then
+    rm_log "STAGE:APP_CRASHED -> in-flight test when the app died: '${started}' (last completed: '${finished:-<none>}')"
+  elif [ -n "$finished" ]; then
+    rm_log "STAGE:APP_CRASHED -> app exited after completing '${finished}' but before the suite-finished marker"
+  fi
+}
+
+# Diagnostics for the crash / early-exit path (app exited before emitting the
+# completion marker). Unlike a timeout there is usually no live process left to
+# `sample`, so the authoritative faulting stack comes from the OS crash report
+# (harvested separately) and from the tail of the app's own stdout, which
+# carries ParparVM's "Codename One revisions:" crash dump. That dump is often
+# truncated in the captured file because the process dies mid-write with
+# stdout block-buffered, so we surface whatever made it to disk directly in the
+# job log -- a partial native dump still names the faulting area.
+capture_crash_diagnostics() {
+  local pid
+  report_inflight_test
+  pid="$(pgrep -x "$APP_PROCESS_NAME" 2>/dev/null | head -n 1 || true)"
+  if [ -n "$pid" ]; then
+    rm_log "A $APP_PROCESS_NAME process is still alive (pid=$pid); sampling -> app-hang-sample.txt"
+    sample "$pid" 3 -file "$ARTIFACTS_DIR/app-hang-sample.txt" >/dev/null 2>&1 || true
+  fi
+  if [ -s "$TEST_LOG" ]; then
+    rm_log "---- last 25 lines of app stdout ($TEST_LOG) ----"
+    tail -n 25 "$TEST_LOG" 2>/dev/null | sed 's/^/[app-stdout] /'
+    rm_log "---- end of app stdout tail ----"
+  fi
+}
+
+# Harvest OS crash reports for the app. macOS writes a .ips (the authoritative
+# native faulting stack + termination reason) for a real SIGSEGV/SIGBUS, but
+# ReportCrash runs asynchronously, so on a fast CI runner the report may not be
+# on disk yet when the app's `open` wrapper returns. Poll for up to ~45s when a
+# crash is suspected. Search both the per-user and system DiagnosticReports
+# dirs, and match the process name as well as common Catalyst report suffixes
+# (.ips / .crash / .diag). Echo the first report's header (Exception Type /
+# Termination / Crashed Thread) into the job log so the cause is visible
+# without unzipping the artifact bundle.
+harvest_crash_reports() {
+  local wait_for_report="$1" deadline=0 found=0 dir crash_file
+  local -a report_dirs=("$HOME/Library/Logs/DiagnosticReports" "/Library/Logs/DiagnosticReports")
+  if [ "$wait_for_report" = "1" ]; then
+    deadline=$(( $(date +%s) + 45 ))
+  fi
+  while true; do
+    found=0
+    for dir in "${report_dirs[@]}"; do
+      [ -d "$dir" ] || continue
+      while IFS= read -r crash_file; do
+        [ -n "$crash_file" ] || continue
+        found=1
+        local base; base="$(basename "$crash_file")"
+        if [ ! -f "$ARTIFACTS_DIR/$base" ]; then
+          rm_log "Collected crash report: $base (from $dir)"
+          cp -f "$crash_file" "$ARTIFACTS_DIR/" 2>/dev/null || true
+          # Surface the key fields. .ips reports are JSON-ish; grep the human
+          # header lines that exist in both the legacy and IPS formats.
+          rm_log "---- crash report header: $base ----"
+          grep -aE 'Exception Type|Exception Codes|Termination|Crashed Thread|"signal"|"exceptionType"|faulting' "$crash_file" 2>/dev/null \
+            | head -n 8 | sed 's/^/[crash] /'
+          rm_log "---- end crash report header ----"
+        fi
+      done < <(find "$dir" -maxdepth 1 -name "${APP_PROCESS_NAME}*" \
+                 -newer "$LAUNCH_MARKER" 2>/dev/null)
+    done
+    if [ "$found" -eq 1 ] || [ "$wait_for_report" != "1" ] || [ "$(date +%s)" -ge "$deadline" ]; then
+      break
+    fi
+    sleep 3
+  done
+  if [ "$found" -eq 0 ] && [ "$wait_for_report" = "1" ]; then
+    rm_log "No OS crash report (.ips) found for $APP_PROCESS_NAME within the wait window; the native faulting stack may be unavailable (ReportCrash disabled or the process was SIGKILLed). The app-stdout tail above is the best remaining signal."
+  fi
+}
+
 END_MARKER="CN1SS:SUITE:FINISHED"
 TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-1500}"
+APP_CRASHED=0
 START_TIME="$(date +%s)"
 rm_log "Waiting for DeviceRunner completion marker ($END_MARKER) -- timeout ${TIMEOUT_SECONDS}s"
 while true; do
@@ -397,6 +487,8 @@ while true; do
   if [ "$APP_PID" -ne 0 ] && ! kill -0 "$APP_PID" >/dev/null 2>&1; then
     if ! pgrep -x "$APP_PROCESS_NAME" >/dev/null 2>&1; then
       rm_log "App process exited before completion marker -- check $FALLBACK_LOG"
+      APP_CRASHED=1
+      capture_crash_diagnostics
       break
     fi
   fi
@@ -440,18 +532,14 @@ fi
 wait "$APP_PID" 2>/dev/null || true
 APP_PID=0
 
-# Collect any crash reports the OS wrote for the app during this run
-# (covers the case where the process died outright instead of spinning in
-# the signal handler -- LaunchServices apps report to DiagnosticReports,
-# not to our stdout pipe).
-CRASH_REPORT_DIR="$HOME/Library/Logs/DiagnosticReports"
-if [ -d "$CRASH_REPORT_DIR" ]; then
-  while IFS= read -r crash_file; do
-    [ -n "$crash_file" ] || continue
-    rm_log "Collected crash report: $(basename "$crash_file")"
-    cp -f "$crash_file" "$ARTIFACTS_DIR/" 2>/dev/null || true
-  done < <(find "$CRASH_REPORT_DIR" -maxdepth 1 -name "${APP_PROCESS_NAME}*" -newer "$LAUNCH_MARKER" 2>/dev/null)
-fi
+# Collect any crash reports the OS wrote for the app during this run (covers
+# the case where the process died outright instead of spinning in the signal
+# handler -- LaunchServices apps report to DiagnosticReports, not to our stdout
+# pipe). When we already know the app crashed (it exited before the completion
+# marker) wait for ReportCrash to flush the .ips, since it is the only place the
+# native faulting stack survives; otherwise do a single non-blocking sweep so a
+# clean run is not slowed down.
+harvest_crash_reports "$APP_CRASHED"
 
 # The app has exited; stop the WebSocket server and adopt whatever it
 # received. The server wrote one <test>.png per delivered screenshot into
