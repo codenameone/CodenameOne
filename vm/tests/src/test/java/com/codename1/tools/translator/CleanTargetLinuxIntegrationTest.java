@@ -330,5 +330,83 @@ class CleanTargetLinuxIntegrationTest {
             if (app != null) { app.destroyForcibly(); }
             server.destroy();
         }
+
+        // Best-effort: also emit a *windowed* demo ELF -- one that builds and shows
+        // a Form instead of driving the cn1ss suite -- by splicing the generated
+        // launcher and relinking the objects we already compiled (a fast relink, no
+        // re-translation). Runs only when CN1_LINUX_DEMO_OUT is set and we built
+        // from source (a dist is present to splice). Wrapped so it can never fail
+        // the suite test.
+        String demoOut = System.getenv("CN1_LINUX_DEMO_OUT");
+        if (demoOut != null && !demoOut.trim().isEmpty()
+                && (prebuilt == null || prebuilt.trim().isEmpty())) {
+            try {
+                Path buildDir = elf.getParent();
+                Path launcher = buildDir.getParent().resolve("LinuxHelloMain-src").resolve("LinuxHelloMain.c");
+                spliceWindowedDemoLauncher(launcher);
+                CleanTargetIntegrationTest.runCommand(
+                        Arrays.asList("cmake", "--build", buildDir.toString()), buildDir.getParent());
+                Path dest = Paths.get(demoOut.trim());
+                if (dest.getParent() != null) { Files.createDirectories(dest.getParent()); }
+                Files.copy(elf, dest, StandardCopyOption.REPLACE_EXISTING);
+                dest.toFile().setExecutable(true);
+                System.out.println("CN1_LINUX_DEMO_ELF=" + dest.toAbsolutePath()
+                        + " (" + (Files.size(dest) / 1024) + "KB)");
+            } catch (Throwable t) {
+                System.out.println("Windowed demo build failed (non-fatal): " + t);
+            }
+        }
+    }
+
+    /**
+     * Rewrites the generated suite launcher ({@code LinuxHelloMain.c}) into a
+     * windowed demo: instead of driving the cn1ss screenshot suite it builds and
+     * shows a small Form (title + two labels + a button) and enters the GTK event
+     * loop. Lets the same translated dist produce a self-contained binary one can
+     * double-click on a Linux desktop. Mirrors the operand-stack / GC-root
+     * discipline of the generated {@code main} so the new objects stay reachable.
+     */
+    static void spliceWindowedDemoLauncher(Path launcherC) throws IOException {
+        String s = new String(Files.readAllBytes(launcherC), StandardCharsets.UTF_8);
+        // 1) pull in the Form/Label/Button headers the demo body calls (otherwise
+        //    __NEW_* is implicitly declared and its pointer return is truncated).
+        String incAnchor = "#include \"com_codename1_ui_plaf_UIManager.h\"\n";
+        if (s.contains(incAnchor) && !s.contains("com_codename1_ui_Form.h")) {
+            s = s.replace(incAnchor, incAnchor
+                    + "#include \"com_codename1_ui_Form.h\"\n"
+                    + "#include \"com_codename1_ui_Label.h\"\n"
+                    + "#include \"com_codename1_ui_Button.h\"\n");
+        }
+        // 2) replace the suite-construction body (the Reporter..Thread.start span)
+        //    with a Form build+show; keep Display.init + theme above it and
+        //    runMainEventLoop below it.
+        int start = s.indexOf("__NEW_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerReporter");
+        int end = s.indexOf("com_codename1_impl_linux_LinuxImplementation_runMainEventLoop__");
+        if (start < 0 || end < 0 || end < start) {
+            throw new IOException("launcher anchors not found; cannot splice windowed demo");
+        }
+        start = s.lastIndexOf('\n', start) + 1;     // start of the Reporter line
+        end = s.lastIndexOf('\n', end) + 1;         // start of the runMainEventLoop line
+        String body =
+            "    /* --- windowed demo: build & show a Form (replaces the cn1ss suite) --- */\n" +
+            "    PUSH_POINTER(__NEW_com_codename1_ui_Form(threadStateData));\n" +
+            "    BC_DUP();\n" +
+            "    com_codename1_ui_Form___INIT____(threadStateData, SP[-1].data.o);     SP -= 1;\n" +
+            "    virtual_com_codename1_ui_Form_setTitle___java_lang_String(threadStateData, SP[-1].data.o, newStringFromCString(threadStateData, \"Codename One - Native Linux (GTK3 / Cairo)\"));\n" +
+            "    PUSH_POINTER(__NEW_com_codename1_ui_Label(threadStateData));\n" +
+            "    BC_DUP();\n" +
+            "    com_codename1_ui_Label___INIT_____java_lang_String(threadStateData, SP[-1].data.o, newStringFromCString(threadStateData, \"This window is a single, self-contained native ELF.\"));     SP -= 1;\n" +
+            "    virtual_com_codename1_ui_Form_addComponent___com_codename1_ui_Component(threadStateData, SP[-2].data.o, SP[-1].data.o);     SP -= 1;\n" +
+            "    PUSH_POINTER(__NEW_com_codename1_ui_Label(threadStateData));\n" +
+            "    BC_DUP();\n" +
+            "    com_codename1_ui_Label___INIT_____java_lang_String(threadStateData, SP[-1].data.o, newStringFromCString(threadStateData, \"2D rendered by Cairo, text by Pango, widgets by GTK3.\"));     SP -= 1;\n" +
+            "    virtual_com_codename1_ui_Form_addComponent___com_codename1_ui_Component(threadStateData, SP[-2].data.o, SP[-1].data.o);     SP -= 1;\n" +
+            "    PUSH_POINTER(__NEW_com_codename1_ui_Button(threadStateData));\n" +
+            "    BC_DUP();\n" +
+            "    com_codename1_ui_Button___INIT_____java_lang_String(threadStateData, SP[-1].data.o, newStringFromCString(threadStateData, \"It works!\"));     SP -= 1;\n" +
+            "    virtual_com_codename1_ui_Form_addComponent___com_codename1_ui_Component(threadStateData, SP[-2].data.o, SP[-1].data.o);     SP -= 1;\n" +
+            "    virtual_com_codename1_ui_Form_show__(threadStateData, SP[-1].data.o);     SP -= 1;\n";
+        s = s.substring(0, start) + body + s.substring(end);
+        Files.write(launcherC, s.getBytes(StandardCharsets.UTF_8));
     }
 }

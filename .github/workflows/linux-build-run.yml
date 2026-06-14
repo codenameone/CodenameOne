@@ -186,6 +186,9 @@ jobs:
         working-directory: vm
         env:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}/artifacts/linux-port/raw
+          # After the suite runs, the capture test relinks the same objects into a
+          # windowed demo ELF here (best-effort; never fails the suite).
+          CN1_LINUX_DEMO_OUT: ${{ github.workspace }}/artifacts/linux-port/demo/codenameone-linux-demo-${{ matrix.arch }}
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -e
@@ -203,6 +206,18 @@ jobs:
         with:
           name: linux-screenshot-raw-${{ matrix.arch }}
           path: artifacts/linux-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+      # A runnable, self-contained windowed demo binary for this arch (opens a
+      # GTK window showing a Form -- not the headless suite). Download and run it
+      # on a Linux desktop to smoke-test the native port on real hardware.
+      - name: Upload windowed demo binary (${{ matrix.arch }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-demo-${{ matrix.arch }}
+          path: artifacts/linux-port/demo
           if-no-files-found: warn
           retention-days: 14
 
