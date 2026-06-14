@@ -4,14 +4,28 @@ name: ParparVM Java Tests (Windows)
 # (clang-cl on the MSVC ABI) and runs the translator test suite, including the
 # clean-target integration test that translates Java -> C, compiles it with
 # clang-cl and runs the resulting binary. This proves translated C compiles and
-# executes on Windows via LLVM. The Linux workflow (parparvm-tests.yml) still
-# owns the quality-report publishing and release jars.
+# executes on Windows via LLVM, and -- via the "windows" app-type case -- that
+# the native Windows port's Direct2D/DirectWrite/Win32 link set resolves. The
+# Linux workflow (parparvm-tests.yml) still owns the quality-report publishing
+# and release jars.
+#
+# The build runs on a matrix of both Windows architectures:
+#   * x64   (windows-latest)  -- the reliable gate; Intel/AMD desktops.
+#   * arm64 (windows-11-arm)  -- matches Apple-Silicon dev VMs and Arm desktops.
+#
+# windows-11-arm is a public-preview runner that is free ONLY on public
+# repositories (it fails on private repos), and its image differs from x64 (some
+# tooling / JDK architectures are not published for Windows-on-Arm). The arm64
+# leg is therefore marked experimental (continue-on-error) so it gives signal
+# without blocking merges while the image's toolchain is nailed down; fail-fast
+# is disabled so the x64 leg always runs to completion.
 
 on:
   pull_request:
     paths:
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
+      - 'Ports/WindowsPort/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -20,25 +34,66 @@ on:
     paths:
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
+      - 'Ports/WindowsPort/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
 
+concurrency:
+  # Cancel superseded runs of this workflow for the same PR branch
+  # (github.head_ref is set on pull_request events). On push to master
+  # head_ref is empty, so the group falls back to the unique run_id and
+  # every master commit is still tested in full -- no coverage lost.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   vm-tests-windows:
-    runs-on: windows-latest
+    name: clean-target (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x64
+            runner: windows-latest
+            msvc_arch: amd64
+            experimental: false
+          - name: arm64
+            runner: windows-11-arm
+            msvc_arch: arm64
+            experimental: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
       # clang-cl uses the MSVC headers, CRT and linker, so the MSVC developer
       # environment has to be on PATH for the spawned cmake/clang-cl to work.
+      # The arch is matched to the runner so the arm64 leg builds native arm64.
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
 
       - name: Set up Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
 
       - name: Verify LLVM / Ninja toolchain
         shell: pwsh
@@ -47,32 +102,45 @@ jobs:
           ninja --version
           cmake --version
 
-      # Install JDKs and export their paths (CompilerHelper reads JDK_*_HOME).
+      # Install JDKs and export their paths (CompilerHelper reads JDK_*_HOME and
+      # also auto-discovers any others). Temurin does not publish Windows/aarch64
+      # builds for JDK 8/11, so those legs are x64-only; 17/21/25 run on both
+      # architectures, which still exercises every JavaAPI bytecode level the
+      # clean target supports.
       - name: Set up JDK 8
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
       - name: Save JDK 8 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
       - name: Set up JDK 11
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '11'
       - name: Save JDK 11 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_11_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
+      # Temurin publishes Windows/aarch64 only from JDK 21, so on arm64 the only
+      # JDK set up is 21; x64 covers 8/11/17/21/25. The translator test harness
+      # adapts to whatever JDKs are present.
       - name: Set up JDK 17
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
       - name: Save JDK 17 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
@@ -86,27 +154,39 @@ jobs:
         run: echo "JDK_21_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
       - name: Set up JDK 25
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '25'
       - name: Save JDK 25 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_25_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
-      # Restore JDK 8 as the active runner JDK (cache is on the first JDK 8 above)
-      - name: Restore JDK 8
+      # Restore the active runner JDK that drives Maven: JDK 8 on x64 (matching
+      # the cache above), and JDK 21 on arm64 where 8/11/17 are unavailable.
+      - name: Restore JDK 8 (x64)
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '8'
+      - name: Restore JDK 21 (arm64)
+        if: ${{ matrix.name == 'arm64' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
 
       # Only the native-compilation tests are run here: this runner exists to
       # prove the translated C compiles with clang-cl (LLVM) and executes on
       # Windows, which is exactly what CleanTargetIntegrationTest does (translate
-      # Java -> C -> cmake/clang-cl build -> run the binary). The rest of the vm
-      # suite is platform-agnostic Java already covered by parparvm-tests.yml on
-      # Linux, and the JavaScript integration tests additionally require Node.
+      # Java -> C -> cmake/clang-cl build -> run the binary), including the
+      # "windows" app-type case that links the Direct2D/DirectWrite/Win32 stack.
+      # The rest of the vm suite is platform-agnostic Java already covered by
+      # parparvm-tests.yml on Linux, and the JavaScript integration tests
+      # additionally require Node.
       - name: Run ParparVM clean-target build on Windows (clang-cl)
         working-directory: vm
         shell: pwsh
@@ -121,3 +201,401 @@ jobs:
           JDK_17_HOME: ${{ env.JDK_17_HOME }}
           JDK_21_HOME: ${{ env.JDK_21_HOME }}
           JDK_25_HOME: ${{ env.JDK_25_HOME }}
+
+  # Renders the native Windows port's UI headlessly and captures a PNG. This is
+  # the GUI/screenshot signal for the port (the "softer" signal in the plan): it
+  # builds codename1-core + the Windows port, translates a real Display/Form app
+  # with the "windows" app type, links it with clang-cl, and runs it in headless
+  # mode -- the app paints into an offscreen Direct2D/WIC bitmap (no window) and
+  # writes a PNG. The PNG is uploaded as an artifact; the companion comment job
+  # posts it to the PR. This x64 leg also publishes the compiled core + port
+  # bytecode for the native arm64 leg (windows-port-screenshot-arm64). PR events
+  # only (the comment job needs PR context). Separate from the clean-target gate
+  # so a rendering hiccup never blocks merges.
+  windows-port-screenshot:
+    name: screenshot-capture (x64)
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Set up Ninja
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
+
+      # JDK 17 compiles the hellocodenameone-common Java (release 17). Set up first
+      # so the JDK 8 below ends up the active JAVA_HOME.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Save JDK 17 path
+        shell: pwsh
+        run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # JDK 8 builds codename1-core (source/target 1.5), runs the Kotlin 1.6.0
+      # compiler (it aborts on JDK 17+), and is the JDK the translator harness uses
+      # (CompilerHelper auto-discovers JDK_8_HOME). Set up last so it stays active.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 path
+        shell: pwsh
+        run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # Install the locally-built artifacts the hellocodenameone Maven build needs:
+      # codename1-core + the Windows port (translator inputs), the codenameone
+      # maven plugin (runs transcode-svg / css / annotation processing during the
+      # app build, '-am' also builds its svg-/lottie-transcoder + css-compiler
+      # deps), and cn1-ads-mock (a common-module dependency). With these in the
+      # local repo the sample resolves the 8.0-SNAPSHOT it pins and builds with the
+      # plugin exactly like a fresh initializr project.
+      - name: Build core + Windows port + CN1 maven plugin (JDK 8)
+        working-directory: maven
+        shell: pwsh
+        # Single-quote the dotted -D arg: PowerShell otherwise splits it at the
+        # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
+        run: mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+
+      # Build the hellocodenameone screenshot app into common/target/classes, which
+      # the capture test translates into the native exe. This is a plain Maven build
+      # of the sample on JDK 17 -- exactly what a fresh initializr project does -- so
+      # the codenameone-maven-plugin runs transcode-svg (emitting the
+      # GeneratedSVGImage classes + SVGRegistry), css, and annotation processing
+      # automatically; nothing here is Windows-port specific. Kotlin 1.6.0 compiles
+      # fine on JDK 17 (jvm-target 1.8 is the output bytecode level, not the runtime
+      # JDK). The codename1 install bootstrap profile is gated on a missing
+      # ~/.codenameone/guibuilder.jar -- we built the artifacts locally, so seed an
+      # empty marker to skip that network step.
+      - name: Build hellocodenameone-common (Maven, JDK 17)
+        shell: pwsh
+        env:
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:JAVA_HOME = $env:JDK_17_HOME
+          New-Item -ItemType Directory -Force "$env:USERPROFILE/.codenameone" | Out-Null
+          if (!(Test-Path "$env:USERPROFILE/.codenameone/guibuilder.jar")) {
+            New-Item -ItemType File -Force "$env:USERPROFILE/.codenameone/guibuilder.jar" | Out-Null
+          }
+          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+          if ($LASTEXITCODE -ne 0) { throw "hellocodenameone-common Maven build failed" }
+          $out = "scripts/hellocodenameone/common/target/classes"
+          if (!(Test-Path "$out/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class")) { throw "common classes missing" }
+          if (!(Test-Path "$out/com/codename1/generated/svg/SVGRegistry.class")) { throw "transcode-svg did not produce SVGRegistry" }
+
+      - name: Upload hellocodenameone-common classes
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-port-common-classes
+          path: scripts/hellocodenameone/common/target/classes
+          if-no-files-found: error
+          retention-days: 1
+
+      # Publish the compiled (architecture-independent) core + port bytecode right
+      # after building it, so the native arm64 screenshot leg can translate +
+      # clang-cl-build an arm64 exe without rebuilding core -- codename1-core needs
+      # JDK 8 (source/target 1.5), which Temurin does not publish for Windows/
+      # aarch64. Uploaded before the capture step so an x64 capture flake does not
+      # block the arm64 leg.
+      - name: Upload compiled core + port classes
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-port-classes
+          path: |
+            maven/core/target/classes
+            maven/windows/target/classes
+            maven/cn1-ads-mock/target/classes
+          if-no-files-found: error
+          retention-days: 1
+
+      # Build the ParparVM JavaAPI, then run the FULL hellocodenameone screenshot
+      # suite over the cn1ss WebSocket: capturesHelloSuiteOverWebSocket builds the
+      # suite exe (app + core + port + nativeSources via clang-cl), starts a
+      # Cn1ssScreenshotServer, runs the exe (it renders each test Form offscreen
+      # with Direct2D/DirectWrite and streams each PNG over com.codename1.io
+      # WebSocket), waits for CN1SS:SUITE:FINISHED, and copies every received PNG
+      # to CN1_SHOT_OUTPUT_DIR (~112 images). This is the CI equivalent of
+      # scripts/windows/run-hello.bat.
+      # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
+      # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
+      # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
+      # Non-fatal: if it fails the browser natives compile as stubs and the
+      # BrowserComponent screenshot is simply absent (no regression).
+      - name: Fetch WebView2 SDK (for the BrowserComponent peer)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
+          if (Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h") {
+            "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+
+      - name: Build JavaAPI + capture screenshot suite over WebSocket
+        working-directory: vm
+        shell: pwsh
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+        run: |
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+
+      - name: Upload screenshot artifact (x64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-port-screenshot-raw-x64
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Native arm64 leg of the screenshot capture: reuses the core + port bytecode
+  # compiled by the x64 job (architecture-independent), then translates +
+  # clang-cl-builds a native arm64 exe on the windows-11-arm runner and captures
+  # the same Contacts UI over the cn1ss WebSocket. Experimental (continue-on-error)
+  # like the arm64 clean-target leg, so an arm64-runner hiccup never blocks the PR.
+  windows-port-screenshot-arm64:
+    name: screenshot-capture (arm64)
+    needs: windows-port-screenshot
+    if: github.event_name == 'pull_request'
+    runs-on: windows-11-arm
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      - name: Set up Ninja
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
+
+      # Temurin publishes Windows/aarch64 from JDK 21; that JDK drives the
+      # translator harness and builds the JavaAPI. Core + port come pre-compiled.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Restore compiled core + port classes
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-classes
+          path: maven
+
+      # The Kotlin 1.6.0 compiler cannot run on this runner's JDK 21 (arm64 has no
+      # Temurin JDK 8/11), so the hellocodenameone-common bytecode is built once on
+      # the x64 leg and reused here (it is architecture-independent).
+      - name: Restore hellocodenameone-common classes
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-common-classes
+          path: scripts/hellocodenameone/common/target/classes
+
+      # Fail loudly if the artifacts did not land where the test reads them --
+      # otherwise the capture test would silently skip (assumeTrue) and post nothing.
+      - name: Verify restored classes
+        shell: pwsh
+        run: |
+          $core = "maven/core/target/classes/com/codename1/ui/Form.class"
+          $port = "maven/windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class"
+          $common = "scripts/hellocodenameone/common/target/classes/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class"
+          if (!(Test-Path $core)) { Write-Error "core classes missing after download: $core"; exit 1 }
+          if (!(Test-Path $port)) { Write-Error "port classes missing after download: $port"; exit 1 }
+          if (!(Test-Path $common)) { Write-Error "common classes missing after download: $common"; exit 1 }
+          Write-Host "Restored core + Windows port + common classes OK"
+
+      # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
+      # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
+      # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
+      # Non-fatal: if it fails the browser natives compile as stubs and the
+      # BrowserComponent screenshot is simply absent (no regression).
+      - name: Fetch WebView2 SDK (for the BrowserComponent peer)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
+          if (Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h") {
+            "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+
+      - name: Build JavaAPI + capture screenshot suite over WebSocket
+        working-directory: vm
+        shell: pwsh
+        env:
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+        run: |
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+
+      - name: Upload screenshot artifact (arm64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-port-screenshot-raw-arm64
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Per-architecture PR comments. x64 (Intel/AMD) and arm64 (Apple Silicon / Arm)
+  # post SEPARATE comments with DISTINCT markers, each depending only on its own
+  # screenshot leg -- so a failure or re-run in one architecture's pipeline never
+  # overrides or hides the other's result (the previous single combined comment
+  # showed only x64 and was skipped entirely if the x64 leg failed). Each comment
+  # carries that arch's own benchmark table (SSE2 on x64, NEON on arm64).
+  windows-port-screenshot-comment-x64:
+    name: screenshot-comment (x64)
+    needs: windows-port-screenshot
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Download x64 screenshot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-screenshot-raw-x64
+          path: artifacts/windows-port/raw
+      - name: Post x64 screenshots to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_X64_COMMENT -->'
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port x64]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-native-x64'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port (x64 / Intel-AMD): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, SSE2 SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          entries=()
+          if [ -d "$ART/raw" ]; then
+            for f in "$ART"/raw/*.png; do
+              [ -f "$f" ] || continue
+              entries+=("$(basename "$f" .png)=$f")
+            done
+          fi
+          if [ ${#entries[@]} -eq 0 ]; then echo "No x64 screenshots; skipping comment."; exit 0; fi
+          echo "Posting ${#entries[@]} x64 screenshot(s)"
+          mkdir -p "$ART/previews"
+          cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
+          cn1ss_process_and_report \
+            "Native Windows port (x64)" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$REF_DIR" "$ART/previews" "$ART" \
+            "${entries[@]}"
+
+  windows-port-screenshot-comment-arm64:
+    name: screenshot-comment (arm64)
+    needs: windows-port-screenshot-arm64
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Download arm64 screenshot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-screenshot-raw-arm64
+          path: artifacts/windows-port/raw
+      - name: Post arm64 screenshots to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_ARM64_COMMENT -->'
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port arm64]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-native-arm64'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port (arm64 / Apple Silicon - Arm): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, NEON SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          entries=()
+          if [ -d "$ART/raw" ]; then
+            for f in "$ART"/raw/*.png; do
+              [ -f "$f" ] || continue
+              entries+=("$(basename "$f" .png)=$f")
+            done
+          fi
+          if [ ${#entries[@]} -eq 0 ]; then echo "No arm64 screenshots; skipping comment."; exit 0; fi
+          echo "Posting ${#entries[@]} arm64 screenshot(s)"
+          mkdir -p "$ART/previews"
+          cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
+          cn1ss_process_and_report \
+            "Native Windows port (arm64)" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$REF_DIR" "$ART/previews" "$ART" \
+            "${entries[@]}"

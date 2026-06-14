@@ -26,7 +26,13 @@ public final class JavaScriptCanvasImageBufferLifecycle {
     }
 
     public interface GraphicsFactory<C, G> {
-        G createGraphics(C canvas);
+        // ``width``/``height`` are the dimensions the canvas was just created
+        // with -- passed in so the graphics can initialise its clip bounds
+        // WITHOUT reading canvas.getWidth()/getHeight() back across the
+        // worker<->host barrier (those numeric round-trips can cross into a
+        // concurrent object read and corrupt it; the Java side already knows
+        // the size).
+        G createGraphics(C canvas, int width, int height);
         void fillRect(G graphics, int fillColor, int width, int height);
     }
 
@@ -74,7 +80,7 @@ public final class JavaScriptCanvasImageBufferLifecycle {
 
     public static <C, G> CanvasImageBuffer<C, G> createBlankBuffer(int width, int height, SizedCanvasFactory<C> canvasFactory, GraphicsFactory<C, G> graphicsFactory) {
         C canvas = canvasFactory.createCanvas(width, height);
-        G graphics = graphicsFactory.createGraphics(canvas);
+        G graphics = graphicsFactory.createGraphics(canvas, width, height);
         return new CanvasImageBuffer<C, G>(canvas, graphics, width, height);
     }
 

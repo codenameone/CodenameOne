@@ -91,6 +91,14 @@ public class BrowserComponent extends Container {
     /// Browser property key to control whether links with `target="_blank"` or `target="_new"`
     /// should be followed in the current browser view. Defaults to `true`.
     public static final String BROWSER_PROPERTY_FOLLOW_TARGET_BLANK = "BrowserComponent.followTargetBlank";
+    /// Browser property key to pin the appearance (light/dark) of the native web widget regardless
+    /// of the device-wide setting. This drives the `prefers-color-scheme` CSS media query and the
+    /// user-agent rendering of form controls and default backgrounds inside the page. Accepted
+    /// values are `"light"`, `"dark"` and `"auto"` (follow the device, the default). Use it via
+    /// `browser.setProperty(BrowserComponent.BROWSER_PROPERTY_INTERFACE_STYLE, "light")`.
+    /// Currently honored on iOS (WKWebView); platforms that do not support pinning the web-view
+    /// appearance ignore it.
+    public static final String BROWSER_PROPERTY_INTERFACE_STYLE = "BrowserComponent.interfaceStyle";
     /// String constant for web event listener `com.codename1.ui.events.ActionListener)`
     public static final String onStart = "onStart";
     /// String constant for web event listener `com.codename1.ui.events.ActionListener)`

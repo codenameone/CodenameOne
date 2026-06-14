@@ -56,15 +56,6 @@ public class StatusBarTapDiagnosticScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() throws Exception {
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            // The JS port truncates this composite stream when chunked through
-            // console logging, leaving the reassembled PNG with missing bytes.
-            // Match the AbstractStickyHeaderScreenshotTest pattern: skip on
-            // HTML5; iOS / Android / JavaSE still cover the visual contract.
-            System.out.println("CN1SS:INFO:test=StatusBarTapDiagnosticScreenshotTest status=SKIPPED reason=js-port-chunk-truncation");
-            done();
-            return true;
-        }
         StatusBarTapDiagnosticNative nativeInterface = NativeLookup.create(StatusBarTapDiagnosticNative.class);
         boolean nativeSupported = nativeInterface != null && nativeInterface.isSupported();
         int displayWidth = Display.getInstance().getDisplayWidth();
@@ -129,6 +120,7 @@ public class StatusBarTapDiagnosticScreenshotTest extends BaseTest {
         beforeFrame.dispose();
         afterFrame.dispose();
 
+        markCaptureStarted();
         Cn1ssDeviceRunnerHelper.emitImage(composite, "StatusBarTapDiagnosticScreenshotTest", this::done);
         return true;
     }

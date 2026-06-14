@@ -87,7 +87,23 @@ class OpenAiClient extends LlmClient {
 
             @Override
             protected void postResponse() {
+                int code;
+                try {
+                    code = getResponseCode();
+                } catch (Throwable t) {
+                    code = 0;
+                }
                 final byte[] data = getResponseData();
+                final LlmException httpErr = httpErrorOrNull(code, data);
+                if (httpErr != null) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            result.error(httpErr);
+                        }
+                    });
+                    return;
+                }
                 try {
                     Map root = JSONParser.parseJSON(data);
                     final ChatResponse cr2 = OpenAiSseDecoder.parseNonStreaming(root);
@@ -222,8 +238,25 @@ class OpenAiClient extends LlmClient {
 
             @Override
             protected void postResponse() {
+                int code;
                 try {
-                    Map root = JSONParser.parseJSON(getResponseData());
+                    code = getResponseCode();
+                } catch (Throwable t) {
+                    code = 0;
+                }
+                final byte[] data = getResponseData();
+                final LlmException httpErr = httpErrorOrNull(code, data);
+                if (httpErr != null) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            result.error(httpErr);
+                        }
+                    });
+                    return;
+                }
+                try {
+                    Map root = JSONParser.parseJSON(data);
                     List<Object> dataArr = JSONParser.asList(root.get("data"));
                     List<Embedding> out = new ArrayList<Embedding>(dataArr == null ? 0 : dataArr.size());
                     if (dataArr != null) {
@@ -274,6 +307,39 @@ class OpenAiClient extends LlmClient {
         configureRequest(cr, "/embeddings");
         NetworkManager.getInstance().addToQueue(cr);
         return result;
+    }
+
+    /// Detects an error response in `postResponse()`. With
+    /// `setReadResponseForErrors(true)` the framework routes HTTP 4xx/5xx
+    /// through `postResponse()` (not `handleException`), so without this
+    /// check an OpenAI `{"error":...}` envelope would be parsed as an empty
+    /// success. Returns the typed [LlmException] to surface, or `null` when
+    /// the response is a normal success that should be parsed as usual.
+    private static LlmException httpErrorOrNull(int code, byte[] data) {
+        String bodyText;
+        try {
+            bodyText = data == null ? "" : new String(data, "UTF-8");
+        } catch (UnsupportedEncodingException uee) {
+            // UTF-8 is universally available; this branch is theoretical.
+            bodyText = "";
+        }
+        boolean envelopeError = false;
+        if (code < 400 && bodyText.length() > 0) {
+            // Some OpenAI-compatible servers answer 200 with an
+            // {"error":...} body; honour that shape too.
+            try {
+                Map root = JSONParser.parseJSON(bodyText);
+                envelopeError = root != null && root.get("error") != null;
+            } catch (IOException ignored) {
+                // Not JSON -> treat as a normal (non-error) body.
+            } catch (RuntimeException ignored) {
+                // Malformed structure -> treat as a non-error body.
+            }
+        }
+        if (code >= 400 || envelopeError) {
+            return OpenAiSseDecoder.mapErrorStatic(code, bodyText);
+        }
+        return null;
     }
 
     private void configureRequest(ConnectionRequest cr, String pathOrNull) {

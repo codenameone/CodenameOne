@@ -58,8 +58,10 @@ public class ProcessScreenshots {
             double maxMismatchPercent
     ) throws IOException {
         List<Map<String, Object>> results = new ArrayList<>();
+        java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
+            deliveredTests.add(testName);
             Path actualPath = entry.getValue();
             Path expectedPath = referenceDir.resolve(testName + ".png");
             Map<String, Object> record = new LinkedHashMap<>();
@@ -83,7 +85,13 @@ public class ProcessScreenshots {
                 try {
                     PNGImage actual = loadPngWithRetry(actualPath);
                     PNGImage expected = loadPngWithRetry(expectedPath);
-                    Map<String, Object> outcome = compareImages(expected, actual, maxChannelDelta, maxMismatchPercent);
+                    // Per-test tolerance override: an optional "<test>.tolerance"
+                    // file next to the reference raises the allowed pixel variance
+                    // for inherently non-deterministic captures (e.g. the GPU 3D
+                    // tests, whose software-renderer output differs by ~1% between
+                    // CI runners). Deterministic 2D tests keep the tight defaults.
+                    double[] tol = readTolerance(referenceDir, testName, maxChannelDelta, maxMismatchPercent);
+                    Map<String, Object> outcome = compareImages(expected, actual, (int) tol[0], tol[1]);
                     if (Boolean.TRUE.equals(outcome.get("equal"))) {
                         record.put("status", "equal");
                     } else {
@@ -100,6 +108,38 @@ public class ProcessScreenshots {
                 }
             }
             results.add(record);
+        }
+        // The reference directory is the manifest of every screenshot a healthy
+        // run MUST produce. The loop above only sees screenshots the suite
+        // actually delivered, so a golden whose actual was never delivered -- the
+        // signature of a suite that hung or crashed partway -- would otherwise
+        // leave no record at all, and the report/comment would describe a clean
+        // "N matched" pass over just the survivors while the suite was in fact
+        // incomplete. Walk the goldens that no delivered actual covered and
+        // record each as missing_actual so the comparison JSON, the rendered
+        // summary, the PR comment and the shell-level count-regression guard all
+        // agree on the same reality. (See scripts/lib/cn1ss.sh cn1ss_count_*.)
+        if (referenceDir != null && Files.isDirectory(referenceDir)) {
+            List<String> missingTests = new ArrayList<>();
+            try (java.util.stream.Stream<Path> goldens = Files.list(referenceDir)) {
+                goldens.filter(Files::isRegularFile)
+                        .map(p -> p.getFileName().toString())
+                        .filter(n -> n.endsWith(".png"))
+                        .map(n -> n.substring(0, n.length() - ".png".length()))
+                        .filter(name -> !deliveredTests.contains(name))
+                        .forEach(missingTests::add);
+            }
+            Collections.sort(missingTests);
+            for (String testName : missingTests) {
+                Path expectedPath = referenceDir.resolve(testName + ".png");
+                Map<String, Object> record = new LinkedHashMap<>();
+                record.put("test", testName);
+                record.put("actual_path", "");
+                record.put("expected_path", expectedPath.toString());
+                record.put("status", "missing_actual");
+                record.put("message", "No screenshot was delivered for this golden (the test did not run, hung, or the suite crashed before reaching it).");
+                results.add(record);
+            }
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("results", results);
@@ -324,6 +364,42 @@ public class ProcessScreenshots {
 
     private static int clamp(int value) {
         return Math.max(0, Math.min(255, value));
+    }
+
+    /// Reads an optional per-test tolerance override from
+    /// "<referenceDir>/<testName>.tolerance" (simple key=value lines:
+    /// maxChannelDelta and/or maxMismatchPercent). Returns
+    /// {channelDelta, mismatchPercent}, falling back to the supplied defaults for
+    /// any key the file omits or when the file is absent.
+    private static double[] readTolerance(Path referenceDir, String testName,
+            int defChannelDelta, double defMismatchPercent) {
+        double[] t = { defChannelDelta, defMismatchPercent };
+        Path tolPath = referenceDir.resolve(testName + ".tolerance");
+        if (!Files.exists(tolPath)) {
+            return t;
+        }
+        try {
+            for (String line : Files.readAllLines(tolPath)) {
+                String s = line.trim();
+                if (s.isEmpty() || s.startsWith("#")) {
+                    continue;
+                }
+                int eq = s.indexOf('=');
+                if (eq <= 0) {
+                    continue;
+                }
+                String key = s.substring(0, eq).trim();
+                String val = s.substring(eq + 1).trim();
+                if (key.equals("maxChannelDelta")) {
+                    t[0] = Integer.parseInt(val);
+                } else if (key.equals("maxMismatchPercent")) {
+                    t[1] = Double.parseDouble(val);
+                }
+            }
+        } catch (Exception ex) {
+            System.err.println("Warning: could not read tolerance " + tolPath + ": " + ex.getMessage());
+        }
+        return t;
     }
 
     private static Map<String, Object> compareImages(PNGImage expected, PNGImage actual, int maxChannelDelta, double maxMismatchPercent) {

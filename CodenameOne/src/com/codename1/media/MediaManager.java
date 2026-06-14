@@ -912,4 +912,16 @@ public abstract class MediaManager {
         };
     }
 
+    /// Returns the cross platform `MediaManager` based `SoundPoolPeer` fallback,
+    /// used by `com.codename1.gaming.SoundPool` when the platform provides no native
+    /// low latency backend. Applications should use `com.codename1.gaming.SoundPool`
+    /// rather than calling this directly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxStreams`: the maximum number of simultaneously playing voices
+    public static SoundPoolPeer createFallbackSoundPoolPeer(int maxStreams) {
+        return new MediaSoundPoolPeer(maxStreams);
+    }
+
 }

@@ -330,6 +330,166 @@ class InteractionDialogTest extends UITestBase {
         assertNull(dialog.getDisposeAnimationSetup(), "setDisposeAnimationSetup(null) clears the override");
     }
 
+    @FormTest
+    void stackableModeKeepsSiblingFormModeDialogOnDispose() {
+        // #5193: all InteractionDialogs share the InteractionDialog.class
+        // layer. In the default behavior, disposing one formMode dialog runs
+        // cleanupLayer() -> c.removeAll()/c.remove(), which also wipes any
+        // sibling dialog still showing in that layer ("sometimes nothing is
+        // shown"). With stackable mode on, dispose must remove only the
+        // disposed dialog.
+        boolean prev = InteractionDialog.isStackable();
+        InteractionDialog.setStackable(true);
+        try {
+            Form form = new Form(new BorderLayout());
+            form.show();
+
+            InteractionDialog first = new InteractionDialog("First");
+            first.setAnimateShow(false);
+            first.setFormMode(true);
+            first.show(0, 0, 0, 0);
+
+            InteractionDialog second = new InteractionDialog("Second");
+            second.setAnimateShow(false);
+            second.setFormMode(true);
+            second.show(0, 0, 0, 0);
+
+            Container formLayer = form.getFormLayeredPane(InteractionDialog.class, true);
+            assertTrue(first.isShowing(), "first dialog should be showing");
+            assertTrue(second.isShowing(), "second dialog should be showing");
+
+            first.dispose();
+
+            assertFalse(first.isShowing(), "disposed dialog must be removed");
+            assertTrue(second.isShowing(),
+                    "#5193: disposing one dialog must not remove its sibling sharing the layer");
+            assertTrue(formLayer.contains(second),
+                    "#5193: the sibling dialog must remain in the shared layer");
+
+            second.dispose();
+            assertFalse(second.isShowing(), "the last dialog should dispose normally");
+        } finally {
+            InteractionDialog.setStackable(prev);
+        }
+    }
+
+    @FormTest
+    void stackableModeKeepsSiblingDialogOnDisposeToTheLeft() {
+        // #5193: disposeTo*() additionally calls pp.removeAll() on the shared
+        // layered pane, which also discards siblings (independent of formMode).
+        // Stackable mode must guard that too.
+        boolean prev = InteractionDialog.isStackable();
+        InteractionDialog.setStackable(true);
+        try {
+            Form form = new Form(new BorderLayout());
+            form.show();
+
+            InteractionDialog first = new InteractionDialog("First");
+            first.setAnimateShow(false);
+            first.show(0, 0, 0, 0);
+
+            InteractionDialog second = new InteractionDialog("Second");
+            second.setAnimateShow(false);
+            second.show(0, 0, 0, 0);
+
+            Container layer = form.getLayeredPane(InteractionDialog.class, true);
+
+            first.disposeToTheLeft();
+
+            assertFalse(first.isShowing(), "disposed dialog must be removed");
+            assertTrue(second.isShowing(),
+                    "#5193: disposeTo* must not remove the sibling dialog");
+            assertTrue(layer.contains(second),
+                    "#5193: the sibling dialog must remain in the shared layer");
+
+            second.dispose();
+        } finally {
+            InteractionDialog.setStackable(prev);
+        }
+    }
+
+    @FormTest
+    void stackableModeLayersDialogsByShowOrder() {
+        // #5193: dialogs should stack by show() order -- a dialog shown later
+        // renders on top of one shown earlier (higher child index in the
+        // shared layered pane).
+        boolean prev = InteractionDialog.isStackable();
+        InteractionDialog.setStackable(true);
+        try {
+            Form form = new Form(new BorderLayout());
+            form.show();
+
+            InteractionDialog first = new InteractionDialog("First");
+            first.setAnimateShow(false);
+            first.show(0, 0, 0, 0);
+
+            InteractionDialog second = new InteractionDialog("Second");
+            second.setAnimateShow(false);
+            second.show(0, 0, 0, 0);
+
+            Container layer = form.getLayeredPane(InteractionDialog.class, true);
+            int firstIndex = layer.getComponentIndex(first.getParent());
+            int secondIndex = layer.getComponentIndex(second.getParent());
+            assertTrue(secondIndex > firstIndex,
+                    "#5193: the later-shown dialog must layer on top of the earlier one");
+
+            first.dispose();
+            second.dispose();
+        } finally {
+            InteractionDialog.setStackable(prev);
+        }
+    }
+
+    @FormTest
+    void stackableModeRemovesSharedLayerOnceEmpty() {
+        // #5193: layers must not accumulate -- once the last dialog leaves the
+        // shared layer it should be torn down rather than lingering empty.
+        boolean prev = InteractionDialog.isStackable();
+        InteractionDialog.setStackable(true);
+        try {
+            Form form = new Form(new BorderLayout());
+            form.show();
+
+            InteractionDialog dialog = new InteractionDialog("Only");
+            dialog.setAnimateShow(false);
+            dialog.show(0, 0, 0, 0);
+
+            Container layer = form.getLayeredPane(InteractionDialog.class, true);
+            assertNotNull(layer.getParent(), "layer should be attached while a dialog is showing");
+
+            dialog.dispose();
+
+            assertNull(layer.getParent(),
+                    "#5193: the shared layer must be removed once the last dialog disposes");
+        } finally {
+            InteractionDialog.setStackable(prev);
+        }
+    }
+
+    @FormTest
+    void defaultModeClearsFormLayerOnDispose() {
+        // Backward-compat: with stackable mode off (the default), disposing a
+        // formMode dialog still clears and removes the shared form layer as it
+        // historically did.
+        assertFalse(InteractionDialog.isStackable(), "stackable must default to false");
+        Form form = new Form(new BorderLayout());
+        form.show();
+
+        InteractionDialog dialog = new InteractionDialog("Only");
+        dialog.setAnimateShow(false);
+        dialog.setFormMode(true);
+        dialog.show(0, 0, 0, 0);
+
+        Container formLayer = form.getFormLayeredPane(InteractionDialog.class, true);
+        assertTrue(formLayer.contains(dialog), "dialog should be in the form layer before dispose");
+
+        dialog.dispose();
+
+        assertFalse(dialog.isShowing(), "dispose must remove the dialog");
+        assertNull(formLayer.getParent(),
+                "default behavior should remove the shared form layer on dispose");
+    }
+
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);

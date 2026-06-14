@@ -297,6 +297,49 @@ print(sum(1 for r in results if isinstance(r, dict) and r.get("status") == "miss
 PY
 }
 
+# Count the authoritative *expected* screenshot set: the number of golden PNGs
+# stored in the reference directory. The reference dir is the manifest -- it is
+# the single source of truth for how many screenshots a suite must produce. We
+# deliberately do NOT derive the expected count from whatever the harness chose
+# to deliver, because a harness that silently drops a test (a hang, a crash, a
+# transport that never delivered the frame) simply omits it from its delivered
+# set, leaving no "missing_actual" record behind. Counting goldens instead means
+# a dropped test is always visible as an uncovered golden. Top-level *.png only;
+# the reference dirs are flat <testName>.png sets.
+cn1ss_count_reference() {
+  local dir="$1"
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    echo 0
+    return
+  fi
+  local n
+  n=$(find "$dir" -maxdepth 1 -name '*.png' -type f 2>/dev/null | wc -l)
+  echo "${n//[^0-9]/}"
+}
+
+# Count the goldens that were actually rendered AND compared against their
+# reference, i.e. results with status "equal" or "different". A "missing_actual"
+# (listed but no image), a "missing_expected" (new image with no golden yet) and
+# any test that never appeared at all are all NOT covered. expected - covered is
+# therefore the number of expected screenshots that failed to materialise.
+cn1ss_count_covered() {
+  local json="$1"
+  if [ -z "$json" ] || [ ! -s "$json" ]; then
+    echo 0
+    return
+  fi
+  python3 - "$json" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    results = data.get("results", []) if isinstance(data, dict) else []
+except Exception:
+    print(0)
+    sys.exit(0)
+print(sum(1 for r in results if isinstance(r, dict) and r.get("status") in ("equal", "different")))
+PY
+}
+
 # Shared function to generate report, compare screenshots, and post PR comment
 cn1ss_process_and_report() {
   local platform_title="$1"
@@ -350,7 +393,7 @@ cn1ss_process_and_report() {
 
   # Pass any stats files found in artifacts
   if [ -n "$artifacts_dir" ] && [ -d "$artifacts_dir" ]; then
-    for stats_file in "$artifacts_dir"/iphone-builder-stats.txt "$artifacts_dir"/ios-test-stats.txt "$artifacts_dir"/android-test-stats.txt "$artifacts_dir"/base64-performance-stats.txt; do
+    for stats_file in "$artifacts_dir"/iphone-builder-stats.txt "$artifacts_dir"/ios-test-stats.txt "$artifacts_dir"/android-test-stats.txt "$artifacts_dir"/base64-performance-stats.txt "$artifacts_dir"/windows-benchmark-stats.txt; do
       if [ -f "$stats_file" ]; then
         render_args+=(--extra-stats "$stats_file")
       fi
@@ -411,31 +454,52 @@ cn1ss_process_and_report() {
       return 15
     fi
 
-    # Missing-screenshot regression guard. Every expected test must produce its
-    # screenshot; a test that runs but emits nothing is recorded as status
-    # "missing_actual". When a test hangs or the rendering pipeline crashes
-    # partway (the Metal DialogTheme hang), every test from that point on
-    # becomes missing_actual and the suite silently drops from 122 captures to
-    # 107 - all still listed, just unproduced. We fail when the number of
-    # missing screenshots exceeds CN1SS_ALLOWED_MISSING (default 0: no missing
-    # screenshots tolerated). A pipeline with a known, steady-state gap raises
-    # its own tolerance (e.g. the iOS jobs set CN1SS_ALLOWED_MISSING=2 for
-    # OrientationLock + MutableImageReadback, which do not render on either iOS
-    # backend). Set CN1SS_SKIP_COUNT_CHECK=1 to bypass while intentionally
-    # seeding a brand new reference set. Enforced on every pipeline that opts
-    # into strict mode (CN1SS_FAIL_ON_MISMATCH=1).
-    if [ "${CN1SS_SKIP_COUNT_CHECK:-0}" != "1" ]; then
-      local missing_count allowed_missing
-      missing_count=$(cn1ss_count_missing "$compare_json_out")
-      missing_count="${missing_count//[^0-9]/}"; : "${missing_count:=999999}"
+    # ------------------------------------------------------------------------
+    # Screenshot count-regression guard. DO NOT WEAKEN OR REMOVE.
+    #
+    # Every golden in the reference directory must be re-produced and compared
+    # on every run. The reference set is the manifest: expected == number of
+    # golden PNGs (cn1ss_count_reference), covered == goldens that were rendered
+    # and compared (cn1ss_count_covered, i.e. status equal|different). When a
+    # test hangs, crashes or its frame never gets delivered, it drops out of the
+    # comparison entirely and `covered` falls below `expected` -- which is the
+    # ONLY reliable signal, because a dropped test leaves no per-test record
+    # behind to count (the older missing_actual-only check was blind to this and
+    # let suites silently shrink from 124 captures to 58 while still going green).
+    #
+    # We fail when expected - covered exceeds CN1SS_ALLOWED_MISSING (default 0:
+    # no uncovered goldens tolerated). A pipeline with a known, steady-state gap
+    # sets its own tolerance and documents why (e.g. the iOS jobs allow 2 for
+    # OrientationLock + MutableImageReadback, which do not render on the iOS
+    # backends). CN1SS_MIN_SCREENSHOTS can raise the floor above the on-disk
+    # golden count (useful before the reference set is fully seeded). The only
+    # bypass is CN1SS_SKIP_COUNT_CHECK=1, reserved for the deliberate, manual act
+    # of seeding a brand new reference set; it is loud in the log so it can never
+    # be mistaken for normal operation.
+    # ------------------------------------------------------------------------
+    if [ "${CN1SS_SKIP_COUNT_CHECK:-0}" = "1" ]; then
+      cn1ss_log "WARNING: CN1SS_SKIP_COUNT_CHECK=1 -- screenshot count-regression guard BYPASSED. This must only be used while intentionally seeding a new reference set."
+    else
+      local expected_count covered_count uncovered_count allowed_missing min_floor
+      expected_count=$(cn1ss_count_reference "$ref_dir")
+      expected_count="${expected_count//[^0-9]/}"; : "${expected_count:=0}"
+      min_floor="${CN1SS_MIN_SCREENSHOTS:-0}"
+      min_floor="${min_floor//[^0-9]/}"; : "${min_floor:=0}"
+      if [ "$min_floor" -gt "$expected_count" ]; then
+        expected_count="$min_floor"
+      fi
+      covered_count=$(cn1ss_count_covered "$compare_json_out")
+      covered_count="${covered_count//[^0-9]/}"; : "${covered_count:=0}"
       allowed_missing="${CN1SS_ALLOWED_MISSING:-0}"
       allowed_missing="${allowed_missing//[^0-9]/}"; : "${allowed_missing:=0}"
-      if [ "$missing_count" -gt "$allowed_missing" ]; then
-        cn1ss_log "FATAL: $missing_count screenshot(s) missing (no image produced) but only $allowed_missing tolerated (CN1SS_ALLOWED_MISSING)."
-        cn1ss_log "       A test failed to emit its screenshot - the suite likely hung or crashed before finishing. See the 'missing actual' entries above."
+      uncovered_count=$(( expected_count - covered_count ))
+      [ "$uncovered_count" -lt 0 ] && uncovered_count=0
+      if [ "$uncovered_count" -gt "$allowed_missing" ]; then
+        cn1ss_log "FATAL: $uncovered_count of $expected_count expected screenshot(s) were not produced and compared (only $covered_count covered); $allowed_missing tolerated (CN1SS_ALLOWED_MISSING)."
+        cn1ss_log "       A test failed to emit its screenshot, or the suite hung/crashed before finishing. The golden set under the comparison directory is the source of truth for how many screenshots must be produced."
         return 17
       fi
-      cn1ss_log "Missing-screenshot check passed: $missing_count missing <= $allowed_missing tolerated."
+      cn1ss_log "Screenshot count check passed: $covered_count of $expected_count goldens covered ($uncovered_count uncovered <= $allowed_missing tolerated)."
     fi
   fi
 

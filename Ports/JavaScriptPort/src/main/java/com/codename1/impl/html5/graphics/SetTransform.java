@@ -36,10 +36,23 @@ public class SetTransform implements ExecutableOp {
     private native static void log(JSObject str);
     @Override
     public void execute(CanvasRenderingContext2D context) {
+        // Apply via the CanvasRenderingContext2D INTERFACE (setTransform/transform),
+        // not JSAffineTransform.Factory.* -- those are @JSBody natives that do
+        // ``context.setTransform(...)`` in raw JS and only work when ``context`` is
+        // a real canvas 2D context. In the surface-id model ``context`` is a
+        // SurfaceCommandRecorder (a Java object), so the raw-JS call hit an
+        // undefined dispatch (RuntimeException: Cannot read properties of undefined
+        // (reading 'apply')) and threw -- aborting the whole display drain before
+        // graphics.flush(), which left codenameone-canvas on the prior frame and
+        // froze every transform/clip/chart test. The interface call records an
+        // OP_SET_TRANSFORM/OP_TRANSFORM that the host replays onto the real context.
+        // Matrix order mirrors the old @JSBody: setTransform(m00,m10,m01,m11,m02,m12).
+        double m00 = t.getScaleX(), m10 = t.getShearY(), m01 = t.getShearX(),
+               m11 = t.getScaleY(), m02 = t.getTranslateX(), m12 = t.getTranslateY();
         if (replace) {
-            JSAffineTransform.Factory.setTransform(context, t);
+            context.setTransform(m00, m10, m01, m11, m02, m12);
         } else {
-            JSAffineTransform.Factory.transform(context, t);
+            context.transform(m00, m10, m01, m11, m02, m12);
         }
     }
     

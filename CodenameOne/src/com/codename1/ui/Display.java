@@ -37,6 +37,8 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
 import com.codename1.security.Biometrics;
 import com.codename1.security.SecureStorage;
 import com.codename1.share.ShareResult;
@@ -543,6 +545,36 @@ public final class Display extends CN1Constants {
             simd = created;
         }
         return simd;
+    }
+
+    /// Returns true if the current platform provides a hardware accelerated 3D
+    /// GPU backend for `com.codename1.gpu.RenderView`.
+    public boolean isGpuSupported() {
+        return impl.getGpuImplementation() != null;
+    }
+
+    /// Creates the native GPU peer backing a `RenderView`. Intended for use by
+    /// `RenderView`; returns null on platforms without a 3D backend.
+    public PeerComponent createGpuPeer(com.codename1.gpu.RenderView view) {
+        com.codename1.impl.gpu.GpuImplementation gpu = impl.getGpuImplementation();
+        return gpu != null ? gpu.createPeer(view) : null;
+    }
+
+    /// Sets whether a GPU peer renders continuously or only on demand. Intended
+    /// for use by `RenderView`.
+    public void gpuSetContinuous(PeerComponent peer, boolean continuous) {
+        com.codename1.impl.gpu.GpuImplementation gpu = impl.getGpuImplementation();
+        if (gpu != null) {
+            gpu.setContinuous(peer, continuous);
+        }
+    }
+
+    /// Requests a single frame from a GPU peer. Intended for use by `RenderView`.
+    public void gpuRequestRender(PeerComponent peer) {
+        com.codename1.impl.gpu.GpuImplementation gpu = impl.getGpuImplementation();
+        if (gpu != null) {
+            gpu.requestRender(peer);
+        }
     }
 
     /// Indicates the maximum frames the API will try to draw every second
@@ -4115,6 +4147,23 @@ public final class Display extends CN1Constants {
 
     }
 
+    /// Indicates whether this platform provides a native low latency sound pool
+    /// backing `com.codename1.gaming.SoundPool`. When false the gaming layer uses a
+    /// `com.codename1.media.MediaManager` based fallback.
+    public boolean isSoundPoolSupported() {
+        return impl.isSoundPoolSupported();
+    }
+
+    /// Creates a native low latency sound pool peer for `com.codename1.gaming.SoundPool`,
+    /// or returns null when this platform has no native backend.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxStreams`: the maximum number of simultaneously playing voices
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        return impl.createSoundPool(maxStreams);
+    }
+
     /// Creates a soft/weak reference to an object that allows it to be collected
     /// yet caches it. This method is in the porting layer since CLDC only includes
     /// weak references while some platforms include nothing at all and some include
@@ -5235,6 +5284,53 @@ public final class Display extends CN1Constants {
         });
     }
 
+    /// Indicates if the underlying platform can print documents through
+    /// [#print(String,String,PrintResultListener)].
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying platform handles printing.
+    public boolean isPrintingSupported() {
+        return impl.isPrintingSupported();
+    }
+
+    /// Print a document file through the platform printing system,
+    /// typically showing the native print dialog where the user picks a
+    /// printer and options. The outcome is reported through `listener` on
+    /// the EDT.
+    ///
+    /// All printing platforms accept PDF (`application/pdf`) and common
+    /// image types (`image/png`, `image/jpeg`); other mime types fail with
+    /// [PrintResult#STATUS_FAILED] on platforms that can't render them.
+    /// See [com.codename1.printing.Printer] for a friendlier facade.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filePath`: path of the document in [com.codename1.io.FileSystemStorage]
+    ///
+    /// - `mimeType`: the document type, e.g. `application/pdf`, `image/png`
+    ///
+    /// - `listener`: callback for the print outcome. May be null.
+    public void print(String filePath, String mimeType, PrintResultListener listener) {
+        if (listener == null) {
+            impl.print(filePath, mimeType, null);
+            return;
+        }
+        final PrintResultListener finalListener = listener;
+        impl.print(filePath, mimeType, new PrintResultListener() {
+            @Override
+            public void onResult(final PrintResult result) {
+                final PrintResult r = result != null ? result : PrintResult.completed();
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        finalListener.onResult(r);
+                    }
+                });
+            }
+        });
+    }
+
     /// The localization manager allows adapting values for display in different locales thru parsing and formatting
     /// capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
     /// related API's similar to Locale/currency API's from JavaSE.
@@ -6010,6 +6106,53 @@ public final class Display extends CN1Constants {
     /// true if supported
     public boolean isReceiveSharedContentSupported() {
         return impl.isReceiveSharedContentSupported();
+    }
+
+    /// Returns true if the platform supports publishing data to a Wallet
+    /// issuer-provisioning extension. Used internally by
+    /// `com.codename1.payment.WalletExtension`.
+    public boolean isWalletExtensionSupported() {
+        return impl.isWalletExtensionSupported();
+    }
+
+    /// Publishes the Wallet extension pass entries, replacing the previous
+    /// list. Used internally by `com.codename1.payment.WalletExtension`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `remote`: true for the Apple Watch list, false for the iPhone list
+    ///
+    /// - `entries`: the available cards; null or empty clears the list
+    public void walletExtensionSetPassEntries(boolean remote, com.codename1.payment.WalletPassEntry[] entries) {
+        impl.walletExtensionClearPassEntries(remote);
+        if (entries != null) {
+            for (com.codename1.payment.WalletPassEntry e : entries) {
+                if (e == null) {
+                    continue;
+                }
+                impl.walletExtensionAddPassEntry(remote, e.getIdentifier(), e.getTitle(),
+                        e.getCardholderName(), e.getPrimaryAccountSuffix(), e.getPaymentNetwork(),
+                        e.getLocalizedDescription(), e.getArtPng());
+            }
+        }
+    }
+
+    /// Sets the Wallet extension requires-authentication flag. Used
+    /// internally by `com.codename1.payment.WalletExtension`.
+    public void walletExtensionSetRequiresAuthentication(boolean requiresAuthentication) {
+        impl.walletExtensionSetRequiresAuthentication(requiresAuthentication);
+    }
+
+    /// Publishes the Wallet extension auth token. Used internally by
+    /// `com.codename1.payment.WalletExtension`.
+    public void walletExtensionSetAuthToken(String token) {
+        impl.walletExtensionSetAuthToken(token);
+    }
+
+    /// Clears all published Wallet extension data. Used internally by
+    /// `com.codename1.payment.WalletExtension`.
+    public void walletExtensionClear() {
+        impl.walletExtensionClear();
     }
 
     /// Subscribes the device to a push topic. Used internally by

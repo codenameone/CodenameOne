@@ -26,7 +26,7 @@ Here is the current list of supported arguments. Build hints change over time, s
 |true/false defaults to true - indicates whether to include the release version in the build
 
 |android.onDeviceDebug
-|Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable="true"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable="true"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it — release builds are unaffected. See the link:#_ondevice_debugging_android[On-Device Debugging (Android) chapter] for the full flow.
+|Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable="true"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable="true"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it — release builds are unaffected. See the <<On-Device Debugging (Android),On-Device Debugging (Android) chapter>> for the full flow.
 
 |android.installLocation
 |Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.
@@ -452,7 +452,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Boolean true/false defaults to false as of 5.0.  Enable legacy generation of splash screen images for use when launching the app. These have been replaced now by the new launch storyboards.
 
 |ios.onDeviceDebug
-|Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the link:#_ondevice_debugging_ios[On-Device Debugging chapter] for the full flow.
+|Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the <<On-Device Debugging (iOS),On-Device Debugging (iOS) chapter>> for the full flow.
 
 |ios.onDeviceDebug.proxyHost
 |Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.
@@ -462,6 +462,39 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 
 |ios.onDeviceDebug.waitForAttach
 |Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.
+
+|ios.wallet.extension
+|Boolean true/false defaults to false. Generates an Apple Wallet issuer provisioning extension (the "From apps on your iPhone" flow in the Wallet app) and embeds it in the build. Requires `ios.wallet.appGroup` and `ios.wallet.issuerEndpoint`. See the <<Apple Wallet Extension,Apple Wallet Extension chapter>>.
+
+|ios.wallet.appGroup
+|App Group id starting with `group.` shared by the app and the generated Wallet extensions. The app publishes pass entries into this group through `com.codename1.payment.WalletExtension` and the group is added to the app and extension entitlements automatically. Required when `ios.wallet.extension=true`.
+
+|ios.wallet.issuerEndpoint
+|HTTPS URL of the issuer backend endpoint that produces the encrypted provisioning payload. The generated extension POSTs Apple's certificates/nonce plus the card identifier and auth token there as JSON. Required when `ios.wallet.extension=true`.
+
+|ios.wallet.includeUI
+|Boolean true/false defaults to false. Also generates the Wallet authorization UI extension - a login form shown inside the Wallet app when the app reports that authentication is required. Requires `ios.wallet.authEndpoint`.
+
+|ios.wallet.authEndpoint
+|HTTPS URL the generated login UI extension POSTs `{"username","password"}` to; the JSON response's `token` is stored in the App Group for the provisioning request. Required when `ios.wallet.includeUI=true`.
+
+|ios.wallet.nonuiExtensionName / ios.wallet.uiExtensionName
+|Names of the generated extension targets, also used as the bundle id suffix (`<package>.<name>`). Default `WalletNonUIExtension` / `WalletUIExtension`. The matching App IDs must be registered with the payment-pass-provisioning entitlement and listed by the card network.
+
+|ios.wallet.nonuiProvisioningProfile / ios.wallet.uiProvisioningProfile
+|Cloud device builds only. File name of the extension's `.mobileprovision` placed under `common/src/main/resources`. The profile must match the app's distribution certificate and carry the `com.apple.developer.payment-pass-provisioning` entitlement; the build keeps it out of the app bundle.
+
+|ios.wallet.nonuiProvisioningURL / ios.wallet.uiProvisioningURL
+|Cloud device builds only. URL fallback for the extension provisioning profile when it isn't bundled in resources, mirroring `ios.notificationServiceExtensionProvisioningURL`.
+
+|ios.wallet.nonui.buildSettings.SETTING / ios.wallet.ui.buildSettings.SETTING
+|Extra Xcode build settings applied to the generated extension targets, for example `ios.wallet.nonui.buildSettings.DEVELOPMENT_TEAM=ABCD123456`. Applied last so they override the generated defaults.
+
+|ios.wallet.nonuiImportsInject, ios.wallet.statusInject, ios.wallet.passEntriesInject, ios.wallet.remotePassEntriesInject, ios.wallet.generateRequestInject, ios.wallet.generateResponseInject, ios.wallet.uiImportsInject, ios.wallet.uiViewDidLoadInject, ios.wallet.uiAuthRequestInject, ios.wallet.uiAuthResponseInject
+|Objective-C code injected at the matching marker comment in the generated Wallet extension sources, for custom behavior at each callback (for example adding fields to the issuer endpoint payload in `generateRequestInject`). See the <<Apple Wallet Extension,Apple Wallet Extension chapter>>.
+
+|ios.appext.NAME.provisioningURL
+|Cloud device builds only. URL of the provisioning profile for a generic app extension dropped into `ios/app_extensions/NAME/`, used when the extension folder doesn't bundle a `.mobileprovision` itself. The profile is installed on the build machine and added to the export options per bundle id.
 
 |codename1.mac.appid
 |Mac Native cloud builds only. The Mac bundle identifier registered in App Store Connect / Apple Developer. Distinct from `codename1.ios.appid` because Apple treats the iOS and Mac App Store records as separate products. Required for cloud Mac builds.
@@ -591,6 +624,30 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 
 |noExtraResources
 |true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.
+
+|windows.arch
+|Native Windows port only (the `windows-native` build target -- not the JVM `win.*` desktop hints above). Target CPU architecture for the standalone `.exe`: `x64` (the default) or `arm64`. Accepts the usual synonyms (`x86_64`/`amd64`, `aarch64`). clang-cl cross-compiles to the chosen architecture from either host. See the link:#_working_with_the_native_windows_port[Working with the native Windows port chapter].
+
+|windows.debug
+|Native Windows port only. true/false (defaults to false). When `false` the `.exe` is built optimized and *stripped* -- no PDB, dead-stripped unreferenced code (`/OPT:REF`) and folded identical functions (`/OPT:ICF`) -- which is the shipping default. Set `true` to keep debug symbols (a `.pdb` next to the exe, via `RelWithDebInfo` / clang-cl `/Zi` + linker `/DEBUG`) so a native crash address can be symbolized during development. Optimizations stay on in both cases.
+
+|windows.sdkRoot
+|Native Windows port only; used when building on a *non-Windows* host (for example a Linux build server). Path to a Windows SDK laid out by https://github.com/Jake-Shadle/xwin[`xwin splat`] (a directory containing `crt/include` and `sdk/include/um`), used to cross-compile the `.exe` with clang-cl + lld-link instead of a Visual Studio environment. If unset, the `CN1_XWIN_SYSROOT` environment variable is used. Ignored on Windows hosts, which build through Visual Studio. The same SDK serves both `windows.arch` targets (its `x86_64` / `aarch64` lib subdirs).
+
+|(signing certificate)
+|Native Windows port only. The code-signing certificate itself isn't a build-hint argument; configure it through project settings as `codename1.windows.signing.certificate` (path to a PKCS#12 `.pfx`/`.p12` file holding the certificate + key) and `codename1.windows.signing.password`. The build uses it for both local and cloud builds -- a cloud build uploads it with the build request automatically, exactly like the iOS / Android signing certificates. When a certificate is present the produced `.exe` is Authenticode-signed with `osslsigncode` (which signs Windows PE files on any OS, so it works in the Linux build cloud); without one the exe ships unsigned (it runs, but shows "Unknown publisher" in UAC and trips SmartScreen on download).
+
+|windows.signing.timestampUrl
+|Native Windows port only. RFC&#160;3161 timestamp server used when signing, so the signature stays valid after the certificate expires. Default `http://timestamp.digicert.com`; set empty to disable timestamping.
+
+|windows.signing.digest
+|Native Windows port only. Signature digest algorithm. Default `sha256`.
+
+|windows.signing.name / windows.signing.url
+|Native Windows port only. The description and URL embedded in the signature (the "More info" shown by Windows). Default: the app's display name, and no URL.
+
+|windows.signing
+|Native Windows port only. `true`/`false` (default `true`). Set `false` to force an unsigned build even when a certificate is available.
 
 |===
 
@@ -744,42 +801,14 @@ Pass `null` to `AndroidNativeUtil.setPermissionPromptCallback()` to restore the 
 
 === On device debugging
 
-Codename One supports debugging applications on devices by using the natively generated project. All paid subscription levels include the ability to check an #Include Source# flag in the settings that returns a native OS project. You can debug that project in the respective native IDE.
+On-device debugging now has two dedicated chapters, one per platform:
 
-In iOS this is strait forward, open the project with Xcode and run it optionally disabling bitcode. Unzip the.bz2 file and open the `.xcworkspace` file if it's available otherwise open the `.xcodeproj` file inside the `dist` directory.
-
-IMPORTANT: The `.xcworkspace` is no longer exclusive to CocoaPods-based builds. Use it whenever it's generated, whether the project uses CocoaPods, Swift Package Manager, or both.
-
-With Android Studio this is sometimes as easy task as it's possible to actually open the Gradle project in Android Studio and run it. For example, due to the fragile nature of the Gradle project this stopped working for some builds and has been "flaky."
-
-==== Android Studio debugging (easy way)
-
-By default you should be able to open the Gradle project in Android Studio and run it. To get this to work open the Android Studio #Setting# and select Gradle *2.11*.
-
-.Gradle settings UI in Android Studio (notice you need Gradle 2.11 and not 2.8 as pictured here)
-image::img/gradle-settings.png[Gradle settings UI in Android Studio,scaledwidth=50%]
-
-If this works for you then you can ignore the section below.
-
-==== Android Studio debugging the hard way
-
-Sometimes the Gradle project might not work or this might fail with a change from Google.
-
-Here are steps that should work for everyone:
-
-. Check the include source flag in the IDE and send a build
-. Download the `sources.zip` result from the build server
-. Launch Android Studio and create a new project
-. Make sure to use the same package and app name as you did in the Codename One project, select to not create an activity
-. Unzip the `sources.zip` file and copy the `main` directory from its `src` directory to the Android Studio projects `src` directory make sure to overwrite files/directories.
-. Copy its `libs` directory on top of the existing libs
-. Copy the source Gradle dependencies content to the destination Gradle file
-. Connect your device and press the Debug button for the IDE
-
-NOTE: You might need to copy more Gradle file meta-data such as multi-dexing etc.
-
-You might not need to repeat the whole thing with every build. For example: it might be practical to copy the `userSources.jar` from the libs directory to get the latest version of your code. You can copy the `src/main` directory to get the latest up-to-date Android port.
-
+* <<On-Device Debugging (iOS)>> covers attaching a standard Java
+  debugger (IntelliJ, jdb, VS Code) to an iOS app running on a device or in the
+  native iOS simulator, as well as debugging the generated Xcode project natively.
+* <<On-Device Debugging (Android)>> covers the equivalent
+  adb/JDWP-based flow for Android devices and emulators, including wireless
+  debugging and debugging the generated Gradle project from Android Studio.
 
 === Native interfaces
 

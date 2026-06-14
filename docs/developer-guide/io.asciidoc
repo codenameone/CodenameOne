@@ -876,7 +876,7 @@ Notice that a static version of the method is used! The callback object is an in
 ===== Writing JSON — `JSONWriter`
 
 For typed DTO serialization use the `@Mapped` annotation framework
-(see `<<binding-framework>>`) plus `Mappers.toJson(...)`. For ad-hoc
+(see `<<annotation-mapping-section,JSON / XML Object Mapping>>`) plus `Mappers.toJson(...)`. For ad-hoc
 maps / lists where a build-time `Mapper` would be overkill, the
 `com.codename1.io.JSONWriter` class is the complement of `JSONParser`:
 
@@ -1415,7 +1415,7 @@ branch on `data.get("root") instanceof List`.
 
 `Rest.fetchAsJsonMap` returns a generic `Map<String, Object>` that the caller
 casts and inspects key by key. Once your DTOs are `@Mapped`-annotated
-(see `<<binding-framework>>`), `fetchAsMapped` returns the typed object
+(see `<<annotation-mapping-section,JSON / XML Object Mapping>>`), `fetchAsMapped` returns the typed object
 directly:
 
 [source,java]

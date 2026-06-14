@@ -198,6 +198,11 @@
 
 #define EAGLVIEW [[CodenameOne_GLViewController instance] eaglView]
 
+// Launch placeholder shown over the GL/Metal view between makeKeyAndVisible
+// and the first EDT-painted frame; see CodenameOne_GLViewController.m
+void CN1ShowLaunchPlaceholder(UIWindow *window);
+void CN1DismissLaunchPlaceholder(void);
+
 //ADD_INCLUDE
 
 @interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, UIScrollViewDelegate,

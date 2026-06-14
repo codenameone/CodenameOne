@@ -143,6 +143,21 @@ if [ -d "$COMMON_DEPS_DIR" ]; then
   done < <(find "$COMMON_DEPS_DIR" -maxdepth 1 -type f -name '*.jar' -print0 | sort -z)
 fi
 
+# Stage the deterministic mock-ads provider (compile-scope dependency used by
+# AdsScreenshotTest). The COMMON_DEPS_DIR allowlist above only extracts
+# kotlin/annotations, and the ads *framework* (com.codename1.ads.*) lives in
+# codenameone-core, but the provider implementation (com.codename1.ads.mock.*)
+# ships in cn1-ads-mock and would otherwise never reach the translator
+# ("Unknown class com_codename1_ads_mock_MockAdProvider" at runtime).
+ADS_MOCK_JAR="$(find "$HOME/.m2/repository/com/codenameone/cn1-ads-mock" -type f -name 'cn1-ads-mock-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' 2>/dev/null | sort | tail -1)"
+if [ -n "$ADS_MOCK_JAR" ]; then
+  bj_log "Including ad-mock classes from $(basename "$ADS_MOCK_JAR")"
+  (
+    cd "$STAGE_CLASSES"
+    "$JAR_BIN" xf "$ADS_MOCK_JAR"
+  )
+fi
+
 # TeaVM is optional for ParparVM builds. The JavaScriptPort now includes JSO interfaces
 # in org.teavm.jso package, so it can compile without external TeaVM dependency.
 # TeaVM jars are only needed if the TeaVM compiler needs to run (which we don't use).
@@ -163,29 +178,33 @@ fi
 # Generate the appropriate launcher based on whether TeaVM is available
 # Both launchers work - they bootstrap the implementation factory before Display.init()
 bj_log "Preparing JavaScript-port launcher"
-if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
-  cat > "$LAUNCHER_SRC" <<'EOF'
-import com.codename1.impl.html5.JavaScriptPortBootstrap;
-import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
-
-public final class HelloCodenameOneJavaScriptMain {
-    public static void main(String[] args) {
-        JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());
-    }
-}
-EOF
-else
-  cat > "$LAUNCHER_SRC" <<'EOF'
-import com.codename1.impl.html5.ParparVMBootstrap;
-import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
-
-public final class HelloCodenameOneJavaScriptMain {
-    public static void main(String[] args) {
-        ParparVMBootstrap.bootstrap(new HelloCodenameOne());
-    }
-}
-EOF
+# If the build-time SVG transcoder generated com.codename1.generated.svg.SVGRegistry,
+# the launcher must call installGlobal() so the transcoded SVG images are registered
+# (Resources.getImage returns them) AND so ParparVM's dead-code elimination keeps the
+# GeneratedSVGImage hierarchy reachable. Mirrors JavaScriptBuilder.writeLauncher().
+SVG_INIT_LINE=""
+if [ -f "$STAGE_CLASSES/com/codename1/generated/svg/SVGRegistry.class" ]; then
+  bj_log "SVGRegistry detected -- launcher will call installGlobal()"
+  SVG_INIT_LINE='        com.codename1.generated.svg.SVGRegistry.installGlobal();'
 fi
+if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
+  BOOT_IMPORT="com.codename1.impl.html5.JavaScriptPortBootstrap"
+  BOOT_CALL="JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());"
+else
+  BOOT_IMPORT="com.codename1.impl.html5.ParparVMBootstrap"
+  BOOT_CALL="ParparVMBootstrap.bootstrap(new HelloCodenameOne());"
+fi
+cat > "$LAUNCHER_SRC" <<EOF
+import ${BOOT_IMPORT};
+import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
+
+public final class HelloCodenameOneJavaScriptMain {
+    public static void main(String[] args) {
+        ${BOOT_CALL}
+${SVG_INIT_LINE}
+    }
+}
+EOF
 
 # Build source list: JavaScriptPort sources plus launcher
 # JavaScriptPort now includes org.teavm.jso interfaces built-in

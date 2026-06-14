@@ -58,4 +58,9 @@
         <exclude name="UncommentedEmptyMethodBody"/>
         <exclude name="UseLocaleWithCaseConversions"/>
     </rule>
+
+    <!-- The com.codename1.gaming.physics.box2d package is a vendored, lightly
+         adapted copy of JBox2D (BSD 2-Clause); we don't own its code style, so it
+         is excluded from PMD just as it is from SpotBugs. -->
+    <exclude-pattern>.*/com/codename1/gaming/physics/box2d/.*</exclude-pattern>
 </ruleset>

@@ -71,10 +71,15 @@
 
     -->
 
+    <!-- Bundle ASM 9.8 (matching nbproject/project.properties' compile classpath
+         and Parser.java's Opcodes.ASM9). The old asm-5.0.3 here shipped a runtime
+         ASM that only reads class file version <= 52 (Java 8); modern app bytecode
+         (Java 9+, e.g. version 61) made ClassReader throw a bare
+         IllegalArgumentException. 9.8 reads current bytecode. -->
     <target name="-pre-jar">
-        <unzip src="../../../cn1-binaries/vm/asm-5.0.3.jar" dest="build/classes"  />
-        <unzip src="../../../cn1-binaries/vm/asm-commons-5.0.3.jar" dest="build/classes"  />
-        <unzip src="../../../cn1-binaries/vm/asm-tree-5.0.3.jar" dest="build/classes"  />
+        <unzip src="../../../cn1-binaries/vm/asm-9.8.jar" dest="build/classes"  />
+        <unzip src="../../../cn1-binaries/vm/asm-commons-9.8.jar" dest="build/classes"  />
+        <unzip src="../../../cn1-binaries/vm/asm-tree-9.8.jar" dest="build/classes"  />
     </target>
             
         <!-- /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project TestApp.xcodeproj/ -target TestApp -configuration release -sdk iphoneos7.0 build -->

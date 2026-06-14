@@ -33,6 +33,7 @@ import com.codename1.impl.html5.graphics.FillRect;
 import com.codename1.impl.html5.graphics.FillRoundRect;
 import com.codename1.impl.html5.graphics.FillShape;
 import com.codename1.impl.html5.graphics.SetTransform;
+import com.codename1.impl.html5.graphics.SurfaceCommandRecorder;
 import com.codename1.impl.html5.graphics.TileImage;
 import com.codename1.impl.html5.graphics.ExecutableOp;
 import com.codename1.teavm.geom.JSAffineTransform;
@@ -57,8 +58,22 @@ import com.codename1.html5.js.dom.HTMLCanvasElement;
 public class HTML5Graphics {
     private final JavaScriptRenderState<NativeFont> renderState = new JavaScriptRenderState<NativeFont>();
     private Runnable mutationListener;
-    private HTMLCanvasElement canvas;
-    private CanvasRenderingContext2D context;
+    // Surface dimensions, known Java-side at construction. Paint ops never read
+    // them back across the barrier.
+    private int canvasWidth;
+    private int canvasHeight;
+    // The opaque worker-assigned id of the host-side surface this graphics
+    // draws onto. The worker NEVER holds the canvas / 2D-context proxy; it
+    // records draw calls into ``context`` (a command recorder) and flushes them
+    // by surface id to the host, which keeps the id->{canvas,ctx} table and
+    // replays them. Only getRGB ever reads pixels back. See
+    // SurfaceCommandRecorder and HTML5Implementation.nativeSurface*.
+    private int surfaceId;
+    // The command recorder this graphics' ExecutableOps draw into. It implements
+    // CanvasRenderingContext2D so the op classes record into it unchanged; each
+    // call appends a self-contained opcode rather than round-tripping a host
+    // canvas method. ``flush()`` ships the recorded batch to the surface.
+    private final SurfaceCommandRecorder context = new SurfaceCommandRecorder();
     //private Paint paint;
     HTML5Implementation impl;
     private boolean inClip = false;
@@ -77,8 +92,7 @@ public class HTML5Graphics {
                     new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            notifyMutation();
-                            operation.execute(context);
+                            dispatchOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp> imageTransformRenderAdapter =
@@ -86,8 +100,7 @@ public class HTML5Graphics {
                     new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            notifyMutation();
-                            operation.execute(context);
+                            dispatchOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp> shapeGradientRenderAdapter =
@@ -95,31 +108,63 @@ public class HTML5Graphics {
                     new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            notifyMutation();
-                            operation.execute(context);
+                            dispatchOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     
     //private final Path tmppath = new Path();
     //private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
     
-    HTML5Graphics(HTML5Implementation impl, HTMLCanvasElement canvas) {
-        this.canvas = canvas;
-        this.context = (CanvasRenderingContext2D)canvas.getContext("2d");
-        
+    // ``width``/``height`` are the surface dimensions, known Java-side, so the
+    // clip bounds are seeded without ever reading them back across the barrier.
+    // ``surfaceId`` is the opaque host-side surface this graphics draws onto;
+    // the caller has already created the surface on the host
+    // (HTML5Implementation.nativeSurfaceCreate) -- except the display surface
+    // (DISPLAY_SURFACE_ID), which the host binds lazily to the output canvas.
+    HTML5Graphics(HTML5Implementation impl, int surfaceId, int width, int height) {
         this.impl = impl;
-        this.clipRect.setWidth(canvas.getWidth());
-        this.clipRect.setHeight(canvas.getHeight());
-        //transform = JSAffineTransform.Factory.getTranslateInstance(0, 0);
-        //paint.setAntiAlias(true);
-        
-        if(context != null) {
-            context.save();
-        }
-        //transform = Transform.makeIdentity();
+        this.surfaceId = surfaceId;
+        this.canvasWidth = width;
+        this.canvasHeight = height;
+        this.clipRect.setWidth(width);
+        this.clipRect.setHeight(height);
     }
-    
-    
+
+    // Single chokepoint for every drawing op: record it into the surface command
+    // buffer. Nothing crosses the barrier here -- the batch is shipped by
+    // flush().
+    private void dispatchOp(ExecutableOp operation) {
+        notifyMutation();
+        operation.execute(context);
+    }
+
+    int getSurfaceId() {
+        return surfaceId;
+    }
+
+    // Ship the recorded command batch to the host surface, fire-and-forget (one
+    // round-trip whose response is null, never a canvas/number). After a flush
+    // the recorder is empty. Idempotent: a no-op when nothing was recorded.
+    void flush() {
+        if (context.isEmpty()) {
+            return;
+        }
+        impl.nativeSurfaceFlush(surfaceId, canvasWidth, canvasHeight,
+                context.opcodeBuffer(), context.opcodeCount(),
+                context.numBuffer(), context.numCountValue(),
+                context.objBuffer(), context.objCountValue());
+        context.reset();
+    }
+
+    int getCanvasWidth() {
+        return canvasWidth;
+    }
+
+    int getCanvasHeight() {
+        return canvasHeight;
+    }
+
+
     public ClipState getClipState() {
         return renderState.getClipState();
     }
@@ -128,37 +173,14 @@ public class HTML5Graphics {
         return renderState;
     }
 
-    public HTMLCanvasElement getCanvas(){
-        return canvas;
-    }
-    
-    void setCanvas(HTMLCanvasElement canvas) {
-        this.canvas = canvas;
-        this.context = null;
-        if(canvas != null) {
-            this.context = (CanvasRenderingContext2D)canvas.getContext("2d");
-            context.save();
-        }
-    }
-
-    void setCanvasNoSave(HTMLCanvasElement canvas) {
-        this.canvas = canvas;
-        this.context = null;
-        if(canvas != null) {
-            this.context = (CanvasRenderingContext2D)canvas.getContext("2d");
-            
-        }
-    }
-
     NativeFont getFont() {
         return renderState.getFont();
     }
 
     void setFont(NativeFont font) {
+        // Drawing ops (DrawString) carry their own font, so the renderState is
+        // the single source of truth; no command is recorded here.
         renderState.setFont(font);
-        context.setFont(font.getCSS());
-        
-        
     }
 
     public static String color(int rgb){
@@ -177,24 +199,19 @@ public class HTML5Graphics {
         return "rgba("+red+","+green+","+blue+","+(alpha/255f)+")";
     }
     
+    // Drawing ops (FillRect/DrawString/...) each carry their own color/alpha and
+    // bracket themselves in save()/restore(), so the render state is the single
+    // source of truth -- no command is recorded by these setters.
     void setColor(int color){
-    	//System.out.println("Setting color "+color(color));
         renderState.setColor(color);
-        this.context.setFillStyle(color(color));
-        this.context.setStrokeStyle(color(color));
-        
     }
-    
+
     void setColorWithAlpha(int color) {
-        //System.out.println("Setting color "+color(color));
         renderState.setColor(color);
-        this.context.setFillStyle(colorWithAlpha(color));
-        this.context.setStrokeStyle(colorWithAlpha(color));
     }
-    
+
     void setAlpha(int alpha) {
         renderState.setAlpha(alpha);
-        this.context.setGlobalAlpha(alpha / 255.0);
     }
     
     int getAlpha() {
@@ -643,37 +660,11 @@ public class HTML5Graphics {
         if (offscreenWidth >= 0) {
             return offscreenWidth + 1;
         }
-        return JavaScriptTextMetricsAdapter.stringWidth(new JavaScriptTextMetricsAdapter.FontMetricsContext() {
-            @Override
-            public String getCurrentFont() {
-                return context.getFont();
-            }
-
-            @Override
-            public void setCurrentFont(String fontCss) {
-                context.setFont(fontCss);
-            }
-
-            @Override
-            public int measureWidth(String text) {
-                return (int)context.measureText(text).getWidth();
-            }
-        }, new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
-            @Override
-            public String getCss(NativeFont font) {
-                return font.getCSS();
-            }
-
-            @Override
-            public int getHeight(NativeFont font) {
-                return font.fontHeight();
-            }
-
-            @Override
-            public int getAscent(NativeFont font) {
-                return font.fontAscent();
-            }
-        }, (NativeFont) nativeFont, str);
+        // OffscreenCanvas is the real measurement route in the surface render
+        // model (the worker holds no canvas context to measure against) and
+        // succeeds in every browser we ship. This estimate is only a defensive
+        // fallback for the pathological case where OffscreenCanvas is missing.
+        return str.length() * Math.max(1, font.fontHeight() / 2) + 1;
     }
     
     
@@ -732,7 +723,12 @@ public class HTML5Graphics {
 //    }
     
     void clear(){
-        context.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+        // Clearing the whole surface == discarding any not-yet-flushed commands
+        // and wiping the host canvas. The host surface persists pixels across
+        // flushes, so a ClearRect over the full bounds is recorded to wipe it.
+        context.reset();
+        context.clearRect(0, 0, canvasWidth, canvasHeight);
+        notifyMutation();
     }
 
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {

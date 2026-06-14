@@ -62,6 +62,7 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         } finally {
             AnimationTime.reset();
         }
+        markCaptureStarted();
         Cn1ssDeviceRunnerHelper.emitImage(grid, getImageName(), this::done);
     }
 

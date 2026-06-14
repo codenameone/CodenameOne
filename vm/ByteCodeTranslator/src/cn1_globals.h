@@ -1320,6 +1320,15 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
         throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
         return;
     }
+    /* The call-depth guard above does not protect the operand/locals stack: a
+     * deep recursion of methods with large frames can exhaust threadObjectStack
+     * before the call-depth limit, and without this check initMethodStack would
+     * memset/write past the buffer end -> access violation instead of a catchable
+     * StackOverflowError. The 1024-slot margin leaves room to build+throw it. */
+    if (threadStateData->threadObjectStackOffset + localsStackSize + stackSize >= CN1_MAX_OBJECT_STACK_DEPTH - 1024) {
+        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        return;
+    }
     if (fullClear) {
         memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0,
                 sizeof(struct elementStruct) * (localsStackSize + stackSize));

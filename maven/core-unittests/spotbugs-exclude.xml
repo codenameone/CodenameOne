@@ -347,4 +347,15 @@
     <Match>
         <Class name="~com\.codename1\.db\.ThreadSafeDatabase(\$.*)?" />
     </Match>
+
+    <!--
+    The com.codename1.gaming.physics.box2d package is a vendored, lightly
+    adapted copy of JBox2D (BSD 2-Clause), third-party code whose style we
+    don't own. Exclude it from SpotBugs wholesale, the same way TarEntry and
+    the gzip classes are treated above. The idiomatic
+    com.codename1.gaming.physics wrapper around it is NOT excluded.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.gaming\.physics\.box2d\..*" />
+    </Match>
 </FindBugsFilter>

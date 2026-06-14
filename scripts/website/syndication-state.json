@@ -191,6 +191,163 @@
         "url": "https://dzone.com/content/3656694/edit.html",
         "syndicated_at": "2026-06-06T15:14:17+00:00"
       }
+    },
+    "platform-apis-in-the-core": {
+      "devto": {
+        "id": 3841163,
+        "url": "https://dev.to/codenameone/ai-oauth-and-other-platform-apis-in-the-core-nd2",
+        "syndicated_at": "2026-06-07T13:32:48+00:00"
+      },
+      "foojay": {
+        "id": 124141,
+        "url": "https://foojay.io/wp-admin/post.php?post=124141&action=edit",
+        "preview_url": "https://foojay.io/?p=124141",
+        "featured_media_id": 124140,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-07T13:33:49+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/362f74616708/edit",
+        "syndicated_at": "2026-06-07T15:01:52+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3656699/edit.html",
+        "syndicated_at": "2026-06-07T15:18:55+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq3xhm4u000i1spq2hgddqg6",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a258bea0d543e9c5d254f2a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-07T15:20:02+00:00"
+      }
+    },
+    "build-time-codegen": {
+      "devto": {
+        "id": 3849555,
+        "url": "https://dev.to/codenameone/openapi-orm-svg-and-lottie-56ea",
+        "syndicated_at": "2026-06-08T14:32:08+00:00"
+      },
+      "foojay": {
+        "id": 124152,
+        "url": "https://foojay.io/wp-admin/post.php?post=124152&action=edit",
+        "preview_url": "https://foojay.io/?p=124152",
+        "featured_media_id": 124151,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-08T14:33:02+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/ab7837351417/edit",
+        "syndicated_at": "2026-06-08T15:01:39+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3656726/edit.html",
+        "syndicated_at": "2026-06-08T15:02:43+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq5ccmj900000bjehn2p1zvu",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a26d99db1bc3cdb83ac9ac3",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-08T15:03:50+00:00"
+      }
+    },
+    "we-will-not-sabotage-your-code": {
+      "devto": {
+        "id": 3866356,
+        "url": "https://dev.to/codenameone/we-will-not-sabotage-your-code-1k4k",
+        "syndicated_at": "2026-06-10T14:07:55+00:00"
+      },
+      "foojay": {
+        "id": 124169,
+        "url": "https://foojay.io/wp-admin/post.php?post=124169&action=edit",
+        "preview_url": "https://foojay.io/?p=124169",
+        "featured_media_id": 124168,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-10T14:08:52+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/13b00417be96/edit",
+        "syndicated_at": "2026-06-10T15:01:18+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3659540/edit.html",
+        "syndicated_at": "2026-06-10T15:02:29+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq8783xu00000bky6mpke9e1",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a297c93aaf199dfbd2442e9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-10T15:03:39+00:00"
+      }
+    },
+    "mac-native-grpc-graphql-and-fewer-open-issues": {
+      "devto": {
+        "id": 3883353,
+        "url": "https://dev.to/codenameone/mac-native-builds-live-protocols-and-open-issues-under-350-1fj5",
+        "syndicated_at": "2026-06-12T14:02:19+00:00"
+      },
+      "foojay": {
+        "id": 124224,
+        "url": "https://foojay.io/wp-admin/post.php?post=124224&action=edit",
+        "preview_url": "https://foojay.io/?p=124224",
+        "featured_media_id": 124223,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-12T14:03:17+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/6e0f8f576d37/edit",
+        "syndicated_at": "2026-06-12T15:01:47+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3659749/edit.html",
+        "syndicated_at": "2026-06-12T15:03:10+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmqb24nhh000904laekkddimg",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a2c1fb8d617a213c25a34bd",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-12T15:04:19+00:00"
+      }
+    },
+    "mac-native-builds-and-desktop-integration": {
+      "devto": {
+        "id": 3891796,
+        "url": "https://dev.to/codenameone/your-codename-one-app-now-a-native-mac-app-4gio",
+        "syndicated_at": "2026-06-13T13:33:30+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/d99e73163aae/edit",
+        "syndicated_at": "2026-06-13T15:01:38+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3659757/edit.html",
+        "syndicated_at": "2026-06-13T15:02:41+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmqchk0bu00000bjc9gbs2zjn",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a2d7123c69e839c84d8741b",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-13T15:03:55+00:00"
+      }
     }
   }
 }

@@ -254,6 +254,9 @@ while true; do
       grep -E 'PARPAR:DIAG:VIRTUAL_FAIL' "$ARTIFACTS_DIR/browser.log" 2>/dev/null | tail -30
     } >"$ARTIFACTS_DIR/timeout-tail.log" 2>&1 || true
     rjb_log "Timeout tail diagnostics written to $ARTIFACTS_DIR/timeout-tail.log"
+    # Preserve whatever screenshots were delivered before the timeout so goldens
+    # can be (re)seeded from a faithful CI render even on a wedged run.
+    mkdir -p "$ARTIFACTS_DIR/delivered" && cp -f "$CN1SS_WS_DIR"/*.png "$ARTIFACTS_DIR/delivered/" 2>/dev/null || true
     exit 5
   fi
   sleep 1
@@ -266,5 +269,9 @@ cn1ss_stop_ws_server
 cp -f "$LOG_FILE" "$ARTIFACTS_DIR/browser.log" 2>/dev/null || true
 write_top_blocker "$ARTIFACTS_DIR/browser.log"
 rjb_log "Top blocker: $(cat "$ARTIFACTS_DIR/top-blocker.txt" 2>/dev/null || echo 'TOP_BLOCKER=unavailable|none|none')"
+# Preserve every delivered screenshot (uploaded with the rest of $ARTIFACTS_DIR)
+# so goldens can be (re)seeded from a faithful CI render via `gh run download`.
+mkdir -p "$ARTIFACTS_DIR/delivered" && cp -f "$CN1SS_WS_DIR"/*.png "$ARTIFACTS_DIR/delivered/" 2>/dev/null || true
+rjb_log "Copied $(ls "$ARTIFACTS_DIR/delivered"/*.png 2>/dev/null | wc -l | tr -d ' ') delivered screenshot(s) to artifacts/delivered"
 
 "$SCRIPT_DIR/run-javascript-screenshot-tests.sh" "$LOG_FILE" "$REFERENCE_DIR"

@@ -102,6 +102,21 @@ public class ByteCodeClass {
         mainClass = null;
         preferredMainClass = null;
         saveUnitTests = false;
+        concreteTarget = null;
+    }
+
+    /// Selects which {@code @Concrete} attribute the parser honours: {@code "win"}
+    /// for the native Windows build (use {@code Concrete.win()}), {@code null}/
+    /// anything else for the default iOS pipeline (use {@code Concrete.name()}).
+    /// Set once per translation run from the app type (see ByteCodeTranslator).
+    private static String concreteTarget;
+
+    static void setConcreteTarget(String target) {
+        concreteTarget = target;
+    }
+
+    static String getConcreteTarget() {
+        return concreteTarget;
     }
     
     /**
@@ -396,12 +411,10 @@ public class ByteCodeClass {
     }
     
     private ByteCodeClass findClass(String s, List<ByteCodeClass> lst) {
-        for(ByteCodeClass c : lst) {
-            if(c.clsName.equals(s)) {
-                return c;
-            }
-        }
-        return null;
+        // lst is always Parser.classes here (markDependencies -> markDependent), so
+        // the shared name index gives the same first-match result in O(1) instead of
+        // the old O(N) scan that ran per dependency per class during marking.
+        return Parser.getClassObject(s);
     }
     
     public void updateAllDependencies() {

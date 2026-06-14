@@ -38,6 +38,9 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/native-interfaces.md` — Authoring native interfaces for iOS/Android/JavaScript/Desktop with `cn1:generate-native-interfaces` and platform callbacks.
 - `references/cn1libs.md` — Creating, packaging, and consuming Codename One libraries (Maven and legacy `.cn1lib`).
 - `references/ai-and-speech.md` — LLM client (`com.codename1.ai`), `ChatView`, `SpeechRecognizer`, `TextToSpeech`, non-prompting `SecureStorage` overloads, the ML Kit cn1libs, and the simulator's offline Ollama redirect. Read this when the user asks for chat, voice, embeddings, image generation, barcode/document/face detection, or wants to store an LLM API key.
+- `references/printing.md` — Cross-platform printing (`com.codename1.printing`): `Printer.printPDF` / `printImage` / `print`, the `PrintResult` outcome, and per-platform caveats (iOS AirPrint, Android, desktop, native Windows, web). Read this when the user wants to print a document, report, image, or the current screen.
+- `references/games.md` — Game development (`com.codename1.gaming`): the `GameView` update loop, `Sprite` / `AnimatedSprite` / `SpriteSheet`, pollable `GameInput`, `TouchControls`, `SoundPool`, and 2D `com.codename1.gaming.physics` (Box2D). Read this for arcade/casual/scroller/board games or any real-time animated canvas.
+- `references/3d-graphics.md` — Portable GPU 3D (`com.codename1.gpu`): the `RenderView` + `Renderer` loop, declarative `Material` / `VertexFormat` (engine-generated shaders — no GLSL), `Primitives`, `GltfLoader` for glTF models, `Camera` / `Light` / `Matrix4`, and platform backends. Read this for product viewers, 3D scenes, or custom GPU rendering.
 - `references/snapshot-builds.md` — Edge case: compiling against a Codename One SNAPSHOT from git.
 - `references/debugging.md` — `jdb`-attach workflow for an agent: start the simulator paused, set breakpoints, dump locals, drive the session non-interactively from a script.
 - `tools/` — runnable Java 17 single-file utilities. `tools/IsApiSupported.java` answers "is this `java.*` class in the CN1 subset?"; `tools/IsCssValid.java` answers "does this `theme.css` compile?"; `tools/CompareToMockup.java` scores a rendered screenshot against a designer mockup (similarity %, with region masking); `tools/DesignImport.java` turns a Figma/Sketch/Adobe XD design — or an HTML/React design's `tokens.css`/`styles.css` (Claude-generated mockups) — into starter CN1 CSS + tokens + a layout map. **`tools/DumpForm.java`** boots the app in **desktop mode** and dumps a model of the current screen, which **`tools/DescribeForm.java`** (vision-free outline), **`tools/AlignmentCheck.java`** (designer alignment guides) and **`tools/GuiLint.java`** (nested scroll, opaque text/containers, image borders) analyse. **`tools/UpdateSkills.java`** self-updates this whole skill from GitHub. Run with `java tools/<Name>.java <args>`.
@@ -303,6 +306,9 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "How do I create / consume a cn1lib" | `references/cn1libs.md` |
 | "Add a chatbot" / "Integrate OpenAI/Ollama/Anthropic" / "Stream LLM tokens" / "Generate an image" / "Embed text" | `references/ai-and-speech.md` |
 | "Read voice input" / "Speak text aloud" / "Add a voice button to my chat" | `references/ai-and-speech.md` |
+| "Print a document / report / image" / "print the current screen" / AirPrint | `references/printing.md` |
+| "Build a game" / sprites, game loop, joystick, collisions / `GameView` | `references/games.md` |
+| "Render 3D" / "show a 3D model" / glTF / `RenderView` / custom GPU drawing | `references/3d-graphics.md` |
 | "Scan a barcode" / "Detect a face" / "Crop a document photo" via ML Kit | `references/ai-and-speech.md` |
 | "Store an LLM API key" / non-prompting SecureStorage | `references/ai-and-speech.md` |
 | "Build against a Codename One SNAPSHOT from git" | `references/snapshot-builds.md` |

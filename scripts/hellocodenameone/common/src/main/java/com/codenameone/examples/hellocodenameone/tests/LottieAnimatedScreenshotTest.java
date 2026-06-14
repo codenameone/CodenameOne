@@ -24,16 +24,7 @@ public class LottieAnimatedScreenshotTest extends AbstractAnimationScreenshotTes
     private Image pulse;
 
     @Override
-    public boolean shouldTakeScreenshot() {
-        return !"HTML5".equals(Display.getInstance().getPlatformName());
-    }
-
-    @Override
     public boolean runTest() throws Exception {
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            done();
-            return true;
-        }
         return super.runTest();
     }
 

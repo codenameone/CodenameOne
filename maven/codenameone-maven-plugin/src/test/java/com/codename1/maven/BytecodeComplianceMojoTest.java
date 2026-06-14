@@ -339,6 +339,93 @@ class BytecodeComplianceMojoTest {
         assertFalse(((Boolean) method.invoke(null, "app/Other", "allocaByte", "(I)[B")).booleanValue());
     }
 
+    @Test
+    void rerunsComplianceCheckWhenClassesRecompiledWithoutSourceChange(@TempDir Path tempDir) throws Exception {
+        BytecodeComplianceMojo mojo = newMojoForSkipCheck(tempDir);
+        long markerTime = markerFile(mojo).lastModified();
+
+        Path classFile = writeClassWithVersion(outputDir(mojo), "app/Stable", Opcodes.V1_8);
+        assertTrue(classFile.toFile().setLastModified(markerTime - 60000));
+        assertFalse(hasChangedSinceLastCheck(mojo),
+                "Expected skip when classes are older than the last compliance check");
+
+        // The rewrites mutate target/classes in place; a recompile with
+        // unchanged sources regenerates the classes and must invalidate the
+        // skip or the rewrites are silently lost.
+        assertTrue(classFile.toFile().setLastModified(markerTime + 60000));
+        assertTrue(hasChangedSinceLastCheck(mojo),
+                "Expected re-run when classes are newer than the last compliance check");
+    }
+
+    @Test
+    void rerunsComplianceCheckWhenKotlinIncrementalClassesAreNewer(@TempDir Path tempDir) throws Exception {
+        BytecodeComplianceMojo mojo = newMojoForSkipCheck(tempDir);
+        long markerTime = markerFile(mojo).lastModified();
+
+        Path kotlinIcDir = tempDir.resolve("ios").resolve("target")
+                .resolve("kotlin-ic").resolve("compile").resolve("classes");
+        Path kotlinClass = writeClassWithVersion(kotlinIcDir, "app/FromKotlinIc", Opcodes.V1_8);
+        assertTrue(kotlinClass.toFile().setLastModified(markerTime + 60000));
+
+        assertTrue(hasChangedSinceLastCheck(mojo),
+                "Expected re-run when the Kotlin incremental output tree has classes newer than the last check");
+    }
+
+    @Test
+    void rerunsComplianceCheckAfterPreviousFailureReport(@TempDir Path tempDir) throws Exception {
+        BytecodeComplianceMojo mojo = newMojoForSkipCheck(tempDir);
+        java.io.File marker = markerFile(mojo);
+        long markerTime = marker.lastModified();
+        Files.write(marker.toPath(),
+                "Codename One compliance check failed.\nProject: test\n".getBytes("UTF-8"));
+        assertTrue(marker.setLastModified(markerTime));
+
+        assertTrue(hasChangedSinceLastCheck(mojo),
+                "Expected re-run when the previous check recorded violations, even with nothing newer");
+    }
+
+    private BytecodeComplianceMojo newMojoForSkipCheck(Path tempDir) throws Exception {
+        Path iosDir = tempDir.resolve("ios");
+        Path commonDir = tempDir.resolve("common");
+        Files.createDirectories(iosDir.resolve("target").resolve("codenameone"));
+        Files.createDirectories(commonDir);
+
+        long base = System.currentTimeMillis();
+        Path settings = commonDir.resolve("codenameone_settings.properties");
+        Files.write(settings, new byte[0]);
+        assertTrue(settings.toFile().setLastModified(base - 120000));
+
+        Path marker = iosDir.resolve("target").resolve("codenameone").resolve("compliance_check.txt");
+        Files.write(marker, "Completed compliance check on test\n".getBytes("UTF-8"));
+        assertTrue(marker.toFile().setLastModified(base));
+
+        MavenProject project = new MavenProject();
+        project.setFile(iosDir.resolve("pom.xml").toFile());
+        org.apache.maven.model.Build build = new org.apache.maven.model.Build();
+        build.setDirectory(iosDir.resolve("target").toString());
+        build.setOutputDirectory(iosDir.resolve("target").resolve("classes").toString());
+        project.setBuild(build);
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        mojo.project = project;
+        setField(mojo, "complianceOutputFile", marker.toFile());
+        return mojo;
+    }
+
+    private java.io.File markerFile(BytecodeComplianceMojo mojo) throws Exception {
+        return (java.io.File) field(mojo, "complianceOutputFile");
+    }
+
+    private Path outputDir(BytecodeComplianceMojo mojo) {
+        return java.nio.file.Paths.get(mojo.project.getBuild().getOutputDirectory());
+    }
+
+    private boolean hasChangedSinceLastCheck(BytecodeComplianceMojo mojo) throws Exception {
+        Method method = BytecodeComplianceMojo.class.getDeclaredMethod("hasChangedSinceLastCheck");
+        method.setAccessible(true);
+        return ((Boolean) method.invoke(mojo)).booleanValue();
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, ?> buildClassIndex(BytecodeComplianceMojo mojo, List<java.io.File> roots) throws Exception {
         Method method = BytecodeComplianceMojo.class.getDeclaredMethod("buildClassIndex", List.class);
