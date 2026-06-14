@@ -50,27 +50,33 @@ maximizes the set of machines your binary runs on out of the box. (GTK is
 dynamically linked, so a future GTK4 build would be a separate target rather than
 a flag, to revisit once GTK4's footprint is as universal as GTK3's.)
 
-=== Why the binary links musl, not glibc
+=== libc: An old glibc by default, musl for Alpine
 
-The translated runtime and your app's C are built against *musl* libc, statically
-linked into the binary, while the GTK stack is dynamically linked. That split is
-deliberate, and it's what makes the executable portable.
+The libc is the one library every program depends on, and it's the most fragile
+external dependency a native Linux binary has. glibc versions its symbols, so a
+binary built on a current distro fails to even start on an older one with the
+familiar `version 'GLIBC_2.38' not found` error -- the binary is effectively tied
+to the glibc of the machine that built it.
 
-A glibc-linked binary is tied to the *exact glibc version of the machine that
-built it*: glibc versions its symbols, so a binary built on a current distro
-fails to even start on an older one with the familiar `version 'GLIBC_2.34' not
-found` error. That makes the libc -- the one library every program depends on --
-the single most fragile external dependency a native Linux binary has. musl
-sidesteps this entirely: it's small and designed to be statically linked, so the
-C runtime travels *inside* the executable. There is no glibc version to match, no
-per-distribution surprise -- the binary just runs.
+The default Linux build sidesteps that by compiling the translated runtime and
+your app's C with *`zig cc` targeting an old glibc* (`*-linux-gnu.2.28`). zig is a
+self-contained toolchain that ships glibc headers and stubs for every version, so
+a binary built on a bleeding-edge host still requires only an ancient,
+universally present glibc (in practice it lands around `GLIBC_2.17`, from 2013).
+The GTK stack stays *dynamically* linked -- the binary resolves `libgtk-3`, Cairo,
+Pango, etc. from the system at startup. The net effect is a single small ELF that
+runs on essentially any glibc desktop from the last decade.
 
-The GTK libraries themselves stay dynamically linked (the GTK stack is large and
-not designed to be statically linked, and every desktop already ships it with a
-stable ABI), so the binary resolves `libgtk-3`, Cairo, Pango, etc. from the system
-at startup. The net effect: the fragile part (libc) is baked in, and the part
-that's genuinely a platform service (the desktop toolkit) is shared -- a single
-small ELF that "just works" across distributions.
+[NOTE]
+====
+Despite an earlier draft of this guide, the binary is glibc, not musl. A musl
+binary can't dynamically link a mainstream distro's GTK: that GTK is built against
+glibc, and two libc implementations can't coexist in one process (a *static* musl
+binary can't `dlopen` at all). musl works only where the whole GTK stack is also
+musl-built -- that is, *Alpine*. musl is therefore an opt-in target for Alpine,
+selected with the `linux.libc=musl` build hint, not the portable default. See the
+build-hint reference below.
+====
 
 === Building a native Linux app
 
@@ -115,10 +121,10 @@ machine of each.
 
 You can also *cross-compile* -- and you may well want to, for example producing an
 arm64 binary from a build host that itself runs x64. The translated C is architecture-independent,
-and the toolchain selected for the musl link (`zig cc`) is itself a
-cross-compiler, so it can emit a binary for a different CPU from the one it runs
-on. Point `linux.cc` at a cross `zig cc` wrapper for the target triple (or set
-`linux.toolchain=zig` together with `linux.arch`) to cross-build.
+and the default toolchain (`zig cc`) is itself a cross-compiler, so it can emit a
+binary for a different CPU from the one it runs on. Point `linux.cc` at a cross
+`zig cc` wrapper for the target triple (or set `linux.arch` and let the builder
+generate one) to cross-build.
 
 === Build hints
 
@@ -138,15 +144,22 @@ The native Linux port adds the build hints below (all use the `linux.` prefix).
 native crash address can be turned back into a function name and source line while
 developing. Optimizations stay on either way.
 
+|linux.libc
+|`glibc` (default) or `musl`. The default builds with `zig cc` against an old
+glibc (`*-linux-gnu.2.28`), so the binary runs on essentially any mainstream
+distro. `musl` targets `*-linux-musl` for *Alpine* (where the GTK stack is itself
+musl-built); a musl binary doesn't run on glibc distros and vice versa.
+
 |linux.toolchain
-|Set to `zig` to build with `zig cc` -- a self-contained cross-compiler that ships
-the musl sysroot -- so a glibc host can emit the musl binary (and cross-compile to
-a different `linux.arch`).
+|Set to `zig` to force the `zig cc` toolchain (the default already uses it for the
+glibc target). zig is a self-contained cross-compiler, so a single host can build
+for either `linux.arch` and either `linux.libc`.
 
 |linux.cc
 |Override the C compiler CMake uses (for example a `zig cc` wrapper for a specific
 target triple, a `musl-gcc`, or a cross `cc`). Takes precedence over
-`linux.toolchain`; also settable through the `CN1_CC` environment variable.
+`linux.libc`/`linux.toolchain`; also settable through the `CN1_CC` environment
+variable.
 |===
 
 The full cross-platform build-hints reference is in the

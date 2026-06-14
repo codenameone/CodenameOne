@@ -56,14 +56,16 @@ import java.util.List;
  *   <li>Collect the executable into the result directory.</li>
  * </ol>
  *
- * <p><b>musl.</b> The lean-libc goal is met by the compiler the build uses: on a
- * musl host (e.g. Alpine) the native {@code cc}/{@code clang} already links musl,
- * and pkg-config resolves the musl-built GTK stack. To target musl from a glibc
- * host, set {@code linux.toolchain=zig} (or point {@code linux.cc} / {@code
- * CN1_CC} at a {@code zig cc}-style wrapper) -- {@link #targetTriple(String)}
- * selects the {@code *-linux-musl} triple. The GTK stack stays dynamically linked
- * either way (it cannot be statically linked); only the translated runtime + app C
- * is musl-bound.</p>
+ * <p><b>libc.</b> By default the build uses {@code zig cc} targeting an OLD glibc
+ * ({@code *-linux-gnu.2.28}) so the dynamically-GTK-linked binary runs on
+ * essentially any mainstream distro (it ends up needing only ~{@code GLIBC_2.17}).
+ * {@code linux.libc=musl} instead targets {@code *-linux-musl} -- but that is only
+ * usable where GTK is itself musl-built (Alpine), because a musl process cannot
+ * dynamically link a glibc-built GTK (two libcs cannot coexist, and a static musl
+ * binary cannot {@code dlopen}). A glibc binary and a musl binary are therefore not
+ * interchangeable: glibc is the portable default, musl is the opt-in Alpine target.
+ * On an Alpine host the native {@code cc} already links musl, so {@code linux.libc=musl}
+ * uses it. The GTK stack stays dynamically linked either way.</p>
  *
  * <p><b>Architecture.</b> {@code linux.arch} selects the target: {@code x64}
  * (x86-64, the default) or {@code arm64}.</p>
@@ -135,15 +137,38 @@ public class LinuxNativeBuilder extends Executor {
     }
 
     /**
-     * LLVM/zig target triple for the given (normalised) architecture. Always the
-     * {@code *-linux-musl} triple -- this builder produces musl binaries; the GTK
-     * stack is dynamically linked on top.
+     * LLVM/zig target triple for the given (normalised) architecture and libc.
+     * The default is an OLD glibc ({@code *-linux-gnu.2.28}) so the dynamically
+     * GTK-linked binary runs on essentially any mainstream distro; {@code musl}
+     * selects {@code *-linux-musl}, which only runs where GTK is itself musl-built
+     * (Alpine). A glibc binary and a musl binary are not interchangeable.
      */
-    public static String targetTriple(String arch) {
-        if (ARCH_ARM64.equals(normalizeArch(arch))) {
-            return "aarch64-linux-musl";
+    public static String targetTriple(String arch, boolean musl) {
+        String a = ARCH_ARM64.equals(normalizeArch(arch)) ? "aarch64" : "x86_64";
+        return musl ? (a + "-linux-musl") : (a + "-linux-gnu.2.28");
+    }
+
+    /** Whether the {@code linux.libc=musl} (or legacy {@code linux.musl=true}) hint is set. */
+    static boolean isMuslRequested(BuildRequest request) {
+        String libc = request.getArg("linux.libc", "glibc");
+        return "musl".equalsIgnoreCase(libc) || "true".equalsIgnoreCase(request.getArg("linux.musl", "false"));
+    }
+
+    /** True when a {@code zig} executable is resolvable (CN1_ZIG or on PATH). */
+    private static boolean zigAvailable() {
+        String env = System.getenv("CN1_ZIG");
+        if (env != null && !env.isEmpty()) {
+            return true;
         }
-        return "x86_64-linux-musl";
+        String path = System.getenv("PATH");
+        if (path != null) {
+            for (String dir : path.split(java.io.File.pathSeparator)) {
+                if (new File(dir, "zig").canExecute()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Best-effort detection of the build host architecture. */
@@ -158,7 +183,7 @@ public class LinuxNativeBuilder extends Executor {
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         String arch = normalizeArch(request.getArg("linux.arch", ARCH_X64));
-        log("Building native Linux app for arch=" + arch + " (triple " + targetTriple(arch) + ")");
+        log("Building native Linux app for arch=" + arch + " (triple " + targetTriple(arch, isMuslRequested(request)) + ")");
 
         File tmpFile = getBuildDirectory();
         tmpFile.mkdirs();
@@ -271,6 +296,9 @@ public class LinuxNativeBuilder extends Executor {
         configure.add("-G");
         configure.add("Ninja");
         configure.add("-DCMAKE_C_COMPILER=" + cc);
+        // Drive the .incbin ASM unit through the same compiler so a zig cc wrapper
+        // links the whole binary.
+        configure.add("-DCMAKE_ASM_COMPILER=" + cc);
 
         try {
             if (!exec(cmakeRoot, 1800000, configure.toArray(new String[0]))) {
@@ -326,29 +354,57 @@ public class LinuxNativeBuilder extends Executor {
         if (hint != null && !hint.isEmpty()) {
             return hint;
         }
-        if ("zig".equalsIgnoreCase(request.getArg("linux.toolchain", "")) || "true".equalsIgnoreCase(request.getArg("linux.musl", "false"))) {
-            return writeZigCcWrapper(arch).getAbsolutePath();
+        boolean musl = isMuslRequested(request);
+        if (musl) {
+            // musl is only correct where GTK is itself musl-built (Alpine). Use the
+            // host cc there (Alpine's gcc already links musl); use the zig musl
+            // triple if explicitly building musl on a non-Alpine host.
+            if (zigAvailable() && !"true".equalsIgnoreCase(request.getArg("linux.muslNativeCc", "false"))) {
+                return writeZigCcWrapper(arch, true).getAbsolutePath();
+            }
+            return "cc";
         }
+        // Default (glibc): build against an OLD glibc with zig so the binary is
+        // portable across distros. Fall back to the host cc when zig is absent --
+        // that ties the binary to the build host's glibc version.
+        if (zigAvailable() || "zig".equalsIgnoreCase(request.getArg("linux.toolchain", ""))) {
+            return writeZigCcWrapper(arch, false).getAbsolutePath();
+        }
+        log("zig not found (set CN1_ZIG or install zig); building with the host 'cc'. "
+                + "The binary will require the build host's glibc version -- install zig for a "
+                + "portable old-glibc binary.");
         return "cc";
     }
 
     /**
      * Writes an executable wrapper script that invokes {@code zig cc -target
-     * <musl-triple>} for the selected arch, so CMake can treat it as a single C
-     * compiler. {@code zig} is a self-contained cross-compiler shipping the musl
-     * sysroot, which is the simplest way to produce musl binaries from any host.
+     * <triple>} for the selected arch/libc, so CMake can treat it as a single C
+     * compiler. {@code zig} is a self-contained toolchain shipping glibc (every
+     * version) and musl, which is the simplest way to pin an old glibc -- or emit a
+     * musl binary -- from any host.
      */
-    private File writeZigCcWrapper(String arch) {
+    private File writeZigCcWrapper(String arch, boolean musl) {
         String zig = System.getenv("CN1_ZIG");
         if (zig == null || zig.isEmpty()) {
             zig = "zig";
         }
-        String triple = targetTriple(arch);
-        File wrapper = new File(getBuildDirectory(), "zig-cc-" + normalizeArch(arch));
+        String triple = targetTriple(arch, musl);
+        File wrapper = new File(getBuildDirectory(), "zig-cc-" + normalizeArch(arch) + (musl ? "-musl" : ""));
         try {
             StringBuilder sh = new StringBuilder();
             sh.append("#!/bin/sh\n");
-            sh.append("exec \"").append(zig).append("\" cc -target ").append(triple).append(" \"$@\"\n");
+            sh.append("exec \"").append(zig).append("\" cc -target ").append(triple);
+            if (!musl) {
+                // Old glibc on a modern host: declare BSD funcs (usleep) WITHOUT
+                // enabling C23 (which redirects strtol -> __isoc23_strtol, a 2.38
+                // symbol the shim covers), silence the benign __GLIBC_MINOR__
+                // redefinition, and add the host's GTK lib dirs (zig does not search
+                // system paths). The arch dir is resolved at run time so the same
+                // wrapper works native or cross.
+                sh.append(" -D_DEFAULT_SOURCE -Wno-macro-redefined");
+                sh.append(" -L/usr/lib/$(uname -m)-linux-gnu -L/usr/lib64 -L/lib/$(uname -m)-linux-gnu");
+            }
+            sh.append(" \"$@\"\n");
             try (OutputStream out = new FileOutputStream(wrapper)) {
                 out.write(sh.toString().getBytes(StandardCharsets.UTF_8));
             }

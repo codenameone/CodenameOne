@@ -604,3 +604,6 @@ libsecret
 libnotify
 sonames
 syscall
+
+# The POSIX dynamic-loader call used by the Linux port to load optional libs.
+dlopen
