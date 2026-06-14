@@ -108,6 +108,11 @@ class CleanTargetLinuxIntegrationTest {
                 "  static Form home;\n" +
                 "  public static void main(String[] args) {\n" +
                 "    Display.init(null);\n" +
+                // The port's runMainEventLoop creates a daemon worker thread via
+                // Thread.setDaemon -- a wrapper this minimal app would not otherwise
+                // reach, so force it into the translation set (the suite reaches it
+                // naturally). The branch never runs; the call just keeps the wrapper.
+                "    if (args != null && args.length < 0) { new Thread().setDaemon(true); }\n" +
                 "    Display.getInstance().callSerially(new Runnable(){ public void run(){ build(); } });\n" +
                 "    LinuxImplementation.runMainEventLoop();\n" +
                 "  }\n" +
