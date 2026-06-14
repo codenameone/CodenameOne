@@ -728,8 +728,13 @@ public class Picker extends Button {
                 dlg.setOwner(Picker.this);
                 //dlg.setFormMode(!isTablet);
                 ComponentSelector.select("DialogTitle", dlg).getParent().setPadding(0).setMargin(0).setBorder(Border.createEmpty());
-                dlg.getTitleComponent().setVisible(false);
-                ComponentSelector.select(dlg.getTitleComponent()).setPadding(0).setMargin(0);
+                Component titleComponent = dlg.getTitleComponent();
+                // setVisible(false) only suppresses painting, it doesn't free the layout space. When the
+                // DialogTitle UIID has a border (e.g. a CSS border-radius) the border's minimum size is still
+                // allocated above the spinner, so setHidden(true) is required to truly collapse the title area.
+                titleComponent.setHidden(true);
+                titleComponent.setVisible(false);
+                ComponentSelector.select(titleComponent).setPadding(0).setMargin(0);
                 dlg.setUIID(isTablet ? "PickerDialogTablet" : "PickerDialog");
                 dlg.getUnselectedStyle().setBgColor(new Label("", "Spinner3DOverlay").getUnselectedStyle().getBgColor());
                 dlg.getUnselectedStyle().setBgTransparency(255);
