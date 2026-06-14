@@ -1,8 +1,11 @@
 package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
+import com.codename1.initializr.JsDownloader;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.system.NativeLookup;
+import com.codename1.util.Base64;
 import com.codename1.util.StringUtil;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
@@ -127,15 +130,29 @@ public class GeneratorModel {
             return;
         }
 
-        // Preferred delivery: hand the bytes straight to the platform's
-        // downloader. On the JavaScript port the storage-backed
-        // execute(file:// URL) download path is broken -- localforage's
-        // getItem/exists never sees the just-written file, so writing to
-        // storage + execute() silently does nothing there (the Generate
-        // button "did nothing"). downloadBytesAsFile bypasses storage and
-        // streams the bytes straight to a browser download. Platforms that
-        // don't implement it return false, and we fall back to the
-        // storage + execute() path that works for them.
+        // JavaScript port: deliver via the proven NativeInterface dispatch
+        // (__cn1_native_interface_call__). Its JS impl runs on the main thread
+        // and drives an <a download> click directly. We route through this
+        // instead of the storage+execute path (broken: localforage getItem/
+        // exists never sees the just-written file) and instead of the worker
+        // @JSBody save-blob bridge (whose invokeHostNative call never reaches
+        // the host). On other platforms NativeLookup returns null and we fall
+        // through to downloadBytesAsFile / storage+execute below.
+        try {
+            JsDownloader jsDownloader = NativeLookup.create(JsDownloader.class);
+            if (jsDownloader != null && jsDownloader.isSupported()) {
+                String dataUrl = "data:application/octet-stream;base64,"
+                        + Base64.encodeNoNewline(bytes);
+                if (jsDownloader.download(fileName, dataUrl)) {
+                    return;
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+
+        // Other platforms: hand the bytes to the platform downloader; falls
+        // through to storage + execute() when unsupported.
         if (downloadBytesAsFile(fileName, bytes)) {
             return;
         }
