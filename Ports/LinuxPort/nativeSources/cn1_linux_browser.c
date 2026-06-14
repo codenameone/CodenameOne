@@ -28,16 +28,66 @@
  * queued for the EDT (browserPollEvent), and the JS->Java bridge is a WebKit user
  * content script message handler ("cn1") whose messages surface as MSG| events.
  * All WebKit calls run on the GTK main thread.
+ *
+ * WebKitGTK is loaded with dlopen() at first use rather than linked, so the port
+ * binary depends only on the GTK3 core at runtime: a desktop without WebKitGTK
+ * installed still runs -- BrowserComponent just reports unsupported. The header is
+ * still included (for the types/macros/enums) but no webkit symbol is referenced
+ * at link time; every entry point is resolved through dlsym (see cn1LoadWebkit).
  */
 
 #include "cn1_linux_gfx.h"
 #include <webkit2/webkit2.h>
+#include <dlfcn.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
 
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
+
+/* --- lazily resolved WebKitGTK entry points (dlopen, not linked) ---------- */
+static __typeof__(webkit_web_view_get_uri)*                                    p_webkit_web_view_get_uri;
+static __typeof__(webkit_user_content_manager_new)*                            p_webkit_user_content_manager_new;
+static __typeof__(webkit_user_content_manager_register_script_message_handler)* p_webkit_user_content_manager_register_script_message_handler;
+static __typeof__(webkit_web_view_new_with_user_content_manager)*              p_webkit_web_view_new_with_user_content_manager;
+static __typeof__(webkit_javascript_result_get_js_value)*                      p_webkit_javascript_result_get_js_value;
+static __typeof__(jsc_value_to_string)*                                        p_jsc_value_to_string;
+static __typeof__(webkit_web_view_load_html)*                                  p_webkit_web_view_load_html;
+static __typeof__(webkit_web_view_load_uri)*                                   p_webkit_web_view_load_uri;
+static __typeof__(webkit_web_view_run_javascript)*                             p_webkit_web_view_run_javascript;
+
+static int cn1_wk_state = 0; /* 0 = untried, 1 = available, -1 = unavailable */
+
+/* dlopen WebKitGTK and resolve the entry points once. Returns non-zero when the
+ * BrowserComponent peer can be created; 0 (and a one-time log) when WebKitGTK is
+ * not installed, so the rest of the UI keeps working on a GTK3-only system. */
+static int cn1LoadWebkit(void) {
+    void* h;
+    int ok = 1;
+    if (cn1_wk_state) { return cn1_wk_state > 0; }
+    h = dlopen("libwebkit2gtk-4.1.so.0", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) { h = dlopen("libwebkit2gtk-4.1.so", RTLD_LAZY | RTLD_GLOBAL); }
+    if (!h) {
+        cn1_wk_state = -1;
+        cn1LinuxStubOnce("WebKitGTK (libwebkit2gtk-4.1) not installed; BrowserComponent unsupported");
+        return 0;
+    }
+#define CN1_WK_SYM(ptr, name) do { *(void**)(&ptr) = dlsym(h, name); if (!(ptr)) { ok = 0; } } while (0)
+    CN1_WK_SYM(p_webkit_web_view_get_uri, "webkit_web_view_get_uri");
+    CN1_WK_SYM(p_webkit_user_content_manager_new, "webkit_user_content_manager_new");
+    CN1_WK_SYM(p_webkit_user_content_manager_register_script_message_handler, "webkit_user_content_manager_register_script_message_handler");
+    CN1_WK_SYM(p_webkit_web_view_new_with_user_content_manager, "webkit_web_view_new_with_user_content_manager");
+    CN1_WK_SYM(p_webkit_javascript_result_get_js_value, "webkit_javascript_result_get_js_value");
+    CN1_WK_SYM(p_jsc_value_to_string, "jsc_value_to_string");
+    CN1_WK_SYM(p_webkit_web_view_load_html, "webkit_web_view_load_html");
+    CN1_WK_SYM(p_webkit_web_view_load_uri, "webkit_web_view_load_uri");
+    CN1_WK_SYM(p_webkit_web_view_run_javascript, "webkit_web_view_run_javascript");
+#undef CN1_WK_SYM
+    cn1_wk_state = ok ? 1 : -1;
+    if (!ok) { cn1LinuxStubOnce("WebKitGTK present but an expected symbol was missing; BrowserComponent unsupported"); }
+    return ok;
+}
 
 #define CN1_BROWSER_QUEUE 64
 
@@ -62,7 +112,7 @@ static void cn1BrowserPush(CN1Browser* b, const char* msg) {
 static void cn1BrowserLoadChanged(WebKitWebView* view, WebKitLoadEvent ev, gpointer data) {
     CN1Browser* b = (CN1Browser*) data;
     if (ev == WEBKIT_LOAD_STARTED) {
-        const char* uri = webkit_web_view_get_uri(view);
+        const char* uri = p_webkit_web_view_get_uri(view);
         char* msg = g_strconcat("NAV|", uri ? uri : "", NULL);
         cn1BrowserPush(b, msg);
         g_free(msg);
@@ -73,8 +123,8 @@ static void cn1BrowserLoadChanged(WebKitWebView* view, WebKitLoadEvent ev, gpoin
 
 static void cn1BrowserScriptMessage(WebKitUserContentManager* mgr, WebKitJavascriptResult* res, gpointer data) {
     CN1Browser* b = (CN1Browser*) data;
-    JSCValue* value = webkit_javascript_result_get_js_value(res);
-    char* str = jsc_value_to_string(value);
+    JSCValue* value = p_webkit_javascript_result_get_js_value(res);
+    char* str = p_jsc_value_to_string(value);
     char* msg = g_strconcat("MSG|", str ? str : "", NULL);
     cn1BrowserPush(b, msg);
     g_free(msg);
@@ -87,23 +137,23 @@ typedef struct { int w, h; CN1Browser* result; } CN1BrowserCreateReq;
 static void cn1BrowserCreateOnMain(void* p) {
     CN1BrowserCreateReq* req = (CN1BrowserCreateReq*) p;
     CN1Browser* b = (CN1Browser*) calloc(1, sizeof(CN1Browser));
-    WebKitUserContentManager* mgr = webkit_user_content_manager_new();
+    WebKitUserContentManager* mgr = p_webkit_user_content_manager_new();
     pthread_mutex_init(&b->lock, 0);
-    webkit_user_content_manager_register_script_message_handler(mgr, "cn1");
+    p_webkit_user_content_manager_register_script_message_handler(mgr, "cn1");
     g_signal_connect(mgr, "script-message-received::cn1", G_CALLBACK(cn1BrowserScriptMessage), b);
-    b->view = webkit_web_view_new_with_user_content_manager(mgr);
+    b->view = p_webkit_web_view_new_with_user_content_manager(mgr);
     g_signal_connect(b->view, "load-changed", G_CALLBACK(cn1BrowserLoadChanged), b);
     cn1LinuxOverlayAdd(b->view, 0, 0, req->w > 0 ? req->w : 1, req->h > 0 ? req->h : 1);
     req->result = b;
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_browserSupported___R_boolean(CODENAME_ONE_THREAD_STATE) {
-    return cn1LinuxWindowWidget() != 0 ? JAVA_TRUE : JAVA_FALSE;
+    return (cn1LinuxWindowWidget() != 0 && cn1LoadWebkit()) ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_browserCreate___int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT w, JAVA_INT h) {
     CN1BrowserCreateReq req;
-    if (cn1LinuxWindowWidget() == 0) {
+    if (cn1LinuxWindowWidget() == 0 || !cn1LoadWebkit()) {
         return 0;
     }
     req.w = w;
@@ -117,17 +167,17 @@ typedef struct { CN1Browser* b; char* a; char* c; int x, y, w, h; } CN1BrowserOp
 
 static void cn1BrowserSetHtmlOnMain(void* p) {
     CN1BrowserOp* op = (CN1BrowserOp*) p;
-    webkit_web_view_load_html(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "", op->c);
+    p_webkit_web_view_load_html(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "", op->c);
 }
 
 static void cn1BrowserSetUrlOnMain(void* p) {
     CN1BrowserOp* op = (CN1BrowserOp*) p;
-    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "about:blank");
+    p_webkit_web_view_load_uri(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "about:blank");
 }
 
 static void cn1BrowserExecuteOnMain(void* p) {
     CN1BrowserOp* op = (CN1BrowserOp*) p;
-    webkit_web_view_run_javascript(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "", 0, 0, 0);
+    p_webkit_web_view_run_javascript(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "", 0, 0, 0);
 }
 
 static void cn1BrowserBoundsOnMain(void* p) {

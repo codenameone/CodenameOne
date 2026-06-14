@@ -40,6 +40,7 @@
 #include <libnotify/notify.h>
 #include <libsecret/secret.h>
 #include <geoclue.h>
+#include <dlfcn.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
@@ -50,6 +51,113 @@ extern GtkWidget* cn1LinuxWindowWidget(void);
 
 /* The run-on-GTK-thread-and-wait helper (cn1LinuxRunOnMainAndWait) is shared from
  * cn1_linux_window.c. */
+
+/* ----------------------------------------------------------------------------
+ * The three desktop services that depend on optional libraries -- secure storage
+ * (libsecret), local notifications (libnotify) and location (libgeoclue) -- are
+ * loaded with dlopen() at first use rather than linked, so the port binary
+ * depends only on the GTK3/GLib/GIO core at runtime. A desktop missing any of
+ * these libraries still runs: the affected service simply reports unsupported and
+ * returns a safe default. GLib/GObject/GIO/GDBus/GTK and libc stay linked.
+ *
+ * Each library has an independent loader (cn1LoadSecret / cn1LoadNotify /
+ * cn1LoadGeoclue) that dlopens the soname, resolves every entry point through
+ * dlsym into a __typeof__ function pointer (signatures kept correct by the
+ * already-included headers) and caches its state. Upper-case macros/enums/types
+ * are compile-time constructs and are not resolved here. */
+
+/* --- libsecret (libsecret-1.so.0) ----------------------------------------- */
+static __typeof__(secret_password_store_sync)*  p_secret_password_store_sync;
+static __typeof__(secret_password_lookup_sync)* p_secret_password_lookup_sync;
+static __typeof__(secret_password_free)*        p_secret_password_free;
+static int cn1_secret_state = 0; /* 0 = untried, 1 = available, -1 = unavailable */
+
+static int cn1LoadSecret(void) {
+    void* h;
+    int ok = 1;
+    if (cn1_secret_state) { return cn1_secret_state > 0; }
+    h = dlopen("libsecret-1.so.0", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) { h = dlopen("libsecret-1.so", RTLD_LAZY | RTLD_GLOBAL); }
+    if (!h) {
+        cn1_secret_state = -1;
+        cn1LinuxStubOnce("libsecret (libsecret-1) not installed; secure storage unsupported");
+        return 0;
+    }
+#define CN1_SECRET_SYM(ptr, name) do { *(void**)(&ptr) = dlsym(h, name); if (!(ptr)) { ok = 0; } } while (0)
+    CN1_SECRET_SYM(p_secret_password_store_sync, "secret_password_store_sync");
+    CN1_SECRET_SYM(p_secret_password_lookup_sync, "secret_password_lookup_sync");
+    CN1_SECRET_SYM(p_secret_password_free, "secret_password_free");
+#undef CN1_SECRET_SYM
+    cn1_secret_state = ok ? 1 : -1;
+    if (!ok) { cn1LinuxStubOnce("libsecret present but an expected symbol was missing; secure storage unsupported"); }
+    return ok;
+}
+
+/* --- libnotify (libnotify.so.4) ------------------------------------------- */
+static __typeof__(notify_init)*                   p_notify_init;
+static __typeof__(notify_notification_new)*       p_notify_notification_new;
+static __typeof__(notify_notification_add_action)* p_notify_notification_add_action;
+static __typeof__(notify_notification_show)*      p_notify_notification_show;
+static int cn1_notify_state = 0; /* 0 = untried, 1 = available, -1 = unavailable */
+
+static int cn1LoadNotify(void) {
+    void* h;
+    int ok = 1;
+    if (cn1_notify_state) { return cn1_notify_state > 0; }
+    h = dlopen("libnotify.so.4", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) { h = dlopen("libnotify.so", RTLD_LAZY | RTLD_GLOBAL); }
+    if (!h) {
+        cn1_notify_state = -1;
+        cn1LinuxStubOnce("libnotify not installed; local notifications unsupported");
+        return 0;
+    }
+#define CN1_NOTIFY_SYM(ptr, name) do { *(void**)(&ptr) = dlsym(h, name); if (!(ptr)) { ok = 0; } } while (0)
+    CN1_NOTIFY_SYM(p_notify_init, "notify_init");
+    CN1_NOTIFY_SYM(p_notify_notification_new, "notify_notification_new");
+    CN1_NOTIFY_SYM(p_notify_notification_add_action, "notify_notification_add_action");
+    CN1_NOTIFY_SYM(p_notify_notification_show, "notify_notification_show");
+#undef CN1_NOTIFY_SYM
+    cn1_notify_state = ok ? 1 : -1;
+    if (!ok) { cn1LinuxStubOnce("libnotify present but an expected symbol was missing; local notifications unsupported"); }
+    return ok;
+}
+
+/* --- geoclue (libgeoclue-2.so.0) ------------------------------------------ */
+static __typeof__(gclue_simple_new_sync)*       p_gclue_simple_new_sync;
+static __typeof__(gclue_simple_get_location)*   p_gclue_simple_get_location;
+static __typeof__(gclue_location_get_latitude)* p_gclue_location_get_latitude;
+static __typeof__(gclue_location_get_longitude)* p_gclue_location_get_longitude;
+static __typeof__(gclue_location_get_accuracy)* p_gclue_location_get_accuracy;
+static __typeof__(gclue_location_get_altitude)* p_gclue_location_get_altitude;
+static __typeof__(gclue_location_get_heading)*  p_gclue_location_get_heading;
+static __typeof__(gclue_location_get_speed)*    p_gclue_location_get_speed;
+static int cn1_geoclue_state = 0; /* 0 = untried, 1 = available, -1 = unavailable */
+
+static int cn1LoadGeoclue(void) {
+    void* h;
+    int ok = 1;
+    if (cn1_geoclue_state) { return cn1_geoclue_state > 0; }
+    h = dlopen("libgeoclue-2.so.0", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) { h = dlopen("libgeoclue-2.so", RTLD_LAZY | RTLD_GLOBAL); }
+    if (!h) {
+        cn1_geoclue_state = -1;
+        cn1LinuxStubOnce("libgeoclue (libgeoclue-2) not installed; location unsupported");
+        return 0;
+    }
+#define CN1_GCLUE_SYM(ptr, name) do { *(void**)(&ptr) = dlsym(h, name); if (!(ptr)) { ok = 0; } } while (0)
+    CN1_GCLUE_SYM(p_gclue_simple_new_sync, "gclue_simple_new_sync");
+    CN1_GCLUE_SYM(p_gclue_simple_get_location, "gclue_simple_get_location");
+    CN1_GCLUE_SYM(p_gclue_location_get_latitude, "gclue_location_get_latitude");
+    CN1_GCLUE_SYM(p_gclue_location_get_longitude, "gclue_location_get_longitude");
+    CN1_GCLUE_SYM(p_gclue_location_get_accuracy, "gclue_location_get_accuracy");
+    CN1_GCLUE_SYM(p_gclue_location_get_altitude, "gclue_location_get_altitude");
+    CN1_GCLUE_SYM(p_gclue_location_get_heading, "gclue_location_get_heading");
+    CN1_GCLUE_SYM(p_gclue_location_get_speed, "gclue_location_get_speed");
+#undef CN1_GCLUE_SYM
+    cn1_geoclue_state = ok ? 1 : -1;
+    if (!ok) { cn1LinuxStubOnce("libgeoclue present but an expected symbol was missing; location unsupported"); }
+    return ok;
+}
 
 /* ----------------------------------------------------------- clipboard */
 
@@ -116,19 +224,22 @@ static void cn1ShowNotifyOnMain(void* p) {
     CN1NotifyReq* r = (CN1NotifyReq*) p;
     NotifyNotification* n;
     if (!cn1NotifyInited) {
-        notify_init("Codename One");
+        p_notify_init("Codename One");
         cn1NotifyInited = 1;
     }
-    n = notify_notification_new(r->title ? r->title : "", r->body ? r->body : "", 0);
+    n = p_notify_notification_new(r->title ? r->title : "", r->body ? r->body : "", 0);
     /* "default" action fires when the body is clicked (servers that support it). */
-    notify_notification_add_action(n, "default", "Open", (NotifyActionCallback) cn1NotifyAction,
+    p_notify_notification_add_action(n, "default", "Open", (NotifyActionCallback) cn1NotifyAction,
             g_strdup(r->id ? r->id : ""), g_free);
-    notify_notification_show(n, 0);
+    p_notify_notification_show(n, 0);
     g_object_unref(n);
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_showNotification___java_lang_String_java_lang_String_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT id, JAVA_OBJECT title, JAVA_OBJECT body) {
     CN1NotifyReq r;
+    if (!cn1LoadNotify()) {
+        return;
+    }
     r.id = id == JAVA_NULL ? "" : stringToUTF8(threadStateData, id);
     r.title = title == JAVA_NULL ? "" : stringToUTF8(threadStateData, title);
     r.body = body == JAVA_NULL ? "" : stringToUTF8(threadStateData, body);
@@ -165,14 +276,14 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiProtect___byte_1ARRAY_R_by
     gchar* token;
     GError* err = 0;
     JAVA_OBJECT result;
-    if (data == JAVA_NULL) {
+    if (data == JAVA_NULL || !cn1LoadSecret()) {
         return JAVA_NULL;
     }
     bytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
     len = (int) (*(JAVA_ARRAY) data).length;
     b64 = g_base64_encode(bytes, len);
     token = g_uuid_string_random();
-    if (!secret_password_store_sync(&cn1SecretSchema, SECRET_COLLECTION_DEFAULT,
+    if (!p_secret_password_store_sync(&cn1SecretSchema, SECRET_COLLECTION_DEFAULT,
             "Codename One Secure Storage", b64, 0, &err, "token", token, NULL)) {
         if (err) {
             g_error_free(err);
@@ -196,7 +307,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiUnprotect___byte_1ARRAY_R_
     guchar* decoded;
     gsize decodedLen = 0;
     JAVA_OBJECT result;
-    if (data == JAVA_NULL) {
+    if (data == JAVA_NULL || !cn1LoadSecret()) {
         return JAVA_NULL;
     }
     tokenBytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
@@ -206,7 +317,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiUnprotect___byte_1ARRAY_R_
     }
     memcpy(token, tokenBytes, len);
     token[len] = 0;
-    b64 = secret_password_lookup_sync(&cn1SecretSchema, 0, &err, "token", token, NULL);
+    b64 = p_secret_password_lookup_sync(&cn1SecretSchema, 0, &err, "token", token, NULL);
     if (err) {
         g_error_free(err);
     }
@@ -214,7 +325,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiUnprotect___byte_1ARRAY_R_
         return JAVA_NULL;
     }
     decoded = g_base64_decode(b64, &decodedLen);
-    secret_password_free(b64);
+    p_secret_password_free(b64);
     result = cn1LinuxNewByteArray(threadStateData, decoded, (int) decodedLen);
     g_free(decoded);
     return result;
@@ -274,7 +385,7 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_locationGetCurrent___double_1A
     double fix[6];
     JAVA_DOUBLE* arr;
     int i;
-    if (out == JAVA_NULL) {
+    if (out == JAVA_NULL || !cn1LoadGeoclue()) {
         return JAVA_FALSE;
     }
     if (!cn1LinuxGeoclueFix(fix)) {
@@ -351,25 +462,29 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_biometricAuthenticate___java_l
  * accuracy(m), altitude(m), heading(deg), speed(m/s)}. Returns 1 on a fix. */
 int cn1LinuxGeoclueFix(double* out6) {
     GError* err = 0;
-    GClueSimple* simple = gclue_simple_new_sync("codenameone", GCLUE_ACCURACY_LEVEL_EXACT, 0, &err);
+    GClueSimple* simple;
     GClueLocation* loc;
+    if (!cn1LoadGeoclue()) {
+        return 0;
+    }
+    simple = p_gclue_simple_new_sync("codenameone", GCLUE_ACCURACY_LEVEL_EXACT, 0, &err);
     if (!simple) {
         if (err) {
             g_error_free(err);
         }
         return 0;
     }
-    loc = gclue_simple_get_location(simple);
+    loc = p_gclue_simple_get_location(simple);
     if (!loc) {
         g_object_unref(simple);
         return 0;
     }
-    out6[0] = gclue_location_get_latitude(loc);
-    out6[1] = gclue_location_get_longitude(loc);
-    out6[2] = gclue_location_get_accuracy(loc);
-    out6[3] = gclue_location_get_altitude(loc);
-    out6[4] = gclue_location_get_heading(loc);
-    out6[5] = gclue_location_get_speed(loc);
+    out6[0] = p_gclue_location_get_latitude(loc);
+    out6[1] = p_gclue_location_get_longitude(loc);
+    out6[2] = p_gclue_location_get_accuracy(loc);
+    out6[3] = p_gclue_location_get_altitude(loc);
+    out6[4] = p_gclue_location_get_heading(loc);
+    out6[5] = p_gclue_location_get_speed(loc);
     g_object_unref(simple);
     return 1;
 }

@@ -350,6 +350,13 @@ class CleanTargetLinuxIntegrationTest {
                 if (dest.getParent() != null) { Files.createDirectories(dest.getParent()); }
                 Files.copy(elf, dest, StandardCopyOption.REPLACE_EXISTING);
                 dest.toFile().setExecutable(true);
+                // Ship the split-out symbol companion next to it (Release builds
+                // emit <exe>.debug via objcopy) so a crash address can be turned
+                // back into a Java method/line with addr2line/gdb.
+                Path elfDebug = Paths.get(elf.toString() + ".debug");
+                if (Files.exists(elfDebug)) {
+                    Files.copy(elfDebug, Paths.get(dest.toString() + ".debug"), StandardCopyOption.REPLACE_EXISTING);
+                }
                 System.out.println("CN1_LINUX_DEMO_ELF=" + dest.toAbsolutePath()
                         + " (" + (Files.size(dest) / 1024) + "KB)");
             } catch (Throwable t) {

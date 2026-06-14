@@ -904,19 +904,21 @@ public class ByteCodeTranslator {
                 writer.append("        endif()\n");
                 writer.append("        target_link_libraries(${PROJECT_NAME} shlwapi version shell32 advapi32)\n");
                 writer.append("    endif()\n");
-                // Release is the shipping default: optimized (/O2 from the Release
-                // config) and stripped -- no debug info, and the linker dead-strips
-                // unreferenced functions (/OPT:REF) and folds identical COMDATs
-                // (/OPT:ICF), which meaningfully shrinks the single self-contained
-                // exe. Debug / RelWithDebInfo (a debug build, or windows.debug=true
-                // through the builder) instead emit a PDB (clang-cl /Zi + linker
-                // /DEBUG) so native crash addresses symbolize to function names
-                // (llvm-symbolizer); optimizations stay on either way.
+                // Debug info always goes to a SEPARATE .pdb (clang-cl /Zi + linker
+                // /DEBUG), never embedded in the exe -- so native crash addresses
+                // symbolize to function names (llvm-symbolizer) from the .pdb while
+                // the shipped exe stays lean. Optimizations stay on for the shipping
+                // Release build: /O2 from the Release config plus the linker
+                // dead-stripping unreferenced functions (/OPT:REF) and folding
+                // identical COMDATs (/OPT:ICF). /OPT:REF/ICF are re-stated for
+                // Release because /DEBUG turns them off by default. (Unlike Linux's
+                // removable .eh_frame, the x64 .pdata/.xdata unwind tables are part
+                // of the Windows ABI and must stay in the image.)
+                writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /Zi)\n");
                 writer.append("    if(CMAKE_BUILD_TYPE STREQUAL \"Debug\" OR CMAKE_BUILD_TYPE STREQUAL \"RelWithDebInfo\")\n");
-                writer.append("        target_compile_options(${PROJECT_NAME} PRIVATE /Zi)\n");
                 writer.append("        target_link_options(${PROJECT_NAME} PRIVATE /DEBUG)\n");
                 writer.append("    else()\n");
-                writer.append("        target_link_options(${PROJECT_NAME} PRIVATE /OPT:REF /OPT:ICF)\n");
+                writer.append("        target_link_options(${PROJECT_NAME} PRIVATE /DEBUG /OPT:REF /OPT:ICF)\n");
                 writer.append("    endif()\n");
                 // GUI subsystem so double-clicking the exe does not pop a console
                 // window; keep main() as the entry via mainCRTStartup. The app still
@@ -948,25 +950,59 @@ public class ByteCodeTranslator {
      */
     private static void writeLinuxLinkSet(Writer writer) throws IOException {
         writer.append("find_package(PkgConfig REQUIRED)\n");
-        // One required probe for the full native stack. Splitting the GLES probe
-        // out keeps a clear error if only the GL bits are missing.
+        // Core GTK3 stack -- LINKED. The shipped binary requires only these (plus
+        // libc/libm/pthread/dl) at runtime. Splitting the GLES probe out keeps a
+        // clear error if only the GL bits are missing.
         writer.append("pkg_check_modules(CN1DEPS REQUIRED\n");
         writer.append("    gtk+-3.0 cairo pango pangocairo gdk-pixbuf-2.0 glib-2.0 gobject-2.0 gio-2.0\n");
         writer.append("    fontconfig freetype2\n");
-        writer.append("    libcurl\n");
+        writer.append("    libcurl)\n");
+        writer.append("pkg_check_modules(CN1GL REQUIRED epoxy egl glesv2)\n");
+        // Optional feature libs (browser/media/secure-storage/notifications/
+        // location). The port dlopen()s these lazily at first use (see
+        // cn1_linux_browser.c / cn1_linux_media.c / cn1_linux_services.c), so we
+        // use their headers at compile time but do NOT link them -- the shipped
+        // binary carries no DT_NEEDED for webkit2gtk/gstreamer/etc., and a desktop
+        // without them still runs every non-optional feature (the optional one
+        // reports unsupported). Probed REQUIRED so the *build* host has the headers.
+        writer.append("pkg_check_modules(CN1OPT REQUIRED\n");
         writer.append("    gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0\n");
         writer.append("    webkit2gtk-4.1 libsecret-1 libnotify libgeoclue-2.0)\n");
-        writer.append("pkg_check_modules(CN1GL REQUIRED epoxy egl glesv2)\n");
-        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS})\n");
-        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1GL_CFLAGS_OTHER})\n");
-        // libm/pthread/dl back the translated runtime + GC; the dependency libs
-        // back the port's nativeSources.
+        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
+        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1GL_CFLAGS_OTHER} ${CN1OPT_CFLAGS_OTHER})\n");
+        // libm/pthread back the translated runtime + GC; dl is required for the
+        // dlopen() of the optional libs above. Note: CN1OPT_LIBRARIES is
+        // deliberately NOT linked.
         writer.append("target_link_libraries(${PROJECT_NAME} ${CN1DEPS_LIBRARIES} ${CN1GL_LIBRARIES} m pthread dl)\n");
 
-        // Strip the shipping (Release) binary; keep symbols for Debug/RelWithDebInfo
-        // so native crash addresses symbolize.
+        // Dead-strip unreferenced functions/data, matching the Windows port's
+        // /OPT:REF + /OPT:ICF. The translator emits a C function per reachable
+        // method but the linker keeps ALL of them by default on ELF, so without
+        // this the binary was ~2.4x the equivalent Windows exe. -ffunction-sections
+        // /-fdata-sections puts each in its own section and --gc-sections drops the
+        // ones nothing references (virtual targets stay live via the vtables that
+        // reference them, exactly as on Windows).
+        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE -ffunction-sections -fdata-sections)\n");
+        writer.append("target_link_options(${PROJECT_NAME} PRIVATE -Wl,--gc-sections)\n");
+        // ParparVM uses setjmp/longjmp for exceptions, not the C++ unwinder, so the
+        // DWARF asynchronous-unwind tables (.eh_frame/.eh_frame_hdr) are dead weight
+        // at runtime (they were ~30% of the binary). Drop them, and instead emit
+        // debug info that, for a shipping build, is SPLIT into a separate
+        // <exe>.debug companion: the shipped executable carries no symbol table,
+        // debug info or .eh_frame, while crashes still symbolize from the .debug
+        // file (function name = the mangled Java method, plus generated-C lines).
+        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE -g1 -fno-asynchronous-unwind-tables -fno-unwind-tables)\n");
         writer.append("if(NOT (CMAKE_BUILD_TYPE STREQUAL \"Debug\" OR CMAKE_BUILD_TYPE STREQUAL \"RelWithDebInfo\"))\n");
-        writer.append("    target_link_options(${PROJECT_NAME} PRIVATE -s)\n");
+        writer.append("    find_program(CN1_OBJCOPY NAMES objcopy llvm-objcopy gobjcopy)\n");
+        writer.append("    if(CN1_OBJCOPY)\n");
+        writer.append("        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD\n");
+        writer.append("            COMMAND ${CN1_OBJCOPY} --only-keep-debug $<TARGET_FILE:${PROJECT_NAME}> $<TARGET_FILE:${PROJECT_NAME}>.debug\n");
+        writer.append("            COMMAND ${CN1_OBJCOPY} --strip-all $<TARGET_FILE:${PROJECT_NAME}>\n");
+        writer.append("            COMMAND ${CN1_OBJCOPY} --add-gnu-debuglink=$<TARGET_FILE:${PROJECT_NAME}>.debug $<TARGET_FILE:${PROJECT_NAME}>\n");
+        writer.append("            COMMENT \"Splitting debug/symbol info into a separate <exe>.debug companion (symbolize crashes with it; the shipped binary stays lean)\")\n");
+        writer.append("    else()\n");
+        writer.append("        target_link_options(${PROJECT_NAME} PRIVATE -s)\n");
+        writer.append("    endif()\n");
         writer.append("endif()\n");
     }
 
