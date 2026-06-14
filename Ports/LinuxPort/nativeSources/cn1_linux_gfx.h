@@ -61,7 +61,17 @@ typedef struct CN1Graphics {
     int height;
     int color;                  /* 0xRRGGBB */
     int alpha;                  /* 0..255 */
-    int clipX, clipY, clipW, clipH;
+    int clipX, clipY, clipW, clipH;     /* clip bounding box (screen space) */
+    /* clipIsRect: 1 -> axis-aligned screen-space rect (clipX/Y/W/H); 0 -> the
+     * arbitrary path below (setClip(Shape) or clipRect under a rotation/scale).
+     * The shape path is held in its raw coordinate space and clipTransform is the
+     * world transform that was active when the clip was set, so it lands exactly
+     * where drawShape would draw the same path. Mirrors the Windows port. */
+    int clipIsRect;
+    float* clipCoords;          /* owned copy of the flattened shape path */
+    int* clipTypes;             /* owned copy of the segment-type array */
+    int clipTypeCount;
+    cairo_matrix_t clipTransform;
     struct CN1Font* font;       /* current font (not owned) */
     cairo_matrix_t transform;   /* current affine (identity by default) */
     int isWindowTarget;         /* 1 for the on-screen/headless window buffer */
@@ -88,6 +98,10 @@ PangoContext* cn1LinuxPangoContext(void);
 
 /* Applies g->color/alpha as the current Cairo source. */
 void cn1LinuxApplySource(CN1Graphics* g);
+/* Applies the current clip (rect or shape) to g->cr; caller saves/restores and
+ * sets the drawing matrix. Used by the graphics, image and text draw paths. */
+void cn1LinuxApplyClip(CN1Graphics* g);
+void cn1LinuxFreeClipShape(CN1Graphics* g);
 
 /* The process-wide window graphics target (the on-screen/headless back buffer). */
 CN1Graphics* cn1LinuxWindowGraphics(void);

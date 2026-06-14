@@ -35,6 +35,8 @@
 
 #include "cn1_linux_gfx.h"
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -50,13 +52,40 @@ void cn1LinuxApplySource(CN1Graphics* g) {
     cairo_set_source_rgba(g->cr, r, gg, b, a);
 }
 
-/* Saves state, applies the device-space rect clip and the current affine, sets
- * the source. Pair with cn1End. */
+static void cn1BuildPath(cairo_t* cr, float* coords, int* types, int typeCount);
+
+void cn1LinuxFreeClipShape(CN1Graphics* g) {
+    free(g->clipCoords);
+    g->clipCoords = 0;
+    free(g->clipTypes);
+    g->clipTypes = 0;
+    g->clipTypeCount = 0;
+}
+
+/* Applies the current clip to g->cr (assumes the caller already cairo_save'd and
+ * will set the drawing matrix afterwards). The clip is applied under identity
+ * (rect) or the frozen clip-set transform (shape) so it stays where it was set
+ * rather than following the drawing transform -- this is what makes a clip
+ * survive a later rotate/scale and what makes setClip(Shape) clip to the real
+ * shape rather than its bounding box. Shared with the image/text draw paths. */
+void cn1LinuxApplyClip(CN1Graphics* g) {
+    if (!g->clipIsRect && g->clipCoords != 0 && g->clipTypeCount > 0) {
+        cairo_set_matrix(g->cr, &g->clipTransform);
+        cairo_new_path(g->cr);
+        cn1BuildPath(g->cr, g->clipCoords, g->clipTypes, g->clipTypeCount);
+        cairo_clip(g->cr);
+    } else {
+        cairo_identity_matrix(g->cr);
+        cairo_rectangle(g->cr, g->clipX, g->clipY, g->clipW, g->clipH);
+        cairo_clip(g->cr);
+    }
+}
+
+/* Saves state, applies the clip and the current affine, sets the source. Pair
+ * with cn1End. */
 static void cn1Begin(CN1Graphics* g) {
     cairo_save(g->cr);
-    cairo_identity_matrix(g->cr);
-    cairo_rectangle(g->cr, g->clipX, g->clipY, g->clipW, g->clipH);
-    cairo_clip(g->cr);
+    cn1LinuxApplyClip(g);
     cairo_set_matrix(g->cr, &g->transform);
     cn1LinuxApplySource(g);
 }
@@ -109,6 +138,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_setClip___long_int_int_int_int(CO
     g->clipY = y;
     g->clipW = width;
     g->clipH = height;
+    g->clipIsRect = 1;
+    cn1LinuxFreeClipShape(g);
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_clipRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG graphics, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
@@ -124,38 +155,59 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_clipRect___long_int_int_int_int(C
     g->clipY = ny;
     g->clipW = nx2 > nx ? nx2 - nx : 0;
     g->clipH = ny2 > ny ? ny2 - ny : 0;
+    g->clipIsRect = 1;
+    cn1LinuxFreeClipShape(g);
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_setClipShape___long_float_1ARRAY_int_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG graphics, JAVA_OBJECT coords, JAVA_OBJECT types, JAVA_INT typeCount, JAVA_INT windingRule) {
-    /* Reduce the flattened path to its bounding box (first cut). */
+    /* Store the real flattened path so cn1Begin can clip to the exact shape (a
+     * circle, rounded rect, rotated rect ...) rather than its bounding box. The
+     * path is kept in its raw coordinate space and clipTransform freezes the
+     * world transform that was active now, so the clip lands where drawShape would
+     * draw the same path. Mirrors the Windows port's clip-geometry model. */
     CN1Graphics* g = CN1G(graphics);
     float* c;
-    int clen;
-    int i;
-    float minX, minY, maxX, maxY;
-    (void) types;
-    (void) typeCount;
+    int* t;
+    int clen, tlen, tcount, i;
+    double minX, minY, maxX, maxY;
     (void) windingRule;
-    if (coords == JAVA_NULL) {
+    cn1LinuxFreeClipShape(g);
+    if (coords == JAVA_NULL || types == JAVA_NULL || typeCount <= 0) {
+        g->clipIsRect = 1;
         return;
     }
     c = (float*) (*(JAVA_ARRAY) coords).data;
     clen = (int) (*(JAVA_ARRAY) coords).length;
+    t = (int*) (*(JAVA_ARRAY) types).data;
+    tlen = (int) (*(JAVA_ARRAY) types).length;
     if (clen < 2) {
+        g->clipIsRect = 1;
         return;
     }
-    minX = maxX = c[0];
-    minY = maxY = c[1];
+    g->clipCoords = (float*) malloc(sizeof(float) * (size_t) clen);
+    memcpy(g->clipCoords, c, sizeof(float) * (size_t) clen);
+    tcount = typeCount < tlen ? typeCount : tlen;
+    g->clipTypes = (int*) malloc(sizeof(int) * (size_t) tcount);
+    memcpy(g->clipTypes, t, sizeof(int) * (size_t) tcount);
+    g->clipTypeCount = tcount;
+    g->clipTransform = g->transform;
+    g->clipIsRect = 0;
+    /* Keep clipX/Y/W/H as the shape's screen-space bounding box (each raw vertex
+     * pushed through the frozen transform) so getClip* stays meaningful. */
+    minX = minY = 1e30;
+    maxX = maxY = -1e30;
     for (i = 0; i + 1 < clen; i += 2) {
-        if (c[i] < minX) minX = c[i];
-        if (c[i] > maxX) maxX = c[i];
-        if (c[i + 1] < minY) minY = c[i + 1];
-        if (c[i + 1] > maxY) maxY = c[i + 1];
+        double dx = c[i], dy = c[i + 1];
+        cairo_matrix_transform_point(&g->clipTransform, &dx, &dy);
+        if (dx < minX) minX = dx;
+        if (dx > maxX) maxX = dx;
+        if (dy < minY) minY = dy;
+        if (dy > maxY) maxY = dy;
     }
-    g->clipX = (int) floorf(minX);
-    g->clipY = (int) floorf(minY);
-    g->clipW = (int) ceilf(maxX - minX);
-    g->clipH = (int) ceilf(maxY - minY);
+    g->clipX = (int) floor(minX);
+    g->clipY = (int) floor(minY);
+    g->clipW = (int) ceil(maxX - minX);
+    g->clipH = (int) ceil(maxY - minY);
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_setTransform___long_float_float_float_float_float_float(CODENAME_ONE_THREAD_STATE, JAVA_LONG graphics, JAVA_FLOAT m00, JAVA_FLOAT m10, JAVA_FLOAT m01, JAVA_FLOAT m11, JAVA_FLOAT m02, JAVA_FLOAT m12) {

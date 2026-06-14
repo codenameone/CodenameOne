@@ -335,9 +335,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawString___long_java_lang_Strin
     }
     s = stringToUTF8(threadStateData, str);
     cairo_save(g->cr);
-    cairo_identity_matrix(g->cr);
-    cairo_rectangle(g->cr, g->clipX, g->clipY, g->clipW, g->clipH);
-    cairo_clip(g->cr);
+    cn1LinuxApplyClip(g);
     cairo_set_matrix(g->cr, &g->transform);
     cn1LinuxApplySource(g);
     layout = pango_cairo_create_layout(g->cr);

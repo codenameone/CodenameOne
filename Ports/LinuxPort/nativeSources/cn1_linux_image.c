@@ -245,9 +245,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawImage___long_long_int_int(COD
         return;
     }
     cairo_save(g->cr);
-    cairo_identity_matrix(g->cr);
-    cairo_rectangle(g->cr, g->clipX, g->clipY, g->clipW, g->clipH);
-    cairo_clip(g->cr);
+    cn1LinuxApplyClip(g);
     cairo_set_matrix(g->cr, &g->transform);
     cairo_set_source_surface(g->cr, img->surface, x, y);
     cairo_paint_with_alpha(g->cr, g->alpha / 255.0);
@@ -268,9 +266,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawImageScaled___long_long_int_i
     sx = (double) width / img->width;
     sy = (double) height / img->height;
     cairo_save(g->cr);
-    cairo_identity_matrix(g->cr);
-    cairo_rectangle(g->cr, g->clipX, g->clipY, g->clipW, g->clipH);
-    cairo_clip(g->cr);
+    cn1LinuxApplyClip(g);
     cairo_set_matrix(g->cr, &g->transform);
     cairo_translate(g->cr, x, y);
     cairo_scale(g->cr, sx, sy);
@@ -291,9 +287,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawRGB___long_int_1ARRAY_int_int
     px = (JAVA_INT*) (*(JAVA_ARRAY) rgbData).data;
     tmp = cn1SurfaceFromArgb(px + offset, width, height);
     cairo_save(g->cr);
-    cairo_identity_matrix(g->cr);
-    cairo_rectangle(g->cr, g->clipX, g->clipY, g->clipW, g->clipH);
-    cairo_clip(g->cr);
+    cn1LinuxApplyClip(g);
     cairo_set_matrix(g->cr, &g->transform);
     cairo_set_source_surface(g->cr, tmp, x, y);
     cairo_paint_with_alpha(g->cr, g->alpha / 255.0);
