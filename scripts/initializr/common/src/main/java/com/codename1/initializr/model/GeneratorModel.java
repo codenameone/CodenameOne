@@ -112,31 +112,49 @@ public class GeneratorModel {
     }
 
     public void generate() {
-        // The JavaScript port backs openFileOutputStream with IndexedDB. The Blob handed to
-        // execute() retains the bytes, but the IndexedDB entry sticks around forever, so each
-        // generation accumulates a multi-MB record until the browser quota is exhausted.
         cleanupGeneratedZips();
-        String filePath = getAppHomePath() + appName.toLowerCase() + ".zip";
+        String fileName = appName.toLowerCase() + ".zip";
+
+        // Build the project zip in memory ONCE.
+        byte[] bytes;
         try {
-            writeProjectZipToStorage(filePath);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            writeProjectZip(bos);
+            bytes = bos.toByteArray();
+        } catch (IOException ex) {
+            Log.e(ex);
+            ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
+            return;
+        }
+
+        // Preferred delivery: hand the bytes straight to the platform's
+        // downloader. On the JavaScript port the storage-backed
+        // execute(file:// URL) download path is broken -- localforage's
+        // getItem/exists never sees the just-written file, so writing to
+        // storage + execute() silently does nothing there (the Generate
+        // button "did nothing"). downloadBytesAsFile bypasses storage and
+        // streams the bytes straight to a browser download. Platforms that
+        // don't implement it return false, and we fall back to the
+        // storage + execute() path that works for them.
+        if (downloadBytesAsFile(fileName, bytes)) {
+            return;
+        }
+
+        // Fallback (non-JS platforms): write the bytes to storage and hand the
+        // file path to execute(). The IndexedDB entry sticks around, so a prior
+        // cleanupGeneratedZips() keeps generations from accumulating multi-MB
+        // records. Retry once after a fresh cleanup before giving up.
+        String filePath = getAppHomePath() + fileName;
+        try {
+            writeBytesToStorage(filePath, bytes);
         } catch (IOException firstErr) {
-            // Almost always quota-exhaustion. Clean up once more (covers orphan entries the
-            // first sweep missed, e.g. a half-written file from this attempt) and retry.
             cleanupGeneratedZips();
             try {
-                writeProjectZipToStorage(filePath);
+                writeBytesToStorage(filePath, bytes);
             } catch (IOException retryErr) {
                 Log.e(retryErr);
-                // Don't assume quota-exhaustion: any failure building or streaming the
-                // project zip (e.g. a ZipException while reading a bundled template zip)
-                // lands here too. Surface the real cause so it isn't misdiagnosed as a
-                // full disk, and keep the storage hint as a secondary possibility.
-                String detail = retryErr.getMessage();
-                if (detail == null || detail.length() == 0) {
-                    detail = retryErr.getClass().getName();
-                }
                 ToastBar.showErrorMessage(
-                        "Couldn't generate the project: " + detail
+                        "Couldn't generate the project: " + describeError(retryErr)
                                 + ". If your browser storage is full, clear site data for "
                                 + "this page and try again.");
                 return;
@@ -145,9 +163,14 @@ public class GeneratorModel {
         execute(filePath);
     }
 
-    private void writeProjectZipToStorage(String filePath) throws IOException {
+    private static String describeError(Throwable ex) {
+        String detail = ex.getMessage();
+        return (detail == null || detail.length() == 0) ? ex.getClass().getName() : detail;
+    }
+
+    private void writeBytesToStorage(String filePath, byte[] bytes) throws IOException {
         try (OutputStream fos = openFileOutputStream(filePath)) {
-            writeProjectZip(fos);
+            fos.write(bytes);
         }
     }
 

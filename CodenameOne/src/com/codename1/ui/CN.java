@@ -696,6 +696,22 @@ public class CN extends CN1Constants {
         Display.impl.execute(url);
     }
 
+    /// Offers the given in-memory bytes to the user as a downloadable file,
+    /// bypassing local storage. This exists for platforms (currently the
+    /// JavaScript port) where the storage-backed {@link #execute(String)}
+    /// download path is unavailable. Returns {@code true} if the platform
+    /// handled the download, {@code false} if unsupported (callers should then
+    /// fall back to writing the file and calling {@link #execute(String)}).
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the suggested file name for the download
+    ///
+    /// - `bytes`: the file contents
+    public static boolean downloadBytesAsFile(String fileName, byte[] bytes) {
+        return Display.impl.downloadBytesAsFile(fileName, bytes);
+    }
+
 
     /// Returns one of the density variables appropriate for this device, notice that
     /// density doesn't always correspond to resolution and an implementation might

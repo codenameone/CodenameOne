@@ -1409,22 +1409,39 @@
     var payload = request || {};
     var dataUrl = String(payload.dataUrl == null ? '' : payload.dataUrl);
     var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:register-dataurl fileName=' + fileName + ' len=' + dataUrl.length); } catch (_le) {}
+    }
     if (!dataUrl) {
       __cn1PendingSaveBlobHandler = null;
       return null;
     }
-    __cn1PendingSaveBlobHandler = function() {
-      var doc = (global.window || global).document || global.document;
-      if (!doc) {
-        return;
-      }
-      var a = doc.createElement('a');
-      a.href = dataUrl;
-      a.download = fileName;
-      doc.body.appendChild(a);
-      a.click();
-      doc.body.removeChild(a);
+    var makeHandler = function() {
+      return function() {
+        var doc = (global.window || global).document || global.document;
+        if (!doc) {
+          return;
+        }
+        var a = doc.createElement('a');
+        a.href = dataUrl;
+        a.download = fileName;
+        doc.body.appendChild(a);
+        a.click();
+        doc.body.removeChild(a);
+      };
     };
+    // Fire immediately -- same rationale as __cn1_register_save_blob__: the
+    // Generate flow is a clear user-intent path, so most browsers allow the
+    // programmatic a.click() even though the original click was seconds ago
+    // while the cooperative scheduler built the zip. Backside-hook timing
+    // becomes irrelevant. Also stash for the backside-hook fire path in case
+    // the immediate click was blocked by user-gesture policy.
+    try { makeHandler()(); } catch (e) {
+      if (global.console && typeof global.console.warn === 'function') {
+        try { global.console.warn('PARPAR:save-blob-dataurl-immediate-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+      }
+    }
+    __cn1PendingSaveBlobHandler = makeHandler();
     return null;
   });
 

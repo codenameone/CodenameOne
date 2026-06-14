@@ -5586,8 +5586,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return false;
         }
         try {
-            Blob blob = BlobUtil.createBlob(bytes, "application/octet-stream");
-            registerSaveBlobHandler(fileName, blob);
+            // Deliver as a base64 ``data:`` URL rather than a worker-side Blob.
+            // A worker Blob does not survive the worker->main host-bridge
+            // serialization (toHostTransferArg has no Blob case), so
+            // __cn1_register_save_blob__ never reaches the host. A plain string
+            // data: URL marshals cleanly through invokeHostNative.
+            String dataUrl = "data:application/octet-stream;base64,"
+                    + com.codename1.util.Base64.encodeNoNewline(bytes);
+            registerSaveBlobHandlerDataUrl(fileName, dataUrl);
         } catch (Throwable t) {
             return false;
         }
