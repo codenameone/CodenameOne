@@ -304,11 +304,14 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_deriveTrueTypeFont___long_float_i
     CN1Font* src = cn1FontOrDefault(font);
     CN1Font* f = (CN1Font*) calloc(1, sizeof(CN1Font));
     f->desc = pango_font_description_copy(src->desc);
-    /* Pango asserts (size >= 0) and ignores the call otherwise; CN1 can transiently
-     * request a non-positive derived size during layout. Clamp to keep a usable
-     * description instead of leaving the copied source size in place. */
-    if (size < 1.0f) {
-        size = 1.0f;
+    /* A non-positive size is the documented "unset/natural" sentinel: Font.pixelSize
+     * defaults to -1 for a freshly loaded (non-derived) TrueType font, so a derive
+     * computed from getPixelSize() (e.g. getPixelSize()*0.45) lands <= 0. Fall back
+     * to a sane default the same way the Windows port does (px = size>0 ? size : 15)
+     * -- clamping to 1px instead renders microscopic text. This also satisfies
+     * Pango's size>=0 assertion. */
+    if (size <= 0.0f) {
+        size = 15.0f;
     }
     pango_font_description_set_absolute_size(f->desc, (int) (size * PANGO_SCALE));
     /* CN1 weight bits: bit 0 bold, bit 1 italic (Font.STYLE_*). */
