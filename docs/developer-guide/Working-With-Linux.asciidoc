@@ -114,7 +114,7 @@ architecture by default, so the straightforward way to get both is to build on a
 machine of each.
 
 You can also *cross-compile* -- and you may well want to, for example producing an
-arm64 binary from an x64 build host. The translated C is architecture-independent,
+arm64 binary from a build host that itself runs x64. The translated C is architecture-independent,
 and the toolchain selected for the musl link (`zig cc`) is itself a
 cross-compiler, so it can emit a binary for a different CPU from the one it runs
 on. Point `linux.cc` at a cross `zig cc` wrapper for the target triple (or set
