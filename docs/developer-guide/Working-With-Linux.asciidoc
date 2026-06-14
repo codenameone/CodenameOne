@@ -195,15 +195,15 @@ The native port is the right choice when you want a true native Linux binary wit
 no JVM dependency; the desktop build remains the convenient path for development
 and for environments where shipping a JRE is acceptable.
 
-=== Known limitations
+=== Blocking native calls and the concurrent GC
 
-* *`DarkLightShowcaseThemeScreenshotTest` aborts during its dark-appearance theme
-refresh.* The CI screenshot suite captures every other test correctly; this one
-test trips a stack canary (`*** stack smashing detected ***`) while re-installing
-the native theme for the dark appearance. The corruption is invisible to
-AddressSanitizer, Valgrind and gdb -- each shifts the stack layout enough to mask
-it (under them the test hangs instead of aborting) -- and it overwrites return
-addresses, so the captured backtrace is unreliable. It is tracked as a known issue
-to be investigated on real hardware with better tooling. Because the screenshot
-server writes each PNG as it arrives, the preceding ~99 screenshots are still
-produced and reviewable even though the process aborts on this test.
+ParparVM's garbage collector is concurrent: before it can traverse a lightweight
+(CN1-created) thread's stack it sets that thread's `threadBlockedByGC` flag and
+spins until the thread parks itself (clears `threadActive`). A native that parks a
+CN1 thread in a long blocking syscall -- a socket `read`/`write`/`connect`, an
+`curl_easy_perform`, a `sleep` -- *must* drop `threadActive` across the call
+(`CN1_YIELD_THREAD` / `CN1_RESUME_THREAD`), exactly as every other port does.
+Forget it on even one path (for example the cn1ss screenshot reader parked in
+`read()` waiting on the server) and a GC that happens to fire during that window
+never completes, deadlocking every thread waiting on it. The Linux port wraps all
+of its blocking I/O this way; keep that invariant when adding new native calls.

@@ -71,6 +71,8 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_socketConnect___java_lang_String_
     if (getaddrinfo(h, portStr, &hints, &res) != 0) {
         return 0;
     }
+    /* connect() blocks during the TCP handshake; yield so a GC mark isn't stalled. */
+    CN1_YIELD_THREAD;
     for (it = res; it != 0; it = it->ai_next) {
         fd = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
         if (fd < 0) {
@@ -82,6 +84,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_socketConnect___java_lang_String_
         close(fd);
         fd = -1;
     }
+    CN1_RESUME_THREAD;
     freeaddrinfo(res);
     if (fd < 0) {
         return 0;
@@ -100,7 +103,14 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketRead___long_byte_1ARRAY_int_
         return -1;
     }
     data = (char*) (*(JAVA_ARRAY) buffer).data;
+    /* read() can block indefinitely (e.g. the cn1ss WebSocket reader waiting on
+     * the server). Mark the thread inactive across the blocking call so the
+     * concurrent GC -- which spins waiting for every lightweight thread to pause
+     * before it can traverse stacks -- is not deadlocked by a thread parked in a
+     * syscall. Every other CN1 port's blocking I/O does the same. */
+    CN1_YIELD_THREAD;
     n = read(s->fd, data + offset, (size_t) length);
+    CN1_RESUME_THREAD;
     if (n <= 0) {
         s->lastError = n < 0 ? errno : 0;
         if (n == 0) {
@@ -119,14 +129,19 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketWrite___long_byte_1ARRAY_int
         return -1;
     }
     data = (char*) (*(JAVA_ARRAY) buffer).data;
+    /* Yield to the concurrent GC across the (potentially blocking) write loop -- a
+     * thread parked in write() must not stall a GC mark (see socketRead). */
+    CN1_YIELD_THREAD;
     while (written < length) {
         ssize_t n = write(s->fd, data + offset + written, (size_t) (length - written));
         if (n <= 0) {
             s->lastError = errno;
+            CN1_RESUME_THREAD;
             return written > 0 ? written : -1;
         }
         written += (int) n;
     }
+    CN1_RESUME_THREAD;
     return written;
 }
 

@@ -108,7 +108,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_sleepMillis___int(CODENAME_ONE_TH
     }
     ts.tv_sec = millis / 1000;
     ts.tv_nsec = (long) (millis % 1000) * 1000000L;
+    /* Yield to the GC across the sleep so a parked thread can't stall a mark. */
+    CN1_YIELD_THREAD;
     nanosleep(&ts, 0);
+    CN1_RESUME_THREAD;
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_exitProcess___int(CODENAME_ONE_THREAD_STATE, JAVA_INT code) {

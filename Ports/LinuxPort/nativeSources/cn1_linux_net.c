@@ -158,7 +158,11 @@ static void cn1HttpPerform(CN1Http* c) {
         curl_easy_setopt(c->easy, CURLOPT_READDATA, c);
         curl_easy_setopt(c->easy, CURLOPT_POSTFIELDSIZE, (long) c->reqLen);
     }
+    /* curl_easy_perform runs the whole blocking HTTP transfer; yield to the GC
+     * across it so a thread parked in the network stack never stalls a GC mark. */
+    CN1_YIELD_THREAD;
     rc = curl_easy_perform(c->easy);
+    CN1_RESUME_THREAD;
     curl_easy_getinfo(c->easy, CURLINFO_RESPONSE_CODE, &code);
     c->status = code;
     c->statusMessage = strdup(rc == CURLE_OK ? "OK" : curl_easy_strerror(rc));
