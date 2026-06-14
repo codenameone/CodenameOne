@@ -40,6 +40,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
+#include <execinfo.h>
+#include <unistd.h>
 
 /* ----------------------------------------------------------- event ring */
 
@@ -278,6 +281,87 @@ static gboolean cn1OnDelete(GtkWidget* widget, GdkEvent* e, gpointer data) {
 
 /* --------------------------------------------------------- lifecycle */
 
+/* ---- hardware fault -> Java exception (POSIX analog of the iOS SignalHandler
+ * and the Win32 cn1WinFaultToException) -------------------------------------
+ *
+ * ParparVM's clean C target only NULL-checks a method's `this` at entry. A null
+ * *argument* deref, a virtual call on a null receiver, or an operand-stack slot
+ * that legitimately reads back null all fault as a raw SIGSEGV in generated C
+ * rather than a catchable NullPointerException -- which hard-kills the process
+ * (and, on CI, the whole screenshot suite) with no Java stack trace. The iOS port
+ * converts the identical fault into an NPE via a SIGSEGV handler that calls
+ * throwException(); this is the Linux analog, hardened with the Win32 port's
+ * "wild faulting address == real corruption, leave it diagnosable" guard.
+ *
+ * The handler runs on the faulting thread's own stack for a synchronous signal,
+ * so longjmp-ing out of it via throwException() to the nearest CN1 try/catch
+ * behaves exactly as a normally thrown Java exception (this is the documented
+ * iOS technique). SA_NODEFER keeps the signal unblocked so faults remain
+ * catchable on subsequent tests after we leave the handler.
+ *
+ * NOTE: like every such handler this interferes with a native debugger (gdb sees
+ * the fault first-chance). It is a release/CI resilience mechanism, not a debug
+ * aid -- set CN1_LINUX_NO_FAULT_HANDLER=1 to disable it when debugging under gdb.
+ */
+static void cn1LinuxFaultToException(int sig, siginfo_t* si, void* ucv) {
+    (void) ucv;
+    /* Only a genuine null-ish deref (null + a small field/vtable/array offset)
+     * is converted to an NPE. A wild faulting address is real memory corruption:
+     * restore the default disposition and return so the re-executed instruction
+     * faults again into a core dump that stays diagnosable, instead of being
+     * masked as a recoverable NPE that silently corrupts further state. */
+    if ((sig == SIGSEGV || sig == SIGBUS) && si != NULL &&
+            (uintptr_t) si->si_addr >= 0x10000) {
+        signal(sig, SIG_DFL);
+        return;
+    }
+    struct ThreadLocalData* t = getThreadLocalData();
+    if (t == NULL || t->tryBlockOffset <= 0) {
+        signal(sig, SIG_DFL);
+        return;
+    }
+    throwException(t, __NEW_INSTANCE_java_lang_NullPointerException(t));
+}
+
+/* Diagnostic: when the process aborts (e.g. __stack_chk_fail / a glib g_error),
+ * dump the native call stack so the failing frame is identifiable from the log
+ * even where an interactive debugger is unavailable (CI containers). Enabled only
+ * when CN1_LINUX_ABORT_BACKTRACE is set so it never interferes with normal runs. */
+static void cn1LinuxAbortBacktrace(int sig) {
+    /* Restore default SIGSEGV/SIGBUS so a fault while walking a corrupted stack
+     * just dies here instead of longjmp-ing out via the NPE handler. */
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    void* bt[80];
+    int n = backtrace(bt, 80);
+    const char* hdr = "\n=====CN1 ABORT BACKTRACE=====\n";
+    write(2, hdr, strlen(hdr));
+    backtrace_symbols_fd(bt, n, 2);
+    const char* ftr = "=====END CN1 ABORT BACKTRACE=====\n";
+    write(2, ftr, strlen(ftr));
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void cn1LinuxInstallFaultHandlers() {
+    static int installed = 0;
+    if (installed || getenv("CN1_LINUX_NO_FAULT_HANDLER") != NULL) {
+        return;
+    }
+    installed = 1;
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = cn1LinuxFaultToException;
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+    /* Dump a native backtrace if the process aborts (e.g. __stack_chk_fail or a
+     * glib g_error) so the failing frame is identifiable from the CI log without a
+     * debugger. Silent unless an abort actually fires. */
+    signal(SIGABRT, cn1LinuxAbortBacktrace);
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT title, JAVA_INT width, JAVA_INT height) {
     extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
     const char* t = title == JAVA_NULL ? "Codename One" : stringToUTF8(threadStateData, title);
@@ -285,6 +369,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
         return;
     }
     cn1Initialized = 1;
+    /* Install the fault->exception handler before anything else (and before the
+     * headless early-return below) so it is active for the CI screenshot run. */
+    cn1LinuxInstallFaultHandlers();
     /* In headless screenshot mode the size set by enableHeadlessScreenshot is
      * authoritative (CI fixes the screenshot dimensions); otherwise take the
      * window size the impl requests. */

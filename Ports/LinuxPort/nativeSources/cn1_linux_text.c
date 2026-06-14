@@ -135,11 +135,34 @@ static CN1Font* cn1FontOrDefault(JAVA_LONG font) {
     return f;
 }
 
+/* Pango rejects invalid UTF-8 outright -- it logs a warning and leaves the layout
+ * empty, so pango_layout_get_pixel_size returns 0. A 0 width then wedges any
+ * width-driven reflow (SpanLabel/TextArea word wrap) into a loop that can never
+ * fit the next word and never terminates (observed as a hard hang flooding
+ * "Invalid UTF-8 string passed to pango_layout_set_text"). stringToUTF8 hands back
+ * a pointer into one shared per-thread scratch buffer that an intervening string
+ * conversion -- including an exception string built by the fault->NPE handler --
+ * can clobber mid-call, so validate defensively and substitute a sanitized copy
+ * rather than trust the bytes. */
+static void cn1LayoutSetText(PangoLayout* layout, const char* s, int len) {
+    if (s == NULL) {
+        pango_layout_set_text(layout, "", 0);
+        return;
+    }
+    if (g_utf8_validate(s, len, NULL)) {
+        pango_layout_set_text(layout, s, len);
+        return;
+    }
+    char* valid = g_utf8_make_valid(s, len);
+    pango_layout_set_text(layout, valid, -1);
+    g_free(valid);
+}
+
 static int cn1MeasureUtf8(CN1Font* f, const char* utf8, int byteLen) {
     PangoLayout* layout = pango_layout_new(cn1LinuxPangoContext());
     int w = 0, h = 0;
     pango_layout_set_font_description(layout, f->desc);
-    pango_layout_set_text(layout, utf8, byteLen);
+    cn1LayoutSetText(layout, utf8, byteLen);
     pango_layout_get_pixel_size(layout, &w, &h);
     g_object_unref(layout);
     return w;
@@ -173,7 +196,12 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_charWidth___long_char_R_int(CODENA
 }
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_charsWidth___long_char_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG font, JAVA_OBJECT chars, JAVA_INT offset, JAVA_INT length) {
-    JAVA_CHAR* data;
+    /* A Java char[] stores 2-byte JAVA_ARRAY_CHAR elements, NOT 4-byte JAVA_CHAR
+     * (which is `int`). Reading the array through a JAVA_CHAR* strides 4 bytes per
+     * element and over-reads ~2x past the end -- an out-of-bounds heap read that
+     * silently corrupts adjacent memory (it surfaced as a TextArea word-wrap
+     * over-read during Form.show that wedged later tests). Use JAVA_ARRAY_CHAR*. */
+    JAVA_ARRAY_CHAR* data;
     char* utf8;
     int n = 0;
     int i;
@@ -181,7 +209,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_charsWidth___long_char_1ARRAY_int_
     if (chars == JAVA_NULL || length <= 0) {
         return 0;
     }
-    data = (JAVA_CHAR*) (*(JAVA_ARRAY) chars).data;
+    data = (JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY) chars).data;
     utf8 = (char*) malloc((size_t) length * 4 + 1);
     for (i = 0; i < length; i++) {
         unsigned int cp = (unsigned int) data[offset + i];
@@ -276,6 +304,12 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_deriveTrueTypeFont___long_float_i
     CN1Font* src = cn1FontOrDefault(font);
     CN1Font* f = (CN1Font*) calloc(1, sizeof(CN1Font));
     f->desc = pango_font_description_copy(src->desc);
+    /* Pango asserts (size >= 0) and ignores the call otherwise; CN1 can transiently
+     * request a non-positive derived size during layout. Clamp to keep a usable
+     * description instead of leaving the copied source size in place. */
+    if (size < 1.0f) {
+        size = 1.0f;
+    }
     pango_font_description_set_absolute_size(f->desc, (int) (size * PANGO_SCALE));
     /* CN1 weight bits: bit 0 bold, bit 1 italic (Font.STYLE_*). */
     if ((weight & 1) != 0) {
@@ -305,7 +339,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawString___long_java_lang_Strin
     cn1LinuxApplySource(g);
     layout = pango_cairo_create_layout(g->cr);
     pango_layout_set_font_description(layout, cn1FontOrDefault(g->font ? (JAVA_LONG) (intptr_t) g->font : 0)->desc);
-    pango_layout_set_text(layout, s, -1);
+    cn1LayoutSetText(layout, s, -1);
     cairo_move_to(g->cr, x, y);
     pango_cairo_show_layout(g->cr, layout);
     g_object_unref(layout);

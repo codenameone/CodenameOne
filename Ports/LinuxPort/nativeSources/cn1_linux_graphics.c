@@ -227,6 +227,16 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_fillRoundRect___long_int_int_int_
  * radians, clockwise positive (y down). Convert with negation and use a unit
  * circle scaled to the ellipse bounds. */
 static void cn1ArcPath(cairo_t* cr, double x, double y, double w, double h, double startDeg, double sweepDeg, int pie) {
+    /* A zero (or negative) width/height arc is degenerate -- nothing visible to
+     * draw. Critically, cairo_scale(cr, 0, ...) below would make the CTM non-
+     * invertible, which puts the cairo_t into a sticky CAIRO_STATUS_INVALID_MATRIX
+     * error that cairo_restore does NOT clear: every subsequent operation on this
+     * context (the shared back buffer) then silently no-ops, freezing all further
+     * rendering. DrawArc sweeps width/height down to exactly 0, so guard here.
+     * Matches the Direct2D port, which renders nothing for a degenerate ellipse. */
+    if (w <= 0 || h <= 0) {
+        return;
+    }
     double cx = x + w / 2.0, cy = y + h / 2.0;
     double a0 = -startDeg * M_PI / 180.0;
     double a1 = -(startDeg + sweepDeg) * M_PI / 180.0;

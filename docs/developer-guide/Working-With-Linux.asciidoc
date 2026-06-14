@@ -194,3 +194,16 @@ symbolized during development; the build stays optimized either way.
 The native port is the right choice when you want a true native Linux binary with
 no JVM dependency; the desktop build remains the convenient path for development
 and for environments where shipping a JRE is acceptable.
+
+=== Known limitations
+
+* *`DarkLightShowcaseThemeScreenshotTest` aborts during its dark-appearance theme
+refresh.* The CI screenshot suite captures every other test correctly; this one
+test trips a stack canary (`*** stack smashing detected ***`) while re-installing
+the native theme for the dark appearance. The corruption is invisible to
+AddressSanitizer, Valgrind and gdb -- each shifts the stack layout enough to mask
+it (under them the test hangs instead of aborting) -- and it overwrites return
+addresses, so the captured backtrace is unreliable. It is tracked as a known issue
+to be investigated on real hardware with better tooling. Because the screenshot
+server writes each PNG as it arrives, the preceding ~99 screenshots are still
+produced and reviewable even though the process aborts on this test.

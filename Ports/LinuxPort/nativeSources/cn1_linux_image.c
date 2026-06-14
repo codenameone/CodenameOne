@@ -258,7 +258,11 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_drawImageScaled___long_long_int_i
     CN1Graphics* g = (CN1Graphics*) (intptr_t) graphics;
     CN1Image* img = CN1I(image);
     double sx, sy;
-    if (!g || !img || img->width <= 0 || img->height <= 0) {
+    /* Guard both source and target extents: a zero target width/height would make
+     * cairo_scale below produce a non-invertible CTM, poisoning the shared back-
+     * buffer context (sticky CAIRO_STATUS_INVALID_MATRIX) and freezing all further
+     * rendering. Nothing to draw for a degenerate target anyway. */
+    if (!g || !img || img->width <= 0 || img->height <= 0 || width <= 0 || height <= 0) {
         return;
     }
     sx = (double) width / img->width;
