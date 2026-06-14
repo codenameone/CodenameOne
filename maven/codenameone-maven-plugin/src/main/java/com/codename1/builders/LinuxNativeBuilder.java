@@ -402,11 +402,6 @@ public class LinuxNativeBuilder extends Executor {
                 // system paths). The arch dir is resolved at run time so the same
                 // wrapper works native or cross.
                 sh.append(" -D_DEFAULT_SOURCE -Wno-macro-redefined");
-                // The translator occasionally omits a cross-class include for a void
-                // runtime wrapper the generated C calls (a no-op under gcc; clang/zig
-                // makes it an error). It is still defined, so match gcc and keep it a
-                // warning rather than failing the build.
-                sh.append(" -Wno-error=implicit-function-declaration");
                 sh.append(" -L/usr/lib/$(uname -m)-linux-gnu -L/usr/lib64 -L/lib/$(uname -m)-linux-gnu");
             }
             sh.append(" \"$@\"\n");
