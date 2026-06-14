@@ -348,6 +348,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-13T15:03:55+00:00"
       }
+    },
+    "websockets-grpc-and-graphql": {
+      "devto": {
+        "id": 3898688,
+        "url": "https://dev.to/codenameone/websockets-grpc-and-graphql-in-the-core-1pp",
+        "syndicated_at": "2026-06-14T13:32:59+00:00"
+      }
     }
   }
 }
