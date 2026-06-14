@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h> /* usleep -- explicit so strict/clang toolchains (zig, iOS) compile this */
 #include <curl/curl.h>
 
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);

@@ -183,10 +183,12 @@ class CleanTargetLinuxIntegrationTest {
         Path buildDir = cmakeRoot.resolve("build");
         Files.createDirectories(buildDir);
         String cc = System.getenv().getOrDefault("CN1_CC", "cc");
+        // Drive both C and the .incbin ASM unit through the same compiler so a zig
+        // cc wrapper (used for the portable old-glibc build) links the whole binary.
         List<String> configure = new ArrayList<>(Arrays.asList(
                 "cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
                 "-DCMAKE_BUILD_TYPE=Release", "-G", "Ninja",
-                "-DCMAKE_C_COMPILER=" + cc));
+                "-DCMAKE_C_COMPILER=" + cc, "-DCMAKE_ASM_COMPILER=" + cc));
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");
