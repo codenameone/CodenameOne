@@ -1812,14 +1812,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             @Override
             public void handleEvent(Event evt) {
-                debugLog("in TouchMove");
                 // touchmove is registered permanently on the canvas (see init) so a
                 // drag's events are never lost to the late-attach race that used to
                 // add it inside the suspending onTouchStart. Only act while a touch
-                // is actually down.
+                // is actually down. Keep this gate FIRST and cheap: the listener is
+                // permanent, so it fires on every touchmove -- debugLog (a native
+                // debugFlag bridge call) must stay BELOW the gate, else it taxes
+                // every move app-wide even when no drag is in progress.
                 if (!pointerState.isTouchDown()) {
                     return;
                 }
+                debugLog("in TouchMove");
                 TouchEvent me = (TouchEvent)evt;
                 JSArray<MouseEvent> touches = me.getTargetTouches();
                 
@@ -1859,15 +1862,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             @Override
             public void handleEvent(Event evt) {
-                debugLog("In mouseMove");
                 // mousemove/pointermove are registered permanently on the canvas
                 // (see init) so a drag's events are never lost to the late-attach
                 // race that used to add them inside the suspending onMouseDown
                 // (which the cooperative scheduler can take a while to complete).
-                // Only act while a pointer is actually pressed.
+                // Only act while a pointer is actually pressed. Keep this gate
+                // FIRST and cheap: the listener is permanent AND bound to both
+                // mousemove and pointermove, so it fires (twice) on every mouse
+                // move -- debugLog (a native debugFlag bridge call) must stay BELOW
+                // the gate, else it taxes every hover app-wide.
                 if (!pointerState.isMouseDown()) {
                     return;
                 }
+                debugLog("In mouseMove");
                 MouseEvent me = (MouseEvent)evt;
                 final int x = getClientX(me);
                 final int y = getClientY(me);
