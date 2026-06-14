@@ -288,4 +288,4 @@ jobs:
               "${entries[@]}"
             posted=$((posted+1))
           done
-          [ "$posted" -eq 0 ] && echo "No screenshots produced; skipping comment."
+          if [ "$posted" -eq 0 ]; then echo "No screenshots produced; skipping comment."; fi
