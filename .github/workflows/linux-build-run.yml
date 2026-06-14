@@ -271,12 +271,17 @@ jobs:
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories
-              apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 maven \
+              apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 openjdk17 maven \
                 gtk+3.0-dev cairo-dev pango-dev gdk-pixbuf-dev glib-dev fontconfig-dev freetype-dev \
                 curl-dev libepoxy-dev mesa-dev mesa-gles mesa-egl mesa-gbm mesa-dri-gallium \
                 webkit2gtk-4.1-dev gstreamer-dev gst-plugins-base-dev \
                 libsecret-dev libnotify-dev geoclue-dev xvfb ttf-dejavu
-              export JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk
+              # JDK 8 runs the translator/maven; JDK 17 is needed to compile the
+              # launcher against the Java-17 suite classes (CompilerHelper discovers
+              # JDKs via JDK_<v>_HOME, which the ubuntu runner sets but Alpine does not).
+              export JDK_8_HOME=/usr/lib/jvm/java-1.8-openjdk
+              export JDK_17_HOME=/usr/lib/jvm/java-17-openjdk
+              export JAVA_HOME="$JDK_8_HOME"
               export PATH="$JAVA_HOME/bin:$PATH"
               Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb.log 2>&1 &
               export DISPLAY=:99
