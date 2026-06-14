@@ -1547,15 +1547,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         || (evt.getTarget() == textField || evt.getTarget() == textArea);
                 if (ignore) {
                     debugLog("[mouseDown] touchIsDown");
-                    if (pointerState.isTouchDown()) {
-                        pointerState.setMouseDown(false);
-                    }
+                    // Ignored press (touch already down, or the target is a native
+                    // text field): clear mouseDown so the permanent mousemove
+                    // listener's press gate does not dispatch drags for it.
+                    pointerState.setMouseDown(false);
                     completePressInFlight();
                     return;
                 }
-                onMouseMoveHandle = EventUtil.addEventListener(outputCanvas, "mousemove", onMouseMove, true);
-                onPointerMoveHandle = EventUtil.addEventListener(outputCanvas, "pointermove", onMouseMove, true);
-
                 pointerState.setLastMousePosition(x, y);
                 // ``mouseDown=true`` already set at handler entry — see comment
                 // at top. Don't unset/re-set here; doing so opens the same
@@ -1623,9 +1621,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     return;
                 }
                 pointerState.setMouseDown(false);
-
-                EventUtil.removeEventListener(outputCanvas, "mousemove", onMouseMoveHandle, true);
-                EventUtil.removeEventListener(outputCanvas, "pointermove", onPointerMoveHandle, true);
 
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
@@ -1711,17 +1706,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (touchDecision.shouldCancelMouseTracking()) {
                     debugLog("[touchStart] mouseIsDown");
                     pointerState.setMouseDown(false);
-                    EventUtil.removeEventListener(outputCanvas, "mousemove", onMouseMoveHandle, true);
-                    EventUtil.removeEventListener(outputCanvas, "pointermove", onPointerMoveHandle, true);
                     pointerState.setTouchDown(false);
                 }
                 pointerState.setTouchDown(true);
                 
                 
                 pointerState.setTouches(x, y);
-                
-                onTouchMoveHandle = EventUtil.addEventListener(outputCanvas, "touchmove", onTouchMove, true);
-                
+
                 callSerially(new Runnable() {
 
                     @Override
@@ -1791,7 +1782,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 pointerState.setGrabbedDrag(false);
                 
                 TouchEvent me = (TouchEvent)evt;
-                EventUtil.removeEventListener(outputCanvas, "touchmove", onTouchMoveHandle, true); 
                 installBacksideHooksInUserInteraction();
                 nativeCallSerially(new Runnable() {
                     @Override
@@ -1823,6 +1813,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void handleEvent(Event evt) {
                 debugLog("in TouchMove");
+                // touchmove is registered permanently on the canvas (see init) so a
+                // drag's events are never lost to the late-attach race that used to
+                // add it inside the suspending onTouchStart. Only act while a touch
+                // is actually down.
+                if (!pointerState.isTouchDown()) {
+                    return;
+                }
                 TouchEvent me = (TouchEvent)evt;
                 JSArray<MouseEvent> touches = me.getTargetTouches();
                 
@@ -1844,7 +1841,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 if (JavaScriptInputCoordinator.shouldCancelTouchMove(pointerState.isMouseDown())) {
                     pointerState.setTouchDown(false);
-                    EventUtil.removeEventListener(outputCanvas, "touchmove", onTouchMoveHandle, true);
                     return;
                 }
                 
@@ -1864,6 +1860,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void handleEvent(Event evt) {
                 debugLog("In mouseMove");
+                // mousemove/pointermove are registered permanently on the canvas
+                // (see init) so a drag's events are never lost to the late-attach
+                // race that used to add them inside the suspending onMouseDown
+                // (which the cooperative scheduler can take a while to complete).
+                // Only act while a pointer is actually pressed.
+                if (!pointerState.isMouseDown()) {
+                    return;
+                }
                 MouseEvent me = (MouseEvent)evt;
                 final int x = getClientX(me);
                 final int y = getClientY(me);
@@ -1874,8 +1878,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 if (JavaScriptInputCoordinator.shouldCancelMouseMove(pointerState.isTouchDown())) {
                     pointerState.setMouseDown(false);
-                    EventUtil.removeEventListener(outputCanvas, "mousemove", onMouseMoveHandle, true);
-                    EventUtil.removeEventListener(outputCanvas, "pointermove", onPointerMoveHandle, true);
                     return;
                 }
                 
@@ -2071,7 +2073,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }, !debugFlag("disableMousedown"), !debugFlag("disableMouseup"), !debugFlag("disableTouchstart"),
                 !debugFlag("disableTouchend"), !debugFlag("disableWheel"), getWheelEventType(),
                 onMouseDown, hitTest, onMouseUp, onTouchStart, onTouchEnd, wheelListener);
-        
+
+        // Register the drag-move listeners PERMANENTLY on the canvas instead of
+        // adding them inside onMouseDown/onTouchStart. ParparVM's cooperative
+        // scheduler can take a while to complete the press handler, so adding the
+        // move listener there lost the early part of a drag -- touch/drag
+        // scrolling barely registered (a full drag scrolled <1%). onMouseMove /
+        // onTouchMove gate on pointerState.isMouseDown()/isTouchDown(), so they
+        // are no-ops outside an active press (e.g. plain hover).
+        onMouseMoveHandle = EventUtil.addEventListener(outputCanvas, "mousemove", onMouseMove, true);
+        onPointerMoveHandle = EventUtil.addEventListener(outputCanvas, "pointermove", onMouseMove, true);
+        onTouchMoveHandle = EventUtil.addEventListener(outputCanvas, "touchmove", onTouchMove, true);
+
         /**
          *  The installbacksidehooks event is an event that can be triggered from native javascript to install
          *  backside hooks.   This may be necessary if the user is interacting with the page outside of the app, or
