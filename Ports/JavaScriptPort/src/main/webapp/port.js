@@ -987,7 +987,7 @@ bindNative([
   "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int",
   "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_void",
   "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_int"
-], function*(src, srcOff, dst, dstOff, length) {
+], function(src, srcOff, dst, dstOff, length) {
   if (!src || length <= 0) {
     return null;
   }
@@ -1018,7 +1018,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int",
   "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int_R_void"
-], function*(src, dst, offset) {
+], function(src, dst, offset) {
   if (!src || !dst) {
     return null;
   }
@@ -1047,7 +1047,7 @@ bindNative([
 // even multi-MiB byte[] inputs cost a single ``yield*`` boundary.
 bindNative([
   "cn1_com_codename1_teavm_io_BlobUtil_byteArrayToUint8Array_byte_1ARRAY_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(bytes) {
+], function(bytes) {
   if (!bytes) {
     return jvm.wrapJsObject(new Uint8Array(0), "com_codename1_html5_js_typedarrays_Uint8Array");
   }
@@ -1059,12 +1059,12 @@ bindNative([
   return jvm.wrapJsObject(u8, "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
-bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function() {
   const arr = [];
   return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
 });
 
-bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___int_R_com_codename1_html5_js_core_JSArray"], function*(length) {
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___int_R_com_codename1_html5_js_core_JSArray"], function(length) {
   const size = Math.max(0, length | 0);
   const arr = new Array(size);
   for (let i = 0; i < size; i++) {
@@ -1294,7 +1294,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create_R_com_codename1_html5_js_ajax_XMLHttpRequest",
   "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create___R_com_codename1_html5_js_ajax_XMLHttpRequest"
-], function*() {
+], function() {
   if (typeof global.XMLHttpRequest !== "function") {
     throw new Error("XMLHttpRequest is not available in this javascript runtime");
   }
@@ -1304,14 +1304,14 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create_int_R_com_codename1_html5_js_typedarrays_ArrayBuffer",
   "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create___int_R_com_codename1_html5_js_typedarrays_ArrayBuffer"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.ArrayBuffer(size | 0), "com_codename1_html5_js_typedarrays_ArrayBuffer");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.Uint8Array(size | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
@@ -1323,28 +1323,28 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_int_R_com_codename1_html5_js_typedarrays_Float64Array",
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___int_R_com_codename1_html5_js_typedarrays_Float64Array"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.Float64Array(size | 0), "com_codename1_html5_js_typedarrays_Float64Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array",
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array"
-], function*(buffer) {
+], function(buffer) {
   return jvm.wrapJsObject(new global.Float64Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Float64Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer) {
+], function(buffer) {
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(bufferView) {
+], function(bufferView) {
   const nativeView = jvm.unwrapJsValue(bufferView);
   return jvm.wrapJsObject(new global.Uint8Array(nativeView.buffer, nativeView.byteOffset || 0, nativeView.byteLength || undefined), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
@@ -1352,14 +1352,14 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer, offset) {
+], function(buffer, offset) {
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer, offset, length) {
+], function(buffer, offset, length) {
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
@@ -1368,28 +1368,28 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(size | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(buffer) {
+], function(buffer) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(buffer, offset) {
+], function(buffer, offset) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(buffer, offset, length) {
+], function(buffer, offset, length) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
@@ -1430,12 +1430,12 @@ bindNative([
   return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function*(name) {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function(name) {
   const value = getQueryParameter(jvm.toNativeString(name));
   return value == null ? null : jvm.createStringLiteral(value);
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function() {
   // Default to 1: Codename One's JS port works end-to-end in CSS
   // ("real") pixels and skips HiDPI auto-scaling of the canvas /
   // pointer events. Use ``?pixelRatio=2`` to opt back in.
@@ -1464,7 +1464,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRati
   return Number(win.overridePixelRatio || win.devicePixelRatio || 1.0);
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize___R_int"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize___R_int"], function() {
   const value = getQueryParameter("baseFont");
   if (value == null || value === "") {
     return 0;
@@ -1473,7 +1473,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_
   return isNaN(parsed) ? 0 : parsed |0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride___R_int"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride___R_int"], function() {
   const value = getQueryParameter("density");
   if (value == null || value === "") {
     return 0;
@@ -1482,27 +1482,27 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride
   return isNaN(parsed) ? 0 : parsed |0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhone___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhone___R_boolean"], function() {
   return isPhoneUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function() {
   return isPhoneOrTabletUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIOS_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIOS___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIOS_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIOS___R_boolean"], function() {
   return isIOSUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isMac_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isMac___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isMac_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isMac___R_boolean"], function() {
   return isMacUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIPad_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIPad___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIPad_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIPad___R_boolean"], function() {
   return isIPadUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function() {
   const nav = global.navigator || {};
   const value = nav.language || nav.browserLanguage || "";
   return jvm.createStringLiteral(String(value));
@@ -1511,7 +1511,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported_R_boolean",
   "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported___R_boolean"
-], function*() {
+], function() {
   return typeof WeakMap === "function" ? 1 : 0;
 });
 
@@ -1569,7 +1569,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int"
-], function*(id, w, h) {
+], function(id, w, h) {
   cn1SurfacePost("__cn1_surface_create__", { id: id | 0, w: w | 0, h: h | 0 });
   return null;
 });
@@ -1579,7 +1579,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush_int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int"
-], function*(id, w, h, ops, opCount, nums, numCount, objs, objCount) {
+], function(id, w, h, ops, opCount, nums, numCount, objs, objCount) {
   const oc = opCount | 0;
   if (oc <= 0) {
     return null;
@@ -1659,7 +1659,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int"
-], function*(id) {
+], function(id) {
   cn1SurfacePost("__cn1_surface_dispose__", { id: id | 0 });
   return null;
 });
@@ -1669,7 +1669,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels_int_int_1ARRAY_int_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int"
-], function*(id, argb, w, h) {
+], function(id, argb, w, h) {
   const n = (w | 0) * (h | 0);
   cn1SurfacePost("__cn1_surface_write__", {
     id: id | 0, w: w | 0, h: h | 0, argb: argb.slice(0, n)
@@ -1700,7 +1700,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur_int_com_codename1_html5_js_JSObject_int_int_int_float",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float"
-], function*(dstId, srcImage, srcSurfaceId, w, h, radius) {
+], function(dstId, srcImage, srcSurfaceId, w, h, radius) {
   cn1SurfacePost("__cn1_surface_blur__", {
     dstId: dstId | 0, srcImage: cn1CleanRef(srcImage), srcSurfaceId: srcSurfaceId | 0,
     w: w | 0, h: h | 0, radius: +radius
@@ -1713,7 +1713,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement_int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String"
-], function*(id, element, cssWidth, cssHeight) {
+], function(id, element, cssWidth, cssHeight) {
   cn1SurfacePost("__cn1_attach_surface_to_element__", {
     id: id | 0, element: cn1CleanRef(element),
     cssWidth: cssWidth == null ? null : jvm.toNativeString(cssWidth),
@@ -1745,7 +1745,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal_java_lang_Object_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int"
-], function*(owner, surfaceId) {
+], function(owner, surfaceId) {
   if (__cn1SurfaceFinalizers && owner && typeof owner === "object") {
     try { __cn1SurfaceFinalizers.register(owner, surfaceId | 0); } catch (_e) {}
   }
@@ -1755,7 +1755,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
-], function*(objectRef) {
+], function(objectRef) {
   if (typeof WeakMap !== "function") {
     return null;
   }
@@ -1771,7 +1771,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
-], function*(keyRef) {
+], function(keyRef) {
   if (typeof WeakMap !== "function") {
     return null;
   }
@@ -1788,7 +1788,7 @@ bindNative([
   return value == null ? null : jvm.wrapJsObject(value, jvm.inferJsObjectClass(value, null));
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function*(name) {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function(name) {
   const win = global.window || global;
   const flags = win.cn1_debug_flags;
   if (!flags) {
@@ -1797,7 +1797,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
   return flags[jvm.toNativeString(name)] ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
   const win = global.window || global;
   const normalizeWheel = win.cn1NormalizeWheel;
   let value = "wheel";
@@ -1812,7 +1812,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded___java_lang_String"
-], function*(resource) {
+], function(resource) {
   const win = global.window || global;
   const handler = win.cn1LoadedFile;
   if (typeof handler === "function") {
@@ -1826,7 +1826,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload",
   "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload__"
-], function*() {
+], function() {
   const win = global.window || global;
   win.onbeforeunload = function() {
     return "Leaving or refreshing the page may cause you to lose unsaved data.";
@@ -1837,7 +1837,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler___R_com_codename1_html5_js_JSObject"
-], function*() {
+], function() {
   const win = global.window || global;
   const handler = win.onbeforeunload;
   return handler == null ? null : jvm.wrapJsObject(handler, "com_codename1_html5_js_JSObject");
@@ -1846,7 +1846,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler___com_codename1_html5_js_JSObject"
-], function*(handler) {
+], function(handler) {
   const win = global.window || global;
   win.onbeforeunload = handler == null ? null : jvm.unwrapJsValue(handler);
   return null;
@@ -1864,7 +1864,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource_java_lang_Object_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource___java_lang_Object_com_codename1_html5_js_JSObject"
-], function*(owner, resource) {
+], function(owner, resource) {
   if (owner != null && resource != null && jvm && typeof jvm.registerNativeResource === "function") {
     jvm.registerNativeResource(owner, resource);
   }
@@ -1874,7 +1874,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage___java_lang_String"
-], function*(msg) {
+], function(msg) {
   const win = global.window || global;
   const value = msg == null ? "" : jvm.toNativeString(msg);
   win.onbeforeunload = function() {
@@ -1886,7 +1886,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload",
   "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload__"
-], function*() {
+], function() {
   const win = global.window || global;
   win.onbeforeunload = function() {};
   return null;
@@ -1895,7 +1895,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter_com_codename1_teavm_io_BlobUtil_BlobToFileFunc",
   "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter___com_codename1_teavm_io_BlobUtil_BlobToFileFunc"
-], function*(_func) {
+], function(_func) {
   const win = global.window || global;
   win.saveBlobToFile = function(_blob, _fileName, callback) {
     if (callback && typeof callback.error === "function") {
@@ -1978,7 +1978,7 @@ bindCiFallback("BlobUtil.toUint8ArrayDirect", [
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative___com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int"
-], function*(handler) {
+], function(handler) {
   const win = global.window || global;
   return (win.requestAnimationFrame || function(cb) { return win.setTimeout(function() { cb(Date.now()); }, 16); })(function(time) {
     try {
@@ -2183,7 +2183,7 @@ bindCiFallback("NetworkManager.addErrorListener", [
 // is not wired up in the worker and silently returned an empty string.
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_loadTrueTypeFont__java_lang_String_java_lang_String_java_lang_String"
-], function*(fontName, fontFile, fontFormat) {
+], function(fontName, fontFile, fontFormat) {
   const toStr = function(v) {
     if (v == null) return "";
     return typeof v === "string" ? v : (jvm.toNativeString ? jvm.toNativeString(v) : String(v));

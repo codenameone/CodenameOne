@@ -543,6 +543,23 @@ final class JavascriptMethodGenerator {
     }
 
     /**
+     * True when a {@code synchronized} method must emit its (yielding)
+     * monitor enter/exit. A synchronized method only needs the monitor
+     * when it is actually classified suspending: the JS suspension
+     * analysis seeds {@code synchronized} as suspending by default, but
+     * may clear a method to synchronous when its monitor is provably
+     * uncontended (single-threaded green-thread model: the body never
+     * yields while holding the monitor, so it runs atomically and no
+     * other thread can be holding the lock). A cleared method is emitted
+     * as a plain {@code function} that runs straight through, so its
+     * monitor is redundant -- skip it rather than emit a {@code yield*}
+     * that a non-generator cannot perform.
+     */
+    private static boolean emitsMonitor(BytecodeMethod method) {
+        return method.isSynchronizedMethod() && method.isJavascriptSuspending();
+    }
+
+    /**
      * True when the given invoke's callee is (or must be conservatively
      * treated as) suspending. Virtual / interface dispatches go through
      * {@code cn1_iv*} which is a generator, so they are always
@@ -596,6 +613,55 @@ final class JavascriptMethodGenerator {
             current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
         }
         return JavascriptNameUtil.sanitizeClassName(owner);
+    }
+
+    /**
+     * Resolves the bytecode Fieldref owner of a STATIC field to the
+     * class/interface that actually DECLARES it, mirroring JVM field
+     * resolution (JVMS 5.4.3.2): search the named class, then its
+     * superinterfaces, then its superclass, recursively. Required because
+     * static fields are stored in {@code _S[<declaringClass>]} and their
+     * {@code <clinit>} is keyed on the declaring class, while javac is free to
+     * name any subtype through which the field is accessed as the Fieldref
+     * owner (e.g. {@code DeflaterEngine.COMPR_FUNC} for {@code COMPR_FUNC}
+     * declared on the interface {@code DeflaterConstants}). Falls back to the
+     * sanitized raw owner when the field can't be located (unknown class, or
+     * a runtime-only field), preserving prior behaviour.
+     */
+    private static String resolveStaticFieldOwner(String owner, String fieldName) {
+        Map<String, ByteCodeClass> idx = classIndex;
+        String start = JavascriptNameUtil.sanitizeClassName(owner);
+        if (idx == null || owner == null || fieldName == null) {
+            return start;
+        }
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String current = stack.pop();
+            if (current == null || !seen.add(current)) {
+                continue;
+            }
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                continue;
+            }
+            for (ByteCodeField f : cls.getFields()) {
+                if (f.isStaticField() && fieldName.equals(f.getFieldName())) {
+                    return current;
+                }
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(JavascriptNameUtil.sanitizeClassName(base));
+            }
+        }
+        return start;
     }
 
     static String generateClassJavascript(ByteCodeClass cls, List<ByteCodeClass> allClasses) {
@@ -2518,7 +2584,7 @@ final class JavascriptMethodGenerator {
                 && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))) {
             out.append("  if(_Yc())yield _Yv;\n");
         }
-        if (method.isSynchronizedMethod()) {
+        if (emitsMonitor(method)) {
             out.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
             // ``yield* _me(...)`` lets the calling green thread park if
             // the monitor is contended; the non-contended case is a
@@ -2689,7 +2755,7 @@ final class JavascriptMethodGenerator {
             out.append("    } catch (__cn1Error) { pc = _E(__cn1TryCatch, pc, __cn1Error, stack); }\n");
         }
         out.append("  }\n");
-        if (method.isSynchronizedMethod()) {
+        if (emitsMonitor(method)) {
             out.append("  } finally {\n");
             out.append("    _mx(__cn1Monitor);\n");
             out.append("  }\n");
@@ -3181,13 +3247,13 @@ final class JavascriptMethodGenerator {
                         || "1".equals(System.getProperty("parparvm.js.preemptYield.allmethods")))) {
                 body.append("  if(_Yc())yield _Yv;\n");
             }
-            if (method.isSynchronizedMethod()) {
+            if (emitsMonitor(method)) {
                 body.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
                 body.append("  yield* _me(__cn1Monitor);\n");
                 body.append("  try {\n");
             }
             body.append(instructionBody);
-            if (method.isSynchronizedMethod()) {
+            if (emitsMonitor(method)) {
                 body.append("  } finally {\n");
                 body.append("    _mx(__cn1Monitor);\n");
                 body.append("  }\n");
@@ -3392,7 +3458,7 @@ final class JavascriptMethodGenerator {
 
     private static boolean appendStructuredInstructionBody(StringBuilder bodyOut, BytecodeMethod method,
             List<Instruction> instructions, Map<Label, Integer> labelToIndex, StraightLineContext ctx) {
-        if (method.isSynchronizedMethod() || labelToIndex == null) {
+        if (emitsMonitor(method) || labelToIndex == null) {
             return _sb(method, instructions, "L2919");
         }
         // Bisection knob: comma-separated substrings matched against
@@ -4094,7 +4160,7 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean isStraightLineEligible(BytecodeMethod method, List<Instruction> instructions) {
-        if (method.isSynchronizedMethod()) {
+        if (emitsMonitor(method)) {
             return false;
         }
         // ATHROW is straight-line-friendly: we just emit ``throw
@@ -4683,7 +4749,15 @@ final class JavascriptMethodGenerator {
         String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
         String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
-        String owner = JavascriptNameUtil.sanitizeClassName(rawOwner);
+        // Static fields live in ``_S[<declaringClass>]`` and their clinit is
+        // keyed on the declaring class, so the bytecode's Fieldref owner must be
+        // resolved to the class/interface that actually DECLARES the static field
+        // (javac may name any accessible subtype as the owner -- e.g.
+        // ``DeflaterEngine.COMPR_FUNC`` for a field declared on the interface
+        // ``DeflaterConstants``). The JVM resolves this; we must too, walking
+        // superclasses AND superinterfaces, else GETSTATIC reads the wrong ``_S``
+        // slot (undefined) and ``_I`` initializes the wrong class.
+        String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
@@ -6507,7 +6581,15 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         // up the alias under the verbose ``cn1_<subclass>_...`` key,
         // which mangling rewrites inconsistently).
         String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
-        String owner = JavascriptNameUtil.sanitizeClassName(rawOwner);
+        // Static fields live in ``_S[<declaringClass>]`` and their clinit is
+        // keyed on the declaring class, so the bytecode's Fieldref owner must be
+        // resolved to the class/interface that actually DECLARES the static field
+        // (javac may name any accessible subtype as the owner -- e.g.
+        // ``DeflaterEngine.COMPR_FUNC`` for a field declared on the interface
+        // ``DeflaterConstants``). The JVM resolves this; we must too, walking
+        // superclasses AND superinterfaces, else GETSTATIC reads the wrong ``_S``
+        // slot (undefined) and ``_I`` initializes the wrong class.
+        String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:

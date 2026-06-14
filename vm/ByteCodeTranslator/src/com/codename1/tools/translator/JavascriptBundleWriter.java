@@ -1639,4 +1639,71 @@ final class JavascriptBundleWriter {
         }
         return tokens;
     }
+
+    /**
+     * Collects the {@code cn1_...} method tokens of native bridge bindings
+     * whose wrapper is a plain {@code function} (NOT {@code function*}).
+     * Such a wrapper runs straight through with no {@code yield}, so the
+     * native is SYNCHRONOUS -- the suspension analysis must not seed it (or
+     * its callers) as suspending, and the emitter calls it directly rather
+     * than {@code yield*}-ing it. A {@code function*} wrapper conversely
+     * yields (host bridge / scheduler hand-off) and stays suspending.
+     *
+     * The plain-{@code function}-vs-{@code function*} distinction is the
+     * single source of truth: a yield-bearing wrapper accidentally written
+     * as a plain {@code function} is a JS syntax error caught at load, and a
+     * yield-free wrapper left as {@code function*} merely keeps the old
+     * (correct but slower) suspending behaviour.
+     */
+    static Set<String> collectSyncNativeTokens() {
+        Set<String> tokens = new HashSet<String>();
+        List<String> sources = new ArrayList<String>();
+        for (String res : new String[]{ "parparvm_runtime.js", "browser_bridge.js" }) {
+            try {
+                sources.add(loadResource(res));
+            } catch (IOException ignore) {
+                // resource absent -- skip
+            }
+        }
+        try {
+            Path webApp = locateJavaScriptPortWebApp();
+            if (webApp != null) {
+                Path portJs = webApp.resolve("port.js");
+                if (Files.exists(portJs)) {
+                    sources.add(new String(Files.readAllBytes(portJs), StandardCharsets.UTF_8));
+                }
+            }
+        } catch (IOException | RuntimeException portJsUnavailable) {
+            // port.js unavailable -- skip
+        }
+        java.util.regex.Pattern call = java.util.regex.Pattern.compile("bindNative\\s*\\(\\s*\\[");
+        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        for (String src : sources) {
+            java.util.regex.Matcher m = call.matcher(src);
+            while (m.find()) {
+                int bracket = m.end() - 1;                 // at '['
+                int close = src.indexOf(']', bracket);      // names list end (cn1_ tokens never contain ']')
+                if (close < 0) {
+                    continue;
+                }
+                int fn = src.indexOf("function", close);    // the wrapper keyword
+                if (fn < 0) {
+                    continue;
+                }
+                int k = fn + "function".length();
+                while (k < src.length() && Character.isWhitespace(src.charAt(k))) {
+                    k++;
+                }
+                boolean generator = k < src.length() && src.charAt(k) == '*';
+                if (generator) {
+                    continue;                               // function* -> suspending, leave seeded
+                }
+                java.util.regex.Matcher lit = literal.matcher(src.substring(bracket + 1, close));
+                while (lit.find()) {
+                    tokens.add(lit.group(1));
+                }
+            }
+        }
+        return tokens;
+    }
 }

@@ -5029,7 +5029,7 @@ function isIPadUserAgent() {
   const maxTouchPoints = Number(nav.maxTouchPoints || 0);
   return /iPad/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
 }
-bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function*() {
+bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function() {
   return 0;
 });
 bindNative([
@@ -5065,9 +5065,9 @@ bindNative([
   }
   return null;
 });
-bindNative(["cn1_java_lang_Object_notify", "cn1_java_lang_Object_notify__"], function*(__cn1ThisObject) { jvm.notifyOne(__cn1ThisObject); return null; });
-bindNative(["cn1_java_lang_Object_notifyAll", "cn1_java_lang_Object_notifyAll__"], function*(__cn1ThisObject) { jvm.notifyAll(__cn1ThisObject); return null; });
-bindNative(["cn1_java_lang_Object_hashCode_R_int", "cn1_java_lang_Object_hashCode___R_int"], function*(__cn1ThisObject) { return __cn1ThisObject == null ? 0 : (__cn1ThisObject.__id | 0); });
+bindNative(["cn1_java_lang_Object_notify", "cn1_java_lang_Object_notify__"], function(__cn1ThisObject) { jvm.notifyOne(__cn1ThisObject); return null; });
+bindNative(["cn1_java_lang_Object_notifyAll", "cn1_java_lang_Object_notifyAll__"], function(__cn1ThisObject) { jvm.notifyAll(__cn1ThisObject); return null; });
+bindNative(["cn1_java_lang_Object_hashCode_R_int", "cn1_java_lang_Object_hashCode___R_int"], function(__cn1ThisObject) { return __cn1ThisObject == null ? 0 : (__cn1ThisObject.__id | 0); });
 bindNative([
   "cn1_java_lang_Object_getClass_R_java_lang_Class",
   "cn1_java_lang_Object_getClass___R_java_lang_Class",
@@ -5082,29 +5082,29 @@ bindNative([
   }
   return jvm.getClassObject(__cn1ThisObject.__class);
 });
-bindNative(["cn1_java_io_PrintStream_print_java_lang_String"], function*(__cn1ThisObject, value) {
+bindNative(["cn1_java_io_PrintStream_print_java_lang_String"], function(__cn1ThisObject, value) {
   printToConsole(printStreamValue(value));
   return null;
 });
-bindNative(["cn1_java_io_PrintStream_println_java_lang_String"], function*(__cn1ThisObject, value) {
+bindNative(["cn1_java_io_PrintStream_println_java_lang_String"], function(__cn1ThisObject, value) {
   printToConsole(printStreamValue(value));
   return null;
 });
-bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function*(__cn1ThisObject, value) {
+bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function(__cn1ThisObject, value) {
   printToConsole(printStreamValue(value));
   return null;
 });
-bindNative(["cn1_java_lang_System___CLINIT__"], function*() {
+bindNative(["cn1_java_lang_System___CLINIT__"], function() {
   ensureSystemPrintStreams();
   return null;
 });
-bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function(__cn1ThisObject) {
   if (__cn1ThisObject == null) {
     return createJavaString("null");
   }
   return createJavaString(javaClassName(__cn1ThisObject.__class) + "@" + ((__cn1ThisObject.__id | 0).toString(16)));
 });
-bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_lang_Thread_currentThread___R_java_lang_Thread"], function*() {
+bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_lang_Thread_currentThread___R_java_lang_Thread"], function() {
   if (jvm.currentThread && jvm.currentThread.object) {
     return jvm.currentThread.object;
   }
@@ -5117,11 +5117,11 @@ bindNative(["cn1_java_lang_Thread_sleep_long", "cn1_java_lang_Thread_sleep___lon
   }
   return null;
 });
-bindNative(["cn1_java_lang_Thread_setPriorityImpl_int", "cn1_java_lang_Thread_setPriorityImpl___int"], function*() { return null; });
-bindNative(["cn1_java_lang_Thread_interrupt0", "cn1_java_lang_Thread_interrupt0__"], function*(__cn1ThisObject) { jvm.interruptThread(__cn1ThisObject); return null; });
-bindNative(["cn1_java_lang_Thread_isInterrupted_boolean_R_boolean", "cn1_java_lang_Thread_isInterrupted___boolean_R_boolean"], function*(__cn1ThisObject, clearInterrupted) { const value = __cn1ThisObject && __cn1ThisObject.__interrupted ? 1 : 0; if (clearInterrupted && __cn1ThisObject) __cn1ThisObject.__interrupted = 0; return value; });
-bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function*() { return _LfromInt(jvm.currentThread ? jvm.currentThread.id : 0); });
-bindNative(["cn1_java_lang_Thread_releaseThreadNativeResources_long", "cn1_java_lang_Thread_releaseThreadNativeResources___long"], function*() { return null; });
+bindNative(["cn1_java_lang_Thread_setPriorityImpl_int", "cn1_java_lang_Thread_setPriorityImpl___int"], function() { return null; });
+bindNative(["cn1_java_lang_Thread_interrupt0", "cn1_java_lang_Thread_interrupt0__"], function(__cn1ThisObject) { jvm.interruptThread(__cn1ThisObject); return null; });
+bindNative(["cn1_java_lang_Thread_isInterrupted_boolean_R_boolean", "cn1_java_lang_Thread_isInterrupted___boolean_R_boolean"], function(__cn1ThisObject, clearInterrupted) { const value = __cn1ThisObject && __cn1ThisObject.__interrupted ? 1 : 0; if (clearInterrupted && __cn1ThisObject) __cn1ThisObject.__interrupted = 0; return value; });
+bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function() { return _LfromInt(jvm.currentThread ? jvm.currentThread.id : 0); });
+bindNative(["cn1_java_lang_Thread_releaseThreadNativeResources_long", "cn1_java_lang_Thread_releaseThreadNativeResources___long"], function() { return null; });
 bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], function*(__cn1ThisObject) {
   const tid = jvm.nextThreadId;
   __cn1ThisObject[CN1_THREAD_ALIVE] = 1;
@@ -5147,8 +5147,8 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   jvm.spawn(__cn1ThisObject, generator);
   return null;
 });
-bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return _LfromNumber(Date.now()); });
-bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTime___R_long"], function*() {
+bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function() { return _LfromNumber(Date.now()); });
+bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTime___R_long"], function() {
   // performance.now() is a high-resolution monotonic clock (sub-millisecond,
   // in fractional milliseconds) and is available in both window and worker
   // scopes. Fall back to the wall clock if it is somehow absent. This branch's
@@ -5159,64 +5159,64 @@ bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTi
   }
   return _LfromNumber(Date.now() * 1e6);
 });
-bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return identityHash(obj); });
-bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function*(src, srcOffset, dst, dstOffset, length) {
+bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function(obj) { return identityHash(obj); });
+bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function(src, srcOffset, dst, dstOffset, length) {
   for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
   return null;
 });
-bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function*() { return null; });
-bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function*() { return null; });
-bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function*(status) { jvm.finish(status); return null; });
-bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function*() { return _LfromNumber(67108864); });
-bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function*() { return _LfromNumber(33554432); });
-bindNative(["cn1_java_lang_Throwable_fillInStack"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function() { return null; });
+bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function() { return null; });
+bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
+bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
+bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function() { return _LfromNumber(33554432); });
+bindNative(["cn1_java_lang_Throwable_fillInStack"], function(__cn1ThisObject) {
   const prevLimit = Error.stackTraceLimit;
   try { Error.stackTraceLimit = 200; } catch (_l) {}
   __cn1ThisObject[CN1_THROWABLE_STACK] = createJavaString(new Error().stack || "");
   try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
   return null;
 });
-bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function*(__cn1ThisObject) { return __cn1ThisObject[CN1_THROWABLE_STACK] || createJavaString(""); });
-bindNative(["cn1_java_lang_Math_abs_double_R_double"], function*(v) { return Math.abs(v); });
-bindNative(["cn1_java_lang_Math_abs_float_R_float"], function*(v) { return Math.abs(v); });
-bindNative(["cn1_java_lang_Math_abs_int_R_int"], function*(v) { return Math.abs(v | 0); });
-bindNative(["cn1_java_lang_Math_abs_long_R_long"], function*(v) { const x = _Lc(v); return x.h < 0 ? _Lneg(x) : x; });
-bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function*(v) { return Math.ceil(v); });
-bindNative(["cn1_java_lang_Math_floor_double_R_double"], function*(v) { return Math.floor(v); });
-bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function*(a, b) { return Math.max(a, b); });
-bindNative(["cn1_java_lang_Math_max_float_float_R_float"], function*(a, b) { return Math.max(a, b); });
-bindNative(["cn1_java_lang_Math_max_int_int_R_int"], function*(a, b) { return Math.max(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function*(a, b) { return _Lcmp(a, b) >= 0 ? _Lc(a) : _Lc(b); });
-bindNative(["cn1_java_lang_Math_min_double_double_R_double"], function*(a, b) { return Math.min(a, b); });
-bindNative(["cn1_java_lang_Math_min_float_float_R_float"], function*(a, b) { return Math.min(a, b); });
-bindNative(["cn1_java_lang_Math_min_int_int_R_int"], function*(a, b) { return Math.min(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function*(a, b) { return _Lcmp(a, b) <= 0 ? _Lc(a) : _Lc(b); });
-bindNative(["cn1_java_lang_Math_pow_double_double_R_double"], function*(a, b) { return Math.pow(a, b); });
-bindNative(["cn1_java_lang_Math_cos_double_R_double"], function*(v) { return Math.cos(v); });
-bindNative(["cn1_java_lang_Math_sin_double_R_double"], function*(v) { return Math.sin(v); });
-bindNative(["cn1_java_lang_Math_sqrt_double_R_double"], function*(v) { return Math.sqrt(v); });
-bindNative(["cn1_java_lang_Math_tan_double_R_double"], function*(v) { return Math.tan(v); });
-bindNative(["cn1_java_lang_Math_atan_double_R_double"], function*(v) { return Math.atan(v); });
-bindNative(["cn1_java_lang_Integer_toString_int_R_java_lang_String"], function*(v) { return createJavaString(String(v | 0)); });
-bindNative(["cn1_java_lang_Integer_toString_int_int_R_java_lang_String"], function*(v, radix) { return createJavaString((v | 0).toString((radix | 0) || 10)); });
-bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function*(v, radix) { return createJavaString(_LtoStr(v, (radix | 0) || 10)); });
-bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
-bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
-bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function*(v) { return intBitsFromFloat(v); });
-bindNative(["cn1_java_lang_Float_intBitsToFloat_int_R_float"], function*(bits) { return floatFromIntBits(bits); });
-bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function*(v) { return createJavaString(String(v)); });
-bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function*(v) { return longBitsFromDouble(v); });
-bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function*(bits) { return doubleFromLongBits(bits); });
-bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function*(v) { return createJavaString(String(v)); });
-bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function*(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
-bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
-bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
-bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function*(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
-bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function*(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
-bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function*(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
-bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function*(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
-bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function(__cn1ThisObject) { return __cn1ThisObject[CN1_THROWABLE_STACK] || createJavaString(""); });
+bindNative(["cn1_java_lang_Math_abs_double_R_double"], function(v) { return Math.abs(v); });
+bindNative(["cn1_java_lang_Math_abs_float_R_float"], function(v) { return Math.abs(v); });
+bindNative(["cn1_java_lang_Math_abs_int_R_int"], function(v) { return Math.abs(v | 0); });
+bindNative(["cn1_java_lang_Math_abs_long_R_long"], function(v) { const x = _Lc(v); return x.h < 0 ? _Lneg(x) : x; });
+bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function(v) { return Math.ceil(v); });
+bindNative(["cn1_java_lang_Math_floor_double_R_double"], function(v) { return Math.floor(v); });
+bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function(a, b) { return Math.max(a, b); });
+bindNative(["cn1_java_lang_Math_max_float_float_R_float"], function(a, b) { return Math.max(a, b); });
+bindNative(["cn1_java_lang_Math_max_int_int_R_int"], function(a, b) { return Math.max(a | 0, b | 0); });
+bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function(a, b) { return _Lcmp(a, b) >= 0 ? _Lc(a) : _Lc(b); });
+bindNative(["cn1_java_lang_Math_min_double_double_R_double"], function(a, b) { return Math.min(a, b); });
+bindNative(["cn1_java_lang_Math_min_float_float_R_float"], function(a, b) { return Math.min(a, b); });
+bindNative(["cn1_java_lang_Math_min_int_int_R_int"], function(a, b) { return Math.min(a | 0, b | 0); });
+bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function(a, b) { return _Lcmp(a, b) <= 0 ? _Lc(a) : _Lc(b); });
+bindNative(["cn1_java_lang_Math_pow_double_double_R_double"], function(a, b) { return Math.pow(a, b); });
+bindNative(["cn1_java_lang_Math_cos_double_R_double"], function(v) { return Math.cos(v); });
+bindNative(["cn1_java_lang_Math_sin_double_R_double"], function(v) { return Math.sin(v); });
+bindNative(["cn1_java_lang_Math_sqrt_double_R_double"], function(v) { return Math.sqrt(v); });
+bindNative(["cn1_java_lang_Math_tan_double_R_double"], function(v) { return Math.tan(v); });
+bindNative(["cn1_java_lang_Math_atan_double_R_double"], function(v) { return Math.atan(v); });
+bindNative(["cn1_java_lang_Integer_toString_int_R_java_lang_String"], function(v) { return createJavaString(String(v | 0)); });
+bindNative(["cn1_java_lang_Integer_toString_int_int_R_java_lang_String"], function(v, radix) { return createJavaString((v | 0).toString((radix | 0) || 10)); });
+bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function(v, radix) { return createJavaString(_LtoStr(v, (radix | 0) || 10)); });
+bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
+bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
+bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function(v) { return intBitsFromFloat(v); });
+bindNative(["cn1_java_lang_Float_intBitsToFloat_int_R_float"], function(bits) { return floatFromIntBits(bits); });
+bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function(v) { return createJavaString(String(v)); });
+bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function(v) { return longBitsFromDouble(v); });
+bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function(bits) { return doubleFromLongBits(bits); });
+bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function(v) { return createJavaString(String(v)); });
+bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
+bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
+bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
+bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
+bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
+bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
+bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
+bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function(__cn1ThisObject) {
   const count = __cn1ThisObject[CN1_SB_COUNT] | 0;
   const data = __cn1ThisObject[CN1_SB_VALUE];
   let out = "";
@@ -5225,28 +5225,28 @@ bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function
   }
   return createJavaString(out);
 });
-bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], function*(__cn1ThisObject, start, end, dst, dstStart) {
+bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], function(__cn1ThisObject, start, end, dst, dstStart) {
   const value = __cn1ThisObject[CN1_SB_VALUE];
   for (let i = start | 0; i < (end | 0); i++) {
     dst[(dstStart | 0) + i - (start | 0)] = value[i] | 0;
   }
   return null;
 });
-bindNative(["cn1_java_lang_String_charAt_int_R_char"], function*(__cn1ThisObject, index) { return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0; });
-bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function*(__cn1ThisObject, obj) {
+bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject, index) { return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0; });
+bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
 });
-bindNative(["cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean"], function*(__cn1ThisObject, other) {
+bindNative(["cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean"], function(__cn1ThisObject, other) {
   return (other != null && jvm.toNativeString(__cn1ThisObject).toLowerCase() === jvm.toNativeString(other).toLowerCase()) ? 1 : 0;
 });
-bindNative(["cn1_java_lang_String_getChars_int_int_char_1ARRAY_int"], function*(__cn1ThisObject, start, end, dst, dstStart) {
+bindNative(["cn1_java_lang_String_getChars_int_int_char_1ARRAY_int"], function(__cn1ThisObject, start, end, dst, dstStart) {
   const value = jvm.toNativeString(__cn1ThisObject);
   for (let i = start | 0; i < (end | 0); i++) {
     dst[(dstStart | 0) + i - (start | 0)] = value.charCodeAt(i) | 0;
   }
   return null;
 });
-bindNative(["cn1_java_lang_String_hashCode_R_int"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_String_hashCode_R_int"], function(__cn1ThisObject) {
   let hash = __cn1ThisObject[CN1_STRING_HASH] | 0;
   if (hash !== 0) {
     return hash;
@@ -5258,12 +5258,12 @@ bindNative(["cn1_java_lang_String_hashCode_R_int"], function*(__cn1ThisObject) {
   __cn1ThisObject[CN1_STRING_HASH] = hash;
   return hash;
 });
-bindNative(["cn1_java_lang_String_indexOf_int_int_R_int"], function*(__cn1ThisObject, ch, fromIndex) { return jvm.toNativeString(__cn1ThisObject).indexOf(String.fromCharCode(ch | 0), fromIndex | 0); });
-bindNative(["cn1_java_lang_String_toLowerCase_R_java_lang_String"], function*(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toLowerCase()); });
-bindNative(["cn1_java_lang_String_toString_R_java_lang_String"], function*(__cn1ThisObject) { return __cn1ThisObject; });
-bindNative(["cn1_java_lang_String_toUpperCase_R_java_lang_String"], function*(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toUpperCase()); });
-bindNative(["cn1_java_lang_String_releaseNSString_long"], function*() { return null; });
-bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function*(bytes, off, len, encoding) {
+bindNative(["cn1_java_lang_String_indexOf_int_int_R_int"], function(__cn1ThisObject, ch, fromIndex) { return jvm.toNativeString(__cn1ThisObject).indexOf(String.fromCharCode(ch | 0), fromIndex | 0); });
+bindNative(["cn1_java_lang_String_toLowerCase_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toLowerCase()); });
+bindNative(["cn1_java_lang_String_toString_R_java_lang_String"], function(__cn1ThisObject) { return __cn1ThisObject; });
+bindNative(["cn1_java_lang_String_toUpperCase_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toUpperCase()); });
+bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return null; });
+bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function(bytes, off, len, encoding) {
   const slice = bytes.slice(off | 0, (off | 0) + (len | 0));
   const array = Uint8Array.from(slice, function(v) { return v & 0xff; });
   let text = "";
@@ -5286,7 +5286,7 @@ bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java
   // ``not iterable`` TypeError.
   return yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding));
 });
-bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY"], function*(chars) {
+bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY"], function(chars) {
   // The original ``text += String.fromCharCode(chars[i] | 0)`` loop
   // is O(N) of additive string concatenation, which most JS engines
   // optimise to a rope but still costs noticeably more than the
@@ -5372,7 +5372,7 @@ bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRA
 
   return createJavaString(out);
 });
-bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function*(value, exponentIndex) {
+bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function(value, exponentIndex) {
   // Contract (per Apache Harmony StringToReal.parseDblImpl): the input string
   // is the pre-processed digits with no decimal point, and exponentIndex is
   // the power of 10 to multiply by. StringToReal.parseDouble("1.4") strips
@@ -5386,7 +5386,7 @@ bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_doub
   const exp = exponentIndex | 0;
   return exp === 0 ? parsed : parsed * Math.pow(10, exp);
 });
-bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum"], function*(enumType, name) {
+bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum"], function(enumType, name) {
   if (!enumType || !enumType.__classDef) {
     return null;
   }
@@ -5414,19 +5414,19 @@ bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_
   }
   return null;
 });
-bindNative(["cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class"], function*(className) {
+bindNative(["cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class"], function(className) {
   const runtimeName = runtimeTypeFromJavaName(jvm.toNativeString(className));
   const cls = jvm.classes[runtimeName];
   return cls ? cls.classObject : null;
 });
-bindNative(["cn1_java_lang_Class_getNameImpl_R_java_lang_String"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Class_getNameImpl_R_java_lang_String"], function(__cn1ThisObject) {
   return createJavaString(javaClassName(__cn1ThisObject.__classDef.name));
 });
-bindNative(["cn1_java_lang_Class_getName_R_java_lang_String"], function*(__cn1ThisObject) { return createJavaString(descriptorClassName(__cn1ThisObject.__classDef.name)); });
-bindNative(["cn1_java_lang_Class_isArray_R_boolean"], function*(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.name.indexOf("[]") > -1 ? 1 : 0; });
-bindNative(["cn1_java_lang_Class_isAssignableFrom_java_lang_Class_R_boolean"], function*(__cn1ThisObject, cls) { return cls && cls.__classDef && cls.__classDef.assignableTo[__cn1ThisObject.__classDef.name] ? 1 : 0; });
-bindNative(["cn1_java_lang_Class_isInstance_java_lang_Object_R_boolean"], function*(__cn1ThisObject, obj) { return jvm.instanceOf(obj, __cn1ThisObject.__classDef.name) ? 1 : 0; });
-bindNative(["cn1_java_lang_Class_isInterface_R_boolean"], function*(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isInterface ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_getName_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(descriptorClassName(__cn1ThisObject.__classDef.name)); });
+bindNative(["cn1_java_lang_Class_isArray_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.name.indexOf("[]") > -1 ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_isAssignableFrom_java_lang_Class_R_boolean"], function(__cn1ThisObject, cls) { return cls && cls.__classDef && cls.__classDef.assignableTo[__cn1ThisObject.__classDef.name] ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_isInstance_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) { return jvm.instanceOf(obj, __cn1ThisObject.__classDef.name) ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_isInterface_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isInterface ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*(__cn1ThisObject) {
   const def = __cn1ThisObject.__classDef;
   if (!def || def.isInterface || def.isAbstract || def.isPrimitive || def.name.indexOf("[]") > -1) {
@@ -5446,26 +5446,26 @@ bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*
   }
   return obj;
 });
-bindNative(["cn1_java_lang_Class_isAnnotation_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_isEnum_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_isAnonymousClass_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_isSynthetic_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_hashCode_R_int"], function*(__cn1ThisObject) { return __cn1ThisObject && __cn1ThisObject.__classDef ? (__cn1ThisObject.__classDef.name.length | 0) : 0; });
-bindNative(["cn1_java_lang_Class_getComponentType_R_java_lang_Class"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Class_isAnnotation_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_isEnum_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_isAnonymousClass_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_isSynthetic_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_hashCode_R_int"], function(__cn1ThisObject) { return __cn1ThisObject && __cn1ThisObject.__classDef ? (__cn1ThisObject.__classDef.name.length | 0) : 0; });
+bindNative(["cn1_java_lang_Class_getComponentType_R_java_lang_Class"], function(__cn1ThisObject) {
   const def = __cn1ThisObject.__classDef;
   if (!def || def.name.indexOf("[]") < 0) {
     return null;
   }
   return classObjectForName(def.componentClass);
 });
-bindNative(["cn1_java_lang_Class_isPrimitive_R_boolean"], function*(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isPrimitive ? 1 : 0; });
-bindNative(["cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object"], function*(componentClass, length) {
+bindNative(["cn1_java_lang_Class_isPrimitive_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isPrimitive ? 1 : 0; });
+bindNative(["cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object"], function(componentClass, length) {
   if (!componentClass || !componentClass.__classDef) {
     return null;
   }
   return jvm.newArray(length | 0, componentClass.__classDef.name, 1);
 });
-bindNative(["cn1_java_util_Locale_getOSLanguage_R_java_lang_String"], function*() {
+bindNative(["cn1_java_util_Locale_getOSLanguage_R_java_lang_String"], function() {
   let locale = null;
   if (typeof navigator !== "undefined" && navigator.language) {
     locale = navigator.language;
@@ -5474,22 +5474,22 @@ bindNative(["cn1_java_util_Locale_getOSLanguage_R_java_lang_String"], function*(
   }
   return createJavaString(locale || "en-US");
 });
-bindNative(["cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String"], function*() {
+bindNative(["cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String"], function() {
   return createJavaString(defaultTimeZoneId());
 });
-bindNative(["cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int"], function*(name, year, month, day, timeOfDayMillis) {
+bindNative(["cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int"], function(name, year, month, day, timeOfDayMillis) {
   const tz = normalizeTimeZoneId(name);
   const millis = Date.UTC((year | 0), ((month | 0) - 1), day | 0, 0, 0, 0, 0) + (timeOfDayMillis | 0);
   return timezoneOffsetMillis(tz, millis);
 });
-bindNative(["cn1_java_util_TimeZone_getTimezoneRawOffset_java_lang_String_R_int"], function*(name) {
+bindNative(["cn1_java_util_TimeZone_getTimezoneRawOffset_java_lang_String_R_int"], function(name) {
   return timezoneRawOffsetMillis(normalizeTimeZoneId(name));
 });
-bindNative(["cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean"], function*(name, millis) {
+bindNative(["cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean"], function(name, millis) {
   const tz = normalizeTimeZoneId(name);
   return timezoneOffsetMillis(tz, millis) !== timezoneRawOffsetMillis(tz) ? 1 : 0;
 });
-bindNative(["cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String"], function*(__cn1ThisObject, date, toAppendTo) {
+bindNative(["cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String"], function(__cn1ThisObject, date, toAppendTo) {
   const formatted = createJavaString(formatJavaDate(__cn1ThisObject, date));
   if (toAppendTo != null && toAppendTo[CN1_STRINGBUFFER_INTERNAL] != null) {
     sbAppendNativeString(toAppendTo[CN1_STRINGBUFFER_INTERNAL], jvm.toNativeString(formatted));
@@ -5535,14 +5535,14 @@ bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function
   return null;
 });
 bindNative(["cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode_R_int",
-            "cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode___R_int"], function*() {
+            "cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode___R_int"], function() {
   if (!jvm.lastEvent || jvm.lastEvent.code == null) {
     return -1;
   }
   return jvm.lastEvent.code | 0;
 });
 bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
-            "cn1_com_codename1_impl_platform_js_VMHost_pollEventCode___R_int"], function*() {
+            "cn1_com_codename1_impl_platform_js_VMHost_pollEventCode___R_int"], function() {
   if (!jvm.eventQueue.length) {
     return -1;
   }
