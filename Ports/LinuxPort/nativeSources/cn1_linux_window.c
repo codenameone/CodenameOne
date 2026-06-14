@@ -41,7 +41,9 @@
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
-#include <execinfo.h>
+#ifdef __GLIBC__
+#include <execinfo.h> /* backtrace() -- glibc only; musl has no execinfo.h */
+#endif
 #include <unistd.h>
 
 /* ----------------------------------------------------------- event ring */
@@ -332,11 +334,17 @@ static void cn1LinuxAbortBacktrace(int sig) {
      * just dies here instead of longjmp-ing out via the NPE handler. */
     signal(SIGSEGV, SIG_DFL);
     signal(SIGBUS, SIG_DFL);
-    void* bt[80];
-    int n = backtrace(bt, 80);
     const char* hdr = "\n=====CN1 ABORT BACKTRACE=====\n";
     write(2, hdr, strlen(hdr));
+#ifdef __GLIBC__
+    void* bt[80];
+    int n = backtrace(bt, 80);
     backtrace_symbols_fd(bt, n, 2);
+#else
+    /* musl has no execinfo.h/backtrace(); fall through with just the markers. */
+    const char* na = "(native backtrace unavailable on this libc)\n";
+    write(2, na, strlen(na));
+#endif
     const char* ftr = "=====END CN1 ABORT BACKTRACE=====\n";
     write(2, ftr, strlen(ftr));
     signal(sig, SIG_DFL);
