@@ -467,6 +467,11 @@ public final class LinuxNative {
      *  source resolver. Returns a peer handle, or 0 on failure. */
     public static native long mediaCreate(byte[] data, int length, String mimeType);
 
+    /** Creates a playbin straight from a URI (http/https/file/...). Used by the
+     *  URL-based createMedia so remote sources stream via souphttpsrc instead of
+     *  being downloaded into memory first. Returns a peer handle, or 0 on failure. */
+    public static native long mediaCreateUri(String uri);
+
     public static native void mediaPlay(long peer);
 
     public static native void mediaPause(long peer);

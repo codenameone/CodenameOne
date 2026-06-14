@@ -2377,6 +2377,26 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return new LinuxMedia(peer, onCompletion);
     }
 
+    /**
+     * URL-based playback. Hands the URI straight to GStreamer's playbin, which
+     * resolves remote (http/https) sources via souphttpsrc -- so streaming works
+     * without buffering the whole asset into memory first -- and plays local files
+     * in place. A bare filesystem path is normalised to a file:// URI. Returns null
+     * only when the engine can't be created (e.g. GStreamer not installed).
+     */
+    @Override
+    public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
+        if (uri == null) {
+            return null;
+        }
+        String u = uri.indexOf("://") >= 0 ? uri : ("file://" + uri.replace('\\', '/'));
+        long peer = LinuxNative.mediaCreateUri(u);
+        if (peer == 0) {
+            return null;
+        }
+        return new LinuxMedia(peer, onCompletion);
+    }
+
     /* ---------------------------------------------------- audio recording
      * waveIn-backed PCM WAV recorder (cn1_linux_audiorec.c). createMediaRecorder
      * returns a Media whose play() starts capturing from the default microphone

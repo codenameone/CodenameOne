@@ -66,11 +66,18 @@ static int cn1LoadWebkit(void) {
     void* h;
     int ok = 1;
     if (cn1_wk_state) { return cn1_wk_state > 0; }
+    /* Prefer webkit2gtk-4.1 (libsoup3), but fall back to the still-common 4.0
+     * (libsoup2) build: the entry points we resolve below have identical names and
+     * signatures across both, so basic browsing works either way. Ubuntu/Debian in
+     * particular frequently ship only 4.0 (soname libwebkit2gtk-4.0.so.37), which is
+     * why a 4.1-only lookup left BrowserComponent blank on those desktops. */
     h = dlopen("libwebkit2gtk-4.1.so.0", RTLD_LAZY | RTLD_GLOBAL);
     if (!h) { h = dlopen("libwebkit2gtk-4.1.so", RTLD_LAZY | RTLD_GLOBAL); }
+    if (!h) { h = dlopen("libwebkit2gtk-4.0.so.37", RTLD_LAZY | RTLD_GLOBAL); }
+    if (!h) { h = dlopen("libwebkit2gtk-4.0.so", RTLD_LAZY | RTLD_GLOBAL); }
     if (!h) {
         cn1_wk_state = -1;
-        cn1LinuxStubOnce("WebKitGTK (libwebkit2gtk-4.1) not installed; BrowserComponent unsupported");
+        cn1LinuxStubOnce("WebKitGTK (libwebkit2gtk-4.1/4.0) not installed; BrowserComponent unsupported");
         return 0;
     }
 #define CN1_WK_SYM(ptr, name) do { *(void**)(&ptr) = dlsym(h, name); if (!(ptr)) { ok = 0; } } while (0)

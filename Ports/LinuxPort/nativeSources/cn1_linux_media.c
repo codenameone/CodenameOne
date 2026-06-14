@@ -175,9 +175,44 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_mediaCreate___byte_1ARRAY_int_jav
     m = (CN1Media*) calloc(1, sizeof(CN1Media));
     m->tempPath = strdup(tmpl);
     m->playbin = p_gst_element_factory_make("playbin", 0);
+    if (!m->playbin) {
+        /* No playbin element (GStreamer base plugins missing): fail cleanly so the
+         * Java side returns a null Media rather than us dereferencing NULL below. */
+        unlink(tmpl);
+        free(m->tempPath);
+        free(m);
+        return 0;
+    }
     uri = g_strconcat("file://", tmpl, NULL);
     g_object_set(m->playbin, "uri", uri, NULL);
     g_free(uri);
+    p_gst_element_set_state(m->playbin, GST_STATE_PAUSED);
+    return (JAVA_LONG) (intptr_t) m;
+}
+
+/* Creates a playbin straight from a URI (http/https/file/...) instead of buffering
+ * the bytes into a temp file. This is the path the URL-based MediaManager.createMedia
+ * uses: playbin resolves remote sources via souphttpsrc, so streaming works without
+ * downloading the whole asset first, and local file:// URIs play in place. */
+JAVA_LONG com_codename1_impl_linux_LinuxNative_mediaCreateUri___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT uri) {
+    CN1Media* m;
+    const char* u;
+    if (uri == JAVA_NULL || !cn1LoadGst()) {
+        return 0;
+    }
+    cn1GstInit();
+    u = stringToUTF8(threadStateData, uri);
+    if (!u || !*u) {
+        return 0;
+    }
+    m = (CN1Media*) calloc(1, sizeof(CN1Media));
+    m->tempPath = 0; /* no temp file to clean up */
+    m->playbin = p_gst_element_factory_make("playbin", 0);
+    if (!m->playbin) {
+        free(m);
+        return 0;
+    }
+    g_object_set(m->playbin, "uri", u, NULL);
     p_gst_element_set_state(m->playbin, GST_STATE_PAUSED);
     return (JAVA_LONG) (intptr_t) m;
 }

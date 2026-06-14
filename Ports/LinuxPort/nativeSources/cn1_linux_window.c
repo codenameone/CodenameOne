@@ -245,6 +245,20 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
 static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
     (void) widget;
     (void) data;
+    /* The key handler is on the toplevel window so it sees keystrokes regardless
+     * of which child has focus. But when a native peer widget (the text-edit
+     * GtkEntry/GtkTextView, a WebKit view, an app @NativeInterface widget) holds
+     * the focus, the keystroke belongs to IT, not the CN1 EDT: return FALSE so
+     * GtkWindow's default handler forwards the event to the focused widget.
+     * Returning TRUE here unconditionally is what made typing into the native
+     * editor show nothing -- it suppressed that default forwarding. Once the peer
+     * is torn down GTK clears the toplevel focus to NULL, so CN1 keys resume. */
+    if (cn1Window != 0) {
+        GtkWidget* focus = gtk_window_get_focus(GTK_WINDOW(cn1Window));
+        if (focus != 0 && focus != cn1DrawingArea) {
+            return FALSE;
+        }
+    }
     /* Map the GDK keyval to a Codename One key code: printable Unicode passes
      * through gdk_keyval_to_unicode; the navigation keys map to the CN1 game-key
      * codes the EDT recognises. */

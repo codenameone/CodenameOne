@@ -137,6 +137,7 @@ class CleanTargetLinuxIntegrationTest {
                 "    play.addActionListener(new ActionListener(){ public void actionPerformed(ActionEvent e){\n" +
                 "      try {\n" +
                 "        Media m = MediaManager.createMedia(\"https://www.codenameone.com/img/audio/test.mp3\", false);\n" +
+                "        if (m == null) { toast(\"Media playback unavailable: GStreamer not installed\"); return; }\n" +
                 "        m.play();\n" +
                 "        toast(\"Playing (duration \" + m.getDuration() + \"ms)\");\n" +
                 "      } catch(Throwable t){ toast(\"Media playback unavailable: \" + t); }\n" +
