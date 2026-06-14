@@ -126,28 +126,12 @@ public class GeneratorModel {
             return;
         }
 
-        // JavaScript port: assemble the zip AND drive the download natively.
-        // A pure-Java zip is unusable on that port -- every Java method is a
-        // cooperative generator, so a DEFLATE compress loop (and even a STORED
-        // entry's per-byte CRC32) over multi-MB of project bytes runs millions
-        // of generator resumes and effectively hangs. buildAndDownloadZip does
-        // the byte-heavy work in native JS over the underlying arrays. On other
-        // platforms it returns false and we build the zip in-Java below.
-        String[] names = new String[entries.size()];
-        byte[][] data = new byte[entries.size()][];
-        int idx = 0;
-        for (Map.Entry<String, byte[]> e : entries.entrySet()) {
-            names[idx] = e.getKey();
-            data[idx] = e.getValue();
-            idx++;
-        }
-        if (buildAndDownloadZip(fileName, names, data)) {
-            return;
-        }
-
-        // Other platforms: build the zip in-Java, then hand the bytes to the
-        // platform downloader; falls through to storage + execute() when
-        // unsupported.
+        // Build the project zip in memory. This runs on every platform,
+        // including the JavaScript port: the in-Java zip is fast there now that
+        // the translator no longer wraps synchronous natives (arraycopy/CRC) in
+        // cooperative generators and resolves inherited interface static fields
+        // correctly. Then hand the bytes to the platform downloader; falls
+        // through to the storage + execute() path when unsupported.
         byte[] bytes;
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -221,8 +205,7 @@ public class GeneratorModel {
 
     /// Reads every entry (IDE scaffold, common files, template sources, cn1libs,
     /// localization, generated README/.gitignore/skills) into an ordered map of
-    /// path -> bytes. This is the I/O phase; the zip assembly is separate so the
-    /// JavaScript port can hand the raw entries to {@code buildAndDownloadZip}.
+    /// path -> bytes. This is the I/O phase, kept separate from the zip assembly.
     Map<String, byte[]> collectProjectEntries() throws IOException {
         Map<String, byte[]> mergedEntries = new LinkedHashMap<String, byte[]>();
 
@@ -244,11 +227,11 @@ public class GeneratorModel {
     }
 
     /// Writes the collected entries as a STORED (uncompressed) zip. STORED rather
-    /// than DEFLATED because the zipme Deflater is unusably slow on the
-    /// JavaScript port; STORED is used uniformly (the size cost is irrelevant for
-    /// a one-off scaffold download, and other platforms only reach this in-Java
-    /// path as a fallback). The JavaScript port does not use this method -- it
-    /// assembles the zip natively via {@code buildAndDownloadZip}.
+    /// than DEFLATED keeps the byte work minimal (CRC + copy, no compression
+    /// engine); the size cost is irrelevant for a one-off scaffold download.
+    /// Used on every platform including the JavaScript port, where it is fast now
+    /// that the translator no longer wraps synchronous natives in generators and
+    /// resolves inherited interface static fields correctly.
     void writeEntriesToZip(OutputStream outputStream, Map<String, byte[]> mergedEntries) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
             zos.setMethod(ZipOutputStream.STORED);
