@@ -80,7 +80,9 @@ The physics engine is JBox2D repackaged under `com.codename1.gaming.physics.box2
 
 ### Your Java app as a native Windows executable, no JVM
 
-The new Windows target translates your Java/Kotlin bytecode to C through ParparVM, compiles it with `clang-cl`, and links a standalone Win32 `.exe`. Rendering is Direct2D, text is DirectWrite, networking is WinHTTP, the browser component is WebView2, and there is no JVM anywhere: not bundled, not downloaded, not required on the user's machine. A hello world is around 5MB and the full Initializr app is around 13MB. One cloud build produces **both x64 and arm64** executables.
+The new Windows target translates your Java/Kotlin bytecode to C through ParparVM, compiles it with `clang-cl`, and links a standalone Win32 `.exe`. Rendering is Direct2D, text is DirectWrite, networking is WinHTTP, the browser component is WebView2, and there is no JVM anywhere: not bundled, not downloaded, not required on the user's machine. A hello world is around 4MB and the full Initializr app is around 8MB. One cloud build produces **both x64 and arm64** executables.
+
+> **Edit:** Since publishing this post we found the binaries were carrying their debug and stack-unwind tables inline. We now split that data into a separate symbol file (kept only to symbolize crashes) and dead-strip code the app never reaches, which brings the sizes down further -- the figures above reflect the leaner build.
 
 To be clear about what this is, because "Java on Windows" carries old associations: there is no Swing here, no AWT, no JavaFX, and no bundled runtime. It is the full Codename One framework compiled to native code, and everything in it works there, including the new printing API and the 3D layer. This is the same app from the same code base, rendered by Direct2D and DirectWrite on Windows:
 

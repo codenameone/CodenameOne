@@ -16,7 +16,9 @@ This week, [PR #5144](https://github.com/codenameone/CodenameOne/pull/5144) and 
 
 To be explicit about what that executable contains, because "Java desktop app" carries decades of associations: there is no Swing in it, no AWT, no JavaFX, and no runtime to install. It is the full Codename One framework compiled to machine code, and everything in the framework works there, including [the new printing API](/blog/native-java-win32-3d-gaming-printing-and-wallet/), the 3D layer, media, networking, storage, and the browser component.
 
-A hello world is around 5MB. The complete Initializr application, the real app from our own site, is around 13MB, and here it is running as a native Windows executable:
+A hello world is around 4MB. The complete Initializr application, the real app from our own site, is around 8MB, and here it is running as a native Windows executable:
+
+> **Edit:** Since publishing this post we found the binaries were carrying their debug and stack-unwind tables inline. We now split that data into a separate symbol file (kept only to symbolize crashes) and dead-strip code the app never reaches, which brings the sizes down further -- the figures above reflect the leaner build.
 
 ![The Initializr running as a native Windows executable](/blog/native-windows-port-no-jvm/initializr-windows.png)
 
