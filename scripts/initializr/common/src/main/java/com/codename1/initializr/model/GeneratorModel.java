@@ -1,12 +1,10 @@
 package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
-import com.codename1.initializr.JsDownloader;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import com.codename1.system.NativeLookup;
-import com.codename1.util.Base64;
 import com.codename1.util.StringUtil;
+import net.sf.zipme.CRC32;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
 import net.sf.zipme.ZipOutputStream;
@@ -118,41 +116,48 @@ public class GeneratorModel {
         cleanupGeneratedZips();
         String fileName = appName.toLowerCase() + ".zip";
 
-        // Build the project zip in memory ONCE.
-        byte[] bytes;
+        // Collect the project's entries (read source/template/cn1lib bytes).
+        Map<String, byte[]> entries;
         try {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            writeProjectZip(bos);
-            bytes = bos.toByteArray();
+            entries = collectProjectEntries();
         } catch (IOException ex) {
             Log.e(ex);
             ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
             return;
         }
 
-        // JavaScript port: deliver via the proven NativeInterface dispatch
-        // (__cn1_native_interface_call__). Its JS impl runs on the main thread
-        // and drives an <a download> click directly. We route through this
-        // instead of the storage+execute path (broken: localforage getItem/
-        // exists never sees the just-written file) and instead of the worker
-        // @JSBody save-blob bridge (whose invokeHostNative call never reaches
-        // the host). On other platforms NativeLookup returns null and we fall
-        // through to downloadBytesAsFile / storage+execute below.
-        try {
-            JsDownloader jsDownloader = NativeLookup.create(JsDownloader.class);
-            if (jsDownloader != null && jsDownloader.isSupported()) {
-                String dataUrl = "data:application/octet-stream;base64,"
-                        + Base64.encodeNoNewline(bytes);
-                if (jsDownloader.download(fileName, dataUrl)) {
-                    return;
-                }
-            }
-        } catch (Throwable t) {
-            Log.e(t);
+        // JavaScript port: assemble the zip AND drive the download natively.
+        // A pure-Java zip is unusable on that port -- every Java method is a
+        // cooperative generator, so a DEFLATE compress loop (and even a STORED
+        // entry's per-byte CRC32) over multi-MB of project bytes runs millions
+        // of generator resumes and effectively hangs. buildAndDownloadZip does
+        // the byte-heavy work in native JS over the underlying arrays. On other
+        // platforms it returns false and we build the zip in-Java below.
+        String[] names = new String[entries.size()];
+        byte[][] data = new byte[entries.size()][];
+        int idx = 0;
+        for (Map.Entry<String, byte[]> e : entries.entrySet()) {
+            names[idx] = e.getKey();
+            data[idx] = e.getValue();
+            idx++;
+        }
+        if (buildAndDownloadZip(fileName, names, data)) {
+            return;
         }
 
-        // Other platforms: hand the bytes to the platform downloader; falls
-        // through to storage + execute() when unsupported.
+        // Other platforms: build the zip in-Java, then hand the bytes to the
+        // platform downloader; falls through to storage + execute() when
+        // unsupported.
+        byte[] bytes;
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            writeEntriesToZip(bos, entries);
+            bytes = bos.toByteArray();
+        } catch (IOException ex) {
+            Log.e(ex);
+            ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
+            return;
+        }
         if (downloadBytesAsFile(fileName, bytes)) {
             return;
         }
@@ -211,6 +216,14 @@ public class GeneratorModel {
     }
 
     void writeProjectZip(OutputStream outputStream) throws IOException {
+        writeEntriesToZip(outputStream, collectProjectEntries());
+    }
+
+    /// Reads every entry (IDE scaffold, common files, template sources, cn1libs,
+    /// localization, generated README/.gitignore/skills) into an ordered map of
+    /// path -> bytes. This is the I/O phase; the zip assembly is separate so the
+    /// JavaScript port can hand the raw entries to {@code buildAndDownloadZip}.
+    Map<String, byte[]> collectProjectEntries() throws IOException {
         Map<String, byte[]> mergedEntries = new LinkedHashMap<String, byte[]>();
 
         copyZipEntriesToMap(ide.ZIP, mergedEntries, ZipEntryType.IDE);
@@ -227,12 +240,29 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
+        return mergedEntries;
+    }
 
+    /// Writes the collected entries as a STORED (uncompressed) zip. STORED rather
+    /// than DEFLATED because the zipme Deflater is unusably slow on the
+    /// JavaScript port; STORED is used uniformly (the size cost is irrelevant for
+    /// a one-off scaffold download, and other platforms only reach this in-Java
+    /// path as a fallback). The JavaScript port does not use this method -- it
+    /// assembles the zip natively via {@code buildAndDownloadZip}.
+    void writeEntriesToZip(OutputStream outputStream, Map<String, byte[]> mergedEntries) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
+            zos.setMethod(ZipOutputStream.STORED);
             for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
+                byte[] data = fileEntry.getValue();
                 ZipEntry zipEntry = new ZipEntry(fileEntry.getKey());
+                zipEntry.setMethod(ZipOutputStream.STORED);
+                zipEntry.setSize(data.length);
+                zipEntry.setCompressedSize(data.length);
+                CRC32 crc = new CRC32();
+                crc.update(data);
+                zipEntry.setCrc(crc.getValue());
                 zos.putNextEntry(zipEntry);
-                zos.write(fileEntry.getValue());
+                zos.write(data);
                 zos.closeEntry();
             }
         }

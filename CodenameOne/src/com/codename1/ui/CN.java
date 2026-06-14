@@ -712,6 +712,24 @@ public class CN extends CN1Constants {
         return Display.impl.downloadBytesAsFile(fileName, bytes);
     }
 
+    /// Builds a ZIP from the given entries and offers it as a download, assembling
+    /// the archive natively where that is far faster than a pure-Java zip (the
+    /// JavaScript port, whose generator-based execution makes a pure-Java
+    /// DEFLATE/CRC over multi-megabyte input effectively hang). Returns {@code
+    /// true} if handled, {@code false} when unsupported -- callers then fall back
+    /// to an in-Java zip + {@link #downloadBytesAsFile}.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the suggested file name for the download
+    ///
+    /// - `names`: the entry path names, parallel to `data`
+    ///
+    /// - `data`: the entry contents, parallel to `names`
+    public static boolean buildAndDownloadZip(String fileName, String[] names, byte[][] data) {
+        return Display.impl.buildAndDownloadZip(fileName, names, data);
+    }
+
 
     /// Returns one of the density variables appropriate for this device, notice that
     /// density doesn't always correspond to resolution and an implementation might

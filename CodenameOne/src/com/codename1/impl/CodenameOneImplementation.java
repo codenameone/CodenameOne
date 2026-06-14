@@ -4527,6 +4527,28 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Builds a ZIP archive from the given entries and offers it to the user as a
+    /// downloadable file, performing the (byte-heavy) archive assembly natively
+    /// where that is dramatically faster than a pure-Java zip. This exists for
+    /// the JavaScript port: there, every Java method is compiled to a cooperative
+    /// generator, so a pure-Java DEFLATE/CRC over multi-megabyte project bytes is
+    /// pathologically slow (millions of generator resumes) and effectively hangs.
+    /// The JS port overrides this to assemble the zip in native JavaScript over
+    /// the underlying arrays. Returns `true` if the platform handled the build and
+    /// download, `false` (the default) when unsupported -- callers then fall back
+    /// to a normal in-Java zip + {@link #downloadBytesAsFile}.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the suggested file name for the download
+    ///
+    /// - `names`: the entry path names, parallel to `data`
+    ///
+    /// - `data`: the entry contents, parallel to `names`
+    public boolean buildAndDownloadZip(String fileName, String[] names, byte[][] data) {
+        return false;
+    }
+
     /// Returns one of the density variables appropriate for this device, notice that
     /// density doesn't always correspond to resolution and an implementation might
     /// decide to change the density based on DPI constraints.

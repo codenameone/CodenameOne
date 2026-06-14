@@ -3909,6 +3909,24 @@ public final class Display extends CN1Constants {
         return impl.downloadBytesAsFile(fileName, bytes);
     }
 
+    /// Builds a ZIP from the given entries and offers it as a download, assembling
+    /// the archive natively where that is far faster than a pure-Java zip (the
+    /// JavaScript port). Returns {@code true} if handled, {@code false} when
+    /// unsupported -- callers then fall back to an in-Java zip + {@link
+    /// #downloadBytesAsFile}. See {@link
+    /// com.codename1.impl.CodenameOneImplementation#buildAndDownloadZip}.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the suggested file name for the download
+    ///
+    /// - `names`: the entry path names, parallel to `data`
+    ///
+    /// - `data`: the entry contents, parallel to `names`
+    public boolean buildAndDownloadZip(String fileName, String[] names, byte[][] data) {
+        return impl.buildAndDownloadZip(fileName, names, data);
+    }
+
     /// Returns one of the density variables appropriate for this device, notice that
     /// density doesn't always correspond to resolution and an implementation might
     /// decide to change the density based on DPI constraints.

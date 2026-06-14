@@ -5630,6 +5630,104 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
 
+    /**
+     * JS-port-only fast path for "zip these entries and download them". A
+     * pure-Java zip (net.sf.zipme) is unusable here: every Java method is
+     * compiled to a cooperative generator, so the DEFLATE compress loop -- and
+     * even a STORED entry's per-byte CRC32 -- runs millions of generator
+     * resumes over multi-megabyte project bytes and effectively hangs. This
+     * assembles a STORED zip (with CRC) entirely in native JavaScript over the
+     * underlying arrays (a Java byte[] is a plain JS Array, so JS reads it at
+     * native speed with no marshalling copy), base64-encodes it into a data:
+     * URL, and reuses the proven save-blob-dataurl main-thread delivery (the
+     * same path {@link #downloadBytesAsFile} uses). Entry names are passed as
+     * UTF-8 byte arrays so no VM-String->JS-string conversion is needed.
+     */
+    public boolean buildAndDownloadZip(final String fileName, String[] names, byte[][] data) {
+        if (fileName == null || names == null || data == null || names.length != data.length) {
+            return false;
+        }
+        byte[][] nameBytes = new byte[names.length][];
+        for (int i = 0; i < names.length; i++) {
+            String n = names[i] == null ? "" : names[i];
+            try {
+                nameBytes[i] = n.getBytes("UTF-8");
+            } catch (java.io.UnsupportedEncodingException e) {
+                nameBytes[i] = n.getBytes();
+            }
+        }
+        String dataUrl;
+        try {
+            dataUrl = jsBuildZipDataUrl(nameBytes, data);
+        } catch (Throwable t) {
+            return false;
+        }
+        if (dataUrl == null || dataUrl.length() == 0) {
+            return false;
+        }
+        registerSaveBlobHandlerDataUrl(fileName, dataUrl);
+        if (isBacksideHookAvailable()) {
+            addBacksideHook(new JSRunnable() {
+                public void run() {
+                    fireSaveBlobHandler();
+                }
+            });
+            return true;
+        }
+        try {
+            fireSaveBlobHandler();
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    // Assembles a STORED zip in native JS over the plain arrays and returns it
+    // as a base64 "data:" URL. Runs straight through (no yield): the byte loops
+    // are native JS, NOT generator-wrapped Java, which is the whole point.
+    @JSBody(params={"nameBytes", "data"}, script=
+        "var n = data.length;\n" +
+        "var crcTab = new Int32Array(256);\n" +
+        "for (var c = 0; c < 256; c++) { var k = c; for (var b = 0; b < 8; b++) { k = (k & 1) ? (0xEDB88320 ^ (k >>> 1)) : (k >>> 1); } crcTab[c] = k; }\n" +
+        "function crc32(arr) { var crc = 0xFFFFFFFF; var len = arr.length; for (var i = 0; i < len; i++) { crc = crcTab[(crc ^ (arr[i] & 0xff)) & 0xff] ^ (crc >>> 8); } return (crc ^ 0xFFFFFFFF) >>> 0; }\n" +
+        "var crcs = new Array(n);\n" +
+        "var total = 0;\n" +
+        "for (var i = 0; i < n; i++) { crcs[i] = crc32(data[i]); total += 30 + nameBytes[i].length + data[i].length; total += 46 + nameBytes[i].length; }\n" +
+        "total += 22;\n" +
+        "var out = new Uint8Array(total);\n" +
+        "var p = 0;\n" +
+        "function u16(v) { out[p++] = v & 0xff; out[p++] = (v >>> 8) & 0xff; }\n" +
+        "function u32(v) { out[p++] = v & 0xff; out[p++] = (v >>> 8) & 0xff; out[p++] = (v >>> 16) & 0xff; out[p++] = (v >>> 24) & 0xff; }\n" +
+        "function bytes(arr) { var len = arr.length; for (var i = 0; i < len; i++) { out[p++] = arr[i] & 0xff; } }\n" +
+        "var offsets = new Array(n);\n" +
+        "for (var i = 0; i < n; i++) {\n" +
+        "  offsets[i] = p;\n" +
+        "  u32(0x04034b50); u16(20); u16(0); u16(0); u16(0); u16(0);\n" +
+        "  u32(crcs[i]); u32(data[i].length); u32(data[i].length); u16(nameBytes[i].length); u16(0);\n" +
+        "  bytes(nameBytes[i]); bytes(data[i]);\n" +
+        "}\n" +
+        "var cdStart = p;\n" +
+        "for (var i = 0; i < n; i++) {\n" +
+        "  u32(0x02014b50); u16(20); u16(20); u16(0); u16(0); u16(0); u16(0);\n" +
+        "  u32(crcs[i]); u32(data[i].length); u32(data[i].length); u16(nameBytes[i].length); u16(0); u16(0); u16(0); u16(0); u32(0); u32(offsets[i]);\n" +
+        "  bytes(nameBytes[i]);\n" +
+        "}\n" +
+        "var cdSize = p - cdStart;\n" +
+        "u32(0x06054b50); u16(0); u16(0); u16(n); u16(n); u32(cdSize); u32(cdStart); u16(0);\n" +
+        "var B = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';\n" +
+        "var res = [];\n" +
+        "var len = out.length;\n" +
+        "var i = 0;\n" +
+        "while (i < len) {\n" +
+        "  var b0 = out[i++];\n" +
+        "  var have1 = i < len; var b1 = have1 ? out[i++] : 0;\n" +
+        "  var have2 = i < len; var b2 = have2 ? out[i++] : 0;\n" +
+        "  var t = (b0 << 16) | (b1 << 8) | b2;\n" +
+        "  res.push(B.charAt((t >>> 18) & 63) + B.charAt((t >>> 12) & 63) + (have1 ? B.charAt((t >>> 6) & 63) : '=') + (have2 ? B.charAt(t & 63) : '='));\n" +
+        "}\n" +
+        "return 'data:application/zip;base64,' + res.join('');\n")
+    private static native String jsBuildZipDataUrl(byte[][] nameBytes, byte[][] data);
+
     public boolean paintNativePeersBehind() {
         return true;
     }
