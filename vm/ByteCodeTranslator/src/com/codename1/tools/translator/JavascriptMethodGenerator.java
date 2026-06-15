@@ -113,7 +113,12 @@ final class JavascriptMethodGenerator {
     private JavascriptMethodGenerator() {
     }
 
+    // Memoises classNeedsInitialization(); keyed on the sanitized class name.
+    // Cleared whenever classIndex changes so a stale run can't leak.
+    private static final Map<String, Boolean> classNeedsInitCache = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
+
     static void setClassIndex(List<ByteCodeClass> allClasses) {
+        classNeedsInitCache.clear();
         if (allClasses == null) {
             classIndex = null;
             referencedStaticFields = null;
@@ -662,6 +667,62 @@ final class JavascriptMethodGenerator {
             }
         }
         return start;
+    }
+
+    /**
+     * True when {@code _I(className)} (ensureClassInitialized) can have any
+     * observable effect: the class or one of its supertypes (superclass or a
+     * transitive superinterface) has an explicit {@code <clinit>} or deferred
+     * static-field initialization. When false the guard is pure overhead — the
+     * runtime helper walks the hierarchy, finds no clinit, and returns — so the
+     * emitter can omit it entirely. This mirrors TeaVM, which only guards
+     * init-bearing classes (a hellocodenameone build emits ~90 guards; ParparVM
+     * emitted ~8900 because it guarded unconditionally). Over-approximates
+     * (returns {@code true}) for unknown classes / hierarchy cycles so a needed
+     * guard is never dropped; static fields themselves are default-initialised
+     * at {@code defineClass} time, so a clinit-less class is safe to read
+     * without a guard.
+     */
+    private static boolean classNeedsInitialization(String className) {
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (className == null || idx == null) {
+            return true;
+        }
+        String start = JavascriptNameUtil.sanitizeClassName(className);
+        Boolean cached = classNeedsInitCache.get(start);
+        if (cached != null) {
+            return cached;
+        }
+        boolean needs = false;
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String cur = stack.pop();
+            if (cur == null || !seen.add(cur)) {
+                continue;
+            }
+            ByteCodeClass cls = idx.get(cur);
+            if (cls == null) {
+                needs = true;            // unknown class -> keep the guard
+                break;
+            }
+            if (hasExplicitClinit(cls) || hasDeferredStaticInitialization(cls)) {
+                needs = true;
+                break;
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(JavascriptNameUtil.sanitizeClassName(base));
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+        }
+        classNeedsInitCache.put(start, needs);
+        return needs;
     }
 
     static String generateClassJavascript(ByteCodeClass cls, List<ByteCodeClass> allClasses) {
@@ -2477,7 +2538,8 @@ final class JavascriptMethodGenerator {
             out.append("__cn1Arg").append(i + 1);
         }
         out.append("){\n");
-        if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
+        if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())
+                && classNeedsInitialization(cls.getClsName())) {
             out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
         }
         if ("__CLINIT__".equals(method.getMethodName())) {
@@ -2819,7 +2881,9 @@ final class JavascriptMethodGenerator {
         out.append(suspending ? "function* " : "function ").append(wrapperName).append("(");
         appendMethodParameters(out, method);
         out.append("){\n");
-        out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
+        if (classNeedsInitialization(cls.getClsName())) {
+            out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
+        }
         out.append("  return ").append(suspending ? "yield* " : "").append(bodyName).append("(");
         appendMethodParameterArguments(out, method);
         out.append(");\n");
@@ -4790,6 +4854,9 @@ final class JavascriptMethodGenerator {
     }
 
     private static void appendStraightLineEnsureClassInitialized(StringBuilder out, StraightLineContext ctx, String owner) {
+        if (!classNeedsInitialization(owner)) {
+            return;
+        }
         if (ctx.initializedClasses.add(owner)) {
             out.append("  _I(\"").append(owner).append("\");\n");
         }
@@ -6635,6 +6702,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         // any of its methods can run, so both are already live by the
         // time this method body executes. ~30% of the 7.7k ``jvm.eI``
         // sites resolve to the containing class or its ancestors.
+        if (!classNeedsInitialization(owner)) {
+            return;
+        }
         if (isClassAlreadyInitializedForCurrentEmission(owner)) {
             return;
         }
