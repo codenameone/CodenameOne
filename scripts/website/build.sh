@@ -120,13 +120,15 @@ set_cn1_user_token() {
 import java.util.prefs.Preferences;
 
 public class SetCn1Prefs {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         if (args.length != 2) {
             throw new IllegalArgumentException("Usage: SetCn1Prefs <user> <token>");
         }
         Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
         prefs.put("user", args[0]);
         prefs.put("token", args[1]);
+        // Force the write to the backing store so the build's JVM reads it back.
+        prefs.flush();
     }
 }
 JAVA
@@ -136,6 +138,23 @@ JAVA
     fi
   else
     echo "CN1_USER/CN1_TOKEN not provided; building ${project_dir} JavaScript without setting token." >&2
+  fi
+}
+
+# Playground/Skin Designer build their JavaScript bundle on the Codename One
+# CLOUD build server, which requires an authenticated account. Without valid
+# credentials the build client drops to an interactive browser login and blocks
+# until the job timeout (the multi-hour "stuck website build"). Fail fast with
+# an actionable message instead, so a credential/authorization problem is
+# obvious and never wastes a runner. Set the CN1_USER / CN1_TOKEN GitHub secrets
+# (a valid Enterprise account) to enable these cloud builds.
+require_cloud_credentials() {
+  local project_dir="$1"
+  if [ -z "${CN1_USER}" ] || [ -z "${CN1_TOKEN}" ]; then
+    echo "ERROR: ${project_dir} builds via the Codename One cloud build server and requires authentication," >&2
+    echo "       but CN1_USER/CN1_TOKEN are not set. Set those GitHub secrets to a valid Enterprise account." >&2
+    echo "       Aborting now instead of hanging on an interactive login." >&2
+    exit 1
   fi
 }
 
@@ -670,6 +689,7 @@ build_playground_for_site() {
     return
   fi
 
+  require_cloud_credentials "Playground"
   bootstrap_local_cn1_snapshots
 
   echo "Building Playground JavaScript bundle for website..." >&2
@@ -729,6 +749,7 @@ build_skindesigner_for_site() {
     return
   fi
 
+  require_cloud_credentials "Skin Designer"
   bootstrap_local_cn1_snapshots
 
   echo "Building Skin Designer JavaScript bundle for website..." >&2

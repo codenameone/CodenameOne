@@ -29,6 +29,14 @@ public class SetUserTokenMojo extends AbstractMojo {
         Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
         prefs.put("token", token);
         prefs.put("user", user);
+        try {
+            // put() only mutates the in-memory node; force it to the backing
+            // store now so a separate JVM (the build) reliably reads it back.
+            prefs.flush();
+        } catch (java.util.prefs.BackingStoreException ex) {
+            throw new MojoExecutionException(
+                    "Failed to persist Codename One credentials to the preferences backing store", ex);
+        }
 
         getLog().info("Saved Codename One user token and user email to preferences node /com/codename1/ui");
     }
