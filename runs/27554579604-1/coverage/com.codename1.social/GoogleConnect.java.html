@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoogleConnect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">GoogleConnect.java</span></div><h1>GoogleConnect.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Oauth2;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.util.Arrays;
+import java.util.Hashtable;
+
+/// Sign-in-with-Google for Codename One.
+///
+/// As of 2025 Google replaced the legacy Sign-In SDK with the Google Identity
+/// Services (GIS) family of APIs. GIS encourages the OAuth 2.0 authorization
+/// code flow with PKCE driven from the system browser -- exactly what
+/// [com.codename1.io.oidc.OidcClient] does. New apps should call
+/// [#signIn(String, String, String[])] which goes through that modern path
+/// and works on every Codename One platform without a native SDK dependency.
+///
+/// The older [#doLogin()] / [#nativelogin()] path remains for source
+/// compatibility, and on iOS / Android it still delegates to the native
+/// implementation provided by the port (see `Ports/iOSPort` and
+/// `Ports/Android`). On other platforms the legacy path also now goes
+/// through `OidcClient` instead of the deprecated [Oauth2] in-app WebView.
+///
+/// @author Chen
+public class GoogleConnect extends Login {
+
+    /// Google's well-known OIDC issuer.
+    public static final String GOOGLE_ISSUER = &quot;https://accounts.google.com&quot;;
+
+    private static final String tokenURL = &quot;https://www.googleapis.com/oauth2/v3/token&quot;;
+<span class="fc" id="L58">    private static final Object INSTANCE_LOCK = new Object();</span>
+    static Class&lt;?&gt; implClass;
+    private static GoogleConnect instance;
+
+
+<span class="fc" id="L63">    GoogleConnect() {</span>
+<span class="fc" id="L64">        setOauth2URL(&quot;https://accounts.google.com/o/oauth2/auth&quot;);</span>
+<span class="fc" id="L65">        setScope(&quot;profile email&quot;);</span>
+<span class="fc" id="L66">    }</span>
+
+    /// Gets the GoogleConnect singleton instance
+    /// .
+    ///
+    /// #### Returns
+    ///
+    /// the GoogleConnect instance
+    public static GoogleConnect getInstance() {
+<span class="fc" id="L75">        synchronized (INSTANCE_LOCK) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (instance == null) {</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                if (implClass != null) {</span>
+                    try {
+<span class="nc" id="L79">                        instance = (GoogleConnect) implClass.newInstance();</span>
+<span class="nc" id="L80">                    } catch (Throwable t) {</span>
+<span class="nc" id="L81">                        instance = new GoogleConnect();</span>
+<span class="nc" id="L82">                    }</span>
+                } else {
+<span class="fc" id="L84">                    instance = new GoogleConnect();</span>
+                }
+            }
+<span class="fc" id="L87">            return instance;</span>
+        }
+    }
+
+    static void setImplClass(Class&lt;?&gt; implClass) {
+<span class="nc" id="L92">        GoogleConnect.implClass = implClass;</span>
+<span class="nc" id="L93">    }</span>
+
+    @Override
+    public boolean isNativeLoginSupported() {
+<span class="fc" id="L97">        return false;</span>
+    }
+
+    @Override
+    protected Oauth2 createOauth2() {
+<span class="fc" id="L102">        Hashtable params = new Hashtable();</span>
+<span class="fc" id="L103">        params.put(&quot;approval_prompt&quot;, &quot;force&quot;);</span>
+<span class="fc" id="L104">        params.put(&quot;access_type&quot;, &quot;offline&quot;);</span>
+
+<span class="fc" id="L106">        return new Oauth2(oauth2URL, clientId, redirectURI, scope, tokenURL, clientSecret, params);</span>
+    }
+
+    /// Modern Google sign-in. Goes through the Google Identity Services OIDC
+    /// endpoints with PKCE, using the system browser. Works the same on every
+    /// platform (iOS, Android, JavaSE, Web) provided the platform port wires
+    /// the system browser native interface; otherwise it falls back to an
+    /// in-app browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientId`: OAuth 2.0 client ID issued in Google Cloud Console.
+    ///   Use the *iOS / Android* client for the matching native build, or the
+    ///   *Web* client when running in the simulator / web port.
+    /// - `redirectUri`: Redirect URI registered for that client. Custom
+    ///   schemes (`com.example.app:/oauth2redirect`) for mobile; HTTPS
+    ///   for web.
+    /// - `scopes`: OAuth scopes to request -- include `openid email profile`
+    ///   to get an ID token plus user metadata, plus any Google API scopes
+    ///   you need.
+    ///
+    /// #### Returns
+    ///
+    /// An [AsyncResource] resolving to the [OidcTokens] for the signed-in
+    /// user.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public AsyncResource&lt;OidcTokens&gt; signIn(final String clientId,
+                                            final String redirectUri,
+                                            final String... scopes) {
+<span class="nc" id="L138">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="nc" id="L139">        OidcClient.discover(GOOGLE_ISSUER)</span>
+<span class="nc" id="L140">                .ready(new SuccessCallback&lt;OidcClient&gt;() {</span>
+                    @Override
+                    public void onSucess(OidcClient client) {
+<span class="nc" id="L143">                        client.setClientId(clientId)</span>
+<span class="nc bnc" id="L144" title="All 4 branches missed.">                                .setRedirectUri(redirectUri)</span>
+<span class="nc" id="L145">                                .setScopes(scopes != null &amp;&amp; scopes.length &gt; 0</span>
+                                        ? scopes
+                                        : new String[] {&quot;openid&quot;, &quot;email&quot;, &quot;profile&quot;})
+                                // `access_type=offline` is Google-specific and is needed
+                                // to get a refresh token; `prompt=consent` forces the
+                                // refresh-token grant on subsequent sign-ins.
+<span class="nc" id="L151">                                .setAuthorizationParameters(</span>
+                                        &quot;access_type&quot;, &quot;offline&quot;,
+                                        &quot;prompt&quot;, &quot;consent&quot;);
+<span class="nc" id="L154">                        client.authorize()</span>
+<span class="nc" id="L155">                                .ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+                                    @Override
+                                    public void onSucess(OidcTokens tokens) {
+<span class="nc" id="L158">                                        setAccessToken(tokens.toAccessToken());</span>
+<span class="nc" id="L159">                                        out.complete(tokens);</span>
+<span class="nc" id="L160">                                    }</span>
+                                })
+<span class="nc" id="L162">                                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                                    @Override
+                                    public void onSucess(Throwable err) {
+<span class="nc" id="L165">                                        out.error(err);</span>
+<span class="nc" id="L166">                                    }</span>
+                                });
+<span class="nc" id="L168">                    }</span>
+                })
+<span class="nc" id="L170">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="nc" id="L173">                        out.error(err);</span>
+<span class="nc" id="L174">                    }</span>
+                });
+<span class="nc" id="L176">        return out;</span>
+    }
+
+    @Override
+    protected boolean validateToken(String token) {
+        //make a call to the API if the return value is 40X the token is not 
+        //valid anymore
+<span class="fc" id="L183">        final boolean[] retval = new boolean[1];</span>
+<span class="fc" id="L184">        retval[0] = true;</span>
+<span class="fc" id="L185">        ConnectionRequest req = new ValidateTokenConnectionRequest(retval);</span>
+<span class="fc" id="L186">        req.setPost(false);</span>
+<span class="fc" id="L187">        req.setUrl(&quot;https://www.googleapis.com/plus/v1/people/me&quot;);</span>
+<span class="fc" id="L188">        req.addRequestHeader(&quot;Authorization&quot;, &quot;Bearer &quot; + token);</span>
+<span class="fc" id="L189">        NetworkManager.getInstance().addToQueueAndWait(req);</span>
+<span class="fc" id="L190">        return retval[0];</span>
+
+    }
+
+    private static class ValidateTokenConnectionRequest extends ConnectionRequest {
+        private final boolean[] retval;
+
+<span class="fc" id="L197">        public ValidateTokenConnectionRequest(boolean[] retval) {</span>
+<span class="fc" id="L198">            this.retval = retval;</span>
+<span class="fc" id="L199">        }</span>
+
+        @Override
+        public final boolean equals(Object o) {
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            if (!(o instanceof ValidateTokenConnectionRequest)) {</span>
+<span class="nc" id="L204">                return false;</span>
+            }
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (!super.equals(o)) {</span>
+<span class="nc" id="L207">                return false;</span>
+            }
+
+<span class="nc" id="L210">            ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;</span>
+<span class="nc" id="L211">            return Arrays.equals(retval, that.retval);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L216">            int result = super.hashCode();</span>
+<span class="nc" id="L217">            result = 31 * result + Arrays.hashCode(retval);</span>
+<span class="nc" id="L218">            return result;</span>
+        }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            //access token not valid anymore
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">            if (code &gt;= 400 &amp;&amp; code &lt;= 410) {</span>
+<span class="fc" id="L225">                retval[0] = false;</span>
+<span class="fc" id="L226">                return;</span>
+            }
+<span class="nc" id="L228">            super.handleErrorResponseCode(code, message);</span>
+<span class="nc" id="L229">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

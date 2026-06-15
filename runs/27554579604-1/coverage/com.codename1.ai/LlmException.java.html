@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LlmException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">LlmException.java</span></div><h1>LlmException.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import java.io.IOException;
+
+/// The single checked-error type raised by [LlmClient]. Extends
+/// [IOException] so callers' existing network catch blocks pick it
+/// up. Inspect [#getType()] for the failure category and switch on
+/// the [ErrorType] enum -- no separate exception subclass per error.
+///
+/// ```
+/// try {
+///     ChatResponse r = client.chat(req).get();
+///     // ...
+/// } catch (AsyncExecutionException ae) {
+///     if (ae.getCause() instanceof LlmException) {
+///         LlmException e = (LlmException) ae.getCause();
+///         switch (e.getType()) {
+///             case RATE_LIMIT:        scheduleRetry(e.getRetryAfterSeconds()); break;
+///             case AUTH:              showLoginScreen(); break;
+///             case CONTEXT_LENGTH:    trimHistory();    break;
+///             case MODEL_OVERLOADED:  scheduleRetry(60); break;
+///             case INVALID_REQUEST:   showError(e);     break;
+///             case NETWORK:           showOfflineUi();  break;
+///             default:                showError(e);
+///         }
+///     }
+/// }
+/// ```
+///
+/// `httpStatus`, `providerErrorCode`, `rawBody`, and (for rate-limit
+/// errors) `retryAfterSeconds` are populated when the provider
+/// returned them. `getRetryAfterSeconds()` returns `-1` for every
+/// non-rate-limit error and for rate-limit errors where the provider
+/// didn't send a `Retry-After` header.
+public class LlmException extends IOException {
+
+    /// Coarse-grained classification of every failure path the
+    /// client can surface. Stable -- new variants are appended at
+    /// the end; existing variants do not change semantics.
+<span class="fc" id="L62">    public enum ErrorType {</span>
+        /// 401 / 403 -- API key invalid, revoked, or lacks access to
+        /// the requested model.
+<span class="fc" id="L65">        AUTH,</span>
+
+        /// 429 -- rate limit hit. Pair with [#getRetryAfterSeconds]
+        /// to honour the provider's backoff hint when available.
+<span class="fc" id="L69">        RATE_LIMIT,</span>
+
+        /// 400 / 422 -- malformed request, unsupported parameter,
+        /// image too large, etc.
+<span class="fc" id="L73">        INVALID_REQUEST,</span>
+
+        /// 400 subtype -- the conversation exceeded the model's
+        /// context window. Drop older turns and retry, or switch
+        /// to a longer-context model.
+<span class="fc" id="L78">        CONTEXT_LENGTH,</span>
+
+        /// 503 / 529 -- the model is temporarily overloaded. Same
+        /// recovery as RATE_LIMIT but a different signal source.
+<span class="fc" id="L82">        MODEL_OVERLOADED,</span>
+
+        /// 5xx other than 503 / 529 -- provider had an internal error.
+<span class="fc" id="L85">        SERVER,</span>
+
+        /// DNS, TLS, read-timeout, connection reset -- the request
+        /// did not reach the provider or did not get a response back.
+<span class="fc" id="L89">        NETWORK,</span>
+
+        /// Any failure that doesn't fit the categories above (e.g.
+        /// JSON parsing of the response failed). Treat as a generic
+        /// programming error and log [#getRawBody].
+<span class="fc" id="L94">        UNKNOWN</span>
+    }
+
+    private final int httpStatus;
+    private final String providerErrorCode;
+    private final String rawBody;
+    private final ErrorType type;
+    private final int retryAfterSeconds;
+
+    public LlmException(String message) {
+<span class="nc" id="L104">        this(message, -1, null, null, null, ErrorType.UNKNOWN, -1);</span>
+<span class="nc" id="L105">    }</span>
+
+    public LlmException(String message, Throwable cause) {
+<span class="nc" id="L108">        this(message, -1, null, null, cause, ErrorType.UNKNOWN, -1);</span>
+<span class="nc" id="L109">    }</span>
+
+    public LlmException(String message, int httpStatus, String providerErrorCode,
+                        String rawBody, Throwable cause, ErrorType type) {
+<span class="fc" id="L113">        this(message, httpStatus, providerErrorCode, rawBody, cause, type, -1);</span>
+<span class="fc" id="L114">    }</span>
+
+    public LlmException(String message, int httpStatus, String providerErrorCode,
+                        String rawBody, Throwable cause, ErrorType type,
+                        int retryAfterSeconds) {
+<span class="fc" id="L119">        super(message);</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (cause != null) {</span>
+<span class="nc" id="L121">            initCause(cause);</span>
+        }
+<span class="fc" id="L123">        this.httpStatus = httpStatus;</span>
+<span class="fc" id="L124">        this.providerErrorCode = providerErrorCode;</span>
+<span class="fc" id="L125">        this.rawBody = rawBody;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        this.type = type == null ? ErrorType.UNKNOWN : type;</span>
+<span class="fc" id="L127">        this.retryAfterSeconds = retryAfterSeconds;</span>
+<span class="fc" id="L128">    }</span>
+
+    /// Coarse-grained category -- the recommended switching point
+    /// for error handling. See the class javadoc for the full
+    /// pattern.
+    public ErrorType getType() {
+<span class="fc" id="L134">        return type;</span>
+    }
+
+    public int getHttpStatus() {
+<span class="fc" id="L138">        return httpStatus;</span>
+    }
+
+    public String getProviderErrorCode() {
+<span class="fc" id="L142">        return providerErrorCode;</span>
+    }
+
+    public String getRawBody() {
+<span class="nc" id="L146">        return rawBody;</span>
+    }
+
+    /// Seconds the provider asked us to wait before retrying, parsed
+    /// from a `Retry-After` header. `-1` when not applicable (the
+    /// usual case for non-`RATE_LIMIT` errors) or when the provider
+    /// did not send the header.
+    public int getRetryAfterSeconds() {
+<span class="fc" id="L154">        return retryAfterSeconds;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

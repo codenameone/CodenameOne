@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Mappers.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mapping</a> &gt; <span class="el_source">Mappers.java</span></div><h1>Mappers.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mapping;
+
+import com.codename1.io.JSONParser;
+import com.codename1.util.regex.StringReader;
+import com.codename1.xml.Element;
+import com.codename1.xml.XMLParser;
+import com.codename1.xml.XMLWriter;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Public entry point for the build-time JSON / XML mapping framework.
+///
+/// `@Mapped` classes get a generated mapper at build time. The generated
+/// mapper's static initializer self-registers with this registry. The
+/// registry stays empty until something triggers each generated class's
+/// `&lt;clinit&gt;`:
+///
+/// - **iOS / Android** -- the build server probes the project zip for
+///   `cn1app.MapperBootstrap`, and when present splices a
+///   `new cn1app.MapperBootstrap();` into the per-build application stub
+///   before `Display.init`. That constructor references every generated
+///   mapper, triggering their static initializers.
+/// - **JavaSE simulator + desktop** -- `JavaSEPort#postInit` calls
+///   `Class.forName(&quot;cn1app.MapperBootstrap&quot;)` so the registry is populated
+///   on the same boundary. Classloading is the legitimate path here:
+///   JavaSE runs unobfuscated.
+/// - **Unit tests / manual init** -- application code can call
+///   `Mappers.register(...)` directly to install a hand-written mapper for
+///   a class the build can't annotate.
+///
+/// Typical use after init:
+///
+/// ```java
+/// String json = Mappers.toJson(user);
+/// User u = Mappers.fromJson(json, User.class);
+///
+/// String xml = Mappers.toXml(user);
+/// User u = Mappers.fromXml(xml, User.class);
+/// ```
+///
+/// The registry is keyed on `getClass().getName()` so it survives ParparVM
+/// rename and R8 obfuscation: both the registration site and the lookup
+/// site see the same renamed name within a single execution. The map keys
+/// are never persisted, so the renaming has no observable effect on
+/// behavior.
+public final class Mappers {
+
+<span class="fc" id="L73">    private static final Map&lt;String, Mapper&lt;?&gt;&gt; BY_NAME = new HashMap&lt;String, Mapper&lt;?&gt;&gt;();</span>
+
+    private Mappers() {
+    }
+
+    /// Installs `mapper` under `mapper.type().getName()`. The generated
+    /// per-class mapper's static initializer calls this; hand-written
+    /// mappers for classes outside the build's annotation scan call it
+    /// explicitly.
+    public static &lt;T&gt; void register(Mapper&lt;T&gt; mapper) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (mapper == null) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;mapper is null&quot;);</span>
+        }
+<span class="fc" id="L86">        BY_NAME.put(mapper.type().getName(), mapper);</span>
+<span class="fc" id="L87">    }</span>
+
+    /// Looks up the mapper for `type` (by `type.getName()`) or null when
+    /// none is registered.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T&gt; Mapper&lt;T&gt; get(Class&lt;T&gt; type) {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L94">            return null;</span>
+        }
+<span class="fc" id="L96">        return (Mapper&lt;T&gt;) BY_NAME.get(type.getName());</span>
+    }
+
+    /// Serializes `instance` to JSON. Throws `IllegalStateException` when
+    /// no mapper is registered for its concrete class; that always points
+    /// at a missing `@Mapped` annotation or a build that ran without the
+    /// process-annotations Mojo.
+    public static String toJson(Object instance) {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc" id="L105">            return &quot;null&quot;;</span>
+        }
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L108">        Mapper&lt;Object&gt; m = (Mapper&lt;Object&gt;) BY_NAME.get(instance.getClass().getName());</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L110">            throw missing(instance.getClass());</span>
+        }
+<span class="nc" id="L112">        Map&lt;String, Object&gt; root = m.toMap(instance);</span>
+<span class="nc" id="L113">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L114">        writeJson(sb, root);</span>
+<span class="nc" id="L115">        return sb.toString();</span>
+    }
+
+    /// Inverse of `#toJson`. Parses the JSON text and hands the resulting
+    /// Map to the registered mapper.
+    public static &lt;T&gt; T fromJson(String json, Class&lt;T&gt; type) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (json == null) {</span>
+<span class="nc" id="L122">            return null;</span>
+        }
+<span class="nc" id="L124">        Mapper&lt;T&gt; m = get(type);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L126">            throw missing(type);</span>
+        }
+        try {
+<span class="nc" id="L129">            JSONParser p = new JSONParser();</span>
+<span class="nc" id="L130">            Map&lt;String, Object&gt; root = p.parseJSON(new StringReader(json));</span>
+<span class="nc" id="L131">            return m.fromMap(root);</span>
+<span class="nc" id="L132">        } catch (IOException ioe) {</span>
+<span class="nc" id="L133">            throw new RuntimeException(&quot;Mappers.fromJson failed: &quot; + ioe.getMessage(), ioe);</span>
+        }
+    }
+
+    /// Parses JSON read from a `Reader` (file, network response, ...) without
+    /// fully buffering it into a String first.
+    public static &lt;T&gt; T fromJson(Reader json, Class&lt;T&gt; type) {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (json == null) {</span>
+<span class="nc" id="L141">            return null;</span>
+        }
+<span class="nc" id="L143">        Mapper&lt;T&gt; m = get(type);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L145">            throw missing(type);</span>
+        }
+        try {
+<span class="nc" id="L148">            JSONParser p = new JSONParser();</span>
+<span class="nc" id="L149">            Map&lt;String, Object&gt; root = p.parseJSON(json);</span>
+<span class="nc" id="L150">            return m.fromMap(root);</span>
+<span class="nc" id="L151">        } catch (IOException ioe) {</span>
+<span class="nc" id="L152">            throw new RuntimeException(&quot;Mappers.fromJson failed: &quot; + ioe.getMessage(), ioe);</span>
+        }
+    }
+
+    /// Serializes `instance` to XML.
+    public static String toXml(Object instance) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc" id="L159">            return &quot;&quot;;</span>
+        }
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L162">        Mapper&lt;Object&gt; m = (Mapper&lt;Object&gt;) BY_NAME.get(instance.getClass().getName());</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L164">            throw missing(instance.getClass());</span>
+        }
+<span class="nc" id="L166">        Element root = new Element(m.xmlRootName());</span>
+<span class="nc" id="L167">        m.writeXml(instance, root);</span>
+<span class="nc" id="L168">        return new XMLWriter(true).toXML(root);</span>
+    }
+
+    /// Inverse of `#toXml`. Parses the XML text and hands the resulting
+    /// Element to the registered mapper.
+    public static &lt;T&gt; T fromXml(String xml, Class&lt;T&gt; type) {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (xml == null) {</span>
+<span class="nc" id="L175">            return null;</span>
+        }
+<span class="nc" id="L177">        Mapper&lt;T&gt; m = get(type);</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L179">            throw missing(type);</span>
+        }
+<span class="nc" id="L181">        XMLParser p = new XMLParser();</span>
+<span class="nc" id="L182">        Element root = p.parse(new StringReader(xml));</span>
+<span class="nc" id="L183">        return m.readXml(root);</span>
+    }
+
+    /// Parses XML read from a `Reader` without fully buffering it first.
+    public static &lt;T&gt; T fromXml(Reader xml, Class&lt;T&gt; type) {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (xml == null) {</span>
+<span class="nc" id="L189">            return null;</span>
+        }
+<span class="nc" id="L191">        Mapper&lt;T&gt; m = get(type);</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L193">            throw missing(type);</span>
+        }
+<span class="nc" id="L195">        XMLParser p = new XMLParser();</span>
+<span class="nc" id="L196">        Element root = p.parse(xml);</span>
+<span class="nc" id="L197">        return m.readXml(root);</span>
+    }
+
+    private static IllegalStateException missing(Class&lt;?&gt; type) {
+<span class="nc" id="L201">        return new IllegalStateException(&quot;No mapper registered for &quot;</span>
+<span class="nc" id="L202">                + type.getName() + &quot;. Add @Mapped and ensure the cn1:process-annotations &quot;</span>
+                + &quot;Mojo ran during build, then re-run -- the generated MapperBootstrap &quot;
+                + &quot;populates this registry at startup.&quot;);
+    }
+
+    // ---------------------------------------------------------------
+    // Tiny JSON writer
+    // ---------------------------------------------------------------
+
+    static void writeJson(StringBuilder sb, Object value) {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L213">            sb.append(&quot;null&quot;);</span>
+<span class="nc" id="L214">            return;</span>
+        }
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (value instanceof Map) {</span>
+<span class="nc" id="L217">            sb.append('{');</span>
+<span class="nc" id="L218">            boolean first = true;</span>
+<span class="nc" id="L219">            Map&lt;?, ?&gt; map = (Map&lt;?, ?&gt;) value;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            for (Map.Entry&lt;?, ?&gt; e : map.entrySet()) {</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L222">                    sb.append(',');</span>
+                }
+<span class="nc" id="L224">                first = false;</span>
+<span class="nc" id="L225">                writeJsonString(sb, String.valueOf(e.getKey()));</span>
+<span class="nc" id="L226">                sb.append(':');</span>
+<span class="nc" id="L227">                writeJson(sb, e.getValue());</span>
+<span class="nc" id="L228">            }</span>
+<span class="nc" id="L229">            sb.append('}');</span>
+<span class="nc" id="L230">            return;</span>
+        }
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (value instanceof java.util.Collection) {</span>
+<span class="nc" id="L233">            sb.append('[');</span>
+<span class="nc" id="L234">            boolean first = true;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            for (Object item : (java.util.Collection&lt;?&gt;) value) {</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L237">                    sb.append(',');</span>
+                }
+<span class="nc" id="L239">                first = false;</span>
+<span class="nc" id="L240">                writeJson(sb, item);</span>
+<span class="nc" id="L241">            }</span>
+<span class="nc" id="L242">            sb.append(']');</span>
+<span class="nc" id="L243">            return;</span>
+        }
+<span class="nc bnc" id="L245" title="All 4 branches missed.">        if (value instanceof Number || value instanceof Boolean) {</span>
+<span class="nc" id="L246">            sb.append(value.toString());</span>
+<span class="nc" id="L247">            return;</span>
+        }
+<span class="nc" id="L249">        writeJsonString(sb, value.toString());</span>
+<span class="nc" id="L250">    }</span>
+
+    private static void writeJsonString(StringBuilder sb, String s) {
+<span class="nc" id="L253">        sb.append('&quot;');</span>
+<span class="nc" id="L254">        int len = s.length();</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L256">            char c = s.charAt(i);</span>
+<span class="nc bnc" id="L257" title="All 8 branches missed.">            switch (c) {</span>
+<span class="nc" id="L258">                case '&quot;':  sb.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L259">                case '\\': sb.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L260">                case '\b': sb.append(&quot;\\b&quot;); break;</span>
+<span class="nc" id="L261">                case '\f': sb.append(&quot;\\f&quot;); break;</span>
+<span class="nc" id="L262">                case '\n': sb.append(&quot;\\n&quot;); break;</span>
+<span class="nc" id="L263">                case '\r': sb.append(&quot;\\r&quot;); break;</span>
+<span class="nc" id="L264">                case '\t': sb.append(&quot;\\t&quot;); break;</span>
+                default:
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L267">                        sb.append(&quot;\\u00&quot;);</span>
+<span class="nc" id="L268">                        sb.append(&quot;0123456789abcdef&quot;.charAt((c &gt;&gt; 4) &amp; 0xF));</span>
+<span class="nc" id="L269">                        sb.append(&quot;0123456789abcdef&quot;.charAt(c &amp; 0xF));</span>
+                    } else {
+<span class="nc" id="L271">                        sb.append(c);</span>
+                    }
+            }
+        }
+<span class="nc" id="L275">        sb.append('&quot;');</span>
+<span class="nc" id="L276">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

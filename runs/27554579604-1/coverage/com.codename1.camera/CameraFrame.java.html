@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CameraFrame.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.camera</a> &gt; <span class="el_source">CameraFrame.java</span></div><h1>CameraFrame.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.camera;
+
+/// A single frame delivered to a `FrameListener`.
+///
+/// **Lifetime**: the byte arrays returned by this class are valid only while
+/// `FrameListener#onFrame(CameraFrame)` is on the stack. After it returns the
+/// framework may reuse or release the underlying buffers. Clone any data you
+/// need to keep.
+public final class CameraFrame {
+    private final byte[] jpegBytes;
+    private final byte[] rawBytes;
+    private final int width;
+    private final int height;
+    private final int rotationDegrees;
+    private final long timestampNanos;
+    private final FrameFormat format;
+
+    /// Used by platform implementations.
+    public CameraFrame(byte[] jpegBytes, byte[] rawBytes,
+                       int width, int height,
+                       int rotationDegrees, long timestampNanos,
+<span class="fc" id="L44">                       FrameFormat format) {</span>
+<span class="fc" id="L45">        this.jpegBytes = jpegBytes;</span>
+<span class="fc" id="L46">        this.rawBytes = rawBytes;</span>
+<span class="fc" id="L47">        this.width = width;</span>
+<span class="fc" id="L48">        this.height = height;</span>
+<span class="fc" id="L49">        this.rotationDegrees = rotationDegrees;</span>
+<span class="fc" id="L50">        this.timestampNanos = timestampNanos;</span>
+<span class="fc" id="L51">        this.format = format;</span>
+<span class="fc" id="L52">    }</span>
+
+    /// JPEG-encoded bytes for this frame. Always non-null regardless of the
+    /// requested `FrameFormat`; the framework encodes raw frames into JPEG
+    /// on demand for AI module consumption.
+    public byte[] getJpegBytes() {
+<span class="fc" id="L58">        return jpegBytes;</span>
+    }
+
+    /// Raw pixel bytes in the format requested via
+    /// `CameraSessionOptions#frameFormat(FrameFormat)`. `null` when the
+    /// requested format was `FrameFormat#JPEG`.
+    public byte[] getRawBytes() {
+<span class="fc" id="L65">        return rawBytes;</span>
+    }
+
+    /// Pixel width of the frame.
+    public int getWidth() {
+<span class="fc" id="L70">        return width;</span>
+    }
+
+    /// Pixel height of the frame.
+    public int getHeight() {
+<span class="fc" id="L75">        return height;</span>
+    }
+
+    /// Clockwise rotation in degrees (0, 90, 180, 270) that should be applied
+    /// to the bytes to display them upright.
+    public int getRotationDegrees() {
+<span class="fc" id="L81">        return rotationDegrees;</span>
+    }
+
+    /// Monotonic timestamp in nanoseconds. Useful for measuring inter-frame
+    /// intervals.
+    public long getTimestampNanos() {
+<span class="fc" id="L87">        return timestampNanos;</span>
+    }
+
+    /// Pixel format actually used for `#getRawBytes()`. JPEG bytes returned by
+    /// `#getJpegBytes()` are always JPEG-encoded regardless of this value.
+    public FrameFormat getFormat() {
+<span class="fc" id="L93">        return format;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

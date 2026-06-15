@@ -1,0 +1,1465 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommonTransitions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">CommonTransitions.java</span></div><h1>CommonTransitions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.animations;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Painter;
+import com.codename1.ui.RGBImage;
+import com.codename1.ui.plaf.Style;
+import com.codename1.util.LazyValue;
+
+/// Contains common transition animations that can be applied to forms &amp; components
+/// including the following types:
+///
+/// - Slide - the exiting form slides out of the screen while the new form slides in (can be vertical or horizontal).
+///
+/// - Slide Fade - slides the content pane while fading the title. This is the default iOS transition.
+///
+/// - Cover/Uncover - like slide only one of the forms remains in place while the other moves.
+///
+/// - Fade - components fade into/out of the screen
+///
+/// - Timeline - uses an animation image as an alpha mask between the source/destination
+///
+/// The code below demonstrates the common transitions
+///
+/// ```java
+/// Toolbar.setGlobalToolbar(true);
+/// Form hi = new Form(&quot;Transitions&quot;, new BoxLayout(BoxLayout.Y_AXIS));
+/// Style bg = hi.getContentPane().getUnselectedStyle();
+/// bg.setBgTransparency(255);
+/// bg.setBgColor(0xff0000);
+/// Button showTransition = new Button(&quot;Show&quot;);
+/// Picker pick = new Picker();
+/// pick.setStrings(&quot;Slide&quot;, &quot;SlideFade&quot;, &quot;Cover&quot;, &quot;Uncover&quot;, &quot;Fade&quot;, &quot;Flip&quot;);
+/// pick.setSelectedString(&quot;Slide&quot;);
+/// TextField duration = new TextField(&quot;10000&quot;, &quot;Duration&quot;, 6, TextArea.NUMERIC);
+/// CheckBox horizontal = CheckBox.createToggle(&quot;Horizontal&quot;);
+/// pick.addActionListener((e) -&gt; {
+///     String s = pick.getSelectedString().toLowerCase();
+///     horizontal.setEnabled(s.equals(&quot;slide&quot;) || s.indexOf(&quot;cover&quot;) &gt; -1);
+/// });
+/// horizontal.setSelected(true);
+/// hi.add(showTransition).
+///     add(pick).
+///     add(duration).
+///     add(horizontal);
+///
+/// Form dest = new Form(&quot;Destination&quot;);
+/// bg = dest.getContentPane().getUnselectedStyle();
+/// bg.setBgTransparency(255);
+/// bg.setBgColor(0xff);
+/// dest.setBackCommand(
+///         dest.getToolbar().addCommandToLeftBar(&quot;Back&quot;, null, (e) -&gt; hi.showBack()));
+///
+/// showTransition.addActionListener((e) -&gt; {
+///     int h = CommonTransitions.SLIDE_HORIZONTAL;
+///     if(!horizontal.isSelected()) {
+///         h = CommonTransitions.SLIDE_VERTICAL;
+///     }
+///     switch(pick.getSelectedString()) {
+///         case &quot;Slide&quot;:
+///             hi.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
+///             break;
+///         case &quot;SlideFade&quot;:
+///             hi.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
+///             break;
+///         case &quot;Cover&quot;:
+///             hi.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
+///             break;
+///         case &quot;Uncover&quot;:
+///             hi.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
+///             break;
+///         case &quot;Fade&quot;:
+///             hi.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
+///             break;
+///         case &quot;Flip&quot;:
+///             hi.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
+///             dest.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
+///             break;
+///     }
+///     dest.show();
+/// });
+/// hi.show();
+/// ```
+/// Slide
+///
+/// Slide Fade
+///
+/// Cover/Uncover
+///
+/// Fade
+///
+/// @author Shai Almog, Chen Fishbein
+public final class CommonTransitions extends Transition {
+    /// Slide the transition horizontally
+    ///
+    /// #### See also
+    ///
+    /// - #createSlide
+    public static final int SLIDE_HORIZONTAL = 0;
+    /// Slide the transition vertically
+    ///
+    /// #### See also
+    ///
+    /// - #createSlide
+    public static final int SLIDE_VERTICAL = 1;
+    private static final int TYPE_EMPTY = 0;
+    private static final int TYPE_SLIDE = 1;
+    private static final int TYPE_FADE = 2;
+    private static final int TYPE_FAST_SLIDE = 3;
+    private static final int TYPE_TIMELINE = 4;
+    private static final int TYPE_SLIDE_AND_FADE = 5;
+    private static final int TYPE_PULSATE_DIALOG = 6;
+    private static final int TYPE_COVER = 7;
+    private static final int TYPE_UNCOVER = 8;
+<span class="fc" id="L149">    private static boolean defaultLinearMotion = false;</span>
+    private Motion motion;
+    private Motion motion2;
+    private LazyValue&lt;Motion&gt; lazyMotion;
+    private int slideType;
+    private int speed;
+    private int position;
+    private int transitionType;
+    private Image buffer;
+    private Image secondaryBuffer;
+    private Image timeline;
+    private byte pulseState;
+<span class="fc" id="L161">    private boolean linearMotion = defaultLinearMotion;</span>
+    private boolean motionSetManually;
+    private int originalWidth;
+    private int originalHeight;
+    private int originalX;
+    private int originalY;
+
+
+    /// The transition is a special case where we &quot;keep&quot; an allocated buffer
+    private RGBImage rgbBuffer;
+    private boolean forward;
+    private boolean drawDialogMenu;
+
+    private boolean firstFinished;
+
+<span class="fc" id="L176">    private CommonTransitions(int type) {</span>
+<span class="fc" id="L177">        transitionType = type;</span>
+<span class="fc" id="L178">    }</span>
+
+    /// Creates an empty transition that does nothing. This has the same effect as
+    /// setting a transition to null.
+    ///
+    /// #### Returns
+    ///
+    /// empty transition
+    public static CommonTransitions createEmpty() {
+<span class="fc" id="L187">        return new CommonTransitions(TYPE_EMPTY);</span>
+    }
+
+    /// Creates a slide transition for the body of the form that fades the title in while sliding
+    ///
+    /// #### Parameters
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    public static CommonTransitions createSlideFadeTitle(boolean forward, int duration) {
+<span class="fc" id="L200">        CommonTransitions c = new CommonTransitions(TYPE_SLIDE_AND_FADE);</span>
+<span class="fc" id="L201">        c.forward = forward;</span>
+<span class="fc" id="L202">        c.speed = duration;</span>
+<span class="fc" id="L203">        return c;</span>
+    }
+
+    /// Creates a dialog pulsate transition
+    public static CommonTransitions createDialogPulsate() {
+<span class="fc" id="L208">        return new CommonTransitions(TYPE_PULSATE_DIALOG);</span>
+    }
+
+    /// Creates a slide transition with the given duration and direction, this differs from the
+    /// standard slide animation by focusing on speed rather than on minimizing heap usage.
+    /// This method works by creating two images and sliding them which works much faster for
+    /// all devices however takes up more ram. Notice that this method of painting doesn't
+    /// support various basic CodenameOne abilities such as translucent menus/dialogs etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    ///
+    /// #### Deprecated
+    ///
+    /// this is not faster than slide on modern devices, you should use that `boolean, int)`
+    public static CommonTransitions createFastSlide(int type, boolean forward, int duration) {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="fc" id="L237">            return createFastSlide(type, forward, duration, false);</span>
+        }
+<span class="fc" id="L239">        return createSlide(type, forward, duration);</span>
+    }
+
+    /// Creates a slide transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    public static CommonTransitions createSlide(int type, boolean forward, int duration) {
+<span class="fc" id="L259">        return createSlide(type, forward, duration, false);</span>
+    }
+
+    /// Creates a slide transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type           type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward        forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// - `drawDialogMenu`: @param drawDialogMenu indicates that the menu (softkey area) of the dialog
+    /// should be kept during a slide transition. This is only relevant for
+    /// dialog in/out transitions.
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    public static CommonTransitions createSlide(int type, boolean forward, int duration, boolean drawDialogMenu) {
+<span class="fc" id="L283">        CommonTransitions t = new CommonTransitions(TYPE_SLIDE);</span>
+<span class="fc" id="L284">        t.slideType = type;</span>
+<span class="fc" id="L285">        t.forward = forward;</span>
+<span class="fc" id="L286">        t.speed = duration;</span>
+<span class="fc" id="L287">        t.position = 0;</span>
+<span class="fc" id="L288">        t.drawDialogMenu = drawDialogMenu;</span>
+<span class="fc" id="L289">        return t;</span>
+    }
+
+    /// Creates a cover transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    public static CommonTransitions createCover(int type, boolean forward, int duration) {
+<span class="fc" id="L309">        CommonTransitions t = new CommonTransitions(TYPE_COVER);</span>
+<span class="fc" id="L310">        t.slideType = type;</span>
+<span class="fc" id="L311">        t.forward = forward;</span>
+<span class="fc" id="L312">        t.speed = duration;</span>
+<span class="fc" id="L313">        t.position = 0;</span>
+<span class="fc" id="L314">        return t;</span>
+    }
+
+    /// Creates a uncover transition with the given duration and direction
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type     type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward  forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    public static CommonTransitions createUncover(int type, boolean forward, int duration) {
+<span class="fc" id="L334">        CommonTransitions t = new CommonTransitions(TYPE_UNCOVER);</span>
+<span class="fc" id="L335">        t.slideType = type;</span>
+<span class="fc" id="L336">        t.forward = forward;</span>
+<span class="fc" id="L337">        t.speed = duration;</span>
+<span class="fc" id="L338">        t.position = 0;</span>
+<span class="fc" id="L339">        return t;</span>
+    }
+
+    /// Creates a slide transition with the given duration and direction, this differs from the
+    /// standard slide animation by focusing on speed rather than on minimizing heap usage
+    /// This method works by creating two images and sliding them which works much faster for
+    /// all devices however takes up more ram. Notice that this method of painting doesn't
+    /// support various basic CodenameOne abilities such as translucent menus/dialogs etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: @param type           type can be either vertically or horizontally, which means
+    /// the movement direction of the transition
+    ///
+    /// - `forward`: @param forward        forward is a boolean value, represent the directions of
+    /// switching forms, for example for a horizontally type, true means
+    /// horizontally movement to right.
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// - `drawDialogMenu`: @param drawDialogMenu indicates that the menu (softkey area) of the dialog
+    /// should be kept during a slide transition. This is only relevant for
+    /// dialog in/out transitions.
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    ///
+    /// #### Deprecated
+    ///
+    /// this is not faster than slide on modern devices, you should use that `boolean, int, boolean)`
+    public static CommonTransitions createFastSlide(int type, boolean forward, int duration, boolean drawDialogMenu) {
+<span class="fc" id="L371">        CommonTransitions t = new CommonTransitions(TYPE_SLIDE);</span>
+<span class="fc" id="L372">        t.slideType = type;</span>
+<span class="fc" id="L373">        t.forward = forward;</span>
+<span class="fc" id="L374">        t.speed = duration;</span>
+<span class="fc" id="L375">        t.position = 0;</span>
+<span class="fc" id="L376">        t.drawDialogMenu = drawDialogMenu;</span>
+<span class="fc" id="L377">        return t;</span>
+    }
+
+    /// Creates a transition for fading a form in while fading out the original form
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: represent the time the transition should take in millisecond
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    public static CommonTransitions createFade(int duration) {
+<span class="fc" id="L390">        CommonTransitions t = new CommonTransitions(TYPE_FADE);</span>
+<span class="fc" id="L391">        t.speed = duration;</span>
+<span class="fc" id="L392">        return t;</span>
+    }
+
+    /// Creates a transition using an animated image object (e.g. timeline object) as an
+    /// alpha mask between the source/target
+    ///
+    /// #### Parameters
+    ///
+    /// - `animation`: the image object to execute
+    ///
+    /// #### Returns
+    ///
+    /// a transition object
+    public static CommonTransitions createTimeline(Image animation) {
+<span class="fc" id="L406">        CommonTransitions t = new CommonTransitions(TYPE_TIMELINE);</span>
+<span class="fc" id="L407">        t.timeline = animation;</span>
+<span class="fc" id="L408">        t.transitionType = TYPE_TIMELINE;</span>
+<span class="fc" id="L409">        return t;</span>
+    }
+
+    /// Indicates whether the motion associated with these transitions by default is linear or spline motion
+    ///
+    /// #### Returns
+    ///
+    /// the defaultLinearMotion
+    public static boolean isDefaultLinearMotion() {
+<span class="fc" id="L418">        return defaultLinearMotion;</span>
+    }
+
+    /// Indicates whether the motion associated with these transitions by default is linear or spline motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultLinearMotion`: the defaultLinearMotion to set
+    public static void setDefaultLinearMotion(boolean aDefaultLinearMotion) {
+<span class="fc" id="L427">        defaultLinearMotion = aDefaultLinearMotion;</span>
+<span class="fc" id="L428">    }</span>
+
+    /// Returns true if this is a horizontal slide transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a horizontal slide transition
+    public boolean isHorizontalSlide() {
+<span class="pc bpc" id="L436" title="3 of 6 branches missed.">        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) &amp;&amp; slideType == SLIDE_HORIZONTAL;</span>
+    }
+
+    /// Returns true if this is a vertical slide transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a vertical slide transition
+    public boolean isVerticalSlide() {
+<span class="pc bpc" id="L445" title="3 of 6 branches missed.">        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) &amp;&amp; slideType == SLIDE_VERTICAL;</span>
+    }
+
+    /// Returns true if this is a horizontal cover transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a horizontal cover transition
+    public boolean isHorizontalCover() {
+<span class="pc bpc" id="L454" title="4 of 6 branches missed.">        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) &amp;&amp; slideType == SLIDE_HORIZONTAL;</span>
+    }
+
+    /// Returns true if this is a vertical cover transition
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a vertical cover transition
+    public boolean isVerticalCover() {
+<span class="nc bnc" id="L463" title="All 6 branches missed.">        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) &amp;&amp; slideType == SLIDE_VERTICAL;</span>
+    }
+
+    /// Indicates the slide/cover transition direction
+    ///
+    /// #### Returns
+    ///
+    /// true for forward
+    public boolean isForwardSlide() {
+<span class="fc" id="L472">        return forward;</span>
+    }
+
+    /// Returns the speed of the transition in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// The speed of the transition in milliseconds
+    public int getTransitionSpeed() {
+<span class="fc" id="L481">        return speed;</span>
+    }
+
+    private Container getDialogParent(Component dlg) {
+<span class="nc" id="L485">        return ((Dialog) dlg).getDialogComponent();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void initTransition() {
+<span class="fc" id="L491">        firstFinished = false;</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        if (transitionType == TYPE_EMPTY) {</span>
+<span class="fc" id="L493">            return;</span>
+        }
+
+<span class="fc" id="L496">        Component source = getSource();</span>
+<span class="fc" id="L497">        Component destination = getDestination();</span>
+<span class="fc" id="L498">        position = 0;</span>
+<span class="fc" id="L499">        int w = source.getWidth();</span>
+<span class="fc" id="L500">        int h = source.getHeight();</span>
+
+        // a transition might occur with illegal source or destination values (common with
+        // improper replace() calls, this may still be valid and shouldn't fail
+<span class="pc bpc" id="L504" title="2 of 4 branches missed.">        if (w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L505">            return;</span>
+        }
+
+        // nothing to prepare in advance  for a shift fade transition
+<span class="pc bpc" id="L509" title="1 of 2 branches missed.">        if (transitionType == TYPE_SLIDE_AND_FADE) {</span>
+<span class="nc bnc" id="L510" title="All 4 branches missed.">            if (getSource() instanceof Form &amp;&amp; getDestination() instanceof Form) {</span>
+<span class="nc" id="L511">                motion = createMotion(100, 200, speed);</span>
+<span class="nc" id="L512">                motion2 = createMotion(0, getDestination().getWidth(), speed);</span>
+<span class="nc" id="L513">                motion.start();</span>
+<span class="nc" id="L514">                motion2.start();</span>
+<span class="nc" id="L515">                return;</span>
+            }
+<span class="nc" id="L517">            transitionType = TYPE_SLIDE;</span>
+        }
+
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">        if (transitionType == TYPE_PULSATE_DIALOG) {</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">            if (getDestination() instanceof Dialog) {</span>
+<span class="nc" id="L522">                motion = createMotion(600, 1100, 150);</span>
+<span class="nc" id="L523">                motion.start();</span>
+<span class="nc" id="L524">                motion2 = createMotion(100, 255, 225);</span>
+<span class="nc" id="L525">                motion2.start();</span>
+<span class="nc" id="L526">                pulseState = 0;</span>
+<span class="nc" id="L527">                Component c = getDialogParent(getDestination());</span>
+<span class="nc" id="L528">                originalX = c.getX();</span>
+<span class="nc" id="L529">                originalY = c.getY();</span>
+<span class="nc" id="L530">                originalWidth = c.getWidth();</span>
+<span class="nc" id="L531">                originalHeight = c.getHeight();</span>
+<span class="nc" id="L532">                Display d = Display.getInstance();</span>
+<span class="nc" id="L533">                Dialog dlg = (Dialog) destination;</span>
+
+                // transparent image!
+<span class="nc" id="L536">                buffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),</span>
+<span class="nc" id="L537">                        Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight() +</span>
+<span class="nc" id="L538">                                getDialogTitleHeight()), 0);</span>
+<span class="nc" id="L539">                Style stl = dlg.getDialogComponent().getStyle();</span>
+<span class="nc" id="L540">                byte bgt = stl.getBgTransparency();</span>
+<span class="nc" id="L541">                stl.setBgTransparency(0xff);</span>
+<span class="nc" id="L542">                drawDialogCmp(buffer.getGraphics(), dlg);</span>
+<span class="nc" id="L543">                stl.setBgTransparency(bgt &amp; 0xff, true);</span>
+<span class="nc" id="L544">                return;</span>
+            }
+<span class="nc" id="L546">            transitionType = TYPE_EMPTY;</span>
+<span class="nc" id="L547">            motion = createMotion(0, 0, 0);</span>
+<span class="nc" id="L548">            pulseState = (byte) 3;</span>
+<span class="nc" id="L549">            return;</span>
+        }
+
+<span class="pc bpc" id="L552" title="3 of 4 branches missed.">        if (Display.getInstance().areMutableImagesFast() || transitionType == TYPE_TIMELINE) {</span>
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">            if (buffer == null) {</span>
+<span class="fc" id="L554">                buffer = createMutableImage(w, h);</span>
+            } else {
+                // this might happen when screen orientation changes
+<span class="nc bnc" id="L557" title="All 4 branches missed.">                if (buffer.getWidth() != w || buffer.getHeight() != h) {</span>
+<span class="nc" id="L558">                    buffer = createMutableImage(w, h);</span>
+<span class="nc" id="L559">                    rgbBuffer = null;</span>
+
+                    // slide motion might need resetting since screen size is different
+<span class="nc" id="L562">                    motion = null;</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L567" title="All 2 branches covered.">        if (transitionType == TYPE_FADE) {</span>
+<span class="fc" id="L568">            motion = createMotion(0, 256, speed);</span>
+<span class="fc" id="L569">            motion.start();</span>
+
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">            if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="fc" id="L572">                hideInterformContainers();</span>
+<span class="fc" id="L573">                Graphics g = buffer.getGraphics();</span>
+<span class="fc" id="L574">                g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());</span>
+
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">                if (getSource().getComponentForm() != null) {</span>
+<span class="fc" id="L577">                    getSource().getComponentForm().paintComponent(g);</span>
+                } else {
+<span class="nc" id="L579">                    getSource().paintBackgrounds(g);</span>
+                }
+<span class="fc" id="L581">                g.setClip(source.getAbsoluteX(), source.getAbsoluteY(), buffer.getWidth(), buffer.getHeight());</span>
+<span class="fc" id="L582">                paint(g, getDestination(), 0, 0, false);</span>
+<span class="fc" id="L583">                source.paintIntersectingComponentsAbove(g);</span>
+<span class="fc" id="L584">                rgbBuffer = new RGBImage(buffer.getRGBCached(), buffer.getWidth(), buffer.getHeight());</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">                if (getSource().getComponentForm() != null) {</span>
+<span class="fc" id="L586">                    getSource().getComponentForm().paintComponent(g);</span>
+                } else {
+<span class="nc" id="L588">                    paint(g, getSource(), 0, 0, true);</span>
+<span class="nc" id="L589">                    source.paintIntersectingComponentsAbove(g);</span>
+                }
+
+<span class="fc" id="L592">                g.translate(source.getAbsoluteX(), source.getAbsoluteY());</span>
+<span class="fc" id="L593">                showInterformContainers();</span>
+            }
+<span class="fc" id="L595">            return;</span>
+        }
+
+
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">        if (transitionType == TYPE_TIMELINE) {</span>
+<span class="nc" id="L600">            hideInterformContainers();</span>
+<span class="nc" id="L601">            Image timelineBuffer = buffer;</span>
+<span class="nc bnc" id="L602" title="All 2 branches missed.">            if (timelineBuffer == null) {</span>
+<span class="nc" id="L603">                timelineBuffer = createMutableImage(w, h);</span>
+<span class="nc" id="L604">                buffer = timelineBuffer;</span>
+            }
+<span class="nc" id="L606">            Graphics g = timelineBuffer.getGraphics();</span>
+<span class="nc" id="L607">            g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());</span>
+
+<span class="nc" id="L609">            g.setClip(0, 0, timelineBuffer.getWidth() + source.getAbsoluteX(), timelineBuffer.getHeight() + source.getAbsoluteY());</span>
+
+<span class="nc bnc" id="L611" title="All 6 branches missed.">            if (timeline != null &amp;&amp; (timeline.getWidth() != timelineBuffer.getWidth() || timeline.getHeight() != timelineBuffer.getHeight())) {</span>
+<span class="nc" id="L612">                timeline = timeline.scaled(timelineBuffer.getWidth(), timelineBuffer.getHeight());</span>
+            }
+
+<span class="nc bnc" id="L615" title="All 2 branches missed.">            if (timeline instanceof Timeline) {</span>
+<span class="nc" id="L616">                ((Timeline) timeline).setTime(0);</span>
+<span class="nc" id="L617">                ((Timeline) timeline).setLoop(false);</span>
+<span class="nc" id="L618">                ((Timeline) timeline).setAnimationDelay(0);</span>
+            }
+
+<span class="nc" id="L621">            paint(g, getDestination(), 0, 0);</span>
+<span class="nc" id="L622">            g.translate(source.getAbsoluteX(), source.getAbsoluteY());</span>
+<span class="nc" id="L623">            showInterformContainers();</span>
+<span class="nc" id="L624">            return;</span>
+        }
+
+<span class="pc bpc" id="L627" title="4 of 8 branches missed.">        if (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE || transitionType == TYPE_COVER || transitionType == TYPE_UNCOVER) {</span>
+            int dest;
+<span class="fc" id="L629">            int startOffset = 0;</span>
+<span class="fc" id="L630">            boolean direction = forward;</span>
+            //flip the direction only for horizontal slides
+<span class="pc bpc" id="L632" title="3 of 4 branches missed.">            if ((source.getUIManager().getLookAndFeel().isRTL()) &amp;&amp; slideType == SLIDE_HORIZONTAL) {</span>
+<span class="nc bnc" id="L633" title="All 2 branches missed.">                direction = !direction;</span>
+            }
+<span class="fc bfc" id="L635" title="All 2 branches covered.">            if (slideType == SLIDE_HORIZONTAL) {</span>
+<span class="fc" id="L636">                dest = w;</span>
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">                if (destination instanceof Dialog) {</span>
+<span class="nc" id="L638">                    startOffset = w - getDialogParent(destination).getWidth();</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">                    if (direction) {</span>
+<span class="nc" id="L640">                        startOffset -= getDialogParent(destination).getStyle().getMarginLeft(destination.isRTL());</span>
+                    } else {
+<span class="nc" id="L642">                        startOffset -= getDialogParent(destination).getStyle().getMarginRight(destination.isRTL());</span>
+                    }
+                } else {
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">                    if (source instanceof Dialog) {</span>
+<span class="nc" id="L646">                        dest = getDialogParent(source).getWidth();</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">                        if (direction) {</span>
+<span class="nc" id="L648">                            dest += getDialogParent(source).getStyle().getMarginLeft(source.isRTL());</span>
+                        } else {
+<span class="nc" id="L650">                            dest += getDialogParent(source).getStyle().getMarginRight(source.isRTL());</span>
+                        }
+                    }
+                }
+            } else {
+<span class="fc" id="L655">                dest = h;</span>
+<span class="pc bpc" id="L656" title="1 of 2 branches missed.">                if (destination instanceof Dialog) {</span>
+<span class="nc" id="L657">                    startOffset = h - getDialogParent(destination).getHeight() -</span>
+<span class="nc" id="L658">                            getDialogTitleHeight();</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">                    if (direction) {</span>
+<span class="nc" id="L660">                        startOffset -= getDialogParent(destination).getStyle().getMarginBottom();</span>
+                    } else {
+<span class="nc" id="L662">                        startOffset -= getDialogParent(destination).getStyle().getMarginTop();</span>
+<span class="nc" id="L663">                        startOffset -= ((Dialog) destination).getTitleStyle().getMarginTop();</span>
+<span class="nc bnc" id="L664" title="All 4 branches missed.">                        if (!drawDialogMenu &amp;&amp; ((Dialog) destination).getCommandCount() &gt; 0) {</span>
+<span class="nc" id="L665">                            Container p = ((Dialog) destination).getSoftButton(0).getParent();</span>
+<span class="nc bnc" id="L666" title="All 2 branches missed.">                            if (p != null) {</span>
+<span class="nc" id="L667">                                startOffset -= p.getHeight();</span>
+                            }
+<span class="nc" id="L669">                        }</span>
+                    }
+                } else {
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                    if (source instanceof Dialog) {</span>
+<span class="nc" id="L673">                        dest = getDialogParent(source).getHeight() +</span>
+<span class="nc" id="L674">                                getDialogTitleHeight();</span>
+<span class="nc bnc" id="L675" title="All 2 branches missed.">                        if (direction) {</span>
+<span class="nc" id="L676">                            dest += getDialogParent(source).getStyle().getMarginBottom();</span>
+                        } else {
+<span class="nc" id="L678">                            dest += getDialogParent(source).getStyle().getMarginTop();</span>
+<span class="nc" id="L679">                            dest += ((Dialog) source).getTitleStyle().getMarginTop();</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                            if (((Dialog) source).getCommandCount() &gt; 0) {</span>
+<span class="nc" id="L681">                                Container p = ((Dialog) source).getSoftButton(0).getParent();</span>
+<span class="nc bnc" id="L682" title="All 2 branches missed.">                                if (p != null) {</span>
+<span class="nc" id="L683">                                    dest += p.getHeight();</span>
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+<span class="fc" id="L691">            motion = createMotion(startOffset, dest, speed);</span>
+
+<span class="pc bpc" id="L693" title="1 of 2 branches missed.">            if (!Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc" id="L694">                motion.start();</span>
+<span class="nc" id="L695">                buffer = null;</span>
+<span class="nc" id="L696">                return;</span>
+            }
+
+            // make sure the destination is painted fully at least once
+            // we must use a full buffer otherwise the clipping will take effect
+<span class="fc" id="L701">            Graphics g = buffer.getGraphics();</span>
+
+            // If this is a dialog render the tinted frame once since
+            // tinting is expensive
+<span class="pc bpc" id="L705" title="1 of 2 branches missed.">            if (getSource() instanceof Dialog) {</span>
+<span class="nc" id="L706">                paint(g, getDestination(), 0, 0);</span>
+<span class="nc bnc" id="L707" title="All 4 branches missed.">                if (transitionType == TYPE_FAST_SLIDE &amp;&amp; !(destination instanceof Dialog)) {</span>
+<span class="nc" id="L708">                    Dialog d = (Dialog) source;</span>
+<span class="nc" id="L709">                    secondaryBuffer = createMutableImage(getDialogParent(d).getWidth(),</span>
+<span class="nc" id="L710">                            getDialogParent(d).getHeight() +</span>
+<span class="nc" id="L711">                                    getDialogTitleHeight());</span>
+<span class="nc" id="L712">                    drawDialogCmp(secondaryBuffer.getGraphics(), d);</span>
+<span class="nc" id="L713">                }</span>
+            } else {
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">                if (getDestination() instanceof Dialog) {</span>
+<span class="nc" id="L716">                    paint(g, getSource(), 0, 0);</span>
+<span class="nc bnc" id="L717" title="All 4 branches missed.">                    if (transitionType == TYPE_FAST_SLIDE &amp;&amp; !(source instanceof Dialog)) {</span>
+<span class="nc" id="L718">                        Dialog d = (Dialog) destination;</span>
+<span class="nc" id="L719">                        secondaryBuffer = createMutableImage(getDialogParent(d).getWidth(),</span>
+<span class="nc" id="L720">                                d.getContentPane().getParent().getHeight() +</span>
+<span class="nc" id="L721">                                        getDialogTitleHeight());</span>
+<span class="nc" id="L722">                        drawDialogCmp(secondaryBuffer.getGraphics(), d);</span>
+<span class="nc" id="L723">                    }</span>
+                } else {
+<span class="fc" id="L725">                    hideInterformContainers();</span>
+<span class="fc" id="L726">                    paint(g, source, -source.getAbsoluteX(), -source.getAbsoluteY(), true);</span>
+<span class="pc bpc" id="L727" title="1 of 2 branches missed.">                    if (transitionType == TYPE_FAST_SLIDE) {</span>
+<span class="nc" id="L728">                        secondaryBuffer = createMutableImage(destination.getWidth(), destination.getHeight());</span>
+<span class="nc" id="L729">                        paint(secondaryBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());</span>
+                    }
+<span class="fc" id="L731">                    showInterformContainers();</span>
+                }
+            }
+<span class="fc" id="L734">            motion.start();</span>
+        }
+
+<span class="fc" id="L737">    }</span>
+
+    private Image createMutableImage(int w, int h) {
+<span class="fc" id="L740">        Display d = Display.getInstance();</span>
+<span class="fc" id="L741">        return Image.createImage(Math.min(d.getDisplayWidth(), w), Math.min(d.getDisplayHeight(), h));</span>
+    }
+
+    /// This method can be overriden by subclasses to create their own motion object on the fly
+    ///
+    /// #### Parameters
+    ///
+    /// - `startOffset`: the start offset for the menu
+    ///
+    /// - `dest`: the destination of the motion
+    ///
+    /// - `speed`: the speed of the motion
+    ///
+    /// #### Returns
+    ///
+    /// a motion instance
+    private Motion createMotion(int startOffset, int dest, int speed) {
+<span class="fc bfc" id="L758" title="All 2 branches covered.">        if (motionSetManually) {</span>
+<span class="fc bfc" id="L759" title="All 2 branches covered.">            if (lazyMotion != null) {</span>
+<span class="fc" id="L760">                return lazyMotion.get(Integer.valueOf(startOffset), Integer.valueOf(dest), Integer.valueOf(speed));</span>
+            }
+<span class="fc" id="L762">            return motion;</span>
+        }
+<span class="pc bpc" id="L764" title="1 of 2 branches missed.">        if (linearMotion) {</span>
+<span class="nc" id="L765">            return Motion.createLinearMotion(startOffset, dest, speed);</span>
+        }
+
+<span class="fc" id="L768">        return Motion.createEaseInOutMotion(startOffset, dest, speed);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    @SuppressWarnings(&quot;PMD.SwitchStmtsShouldHaveDefault&quot;)
+    public boolean animate() {
+<span class="pc bpc" id="L775" title="1 of 2 branches missed.">        if (timeline != null) {</span>
+<span class="nc" id="L776">            return timeline.animate();</span>
+        }
+<span class="fc bfc" id="L778" title="All 2 branches covered.">        if (motion == null) {</span>
+<span class="fc" id="L779">            return false;</span>
+        }
+<span class="fc" id="L781">        position = motion.getValue();</span>
+
+        // after the motion finished we need to paint one last time otherwise
+        // there will be a &quot;bump&quot; in sliding
+<span class="fc bfc" id="L785" title="All 2 branches covered.">        if (firstFinished) {</span>
+<span class="fc" id="L786">            return false;</span>
+        }
+<span class="fc" id="L788">        boolean finished = motion.isFinished();</span>
+<span class="fc bfc" id="L789" title="All 2 branches covered.">        if (finished) {</span>
+<span class="pc bpc" id="L790" title="1 of 2 branches missed.">            if (transitionType == TYPE_PULSATE_DIALOG) {</span>
+<span class="nc bnc" id="L791" title="All 3 branches missed.">                switch (pulseState) {</span>
+                    case 0:
+<span class="nc" id="L793">                        pulseState = 1;</span>
+<span class="nc" id="L794">                        motion = createMotion(1100, 900, 70);</span>
+<span class="nc" id="L795">                        motion.start();</span>
+<span class="nc" id="L796">                        return true;</span>
+                    case 1:
+<span class="nc" id="L798">                        pulseState = 2;</span>
+<span class="nc" id="L799">                        motion = createMotion(900, 1000, 140);</span>
+<span class="nc" id="L800">                        motion.start();</span>
+<span class="nc" id="L801">                        return true;</span>
+                }
+            }
+<span class="pc bpc" id="L804" title="1 of 2 branches missed.">            if (!firstFinished) {</span>
+<span class="fc" id="L805">                firstFinished = true;</span>
+            }
+        }
+<span class="fc" id="L808">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+        try {
+<span class="pc bpc" id="L815" title="5 of 8 branches missed.">            switch (transitionType) {</span>
+                case TYPE_FAST_SLIDE:
+                case TYPE_SLIDE: {
+<span class="fc" id="L818">                    hideInterformContainers();</span>
+                    // if this is an up or down slide
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">                    if (slideType == SLIDE_HORIZONTAL) {</span>
+<span class="fc" id="L821">                        paintSlideAtPosition(g, position, 0);</span>
+                    } else {
+<span class="nc" id="L823">                        paintSlideAtPosition(g, 0, position);</span>
+                    }
+<span class="fc" id="L825">                    paintInterformContainers(g);</span>
+<span class="fc" id="L826">                    return;</span>
+                }
+                case TYPE_UNCOVER:
+<span class="nc" id="L829">                    hideInterformContainers();</span>
+<span class="nc bnc" id="L830" title="All 2 branches missed.">                    if (motion != null) {</span>
+<span class="nc" id="L831">                        int p = motion.getDestinationValue() - position;</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">                        if (slideType == SLIDE_HORIZONTAL) {</span>
+<span class="nc" id="L833">                            paintCoverAtPosition(g, p, 0);</span>
+                        } else {
+<span class="nc" id="L835">                            paintCoverAtPosition(g, 0, p);</span>
+                        }
+                    }
+<span class="nc" id="L838">                    paintInterformContainers(g);</span>
+
+<span class="nc" id="L840">                    return;</span>
+                case TYPE_COVER:
+<span class="fc" id="L842">                    hideInterformContainers();</span>
+<span class="pc bpc" id="L843" title="1 of 2 branches missed.">                    if (slideType == SLIDE_HORIZONTAL) {</span>
+<span class="nc" id="L844">                        paintCoverAtPosition(g, position, 0);</span>
+                    } else {
+<span class="fc" id="L846">                        paintCoverAtPosition(g, 0, position);</span>
+                    }
+<span class="fc" id="L848">                    paintInterformContainers(g);</span>
+<span class="fc" id="L849">                    return;</span>
+                case TYPE_FADE:
+<span class="fc" id="L851">                    hideInterformContainers();</span>
+<span class="fc" id="L852">                    paintAlpha(g);</span>
+<span class="fc" id="L853">                    paintInterformContainers(g);</span>
+<span class="fc" id="L854">                    return;</span>
+                case TYPE_TIMELINE:
+<span class="nc" id="L856">                    hideInterformContainers();</span>
+<span class="nc bnc" id="L857" title="All 4 branches missed.">                    if (timeline != null &amp;&amp; buffer != null) {</span>
+<span class="nc" id="L858">                        Object mask = timeline.createMask();</span>
+<span class="nc" id="L859">                        paint(g, getSource(), 0, 0);</span>
+<span class="nc" id="L860">                        g.drawImage(buffer.applyMask(mask), 0, 0);</span>
+                    }
+<span class="nc" id="L862">                    paintInterformContainers(g);</span>
+<span class="nc" id="L863">                    return;</span>
+                case TYPE_SLIDE_AND_FADE: {
+                    // Final transition frame: instead of repeating the cross-
+                    // fade (which intentionally leaves both source + dest
+                    // titles visible at varying alpha), paint the destination
+                    // form fully. The form's normal paint clears the title
+                    // area properly, which matters on persistent-backing
+                    // renderers (iOS Metal MTLLoadActionLoad) that faithfully
+                    // preserve every previous-frame pixel -- without this
+                    // cleanup, the cross-fade's accumulated alpha-blended
+                    // title pixels remain in the screenTexture and the next
+                    // captured frame shows two titles overlapping. iOS GL ES2
+                    // happens to mask this because CAEAGLLayer.retainBacking
+                    // is permissively lossy about partial-alpha pixels.
+<span class="nc bnc" id="L877" title="All 2 branches missed.">                    if (firstFinished) {</span>
+<span class="nc" id="L878">                        Form finalForm = (Form) getDestination();</span>
+<span class="nc bnc" id="L879" title="All 2 branches missed.">                        if (finalForm != null) {</span>
+<span class="nc" id="L880">                            paint(g, finalForm, 0, 0, true);</span>
+                        }
+<span class="nc" id="L882">                        return;</span>
+                    }
+
+<span class="nc" id="L885">                    Form sourceForm = (Form) getSource();</span>
+<span class="nc" id="L886">                    Form destForm = (Form) getDestination();</span>
+<span class="nc" id="L887">                    Container titleArea = sourceForm.getTitleArea();</span>
+<span class="nc" id="L888">                    Container destTitleArea = destForm.getTitleArea();</span>
+<span class="nc bnc" id="L889" title="All 8 branches missed.">                    if (titleArea == null || titleArea.isHidden(true) || destTitleArea == null || destTitleArea.isHidden(true)) {</span>
+<span class="nc" id="L890">                        hideInterformContainers();</span>
+<span class="nc bnc" id="L891" title="All 2 branches missed.">                        if (motion2 != null) {</span>
+<span class="nc" id="L892">                            paintSlideAtPosition(g, motion2.getValue(), 0);</span>
+                        }
+
+<span class="nc" id="L895">                        paintInterformContainers(g);</span>
+<span class="nc" id="L896">                        return;</span>
+                    }
+
+<span class="nc" id="L899">                    int alpha = position;</span>
+<span class="nc" id="L900">                    int slidePos = motion2.getValue();</span>
+<span class="nc" id="L901">                    int clipX = g.getClipX();</span>
+<span class="nc" id="L902">                    int clipY = g.getClipY();</span>
+<span class="nc" id="L903">                    int clipW = g.getClipWidth();</span>
+<span class="nc" id="L904">                    int clipH = g.getClipHeight();</span>
+<span class="nc bnc" id="L905" title="All 4 branches missed.">                    if (clipW &lt;= 0 || clipH &lt;= 0) {</span>
+<span class="nc" id="L906">                        return;</span>
+                    }
+<span class="nc" id="L908">                    g.translate(0, sourceForm.getTitleArea().getHeight());</span>
+
+<span class="nc" id="L910">                    Container sourcePane = ((Form) getSource()).getContentPane();</span>
+<span class="nc" id="L911">                    Container destPane = ((Form) getDestination()).getContentPane();</span>
+<span class="nc" id="L912">                    boolean dir = forward;</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">                    if (sourceForm.getUIManager().getLookAndFeel().isRTL()) {</span>
+<span class="nc bnc" id="L914" title="All 2 branches missed.">                        dir = !dir;</span>
+                    }
+<span class="nc" id="L916">                    hideInterformContainers();</span>
+<span class="nc bnc" id="L917" title="All 2 branches missed.">                    if (dir) {</span>
+<span class="nc" id="L918">                        g.translate(slidePos, 0);</span>
+<span class="nc" id="L919">                        paint(g, sourcePane, -sourcePane.getAbsoluteX() - sourcePane.getScrollX(), -sourcePane.getAbsoluteY() - sourcePane.getScrollY(), true);</span>
+<span class="nc" id="L920">                        g.translate(-destPane.getWidth(), 0);</span>
+<span class="nc" id="L921">                        paint(g, destPane, -destPane.getAbsoluteX() - destPane.getScrollX(), -destPane.getAbsoluteY() - destPane.getScrollY(), true);</span>
+<span class="nc" id="L922">                        g.translate(destPane.getWidth() - slidePos, 0);</span>
+                    } else {
+<span class="nc" id="L924">                        g.translate(-slidePos, 0);</span>
+<span class="nc" id="L925">                        paint(g, sourcePane, -sourcePane.getAbsoluteX() - sourcePane.getScrollX(), -sourcePane.getAbsoluteY() - sourcePane.getScrollY(), true);</span>
+<span class="nc" id="L926">                        g.translate(destPane.getWidth(), 0);</span>
+<span class="nc" id="L927">                        paint(g, destPane, -destPane.getAbsoluteX() - destPane.getScrollX(), -destPane.getAbsoluteY() - destPane.getScrollY(), true);</span>
+<span class="nc" id="L928">                        g.translate(slidePos - destPane.getWidth(), 0);</span>
+                    }
+<span class="nc" id="L930">                    g.translate(0, -sourceForm.getTitleArea().getHeight());</span>
+
+<span class="nc" id="L932">                    g.setClip(clipX, clipY, clipW, clipH);</span>
+<span class="nc" id="L933">                    paintInterformContainers(g);</span>
+
+
+<span class="nc" id="L936">                    titleArea.paintComponentBackground(g);</span>
+<span class="nc" id="L937">                    paintShiftFadeHierarchy(titleArea, 255 - alpha, g, false);</span>
+<span class="nc" id="L938">                    paintShiftFadeHierarchy(destTitleArea, alpha, g, true);</span>
+
+<span class="nc" id="L940">                    return;</span>
+                }
+                case TYPE_PULSATE_DIALOG:
+<span class="nc" id="L943">                    paint(g, getSource(), 0, 0);</span>
+<span class="nc" id="L944">                    int alpha = g.getAlpha();</span>
+<span class="nc bnc" id="L945" title="All 2 branches missed.">                    if (motion2 != null) {</span>
+<span class="nc" id="L946">                        g.setAlpha(motion2.getValue());</span>
+                    }
+
+<span class="nc" id="L949">                    Component c = getDialogParent(getDestination());</span>
+<span class="nc" id="L950">                    float ratio = ((float) position) / 1000.0f;</span>
+<span class="nc bnc" id="L951" title="All 2 branches missed.">                    if (g.isAffineSupported()) {</span>
+<span class="nc" id="L952">                        g.scale(ratio, ratio);</span>
+<span class="nc" id="L953">                        int w = (int) (originalWidth * ratio);</span>
+<span class="nc" id="L954">                        int h = (int) (originalHeight * ratio);</span>
+<span class="nc" id="L955">                        c.setX(originalX + ((originalWidth - w) / 2));</span>
+<span class="nc" id="L956">                        c.setY(originalY + ((originalHeight - h) / 2));</span>
+
+<span class="nc" id="L958">                        int currentDlgX = getDialogParent(getDestination()).getX();</span>
+<span class="nc" id="L959">                        int currentDlgY = getDialogParent(getDestination()).getY();</span>
+<span class="nc" id="L960">                        g.drawImage(buffer, currentDlgX, currentDlgY);</span>
+
+                        //paint(g, c, 0, 0);
+<span class="nc" id="L963">                        g.resetAffine();</span>
+<span class="nc" id="L964">                    } else {</span>
+<span class="nc" id="L965">                        c.setWidth((int) (originalWidth * ratio));</span>
+<span class="nc" id="L966">                        c.setHeight((int) (originalHeight * ratio));</span>
+<span class="nc" id="L967">                        c.setX(originalX + ((originalWidth - c.getWidth()) / 2));</span>
+<span class="nc" id="L968">                        c.setY(originalY + ((originalHeight - c.getHeight()) / 2));</span>
+<span class="nc" id="L969">                        paint(g, c, 0, 0);</span>
+                    }
+<span class="nc" id="L971">                    g.setAlpha(alpha);</span>
+<span class="nc" id="L972">                    break;</span>
+                default:
+                    break;
+            }
+<span class="nc" id="L976">        } catch (Throwable t) {</span>
+            // end the transition now just to be safe
+<span class="nc" id="L978">            motion = null;</span>
+<span class="nc" id="L979">            Log.p(&quot;An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition&quot;);</span>
+<span class="nc" id="L980">            Log.e(t);</span>
+<span class="nc" id="L981">        }</span>
+<span class="nc" id="L982">    }</span>
+
+    private void paintShiftFadeHierarchy(Container c, int alpha, Graphics g, boolean incoming) {
+<span class="nc" id="L985">        int componentCount = c.getComponentCount();</span>
+<span class="nc bnc" id="L986" title="All 2 branches missed.">        for (int iter = 0; iter &lt; componentCount; iter++) {</span>
+<span class="nc" id="L987">            Component current = c.getComponentAt(iter);</span>
+<span class="nc bnc" id="L988" title="All 2 branches missed.">            if (current instanceof Container) {</span>
+<span class="nc" id="L989">                paintShiftFadeHierarchy((Container) current, alpha, g, incoming);</span>
+<span class="nc" id="L990">                continue;</span>
+            }
+<span class="nc" id="L992">            g.setAlpha(alpha);</span>
+<span class="nc" id="L993">            Motion m = getComponentShiftMotion(current, incoming);</span>
+<span class="nc bnc" id="L994" title="All 2 branches missed.">            if (m != null) {</span>
+<span class="nc" id="L995">                int tval = m.getValue();</span>
+<span class="nc" id="L996">                g.translate(tval, 0);</span>
+<span class="nc" id="L997">                current.paintComponent(g, false);</span>
+<span class="nc" id="L998">                g.translate(-tval, 0);</span>
+            }
+<span class="nc" id="L1000">            g.setAlpha(255);</span>
+        }
+<span class="nc" id="L1002">    }</span>
+
+    private Motion getComponentShiftMotion(Component c, boolean incoming) {
+<span class="nc bnc" id="L1005" title="All 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L1006">            return null;</span>
+        }
+<span class="nc" id="L1008">        Motion m = (Motion) c.getClientProperty(&quot;$shm&quot;);</span>
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L1010">            Component dest = getDestination();</span>
+<span class="nc bnc" id="L1011" title="All 2 branches missed.">            if (dest == null) {</span>
+<span class="nc" id="L1012">                return m;</span>
+            }
+<span class="nc" id="L1014">            int travelDestination = dest.getWidth() - c.getWidth() - c.getAbsoluteX();</span>
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">            if (getDestination().getWidth() - c.getWidth() &lt; 10) {</span>
+                // big component that takes up all the space such as a title that occupies the entire title area
+<span class="nc" id="L1017">                travelDestination = c.getWidth() / 2 - c.getPreferredW() / 2;</span>
+            }
+<span class="nc" id="L1019">            boolean dir = forward;</span>
+<span class="nc bnc" id="L1020" title="All 2 branches missed.">            if (c.getUIManager().getLookAndFeel().isRTL()) {</span>
+<span class="nc bnc" id="L1021" title="All 2 branches missed.">                dir = !dir;</span>
+            }
+<span class="nc bnc" id="L1023" title="All 2 branches missed.">            if (incoming) {</span>
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">                if (dir) {</span>
+<span class="nc" id="L1025">                    m = createMotion(-travelDestination, 0, speed);</span>
+                } else {
+<span class="nc" id="L1027">                    m = createMotion(travelDestination, 0, speed);</span>
+                }
+            } else {
+<span class="nc bnc" id="L1030" title="All 2 branches missed.">                if (dir) {</span>
+<span class="nc" id="L1031">                    m = createMotion(0, travelDestination, speed);</span>
+                } else {
+<span class="nc" id="L1033">                    m = createMotion(0, -travelDestination, speed);</span>
+                }
+            }
+<span class="nc" id="L1036">            m.start();</span>
+<span class="nc" id="L1037">            c.putClientProperty(&quot;$shm&quot;, m);</span>
+        }
+<span class="nc" id="L1039">        return m;</span>
+    }
+
+    private void paintAlpha(Graphics graphics) {
+<span class="fc" id="L1043">        Component src = getSource();</span>
+<span class="fc bfc" id="L1044" title="All 2 branches covered.">        if (src == null) {</span>
+<span class="fc" id="L1045">            return;</span>
+        }
+<span class="fc" id="L1047">        int position = this.position;</span>
+<span class="pc bpc" id="L1048" title="1 of 2 branches missed.">        if (position &gt; 255) {</span>
+<span class="nc" id="L1049">            position = 255;</span>
+        } else {
+<span class="pc bpc" id="L1051" title="1 of 2 branches missed.">            if (position &lt; 0) {</span>
+<span class="nc" id="L1052">                position = 0;</span>
+            }
+        }
+        // for slow mutable images
+<span class="pc bpc" id="L1056" title="1 of 2 branches missed.">        if (buffer == null) {</span>
+<span class="nc" id="L1057">            Component dest = getDestination();</span>
+<span class="nc" id="L1058">            Component srcCmp = src;</span>
+<span class="nc" id="L1059">            Component destCmp = dest;</span>
+<span class="nc" id="L1060">            int alpha = position;</span>
+<span class="nc bnc" id="L1061" title="All 4 branches missed.">            if (src instanceof Dialog &amp;&amp; dest instanceof Form) {</span>
+<span class="nc" id="L1062">                srcCmp = dest;</span>
+<span class="nc" id="L1063">                destCmp = src;</span>
+<span class="nc" id="L1064">                alpha = 255 - position;</span>
+            }
+<span class="nc" id="L1066">            paint(graphics, srcCmp, 0, 0);</span>
+<span class="nc" id="L1067">            destCmp.setX(srcCmp.getX());</span>
+<span class="nc" id="L1068">            destCmp.setY(srcCmp.getY());</span>
+<span class="nc" id="L1069">            destCmp.setWidth(srcCmp.getWidth());</span>
+<span class="nc" id="L1070">            destCmp.setHeight(srcCmp.getHeight());</span>
+<span class="nc" id="L1071">            graphics.setAlpha(alpha);</span>
+<span class="nc" id="L1072">            paint(graphics, destCmp, 0, 0);</span>
+<span class="nc" id="L1073">            graphics.setAlpha(255);</span>
+<span class="nc" id="L1074">            return;</span>
+        }
+        // this will always be invoked on the EDT so there is no race condition risk
+<span class="pc bpc" id="L1077" title="3 of 4 branches missed.">        if (rgbBuffer != null || secondaryBuffer != null) {</span>
+<span class="pc bpc" id="L1078" title="1 of 2 branches missed.">            if (secondaryBuffer != null) {</span>
+<span class="nc" id="L1079">                Component dest = getDestination();</span>
+<span class="nc" id="L1080">                int x = dest.getAbsoluteX();</span>
+<span class="nc" id="L1081">                int y = dest.getAbsoluteY();</span>
+
+<span class="nc" id="L1083">                graphics.drawImage(buffer, x, y);</span>
+<span class="nc" id="L1084">                graphics.setAlpha(position);</span>
+<span class="nc" id="L1085">                graphics.drawImage(secondaryBuffer, x, y);</span>
+<span class="nc" id="L1086">                graphics.setAlpha(0xff);</span>
+<span class="nc" id="L1087">            } else {</span>
+<span class="fc" id="L1088">                int alpha = position &lt;&lt; 24;</span>
+<span class="fc" id="L1089">                int[] bufferArray = rgbBuffer.getRGB();</span>
+<span class="fc" id="L1090">                int size = bufferArray.length;</span>
+<span class="fc bfc" id="L1091" title="All 2 branches covered.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L1092">                    bufferArray[iter] = ((bufferArray[iter] &amp; 0xFFFFFF) | alpha);</span>
+                }
+<span class="fc" id="L1094">                Component dest = getDestination();</span>
+<span class="fc" id="L1095">                int x = dest.getAbsoluteX();</span>
+<span class="fc" id="L1096">                int y = dest.getAbsoluteY();</span>
+<span class="fc" id="L1097">                graphics.drawImage(buffer, x, y);</span>
+<span class="fc" id="L1098">                graphics.drawImage(rgbBuffer, x, y);</span>
+            }
+        }
+<span class="fc" id="L1101">    }</span>
+
+    private void removeConstant(Container c) {
+<span class="nc" id="L1104">        int componentCount = c.getComponentCount();</span>
+<span class="nc" id="L1105">        c.putClientProperty(&quot;$shm&quot;, null);</span>
+<span class="nc bnc" id="L1106" title="All 2 branches missed.">        for (int iter = 0; iter &lt; componentCount; iter++) {</span>
+<span class="nc" id="L1107">            Component cmp = c.getComponentAt(iter);</span>
+<span class="nc" id="L1108">            cmp.putClientProperty(&quot;$shm&quot;, null);</span>
+<span class="nc bnc" id="L1109" title="All 2 branches missed.">            if (cmp instanceof Container) {</span>
+<span class="nc" id="L1110">                removeConstant((Container) cmp);</span>
+            }
+        }
+<span class="nc" id="L1113">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void cleanup() {
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">        if (transitionType == TYPE_SLIDE_AND_FADE) {</span>
+<span class="nc" id="L1119">            Component c = getSource();</span>
+<span class="nc bnc" id="L1120" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L1121">                removeConstant((Container) c);</span>
+            }
+<span class="nc" id="L1123">            c = getDestination();</span>
+<span class="nc bnc" id="L1124" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L1125">                removeConstant((Container) c);</span>
+            }
+        }
+<span class="fc" id="L1128">        super.cleanup();</span>
+<span class="fc" id="L1129">        buffer = null;</span>
+<span class="fc" id="L1130">        rgbBuffer = null;</span>
+<span class="fc" id="L1131">        secondaryBuffer = null;</span>
+<span class="fc" id="L1132">        timeline = null;</span>
+<span class="fc" id="L1133">    }</span>
+
+    private void paintSlideAtPosition(Graphics g, int slideX, int slideY) {
+<span class="fc" id="L1136">        Component source = getSource();</span>
+
+        // if this is the first form we can't do a slide transition since we have no source form
+<span class="pc bpc" id="L1139" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L1140">            return;</span>
+        }
+
+<span class="fc" id="L1143">        Component dest = getDestination();</span>
+<span class="fc" id="L1144">        int w = source.getWidth();</span>
+<span class="fc" id="L1145">        int h = source.getHeight();</span>
+
+<span class="pc bpc" id="L1147" title="1 of 2 branches missed.">        if (slideType == SLIDE_HORIZONTAL) {</span>
+<span class="fc" id="L1148">            h = 0;</span>
+        } else {
+<span class="nc" id="L1150">            w = 0;</span>
+        }
+
+<span class="fc" id="L1153">        boolean dir = forward;</span>
+<span class="pc bpc" id="L1154" title="4 of 6 branches missed.">        if (dest != null &amp;&amp; dest.getUIManager().getLookAndFeel().isRTL() &amp;&amp; slideType == SLIDE_HORIZONTAL) {</span>
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">            dir = !dir;</span>
+        }
+<span class="pc bpc" id="L1157" title="1 of 2 branches missed.">        if (dir) {</span>
+<span class="nc" id="L1158">            w = -w;</span>
+<span class="nc" id="L1159">            h = -h;</span>
+        } else {
+<span class="fc" id="L1161">            slideX = -slideX;</span>
+<span class="fc" id="L1162">            slideY = -slideY;</span>
+        }
+<span class="fc" id="L1164">        g.setClip(source.getAbsoluteX() + source.getScrollX(), source.getAbsoluteY() + source.getScrollY(), source.getWidth(), source.getHeight());</span>
+
+        // dialog animation is slightly different...
+<span class="pc bpc" id="L1167" title="1 of 2 branches missed.">        if (source instanceof Dialog) {</span>
+<span class="nc bnc" id="L1168" title="All 2 branches missed.">            if (buffer != null) {</span>
+<span class="nc" id="L1169">                g.drawImage(buffer, 0, 0);</span>
+            } else {
+<span class="nc" id="L1171">                paint(g, dest, 0, 0);</span>
+            }
+<span class="nc" id="L1173">            paint(g, source, -slideX, -slideY);</span>
+<span class="nc" id="L1174">            return;</span>
+        }
+
+<span class="pc bpc" id="L1177" title="1 of 2 branches missed.">        if (dest instanceof Dialog) {</span>
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">            if (buffer != null) {</span>
+<span class="nc" id="L1179">                g.drawImage(buffer, 0, 0);</span>
+            } else {
+<span class="nc" id="L1181">                paint(g, source, 0, 0);</span>
+            }
+<span class="nc" id="L1183">            paint(g, dest, -slideX - w, -slideY - h);</span>
+<span class="nc" id="L1184">            return;</span>
+        }
+        //hideInterformContainers();
+<span class="pc bpc" id="L1187" title="2 of 4 branches missed.">        if (source.getParent() != null || buffer == null) {</span>
+<span class="nc" id="L1188">            source.paintBackgrounds(g);</span>
+<span class="nc" id="L1189">            paint(g, source, slideX, slideY);</span>
+        } else {
+<span class="fc" id="L1191">            g.drawImage(buffer, slideX, slideY);</span>
+        }
+<span class="fc" id="L1193">        paint(g, dest, slideX + w, slideY + h);</span>
+
+        //paintInterformContainers(g);
+
+<span class="fc" id="L1197">    }</span>
+
+    private void paintCoverAtPosition(Graphics g, int slideX, int slideY) {
+<span class="fc" id="L1200">        Component source = getSource();</span>
+
+        // if this is the first form we can't do a slide transition since we have no source form
+<span class="pc bpc" id="L1203" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L1204">            return;</span>
+        }
+
+<span class="fc" id="L1207">        Component dest = getDestination();</span>
+<span class="fc" id="L1208">        int w = source.getWidth();</span>
+<span class="fc" id="L1209">        int h = source.getHeight();</span>
+
+<span class="pc bpc" id="L1211" title="1 of 2 branches missed.">        if (slideType == SLIDE_HORIZONTAL) {</span>
+<span class="nc" id="L1212">            h = 0;</span>
+        } else {
+<span class="fc" id="L1214">            w = 0;</span>
+        }
+
+<span class="fc" id="L1217">        boolean dir = forward;</span>
+<span class="pc bpc" id="L1218" title="2 of 4 branches missed.">        if (dest != null &amp;&amp; dest.getUIManager().getLookAndFeel().isRTL()) {</span>
+<span class="nc bnc" id="L1219" title="All 2 branches missed.">            dir = !dir;</span>
+        }
+<span class="pc bpc" id="L1221" title="1 of 2 branches missed.">        if (dir) {</span>
+<span class="fc" id="L1222">            w = -w;</span>
+<span class="fc" id="L1223">            h = -h;</span>
+        } else {
+<span class="nc" id="L1225">            slideX = -slideX;</span>
+<span class="nc" id="L1226">            slideY = -slideY;</span>
+        }
+<span class="fc" id="L1228">        g.setClip(source.getAbsoluteX() + source.getScrollX(), source.getAbsoluteY() + source.getScrollY(), source.getWidth(), source.getHeight());</span>
+
+        // dialog animation is slightly different...
+<span class="pc bpc" id="L1231" title="1 of 2 branches missed.">        if (source instanceof Dialog) {</span>
+<span class="nc bnc" id="L1232" title="All 2 branches missed.">            if (buffer != null) {</span>
+<span class="nc" id="L1233">                g.drawImage(buffer, 0, 0);</span>
+            } else {
+<span class="nc" id="L1235">                paint(g, dest, 0, 0);</span>
+            }
+<span class="nc" id="L1237">            paint(g, source, -slideX, -slideY);</span>
+<span class="nc" id="L1238">            return;</span>
+        }
+
+<span class="pc bpc" id="L1241" title="1 of 2 branches missed.">        if (dest instanceof Dialog) {</span>
+<span class="nc bnc" id="L1242" title="All 2 branches missed.">            if (buffer != null) {</span>
+<span class="nc" id="L1243">                g.drawImage(buffer, 0, 0);</span>
+            } else {
+<span class="nc" id="L1245">                paint(g, source, 0, 0);</span>
+            }
+<span class="nc" id="L1247">            paint(g, dest, -slideX - w, -slideY - h);</span>
+<span class="nc" id="L1248">            return;</span>
+        }
+
+<span class="pc bpc" id="L1251" title="1 of 2 branches missed.">        if (transitionType == TYPE_UNCOVER) {</span>
+<span class="nc" id="L1252">            paint(g, dest, 0, 0);</span>
+<span class="nc bnc" id="L1253" title="All 4 branches missed.">            if (source.getParent() != null || buffer == null) {</span>
+<span class="nc" id="L1254">                source.paintBackgrounds(g);</span>
+<span class="nc" id="L1255">                paint(g, source, slideX + w, slideY + h);</span>
+            } else {
+<span class="nc" id="L1257">                g.drawImage(buffer, slideX + w, slideY + h);</span>
+            }
+        } else {
+<span class="pc bpc" id="L1260" title="3 of 4 branches missed.">            if (source.getParent() != null || buffer == null) {</span>
+<span class="fc" id="L1261">                source.paintBackgrounds(g);</span>
+<span class="fc" id="L1262">                paint(g, source, 0, 0);</span>
+            } else {
+<span class="nc" id="L1264">                g.drawImage(buffer, 0, 0);</span>
+            }
+<span class="fc" id="L1266">            paint(g, dest, slideX + w, slideY + h);</span>
+        }
+<span class="fc" id="L1268">    }</span>
+
+    private int getDialogTitleHeight() {
+<span class="nc" id="L1271">        return 0;</span>
+    }
+
+    private void drawDialogCmp(Graphics g, Dialog dlg) {
+<span class="nc" id="L1275">        Painter p = dlg.getStyle().getBgPainter();</span>
+<span class="nc" id="L1276">        dlg.getStyle().setBgPainter(null);</span>
+<span class="nc" id="L1277">        g.setClip(0, 0, dlg.getWidth(), dlg.getHeight());</span>
+<span class="nc" id="L1278">        g.translate(-getDialogParent(dlg).getX(), -getDialogParent(dlg).getY() + getDialogTitleHeight());</span>
+<span class="nc" id="L1279">        getDialogParent(dlg).paintComponent(g, false);</span>
+<span class="nc bnc" id="L1280" title="All 4 branches missed.">        if (drawDialogMenu &amp;&amp; dlg.getCommandCount() &gt; 0) {</span>
+<span class="nc" id="L1281">            Component menuBar = dlg.getSoftButton(0).getParent();</span>
+<span class="nc bnc" id="L1282" title="All 2 branches missed.">            if (menuBar != null) {</span>
+<span class="nc" id="L1283">                g.setClip(0, 0, dlg.getWidth(), dlg.getHeight());</span>
+<span class="nc" id="L1284">                menuBar.paintComponent(g, false);</span>
+            }
+        }
+
+<span class="nc" id="L1288">        dlg.getStyle().setBgPainter(p);</span>
+<span class="nc" id="L1289">    }</span>
+
+    private void paint(Graphics g, Component cmp, int x, int y) {
+<span class="fc" id="L1292">        paint(g, cmp, x, y, false);</span>
+<span class="fc" id="L1293">    }</span>
+
+    private void paint(Graphics g, Component cmp, int x, int y, boolean background) {
+
+<span class="fc" id="L1297">        boolean b = cmp.isVisible();</span>
+<span class="fc" id="L1298">        cmp.setVisible(true);</span>
+<span class="fc" id="L1299">        int cx = g.getClipX();</span>
+<span class="fc" id="L1300">        int cy = g.getClipY();</span>
+<span class="fc" id="L1301">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L1302">        int ch = g.getClipHeight();</span>
+<span class="pc bpc" id="L1303" title="1 of 2 branches missed.">        if (cmp instanceof Dialog) {</span>
+<span class="nc bnc" id="L1304" title="All 4 branches missed.">            if (transitionType == TYPE_FADE &amp;&amp; Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc" id="L1305">                cmp.paintComponent(g, background);</span>
+<span class="nc" id="L1306">                return;</span>
+            }
+<span class="nc bnc" id="L1308" title="All 4 branches missed.">            if (!(getSource() instanceof Dialog &amp;&amp; getDestination() instanceof Dialog</span>
+<span class="nc bnc" id="L1309" title="All 2 branches missed.">                    &amp;&amp; cmp == getDestination())) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1310">                Painter p = cmp.getStyle().getBgPainter();</span>
+<span class="nc" id="L1311">                cmp.getStyle().setBgPainter(null);</span>
+<span class="nc" id="L1312">                g.translate(x, y);</span>
+<span class="nc" id="L1313">                Dialog dlg = (Dialog) cmp;</span>
+<span class="nc" id="L1314">                g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());</span>
+<span class="nc" id="L1315">                getDialogParent(dlg).paintComponent(g, false);</span>
+<span class="nc" id="L1316">                g.translate(-x, -y);</span>
+<span class="nc bnc" id="L1317" title="All 4 branches missed.">                if (drawDialogMenu &amp;&amp; dlg.getCommandCount() &gt; 0) {</span>
+<span class="nc" id="L1318">                    Component menuBar = dlg.getSoftButton(0).getParent();</span>
+<span class="nc bnc" id="L1319" title="All 2 branches missed.">                    if (menuBar != null) {</span>
+<span class="nc" id="L1320">                        g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());</span>
+<span class="nc" id="L1321">                        menuBar.paintComponent(g, false);</span>
+                    }
+                }
+<span class="nc" id="L1324">                g.setClip(cx, cy, cw, ch);</span>
+<span class="nc" id="L1325">                cmp.getStyle().setBgPainter(p);</span>
+<span class="nc" id="L1326">            } else {</span>
+<span class="nc" id="L1327">                cmp.paintComponent(g, background);</span>
+            }
+<span class="nc" id="L1329">            return;</span>
+        }
+        //g.clipRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+<span class="fc" id="L1332">        g.translate(x, y);</span>
+        //g.clipRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+<span class="fc" id="L1334">        cmp.paintComponent(g, background);</span>
+<span class="fc" id="L1335">        g.translate(-x, -y);</span>
+
+<span class="fc" id="L1337">        g.setClip(cx, cy, cw, ch);</span>
+<span class="fc" id="L1338">        cmp.setVisible(b);</span>
+<span class="fc" id="L1339">    }</span>
+
+    /// Motion represents the physical movement within a transition, it can
+    /// be replaced by the user to provide a more appropriate physical feel
+    ///
+    /// #### Returns
+    ///
+    /// the instanceo of the motion class used by this transition
+    public Motion getMotion() {
+<span class="nc" id="L1348">        return motion;</span>
+    }
+
+    /// Motion represents the physical movement within a transition, it can
+    /// be replaced by the user to provide a more appropriate physical feel
+    ///
+    /// #### Parameters
+    ///
+    /// - `motion`: new instance of the motion class that will be used by the transition
+    public void setMotion(Motion motion) {
+<span class="fc" id="L1358">        motionSetManually = true;</span>
+<span class="fc" id="L1359">        this.motion = motion;</span>
+<span class="fc" id="L1360">    }</span>
+
+    /// Motion represents the physical movement within a transition, it can
+    /// be replaced by the user to provide a more appropriate physical feel
+    ///
+    /// #### Parameters
+    ///
+    /// - `motion`: new instance of the motion class that will be used by the transition
+    public void setMotion(LazyValue&lt;Motion&gt; motion) {
+<span class="fc" id="L1369">        motionSetManually = true;</span>
+<span class="fc" id="L1370">        this.lazyMotion = motion;</span>
+<span class="fc" id="L1371">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Transition copy(boolean reverse) {
+<span class="fc" id="L1376">        CommonTransitions retVal = null;</span>
+<span class="pc bpc" id="L1377" title="2 of 10 branches missed.">        switch (transitionType) {</span>
+            case TYPE_TIMELINE:
+<span class="fc" id="L1379">                retVal = CommonTransitions.createTimeline(timeline);</span>
+<span class="fc" id="L1380">                break;</span>
+            case TYPE_FADE:
+<span class="fc" id="L1382">                retVal = CommonTransitions.createFade(speed);</span>
+<span class="fc" id="L1383">                break;</span>
+            case TYPE_SLIDE: {
+<span class="fc" id="L1385">                boolean fwd = forward;</span>
+
+<span class="fc bfc" id="L1387" title="All 2 branches covered.">                if (reverse) {</span>
+<span class="fc bfc" id="L1388" title="All 2 branches covered.">                    retVal = CommonTransitions.createSlide(slideType, !fwd, speed, drawDialogMenu);</span>
+                } else {
+<span class="fc" id="L1390">                    retVal = CommonTransitions.createSlide(slideType, fwd, speed, drawDialogMenu);</span>
+                }
+<span class="fc" id="L1392">                break;</span>
+            }
+            case TYPE_COVER: {
+<span class="fc" id="L1395">                boolean fwd = forward;</span>
+
+<span class="pc bpc" id="L1397" title="1 of 2 branches missed.">                if (reverse) {</span>
+<span class="nc bnc" id="L1398" title="All 2 branches missed.">                    retVal = CommonTransitions.createCover(slideType, !fwd, speed);</span>
+                } else {
+<span class="fc" id="L1400">                    retVal = CommonTransitions.createCover(slideType, fwd, speed);</span>
+                }
+<span class="fc" id="L1402">                break;</span>
+            }
+            case TYPE_UNCOVER: {
+<span class="fc" id="L1405">                boolean fwd = forward;</span>
+
+<span class="pc bpc" id="L1407" title="1 of 2 branches missed.">                if (reverse) {</span>
+<span class="pc bpc" id="L1408" title="1 of 2 branches missed.">                    retVal = CommonTransitions.createUncover(slideType, !fwd, speed);</span>
+                } else {
+<span class="nc" id="L1410">                    retVal = CommonTransitions.createUncover(slideType, fwd, speed);</span>
+                }
+<span class="nc" id="L1412">                break;</span>
+            }
+            case TYPE_SLIDE_AND_FADE: {
+<span class="fc" id="L1415">                boolean fwd = forward;</span>
+<span class="pc bpc" id="L1416" title="1 of 2 branches missed.">                if (reverse) {</span>
+<span class="pc bpc" id="L1417" title="1 of 2 branches missed.">                    retVal = CommonTransitions.createSlideFadeTitle(!fwd, speed);</span>
+                } else {
+<span class="nc" id="L1419">                    retVal = CommonTransitions.createSlideFadeTitle(fwd, speed);</span>
+                }
+<span class="nc" id="L1421">                break;</span>
+            }
+            case TYPE_FAST_SLIDE: {
+<span class="nc" id="L1424">                boolean fwd = forward;</span>
+
+<span class="nc bnc" id="L1426" title="All 2 branches missed.">                if (reverse) {</span>
+<span class="nc bnc" id="L1427" title="All 2 branches missed.">                    retVal = CommonTransitions.createFastSlide(slideType, !fwd, speed, drawDialogMenu);</span>
+                } else {
+<span class="nc" id="L1429">                    retVal = CommonTransitions.createFastSlide(slideType, fwd, speed, drawDialogMenu);</span>
+                }
+<span class="nc" id="L1431">                break;</span>
+            }
+            case TYPE_EMPTY:
+<span class="fc" id="L1434">                retVal = CommonTransitions.createEmpty();</span>
+<span class="fc" id="L1435">                break;</span>
+            case TYPE_PULSATE_DIALOG:
+<span class="fc" id="L1437">                retVal = createDialogPulsate();</span>
+<span class="fc" id="L1438">                break;</span>
+            default:
+<span class="nc" id="L1440">                retVal = CommonTransitions.createEmpty();</span>
+                break;
+        }
+<span class="fc" id="L1443">        retVal.linearMotion = linearMotion;</span>
+<span class="fc" id="L1444">        return retVal;</span>
+    }
+
+    /// Indicates whether the motion associated with this transition is linear or spline motion
+    ///
+    /// #### Returns
+    ///
+    /// the linearMotion
+    public boolean isLinearMotion() {
+<span class="fc" id="L1453">        return linearMotion;</span>
+    }
+
+    /// Indicates whether the motion associated with this transition is linear or spline motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `linearMotion`: the linearMotion to set
+    public void setLinearMotion(boolean linearMotion) {
+<span class="fc" id="L1462">        this.linearMotion = linearMotion;</span>
+<span class="fc" id="L1463">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

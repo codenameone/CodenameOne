@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnalyticsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics</a> &gt; <span class="el_source">AnalyticsService.java</span></div><h1>AnalyticsService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+/// The analytics service allows an application to report its usage, it is seamlessly
+/// invoked by GUI builder applications if analytics is enabled for your application but can
+/// work just as well for handcoded apps!
+///
+/// To enable analytics just use the `java.lang.String)`
+/// method of the analytics service. For most typical usage you should also invoke the
+/// `#setAppsMode(boolean)` method with `true`. If you are
+/// not using the GUI builder invoke the visit method whenever you would like to log a
+/// page view event.
+///
+/// @author Shai Almog
+<span class="fc" id="L43">public class AnalyticsService {</span>
+<span class="fc" id="L44">    private static final Object INSTANCE_LOCK = new Object();</span>
+    private static AnalyticsService instance;
+<span class="fc" id="L46">    private static boolean appsMode = true;</span>
+<span class="fc" id="L47">    private static boolean failSilently = true;</span>
+    private static int timeout;
+    private static int readTimeout;
+    private String agent;
+    private String domain;
+    private ConnectionRequest lastRequest;
+
+    /// Indicates whether analytics server failures should brodcast an error event
+    ///
+    /// #### Returns
+    ///
+    /// the failSilently
+    public static boolean isFailSilently() {
+<span class="nc" id="L60">        return failSilently;</span>
+    }
+
+    /// Indicates whether analytics server failures should brodcast an error event
+    ///
+    /// #### Parameters
+    ///
+    /// - `aFailSilently`: the failSilently to set
+    public static void setFailSilently(boolean aFailSilently) {
+<span class="nc" id="L69">        failSilently = aFailSilently;</span>
+<span class="nc" id="L70">    }</span>
+
+    /// Apps mode allows improved analytics using the newer google analytics API designed for apps
+    ///
+    /// #### Returns
+    ///
+    /// the appsMode
+    public static boolean isAppsMode() {
+<span class="nc" id="L78">        return appsMode;</span>
+    }
+
+    /// Apps mode allows improved analytics using the newer google analytics API designed for apps.
+    /// Most developers should invoke this method with `true`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aAppsMode`: the appsMode to set
+    public static void setAppsMode(boolean aAppsMode) {
+<span class="fc" id="L88">        appsMode = aAppsMode;</span>
+<span class="fc" id="L89">    }</span>
+
+    /// Sets timeout for HTTP requests to Google Analytics service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ms`: Milliseconds timeout.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public static void setTimeout(int ms) {
+<span class="nc" id="L101">        timeout = ms;</span>
+<span class="nc" id="L102">    }</span>
+
+    /// Sets read timeout for  HTTP requests to Google Analytics services.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ms`: Milliseconds read timeout.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public static void setReadTimeout(int ms) {
+<span class="nc" id="L114">        readTimeout = ms;</span>
+<span class="nc" id="L115">    }</span>
+
+    /// Indicates whether analytics is enabled for this application
+    ///
+    /// #### Returns
+    ///
+    /// true if analytics is enabled
+    public static boolean isEnabled() {
+<span class="nc bnc" id="L123" title="All 4 branches missed.">        return instance != null &amp;&amp; instance.isAnalyticsEnabled();</span>
+    }
+
+    /// Initializes google analytics for this application
+    ///
+    /// #### Parameters
+    ///
+    /// - `agent`: the google analytics tracking agent
+    ///
+    /// - `domain`: @param domain a domain to represent your application, commonly you should use your package name as a URL (e.g.
+    /// com.mycompany.myapp should become: myapp.mycompany.com)
+    public static void init(String agent, String domain) {
+<span class="fc" id="L135">        synchronized (INSTANCE_LOCK) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (instance == null) {</span>
+<span class="fc" id="L137">                instance = new AnalyticsService();</span>
+            }
+<span class="fc" id="L139">            instance.agent = agent;</span>
+<span class="fc" id="L140">            instance.domain = domain;</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">    }</span>
+
+    /// Allows installing an analytics service other than the default
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the analytics service implementation.
+    public static void init(AnalyticsService i) {
+<span class="nc" id="L150">        synchronized (INSTANCE_LOCK) {</span>
+<span class="nc" id="L151">            instance = i;</span>
+<span class="nc" id="L152">        }</span>
+<span class="nc" id="L153">    }</span>
+
+    /// Sends an asynchronous notice to the server regarding a page in the application being viewed, notice that
+    /// you don't need to append the URL prefix to the page string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the page viewed
+    ///
+    /// - `referer`: the source page
+    public static void visit(String page, String referer) {
+<span class="fc" id="L164">        instance.visitPage(page, referer);</span>
+<span class="fc" id="L165">    }</span>
+
+    /// In apps mode we can send information about an exception to the analytics server
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the exception
+    ///
+    /// - `message`: up to 150 character message,
+    ///
+    /// - `fatal`: is the exception fatal
+    public static void sendCrashReport(Throwable t, String message, boolean fatal) {
+        // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#exception
+<span class="fc" id="L178">        ConnectionRequest req = getGaRequest();</span>
+<span class="fc" id="L179">        req.addArgument(&quot;t&quot;, &quot;exception&quot;);</span>
+<span class="fc" id="L180">        System.out.println(message);</span>
+<span class="fc" id="L181">        req.addArgument(&quot;exd&quot;, message.substring(0, Math.min(message.length(), 150) - 1));</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (fatal) {</span>
+<span class="fc" id="L183">            req.addArgument(&quot;exf&quot;, &quot;1&quot;);</span>
+        } else {
+<span class="nc" id="L185">            req.addArgument(&quot;exf&quot;, &quot;0&quot;);</span>
+        }
+
+<span class="fc" id="L188">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L189">    }</span>
+
+    private static ConnectionRequest getGaRequest() {
+<span class="fc" id="L192">        ConnectionRequest req = new ConnectionRequest();</span>
+<span class="fc" id="L193">        req.setUrl(&quot;https://www.google-analytics.com/collect&quot;);</span>
+<span class="fc" id="L194">        req.setPost(true);</span>
+<span class="fc" id="L195">        req.setFailSilently(true);</span>
+<span class="fc" id="L196">        req.addArgument(&quot;v&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L197">        req.addArgument(&quot;tid&quot;, instance.agent);</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (timeout &gt; 0) {</span>
+<span class="nc" id="L199">            req.setTimeout(timeout);</span>
+        }
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (readTimeout &gt; 0) {</span>
+<span class="nc" id="L202">            req.setReadTimeout(readTimeout);</span>
+        }
+<span class="fc" id="L204">        long uniqueId = Log.getUniqueDeviceId();</span>
+<span class="fc" id="L205">        req.addArgument(&quot;cid&quot;, String.valueOf(uniqueId));</span>
+<span class="fc" id="L206">        return req;</span>
+    }
+
+    /// Indicates if the analytics is enabled, subclasses must override this method to process their information
+    ///
+    /// #### Returns
+    ///
+    /// true if analytics is enabled
+    protected boolean isAnalyticsEnabled() {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        return agent != null;</span>
+    }
+
+    /// Decorates the ConnectionRequest to be sent to the server before the request is sent.
+    /// This can be overridden to add additional request parameters to the service, and hence provide
+    /// additional analytics data.
+    ///
+    /// If using Google Analytics, the current you can see the available POST parameters that
+    /// the server accepts [here](https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters).
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: The page visited
+    ///
+    /// - `referer`: The page from which the user came.
+    ///
+    /// - `request`: The ConnectionRequest
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    protected void decorateVisitPageRequest(String page, String referer, ConnectionRequest request) {
+
+<span class="fc" id="L238">    }</span>
+
+    /// Subclasses should override this method to track page visits
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the page visited
+    ///
+    /// - `referer`: the page from which the user came
+    protected void visitPage(String page, String referer) {
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (lastRequest != null) {</span>
+<span class="nc" id="L249">            final String fPage = page;</span>
+<span class="nc" id="L250">            final String fReferer = referer;</span>
+<span class="nc" id="L251">            ActionListener onComplete = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L254">                    visitPage(fPage, fReferer);</span>
+<span class="nc" id="L255">                }</span>
+            };
+<span class="nc" id="L257">            lastRequest.addResponseListener(onComplete);</span>
+<span class="nc" id="L258">            lastRequest.addResponseCodeListener(onComplete);</span>
+<span class="nc" id="L259">            lastRequest.addExceptionListener(onComplete);</span>
+<span class="nc" id="L260">            return;</span>
+        }
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (appsMode) {</span>
+            // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#apptracking
+<span class="fc" id="L264">            final ConnectionRequest req = getGaRequest();</span>
+<span class="fc" id="L265">            req.addArgument(&quot;t&quot;, &quot;appview&quot;);</span>
+<span class="fc" id="L266">            req.addArgument(&quot;an&quot;, Display.getInstance().getProperty(&quot;AppName&quot;, &quot;Codename One App&quot;));</span>
+<span class="fc" id="L267">            String version = Display.getInstance().getProperty(&quot;AppVersion&quot;, &quot;1.0&quot;);</span>
+<span class="fc" id="L268">            req.addArgument(&quot;av&quot;, version);</span>
+<span class="fc" id="L269">            req.addArgument(&quot;cd&quot;, page);</span>
+<span class="fc" id="L270">            ActionListener onComplete = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                    if (req == lastRequest) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L274">                        lastRequest = null;</span>
+                    }
+<span class="nc" id="L276">                }</span>
+            };
+<span class="fc" id="L278">            req.addResponseListener(onComplete);</span>
+<span class="fc" id="L279">            req.addResponseCodeListener(onComplete);</span>
+<span class="fc" id="L280">            req.addExceptionListener(onComplete);</span>
+<span class="fc" id="L281">            lastRequest = req;</span>
+<span class="fc" id="L282">            decorateVisitPageRequest(page, referer, req);</span>
+<span class="fc" id="L283">            NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L284">        } else {</span>
+<span class="nc" id="L285">            String url = Display.getInstance().getProperty(&quot;cloudServerURL&quot;, &quot;https://codename-one.appspot.com/&quot;) + &quot;anal&quot;;</span>
+<span class="nc" id="L286">            final ConnectionRequest r = new ConnectionRequest();</span>
+<span class="nc" id="L287">            r.setUrl(url);</span>
+<span class="nc" id="L288">            r.setPost(false);</span>
+<span class="nc" id="L289">            r.setFailSilently(failSilently);</span>
+<span class="nc" id="L290">            r.addArgument(&quot;guid&quot;, &quot;ON&quot;);</span>
+<span class="nc" id="L291">            r.addArgument(&quot;utmac&quot;, instance.agent);</span>
+<span class="nc" id="L292">            r.addArgument(&quot;utmn&quot;, Integer.toString((int) (System.currentTimeMillis() % 0x7fffffff)));</span>
+<span class="nc bnc" id="L293" title="All 4 branches missed.">            if (page == null || page.length() == 0) {</span>
+<span class="nc" id="L294">                page = &quot;-&quot;;</span>
+            }
+<span class="nc" id="L296">            r.addArgument(&quot;utmp&quot;, page);</span>
+<span class="nc bnc" id="L297" title="All 4 branches missed.">            if (referer == null || referer.length() == 0) {</span>
+<span class="nc" id="L298">                referer = &quot;-&quot;;</span>
+            }
+<span class="nc" id="L300">            r.addArgument(&quot;utmr&quot;, referer);</span>
+<span class="nc" id="L301">            r.addArgument(&quot;d&quot;, instance.domain);</span>
+<span class="nc" id="L302">            r.setPriority(ConnectionRequest.PRIORITY_LOW);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            if (timeout &gt; 0) {</span>
+<span class="nc" id="L304">                r.setTimeout(timeout);</span>
+            }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            if (readTimeout &gt; 0) {</span>
+<span class="nc" id="L307">                r.setReadTimeout(readTimeout);</span>
+            }
+<span class="nc" id="L309">            ActionListener onComplete = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                    if (r == lastRequest) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L313">                        lastRequest = null;</span>
+                    }
+<span class="nc" id="L315">                }</span>
+            };
+<span class="nc" id="L317">            r.addResponseListener(onComplete);</span>
+<span class="nc" id="L318">            r.addResponseCodeListener(onComplete);</span>
+<span class="nc" id="L319">            r.addExceptionListener(onComplete);</span>
+<span class="nc" id="L320">            lastRequest = r;</span>
+<span class="nc" id="L321">            decorateVisitPageRequest(page, referer, r);</span>
+<span class="nc" id="L322">            NetworkManager.getInstance().addToQueue(r);</span>
+        }
+<span class="fc" id="L324">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

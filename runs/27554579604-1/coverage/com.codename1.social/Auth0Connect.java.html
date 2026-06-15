@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Auth0Connect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">Auth0Connect.java</span></div><h1>Auth0Connect.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Util;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcException;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.io.webauthn.PublicKeyCredential;
+import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
+import com.codename1.io.webauthn.PublicKeyCredentialRequestOptions;
+import com.codename1.io.webauthn.WebAuthnClient;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+import com.codename1.util.regex.StringReader;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Sign-in via an Auth0 tenant. Auth0 is a fully OpenID-Connect compliant
+/// provider so this class is a very thin convenience over
+/// [com.codename1.io.oidc.OidcClient] -- it just builds the issuer URL from
+/// the tenant domain and configures sensible defaults.
+///
+/// ```java
+/// Auth0Connect.getInstance()
+///     .withDomain(&quot;dev-xyz.us.auth0.com&quot;)
+///     .signIn(
+///         &quot;YOUR_AUTH0_CLIENT_ID&quot;,
+///         &quot;com.example.app:/oauth2redirect&quot;,
+///         &quot;openid&quot;, &quot;email&quot;, &quot;profile&quot;)
+///     .ready(new SuccessCallback&lt;OidcTokens&gt;() { ... });
+/// ```
+///
+/// To request an Auth0 *audience* (so the access token can be used against
+/// your custom API) pass it via [#withAudience(String)] before calling
+/// [#signIn(String, String, String...)].
+///
+/// @since 7.0.245
+public final class Auth0Connect extends Login {
+
+    private static Auth0Connect INSTANCE;
+    private String domain;
+    private String audience;
+
+    private Auth0Connect() {}
+
+    public static synchronized Auth0Connect getInstance() {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (INSTANCE == null) {</span>
+<span class="fc" id="L77">            INSTANCE = new Auth0Connect();</span>
+        }
+<span class="fc" id="L79">        return INSTANCE;</span>
+    }
+
+    /// Auth0 tenant domain (e.g. `&quot;dev-xyz.us.auth0.com&quot;`). Do not include
+    /// the protocol -- it is always `https://`.
+    public Auth0Connect withDomain(String domain) {
+<span class="fc" id="L85">        this.domain = domain;</span>
+<span class="fc" id="L86">        return this;</span>
+    }
+
+    /// Optional `audience` parameter for API authorization. When set, the
+    /// access token issued by Auth0 will be a JWT valid against your API
+    /// identifier instead of the default opaque token.
+    public Auth0Connect withAudience(String audience) {
+<span class="fc" id="L93">        this.audience = audience;</span>
+<span class="fc" id="L94">        return this;</span>
+    }
+
+    public String getDomain() {
+<span class="fc" id="L98">        return domain;</span>
+    }
+
+    public String getAudience() {
+<span class="fc" id="L102">        return audience;</span>
+    }
+
+    @Override
+    public boolean isNativeLoginSupported() {
+<span class="fc" id="L107">        return false;</span>
+    }
+
+    @Override
+    protected boolean validateToken(String token) {
+<span class="nc bnc" id="L112" title="All 4 branches missed.">        return token != null &amp;&amp; token.length() &gt; 0;</span>
+    }
+
+    /// Signs the user in with an existing passkey via Auth0's WebAuthn grant.
+    /// Routes through Auth0's `/passkey/challenge` + `/oauth/token` endpoints
+    /// (`grant_type=urn:okta:params:oauth:grant-type:webauthn`).
+    ///
+    /// Requires the Auth0 tenant to have *Passkeys* enabled and the
+    /// application to have the *WebAuthn* grant type allowed. The user must
+    /// already have at least one passkey enrolled (use the standard `signIn`
+    /// flow first and have the user enroll via Auth0's hosted page, or call
+    /// [#registerPasskey(String, String, String, String, String...)] for a
+    /// new account).
+    ///
+    /// `realm` is the Auth0 *Connection* name (most often
+    /// `&quot;Username-Password-Authentication&quot;`).
+    ///
+    /// Available iOS 16+ and Android API 28+ via the system passkey
+    /// providers. Fails fast with
+    /// [com.codename1.io.webauthn.WebAuthnException#NOT_IMPLEMENTED] on
+    /// platforms that don't have a WebAuthn implementation.
+    ///
+    /// @since 7.0.245
+    public AsyncResource&lt;OidcTokens&gt; signInWithPasskey(final String clientId,
+                                                       final String realm,
+                                                       final String... scopes) {
+<span class="fc" id="L138">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (domain == null) {</span>
+<span class="fc" id="L140">            out.error(new IllegalStateException(</span>
+                    &quot;Auth0Connect requires withDomain(\&quot;your-tenant.region.auth0.com\&quot;)&quot;));
+<span class="fc" id="L142">            return out;</span>
+        }
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">        final String scopeArg = scopes == null || scopes.length == 0</span>
+                ? &quot;openid email profile offline_access&quot;
+<span class="fc" id="L146">                : joinScopes(scopes);</span>
+<span class="fc" id="L147">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L148">        body.put(&quot;client_id&quot;, clientId);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        body.put(&quot;realm&quot;, realm == null ? &quot;Username-Password-Authentication&quot; : realm);</span>
+<span class="fc" id="L150">        postJson(&quot;https://&quot; + domain + &quot;/passkey/challenge&quot;, body)</span>
+<span class="fc" id="L151">                .ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(Map&lt;String, Object&gt; challenge) {
+<span class="fc" id="L154">                        runPasskeyAssertion(clientId, scopeArg, challenge, out);</span>
+<span class="fc" id="L155">                    }</span>
+                })
+<span class="fc" id="L157">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="fc" id="L160">                        out.error(err);</span>
+<span class="fc" id="L161">                    }</span>
+                });
+<span class="fc" id="L163">        return out;</span>
+    }
+
+    /// Enrolls a brand-new passkey credential for the given Auth0 user. The
+    /// account is created on first registration (if the connection allows
+    /// signup), or attached to an existing passwordless account by email.
+    ///
+    /// The flow is:
+    /// 1. POST `/passkey/register` with `client_id`, `realm`,
+    ///    `user_profile`. Response includes registration options.
+    /// 2. Run [WebAuthnClient#create] with those options.
+    /// 3. POST `/oauth/token` to swap the authenticator response for tokens.
+    ///
+    /// @since 7.0.245
+    public AsyncResource&lt;OidcTokens&gt; registerPasskey(final String clientId,
+                                                     final String realm,
+                                                     final String email,
+                                                     final String displayName,
+                                                     final String... scopes) {
+<span class="fc" id="L182">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (domain == null) {</span>
+<span class="fc" id="L184">            out.error(new IllegalStateException(</span>
+                    &quot;Auth0Connect requires withDomain(\&quot;your-tenant.region.auth0.com\&quot;)&quot;));
+<span class="fc" id="L186">            return out;</span>
+        }
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">        final String scopeArg = scopes == null || scopes.length == 0</span>
+                ? &quot;openid email profile offline_access&quot;
+<span class="fc" id="L190">                : joinScopes(scopes);</span>
+<span class="fc" id="L191">        StringBuilder userProfile = new StringBuilder(&quot;{&quot;);</span>
+<span class="fc" id="L192">        boolean first = true;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (email != null) {</span>
+<span class="fc" id="L194">            userProfile.append(&quot;\&quot;email\&quot;:&quot;).append(jsonString(email));</span>
+<span class="fc" id="L195">            first = false;</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (displayName != null) {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (!first) {</span>
+<span class="fc" id="L199">                userProfile.append(',');</span>
+            }
+<span class="fc" id="L201">            userProfile.append(&quot;\&quot;name\&quot;:&quot;).append(jsonString(displayName));</span>
+        }
+<span class="fc" id="L203">        userProfile.append('}');</span>
+<span class="fc" id="L204">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L205">        body.put(&quot;client_id&quot;, clientId);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        body.put(&quot;realm&quot;, realm == null ? &quot;Username-Password-Authentication&quot; : realm);</span>
+<span class="fc" id="L207">        body.put(&quot;user_profile&quot;, userProfile.toString());</span>
+<span class="fc" id="L208">        postJson(&quot;https://&quot; + domain + &quot;/passkey/register&quot;, body)</span>
+<span class="fc" id="L209">                .ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(Map&lt;String, Object&gt; registration) {
+<span class="fc" id="L212">                        runPasskeyRegistration(clientId, scopeArg, registration, out);</span>
+<span class="fc" id="L213">                    }</span>
+                })
+<span class="fc" id="L215">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="fc" id="L218">                        out.error(err);</span>
+<span class="fc" id="L219">                    }</span>
+                });
+<span class="fc" id="L221">        return out;</span>
+    }
+
+    private void runPasskeyAssertion(final String clientId,
+                                     final String scopes,
+                                     Map&lt;String, Object&gt; challenge,
+                                     final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L228">        Object authSession = challenge.get(&quot;auth_session&quot;);</span>
+<span class="fc" id="L229">        Object authnParams = challenge.get(&quot;authn_params_public_key&quot;);</span>
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">        if (authSession == null || !(authnParams instanceof Map)) {</span>
+<span class="fc" id="L231">            out.error(new OidcException(OidcException.INVALID_GRANT,</span>
+                    &quot;Auth0 /passkey/challenge response missing auth_session / authn_params_public_key&quot;));
+<span class="fc" id="L233">            return;</span>
+        }
+        String optionsJson;
+        try {
+<span class="fc" id="L237">            optionsJson = mapToJson((Map&lt;?, ?&gt;) authnParams);</span>
+<span class="nc" id="L238">        } catch (Throwable t) {</span>
+<span class="nc" id="L239">            out.error(new OidcException(OidcException.INVALID_GRANT,</span>
+<span class="nc" id="L240">                    &quot;Could not serialise WebAuthn request options: &quot; + t.getMessage(), t));</span>
+<span class="nc" id="L241">            return;</span>
+<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">        final String authSessionStr = authSession.toString();</span>
+<span class="fc" id="L244">        WebAuthnClient.getInstance()</span>
+<span class="fc" id="L245">                .get(PublicKeyCredentialRequestOptions.fromJson(optionsJson))</span>
+<span class="fc" id="L246">                .ready(new SuccessCallback&lt;PublicKeyCredential&gt;() {</span>
+                    @Override
+                    public void onSucess(PublicKeyCredential cred) {
+<span class="nc" id="L249">                        exchangePasskeyForToken(clientId, scopes, authSessionStr,</span>
+<span class="nc" id="L250">                                cred.toJson(), out);</span>
+<span class="nc" id="L251">                    }</span>
+                })
+<span class="fc" id="L253">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="fc" id="L256">                        out.error(err);</span>
+<span class="fc" id="L257">                    }</span>
+                });
+<span class="fc" id="L259">    }</span>
+
+    private void runPasskeyRegistration(final String clientId,
+                                        final String scopes,
+                                        Map&lt;String, Object&gt; registration,
+                                        final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="fc" id="L265">        Object authSession = registration.get(&quot;auth_session&quot;);</span>
+<span class="fc" id="L266">        Object authnParams = registration.get(&quot;authn_params_public_key&quot;);</span>
+<span class="fc bfc" id="L267" title="All 4 branches covered.">        if (authSession == null || !(authnParams instanceof Map)) {</span>
+<span class="fc" id="L268">            out.error(new OidcException(OidcException.INVALID_GRANT,</span>
+                    &quot;Auth0 /passkey/register response missing auth_session / authn_params_public_key&quot;));
+<span class="fc" id="L270">            return;</span>
+        }
+        String optionsJson;
+        try {
+<span class="fc" id="L274">            optionsJson = mapToJson((Map&lt;?, ?&gt;) authnParams);</span>
+<span class="nc" id="L275">        } catch (Throwable t) {</span>
+<span class="nc" id="L276">            out.error(new OidcException(OidcException.INVALID_GRANT,</span>
+<span class="nc" id="L277">                    &quot;Could not serialise WebAuthn creation options: &quot; + t.getMessage(), t));</span>
+<span class="nc" id="L278">            return;</span>
+<span class="fc" id="L279">        }</span>
+<span class="fc" id="L280">        final String authSessionStr = authSession.toString();</span>
+<span class="fc" id="L281">        WebAuthnClient.getInstance()</span>
+<span class="fc" id="L282">                .create(PublicKeyCredentialCreationOptions.fromJson(optionsJson))</span>
+<span class="fc" id="L283">                .ready(new SuccessCallback&lt;PublicKeyCredential&gt;() {</span>
+                    @Override
+                    public void onSucess(PublicKeyCredential cred) {
+<span class="nc" id="L286">                        exchangePasskeyForToken(clientId, scopes, authSessionStr,</span>
+<span class="nc" id="L287">                                cred.toJson(), out);</span>
+<span class="nc" id="L288">                    }</span>
+                })
+<span class="fc" id="L290">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="fc" id="L293">                        out.error(err);</span>
+<span class="fc" id="L294">                    }</span>
+                });
+<span class="fc" id="L296">    }</span>
+
+    private void exchangePasskeyForToken(String clientId,
+                                         String scope,
+                                         String authSession,
+                                         String authnResponseJson,
+                                         final AsyncResource&lt;OidcTokens&gt; out) {
+<span class="nc" id="L303">        final ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="nc" id="L306">                byte[] body = Util.readInputStream(input);</span>
+<span class="nc" id="L307">                String json = StringUtil.newString(body);</span>
+<span class="nc" id="L308">                Map&lt;String, Object&gt; parsed = new JSONParser().parseJSON(new StringReader(json));</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                if (parsed == null) {</span>
+<span class="nc" id="L310">                    out.error(new OidcException(OidcException.INVALID_GRANT,</span>
+                            &quot;Auth0 /oauth/token returned an empty body&quot;));
+<span class="nc" id="L312">                    return;</span>
+                }
+<span class="nc bnc" id="L314" title="All 2 branches missed.">                if (parsed.get(&quot;error&quot;) != null) {</span>
+<span class="nc" id="L315">                    Object desc = parsed.get(&quot;error_description&quot;);</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">                    out.error(new OidcException(parsed.get(&quot;error&quot;).toString(),</span>
+<span class="nc" id="L317">                            desc != null ? desc.toString() : null));</span>
+<span class="nc" id="L318">                    return;</span>
+                }
+<span class="nc" id="L320">                OidcTokens tokens = OidcTokens.fromTokenResponse(parsed, null);</span>
+<span class="nc" id="L321">                setAccessToken(tokens.toAccessToken());</span>
+<span class="nc" id="L322">                out.complete(tokens);</span>
+<span class="nc" id="L323">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="nc" id="L327">                out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+<span class="nc" id="L328">                        &quot;Auth0 passkey token exchange failed: &quot; + err.getMessage(), err));</span>
+<span class="nc" id="L329">            }</span>
+        };
+<span class="nc" id="L331">        req.setUrl(&quot;https://&quot; + domain + &quot;/oauth/token&quot;);</span>
+<span class="nc" id="L332">        req.setPost(true);</span>
+<span class="nc" id="L333">        req.setReadResponseForErrors(true);</span>
+<span class="nc" id="L334">        req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/x-www-form-urlencoded&quot;);</span>
+<span class="nc" id="L335">        req.addRequestHeader(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+<span class="nc" id="L336">        req.addArgument(&quot;grant_type&quot;, &quot;urn:okta:params:oauth:grant-type:webauthn&quot;);</span>
+<span class="nc" id="L337">        req.addArgument(&quot;client_id&quot;, clientId);</span>
+<span class="nc" id="L338">        req.addArgument(&quot;scope&quot;, scope);</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        if (audience != null) {</span>
+<span class="nc" id="L340">            req.addArgument(&quot;audience&quot;, audience);</span>
+        }
+<span class="nc" id="L342">        req.addArgument(&quot;auth_session&quot;, authSession);</span>
+<span class="nc" id="L343">        req.addArgument(&quot;authn_response&quot;, authnResponseJson);</span>
+<span class="nc" id="L344">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="nc" id="L345">    }</span>
+
+    private static AsyncResource&lt;Map&lt;String, Object&gt;&gt; postJson(final String url,
+                                                               final Map&lt;String, String&gt; body) {
+<span class="fc" id="L349">        final AsyncResource&lt;Map&lt;String, Object&gt;&gt; out = new AsyncResource&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L350">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L353">                byte[] data = Util.readInputStream(input);</span>
+<span class="fc" id="L354">                String json = StringUtil.newString(data);</span>
+<span class="fc" id="L355">                Map&lt;String, Object&gt; parsed = new JSONParser().parseJSON(new StringReader(json));</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">                if (parsed == null) {</span>
+<span class="nc" id="L357">                    out.error(new OidcException(OidcException.INVALID_GRANT,</span>
+                            &quot;Auth0 returned an empty body for &quot; + url));
+<span class="nc" id="L359">                    return;</span>
+                }
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                if (parsed.get(&quot;error&quot;) != null) {</span>
+<span class="fc" id="L362">                    Object desc = parsed.get(&quot;error_description&quot;);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                    out.error(new OidcException(parsed.get(&quot;error&quot;).toString(),</span>
+<span class="fc" id="L364">                            desc != null ? desc.toString() : null));</span>
+<span class="fc" id="L365">                    return;</span>
+                }
+<span class="fc" id="L367">                out.complete(parsed);</span>
+<span class="fc" id="L368">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="nc" id="L372">                out.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+<span class="nc" id="L373">                        &quot;Auth0 request to &quot; + url + &quot; failed: &quot; + err.getMessage(), err));</span>
+<span class="nc" id="L374">            }</span>
+        };
+<span class="fc" id="L376">        req.setUrl(url);</span>
+<span class="fc" id="L377">        req.setPost(true);</span>
+<span class="fc" id="L378">        req.setReadResponseForErrors(true);</span>
+<span class="fc" id="L379">        req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/json&quot;);</span>
+<span class="fc" id="L380">        req.addRequestHeader(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+<span class="fc" id="L381">        req.setRequestBody(mapToFlatJson(body));</span>
+<span class="fc" id="L382">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="fc" id="L383">        return out;</span>
+    }
+
+    private static String joinScopes(String[] scopes) {
+<span class="fc" id="L387">        StringBuilder b = new StringBuilder();</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        for (int i = 0; i &lt; scopes.length; i++) {</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L390">                b.append(' ');</span>
+            }
+<span class="fc" id="L392">            b.append(scopes[i]);</span>
+        }
+<span class="fc" id="L394">        return b.toString();</span>
+    }
+
+    /// Serialises a parsed JSON sub-tree back into a JSON string. We need this
+    /// because the Auth0 challenge response embeds the W3C options as a nested
+    /// object, but [PublicKeyCredentialRequestOptions#fromJson] takes a string.
+    private static String mapToJson(Map&lt;?, ?&gt; map) {
+<span class="fc" id="L401">        StringBuilder b = new StringBuilder(&quot;{&quot;);</span>
+<span class="fc" id="L402">        boolean first = true;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        for (Map.Entry&lt;?, ?&gt; e : map.entrySet()) {</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L405">                b.append(',');</span>
+            }
+<span class="fc" id="L407">            first = false;</span>
+<span class="fc" id="L408">            b.append(jsonString(e.getKey().toString())).append(':');</span>
+<span class="fc" id="L409">            appendValue(b, e.getValue());</span>
+<span class="fc" id="L410">        }</span>
+<span class="fc" id="L411">        return b.append('}').toString();</span>
+    }
+
+    private static void appendValue(StringBuilder b, Object v) {
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L416">            b.append(&quot;null&quot;);</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        } else if (v instanceof Map) {</span>
+<span class="fc" id="L418">            b.append(mapToJson((Map&lt;?, ?&gt;) v));</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        } else if (v instanceof java.util.Collection) {</span>
+<span class="nc" id="L420">            b.append('[');</span>
+<span class="nc" id="L421">            boolean first = true;</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">            for (Object item : (java.util.Collection&lt;?&gt;) v) {</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L424">                    b.append(',');</span>
+                }
+<span class="nc" id="L426">                first = false;</span>
+<span class="nc" id="L427">                appendValue(b, item);</span>
+<span class="nc" id="L428">            }</span>
+<span class="nc" id="L429">            b.append(']');</span>
+<span class="pc bpc" id="L430" title="2 of 4 branches missed.">        } else if (v instanceof Number || v instanceof Boolean) {</span>
+<span class="nc" id="L431">            b.append(v.toString());</span>
+        } else {
+<span class="fc" id="L433">            b.append(jsonString(v.toString()));</span>
+        }
+<span class="fc" id="L435">    }</span>
+
+    /// Flat string-to-string JSON object serializer used for the small
+    /// Auth0 request bodies. `user_profile` arrives as a JSON-shaped string
+    /// and is emitted unquoted so the server receives a real JSON object.
+    private static String mapToFlatJson(Map&lt;String, String&gt; map) {
+<span class="fc" id="L441">        StringBuilder b = new StringBuilder(&quot;{&quot;);</span>
+<span class="fc" id="L442">        boolean first = true;</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; e : map.entrySet()) {</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L445">                b.append(',');</span>
+            }
+<span class="fc" id="L447">            first = false;</span>
+<span class="fc" id="L448">            b.append(jsonString(e.getKey())).append(':');</span>
+<span class="fc" id="L449">            String val = e.getValue();</span>
+            // `user_profile` is already a JSON object; everything else is a
+            // plain string. We detect this by the leading brace.
+<span class="pc bpc" id="L452" title="2 of 6 branches missed.">            if (val != null &amp;&amp; val.length() &gt; 0 &amp;&amp; val.charAt(0) == '{') {</span>
+<span class="fc" id="L453">                b.append(val);</span>
+            } else {
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                b.append(jsonString(val == null ? &quot;&quot; : val));</span>
+            }
+<span class="fc" id="L457">        }</span>
+<span class="fc" id="L458">        return b.append('}').toString();</span>
+    }
+
+    private static String jsonString(String s) {
+<span class="fc" id="L462">        StringBuilder out = new StringBuilder(s.length() + 8).append('&quot;');</span>
+<span class="fc" id="L463">        int len = s.length();</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L465">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L466" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L467">                case '&quot;':  out.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L468">                case '\\': out.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L469">                case '\n': out.append(&quot;\\n&quot;);  break;</span>
+<span class="nc" id="L470">                case '\r': out.append(&quot;\\r&quot;);  break;</span>
+<span class="nc" id="L471">                case '\t': out.append(&quot;\\t&quot;);  break;</span>
+                default:
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L474">                        String hex = Integer.toHexString(c);</span>
+<span class="nc" id="L475">                        out.append(&quot;\\u&quot;);</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">                        for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="nc" id="L477">                            out.append('0');</span>
+                        }
+<span class="nc" id="L479">                        out.append(hex);</span>
+<span class="nc" id="L480">                    } else {</span>
+<span class="fc" id="L481">                        out.append(c);</span>
+                    }
+            }
+        }
+<span class="fc" id="L485">        return out.append('&quot;').toString();</span>
+    }
+
+    public AsyncResource&lt;OidcTokens&gt; signIn(final String clientId,
+                                            final String redirectUri,
+                                            final String... scopes) {
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        if (domain == null) {</span>
+<span class="fc" id="L492">            AsyncResource&lt;OidcTokens&gt; err = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L493">            err.error(new IllegalStateException(</span>
+                    &quot;Auth0Connect requires withDomain(\&quot;your-tenant.region.auth0.com\&quot;)&quot;));
+<span class="fc" id="L495">            return err;</span>
+        }
+<span class="fc" id="L497">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L498">        OidcClient.discover(&quot;https://&quot; + domain)</span>
+<span class="fc" id="L499">                .ready(new SuccessCallback&lt;OidcClient&gt;() {</span>
+                    @Override
+                    public void onSucess(OidcClient client) {
+<span class="nc" id="L502">                        client.setClientId(clientId)</span>
+<span class="nc bnc" id="L503" title="All 4 branches missed.">                                .setRedirectUri(redirectUri)</span>
+<span class="nc" id="L504">                                .setScopes(scopes != null &amp;&amp; scopes.length &gt; 0</span>
+                                        ? scopes
+                                        : new String[] {&quot;openid&quot;, &quot;email&quot;,
+                                                &quot;profile&quot;, &quot;offline_access&quot;});
+<span class="nc bnc" id="L508" title="All 2 branches missed.">                        if (audience != null) {</span>
+<span class="nc" id="L509">                            client.setAuthorizationParameters(&quot;audience&quot;, audience);</span>
+                        }
+<span class="nc" id="L511">                        client.authorize()</span>
+<span class="nc" id="L512">                                .ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+                                    @Override
+                                    public void onSucess(OidcTokens t) {
+<span class="nc" id="L515">                                        setAccessToken(t.toAccessToken());</span>
+<span class="nc" id="L516">                                        out.complete(t);</span>
+<span class="nc" id="L517">                                    }</span>
+                                })
+<span class="nc" id="L519">                                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                                    @Override
+                                    public void onSucess(Throwable err) {
+<span class="nc" id="L522">                                        out.error(err);</span>
+<span class="nc" id="L523">                                    }</span>
+                                });
+<span class="nc" id="L525">                    }</span>
+                })
+<span class="fc" id="L527">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="fc" id="L530">                        out.error(err);</span>
+<span class="fc" id="L531">                    }</span>
+                });
+<span class="fc" id="L533">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

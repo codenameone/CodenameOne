@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShareService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.share</a> &gt; <span class="el_source">ShareService.java</span></div><h1>ShareService.java</h1><pre class="source lang-java linenums">/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.codename1.share;
+
+import com.codename1.ui.Command;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionEvent;
+
+// ShareResult / ShareResultListener live in the same package.
+
+/// This is an abstract sharing service.
+///
+/// @author Chen
+public abstract class ShareService extends Command {
+
+    private String message;
+    private String image;
+    private String mimeType;
+    private Form original;
+    private ShareResultListener shareResultListener;
+    private boolean resultDelivered;
+
+    /// Constructor with the service name and icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the service name
+    ///
+    /// - `icon`: the service icon
+    public ShareService(String name, Image icon) {
+<span class="fc" id="L34">        super(name, icon);</span>
+<span class="fc" id="L35">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (image != null) {</span>
+<span class="fc" id="L41">            share(message, image, mimeType);</span>
+        } else {
+<span class="fc" id="L43">            share(message);</span>
+        }
+<span class="fc" id="L45">    }</span>
+
+    /// This is the sharing method which should be implemented by the service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: text to share
+    public abstract void share(String text);
+
+    /// This is the image sharing method which should be implemented by the
+    /// service, if the service returned true on the canShareImage() method
+    /// Notice not all services are able to share text and image together, in this
+    /// case the image sharing will be preferred by these services
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: text to share
+    ///
+    /// - `image`: image to share
+    public void share(String text, String image, String imageMimeType) {
+<span class="nc" id="L65">    }</span>
+
+    /// The implementing service needs to declare if it is capable to share an
+    /// image
+    ///
+    /// #### Returns
+    ///
+    /// true if the service can share images
+    public abstract boolean canShareImage();
+
+    /// Sets the message to share, this is done by the ShareButton and shouldn't
+    /// be used by the developers
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`
+    public void setMessage(String message) {
+<span class="fc" id="L82">        this.message = message;</span>
+<span class="fc" id="L83">    }</span>
+
+    /// Sets the image to share, this is done by the ShareButton and shouldn't
+    /// be used by the developers
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the file path to the image
+    ///
+    /// - `mime`: the image mime type e.g. image/png, image/jpeg
+    public void setImage(String image, String mime) {
+<span class="fc" id="L94">        this.image = image;</span>
+<span class="fc" id="L95">        this.mimeType = mime;</span>
+<span class="fc" id="L96">    }</span>
+
+    /// Sets the Original Form (this is the Form of the share button)
+    public void setOriginalForm(Form original) {
+<span class="fc" id="L100">        this.original = original;</span>
+<span class="fc" id="L101">    }</span>
+
+    /// Gets the original Form
+    public Form getOriginal() {
+<span class="nc" id="L105">        return original;</span>
+    }
+
+    /// Once the share service has finished sharing it should call the finish
+    /// method
+    public void finish() {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (original != null) {</span>
+<span class="fc" id="L112">            original.showBack();</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!resultDelivered) {</span>
+<span class="fc" id="L115">            deliverResult(ShareResult.sharedTo(getCommandName()));</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    /// Registers a listener to be notified once when the share completes.
+    ///
+    /// Set by [com.codename1.components.ShareButton] before the service
+    /// is invoked. Subclasses normally do not call this directly.
+    public void setShareResultListener(ShareResultListener listener) {
+<span class="fc" id="L124">        this.shareResultListener = listener;</span>
+<span class="fc" id="L125">        this.resultDelivered = false;</span>
+<span class="fc" id="L126">    }</span>
+
+    /// Returns the registered result listener (may be null).
+    public ShareResultListener getShareResultListener() {
+<span class="nc" id="L130">        return shareResultListener;</span>
+    }
+
+    /// Delivers a [ShareResult] to the registered listener exactly once.
+    ///
+    /// Subclasses can call this to report a `DISMISSED` (user cancelled)
+    /// or `FAILED` outcome. [#finish] already reports a default
+    /// `SHARED_TO(commandName)` if no explicit result was delivered.
+    protected void deliverResult(ShareResult result) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (resultDelivered) {</span>
+<span class="nc" id="L140">            return;</span>
+        }
+<span class="fc" id="L142">        resultDelivered = true;</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">        if (shareResultListener != null &amp;&amp; result != null) {</span>
+<span class="fc" id="L144">            shareResultListener.onResult(result);</span>
+        }
+<span class="fc" id="L146">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,582 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneratedSVGImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">GeneratedSVGImage.java</span></div><h1>GeneratedSVGImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.animations.AnimationTime;
+import com.codename1.util.MathUtil;
+
+/// Base class for SVG images emitted by the build-time transcoder
+/// (`maven/svg-transcoder`).
+///
+/// A subclass is generated per source SVG file. The subclass overrides
+/// [#paintSVG(Graphics, long)] to issue the actual drawing commands and
+/// passes its intrinsic dimensions and viewBox to the constructor. This class
+/// handles three concerns the generated code should not have to think about:
+///
+/// 1. **Viewport mapping** -- the viewBox is scaled into the destination
+///    rectangle on every paint, so the same generated class can render at any
+///    requested width/height without re-emitting code.
+///
+/// 2. **DPI-aware default sizing** -- the SVG's declared `width`/`height` are
+///    interpreted as design pixels at [com.codename1.ui.CN1Constants#DENSITY_MEDIUM]
+///    (the same convention CN1 uses for its multi-image density buckets) and
+///    scaled to the device density so an icon that looks &quot;right&quot; on a desktop
+///    simulator also looks right on a high-DPI handset. Override with
+///    [#scaled(int, int)] or by passing explicit dimensions on construction.
+///
+/// 3. **Deterministic animation time** -- animation progress is read from
+///    [AnimationTime#now()], so tests that pin the clock with
+///    [AnimationTime#setTime(long)] capture predictable frames. The &quot;first
+///    paint&quot; timestamp is captured the first time [#paintSVG] is invoked,
+///    making animations start at `t = 0` from the user's perspective
+///    regardless of when the image instance was constructed.
+///
+/// Generated SVGs are normally registered with a [com.codename1.ui.util.Resources]
+/// object via the auto-generated `com.codename1.generated.svg.SVGRegistry` so
+/// they appear under their original filename when calling
+/// [com.codename1.ui.util.Resources#getImage(String)].
+public abstract class GeneratedSVGImage extends Image {
+
+    /// Sentinel value used by [#progress] when an animation declared
+    /// `repeatCount=&quot;indefinite&quot;`.
+    public static final int REPEAT_INDEFINITE = -1;
+
+    private final int intrinsicWidth;
+    private final int intrinsicHeight;
+    private final int sourceDensity;
+    private final int width;
+    private final int height;
+    private final float viewBoxX;
+    private final float viewBoxY;
+    private final float viewBoxWidth;
+    private final float viewBoxHeight;
+    private final boolean animated;
+<span class="fc" id="L59">    private long animationStartMs = -1L;</span>
+
+    /// Construct with intrinsic SVG dimensions and viewBox metadata. The
+    /// rendered size defaults to the intrinsic dimensions scaled by the
+    /// device's density (so SVGs designed at standard mdpi look correct on
+    /// every screen). Use [#scaled(int, int)] for explicit pixel sizing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intrinsicWidth`: SVG-declared width in design pixels
+    ///
+    /// - `intrinsicHeight`: SVG-declared height in design pixels
+    ///
+    /// - `viewBoxX`: x origin of the viewBox in SVG user units
+    ///
+    /// - `viewBoxY`: y origin of the viewBox in SVG user units
+    ///
+    /// - `viewBoxWidth`: width of the viewBox; falls back to `intrinsicWidth` if `&lt;= 0`
+    ///
+    /// - `viewBoxHeight`: height of the viewBox; falls back to `intrinsicHeight` if `&lt;= 0`
+    ///
+    /// - `animated`: true if any SMIL animation was found inside the SVG
+    protected GeneratedSVGImage(int intrinsicWidth, int intrinsicHeight,
+                                float viewBoxX, float viewBoxY,
+                                float viewBoxWidth, float viewBoxHeight,
+                                boolean animated) {
+<span class="fc" id="L85">        this(intrinsicWidth, intrinsicHeight,</span>
+                viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight,
+                animated, CN1Constants.DENSITY_MEDIUM);
+<span class="fc" id="L88">    }</span>
+
+    /// Construct with an explicit source density for the SVG's declared
+    /// dimensions. This is the constructor the auto-generated `SVGRegistry`
+    /// targets when the CSS for an SVG declared a `cn1-source-dpi` -- the
+    /// runtime width/height then track that hint instead of assuming
+    /// [com.codename1.ui.CN1Constants#DENSITY_MEDIUM].
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceDensity`: one of the `CN1Constants.DENSITY_*` constants,
+    ///   describing the device class the SVG was designed for. A value of
+    ///   `0` falls back to the SVG's intrinsic pixels (no scaling).
+    protected GeneratedSVGImage(int intrinsicWidth, int intrinsicHeight,
+                                float viewBoxX, float viewBoxY,
+                                float viewBoxWidth, float viewBoxHeight,
+                                boolean animated, int sourceDensity) {
+<span class="fc" id="L105">        super(null);</span>
+<span class="fc" id="L106">        this.intrinsicWidth = intrinsicWidth;</span>
+<span class="fc" id="L107">        this.intrinsicHeight = intrinsicHeight;</span>
+<span class="fc" id="L108">        this.sourceDensity = sourceDensity;</span>
+<span class="fc" id="L109">        int density = readDeviceDensitySafely();</span>
+<span class="fc" id="L110">        this.width = scaleForDensity(intrinsicWidth, density, sourceDensity);</span>
+<span class="fc" id="L111">        this.height = scaleForDensity(intrinsicHeight, density, sourceDensity);</span>
+<span class="fc" id="L112">        this.viewBoxX = viewBoxX;</span>
+<span class="fc" id="L113">        this.viewBoxY = viewBoxY;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        this.viewBoxWidth = viewBoxWidth &lt;= 0 ? intrinsicWidth : viewBoxWidth;</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        this.viewBoxHeight = viewBoxHeight &lt;= 0 ? intrinsicHeight : viewBoxHeight;</span>
+<span class="fc" id="L116">        this.animated = animated;</span>
+<span class="fc" id="L117">    }</span>
+
+    /// Construct with explicit absolute width/height -- expressed in device
+    /// pixels here, but the auto-generated subclass takes them in millimeters
+    /// and converts via [Display#convertToPixels(float)] so the dimensions
+    /// carry across DPIs the same way `font-size: 3mm` does. This is the
+    /// constructor the [SVGRegistry] uses when the CSS rule specified
+    /// `cn1-svg-width` / `cn1-svg-height`, overriding any density-based
+    /// sizing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `explicitWidth`: rendered width in device pixels (`&gt;= 1`)
+    ///
+    /// - `explicitHeight`: rendered height in device pixels (`&gt;= 1`)
+    protected GeneratedSVGImage(int intrinsicWidth, int intrinsicHeight,
+                                float viewBoxX, float viewBoxY,
+                                float viewBoxWidth, float viewBoxHeight,
+                                boolean animated,
+                                int explicitWidth, int explicitHeight) {
+<span class="fc" id="L137">        super(null);</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">        if (explicitWidth &lt; 1 || explicitHeight &lt; 1) {</span>
+<span class="nc" id="L139">            throw new IllegalArgumentException(</span>
+                    &quot;SVG dimensions must be &gt;= 1 pixel; got width=&quot; + explicitWidth
+                            + &quot; height=&quot; + explicitHeight
+                            + &quot;. Check the cn1-svg-width / cn1-svg-height CSS hint --&quot;
+                            + &quot; a 0.something mm value rounds down to 0 pixels.&quot;);
+        }
+<span class="fc" id="L145">        this.intrinsicWidth = intrinsicWidth;</span>
+<span class="fc" id="L146">        this.intrinsicHeight = intrinsicHeight;</span>
+<span class="fc" id="L147">        this.sourceDensity = 0;</span>
+<span class="fc" id="L148">        this.width = explicitWidth;</span>
+<span class="fc" id="L149">        this.height = explicitHeight;</span>
+<span class="fc" id="L150">        this.viewBoxX = viewBoxX;</span>
+<span class="fc" id="L151">        this.viewBoxY = viewBoxY;</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        this.viewBoxWidth = viewBoxWidth &lt;= 0 ? intrinsicWidth : viewBoxWidth;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        this.viewBoxHeight = viewBoxHeight &lt;= 0 ? intrinsicHeight : viewBoxHeight;</span>
+<span class="fc" id="L154">        this.animated = animated;</span>
+<span class="fc" id="L155">    }</span>
+
+    /// Convert a length in millimeters to device pixels using the current
+    /// [Display] DPI. Provided as a static helper for the generated subclass
+    /// constructors that accept mm-typed dimensions. Throws
+    /// [IllegalArgumentException] for `mm &lt;= 0` -- callers should never pin
+    /// an SVG to a zero-or-negative physical size. Falls back to treating
+    /// the input as a literal pixel count when [Display] is not initialized
+    /// (e.g. during unit tests that construct an image before
+    /// `Display.init()` has run).
+    public static int mmToPixels(float mm) {
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">        if (mm &lt;= 0f || Float.isNaN(mm)) {</span>
+<span class="nc" id="L167">            throw new IllegalArgumentException(&quot;SVG dimension must be &gt; 0mm; got &quot; + mm);</span>
+        }
+        int pixels;
+        try {
+<span class="fc" id="L171">            pixels = Display.getInstance().convertToPixels(mm);</span>
+<span class="nc" id="L172">        } catch (Throwable t) {</span>
+<span class="nc" id="L173">            pixels = (int) Math.round(mm);</span>
+<span class="fc" id="L174">        }</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (pixels &lt; 1) {</span>
+<span class="nc" id="L176">            throw new IllegalArgumentException(&quot;SVG dimension &quot; + mm</span>
+                    + &quot;mm resolves to &quot; + pixels + &quot; px on this device --&quot;
+                    + &quot; pick a larger cn1-svg-width / cn1-svg-height value.&quot;);
+        }
+<span class="fc" id="L180">        return pixels;</span>
+    }
+
+    @Override
+    public final int getWidth() {
+<span class="fc" id="L185">        return width;</span>
+    }
+
+    @Override
+    public final int getHeight() {
+<span class="fc" id="L190">        return height;</span>
+    }
+
+    @Override
+    public final boolean isAnimation() {
+<span class="fc" id="L195">        return animated;</span>
+    }
+
+    /// Returning `true` requests a repaint on the next animation tick so the
+    /// embedding component re-reads the SMIL clock. The animation state itself
+    /// is re-derived from [AnimationTime#now()] on each paint, so there is
+    /// nothing to advance imperatively.
+    @Override
+    public final boolean animate() {
+<span class="fc" id="L204">        return animated;</span>
+    }
+
+    /// Generated implementations render the SVG content using the supplied
+    /// graphics context. `elapsedMs` is the number of milliseconds since the
+    /// first paint of this image instance, measured against
+    /// [AnimationTime#now()] so test code can pin the clock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics context, already transformed so SVG user-space
+    ///   coordinates map onto the destination rectangle
+    ///
+    /// - `elapsedMs`: animation time in milliseconds, `0` for non-animated SVGs
+    protected abstract void paintSVG(Graphics g, long elapsedMs);
+
+    @Override
+    protected final void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="nc" id="L222">        drawImage(g, nativeGraphics, x, y, width, height);</span>
+<span class="nc" id="L223">    }</span>
+
+    @Override
+    protected final void drawImage(Graphics g, Object nativeGraphics,
+                                   int x, int y, int w, int h) {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (!g.isShapeSupported()) {</span>
+<span class="nc" id="L229">            return;</span>
+        }
+<span class="nc" id="L231">        long elapsed = currentAnimationOffsetMs();</span>
+
+<span class="nc" id="L233">        Transform saved = null;</span>
+        try {
+<span class="nc" id="L235">            saved = g.getTransform();</span>
+<span class="nc" id="L236">        } catch (Throwable ignored) {</span>
+<span class="nc" id="L237">            saved = null;</span>
+<span class="nc" id="L238">        }</span>
+<span class="nc" id="L239">        int savedColor = g.getColor();</span>
+<span class="nc" id="L240">        int savedAlpha = g.getAlpha();</span>
+<span class="nc" id="L241">        boolean savedAA = g.isAntiAliased();</span>
+        try {
+            // Anti-alias every SVG render. Vector shapes drawn without AA
+            // look stair-stepped on every port we ship, and the perf cost
+            // on modern hardware is negligible.
+<span class="nc" id="L246">            g.setAntiAliased(true);</span>
+<span class="nc" id="L247">            float sx = (float) w / viewBoxWidth;</span>
+<span class="nc" id="L248">            float sy = (float) h / viewBoxHeight;</span>
+            Transform t;
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if (saved != null) {</span>
+<span class="nc" id="L251">                t = saved.copy();</span>
+            } else {
+<span class="nc" id="L253">                t = Transform.makeIdentity();</span>
+            }
+<span class="nc" id="L255">            t.translate((float) x, (float) y);</span>
+<span class="nc" id="L256">            t.scale(sx, sy);</span>
+<span class="nc" id="L257">            t.translate(-viewBoxX, -viewBoxY);</span>
+<span class="nc" id="L258">            g.setTransform(t);</span>
+<span class="nc" id="L259">            paintSVG(g, elapsed);</span>
+        } finally {
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (saved != null) {</span>
+<span class="nc" id="L262">                g.setTransform(saved);</span>
+            } else {
+<span class="nc" id="L264">                g.setTransform(Transform.makeIdentity());</span>
+            }
+<span class="nc" id="L266">            g.setColor(savedColor);</span>
+<span class="nc" id="L267">            g.setAlpha(savedAlpha);</span>
+<span class="nc" id="L268">            g.setAntiAliased(savedAA);</span>
+        }
+<span class="nc" id="L270">    }</span>
+
+    /// Returns a lightweight view onto this image that reports `width` /
+    /// `height` from [#getWidth] / [#getHeight] but reuses the underlying
+    /// rendering. The returned image's animation clock is shared with the
+    /// source so progress is consistent across both views.
+    @Override
+    public final Image scaled(int width, int height) {
+<span class="fc" id="L278">        return new SVGScaledView(this, width, height);</span>
+    }
+
+    /// Reset the per-instance animation start so the next paint begins at
+    /// `t = 0`. Tests typically prefer [AnimationTime#setTime(long)] instead,
+    /// which controls every animation in the VM at once.
+    public final void resetAnimation() {
+<span class="fc" id="L285">        animationStartMs = -1L;</span>
+<span class="fc" id="L286">    }</span>
+
+    /// The intrinsic SVG width before DPI scaling -- useful for tests or
+    /// callers that want to apply a different sizing heuristic.
+    public final int getIntrinsicWidth() {
+<span class="fc" id="L291">        return intrinsicWidth;</span>
+    }
+
+    /// The intrinsic SVG height before DPI scaling.
+    public final int getIntrinsicHeight() {
+<span class="fc" id="L296">        return intrinsicHeight;</span>
+    }
+
+    /// Compute the animation offset that the next [#paintSVG] call would see,
+    /// capturing the per-instance start timestamp from [AnimationTime#now()]
+    /// on first call. Package-visible so tests can exercise the clock without
+    /// needing a Graphics context with shape support; production code reaches
+    /// this through [#drawImage(Graphics, Object, int, int, int, int)].
+    long currentAnimationOffsetMs() {
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (!animated) {</span>
+<span class="fc" id="L306">            return 0L;</span>
+        }
+<span class="fc" id="L308">        long now = AnimationTime.now();</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (animationStartMs &lt; 0L) {</span>
+<span class="fc" id="L310">            animationStartMs = now;</span>
+        }
+<span class="fc" id="L312">        long elapsed = now - animationStartMs;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        return elapsed &lt; 0L ? 0L : elapsed;</span>
+    }
+
+    private static int readDeviceDensitySafely() {
+        // Display may not be fully initialized when the image is constructed
+        // (e.g. during static-init of an SVGRegistry that's loaded before
+        // Display.init in a unit test). Fall back to DENSITY_MEDIUM, which is
+        // the design-time default and produces 1:1 pixels for the intrinsic
+        // dimensions.
+        try {
+<span class="fc" id="L323">            return Display.getInstance().getDeviceDensity();</span>
+<span class="nc" id="L324">        } catch (Throwable t) {</span>
+<span class="nc" id="L325">            return CN1Constants.DENSITY_MEDIUM;</span>
+        }
+    }
+
+    /// Returns the source density the SVG was designed for, in
+    /// `CN1Constants.DENSITY_*` units. `0` means &quot;no scaling, use intrinsic
+    /// pixels&quot;. CSS can override the default via `cn1-source-dpi:`.
+    public final int getSourceDensity() {
+<span class="nc" id="L333">        return sourceDensity;</span>
+    }
+
+    private static int scaleForDensity(int designPixels, int density, int sourceDensity) {
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (designPixels &lt;= 0) {</span>
+<span class="nc" id="L338">            return 1;</span>
+        }
+<span class="pc bpc" id="L340" title="3 of 6 branches missed.">        if (sourceDensity &lt;= 0 || density &lt;= 0 || density == sourceDensity) {</span>
+<span class="fc" id="L341">            return designPixels;</span>
+        }
+<span class="nc" id="L343">        int scaled = (int) Math.floor(((double) designPixels * density) / sourceDensity + 0.5);</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        return scaled &lt; 1 ? 1 : scaled;</span>
+    }
+
+    // ---------------------------------------------------------------------
+    // SMIL helpers -- referenced by generated code; keep signatures stable.
+    // ---------------------------------------------------------------------
+
+    /// Compute the active progress through an animation cycle, in the range
+    /// `[0, 1]`. Honors begin offsets, repeat counts and the SMIL fill=&quot;freeze&quot;
+    /// behavior. Generated code calls this per animated attribute per paint.
+    public static float progress(long elapsedMs, long beginMs, long durMs,
+                                 int repeatCount, boolean freeze) {
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (durMs &lt;= 0L) {</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            return freeze ? 1f : 0f;</span>
+        }
+<span class="fc" id="L359">        long t = elapsedMs - beginMs;</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (t &lt; 0L) {</span>
+<span class="fc" id="L361">            return 0f;</span>
+        }
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (repeatCount == REPEAT_INDEFINITE) {</span>
+<span class="fc" id="L364">            long cycle = t % durMs;</span>
+<span class="fc" id="L365">            return (float) cycle / (float) durMs;</span>
+        }
+<span class="fc" id="L367">        long total = durMs * (long) repeatCount;</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        if (t &gt;= total) {</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            return freeze ? 1f : 0f;</span>
+        }
+<span class="fc" id="L371">        long cycle = t % durMs;</span>
+<span class="fc" id="L372">        return (float) cycle / (float) durMs;</span>
+    }
+
+    public static float lerp(float from, float to, float t) {
+<span class="fc" id="L376">        return from + (to - from) * t;</span>
+    }
+
+    /// Lerp between two ARGB colors. Each channel is linearly interpolated.
+    public static int lerpColor(int fromArgb, int toArgb, float t) {
+<span class="fc" id="L381">        int fa = (fromArgb &gt;&gt;&gt; 24) &amp; 0xFF;</span>
+<span class="fc" id="L382">        int fr = (fromArgb &gt;&gt;&gt; 16) &amp; 0xFF;</span>
+<span class="fc" id="L383">        int fg = (fromArgb &gt;&gt;&gt; 8) &amp; 0xFF;</span>
+<span class="fc" id="L384">        int fb = fromArgb &amp; 0xFF;</span>
+<span class="fc" id="L385">        int ta = (toArgb &gt;&gt;&gt; 24) &amp; 0xFF;</span>
+<span class="fc" id="L386">        int tr = (toArgb &gt;&gt;&gt; 16) &amp; 0xFF;</span>
+<span class="fc" id="L387">        int tg = (toArgb &gt;&gt;&gt; 8) &amp; 0xFF;</span>
+<span class="fc" id="L388">        int tb = toArgb &amp; 0xFF;</span>
+<span class="fc" id="L389">        int a = round(fa + (ta - fa) * t);</span>
+<span class="fc" id="L390">        int r = round(fr + (tr - fr) * t);</span>
+<span class="fc" id="L391">        int g = round(fg + (tg - fg) * t);</span>
+<span class="fc" id="L392">        int b = round(fb + (tb - fb) * t);</span>
+<span class="fc" id="L393">        return ((a &amp; 0xFF) &lt;&lt; 24) | ((r &amp; 0xFF) &lt;&lt; 16) | ((g &amp; 0xFF) &lt;&lt; 8) | (b &amp; 0xFF);</span>
+    }
+
+    /// Multi-stop floating point lerp. Stops are evenly spaced in `[0, 1]`.
+    public static float lerpValues(float[] values, float t) {
+<span class="pc bpc" id="L398" title="2 of 4 branches missed.">        if (values == null || values.length == 0) {</span>
+<span class="nc" id="L399">            return 0f;</span>
+        }
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        if (values.length == 1) {</span>
+<span class="nc" id="L402">            return values[0];</span>
+        }
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (t &lt;= 0f) {</span>
+<span class="fc" id="L405">            return values[0];</span>
+        }
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (t &gt;= 1f) {</span>
+<span class="fc" id="L408">            return values[values.length - 1];</span>
+        }
+<span class="fc" id="L410">        float seg = 1f / (values.length - 1);</span>
+<span class="fc" id="L411">        int i = (int) Math.floor(t / seg);</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (i &gt;= values.length - 1) {</span>
+<span class="nc" id="L413">            i = values.length - 2;</span>
+        }
+<span class="fc" id="L415">        float local = (t - i * seg) / seg;</span>
+<span class="fc" id="L416">        return values[i] + (values[i + 1] - values[i]) * local;</span>
+    }
+
+    /// Build a font for a generated SVG `&lt;text&gt;` element. Always loads a
+    /// `native:` TrueType face (HelveticaNeue on iOS, Roboto on Android,
+    /// the platform default elsewhere) so the size argument is honored at
+    /// arbitrary pixel resolutions. Weight / style maps to the matching
+    /// face name because some platforms ignore the derive weight argument.
+    public static Font svgTextFont(float sizePixels, int styleBits) {
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        boolean bold = (styleBits &amp; Font.STYLE_BOLD) != 0;</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        boolean italic = (styleBits &amp; Font.STYLE_ITALIC) != 0;</span>
+        String face;
+<span class="nc bnc" id="L428" title="All 4 branches missed.">        if (italic &amp;&amp; bold) {</span>
+<span class="nc" id="L429">            face = &quot;native:ItalicBold&quot;;</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        } else if (italic) {</span>
+<span class="nc" id="L431">            face = &quot;native:ItalicRegular&quot;;</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">        } else if (bold) {</span>
+<span class="nc" id="L433">            face = &quot;native:MainBold&quot;;</span>
+        } else {
+<span class="nc" id="L435">            face = &quot;native:MainRegular&quot;;</span>
+        }
+<span class="nc" id="L437">        Font f = Font.createTrueTypeFont(face, face);</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L439">            throw new IllegalStateException(</span>
+                    &quot;SVG text rendering requires the native: font scheme;&quot;
+                            + &quot; platform reported no TrueType support for &quot; + face);
+        }
+<span class="nc" id="L443">        return f.derive(sizePixels, styleBits);</span>
+    }
+
+    private static int round(float v) {
+<span class="fc" id="L447">        int r = (int) (v + 0.5f);</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        if (r &lt; 0) {</span>
+<span class="nc" id="L449">            return 0;</span>
+        }
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        if (r &gt; 255) {</span>
+<span class="nc" id="L452">            return 255;</span>
+        }
+<span class="fc" id="L454">        return r;</span>
+    }
+
+    /// Append an SVG elliptical arc segment to the given path using the
+    /// endpoint parameterization defined by the SVG 1.1 spec (appendix F.6).
+    /// The current point of `p` is treated as the arc's start; on return the
+    /// current point is the end of the arc. Decomposes into up to four
+    /// cubic Beziers -- a single quadrant per Bezier -- for accuracy.
+    public static void svgArc(com.codename1.ui.geom.GeneralPath p,
+                              float x1, float y1,
+                              float rx, float ry,
+                              float xAxisRotationDeg,
+                              boolean largeArc, boolean sweep,
+                              float x2, float y2) {
+<span class="pc bpc" id="L468" title="1 of 4 branches missed.">        if (rx == 0f || ry == 0f) {</span>
+<span class="fc" id="L469">            p.lineTo(x2, y2);</span>
+<span class="fc" id="L470">            return;</span>
+        }
+<span class="fc" id="L472">        float arx = Math.abs(rx);</span>
+<span class="fc" id="L473">        float ary = Math.abs(ry);</span>
+<span class="fc" id="L474">        double phi = Math.toRadians(xAxisRotationDeg);</span>
+<span class="fc" id="L475">        double cosPhi = Math.cos(phi);</span>
+<span class="fc" id="L476">        double sinPhi = Math.sin(phi);</span>
+
+        // F.6.5.1 -- compute (x1', y1')
+<span class="fc" id="L479">        double dx2 = (x1 - x2) / 2.0;</span>
+<span class="fc" id="L480">        double dy2 = (y1 - y2) / 2.0;</span>
+<span class="fc" id="L481">        double x1p =  cosPhi * dx2 + sinPhi * dy2;</span>
+<span class="fc" id="L482">        double y1p = -sinPhi * dx2 + cosPhi * dy2;</span>
+
+        // F.6.6.2 -- ensure radii are large enough
+<span class="fc" id="L485">        double rx2 = arx * arx;</span>
+<span class="fc" id="L486">        double ry2 = ary * ary;</span>
+<span class="fc" id="L487">        double x1p2 = x1p * x1p;</span>
+<span class="fc" id="L488">        double y1p2 = y1p * y1p;</span>
+<span class="fc" id="L489">        double radiiCheck = x1p2 / rx2 + y1p2 / ry2;</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">        if (radiiCheck &gt; 1.0) {</span>
+<span class="nc" id="L491">            double s = Math.sqrt(radiiCheck);</span>
+<span class="nc" id="L492">            arx = (float) (s * arx);</span>
+<span class="nc" id="L493">            ary = (float) (s * ary);</span>
+<span class="nc" id="L494">            rx2 = arx * arx;</span>
+<span class="nc" id="L495">            ry2 = ary * ary;</span>
+        }
+
+        // F.6.5.2 -- compute (cx', cy')
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">        double sign = (largeArc == sweep) ? -1.0 : 1.0;</span>
+<span class="fc" id="L500">        double sq = (rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2) / (rx2 * y1p2 + ry2 * x1p2);</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if (sq &lt; 0.0) {</span>
+<span class="nc" id="L502">            sq = 0.0;</span>
+        }
+<span class="fc" id="L504">        double coef = sign * Math.sqrt(sq);</span>
+<span class="fc" id="L505">        double cxp = coef * (arx * y1p / ary);</span>
+<span class="fc" id="L506">        double cyp = coef * -(ary * x1p / arx);</span>
+
+        // F.6.5.3 -- compute (cx, cy)
+<span class="fc" id="L509">        double sx2 = (x1 + x2) / 2.0;</span>
+<span class="fc" id="L510">        double sy2 = (y1 + y2) / 2.0;</span>
+<span class="fc" id="L511">        double cx = sx2 + (cosPhi * cxp - sinPhi * cyp);</span>
+<span class="fc" id="L512">        double cy = sy2 + (sinPhi * cxp + cosPhi * cyp);</span>
+
+        // F.6.5.4 -- start angle and sweep
+<span class="fc" id="L515">        double ux = (x1p - cxp) / arx;</span>
+<span class="fc" id="L516">        double uy = (y1p - cyp) / ary;</span>
+<span class="fc" id="L517">        double vx = (-x1p - cxp) / arx;</span>
+<span class="fc" id="L518">        double vy = (-y1p - cyp) / ary;</span>
+<span class="fc" id="L519">        double theta1 = vectorAngle(1.0, 0.0, ux, uy);</span>
+<span class="fc" id="L520">        double deltaTheta = vectorAngle(ux, uy, vx, vy);</span>
+<span class="pc bpc" id="L521" title="3 of 4 branches missed.">        if (!sweep &amp;&amp; deltaTheta &gt; 0.0) {</span>
+<span class="nc" id="L522">            deltaTheta -= 2.0 * Math.PI;</span>
+<span class="pc bpc" id="L523" title="2 of 4 branches missed.">        } else if (sweep &amp;&amp; deltaTheta &lt; 0.0) {</span>
+<span class="nc" id="L524">            deltaTheta += 2.0 * Math.PI;</span>
+        }
+
+        // Split into segments small enough that the cubic approximation stays accurate.
+<span class="fc" id="L528">        int segments = (int) Math.ceil(Math.abs(deltaTheta) / (Math.PI / 2.0));</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        if (segments &lt; 1) {</span>
+<span class="nc" id="L530">            segments = 1;</span>
+        }
+<span class="fc" id="L532">        double dt = deltaTheta / segments;</span>
+<span class="fc" id="L533">        double t = (4.0 / 3.0) * Math.tan(dt / 4.0);</span>
+
+<span class="fc" id="L535">        double cosTheta1 = Math.cos(theta1);</span>
+<span class="fc" id="L536">        double sinTheta1 = Math.sin(theta1);</span>
+<span class="fc" id="L537">        double px = x1;</span>
+<span class="fc" id="L538">        double py = y1;</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        for (int i = 0; i &lt; segments; i++) {</span>
+<span class="fc" id="L540">            double theta2 = theta1 + dt;</span>
+<span class="fc" id="L541">            double cosTheta2 = Math.cos(theta2);</span>
+<span class="fc" id="L542">            double sinTheta2 = Math.sin(theta2);</span>
+<span class="fc" id="L543">            double ex = cx + arx * (cosPhi * cosTheta2 - sinPhi * sinTheta2);</span>
+<span class="fc" id="L544">            double ey = cy + ary * (sinPhi * cosTheta2 + cosPhi * sinTheta2);</span>
+<span class="fc" id="L545">            double dx1L = -arx * sinTheta1;</span>
+<span class="fc" id="L546">            double dy1L =  ary * cosTheta1;</span>
+<span class="fc" id="L547">            double dx2L = -arx * sinTheta2;</span>
+<span class="fc" id="L548">            double dy2L =  ary * cosTheta2;</span>
+<span class="fc" id="L549">            double c1xL = px + t * (cosPhi * dx1L - sinPhi * dy1L);</span>
+<span class="fc" id="L550">            double c1yL = py + t * (sinPhi * dx1L + cosPhi * dy1L);</span>
+<span class="fc" id="L551">            double c2xL = ex - t * (cosPhi * dx2L - sinPhi * dy2L);</span>
+<span class="fc" id="L552">            double c2yL = ey - t * (sinPhi * dx2L + cosPhi * dy2L);</span>
+<span class="fc" id="L553">            p.curveTo((float) c1xL, (float) c1yL,</span>
+                      (float) c2xL, (float) c2yL,
+                      (float) ex, (float) ey);
+<span class="fc" id="L556">            theta1 = theta2;</span>
+<span class="fc" id="L557">            cosTheta1 = cosTheta2;</span>
+<span class="fc" id="L558">            sinTheta1 = sinTheta2;</span>
+<span class="fc" id="L559">            px = ex;</span>
+<span class="fc" id="L560">            py = ey;</span>
+        }
+<span class="fc" id="L562">    }</span>
+
+    private static double vectorAngle(double ux, double uy, double vx, double vy) {
+<span class="fc" id="L565">        double dot = ux * vx + uy * vy;</span>
+<span class="fc" id="L566">        double len = Math.sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy));</span>
+<span class="fc" id="L567">        double cos = dot / len;</span>
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">        if (cos &lt; -1.0) {</span>
+<span class="nc" id="L569">            cos = -1.0;</span>
+        }
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">        if (cos &gt; 1.0) {</span>
+<span class="nc" id="L572">            cos = 1.0;</span>
+        }
+        // CLDC's java.lang.Math has no acos; use the CN1 helper.
+<span class="fc" id="L575">        double a = MathUtil.acos(cos);</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">        if ((ux * vy - uy * vx) &lt; 0.0) {</span>
+<span class="nc" id="L577">            a = -a;</span>
+        }
+<span class="fc" id="L579">        return a;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

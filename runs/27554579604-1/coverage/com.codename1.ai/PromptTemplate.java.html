@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PromptTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">PromptTemplate.java</span></div><h1>PromptTemplate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import java.util.Map;
+
+/// Trivial `{placeholder}` substitution. Designed for the common
+/// &quot;build a prompt from a handful of fields&quot; pattern without pulling
+/// in a templating library. For anything more sophisticated (loops,
+/// conditionals) just compose strings directly.
+///
+/// ```
+/// String prompt = PromptTemplate.of(
+///     &quot;You are an expert {role}. Reply in {style}.&quot;
+/// ).put(&quot;role&quot;, &quot;tax accountant&quot;).put(&quot;style&quot;, &quot;bullet points&quot;).build();
+/// ```
+public final class PromptTemplate {
+    private final String template;
+<span class="fc" id="L39">    private final java.util.HashMap&lt;String, String&gt; values = new java.util.HashMap&lt;String, String&gt;();</span>
+
+<span class="fc" id="L41">    private PromptTemplate(String template) {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (template == null) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;template is required&quot;);</span>
+        }
+<span class="fc" id="L45">        this.template = template;</span>
+<span class="fc" id="L46">    }</span>
+
+    public static PromptTemplate of(String template) {
+<span class="fc" id="L49">        return new PromptTemplate(template);</span>
+    }
+
+    public PromptTemplate put(String key, String value) {
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        values.put(key, value == null ? &quot;&quot; : value);</span>
+<span class="fc" id="L54">        return this;</span>
+    }
+
+    public PromptTemplate putAll(Map&lt;String, String&gt; map) {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (map != null) {</span>
+<span class="nc" id="L59">            values.putAll(map);</span>
+        }
+<span class="nc" id="L61">        return this;</span>
+    }
+
+    /// Renders the final string. Unknown placeholders are left
+    /// intact (`{like_this}`) so they're easy to spot in test
+    /// output -- silently dropping them tends to hide bugs.
+    public String build() {
+<span class="fc" id="L68">        StringBuilder out = new StringBuilder(template.length() + 32);</span>
+<span class="fc" id="L69">        int i = 0;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        while (i &lt; template.length()) {</span>
+<span class="fc" id="L71">            char c = template.charAt(i);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (c == '{') {</span>
+<span class="fc" id="L73">                int end = template.indexOf('}', i + 1);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                if (end &gt; i) {</span>
+<span class="fc" id="L75">                    String key = template.substring(i + 1, end);</span>
+<span class="fc" id="L76">                    String v = values.get(key);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                    if (v != null) {</span>
+<span class="fc" id="L78">                        out.append(v);</span>
+<span class="fc" id="L79">                        i = end + 1;</span>
+<span class="fc" id="L80">                        continue;</span>
+                    }
+                }
+            }
+<span class="fc" id="L84">            out.append(c);</span>
+<span class="fc" id="L85">            i++;</span>
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        return out.toString();</span>
+    }
+
+    /// Convenience: render and wrap as a [ChatMessage] with USER role.
+    public ChatMessage asUser() {
+<span class="fc" id="L92">        return ChatMessage.user(build());</span>
+    }
+
+    /// Convenience: render and wrap as a [ChatMessage] with SYSTEM role.
+    public ChatMessage asSystem() {
+<span class="nc" id="L97">        return ChatMessage.system(build());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BarChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">BarChart.java</span></div><h1>BarChart.java</h1><pre class="source lang-java linenums">/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+package com.codename1.charts.views;
+
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.GradientDrawable;
+import com.codename1.charts.compat.GradientDrawable.Orientation;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.models.XYSeries;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYSeriesRenderer;
+import com.codename1.charts.util.ColorUtil;
+
+import java.util.List;
+
+
+/// Renders a bar chart based on an `XYMultipleSeriesDataset`.
+///
+/// Create an instance together with a matching `XYMultipleSeriesRenderer`
+/// and wrap it in a `com.codename1.charts.ChartComponent` to display it in
+/// the UI. A minimal setup looks like this:
+///
+/// ```java
+/// XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+/// dataset.addSeries(mySeries);
+///
+/// XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
+/// renderer.addSeriesRenderer(new XYSeriesRenderer());
+///
+/// BarChart chart = new BarChart(dataset, renderer, BarChart.Type.DEFAULT);
+/// Form form = new Form(new BorderLayout());
+/// form.add(BorderLayout.CENTER, new ChartComponent(chart));
+/// form.show();
+/// ```
+///
+/// The `Type` supplied to the constructor controls whether the bars are
+/// rendered in their default style, stacked or heaped.
+public class BarChart extends XYChart {
+    /// The constant to identify this chart type.
+    public static final String TYPE = &quot;Bar&quot;;
+    /// The legend shape width.
+    private static final int SHAPE_WIDTH = 12;
+    /// The chart type.
+<span class="fc" id="L59">    protected Type mType = Type.DEFAULT;</span>
+    /// The previous series Y axis point limits to be used for HEAP type bar charts.
+    private List&lt;Float&gt; mPreviousSeriesPoints;
+
+<span class="fc" id="L63">    BarChart() {</span>
+<span class="fc" id="L64">    }</span>
+
+<span class="fc" id="L66">    BarChart(Type type) {</span>
+<span class="fc" id="L67">        mType = type;</span>
+<span class="fc" id="L68">    }</span>
+
+    /// Builds a new bar chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the multiple series dataset
+    ///
+    /// - `renderer`: the multiple series renderer
+    ///
+    /// - `type`: the bar chart type
+    public BarChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer, Type type) {
+<span class="fc" id="L80">        super(dataset, renderer);</span>
+<span class="fc" id="L81">        mType = type;</span>
+<span class="fc" id="L82">    }</span>
+
+    @Override
+    protected ClickableArea[] clickableAreasForPoints(List&lt;Float&gt; points, List&lt;Double&gt; values,
+                                                      float yAxisValue, int seriesIndex, int startIndex) {
+<span class="fc" id="L87">        int seriesNr = mDataset.getSeriesCount();</span>
+<span class="fc" id="L88">        int length = points.size();</span>
+<span class="fc" id="L89">        ClickableArea[] ret = new ClickableArea[length / 2];</span>
+<span class="fc" id="L90">        float halfDiffX = getHalfDiffX(points, length, seriesNr);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i += 2) {</span>
+<span class="fc" id="L92">            float x = points.get(i);</span>
+<span class="fc" id="L93">            float y = points.get(i + 1);</span>
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">            if (mType == Type.STACKED || mType == Type.HEAPED) {</span>
+<span class="fc" id="L95">                ret[i / 2] = new ClickableArea(PkgUtils.makeRect(x - halfDiffX, Math.min(y, yAxisValue), x</span>
+<span class="fc" id="L96">                        + halfDiffX, Math.max(y, yAxisValue)), values.get(i), values.get(i + 1));</span>
+            } else {
+<span class="fc" id="L98">                float startX = x - seriesNr * halfDiffX + seriesIndex * 2 * halfDiffX;</span>
+<span class="fc" id="L99">                ret[i / 2] = new ClickableArea(PkgUtils.makeRect(startX, Math.min(y, yAxisValue), startX + 2</span>
+<span class="fc" id="L100">                        * halfDiffX, Math.max(y, yAxisValue)), values.get(i), values.get(i + 1));</span>
+            }
+        }
+<span class="fc" id="L103">        return ret;</span>
+    }
+
+    /// The graphical representation of a series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesRenderer`: the series renderer
+    ///
+    /// - `yAxisValue`: the minimum value of the y axis
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
+    @Override
+    public void drawSeries(Canvas canvas, Paint paint, List&lt;Float&gt; points,
+                           XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
+<span class="fc" id="L126">        int seriesNr = mDataset.getSeriesCount();</span>
+<span class="fc" id="L127">        int length = points.size();</span>
+<span class="fc" id="L128">        paint.setColor(seriesRenderer.getColor());</span>
+<span class="fc" id="L129">        paint.setStyle(Style.FILL);</span>
+<span class="fc" id="L130">        float halfDiffX = getHalfDiffX(points, length, seriesNr);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i += 2) {</span>
+<span class="fc" id="L132">            float x = points.get(i);</span>
+<span class="fc" id="L133">            float y = points.get(i + 1);</span>
+
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">            if (mType == Type.HEAPED &amp;&amp; seriesIndex &gt; 0) {</span>
+<span class="fc" id="L136">                float lastY = mPreviousSeriesPoints.get(i + 1);</span>
+<span class="fc" id="L137">                y = y + (lastY - yAxisValue);</span>
+<span class="fc" id="L138">                points.set(i + 1, y);</span>
+<span class="fc" id="L139">                drawBar(canvas, x, lastY, x, y, halfDiffX, seriesNr, seriesIndex, paint);</span>
+<span class="fc" id="L140">            } else {</span>
+<span class="fc" id="L141">                drawBar(canvas, x, yAxisValue, x, y, halfDiffX, seriesNr, seriesIndex, paint);</span>
+            }
+        }
+<span class="fc" id="L144">        paint.setColor(seriesRenderer.getColor());</span>
+<span class="fc" id="L145">        mPreviousSeriesPoints = points;</span>
+<span class="fc" id="L146">    }</span>
+
+    /// Draws a bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `xMin`: the X axis minimum
+    ///
+    /// - `yMin`: the Y axis minimum
+    ///
+    /// - `xMax`: the X axis maximum
+    ///
+    /// - `yMax`: the Y axis maximum
+    ///
+    /// - `halfDiffX`: half the size of a bar
+    ///
+    /// - `seriesNr`: the total number of series
+    ///
+    /// - `seriesIndex`: the current series index
+    ///
+    /// - `paint`: the paint
+    protected void drawBar(Canvas canvas, float xMin, float yMin, float xMax, float yMax,
+                           float halfDiffX, int seriesNr, int seriesIndex, Paint paint) {
+<span class="fc" id="L171">        int scale = mDataset.getSeriesAt(seriesIndex).getScaleNumber();</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        if (mType == Type.STACKED || mType == Type.HEAPED) {</span>
+<span class="fc" id="L173">            drawBar(canvas, xMin - halfDiffX, yMax, xMax + halfDiffX, yMin, scale, seriesIndex, paint);</span>
+        } else {
+<span class="fc" id="L175">            float startX = xMin - seriesNr * halfDiffX + seriesIndex * 2 * halfDiffX;</span>
+<span class="fc" id="L176">            drawBar(canvas, startX, yMax, startX + 2 * halfDiffX, yMin, scale, seriesIndex, paint);</span>
+        }
+<span class="fc" id="L178">    }</span>
+
+    /// Draws a bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas
+    ///
+    /// - `xMin`: the X axis minimum
+    ///
+    /// - `yMin`: the Y axis minimum
+    ///
+    /// - `xMax`: the X axis maximum
+    ///
+    /// - `yMax`: the Y axis maximum
+    ///
+    /// - `scale`: the scale index
+    ///
+    /// - `seriesIndex`: the current series index
+    ///
+    /// - `paint`: the paint
+    protected void drawBar(Canvas canvas, float xMin, float yMin, float xMax, float yMax, int scale,
+                           int seriesIndex, Paint paint) {
+        // Fix negative bars issue in Android 4.2
+        float temp;
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (xMin &gt; xMax) {</span>
+<span class="nc" id="L204">            temp = xMin;</span>
+<span class="nc" id="L205">            xMin = xMax;</span>
+<span class="nc" id="L206">            xMax = temp;</span>
+        }
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (yMin &gt; yMax) {</span>
+<span class="fc" id="L209">            temp = yMin;</span>
+<span class="fc" id="L210">            yMin = yMax;</span>
+<span class="fc" id="L211">            yMax = temp;</span>
+        }
+
+<span class="fc" id="L214">        SimpleSeriesRenderer renderer = mRenderer.getSeriesRendererAt(seriesIndex);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (renderer.isGradientEnabled()) {</span>
+<span class="nc" id="L216">            float minY = (float) toScreenPoint(new double[]{0, renderer.getGradientStopValue()}, scale)[1];</span>
+<span class="nc" id="L217">            float maxY = (float) toScreenPoint(new double[]{0, renderer.getGradientStartValue()},</span>
+                    scale)[1];
+<span class="nc" id="L219">            float gradientMinY = Math.max(minY, Math.min(yMin, yMax));</span>
+<span class="nc" id="L220">            float gradientMaxY = Math.min(maxY, Math.max(yMin, yMax));</span>
+<span class="nc" id="L221">            int gradientMinColor = renderer.getGradientStopColor();</span>
+<span class="nc" id="L222">            int gradientMaxColor = renderer.getGradientStartColor();</span>
+<span class="nc" id="L223">            int gradientStartColor = gradientMaxColor;</span>
+<span class="nc" id="L224">            int gradientStopColor = gradientMinColor;</span>
+
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (yMin &lt; minY) {</span>
+<span class="nc" id="L227">                paint.setColor(gradientMinColor);</span>
+<span class="nc" id="L228">                canvas.drawRect(Math.round(xMin), Math.round(yMin), Math.round(xMax),</span>
+<span class="nc" id="L229">                        Math.round(gradientMinY), paint);</span>
+            } else {
+<span class="nc" id="L231">                gradientStopColor = getGradientPartialColor(gradientMinColor, gradientMaxColor,</span>
+                        (maxY - gradientMinY) / (maxY - minY));
+            }
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (yMax &gt; maxY) {</span>
+<span class="nc" id="L235">                paint.setColor(gradientMaxColor);</span>
+<span class="nc" id="L236">                canvas.drawRect(Math.round(xMin), Math.round(gradientMaxY), Math.round(xMax),</span>
+<span class="nc" id="L237">                        Math.round(yMax), paint);</span>
+            } else {
+<span class="nc" id="L239">                gradientStartColor = getGradientPartialColor(gradientMaxColor, gradientMinColor,</span>
+                        (gradientMaxY - minY) / (maxY - minY));
+            }
+<span class="nc" id="L242">            GradientDrawable gradient = new GradientDrawable(Orientation.BOTTOM_TOP, new int[]{</span>
+                    gradientStartColor, gradientStopColor});
+<span class="nc" id="L244">            gradient.setBounds(Math.round(xMin), Math.round(gradientMinY), Math.round(xMax),</span>
+<span class="nc" id="L245">                    Math.round(gradientMaxY));</span>
+<span class="nc" id="L246">            gradient.draw(canvas);</span>
+<span class="nc" id="L247">        } else {</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (Math.abs(yMin - yMax) &lt; 1) {</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                if (yMin &lt; yMax) {</span>
+<span class="nc" id="L250">                    yMax = yMin + 1;</span>
+                } else {
+<span class="nc" id="L252">                    yMax = yMin - 1;</span>
+                }
+            }
+<span class="fc" id="L255">            canvas</span>
+<span class="fc" id="L256">                    .drawRect(Math.round(xMin), Math.round(yMin), Math.round(xMax), Math.round(yMax), paint);</span>
+        }
+<span class="fc" id="L258">    }</span>
+
+    protected int getGradientPartialColor(int minColor, int maxColor, float fraction) {
+<span class="fc" id="L261">        int alpha = Math.round(fraction * ColorUtil.alpha(minColor) + (1 - fraction)</span>
+<span class="fc" id="L262">                * ColorUtil.alpha(maxColor));</span>
+<span class="fc" id="L263">        int r = Math.round(fraction * ColorUtil.red(minColor) + (1 - fraction) * ColorUtil.red(maxColor));</span>
+<span class="fc" id="L264">        int g = Math.round(fraction * ColorUtil.green(minColor) + (1 - fraction) * ColorUtil.green(maxColor));</span>
+<span class="fc" id="L265">        int b = Math.round(fraction * ColorUtil.blue(minColor) + (1 - fraction) * ColorUtil.blue((maxColor)));</span>
+<span class="fc" id="L266">        return ColorUtil.argb(alpha, r, g, b);</span>
+    }
+
+    /// The graphical representation of the series values as text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `series`: the series to be painted
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
+    @Override
+    protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
+                                       Paint paint, List&lt;Float&gt; points, int seriesIndex, int startIndex) {
+<span class="nc" id="L289">        int seriesNr = mDataset.getSeriesCount();</span>
+<span class="nc" id="L290">        int length = points.size();</span>
+<span class="nc" id="L291">        float halfDiffX = getHalfDiffX(points, length, seriesNr);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i += 2) {</span>
+<span class="nc" id="L293">            int index = startIndex + i / 2;</span>
+<span class="nc" id="L294">            double value = series.getY(index);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            if (!isNullValue(value)) {</span>
+<span class="nc" id="L296">                float x = points.get(i);</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                if (mType == Type.DEFAULT) {</span>
+<span class="nc" id="L298">                    x += seriesIndex * 2 * halfDiffX - (seriesNr - 1.5f) * halfDiffX;</span>
+                }
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                if (value &gt;= 0) {</span>
+<span class="nc" id="L301">                    drawText(canvas, getLabel(renderer.getChartValuesFormat(), value), x, points.get(i + 1)</span>
+<span class="nc" id="L302">                            - renderer.getChartValuesSpacing(), paint, 0);</span>
+                } else {
+<span class="nc" id="L304">                    drawText(canvas, getLabel(renderer.getChartValuesFormat(), value), x, points.get(i + 1)</span>
+<span class="nc" id="L305">                            + renderer.getChartValuesTextSize() + renderer.getChartValuesSpacing() - 3, paint, 0);</span>
+                }
+            }
+        }
+<span class="nc" id="L309">    }</span>
+
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
+    @Override
+    public int getLegendShapeWidth(int seriesIndex) {
+<span class="fc" id="L322">        return SHAPE_WIDTH;</span>
+    }
+
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
+    @Override
+    public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
+                                int seriesIndex, Paint paint) {
+<span class="nc" id="L343">        float halfShapeWidth = SHAPE_WIDTH / 2;</span>
+<span class="nc" id="L344">        canvas.drawRect(x, y - halfShapeWidth, x + SHAPE_WIDTH, y + halfShapeWidth, paint);</span>
+<span class="nc" id="L345">    }</span>
+
+    /// Calculates and returns the half-distance in the graphical representation of
+    /// 2 consecutive points.
+    ///
+    /// #### Parameters
+    ///
+    /// - `points`: the points
+    ///
+    /// - `length`: the points length
+    ///
+    /// - `seriesNr`: the series number
+    ///
+    /// #### Returns
+    ///
+    /// the calculated half-distance value
+    protected float getHalfDiffX(List&lt;Float&gt; points, int length, int seriesNr) {
+<span class="fc" id="L362">        float barWidth = mRenderer.getBarWidth();</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (barWidth &gt; 0) {</span>
+<span class="fc" id="L364">            return barWidth / 2;</span>
+        }
+<span class="fc" id="L366">        int div = length;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (length &gt; 2) {</span>
+<span class="fc" id="L368">            div = length - 2;</span>
+        }
+<span class="fc" id="L370">        float halfDiffX = (points.get(length - 2) - points.get(0)) / div;</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        if (halfDiffX == 0) {</span>
+<span class="fc" id="L372">            halfDiffX = 10;</span>
+        }
+
+<span class="fc bfc" id="L375" title="All 4 branches covered.">        if (mType != Type.STACKED &amp;&amp; mType != Type.HEAPED) {</span>
+<span class="fc" id="L376">            halfDiffX /= seriesNr;</span>
+        }
+<span class="fc" id="L378">        return (float) (halfDiffX / (getCoeficient() * (1 + mRenderer.getBarSpacing())));</span>
+    }
+
+    /// Returns the value of a constant used to calculate the half-distance.
+    ///
+    /// #### Returns
+    ///
+    /// the constant value
+    protected float getCoeficient() {
+<span class="fc" id="L387">        return 1f;</span>
+    }
+
+    /// Returns if the chart should display the null values.
+    ///
+    /// #### Returns
+    ///
+    /// if null values should be rendered
+    @Override
+    protected boolean isRenderNullValues() {
+<span class="fc" id="L397">        return true;</span>
+    }
+
+    /// Returns the default axis minimum.
+    ///
+    /// #### Returns
+    ///
+    /// the default axis minimum
+    @Override
+    public double getDefaultMinimum() {
+<span class="fc" id="L407">        return 0;</span>
+    }
+
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
+    @Override
+    public String getChartType() {
+<span class="fc" id="L417">        return TYPE;</span>
+    }
+
+    /// The bar chart type enum.
+<span class="fc" id="L421">    public enum Type {</span>
+<span class="fc" id="L422">        DEFAULT, STACKED, HEAPED</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

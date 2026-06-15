@@ -1,0 +1,3174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectionRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">ConnectionRequest.java</span></div><h1>ConnectionRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.l10n.ParseException;
+import com.codename1.l10n.SimpleDateFormat;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.Base64;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.CallbackDispatcher;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.Vector;
+
+/// This class represents a connection object in the form of a request response
+/// typically common for HTTP/HTTPS connections. A connection request is added to
+/// the `com.codename1.io.NetworkManager` for processing in a queue on one of the
+/// network threads. You can read more about networking in Codename One `here`
+///
+/// The sample
+/// code below fetches a page of data from the nestoria housing listing API.
+///
+/// You can see instructions on how to display the data in the `com.codename1.components.InfiniteScrollAdapter`
+/// class. You can read more about networking in Codename One `here`.
+///
+/// ```java
+/// int pageNumber = 1;
+/// java.util.List&lt;Map&lt;String, Object&gt;&gt; fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl(&quot;http://api.nestoria.co.uk/api&quot;);
+///         r.addArgument(&quot;pretty&quot;, &quot;0&quot;);
+///         r.addArgument(&quot;action&quot;, &quot;search_listings&quot;);
+///         r.addArgument(&quot;encoding&quot;, &quot;json&quot;);
+///         r.addArgument(&quot;listing_type&quot;, &quot;buy&quot;);
+///         r.addArgument(&quot;page&quot;, &quot;&quot; + pageNumber);
+///         pageNumber++;
+///         r.addArgument(&quot;country&quot;, &quot;uk&quot;);
+///         r.addArgument(&quot;place_name&quot;, text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), &quot;UTF-8&quot;));
+///         Map response = (Map)result.get(&quot;response&quot;);
+///         return (java.util.List&lt;Map&lt;String, Object&gt;&gt;)response.get(&quot;listings&quot;);
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+///
+/// @author Shai Almog
+public class ConnectionRequest implements IOProgressListener {
+
+    /// A critical priority request will &quot;push&quot; through the queue to the highest point
+    /// regardless of anything else and ignoring anything that is not in itself of
+    /// critical priority.
+    /// A critical priority will stop any none critical connection in progress
+    public static final byte PRIORITY_CRITICAL = (byte) 100;
+
+    /// A high priority request is the second highest level, it will act exactly like
+    /// a critical priority with one difference. It doesn't block another incoming high priority
+    /// request. E.g. if a high priority request
+    public static final byte PRIORITY_HIGH = (byte) 80;
+
+    /// Normal priority executes as usual on the queue
+    public static final byte PRIORITY_NORMAL = (byte) 50;
+
+    /// Low priority requests are mostly background tasks that should still be accomplished though
+    public static final byte PRIORITY_LOW = (byte) 30;
+
+    /// Redundant elements can be discarded from the queue when paused
+    public static final byte PRIORITY_REDUNDANT = (byte) 0;
+    /// The default value for the cacheMode property see `#getCacheMode()`
+<span class="fc" id="L122">    private static CachingMode defaultCacheMode = CachingMode.OFF;</span>
+<span class="fc" id="L123">    private static String defaultUserAgent = null;</span>
+<span class="fc" id="L124">    private static boolean defaultFollowRedirects = true;</span>
+<span class="fc" id="L125">    private static boolean readResponseForErrorsDefault = true;</span>
+<span class="fc" id="L126">    private static boolean cookiesEnabledDefault = true;</span>
+    /// When set to true (the default), the global error handler in
+    /// `NetworkManager` should receive errors for response code as well
+<span class="fc" id="L129">    private static boolean handleErrorCodesInGlobalErrorHandler = true;</span>
+    /// Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
+    /// customize the name of the cookie header to Cookie
+<span class="fc" id="L132">    private static String cookieHeader = &quot;cookie&quot;;</span>
+    boolean complete;
+    boolean retrying;
+    /// Connection ID.  Can be used for callbacks from native layer.
+    private int id;
+    /// There are 5 caching modes:
+    ///
+    /// - `OFF` is the default, meaning no caching.
+    ///
+    /// - `SMART` means all get requests are cached intelligently and caching is &quot;mostly&quot; seamless.
+    ///
+    /// - `MANUAL` means that the developer is responsible for the actual caching but the system will not do a
+    /// request on a resource that's already &quot;fresh&quot;.
+    ///
+    /// - `OFFLINE` will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+    /// if data isn't available.
+    ///
+    /// - `OFFLINE_FIRST` works the same way as offline but if data isn't available locally it will try to
+    /// connect to the server.
+<span class="fc" id="L151">    private CachingMode cacheMode = defaultCacheMode;</span>
+    private EventDispatcher actionListeners;
+<span class="fc" id="L153">    private byte priority = PRIORITY_NORMAL;</span>
+    private long timeSinceLastUpdate;
+    private LinkedHashMap requestArguments;
+<span class="fc" id="L156">    private boolean post = true;</span>
+<span class="fc" id="L157">    private String contentType = &quot;application/x-www-form-urlencoded; charset=UTF-8&quot;;</span>
+<span class="fc" id="L158">    private String userAgent = getDefaultUserAgent();</span>
+    private String url;
+    private boolean writeRequest;
+<span class="fc" id="L161">    private boolean readRequest = true;</span>
+    private boolean paused;
+<span class="fc" id="L163">    private boolean killed = false;</span>
+<span class="fc" id="L164">    private boolean followRedirects = defaultFollowRedirects;</span>
+<span class="fc" id="L165">    private int timeout = -1;</span>
+<span class="fc" id="L166">    private int readTimeout = -1;</span>
+    private InputStream input;
+    private OutputStream output;
+<span class="fc" id="L169">    private int progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;</span>
+<span class="fc" id="L170">    private int contentLength = -1;</span>
+<span class="fc" id="L171">    private boolean duplicateSupported = true;</span>
+    private EventDispatcher responseCodeListeners;
+    private EventDispatcher exceptionListeners;
+    private Hashtable userHeaders;
+    private Dialog showOnInit;
+    private Dialog disposeOnCompletion;
+    private byte[] data;
+    private int responseCode;
+    private String responseErrorMessge;
+    private String httpMethod;
+<span class="fc" id="L181">    private int silentRetryCount = 0;</span>
+    private boolean failSilently;
+<span class="fc" id="L183">    private boolean readResponseForErrors = readResponseForErrorsDefault;</span>
+    private String responseContentType;
+    private boolean redirecting;
+<span class="fc" id="L186">    private boolean cookiesEnabled = cookiesEnabledDefault;</span>
+<span class="fc" id="L187">    private int chunkedStreamingLen = -1;</span>
+    private Exception failureException;
+    private int failureErrorCode;
+    private String destinationFile;
+    private String destinationStorage;
+    private SSLCertificate[] sslCertificates;
+    private boolean checkSSLCertificates;
+    /// A flag that turns off checking for invalid certificates.
+    private boolean insecure;
+    /// The request body can be used instead of arguments to pass JSON data to a restful request,
+    /// it can't be used in a get request and will fail if you have arguments
+    private String requestBody;
+    /// The request body can be used instead of arguments to pass JSON data to a restful request.  It
+    /// can't be used in a get request and will fail if you have arguments.
+    private Data requestBodyData;
+    // Flag to indicate if the contentType was explicitly set for this
+    // request
+    private boolean contentTypeSetExplicitly;
+    private Object _connection;
+
+    /// Default constructor
+<span class="fc" id="L208">    public ConnectionRequest() {</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (NetworkManager.getInstance().isAPSupported()) {</span>
+<span class="nc" id="L210">            silentRetryCount = 1;</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+    /// Construct a connection request to a url
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url
+    public ConnectionRequest(String url) {
+<span class="nc" id="L220">        this();</span>
+<span class="nc" id="L221">        setUrl(url);</span>
+<span class="nc" id="L222">    }</span>
+
+    /// Construct a connection request to a url
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url
+    ///
+    /// - `post`: whether the request is a post url or a get URL
+    public ConnectionRequest(String url, boolean post) {
+<span class="nc" id="L232">        this(url);</span>
+<span class="nc" id="L233">        setPost(post);</span>
+<span class="nc" id="L234">    }</span>
+
+    /// The default value for the cacheMode property see `#getCacheMode()`
+    ///
+    /// #### Returns
+    ///
+    /// the defaultCacheMode
+    public static CachingMode getDefaultCacheMode() {
+<span class="nc" id="L242">        return defaultCacheMode;</span>
+    }
+
+    /// The default value for the cacheMode property see `#getCacheMode()`
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultCacheMode`: the defaultCacheMode to set
+    public static void setDefaultCacheMode(CachingMode aDefaultCacheMode) {
+<span class="nc" id="L251">        defaultCacheMode = aDefaultCacheMode;</span>
+<span class="nc" id="L252">    }</span>
+
+    /// Determines the default value for `#isReadResponseForErrors()`
+    ///
+    /// #### Returns
+    ///
+    /// the readResponseForErrorsDefault
+    public static boolean isReadResponseForErrorsDefault() {
+<span class="nc" id="L260">        return readResponseForErrorsDefault;</span>
+    }
+
+    /// Determines the default value for `#setReadResponseForErrors(boolean)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `aReadResponseForErrorsDefault`: the readResponseForErrorsDefault to set
+    public static void setReadResponseForErrorsDefault(boolean aReadResponseForErrorsDefault) {
+<span class="nc" id="L269">        readResponseForErrorsDefault = aReadResponseForErrorsDefault;</span>
+<span class="nc" id="L270">    }</span>
+
+    /// When set to true (the default), the global error handler in
+    /// `NetworkManager` should receive errors for response code as well
+    ///
+    /// #### Returns
+    ///
+    /// the handleErrorCodesInGlobalErrorHandler
+    public static boolean isHandleErrorCodesInGlobalErrorHandler() {
+<span class="nc" id="L279">        return handleErrorCodesInGlobalErrorHandler;</span>
+    }
+
+    /// When set to true (the default), the global error handler in
+    /// `NetworkManager` should receive errors for response code as well
+    ///
+    /// #### Parameters
+    ///
+    /// - `aHandleErrorCodesInGlobalErrorHandler`: the handleErrorCodesInGlobalErrorHandler to set
+    public static void setHandleErrorCodesInGlobalErrorHandler(
+            boolean aHandleErrorCodesInGlobalErrorHandler) {
+<span class="nc" id="L290">        handleErrorCodesInGlobalErrorHandler =</span>
+                aHandleErrorCodesInGlobalErrorHandler;
+<span class="nc" id="L292">    }</span>
+
+    /// Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
+    /// customize the name of the cookie header to Cookie
+    ///
+    /// #### Returns
+    ///
+    /// the cookieHeader
+    public static String getCookieHeader() {
+<span class="nc" id="L301">        return cookieHeader;</span>
+    }
+
+    /// Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
+    /// customize the name of the cookie header to Cookie
+    ///
+    /// #### Parameters
+    ///
+    /// - `aCookieHeader`: the cookieHeader to set
+    public static void setCookieHeader(String aCookieHeader) {
+<span class="nc" id="L311">        cookieHeader = aCookieHeader;</span>
+<span class="nc" id="L312">    }</span>
+
+    /// #### Returns
+    ///
+    /// the cookiesEnabledDefault
+    public static boolean isCookiesEnabledDefault() {
+<span class="nc" id="L318">        return cookiesEnabledDefault;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `aCookiesEnabledDefault`: the cookiesEnabledDefault to set
+    public static void setCookiesEnabledDefault(boolean aCookiesEnabledDefault) {
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        if (!aCookiesEnabledDefault) {</span>
+<span class="nc" id="L326">            setUseNativeCookieStore(false);</span>
+        }
+<span class="nc" id="L328">        cookiesEnabledDefault = aCookiesEnabledDefault;</span>
+<span class="nc" id="L329">    }</span>
+
+    /// Enables/Disables automatic redirects globally and returns the 302 error code, **IMPORTANT**
+    /// this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
+    ///
+    /// #### Returns
+    ///
+    /// the defaultFollowRedirects
+    public static boolean isDefaultFollowRedirects() {
+<span class="nc" id="L338">        return defaultFollowRedirects;</span>
+    }
+
+    /// Enables/Disables automatic redirects globally and returns the 302 error code, **IMPORTANT**
+    /// this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultFollowRedirects`: the defaultFollowRedirects to set
+    public static void setDefaultFollowRedirects(boolean aDefaultFollowRedirects) {
+<span class="nc" id="L348">        defaultFollowRedirects = aDefaultFollowRedirects;</span>
+<span class="nc" id="L349">    }</span>
+
+    /// Checks if this platform supports read timeouts.
+    ///
+    /// #### Returns
+    ///
+    /// True if this connection supports read timeouts;
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public static boolean isReadTimeoutSupported() {
+<span class="nc" id="L361">        return Util.getImplementation().isReadTimeoutSupported();</span>
+    }
+
+    /// Purges all locally cached files
+    public static void purgeCacheDirectory() throws IOException {
+<span class="nc" id="L366">        Set&lt;String&gt; s = Preferences.keySet();</span>
+<span class="nc" id="L367">        Iterator&lt;String&gt; i = s.iterator();</span>
+<span class="nc" id="L368">        ArrayList&lt;String&gt; remove = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        while (i.hasNext()) {</span>
+<span class="nc" id="L370">            String ss = i.next();</span>
+<span class="nc bnc" id="L371" title="All 4 branches missed.">            if (ss.startsWith(&quot;cn1MSince&quot;) || ss.startsWith(&quot;cn1Etag&quot;)) {</span>
+<span class="nc" id="L372">                remove.add(ss);</span>
+            }
+<span class="nc" id="L374">        }</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        for (String ss : remove) {</span>
+<span class="nc" id="L376">            Preferences.set(ss, null);</span>
+<span class="nc" id="L377">        }</span>
+        String root;
+<span class="nc" id="L379">        FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">        if (fs.hasCachesDir()) {</span>
+<span class="nc" id="L381">            root = fs.getCachesDir() + &quot;cn1ConCache/&quot;;</span>
+        } else {
+<span class="nc" id="L383">            root = fs.getAppHomePath() + &quot;cn1ConCache/&quot;;</span>
+        }
+
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        for (String ss : fs.listFiles(root)) {</span>
+<span class="nc" id="L387">            fs.delete(ss);</span>
+        }
+<span class="nc" id="L389">    }</span>
+
+    /// #### Returns
+    ///
+    /// the defaultUserAgent
+    public static String getDefaultUserAgent() {
+<span class="fc" id="L395">        return defaultUserAgent;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `aDefaultUserAgent`: the defaultUserAgent to set
+    public static void setDefaultUserAgent(String aDefaultUserAgent) {
+<span class="fc" id="L402">        defaultUserAgent = aDefaultUserAgent;</span>
+<span class="fc" id="L403">    }</span>
+
+    /// Indicates whether the native Cookie stores should be used
+    ///
+    /// NOTE: If the platform doesn't support Native Cookie sharing, then this method will
+    /// have no effect.  Use `#isNativeCookieSharingSupported()`} to check if the platform
+    /// supports native cookie sharing at runtime.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to enable native cookie stores when applicable
+    public static void setUseNativeCookieStore(boolean b) {
+<span class="fc" id="L415">        Util.getImplementation().setUseNativeCookieStore(b);</span>
+<span class="fc" id="L416">    }</span>
+
+    /// Checks if the platform supports sharing cookies between the native components (e.g. BrowserComponent)
+    /// and ConnectionRequests.  Currently only iOS and Android support this.
+    ///
+    /// If the platform does not support native cookie sharing, then methods like `#setUseNativeCookieStore(boolean)` will
+    /// have no effect.
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform supports native cookie sharing.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public static boolean isNativeCookieSharingSupported() {
+<span class="nc" id="L432">        return Util.getImplementation().isNativeCookieSharingSupported();</span>
+    }
+
+    /// Utility method that returns a JSON structure or throws an IOException in case of a failure.
+    /// This method blocks the EDT legally and can be used synchronously. Notice that this method assumes
+    /// all JSON data is UTF-8
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL hosing the JSON
+    ///
+    /// #### Returns
+    ///
+    /// map data
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: in case of an error
+    public static Map&lt;String, Object&gt; fetchJSON(String url) throws IOException {
+<span class="nc" id="L451">        ConnectionRequest cr = new ConnectionRequest();</span>
+<span class="nc" id="L452">        cr.setFailSilently(true);</span>
+<span class="nc" id="L453">        cr.setPost(false);</span>
+<span class="nc" id="L454">        cr.setUrl(url);</span>
+<span class="nc" id="L455">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        if (cr.getResponseData() == null) {</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">            if (cr.failureException != null) {</span>
+<span class="nc" id="L458">                throw new IOException(cr.failureException.toString());</span>
+            } else {
+<span class="nc" id="L460">                throw new IOException(&quot;Server returned error code: &quot; + cr.failureErrorCode);</span>
+            }
+        }
+<span class="nc" id="L463">        JSONParser jp = new JSONParser();</span>
+<span class="nc" id="L464">        return jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), &quot;UTF-8&quot;));</span>
+    }
+
+    /// Fetches JSON asynchronously.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: The URL to fetch.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource that will resolve with either an exception or the parsed JSON data.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public static AsyncResource&lt;Map&lt;String, Object&gt;&gt; fetchJSONAsync(String url) {
+<span class="nc" id="L481">        final AsyncResource&lt;Map&lt;String, Object&gt;&gt; out = new AsyncResource&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc" id="L482">        final ConnectionRequest cr = new ConnectionRequest();</span>
+<span class="nc" id="L483">        cr.setFailSilently(true);</span>
+<span class="nc" id="L484">        cr.setPost(false);</span>
+<span class="nc" id="L485">        cr.setUrl(url);</span>
+<span class="nc" id="L486">        cr.addResponseListener(new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+<span class="nc bnc" id="L489" title="All 2 branches missed.">                if (out.isDone()) {</span>
+<span class="nc" id="L490">                    return;</span>
+                }
+<span class="nc bnc" id="L492" title="All 2 branches missed.">                if (cr.getResponseData() == null) {</span>
+<span class="nc bnc" id="L493" title="All 2 branches missed.">                    if (cr.failureException != null) {</span>
+<span class="nc" id="L494">                        out.error(new IOException(cr.failureException.toString()));</span>
+<span class="nc" id="L495">                        return;</span>
+                    } else {
+<span class="nc" id="L497">                        out.error(new IOException(&quot;Server returned error code: &quot; + cr.failureErrorCode));</span>
+<span class="nc" id="L498">                        return;</span>
+                    }
+                }
+<span class="nc" id="L501">                JSONParser jp = new JSONParser();</span>
+<span class="nc" id="L502">                Map&lt;String, Object&gt; result = null;</span>
+                try {
+<span class="nc" id="L504">                    result = jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), &quot;UTF-8&quot;));</span>
+<span class="nc" id="L505">                } catch (IOException ex) {</span>
+<span class="nc" id="L506">                    out.error(ex);</span>
+<span class="nc" id="L507">                    return;</span>
+<span class="nc" id="L508">                }</span>
+<span class="nc" id="L509">                out.complete(result);</span>
+<span class="nc" id="L510">            }</span>
+        });
+<span class="nc" id="L512">        NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="nc" id="L513">        return out;</span>
+    }
+
+    /// There are 5 caching modes:
+    ///
+    /// - `OFF` is the default, meaning no caching.
+    ///
+    /// - `SMART` means all get requests are cached intelligently and caching is &quot;mostly&quot; seamless.
+    ///
+    /// - `MANUAL` means that the developer is responsible for the actual caching but the system will not do a
+    /// request on a resource that's already &quot;fresh&quot;.
+    ///
+    /// - `OFFLINE` will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+    /// if data isn't available.
+    ///
+    /// - `OFFLINE_FIRST` works the same way as offline but if data isn't available locally it will try to
+    /// connect to the server.
+    ///
+    /// #### Returns
+    ///
+    /// the cacheMode
+    public CachingMode getCacheMode() {
+<span class="fc" id="L535">        return cacheMode;</span>
+    }
+
+    /// There are 5 caching modes:
+    ///
+    /// - `OFF` is the default, meaning no caching.
+    ///
+    /// - `SMART` means all get requests are cached intelligently and caching is &quot;mostly&quot; seamless.
+    ///
+    /// - `MANUAL` means that the developer is responsible for the actual caching but the system will not do a
+    /// request on a resource that's already &quot;fresh&quot;.
+    ///
+    /// - `OFFLINE` will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+    /// if data isn't available.
+    ///
+    /// - `OFFLINE_FIRST` works the same way as offline but if data isn't available locally it will try to
+    /// connect to the server.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cacheMode`: the cacheMode to set
+    public void setCacheMode(CachingMode cacheMode) {
+<span class="fc" id="L557">        this.cacheMode = cacheMode;</span>
+<span class="fc" id="L558">    }</span>
+
+    /// #### Returns
+    ///
+    /// the checkSSLCertificates
+    public boolean isCheckSSLCertificates() {
+<span class="nc" id="L564">        return checkSSLCertificates;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `checkSSLCertificates`: the checkSSLCertificates to set
+    public void setCheckSSLCertificates(boolean checkSSLCertificates) {
+<span class="fc" id="L571">        this.checkSSLCertificates = checkSSLCertificates;</span>
+<span class="fc" id="L572">    }</span>
+
+    /// Connection ID used for callbacks from native layer.
+    int getId() {
+<span class="nc" id="L576">        return id;</span>
+    }
+
+    /// Connection ID used for callbacks from native layer
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`
+    void setId(int id) {
+<span class="fc" id="L585">        this.id = id;</span>
+<span class="fc" id="L586">    }</span>
+
+    /// Checks if the request is insecure (default false).
+    ///
+    /// #### Returns
+    ///
+    /// True if the request is insecure, i.e. does not check SSL certificate for validity.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public boolean isInsecure() {
+<span class="fc" id="L598">        return insecure;</span>
+    }
+
+    /// Turns off checking to make sure that SSL certificate is valid.
+    ///
+    /// #### Parameters
+    ///
+    /// - `insecure`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public void setInsecure(boolean insecure) {
+<span class="fc" id="L611">        this.insecure = insecure;</span>
+<span class="fc" id="L612">    }</span>
+
+    /// This method will return a valid value for only some of the responses and only after the response was processed
+    ///
+    /// #### Returns
+    ///
+    /// null or the actual data returned
+    public byte[] getResponseData() {
+<span class="fc" id="L620">        return data;</span>
+    }
+
+    /// Returns the http method
+    ///
+    /// #### Returns
+    ///
+    /// the http method of the request
+    public String getHttpMethod() {
+<span class="fc" id="L629">        return httpMethod;</span>
+    }
+
+    /// Sets the http method for the request
+    ///
+    /// #### Parameters
+    ///
+    /// - `httpMethod`: the http method string
+    public void setHttpMethod(String httpMethod) {
+<span class="fc" id="L638">        this.httpMethod = httpMethod;</span>
+<span class="fc" id="L639">    }</span>
+
+    /// Adds the given header to the request that will be sent
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the header key
+    ///
+    /// - `value`: the header value
+    public void addRequestHeader(String key, String value) {
+<span class="fc bfc" id="L649" title="All 2 branches covered.">        if (userHeaders == null) {</span>
+<span class="fc" id="L650">            userHeaders = new Hashtable();</span>
+        }
+<span class="fc bfc" id="L652" title="All 2 branches covered.">        if (&quot;content-type&quot;.equalsIgnoreCase(key)) {</span>
+<span class="fc" id="L653">            setContentType(value);</span>
+        } else {
+<span class="fc" id="L655">            userHeaders.put(key, value);</span>
+        }
+<span class="fc" id="L657">    }</span>
+
+    /// Adds the given header to the request that will be sent unless the header
+    /// is already set to something else
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the header key
+    ///
+    /// - `value`: the header value
+    void addRequestHeaderDontRepleace(String key, String value) {
+<span class="fc bfc" id="L668" title="All 2 branches covered.">        if (userHeaders == null) {</span>
+<span class="fc" id="L669">            userHeaders = new Hashtable();</span>
+        }
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">        if (!userHeaders.containsKey(key)) {</span>
+<span class="fc" id="L672">            userHeaders.put(key, value);</span>
+        }
+<span class="fc" id="L674">    }</span>
+
+    void prepare() {
+<span class="fc" id="L677">        complete = false;</span>
+<span class="fc" id="L678">        timeSinceLastUpdate = System.currentTimeMillis();</span>
+<span class="fc" id="L679">    }</span>
+
+    /// A callback that can be overridden by subclasses to check the SSL certificates
+    /// for the server, and kill the connection if they don't pass muster.  This can
+    /// be used for SSL pinning.
+    ///
+    /// **NOTE:** This method will only be called if `#isCheckSSLCertificates()` is true and the platform supports SSL certificates (`#canGetSSLCertificates()`.
+    ///
+    /// **WARNING:**  On iOS it is possible that certificates for a request would not be available even through the
+    /// platform supports it, and checking certificates are enabled.  This could happen if the certificates had been cached by the
+    /// TLS cache by some network mechanism other than ConnectionRequest (e.g. native code, websockets, etc..).  In such cases
+    /// this method would receive an empty array as a parameter.
+    ///
+    /// This is called after the SSL handshake, but before any data has been sent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `certificates`: The server's SSL certificates.
+    ///
+    /// #### See also
+    ///
+    /// - #setCheckSSLCertificates(boolean)
+    ///
+    /// - #isCheckSSLCertificates()
+    protected void checkSSLCertificates(SSLCertificate[] certificates) {
+
+<span class="nc" id="L705">    }</span>
+
+    /// Gets the read timeout for this connection. This is only used if `#isReadTimeoutSupported()`
+    /// is true on this platform.  Currently Android, Mac Desktop, Windows Desktop, and Simulator supports read timeouts.
+    ///
+    /// #### Returns
+    ///
+    /// The read timeout.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public int getReadTimeout() {
+<span class="fc" id="L718">        return readTimeout;</span>
+    }
+
+    /// Sets the read timeout for the connection.  This is only used if `#isReadTimeoutSupported()`
+    /// is true on this platform.  Currently Android, Mac Desktop, Windows Desktop, and Simulator supports read timeouts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: The read timeout. If less than or equal to zero, then there is no timeout.
+    ///
+    /// #### See also
+    ///
+    /// - #isReadTimeoutSupported()
+    public void setReadTimeout(int timeout) {
+<span class="fc" id="L732">        readTimeout = timeout;</span>
+<span class="fc" id="L733">    }</span>
+
+    /// Invoked to initialize HTTP headers, cookies etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection object
+    protected void initConnection(Object connection) {
+
+<span class="fc" id="L742">        timeSinceLastUpdate = System.currentTimeMillis();</span>
+<span class="fc" id="L743">        CodenameOneImplementation impl = Util.getImplementation();</span>
+<span class="fc" id="L744">        impl.setPostRequest(connection, isPost());</span>
+<span class="fc bfc" id="L745" title="All 2 branches covered.">        if (readTimeout &gt; 0) {</span>
+<span class="fc" id="L746">            impl.setReadTimeout(connection, readTimeout);</span>
+        }
+<span class="fc bfc" id="L748" title="All 2 branches covered.">        if (insecure) {</span>
+<span class="fc" id="L749">            impl.setInsecure(connection, insecure);</span>
+        }
+<span class="fc" id="L751">        impl.setConnectionId(connection, id);</span>
+
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">        if (getUserAgent() != null) {</span>
+<span class="fc" id="L754">            impl.setHeader(connection, &quot;User-Agent&quot;, getUserAgent());</span>
+        }
+
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">        if (getContentType() != null) {</span>
+            // UWP will automatically filter out the Content-Type header from GET requests
+            // Historically, CN1 has always included this header even though it has no meaning
+            // for GET requests.  it would be be better if CN1 did not include this header
+            // with GET requests, but for backward compatibility, I'll leave it on as
+            // the default, and add a property to turn it off.
+            //  -- SJH Sept. 15, 2016
+<span class="fc bfc" id="L764" title="All 2 branches covered.">            boolean shouldAddContentType = contentTypeSetExplicitly ||</span>
+<span class="pc bpc" id="L765" title="1 of 2 branches missed.">                    &quot;false&quot;.equals(Display.getInstance().getProperty(&quot;ConnectionRequest.excludeContentTypeFromGetRequests&quot;, &quot;true&quot;));</span>
+
+<span class="fc bfc" id="L767" title="All 6 branches covered.">            if (isPost() || (getHttpMethod() != null &amp;&amp; !&quot;get&quot;.equalsIgnoreCase(getHttpMethod()))) {</span>
+<span class="fc" id="L768">                shouldAddContentType = true;</span>
+            }
+
+<span class="fc bfc" id="L771" title="All 2 branches covered.">            if (shouldAddContentType) {</span>
+<span class="fc" id="L772">                impl.setHeader(connection, &quot;Content-Type&quot;, getContentType());</span>
+            }
+        }
+
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">        if (chunkedStreamingLen &gt; -1) {</span>
+<span class="nc" id="L777">            impl.setChunkedStreamingMode(connection, chunkedStreamingLen);</span>
+        }
+
+<span class="pc bpc" id="L780" title="2 of 8 branches missed.">        if (!post &amp;&amp; (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART</span>
+                || cacheMode == CachingMode.OFFLINE_FIRST)) {
+<span class="fc" id="L782">            String msince = Preferences.get(&quot;cn1MSince&quot; + createRequestURL(), null);</span>
+<span class="pc bpc" id="L783" title="1 of 2 branches missed.">            if (msince != null) {</span>
+<span class="nc" id="L784">                impl.setHeader(connection, &quot;If-Modified-Since&quot;, msince);</span>
+            } else {
+<span class="fc" id="L786">                String etag = Preferences.get(&quot;cn1Etag&quot; + createRequestURL(), null);</span>
+<span class="pc bpc" id="L787" title="1 of 2 branches missed.">                if (etag != null) {</span>
+<span class="nc" id="L788">                    impl.setHeader(connection, &quot;If-None-Match&quot;, etag);</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L793" title="All 2 branches covered.">        if (userHeaders != null) {</span>
+<span class="fc" id="L794">            Enumeration e = userHeaders.keys();</span>
+<span class="fc bfc" id="L795" title="All 2 branches covered.">            while (e.hasMoreElements()) {</span>
+<span class="fc" id="L796">                String k = (String) e.nextElement();</span>
+<span class="fc" id="L797">                String value = (String) userHeaders.get(k);</span>
+<span class="fc" id="L798">                impl.setHeader(connection, k, value);</span>
+<span class="fc" id="L799">            }</span>
+        }
+<span class="fc" id="L801">    }</span>
+
+    /// This method should be overriden in `CacheMode.MANUAL` to provide offline caching. The default
+    /// implementation will work as expected in the `CacheMode.SMART` and `CacheMode.OFFLINE_FIRST` modes.
+    ///
+    /// #### Returns
+    ///
+    /// the offline cached data or null/exception if unavailable
+    protected InputStream getCachedData() throws IOException {
+<span class="nc bnc" id="L810" title="All 2 branches missed.">        if (destinationFile != null) {</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">            if (FileSystemStorage.getInstance().exists(destinationFile)) {</span>
+<span class="nc" id="L812">                return FileSystemStorage.getInstance().openInputStream(destinationFile);</span>
+            }
+<span class="nc" id="L814">            return null;</span>
+        }
+
+<span class="nc bnc" id="L817" title="All 2 branches missed.">        if (destinationStorage != null) {</span>
+<span class="nc bnc" id="L818" title="All 2 branches missed.">            if (Storage.getInstance().exists(destinationFile)) {</span>
+<span class="nc" id="L819">                return Storage.getInstance().createInputStream(destinationFile);</span>
+            }
+<span class="nc" id="L821">            return null;</span>
+        }
+
+<span class="nc" id="L824">        String s = getCacheFileName();</span>
+<span class="nc bnc" id="L825" title="All 2 branches missed.">        if (FileSystemStorage.getInstance().exists(s)) {</span>
+<span class="nc" id="L826">            return FileSystemStorage.getInstance().openInputStream(s);</span>
+        }
+<span class="nc" id="L828">        return null;</span>
+    }
+
+    /// Deletes the cache file if it exists, notice that this will not work for download files
+    public void purgeCache() {
+<span class="nc" id="L833">        FileSystemStorage.getInstance().delete(getCacheFileName());</span>
+<span class="nc" id="L834">    }</span>
+
+    /// This callback is invoked on a 304 server response indicating the data in the server matches the result
+    /// we currently have in the cache. This method can be overriden to detect this case
+    protected void cacheUnmodified() throws IOException {
+<span class="nc bnc" id="L839" title="All 4 branches missed.">        if (destinationFile != null || destinationStorage != null) {</span>
+<span class="nc bnc" id="L840" title="All 4 branches missed.">            if (hasResponseListeners() &amp;&amp; !isKilled()) {</span>
+<span class="nc bnc" id="L841" title="All 2 branches missed.">                if (destinationFile != null) {</span>
+<span class="nc" id="L842">                    data = Util.readInputStream(FileSystemStorage.getInstance().openInputStream(destinationFile));</span>
+                } else {
+<span class="nc" id="L844">                    data = Util.readInputStream(Storage.getInstance().createInputStream(destinationStorage));</span>
+                }
+<span class="nc" id="L846">                fireResponseListener(new NetworkEvent(this, data));</span>
+            }
+<span class="nc" id="L848">            return;</span>
+        }
+<span class="nc" id="L850">        InputStream is = null; //NOPMD CloseResource</span>
+        try {
+<span class="nc" id="L852">            is = FileSystemStorage.getInstance().openInputStream(getCacheFileName());</span>
+<span class="nc" id="L853">            readResponse(is);</span>
+        } finally {
+<span class="nc" id="L855">            Util.cleanup(is);</span>
+        }
+
+<span class="nc" id="L858">    }</span>
+
+    private String getCacheFileName() {
+        String root;
+<span class="nc bnc" id="L862" title="All 2 branches missed.">        if (FileSystemStorage.getInstance().hasCachesDir()) {</span>
+<span class="nc" id="L863">            root = FileSystemStorage.getInstance().getCachesDir() + &quot;cn1ConCache/&quot;;</span>
+        } else {
+<span class="nc" id="L865">            root = FileSystemStorage.getInstance().getAppHomePath() + &quot;cn1ConCache/&quot;;</span>
+        }
+<span class="nc" id="L867">        FileSystemStorage.getInstance().mkdir(root);</span>
+<span class="nc" id="L868">        String fileName = Base64.encodeNoNewline(StringUtil.getBytes(createRequestURL())).replace('/', '-').replace('+', '_');</span>
+
+        // limit file name length for portability: https://stackoverflow.com/questions/54644088/why-is-codenameone-rest-giving-me-file-name-too-long-error
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        if (fileName.length() &gt; 255) {</span>
+<span class="nc" id="L872">            String s = fileName.substring(0, 248);</span>
+<span class="nc" id="L873">            int checksum = 0;</span>
+<span class="nc bnc" id="L874" title="All 2 branches missed.">            for (int iter = 248; iter &lt; fileName.length(); iter++) {</span>
+<span class="nc" id="L875">                checksum += fileName.charAt(iter);</span>
+            }
+<span class="nc" id="L877">            fileName = s + checksum;</span>
+        }
+
+<span class="nc" id="L880">        return root + fileName;</span>
+    }
+
+    /// This callback is used internally to check SSL certificates, only on platforms that require
+    /// native callbacks for checking SSL certs.  Currently only iOS requires this.
+    ///
+    /// #### Returns
+    ///
+    /// True if the certificates checkout OK, or if the request doesn't require SSL cert checks.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
+    ///
+    /// #### See also
+    ///
+    /// - NetworkManager#checkCertificatesNativeCallback(int)
+    boolean checkCertificatesNativeCallback() {
+<span class="nc bnc" id="L898" title="All 2 branches missed.">        if (!Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {</span>
+            //throw new RuntimeException(&quot;checkCertificates() can only be explicitly called on platforms that require native callbacks for checking certificates.&quot;);
+<span class="nc" id="L900">            return true;</span>
+        }
+<span class="nc bnc" id="L902" title="All 2 branches missed.">        if (!checkSSLCertificates) {</span>
+            // If the request doesn't require checking SSL certificates, then this returns true.
+            // meaning that it checks out OK.
+<span class="nc" id="L905">            return true;</span>
+        }
+        try {
+<span class="nc" id="L908">            checkSSLCertificates(getSSLCertificates());</span>
+<span class="nc bnc" id="L909" title="All 2 branches missed.">            return !shouldStop();</span>
+<span class="nc" id="L910">        } catch (IOException ex) {</span>
+<span class="nc" id="L911">            Log.e(ex);</span>
+<span class="nc" id="L912">            return false;</span>
+        }
+
+    }
+
+    /// Performs the actual network request on behalf of the network manager
+    void performOperation() throws IOException {
+<span class="nc" id="L919">        performOperationComplete();</span>
+<span class="nc" id="L920">    }</span>
+
+    /// Performs the actual network request on behalf of the network manager
+    ///
+    /// #### Returns
+    ///
+    /// true if the operation completed, false if the network request is scheduled to be retried.
+    boolean performOperationComplete() throws IOException {
+<span class="pc bpc" id="L928" title="1 of 2 branches missed.">        if (shouldStop()) {</span>
+<span class="nc" id="L929">            return true;</span>
+        }
+<span class="pc bpc" id="L931" title="2 of 4 branches missed.">        if (cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {</span>
+<span class="nc" id="L932">            InputStream is = null; //NOPMD CloseResource</span>
+            try {
+<span class="nc" id="L934">                is = getCachedData();</span>
+<span class="nc bnc" id="L935" title="All 2 branches missed.">                if (is != null) {</span>
+<span class="nc" id="L936">                    readResponse(is);</span>
+<span class="nc" id="L937">                    return true;</span>
+                } else {
+<span class="nc bnc" id="L939" title="All 2 branches missed.">                    if (cacheMode == CachingMode.OFFLINE) {</span>
+<span class="nc" id="L940">                        responseCode = 404;</span>
+<span class="nc" id="L941">                        throw new IOException(&quot;File unavilable in cache&quot;);</span>
+                    }
+                }
+            } finally {
+<span class="nc" id="L945">                Util.cleanup(is);</span>
+            }
+        }
+<span class="fc" id="L948">        CodenameOneImplementation impl = Util.getImplementation();</span>
+<span class="fc" id="L949">        Object connection = null;</span>
+<span class="fc" id="L950">        input = null;</span>
+<span class="fc" id="L951">        output = null;</span>
+<span class="fc" id="L952">        redirecting = false;</span>
+        try {
+<span class="fc" id="L954">            String actualUrl = createRequestURL();</span>
+<span class="fc bfc" id="L955" title="All 2 branches covered.">            if (timeout &gt; 0) {</span>
+<span class="fc bfc" id="L956" title="All 4 branches covered.">                connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest(), timeout);</span>
+            } else {
+<span class="pc bpc" id="L958" title="1 of 4 branches missed.">                connection = impl.connect(actualUrl, isReadRequest(), isPost() || isWriteRequest());</span>
+            }
+<span class="fc" id="L960">            _connection = connection;</span>
+<span class="pc bpc" id="L961" title="1 of 2 branches missed.">            if (shouldStop()) {</span>
+<span class="nc" id="L962">                return true;</span>
+            }
+<span class="fc" id="L964">            initConnection(connection);</span>
+<span class="fc bfc" id="L965" title="All 2 branches covered.">            if (httpMethod != null) {</span>
+<span class="fc" id="L966">                impl.setHttpMethod(connection, httpMethod);</span>
+            }
+<span class="fc bfc" id="L968" title="All 2 branches covered.">            if (isCookiesEnabled()) {</span>
+<span class="fc" id="L969">                Vector v = impl.getCookiesForURL(actualUrl);</span>
+<span class="pc bpc" id="L970" title="1 of 2 branches missed.">                if (v != null) {</span>
+<span class="nc" id="L971">                    int c = v.size();</span>
+<span class="nc bnc" id="L972" title="All 2 branches missed.">                    if (c &gt; 0) {</span>
+<span class="nc" id="L973">                        StringBuilder cookieStr = new StringBuilder();</span>
+<span class="nc" id="L974">                        Cookie first = (Cookie) v.elementAt(0);</span>
+<span class="nc" id="L975">                        cookieSent(first);</span>
+<span class="nc" id="L976">                        cookieStr.append(first.getName());</span>
+<span class="nc" id="L977">                        cookieStr.append(&quot;=&quot;);</span>
+<span class="nc" id="L978">                        cookieStr.append(first.getValue());</span>
+<span class="nc bnc" id="L979" title="All 2 branches missed.">                        for (int iter = 1; iter &lt; c; iter++) {</span>
+<span class="nc" id="L980">                            Cookie current = (Cookie) v.elementAt(iter);</span>
+<span class="nc" id="L981">                            cookieStr.append(&quot;;&quot;);</span>
+<span class="nc" id="L982">                            cookieStr.append(current.getName());</span>
+<span class="nc" id="L983">                            cookieStr.append(&quot;=&quot;);</span>
+<span class="nc" id="L984">                            cookieStr.append(current.getValue());</span>
+<span class="nc" id="L985">                            cookieSent(current);</span>
+                        }
+<span class="nc" id="L987">                        impl.setHeader(connection, cookieHeader, initCookieHeader(cookieStr.toString()));</span>
+<span class="nc" id="L988">                    } else {</span>
+<span class="nc" id="L989">                        String s = initCookieHeader(null);</span>
+<span class="nc bnc" id="L990" title="All 2 branches missed.">                        if (s != null) {</span>
+<span class="nc" id="L991">                            impl.setHeader(connection, cookieHeader, s);</span>
+                        }
+                    }
+<span class="nc" id="L994">                } else {</span>
+<span class="fc" id="L995">                    String s = initCookieHeader(null);</span>
+<span class="pc bpc" id="L996" title="1 of 2 branches missed.">                    if (s != null) {</span>
+<span class="nc" id="L997">                        impl.setHeader(connection, cookieHeader, s);</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L1001" title="1 of 4 branches missed.">            if (checkSSLCertificates &amp;&amp; canGetSSLCertificates() &amp;&amp;</span>
+                    // For iOS only... it needs to use a callback from native code
+                    // for checking the SSL certificates - otherwise it will send
+                    // empty POST bodies.
+<span class="pc bpc" id="L1005" title="1 of 2 branches missed.">                    !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {</span>
+<span class="fc" id="L1006">                sslCertificates = getSSLCertificatesImpl(connection, url);</span>
+<span class="fc" id="L1007">                checkSSLCertificates(sslCertificates);</span>
+<span class="fc bfc" id="L1008" title="All 2 branches covered.">                if (shouldStop()) {</span>
+<span class="fc" id="L1009">                    return true;</span>
+                }
+            }
+<span class="fc bfc" id="L1012" title="All 2 branches covered.">            if (isWriteRequest()) {</span>
+<span class="fc" id="L1013">                progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;</span>
+<span class="fc" id="L1014">                output = impl.openOutputStream(connection);</span>
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">                if (shouldStop()) {</span>
+<span class="nc" id="L1016">                    return true;</span>
+                }
+<span class="pc bpc" id="L1018" title="1 of 4 branches missed.">                if (NetworkManager.getInstance().hasProgressListeners() &amp;&amp; output instanceof BufferedOutputStream) {</span>
+<span class="fc" id="L1019">                    ((BufferedOutputStream) output).setProgressListener(this);</span>
+                }
+<span class="fc bfc" id="L1021" title="All 2 branches covered.">                if (requestBody != null) {</span>
+<span class="pc bpc" id="L1022" title="1 of 2 branches missed.">                    if (shouldWriteUTFAsGetBytes()) {</span>
+<span class="fc" id="L1023">                        output.write(requestBody.getBytes(&quot;UTF-8&quot;));</span>
+                    } else {
+<span class="nc" id="L1025">                        OutputStreamWriter w = null; //NOPMD CloseResource</span>
+                        try {
+<span class="nc" id="L1027">                            w = new OutputStreamWriter(output, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L1028">                            w.write(requestBody);</span>
+<span class="nc" id="L1029">                            w.flush();</span>
+                        } finally {
+<span class="nc" id="L1031">                            Util.cleanup(w);</span>
+                        }
+<span class="nc" id="L1033">                    }</span>
+<span class="fc bfc" id="L1034" title="All 2 branches covered.">                } else if (requestBodyData != null) {</span>
+<span class="fc" id="L1035">                    requestBodyData.appendTo(output);</span>
+                } else {
+<span class="fc" id="L1037">                    buildRequestBody(output);</span>
+                }
+<span class="pc bpc" id="L1039" title="1 of 2 branches missed.">                if (shouldStop()) {</span>
+<span class="nc" id="L1040">                    return true;</span>
+                }
+<span class="pc bpc" id="L1042" title="1 of 2 branches missed.">                if (output instanceof BufferedOutputStream) {</span>
+<span class="fc" id="L1043">                    ((BufferedOutputStream) output).flushBuffer();</span>
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">                    if (shouldStop()) {</span>
+<span class="nc" id="L1045">                        return true;</span>
+                    }
+                }
+            }
+<span class="fc" id="L1049">            timeSinceLastUpdate = System.currentTimeMillis();</span>
+<span class="fc" id="L1050">            responseCode = impl.getResponseCode(connection);</span>
+
+<span class="fc bfc" id="L1052" title="All 2 branches covered.">            if (isCookiesEnabled()) {</span>
+<span class="fc" id="L1053">                String[] cookies = impl.getHeaderFields(&quot;Set-Cookie&quot;, connection);</span>
+<span class="pc bpc" id="L1054" title="3 of 4 branches missed.">                if (cookies != null &amp;&amp; cookies.length &gt; 0) {</span>
+<span class="nc" id="L1055">                    ArrayList cook = new ArrayList();</span>
+<span class="nc" id="L1056">                    int clen = cookies.length;</span>
+<span class="nc bnc" id="L1057" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; clen; iter++) {</span>
+<span class="nc" id="L1058">                        Cookie coo = parseCookieHeader(cookies[iter]);</span>
+<span class="nc bnc" id="L1059" title="All 2 branches missed.">                        if (coo != null) {</span>
+<span class="nc" id="L1060">                            cook.add(coo);</span>
+<span class="nc" id="L1061">                            cookieReceived(coo);</span>
+                        }
+                    }
+<span class="nc" id="L1064">                    impl.addCookie((Cookie[]) cook.toArray(new Cookie[cook.size()]));</span>
+                }
+            }
+
+<span class="pc bpc" id="L1068" title="3 of 4 branches missed.">            if (responseCode == 304 &amp;&amp; cacheMode != CachingMode.OFF) {</span>
+<span class="nc" id="L1069">                cacheUnmodified();</span>
+<span class="nc" id="L1070">                return true;</span>
+            }
+
+<span class="pc bpc" id="L1073" title="1 of 4 branches missed.">            if (responseCode - 200 &lt; 0 || responseCode - 200 &gt; 100) {</span>
+<span class="fc" id="L1074">                readErrorCodeHeaders(connection);</span>
+                // redirect to new location
+<span class="pc bpc" id="L1076" title="5 of 10 branches missed.">                if (followRedirects &amp;&amp; (responseCode == 301 || responseCode == 302</span>
+                        || responseCode == 303 || responseCode == 307)) {
+<span class="nc" id="L1078">                    String uri = impl.getHeaderField(&quot;location&quot;, connection);</span>
+
+<span class="nc bnc" id="L1080" title="All 4 branches missed.">                    if (!(uri.startsWith(&quot;http://&quot;) || uri.startsWith(&quot;https://&quot;))) {</span>
+                        // relative URI's in the location header are illegal but some sites mistakenly use them
+<span class="nc" id="L1082">                        url = Util.relativeToAbsolute(url, uri);</span>
+                    } else {
+<span class="nc" id="L1084">                        url = uri;</span>
+                    }
+<span class="nc bnc" id="L1086" title="All 4 branches missed.">                    if (requestArguments != null &amp;&amp; url.indexOf('?') &gt; -1) {</span>
+<span class="nc" id="L1087">                        requestArguments.clear();</span>
+                    }
+
+<span class="nc bnc" id="L1090" title="All 4 branches missed.">                    if ((responseCode == 302 || responseCode == 303)) {</span>
+<span class="nc bnc" id="L1091" title="All 4 branches missed.">                        if (this.post &amp;&amp; shouldConvertPostToGetOnRedirect()) {</span>
+<span class="nc" id="L1092">                            this.post = false;</span>
+<span class="nc" id="L1093">                            setWriteRequest(false);</span>
+                        }
+                    }
+
+<span class="nc" id="L1097">                    impl.cleanup(output);</span>
+<span class="nc" id="L1098">                    impl.cleanup(connection);</span>
+<span class="nc" id="L1099">                    connection = null;</span>
+<span class="nc" id="L1100">                    output = null;</span>
+<span class="nc bnc" id="L1101" title="All 2 branches missed.">                    if (!onRedirect(url)) {</span>
+<span class="nc" id="L1102">                        redirecting = true;</span>
+<span class="nc" id="L1103">                        retry();</span>
+<span class="nc" id="L1104">                        return false;</span>
+                    }
+<span class="nc" id="L1106">                    return true;</span>
+                }
+
+<span class="fc" id="L1109">                responseErrorMessge = impl.getResponseMessage(connection);</span>
+<span class="fc" id="L1110">                handleErrorResponseCode(responseCode, responseErrorMessge);</span>
+<span class="fc bfc" id="L1111" title="All 2 branches covered.">                if (!isReadResponseForErrors()) {</span>
+<span class="fc" id="L1112">                    return true;</span>
+                }
+            }
+<span class="fc" id="L1115">            responseContentType = getHeader(connection, &quot;Content-Type&quot;);</span>
+
+<span class="pc bpc" id="L1117" title="2 of 6 branches missed.">            if (cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL</span>
+                    || cacheMode == CachingMode.OFFLINE_FIRST) {
+<span class="fc" id="L1119">                String last = getHeader(connection, &quot;Last-Modified&quot;);</span>
+<span class="fc" id="L1120">                String etag = getHeader(connection, &quot;ETag&quot;);</span>
+<span class="fc" id="L1121">                Preferences.set(&quot;cn1MSince&quot; + createRequestURL(), last);</span>
+<span class="fc" id="L1122">                Preferences.set(&quot;cn1Etag&quot; + createRequestURL(), etag);</span>
+            }
+<span class="fc" id="L1124">            readHeaders(connection);</span>
+<span class="fc" id="L1125">            contentLength = impl.getContentLength(connection);</span>
+<span class="fc" id="L1126">            timeSinceLastUpdate = System.currentTimeMillis();</span>
+
+<span class="fc" id="L1128">            progress = NetworkEvent.PROGRESS_TYPE_INPUT;</span>
+<span class="pc bpc" id="L1129" title="1 of 2 branches missed.">            if (isReadRequest()) {</span>
+<span class="fc" id="L1130">                input = impl.openInputStream(connection);</span>
+<span class="pc bpc" id="L1131" title="1 of 2 branches missed.">                if (shouldStop()) {</span>
+<span class="nc" id="L1132">                    return true;</span>
+                }
+<span class="pc bpc" id="L1134" title="1 of 2 branches missed.">                if (input instanceof BufferedInputStream) {</span>
+<span class="nc bnc" id="L1135" title="All 2 branches missed.">                    if (NetworkManager.getInstance().hasProgressListeners()) {</span>
+<span class="nc" id="L1136">                        ((BufferedInputStream) input).setProgressListener(this);</span>
+                    }
+<span class="nc" id="L1138">                    ((BufferedInputStream) input).setYield(getYield());</span>
+                }
+<span class="pc bpc" id="L1140" title="6 of 10 branches missed.">                if (!post &amp;&amp; (cacheMode == CachingMode.SMART || cacheMode == CachingMode.OFFLINE_FIRST)</span>
+                        &amp;&amp; destinationFile == null &amp;&amp; destinationStorage == null) {
+<span class="nc" id="L1142">                    byte[] d = Util.readInputStream(input);</span>
+<span class="nc" id="L1143">                    OutputStream os = null; //NOPMD CloseResource</span>
+                    try {
+<span class="nc" id="L1145">                        os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());</span>
+<span class="nc" id="L1146">                        os.write(d);</span>
+                    } finally {
+<span class="nc" id="L1148">                        Util.cleanup(os);</span>
+                    }
+<span class="nc" id="L1150">                    readResponse(new ByteArrayInputStream(d));</span>
+<span class="nc" id="L1151">                } else {</span>
+<span class="fc" id="L1152">                    readResponse(input);</span>
+                }
+<span class="pc bpc" id="L1154" title="1 of 2 branches missed.">                if (shouldAutoCloseResponse()) {</span>
+<span class="pc bpc" id="L1155" title="1 of 2 branches missed.">                    if (input != null) {</span>
+<span class="fc" id="L1156">                        input.close();</span>
+                    }
+                }
+            }
+        } finally {
+            // always cleanup connections/streams even in case of an exception
+<span class="fc" id="L1162">            impl.cleanup(output);</span>
+<span class="fc" id="L1163">            impl.cleanup(input);</span>
+<span class="fc" id="L1164">            impl.cleanup(connection);</span>
+<span class="fc" id="L1165">            timeSinceLastUpdate = -1;</span>
+<span class="fc" id="L1166">            input = null;</span>
+<span class="fc" id="L1167">            output = null;</span>
+<span class="fc" id="L1168">            connection = null;</span>
+<span class="fc" id="L1169">            _connection = null;</span>
+        }
+<span class="pc bpc" id="L1171" title="1 of 2 branches missed.">        if (!isKilled()) {</span>
+<span class="fc" id="L1172">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L1175">                    postResponse();</span>
+<span class="fc" id="L1176">                }</span>
+            });
+        }
+<span class="fc" id="L1179">        return true;</span>
+    }
+
+    /// Callback invoked for every cookie received from the server
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the cookie
+    protected void cookieReceived(Cookie c) {
+<span class="nc" id="L1188">    }</span>
+
+    /// Callback invoked for every cookie being sent to the server
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the cookie
+    protected void cookieSent(Cookie c) {
+<span class="nc" id="L1196">    }</span>
+
+    /// Allows subclasses to inject cookies into the request
+    ///
+    /// #### Parameters
+    ///
+    /// - `cookie`: the cookie that the implementation is about to send or null for no cookie
+    ///
+    /// #### Returns
+    ///
+    /// new cookie or the value of cookie
+    protected String initCookieHeader(String cookie) {
+<span class="fc" id="L1208">        return cookie;</span>
+    }
+
+    /// Returns the response code for this request, this is only relevant after the request completed and
+    /// might contain a temporary (e.g. redirect) code while the request is in progress
+    ///
+    /// #### Returns
+    ///
+    /// the response code
+    public int getResponseCode() {
+<span class="fc" id="L1218">        return responseCode;</span>
+    }
+
+    /// Returns the response code for this request, this is only relevant after the request completed and
+    /// might contain a temporary (e.g. redirect) code while the request is in progress
+    ///
+    /// #### Returns
+    ///
+    /// the response code
+    ///
+    /// #### Deprecated
+    ///
+    /// misspelled method name please use getResponseCode
+    public int getResposeCode() {
+<span class="nc" id="L1232">        return responseCode;</span>
+    }
+
+    /// This mimics the behavior of browsers that convert post operations to get operations when redirecting a
+    /// request.
+    ///
+    /// #### Returns
+    ///
+    /// defaults to true, this case be modified by subclasses
+    protected boolean shouldConvertPostToGetOnRedirect() {
+<span class="nc" id="L1242">        return true;</span>
+    }
+
+    /// Allows reading the headers from the connection by calling the getHeader() method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: used when invoking getHeader
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: thrown on failure
+    protected void readHeaders(Object connection) throws IOException {
+<span class="fc" id="L1255">    }</span>
+
+    /// Allows reading the headers from the connection by calling the getHeader() method when a response that isn't 200 OK is sent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: used when invoking getHeader
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: thrown on failure
+    protected void readErrorCodeHeaders(Object connection) throws IOException {
+<span class="fc" id="L1267">    }</span>
+
+    /// Returns the HTTP header field for the given connection, this method is only guaranteed to work
+    /// when invoked from the readHeaders method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to the network
+    ///
+    /// - `header`: the name of the header
+    ///
+    /// #### Returns
+    ///
+    /// the value of the header
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: thrown on failure
+    protected String getHeader(Object connection, String header) throws IOException {
+<span class="fc" id="L1286">        return Util.getImplementation().getHeaderField(header, connection);</span>
+    }
+
+    /// Returns the HTTP header field for the given connection, this method is only guaranteed to work
+    /// when invoked from the readHeaders method. Unlike the getHeader method this version works when
+    /// the same header name is declared multiple times.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to the network
+    ///
+    /// - `header`: the name of the header
+    ///
+    /// #### Returns
+    ///
+    /// the value of the header
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: thrown on failure
+    protected String[] getHeaders(Object connection, String header) throws IOException {
+<span class="nc" id="L1307">        return Util.getImplementation().getHeaderFields(header, connection);</span>
+    }
+
+    /// Returns the HTTP header field names for the given connection, this method is only guaranteed to work
+    /// when invoked from the readHeaders method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to the network
+    ///
+    /// #### Returns
+    ///
+    /// the names of the headers
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: thrown on failure
+    protected String[] getHeaderFieldNames(Object connection) throws IOException {
+<span class="nc" id="L1325">        return Util.getImplementation().getHeaderFieldNames(connection);</span>
+    }
+
+    /// Returns the amount of time to yield for other processes, this is an implicit
+    /// method that automatically generates values for lower priority connections
+    ///
+    /// #### Returns
+    ///
+    /// yield duration or -1 for no yield
+    protected int getYield() {
+<span class="nc bnc" id="L1335" title="All 2 branches missed.">        if (priority &gt; PRIORITY_NORMAL) {</span>
+<span class="nc" id="L1336">            return -1;</span>
+        }
+<span class="nc bnc" id="L1338" title="All 2 branches missed.">        if (priority == PRIORITY_NORMAL) {</span>
+<span class="nc" id="L1339">            return 20;</span>
+        }
+<span class="nc" id="L1341">        return 40;</span>
+    }
+
+    /// Indicates whether the response stream should be closed automatically by
+    /// the framework (defaults to true), this might cause an issue if the stream
+    /// needs to be passed to a separate thread for reading.
+    ///
+    /// #### Returns
+    ///
+    /// true to close the response stream automatically.
+    protected boolean shouldAutoCloseResponse() {
+<span class="fc" id="L1352">        return true;</span>
+    }
+
+    /// Parses a raw cookie header and returns a cookie object to send back at the server
+    ///
+    /// #### Parameters
+    ///
+    /// - `h`: raw cookie header
+    ///
+    /// #### Returns
+    ///
+    /// the cookie object
+    private Cookie parseCookieHeader(String h) {
+<span class="nc" id="L1365">        String lowerH = h.toLowerCase();</span>
+
+<span class="nc" id="L1367">        Cookie c = new Cookie();</span>
+<span class="nc" id="L1368">        int edge = h.indexOf(';');</span>
+<span class="nc" id="L1369">        int equals = h.indexOf('=');</span>
+<span class="nc bnc" id="L1370" title="All 2 branches missed.">        if (equals &lt; 0) {</span>
+<span class="nc" id="L1371">            return null;</span>
+        }
+<span class="nc" id="L1373">        c.setName(h.substring(0, equals));</span>
+<span class="nc bnc" id="L1374" title="All 2 branches missed.">        if (edge &lt; 0) {</span>
+<span class="nc" id="L1375">            c.setValue(h.substring(equals + 1));</span>
+<span class="nc" id="L1376">            c.setDomain(Util.getImplementation().getURLDomain(url));</span>
+<span class="nc" id="L1377">            return c;</span>
+        } else {
+<span class="nc" id="L1379">            c.setValue(h.substring(equals + 1, edge));</span>
+        }
+
+<span class="nc" id="L1382">        int index = lowerH.indexOf(&quot;domain=&quot;);</span>
+<span class="nc bnc" id="L1383" title="All 2 branches missed.">        if (index &gt; -1) {</span>
+<span class="nc" id="L1384">            String domain = h.substring(index + 7);</span>
+<span class="nc" id="L1385">            index = domain.indexOf(';');</span>
+<span class="nc bnc" id="L1386" title="All 2 branches missed.">            if (index != -1) {</span>
+<span class="nc" id="L1387">                domain = domain.substring(0, index);</span>
+            }
+
+            // Fix for https://github.com/codenameone/CodenameOne/issues/3565
+<span class="nc bnc" id="L1391" title="All 2 branches missed.">            if (domain.startsWith(&quot;.&quot;)) {</span>
+<span class="nc" id="L1392">                domain = domain.substring(1);</span>
+            }
+
+<span class="nc bnc" id="L1395" title="All 2 branches missed.">            if (url.indexOf(domain) &lt; 0) { //if (!hc.getHost().endsWith(domain)) {</span>
+<span class="nc" id="L1396">                Log.p(&quot;Warning: Cookie tried to set to another domain&quot;);</span>
+<span class="nc" id="L1397">                c.setDomain(Util.getImplementation().getURLDomain(url));</span>
+            } else {
+<span class="nc" id="L1399">                c.setDomain(domain);</span>
+            }
+<span class="nc" id="L1401">        } else {</span>
+<span class="nc" id="L1402">            c.setDomain(Util.getImplementation().getURLDomain(url));</span>
+        }
+
+<span class="nc" id="L1405">        index = lowerH.indexOf(&quot;path=&quot;);</span>
+<span class="nc bnc" id="L1406" title="All 2 branches missed.">        if (index &gt; -1) {</span>
+<span class="nc" id="L1407">            String path = h.substring(index + 5);</span>
+<span class="nc" id="L1408">            index = path.indexOf(';');</span>
+<span class="nc bnc" id="L1409" title="All 2 branches missed.">            if (index &gt; -1) {</span>
+<span class="nc" id="L1410">                path = path.substring(0, index);</span>
+            }
+
+<span class="nc bnc" id="L1413" title="All 2 branches missed.">            if (Util.getImplementation().getURLPath(url).indexOf(path) != 0) { //if (!hc.getHost().endsWith(domain)) {</span>
+<span class="nc" id="L1414">                Log.p(&quot;Warning: Cookie tried to set to another path&quot;);</span>
+<span class="nc" id="L1415">                c.setPath(path);</span>
+            }
+        }
+
+        // Check for secure and httponly.
+        // SJH NOTE:  It would be better to rewrite this whole method to
+        // split it up this way, rather than do the domain and path
+        // separately.. but this is a patch job to just get secure
+        // path, and httponly working... don't want to break any existing
+        // code for now.
+<span class="nc" id="L1425">        java.util.List parts = StringUtil.tokenize(lowerH, ';');</span>
+<span class="nc bnc" id="L1426" title="All 2 branches missed.">        for (int i = 0; i &lt; parts.size(); i++) {</span>
+<span class="nc" id="L1427">            String part = (String) parts.get(i);</span>
+<span class="nc" id="L1428">            part = part.trim();</span>
+<span class="nc bnc" id="L1429" title="All 2 branches missed.">            if (part.indexOf(&quot;secure&quot;) == 0) {</span>
+<span class="nc" id="L1430">                c.setSecure(true);</span>
+<span class="nc bnc" id="L1431" title="All 2 branches missed.">            } else if (part.indexOf(&quot;httponly&quot;) == 0) {</span>
+<span class="nc" id="L1432">                c.setHttpOnly(true);</span>
+<span class="nc bnc" id="L1433" title="All 2 branches missed.">            } else if (part.indexOf(&quot;expires&quot;) == 0) {</span>
+                //SimpleDateFormat format = new SimpleDateFormat(&quot;EEE, dd-MMM-yyyy HH:mm:ss z&quot;);
+<span class="nc" id="L1435">                String date = part.substring(part.indexOf(&quot;=&quot;) + 1);</span>
+<span class="nc" id="L1436">                Date dt = parseDate(date,</span>
+                        &quot;EEE, dd-MMM-yyyy HH:mm:ss z&quot;,
+                        &quot;EEE dd-MMM-yyyy HH:mm:ss z&quot;,
+                        &quot;EEE, dd MMM yyyy HH:mm:ss z&quot;,
+                        &quot;EEE dd MMM yyyy HH:mm:ss z&quot;,
+                        &quot;EEE, dd-MMM-yyyy HH:mm:ss Z&quot;,
+                        &quot;EEE dd-MMM-yyyy HH:mm:ss Z&quot;,
+                        &quot;EEE, dd MMM yyyy HH:mm:ss Z&quot;,
+                        &quot;EEE dd MMM yyyy HH:mm:ss Z&quot;,
+                        &quot;EEE, dd-MMM-yy HH:mm:ss z&quot;,
+                        &quot;EEE dd-MMM-yy HH:mm:ss z&quot;,
+                        &quot;EEE, dd MMM yy HH:mm:ss z&quot;,
+                        &quot;EEE dd MMM yy HH:mm:ss z&quot;,
+                        &quot;EEE, dd-MMM-yy HH:mm:ss Z&quot;,
+                        &quot;EEE dd-MMM-yy HH:mm:ss Z&quot;,
+                        &quot;EEE, dd MMM yy HH:mm:ss Z&quot;,
+                        &quot;EEE dd MMM yy HH:mm:ss Z&quot;,
+                        &quot;dd-MMM-yy HH:mm:ss z&quot;,
+                        &quot;EEE, dd-MMM-yy HH:mm:ss z&quot;
+                );
+<span class="nc bnc" id="L1456" title="All 2 branches missed.">                if (dt != null) {</span>
+<span class="nc" id="L1457">                    c.setExpires(dt.getTime());</span>
+                } else {
+<span class="nc bnc" id="L1459" title="All 2 branches missed.">                    if (&quot;true&quot;.equals(Display.getInstance().getProperty(&quot;com.codename1.io.ConnectionRequest.throwExceptionOnFailedCookieParse&quot;, &quot;false&quot;))) {</span>
+<span class="nc" id="L1460">                        throw new RuntimeException(&quot;Failed to parse expires date &quot; + date + &quot; for cookie&quot;);</span>
+                    } else {
+<span class="nc" id="L1462">                        Log.p(&quot;Failed to parse expires date &quot; + date + &quot; for cookie&quot;, Log.WARNING);</span>
+                    }
+                }
+            }
+        }
+
+
+<span class="nc" id="L1469">        return c;</span>
+    }
+
+    private Date parseDate(String date, String... formats) {
+<span class="nc bnc" id="L1473" title="All 2 branches missed.">        for (String format : formats) {</span>
+            try {
+<span class="nc" id="L1475">                SimpleDateFormat sdf = new SimpleDateFormat(format);</span>
+<span class="nc" id="L1476">                return sdf.parse(date);</span>
+<span class="nc" id="L1477">            } catch (ParseException t) { // NOPMD EmptyCatchBlock</span>
+                // swallow the exception
+            }
+        }
+<span class="nc" id="L1481">        return null;</span>
+
+    }
+
+    /// Handles IOException thrown when performing a network operation
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the exception thrown
+    protected void handleIOException(IOException err) {
+<span class="nc" id="L1491">        handleException(err);</span>
+<span class="nc" id="L1492">    }</span>
+
+    /// Handles an exception thrown when performing a network operation
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the exception thrown
+    protected void handleRuntimeException(RuntimeException err) {
+<span class="nc" id="L1500">        handleException(err);</span>
+<span class="nc" id="L1501">    }</span>
+
+    /// Handles an exception thrown when performing a network operation, the default
+    /// implementation shows a retry dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the exception thrown
+    protected void handleException(Exception err) {
+<span class="pc bpc" id="L1510" title="1 of 2 branches missed.">        if (exceptionListeners != null) {</span>
+<span class="nc bnc" id="L1511" title="All 2 branches missed.">            if (!isKilled()) {</span>
+<span class="nc" id="L1512">                NetworkEvent n = new NetworkEvent(this, err);</span>
+<span class="nc" id="L1513">                exceptionListeners.fireActionEvent(n);</span>
+            }
+<span class="nc" id="L1515">            return;</span>
+        }
+<span class="pc bpc" id="L1517" title="2 of 4 branches missed.">        if (killed || failSilently) {</span>
+<span class="fc" id="L1518">            failureException = err;</span>
+<span class="fc" id="L1519">            return;</span>
+        }
+<span class="nc" id="L1521">        Log.e(err);</span>
+<span class="nc bnc" id="L1522" title="All 2 branches missed.">        if (silentRetryCount &gt; 0) {</span>
+<span class="nc" id="L1523">            silentRetryCount--;</span>
+<span class="nc" id="L1524">            NetworkManager.getInstance().resetAPN();</span>
+<span class="nc" id="L1525">            retry();</span>
+<span class="nc" id="L1526">            return;</span>
+        }
+<span class="nc bnc" id="L1528" title="All 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !Display.getInstance().isMinimized() &amp;&amp;</span>
+<span class="nc bnc" id="L1529" title="All 2 branches missed.">                Dialog.show(&quot;Exception&quot;, err.toString() + &quot;: for URL &quot; + url + &quot;\n&quot; + err.getMessage(), &quot;Retry&quot;, &quot;Cancel&quot;)) {</span>
+<span class="nc" id="L1530">            retry();</span>
+        } else {
+<span class="nc" id="L1532">            retrying = false;</span>
+<span class="nc" id="L1533">            killed = true;</span>
+        }
+<span class="nc" id="L1535">    }</span>
+
+    /// Checks to see if the platform supports getting SSL certificates.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform supports getting SSL certificates.
+    public boolean canGetSSLCertificates() {
+<span class="fc" id="L1543">        return Util.getImplementation().canGetSSLCertificates();</span>
+    }
+
+    /// Gets the server's SSL certificates for this requests.  If this connection request
+    /// does not have any certificates available, it returns an array of size 0.
+    ///
+    /// #### Returns
+    ///
+    /// The server's SSL certificates.   If not available, an empty array.
+    public SSLCertificate[] getSSLCertificates() throws IOException {
+<span class="nc bnc" id="L1553" title="All 2 branches missed.">        if (sslCertificates == null) {</span>
+<span class="nc bnc" id="L1554" title="All 4 branches missed.">            if (_connection != null &amp;&amp; Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {</span>
+                // On iOS we need to do some contortions to get the SSL certificates there at the right time.
+                // The _connection object will only be set while a connection is in progress.
+                // It is a reference to the native connection object.
+                // The native certificate callback will be triggered in the iOS port after it has set its SSL certificates
+                // so they should be available.
+
+<span class="nc" id="L1561">                sslCertificates = getSSLCertificatesImpl(_connection, url);</span>
+            }
+
+        }
+<span class="nc bnc" id="L1565" title="All 2 branches missed.">        if (sslCertificates == null) {</span>
+<span class="nc" id="L1566">            sslCertificates = new SSLCertificate[0];</span>
+        }
+<span class="nc" id="L1568">        return sslCertificates;</span>
+    }
+
+    private SSLCertificate[] getSSLCertificatesImpl(Object connection, String url) throws IOException {
+<span class="fc" id="L1572">        String[] sslCerts = Util.getImplementation().getSSLCertificates(connection, url);</span>
+<span class="fc" id="L1573">        SSLCertificate[] out = new SSLCertificate[sslCerts.length];</span>
+<span class="fc" id="L1574">        int i = 0;</span>
+<span class="fc bfc" id="L1575" title="All 2 branches covered.">        for (String sslCertStr : sslCerts) {</span>
+<span class="pc bpc" id="L1576" title="1 of 2 branches missed.">            if (sslCertStr == null) {</span>
+<span class="nc" id="L1577">                continue;</span>
+            }
+<span class="fc" id="L1579">            SSLCertificate sslCert = new SSLCertificate();</span>
+<span class="fc" id="L1580">            int splitPos = sslCertStr.indexOf(':');</span>
+<span class="pc bpc" id="L1581" title="1 of 2 branches missed.">            if (splitPos == -1) {</span>
+<span class="nc" id="L1582">                continue;</span>
+            }
+
+<span class="fc" id="L1585">            sslCert.certificateAlgorithm = sslCertStr.substring(0, splitPos);</span>
+<span class="fc" id="L1586">            sslCert.certificateUniqueKey = sslCertStr.substring(splitPos + 1);</span>
+<span class="fc" id="L1587">            out[i++] = sslCert;</span>
+        }
+<span class="fc" id="L1589">        return out;</span>
+
+    }
+
+    /// Handles a server response code that is not 200 and not a redirect (unless redirect handling is disabled)
+    ///
+    /// #### Parameters
+    ///
+    /// - `code`: the response code from the server
+    ///
+    /// - `message`: the response message from the server
+    protected void handleErrorResponseCode(int code, String message) {
+<span class="pc bpc" id="L1601" title="1 of 2 branches missed.">        if (responseCodeListeners != null) {</span>
+<span class="nc bnc" id="L1602" title="All 2 branches missed.">            if (!isKilled()) {</span>
+<span class="nc" id="L1603">                NetworkEvent n = new NetworkEvent(this, code, message);</span>
+<span class="nc" id="L1604">                responseCodeListeners.fireActionEvent(n);</span>
+            }
+<span class="nc" id="L1606">            return;</span>
+        }
+<span class="pc bpc" id="L1608" title="1 of 2 branches missed.">        if (failSilently) {</span>
+<span class="fc" id="L1609">            failureErrorCode = code;</span>
+<span class="fc" id="L1610">            return;</span>
+        }
+
+<span class="nc bnc" id="L1613" title="All 2 branches missed.">        if (handleErrorCodesInGlobalErrorHandler) {</span>
+<span class="nc bnc" id="L1614" title="All 2 branches missed.">            if (NetworkManager.getInstance().handleErrorCode(this, code, message)) {</span>
+<span class="nc" id="L1615">                failureErrorCode = code;</span>
+<span class="nc" id="L1616">                return;</span>
+            }
+        }
+
+<span class="nc" id="L1620">        Log.p(&quot;Unhandled error code: &quot; + code + &quot; for &quot; + url);</span>
+<span class="nc bnc" id="L1621" title="All 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !Display.getInstance().isMinimized() &amp;&amp;</span>
+<span class="nc bnc" id="L1622" title="All 2 branches missed.">                Dialog.show(&quot;Error&quot;, code + &quot;: &quot; + message, &quot;Retry&quot;, &quot;Cancel&quot;)) {</span>
+<span class="nc" id="L1623">            retry();</span>
+        } else {
+<span class="nc" id="L1625">            retrying = false;</span>
+<span class="nc bnc" id="L1626" title="All 2 branches missed.">            if (!isReadResponseForErrors()) {</span>
+<span class="nc" id="L1627">                killed = true;</span>
+            }
+        }
+<span class="nc" id="L1630">    }</span>
+
+    /// Retry the current operation in case of an exception
+    public void retry() {
+<span class="nc" id="L1634">        retrying = true;</span>
+<span class="nc" id="L1635">        NetworkManager.getInstance().addToQueue(this, true);</span>
+<span class="nc" id="L1636">    }</span>
+
+    /// This is a callback method that been called when there is a redirect.
+    /// **IMPORTANT**
+    /// this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url to be redirected
+    ///
+    /// #### Returns
+    ///
+    /// true if the implementation would like to handle this by itself
+    public boolean onRedirect(String url) {
+<span class="nc" id="L1650">        return false;</span>
+    }
+
+    /// Callback for the server response with the input stream from the server.
+    /// This method is invoked on the network thread
+    ///
+    /// #### Parameters
+    ///
+    /// - `input`: the input stream containing the response
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when a read input occurs
+    protected void readResponse(InputStream input) throws IOException {
+<span class="pc bpc" id="L1664" title="1 of 2 branches missed.">        if (isKilled()) {</span>
+<span class="nc" id="L1665">            return;</span>
+        }
+<span class="pc bpc" id="L1667" title="1 of 2 branches missed.">        if (destinationFile != null) {</span>
+<span class="nc" id="L1668">            OutputStream o = null; //NOPMD CloseResource</span>
+            try {
+<span class="nc" id="L1670">                o = FileSystemStorage.getInstance().openOutputStream(destinationFile);</span>
+<span class="nc" id="L1671">                Util.copy(input, o);</span>
+
+                // was the download killed while we downloaded
+<span class="nc bnc" id="L1674" title="All 2 branches missed.">                if (isKilled()) {</span>
+<span class="nc" id="L1675">                    FileSystemStorage.getInstance().delete(destinationFile);</span>
+                }
+            } finally {
+<span class="nc" id="L1678">                Util.cleanup(o);</span>
+            }
+<span class="nc" id="L1680">        } else {</span>
+<span class="fc bfc" id="L1681" title="All 2 branches covered.">            if (destinationStorage != null) {</span>
+<span class="fc" id="L1682">                OutputStream o = null; //NOPMD CloseResource</span>
+                try {
+<span class="fc" id="L1684">                    o = Storage.getInstance().createOutputStream(destinationStorage);</span>
+<span class="fc" id="L1685">                    Util.copy(input, o);</span>
+
+                    // was the download killed while we downloaded
+<span class="pc bpc" id="L1688" title="1 of 2 branches missed.">                    if (isKilled()) {</span>
+<span class="nc" id="L1689">                        Storage.getInstance().deleteStorageFile(destinationStorage);</span>
+                    }
+                } finally {
+<span class="fc" id="L1692">                    Util.cleanup(o);</span>
+                }
+<span class="fc" id="L1694">            } else {</span>
+<span class="fc" id="L1695">                data = Util.readInputStream(input);</span>
+            }
+        }
+<span class="pc bpc" id="L1698" title="1 of 4 branches missed.">        if (hasResponseListeners() &amp;&amp; !isKilled()) {</span>
+<span class="fc" id="L1699">            fireResponseListener(new NetworkEvent(this, data));</span>
+        }
+<span class="fc" id="L1701">    }</span>
+
+    /// A callback method that's invoked on the EDT after the readResponse() method has finished,
+    /// this is the place where developers should change their Codename One user interface to
+    /// avoid race conditions that might be triggered by modifications within readResponse.
+    /// Notice this method is only invoked on a successful response and will not be invoked in case
+    /// of a failure.
+    protected void postResponse() {
+<span class="fc" id="L1709">    }</span>
+
+    /// Creates the request URL mostly for a get request
+    ///
+    /// #### Returns
+    ///
+    /// the string of a request
+    protected String createRequestURL() {
+<span class="fc bfc" id="L1717" title="All 4 branches covered.">        if (!post &amp;&amp; requestArguments != null) {</span>
+<span class="fc" id="L1718">            StringBuilder b = new StringBuilder(url);</span>
+<span class="fc" id="L1719">            Iterator entries = requestArguments.entrySet().iterator();</span>
+<span class="pc bpc" id="L1720" title="1 of 2 branches missed.">            if (entries.hasNext()) {</span>
+<span class="fc" id="L1721">                b.append(&quot;?&quot;);</span>
+            }
+<span class="fc bfc" id="L1723" title="All 2 branches covered.">            while (entries.hasNext()) {</span>
+<span class="fc" id="L1724">                Map.Entry entry = (Map.Entry) entries.next();</span>
+<span class="fc" id="L1725">                String key = (String) entry.getKey();</span>
+<span class="fc" id="L1726">                Object requestVal = entry.getValue();</span>
+<span class="fc bfc" id="L1727" title="All 2 branches covered.">                if (requestVal instanceof String) {</span>
+<span class="fc" id="L1728">                    String value = (String) requestVal;</span>
+<span class="fc" id="L1729">                    b.append(key);</span>
+<span class="fc" id="L1730">                    b.append(&quot;=&quot;);</span>
+<span class="fc" id="L1731">                    b.append(value);</span>
+<span class="fc bfc" id="L1732" title="All 2 branches covered.">                    if (entries.hasNext()) {</span>
+<span class="fc" id="L1733">                        b.append(&quot;&amp;&quot;);</span>
+                    }
+                    continue;
+                }
+<span class="fc" id="L1737">                String[] val = (String[]) requestVal;</span>
+<span class="fc" id="L1738">                int vlen = val.length;</span>
+<span class="fc bfc" id="L1739" title="All 2 branches covered.">                for (int iter = 0; iter &lt; vlen - 1; iter++) {</span>
+<span class="fc" id="L1740">                    b.append(key);</span>
+<span class="fc" id="L1741">                    b.append(&quot;=&quot;);</span>
+<span class="fc" id="L1742">                    b.append(val[iter]);</span>
+<span class="fc" id="L1743">                    b.append(&quot;&amp;&quot;);</span>
+                }
+<span class="fc" id="L1745">                b.append(key);</span>
+<span class="fc" id="L1746">                b.append(&quot;=&quot;);</span>
+<span class="fc" id="L1747">                b.append(val[vlen - 1]);</span>
+<span class="pc bpc" id="L1748" title="1 of 2 branches missed.">                if (entries.hasNext()) {</span>
+<span class="fc" id="L1749">                    b.append(&quot;&amp;&quot;);</span>
+                }
+<span class="fc" id="L1751">            }</span>
+<span class="fc" id="L1752">            return b.toString();</span>
+        }
+<span class="fc" id="L1754">        return url;</span>
+    }
+
+    /// Invoked when send body is true, by default sends the request arguments based
+    /// on &quot;POST&quot; conventions
+    ///
+    /// #### Parameters
+    ///
+    /// - `os`: output stream of the body
+    protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="pc bpc" id="L1764" title="2 of 4 branches missed.">        if (post &amp;&amp; requestArguments != null) {</span>
+<span class="fc" id="L1765">            StringBuilder val = new StringBuilder();</span>
+<span class="fc" id="L1766">            Iterator entries = requestArguments.entrySet().iterator();</span>
+<span class="fc bfc" id="L1767" title="All 2 branches covered.">            while (entries.hasNext()) {</span>
+<span class="fc" id="L1768">                Map.Entry entry = (Map.Entry) entries.next();</span>
+<span class="fc" id="L1769">                String key = (String) entry.getKey();</span>
+<span class="fc" id="L1770">                Object requestVal = entry.getValue();</span>
+<span class="fc bfc" id="L1771" title="All 2 branches covered.">                if (requestVal instanceof String) {</span>
+<span class="fc" id="L1772">                    String value = (String) requestVal;</span>
+<span class="fc" id="L1773">                    val.append(key);</span>
+<span class="fc" id="L1774">                    val.append(&quot;=&quot;);</span>
+<span class="fc" id="L1775">                    val.append(value);</span>
+<span class="fc bfc" id="L1776" title="All 2 branches covered.">                    if (entries.hasNext()) {</span>
+<span class="fc" id="L1777">                        val.append(&quot;&amp;&quot;);</span>
+                    }
+                    continue;
+                }
+<span class="fc" id="L1781">                String[] valArray = (String[]) requestVal;</span>
+<span class="fc" id="L1782">                int vlen = valArray.length;</span>
+<span class="fc bfc" id="L1783" title="All 2 branches covered.">                for (int iter = 0; iter &lt; vlen - 1; iter++) {</span>
+<span class="fc" id="L1784">                    val.append(key);</span>
+<span class="fc" id="L1785">                    val.append(&quot;=&quot;);</span>
+<span class="fc" id="L1786">                    val.append(valArray[iter]);</span>
+<span class="fc" id="L1787">                    val.append(&quot;&amp;&quot;);</span>
+                }
+<span class="fc" id="L1789">                val.append(key);</span>
+<span class="fc" id="L1790">                val.append(&quot;=&quot;);</span>
+<span class="fc" id="L1791">                val.append(valArray[vlen - 1]);</span>
+<span class="pc bpc" id="L1792" title="1 of 2 branches missed.">                if (entries.hasNext()) {</span>
+<span class="fc" id="L1793">                    val.append(&quot;&amp;&quot;);</span>
+                }
+<span class="fc" id="L1795">            }</span>
+<span class="pc bpc" id="L1796" title="1 of 2 branches missed.">            if (shouldWriteUTFAsGetBytes()) {</span>
+<span class="fc" id="L1797">                os.write(val.toString().getBytes(&quot;UTF-8&quot;));</span>
+            } else {
+<span class="nc" id="L1799">                OutputStreamWriter w = new OutputStreamWriter(os, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L1800">                w.write(val.toString());</span>
+            }
+        }
+<span class="fc" id="L1803">    }</span>
+
+    /// Returns whether when writing a post body the platform expects something in the form of
+    /// string.getBytes(&quot;UTF-8&quot;) or new OutputStreamWriter(os, &quot;UTF-8&quot;).
+    protected boolean shouldWriteUTFAsGetBytes() {
+<span class="fc" id="L1808">        return Util.getImplementation().shouldWriteUTFAsGetBytes();</span>
+    }
+
+    /// Kills this request if possible
+    public void kill() {
+<span class="fc" id="L1813">        killed = true;</span>
+        //if the connection is in the midle of a reading, stop it to release the
+        //resources
+<span class="pc bpc" id="L1816" title="1 of 2 branches missed.">        if (input instanceof BufferedInputStream) {</span>
+<span class="nc" id="L1817">            ((BufferedInputStream) input).stop();</span>
+        }
+<span class="fc" id="L1819">        NetworkManager.getInstance().kill9(this);</span>
+<span class="fc" id="L1820">    }</span>
+
+    /// Returns true if the request is paused or killed, developers should call this
+    /// method periodically to test whether they should quit the current IO operation immediately
+    ///
+    /// #### Returns
+    ///
+    /// true if the request is paused or killed
+    protected boolean shouldStop() {
+<span class="pc bpc" id="L1829" title="1 of 4 branches missed.">        return isPaused() || isKilled();</span>
+    }
+
+    /// Return true from this method if this connection can be paused and resumed later on.
+    /// A pausable network operation receives a &quot;pause&quot; invocation and is expected to stop
+    /// network operations as soon as possible. It will later on receive a resume() call and
+    /// optionally start downloading again.
+    ///
+    /// #### Returns
+    ///
+    /// false by default.
+    protected boolean isPausable() {
+<span class="nc" id="L1841">        return false;</span>
+    }
+
+    /// Invoked to pause this opeation, this method will only be invoked if isPausable() returns true
+    /// (its false by default). After this method is invoked current network operations should
+    /// be stoped as soon as possible for this class.
+    ///
+    /// #### Returns
+    ///
+    /// @return This method can return false to indicate that there is no need to resume this
+    /// method since the operation has already been completed or made redundant
+    public boolean pause() {
+<span class="nc" id="L1853">        paused = true;</span>
+<span class="nc" id="L1854">        return true;</span>
+    }
+
+    /// Called when a previously paused operation now has the networking time to resume.
+    /// Assuming this method returns true, the network request will be resent to the server
+    /// and the operation can resume.
+    ///
+    /// #### Returns
+    ///
+    /// @return This method can return false to indicate that there is no need to resume this
+    /// method since the operation has already been completed or made redundant
+    public boolean resume() {
+<span class="nc" id="L1866">        paused = false;</span>
+<span class="nc" id="L1867">        return true;</span>
+    }
+
+    /// Returns true for a post operation and false for a get operation
+    ///
+    /// #### Returns
+    ///
+    /// the post
+    public boolean isPost() {
+<span class="fc" id="L1876">        return post;</span>
+    }
+
+    /// Set to true for a post operation and false for a get operation, this will implicitly
+    /// set the method to post/get respectively (which you can change back by setting the method).
+    /// The main importance of this method is how arguments are added to the request (within the
+    /// body or in the URL) and so it is important to invoke this method before any argument was
+    /// added.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if invoked after an addArgument call
+    public void setPost(boolean post) {
+<span class="pc bpc" id="L1889" title="3 of 6 branches missed.">        if (this.post != post &amp;&amp; requestArguments != null &amp;&amp; !requestArguments.isEmpty()) {</span>
+<span class="nc" id="L1890">            throw new IllegalStateException(&quot;Request method (post/get) can't be modified once arguments have been assigned to the request&quot;);</span>
+        }
+<span class="fc" id="L1892">        this.post = post;</span>
+<span class="fc bfc" id="L1893" title="All 2 branches covered.">        if (this.post) {</span>
+<span class="fc" id="L1894">            setWriteRequest(true);</span>
+        }
+<span class="fc" id="L1896">    }</span>
+
+    /// Add an argument to the request response
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    private void addArg(String key, Object value) {
+<span class="pc bpc" id="L1906" title="1 of 2 branches missed.">        if (requestBody != null) {</span>
+<span class="nc" id="L1907">            throw new IllegalStateException(&quot;Request body and arguments are mutually exclusive, you can't use both&quot;);</span>
+        }
+<span class="fc bfc" id="L1909" title="All 2 branches covered.">        if (requestArguments == null) {</span>
+<span class="fc" id="L1910">            requestArguments = new LinkedHashMap();</span>
+        }
+<span class="pc bpc" id="L1912" title="2 of 4 branches missed.">        if (value == null || key == null) {</span>
+<span class="nc" id="L1913">            return;</span>
+        }
+<span class="fc bfc" id="L1915" title="All 2 branches covered.">        if (post) {</span>
+            // this needs to be implicit for a post request with arguments
+<span class="fc" id="L1917">            setWriteRequest(true);</span>
+        }
+<span class="fc" id="L1919">        requestArguments.put(key, value);</span>
+<span class="fc" id="L1920">    }</span>
+
+    /// Add an argument to the request response
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    ///
+    /// #### Deprecated
+    ///
+    /// use the version that accepts a string instead
+    public void addArgument(String key, byte[] value) {
+<span class="nc" id="L1934">        key = key.intern();</span>
+<span class="nc bnc" id="L1935" title="All 2 branches missed.">        if (post) {</span>
+<span class="nc" id="L1936">            addArg(Util.encodeBody(key), Util.encodeBody(value));</span>
+        } else {
+<span class="nc" id="L1938">            addArg(Util.encodeUrl(key), Util.encodeUrl(value));</span>
+        }
+<span class="nc" id="L1940">    }</span>
+
+    /// Removes the given argument from the request
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument no longer used
+    public void removeArgument(String key) {
+<span class="nc bnc" id="L1948" title="All 2 branches missed.">        if (requestArguments != null) {</span>
+<span class="nc" id="L1949">            requestArguments.remove(key);</span>
+        }
+<span class="nc" id="L1951">    }</span>
+
+    /// Removes all arguments
+    public void removeAllArguments() {
+<span class="nc" id="L1955">        requestArguments = null;</span>
+<span class="nc" id="L1956">    }</span>
+
+    /// Add an argument to the request response without encoding it, this is useful for
+    /// arguments which are already encoded
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    public void addArgumentNoEncoding(String key, String value) {
+<span class="fc" id="L1967">        addArg(key, value);</span>
+<span class="fc" id="L1968">    }</span>
+
+    /// Add an argument to the request response as an array of elements, this will
+    /// trigger multiple request entries with the same key, notice that this doesn't implicitly
+    /// encode the value
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    public void addArgumentNoEncoding(String key, String[] value) {
+<span class="nc bnc" id="L1980" title="All 4 branches missed.">        if (value == null || value.length == 0) {</span>
+<span class="nc" id="L1981">            return;</span>
+        }
+<span class="nc bnc" id="L1983" title="All 2 branches missed.">        if (value.length == 1) {</span>
+<span class="nc" id="L1984">            addArgumentNoEncoding(key, value[0]);</span>
+<span class="nc" id="L1985">            return;</span>
+        }
+        // copying the array to prevent mutation
+<span class="nc" id="L1988">        String[] v = new String[value.length];</span>
+<span class="nc" id="L1989">        System.arraycopy(value, 0, v, 0, value.length);</span>
+<span class="nc" id="L1990">        addArg(key, v);</span>
+<span class="nc" id="L1991">    }</span>
+
+    /// Add an argument to the request response as an array of elements, this will
+    /// trigger multiple request entries with the same key, notice that this doesn't implicitly
+    /// encode the value
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    public void addArgumentNoEncodingArray(String key, String... value) {
+<span class="nc" id="L2003">        addArgumentNoEncoding(key, value);</span>
+<span class="nc" id="L2004">    }</span>
+
+    /// Add an argument to the request response
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    public void addArgument(String key, String value) {
+<span class="fc bfc" id="L2014" title="All 2 branches covered.">        if (post) {</span>
+<span class="fc" id="L2015">            addArg(Util.encodeBody(key), Util.encodeBody(value));</span>
+        } else {
+<span class="fc" id="L2017">            addArg(Util.encodeUrl(key), Util.encodeUrl(value));</span>
+        }
+<span class="fc" id="L2019">    }</span>
+
+    /// Add an argument to the request response as an array of elements, this will
+    /// trigger multiple request entries with the same key
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    public void addArgumentArray(String key, String... value) {
+<span class="nc" id="L2030">        addArgument(key, value);</span>
+<span class="nc" id="L2031">    }</span>
+
+    /// Add an argument to the request response as an array of elements, this will
+    /// trigger multiple request entries with the same key
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    public void addArgument(String key, String[] value) {
+        // copying the array to prevent mutation
+<span class="fc" id="L2043">        String[] v = new String[value.length];</span>
+<span class="fc bfc" id="L2044" title="All 2 branches covered.">        if (post) {</span>
+<span class="fc" id="L2045">            int vlen = value.length;</span>
+<span class="fc bfc" id="L2046" title="All 2 branches covered.">            for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="fc" id="L2047">                v[iter] = Util.encodeBody(value[iter]);</span>
+            }
+<span class="fc" id="L2049">            addArg(Util.encodeBody(key), v);</span>
+<span class="fc" id="L2050">        } else {</span>
+<span class="fc" id="L2051">            int vlen = value.length;</span>
+<span class="fc bfc" id="L2052" title="All 2 branches covered.">            for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="fc" id="L2053">                v[iter] = Util.encodeUrl(value[iter]);</span>
+            }
+<span class="fc" id="L2055">            addArg(Util.encodeUrl(key), v);</span>
+        }
+<span class="fc" id="L2057">    }</span>
+
+    /// Add an argument to the request response as an array of elements, this will
+    /// trigger multiple request entries with the same key
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the argument
+    ///
+    /// - `value`: the value for the argument
+    public void addArguments(String key, String... value) {
+<span class="fc bfc" id="L2068" title="All 2 branches covered.">        if (value.length == 1) {</span>
+<span class="fc" id="L2069">            addArgument(key, value[0]);</span>
+        } else {
+<span class="fc" id="L2071">            addArgument(key, value);</span>
+        }
+<span class="fc" id="L2073">    }</span>
+
+    /// #### Returns
+    ///
+    /// the contentType
+    public String getContentType() {
+<span class="fc" id="L2079">        return contentType;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `contentType`: the contentType to set
+    public void setContentType(String contentType) {
+<span class="fc" id="L2086">        contentTypeSetExplicitly = true;</span>
+<span class="fc" id="L2087">        this.contentType = contentType;</span>
+<span class="fc" id="L2088">    }</span>
+
+    /// #### Returns
+    ///
+    /// the writeRequest
+    public boolean isWriteRequest() {
+<span class="fc" id="L2094">        return writeRequest;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `writeRequest`: the writeRequest to set
+    public void setWriteRequest(boolean writeRequest) {
+<span class="fc" id="L2101">        this.writeRequest = writeRequest;</span>
+<span class="fc" id="L2102">    }</span>
+
+    /// #### Returns
+    ///
+    /// the readRequest
+    public boolean isReadRequest() {
+<span class="fc" id="L2108">        return readRequest;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `readRequest`: the readRequest to set
+    public void setReadRequest(boolean readRequest) {
+<span class="nc" id="L2115">        this.readRequest = readRequest;</span>
+<span class="nc" id="L2116">    }</span>
+
+    /// #### Returns
+    ///
+    /// the paused
+    protected boolean isPaused() {
+<span class="fc" id="L2122">        return paused;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `paused`: the paused to set
+    protected void setPaused(boolean paused) {
+<span class="nc" id="L2129">        this.paused = paused;</span>
+<span class="nc" id="L2130">    }</span>
+
+    /// #### Returns
+    ///
+    /// the killed
+    protected boolean isKilled() {
+<span class="fc" id="L2136">        return killed;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `killed`: the killed to set
+    protected void setKilled(boolean killed) {
+<span class="nc" id="L2143">        this.killed = killed;</span>
+<span class="nc" id="L2144">    }</span>
+
+    /// The priority of this connection based on the constants in this class
+    ///
+    /// #### Returns
+    ///
+    /// the priority
+    public byte getPriority() {
+<span class="fc" id="L2152">        return priority;</span>
+    }
+
+    /// The priority of this connection based on the constants in this class
+    ///
+    /// #### Parameters
+    ///
+    /// - `priority`: the priority to set
+    public void setPriority(byte priority) {
+<span class="fc" id="L2161">        this.priority = priority;</span>
+<span class="fc" id="L2162">    }</span>
+
+    /// #### Returns
+    ///
+    /// the userAgent
+    public String getUserAgent() {
+<span class="fc" id="L2168">        return userAgent;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `userAgent`: the userAgent to set
+    public void setUserAgent(String userAgent) {
+<span class="nc" id="L2175">        this.userAgent = userAgent;</span>
+<span class="nc" id="L2176">    }</span>
+
+    /// Enables/Disables automatic redirects globally and returns the 302 error code, **IMPORTANT**
+    /// this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
+    ///
+    /// #### Returns
+    ///
+    /// the followRedirects
+    public boolean isFollowRedirects() {
+<span class="nc" id="L2185">        return followRedirects;</span>
+    }
+
+    /// Enables/Disables automatic redirects globally and returns the 302 error code, **IMPORTANT**
+    /// this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
+    ///
+    /// #### Parameters
+    ///
+    /// - `followRedirects`: the followRedirects to set
+    public void setFollowRedirects(boolean followRedirects) {
+<span class="nc" id="L2195">        this.followRedirects = followRedirects;</span>
+<span class="nc" id="L2196">    }</span>
+
+    /// Indicates the timeout for this connection request
+    ///
+    /// #### Returns
+    ///
+    /// the timeout
+    public int getTimeout() {
+<span class="fc" id="L2204">        return timeout;</span>
+    }
+
+    /// Indicates the timeout for this connection request
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: the timeout to set
+    public void setTimeout(int timeout) {
+<span class="fc" id="L2213">        this.timeout = timeout;</span>
+<span class="fc" id="L2214">    }</span>
+
+    /// This method prevents a manual timeout from occurring when invoked at a frequency faster
+    /// than the timeout.
+    void updateActivity() {
+<span class="nc" id="L2219">        timeSinceLastUpdate = System.currentTimeMillis();</span>
+<span class="nc" id="L2220">    }</span>
+
+    /// Returns the time since the last activity update
+    int getTimeSinceLastActivity() {
+<span class="nc bnc" id="L2224" title="All 2 branches missed.">        if (input instanceof BufferedInputStream) {</span>
+<span class="nc" id="L2225">            long t = ((BufferedInputStream) input).getLastActivityTime();</span>
+<span class="nc bnc" id="L2226" title="All 2 branches missed.">            if (t &gt; timeSinceLastUpdate) {</span>
+<span class="nc" id="L2227">                timeSinceLastUpdate = t;</span>
+            }
+        }
+<span class="nc bnc" id="L2230" title="All 2 branches missed.">        if (output instanceof BufferedOutputStream) {</span>
+<span class="nc" id="L2231">            long t = ((BufferedOutputStream) output).getLastActivityTime();</span>
+<span class="nc bnc" id="L2232" title="All 2 branches missed.">            if (t &gt; timeSinceLastUpdate) {</span>
+<span class="nc" id="L2233">                timeSinceLastUpdate = t;</span>
+            }
+        }
+<span class="nc" id="L2236">        return (int) (System.currentTimeMillis() - timeSinceLastUpdate);</span>
+    }
+
+    /// Returns the content length header value
+    ///
+    /// #### Returns
+    ///
+    /// the content length
+    public int getContentLength() {
+<span class="fc" id="L2245">        return contentLength;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void ioStreamUpdate(Object source, int bytes) {
+<span class="pc bpc" id="L2251" title="1 of 2 branches missed.">        if (!isKilled()) {</span>
+<span class="fc" id="L2252">            NetworkManager.getInstance().fireProgressEvent(this, progress, getContentLength(), bytes);</span>
+        }
+<span class="fc" id="L2254">    }</span>
+
+    /// #### Returns
+    ///
+    /// the url
+    public String getUrl() {
+<span class="fc" id="L2260">        return url;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `url`: the url to set
+    public void setUrl(String url) {
+<span class="pc bpc" id="L2267" title="1 of 2 branches missed.">        if (url.indexOf(' ') &gt; -1) {</span>
+<span class="nc" id="L2268">            url = StringUtil.replaceAll(url, &quot; &quot;, &quot;%20&quot;);</span>
+        }
+<span class="fc" id="L2270">        url = url.intern();</span>
+<span class="fc" id="L2271">        this.url = url;</span>
+<span class="fc" id="L2272">    }</span>
+
+    /// Adds a listener that would be notified on the CodenameOne thread of a response from the server.
+    /// This event is specific to the connection request type and its firing will change based on
+    /// how the connection request is read/processed
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: listener
+    public void addResponseListener(ActionListener&lt;NetworkEvent&gt; a) {
+<span class="pc bpc" id="L2282" title="1 of 2 branches missed.">        if (actionListeners == null) {</span>
+<span class="fc" id="L2283">            actionListeners = new EventDispatcher();</span>
+<span class="fc" id="L2284">            actionListeners.setBlocking(false);</span>
+        }
+<span class="fc" id="L2286">        actionListeners.addListener(a);</span>
+<span class="fc" id="L2287">    }</span>
+
+    /// Removes the given listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: listener
+    public void removeResponseListener(ActionListener&lt;NetworkEvent&gt; a) {
+<span class="pc bpc" id="L2295" title="1 of 2 branches missed.">        if (actionListeners == null) {</span>
+<span class="nc" id="L2296">            return;</span>
+        }
+<span class="fc" id="L2298">        actionListeners.removeListener(a);</span>
+<span class="pc bpc" id="L2299" title="2 of 4 branches missed.">        if (actionListeners.getListenerCollection() == null || actionListeners.getListenerCollection().isEmpty()) {</span>
+<span class="fc" id="L2300">            actionListeners = null;</span>
+        }
+<span class="fc" id="L2302">    }</span>
+
+    /// Adds a listener that would be notified on the CodenameOne thread of a response code that
+    /// is not a 200 (OK) or 301/2 (redirect) response code.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: listener
+    public void addResponseCodeListener(ActionListener&lt;NetworkEvent&gt; a) {
+<span class="pc bpc" id="L2311" title="1 of 2 branches missed.">        if (responseCodeListeners == null) {</span>
+<span class="fc" id="L2312">            responseCodeListeners = new EventDispatcher();</span>
+<span class="fc" id="L2313">            responseCodeListeners.setBlocking(false);</span>
+        }
+<span class="fc" id="L2315">        responseCodeListeners.addListener(a);</span>
+<span class="fc" id="L2316">    }</span>
+
+    /// Adds a listener that would be notified on the CodenameOne thread of an exception
+    /// in this connection request
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: listener
+    public void addExceptionListener(ActionListener&lt;NetworkEvent&gt; a) {
+<span class="pc bpc" id="L2325" title="1 of 2 branches missed.">        if (exceptionListeners == null) {</span>
+<span class="fc" id="L2326">            exceptionListeners = new EventDispatcher();</span>
+<span class="fc" id="L2327">            exceptionListeners.setBlocking(false);</span>
+        }
+<span class="fc" id="L2329">        exceptionListeners.addListener(a);</span>
+<span class="fc" id="L2330">    }</span>
+
+    /// Removes the given listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: listener
+    public void removeResponseCodeListener(ActionListener&lt;NetworkEvent&gt; a) {
+<span class="nc bnc" id="L2338" title="All 2 branches missed.">        if (responseCodeListeners == null) {</span>
+<span class="nc" id="L2339">            return;</span>
+        }
+<span class="nc" id="L2341">        responseCodeListeners.removeListener(a);</span>
+<span class="nc bnc" id="L2342" title="All 4 branches missed.">        if (responseCodeListeners.getListenerCollection() == null || responseCodeListeners.getListenerCollection().isEmpty()) {</span>
+<span class="nc" id="L2343">            responseCodeListeners = null;</span>
+        }
+<span class="nc" id="L2345">    }</span>
+
+    /// Removes the given listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: listener
+    public void removeExceptionListener(ActionListener&lt;NetworkEvent&gt; a) {
+<span class="nc bnc" id="L2353" title="All 2 branches missed.">        if (exceptionListeners == null) {</span>
+<span class="nc" id="L2354">            return;</span>
+        }
+<span class="nc" id="L2356">        exceptionListeners.removeListener(a);</span>
+<span class="nc bnc" id="L2357" title="All 4 branches missed.">        if (exceptionListeners.getListenerCollection() == null || exceptionListeners.getListenerCollection().isEmpty()) {</span>
+<span class="nc" id="L2358">            exceptionListeners = null;</span>
+        }
+<span class="nc" id="L2360">    }</span>
+
+    /// Returns true if someone is listening to action response events, this is useful
+    /// so we can decide whether to bother collecting data for an event in some cases
+    /// since building the event object might be memory/CPU intensive.
+    ///
+    /// #### Returns
+    ///
+    /// true or false
+    protected boolean hasResponseListeners() {
+<span class="fc bfc" id="L2370" title="All 2 branches covered.">        return actionListeners != null;</span>
+    }
+
+    /// Fires the response event to the listeners on this connection
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the event to fire
+    protected void fireResponseListener(ActionEvent ev) {
+<span class="fc bfc" id="L2379" title="All 2 branches covered.">        if (actionListeners != null) {</span>
+<span class="fc" id="L2380">            actionListeners.fireActionEvent(ev);</span>
+        }
+<span class="fc" id="L2382">    }</span>
+
+    /// Indicates whether this connection request supports duplicate entries in the request queue
+    ///
+    /// #### Returns
+    ///
+    /// the duplicateSupported value
+    public boolean isDuplicateSupported() {
+<span class="fc" id="L2390">        return duplicateSupported;</span>
+    }
+
+    /// Indicates whether this connection request supports duplicate entries in the request queue
+    ///
+    /// #### Parameters
+    ///
+    /// - `duplicateSupported`: the duplicateSupported to set
+    public void setDuplicateSupported(boolean duplicateSupported) {
+<span class="fc" id="L2399">        this.duplicateSupported = duplicateSupported;</span>
+<span class="fc" id="L2400">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L2405" title="All 2 branches missed.">        if (url != null) {</span>
+<span class="nc" id="L2406">            int i = url.hashCode();</span>
+<span class="nc bnc" id="L2407" title="All 2 branches missed.">            if (requestArguments != null) {</span>
+<span class="nc" id="L2408">                i = i ^ requestArguments.hashCode();</span>
+            }
+<span class="nc" id="L2410">            return i;</span>
+        }
+<span class="nc" id="L2412">        return 0;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L2418" title="All 4 branches missed.">        if (o != null &amp;&amp; o.getClass() == getClass()) {</span>
+<span class="nc" id="L2419">            ConnectionRequest r = (ConnectionRequest) o;</span>
+
+            // interned string comparison
+<span class="nc bnc" id="L2422" title="All 2 branches missed.">            if (r.url == url) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L2423" title="All 2 branches missed.">                if (requestArguments != null) {</span>
+<span class="nc bnc" id="L2424" title="All 4 branches missed.">                    if (r.requestArguments != null &amp;&amp; requestArguments.size() == r.requestArguments.size()) {</span>
+<span class="nc" id="L2425">                        Iterator entries = requestArguments.entrySet().iterator();</span>
+<span class="nc bnc" id="L2426" title="All 2 branches missed.">                        while (entries.hasNext()) {</span>
+<span class="nc" id="L2427">                            Map.Entry entry = (Map.Entry) entries.next();</span>
+<span class="nc" id="L2428">                            Object key = entry.getKey();</span>
+<span class="nc" id="L2429">                            Object value = entry.getValue();</span>
+<span class="nc" id="L2430">                            Object otherValue = r.requestArguments.get(key);</span>
+<span class="nc bnc" id="L2431" title="All 2 branches missed.">                            if (!value.equals(otherValue)) {</span>
+<span class="nc" id="L2432">                                return false;</span>
+                            }
+<span class="nc" id="L2434">                        }</span>
+<span class="nc bnc" id="L2435" title="All 2 branches missed.">                        return r.killed == killed;</span>
+                    }
+                } else {
+<span class="nc bnc" id="L2438" title="All 2 branches missed.">                    if (r.requestArguments == null) {</span>
+<span class="nc bnc" id="L2439" title="All 2 branches missed.">                        return r.killed == killed;</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L2444">        return false;</span>
+    }
+
+    void validateImpl() {
+<span class="pc bpc" id="L2448" title="1 of 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L2449">            throw new IllegalStateException(&quot;URL is null&quot;);</span>
+        }
+<span class="pc bpc" id="L2451" title="1 of 2 branches missed.">        if (url.length() == 0) {</span>
+<span class="nc" id="L2452">            throw new IllegalStateException(&quot;URL is empty&quot;);</span>
+        }
+<span class="fc" id="L2454">        validate();</span>
+<span class="fc" id="L2455">    }</span>
+
+    /// Validates that the request has the required information before being added to the queue
+    /// e.g. checks if the URL is null. This method should throw an IllegalStateException for
+    /// a case where one of the values required for this connection request is missing.
+    /// This method can be overriden by subclasses to add additional tests. It is usefull
+    /// to do tests here since the exception will be thrown immediately when invoking addToQueue
+    /// which is more intuitive to debug than the alternative.
+    protected void validate() {
+<span class="pc bpc" id="L2464" title="1 of 2 branches missed.">        if (!url.toLowerCase().startsWith(&quot;http&quot;)) {</span>
+<span class="nc" id="L2465">            throw new IllegalStateException(&quot;Only HTTP urls are supported!&quot;);</span>
+        }
+<span class="fc" id="L2467">    }</span>
+
+    /// A dialog that will be seamlessly disposed once the given request has been completed
+    ///
+    /// #### Returns
+    ///
+    /// the disposeOnCompletion
+    public Dialog getDisposeOnCompletion() {
+<span class="fc" id="L2475">        return disposeOnCompletion;</span>
+    }
+
+    /// A dialog that will be seamlessly disposed once the given request has been completed
+    ///
+    /// #### Parameters
+    ///
+    /// - `disposeOnCompletion`: the disposeOnCompletion to set
+    public void setDisposeOnCompletion(Dialog disposeOnCompletion) {
+<span class="nc" id="L2484">        this.disposeOnCompletion = disposeOnCompletion;</span>
+<span class="nc" id="L2485">    }</span>
+
+    /// This dialog will be shown when this request enters the network queue
+    ///
+    /// #### Returns
+    ///
+    /// the showOnInit
+    public Dialog getShowOnInit() {
+<span class="fc" id="L2493">        return showOnInit;</span>
+    }
+
+    /// This dialog will be shown when this request enters the network queue
+    ///
+    /// #### Parameters
+    ///
+    /// - `showOnInit`: the showOnInit to set
+    public void setShowOnInit(Dialog showOnInit) {
+<span class="nc" id="L2502">        this.showOnInit = showOnInit;</span>
+<span class="nc" id="L2503">    }</span>
+
+    /// Indicates the number of times to silently retry a connection that failed
+    /// before prompting
+    ///
+    /// #### Returns
+    ///
+    /// the silentRetryCount
+    public int getSilentRetryCount() {
+<span class="nc" id="L2512">        return silentRetryCount;</span>
+    }
+
+    /// Indicates the number of times to silently retry a connection that failed
+    /// before prompting
+    ///
+    /// #### Parameters
+    ///
+    /// - `silentRetryCount`: the silentRetryCount to set
+    public void setSilentRetryCount(int silentRetryCount) {
+<span class="fc" id="L2522">        this.silentRetryCount = silentRetryCount;</span>
+<span class="fc" id="L2523">    }</span>
+
+    /// Indicates that we are uninterested in error handling
+    ///
+    /// #### Returns
+    ///
+    /// the failSilently
+    public boolean isFailSilently() {
+<span class="nc" id="L2531">        return failSilently;</span>
+    }
+
+    /// Indicates that we are uninterested in error handling
+    ///
+    /// #### Parameters
+    ///
+    /// - `failSilently`: the failSilently to set
+    public void setFailSilently(boolean failSilently) {
+<span class="fc" id="L2540">        this.failSilently = failSilently;</span>
+<span class="fc" id="L2541">    }</span>
+
+    /// When set to true the read response code will happen even for error codes such as 400 and 500
+    ///
+    /// #### Returns
+    ///
+    /// the readResponseForErrors
+    public boolean isReadResponseForErrors() {
+<span class="fc" id="L2549">        return readResponseForErrors;</span>
+    }
+
+    /// When set to true the read response code will happen even for error codes such as 400 and 500
+    ///
+    /// #### Parameters
+    ///
+    /// - `readResponseForErrors`: the readResponseForErrors to set
+    public void setReadResponseForErrors(boolean readResponseForErrors) {
+<span class="fc" id="L2558">        this.readResponseForErrors = readResponseForErrors;</span>
+<span class="fc" id="L2559">    }</span>
+
+    /// Returns the content type from the response headers
+    ///
+    /// #### Returns
+    ///
+    /// the content type
+    public String getResponseContentType() {
+<span class="fc" id="L2567">        return responseContentType;</span>
+    }
+
+    /// Returns true if this request is been redirected to a different url
+    ///
+    /// #### Returns
+    ///
+    /// true if redirecting
+    public boolean isRedirecting() {
+<span class="nc" id="L2576">        return redirecting;</span>
+    }
+
+    /// When set to a none null string saves the response to file system under
+    /// this file name
+    ///
+    /// #### Returns
+    ///
+    /// the destinationFile
+    public String getDestinationFile() {
+<span class="fc" id="L2586">        return destinationFile;</span>
+    }
+
+    /// When set to a none null string saves the response to file system under
+    /// this file name
+    ///
+    /// #### Parameters
+    ///
+    /// - `destinationFile`: the destinationFile to set
+    public void setDestinationFile(String destinationFile) {
+<span class="nc" id="L2596">        this.destinationFile = destinationFile;</span>
+<span class="nc" id="L2597">    }</span>
+
+    /// When set to a none null string saves the response to storage under
+    /// this file name
+    ///
+    /// #### Returns
+    ///
+    /// the destinationStorage
+    public String getDestinationStorage() {
+<span class="fc" id="L2606">        return destinationStorage;</span>
+    }
+
+    /// When set to a none null string saves the response to storage under
+    /// this file name
+    ///
+    /// #### Parameters
+    ///
+    /// - `destinationStorage`: the destinationStorage to set
+    public void setDestinationStorage(String destinationStorage) {
+<span class="fc" id="L2616">        this.destinationStorage = destinationStorage;</span>
+<span class="fc" id="L2617">    }</span>
+
+    /// #### Returns
+    ///
+    /// the cookiesEnabled
+    public boolean isCookiesEnabled() {
+<span class="fc" id="L2623">        return cookiesEnabled;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `cookiesEnabled`: the cookiesEnabled to set
+    public void setCookiesEnabled(boolean cookiesEnabled) {
+<span class="fc" id="L2630">        this.cookiesEnabled = cookiesEnabled;</span>
+<span class="pc bpc" id="L2631" title="1 of 2 branches missed.">        if (!cookiesEnabled) {</span>
+<span class="fc" id="L2632">            setUseNativeCookieStore(false);</span>
+        }
+<span class="fc" id="L2634">    }</span>
+
+    /// This method is used to enable streaming of a HTTP request body without
+    /// internal buffering, when the content length is not known in advance.
+    /// In this mode, chunked transfer encoding is used to send the request body.
+    /// Note, not all HTTP servers support this mode.
+    /// This mode is supported on Android and the Desktop ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chunklen`: @param chunklen The number of bytes to write in each chunk. If chunklen
+    /// is zero a default value will be used.
+    public void setChunkedStreamingMode(int chunklen) {
+<span class="nc" id="L2647">        this.chunkedStreamingLen = chunklen;</span>
+<span class="nc" id="L2648">    }</span>
+
+    /// Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.
+    /// If useCache is true, then this will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFile`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// - `onFail`: Callback called if we fail to load the image.
+    ///
+    /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToStorage(String storageFile, final SuccessCallback&lt;Image&gt; onSuccess, FailureCallback&lt;Image&gt; onFail, boolean useCache) {
+<span class="fc" id="L2667">        setDestinationStorage(storageFile);</span>
+<span class="fc" id="L2668">        downloadImage(onSuccess, onFail, useCache);</span>
+<span class="fc" id="L2669">    }</span>
+
+    /// Downloads an image to a specified storage file asynchronously returning an AsyncResource that resolves to the resulting image..
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFile`: The storage file where the file should be saved.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource that will resolve to the loaded image.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public AsyncResource&lt;Image&gt; downloadImageToStorage(String storageFile) {
+<span class="nc" id="L2685">        return downloadImageToStorage(storageFile, true);</span>
+    }
+
+    /// Downloads an image to a specified storage file asynchronously returning an AsyncResource that resolves to the resulting image..
+    /// If useCache is true, then this will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFile`: The storage file where the file should be saved.
+    ///
+    /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource that will resolve to the loaded image.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public AsyncResource&lt;Image&gt; downloadImageToStorage(String storageFile, boolean useCache) {
+<span class="nc" id="L2705">        final AsyncResource&lt;Image&gt; out = new AsyncResource&lt;Image&gt;();</span>
+<span class="nc" id="L2706">        downloadImageToStorage(storageFile, new ImageStorageSuccessCallback(out),</span>
+                new ImageStorageFailureCallback(out), useCache);
+<span class="nc" id="L2708">        return out;</span>
+    }
+
+    /// Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.
+    /// If useCache is true, then this will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFile`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToStorage(String storageFile, SuccessCallback&lt;Image&gt; onSuccess, boolean useCache) {
+<span class="nc" id="L2726">        downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter&lt;Image&gt;(), useCache);</span>
+<span class="nc" id="L2727">    }</span>
+
+    /// Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.
+    /// This will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFile`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToStorage(String storageFile, SuccessCallback&lt;Image&gt; onSuccess) {
+<span class="nc" id="L2742">        downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter&lt;Image&gt;(), true);</span>
+<span class="nc" id="L2743">    }</span>
+
+    /// Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.
+    /// This will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `storageFile`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToStorage(String storageFile, SuccessCallback&lt;Image&gt; onSuccess, FailureCallback&lt;Image&gt; onFail) {
+<span class="fc" id="L2758">        downloadImageToStorage(storageFile, onSuccess, onFail, true);</span>
+<span class="fc" id="L2759">    }</span>
+
+    /// Downloads an image to a the file system asynchronously returning an AsyncResource object that resolves to the loaded image..
+    /// If useCache is true, then this will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The storage file where the file should be saved.
+    ///
+    /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource resolving to the downloaded image.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public AsyncResource&lt;Image&gt; downloadImageToFileSystem(String file, boolean useCache) {
+<span class="nc" id="L2778">        final AsyncResource&lt;Image&gt; out = new AsyncResource&lt;Image&gt;();</span>
+<span class="nc" id="L2779">        downloadImageToFileSystem(file, new ImageFileSystemSuccessCallback(out),</span>
+                new ImageFileSystemFailureCallback(out), useCache);
+<span class="nc" id="L2781">        return out;</span>
+    }
+
+    /// Downloads an image to the file system asynchronously returning an AsyncResource object that resolves to the loaded image..
+    /// If useCache is true, then this will first try to load the image from Storage if it exists.  This is a wrapper around `boolean)`
+    /// with true as the 2nd parameter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The storage file where the file should be saved.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource resolving to the downloaded image.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public AsyncResource&lt;Image&gt; downloadImageToFileSystem(String file) {
+<span class="nc" id="L2800">        return downloadImageToFileSystem(file, true);</span>
+    }
+
+    /// Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.
+    /// If useCache is true, then this will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// - `onFail`: Callback called if we fail to load the image.
+    ///
+    /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToFileSystem(String file, final SuccessCallback&lt;Image&gt; onSuccess, FailureCallback&lt;Image&gt; onFail, boolean useCache) {
+<span class="nc" id="L2820">        setDestinationFile(file);</span>
+<span class="nc" id="L2821">        downloadImage(onSuccess, onFail, useCache);</span>
+<span class="nc" id="L2822">    }</span>
+
+    /// Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.
+    /// If useCache is true, then this will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToFileSystem(String file, SuccessCallback&lt;Image&gt; onSuccess, boolean useCache) {
+<span class="nc" id="L2839">        downloadImageToFileSystem(file, onSuccess, new CallbackAdapter&lt;Image&gt;(), useCache);</span>
+<span class="nc" id="L2840">    }</span>
+
+    /// Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.
+    /// This will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToFileSystem(String file, SuccessCallback&lt;Image&gt; onSuccess) {
+<span class="nc" id="L2855">        downloadImageToFileSystem(file, onSuccess, new CallbackAdapter&lt;Image&gt;(), true);</span>
+<span class="nc" id="L2856">    }</span>
+
+    /// Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.
+    /// This will first try to load the image from Storage if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: The storage file where the file should be saved.
+    ///
+    /// - `onSuccess`: Callback called if the image is successfully loaded.
+    ///
+    /// - `onFail`: Callback called if the image fails to load.
+    ///
+    /// #### Since
+    ///
+    /// 3.4
+    public void downloadImageToFileSystem(String file, SuccessCallback&lt;Image&gt; onSuccess, FailureCallback&lt;Image&gt; onFail) {
+<span class="nc" id="L2873">        downloadImageToFileSystem(file, onSuccess, onFail, true);</span>
+<span class="nc" id="L2874">    }</span>
+
+    private void downloadImage(final SuccessCallback&lt;Image&gt; onSuccess, final FailureCallback&lt;Image&gt; onFail, boolean useCache) {
+<span class="fc" id="L2877">        setReadResponseForErrors(false);</span>
+<span class="fc bfc" id="L2878" title="All 2 branches covered.">        if (useCache) {</span>
+<span class="fc" id="L2879">            Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="pc bpc" id="L2882" title="1 of 2 branches missed.">                    if (getDestinationFile() != null) {</span>
+<span class="nc" id="L2883">                        String file = getDestinationFile();</span>
+<span class="nc" id="L2884">                        FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc bnc" id="L2885" title="All 2 branches missed.">                        if (fs.exists(file)) {</span>
+                            try {
+<span class="nc" id="L2887">                                EncodedImage img = EncodedImage.create(fs.openInputStream(file), (int) fs.getLength(file));</span>
+<span class="nc" id="L2888">                                CallbackDispatcher.dispatchSuccess(onSuccess, img);</span>
+<span class="nc" id="L2889">                            } catch (Exception ex) {</span>
+<span class="nc" id="L2890">                                CallbackDispatcher.dispatchError(onFail, ex);</span>
+<span class="nc" id="L2891">                            }</span>
+                        } else {
+<span class="nc" id="L2893">                            downloadImage(onSuccess, onFail, false);</span>
+                        }
+<span class="pc bpc" id="L2895" title="1 of 2 branches missed.">                    } else if (getDestinationStorage() != null) {</span>
+<span class="fc" id="L2896">                        String file = getDestinationStorage();</span>
+<span class="fc" id="L2897">                        Storage fs = Storage.getInstance();</span>
+<span class="fc bfc" id="L2898" title="All 2 branches covered.">                        if (fs.exists(file)) {</span>
+                            try {
+<span class="fc" id="L2900">                                EncodedImage img = EncodedImage.create(fs.createInputStream(file), fs.entrySize(file));</span>
+<span class="fc" id="L2901">                                CallbackDispatcher.dispatchSuccess(onSuccess, img);</span>
+<span class="nc" id="L2902">                            } catch (Exception ex) {</span>
+<span class="nc" id="L2903">                                CallbackDispatcher.dispatchError(onFail, ex);</span>
+<span class="pc" id="L2904">                            }</span>
+                        } else {
+<span class="fc" id="L2906">                            downloadImage(onSuccess, onFail, false);</span>
+                        }
+                    }
+<span class="fc" id="L2909">                }</span>
+            });
+
+        } else {
+<span class="fc" id="L2913">            final ActionListener onDownload = new ActionListener&lt;NetworkEvent&gt;() {</span>
+
+                @Override
+                public void actionPerformed(NetworkEvent nevt) {
+<span class="fc" id="L2917">                    int rc = nevt.getResponseCode();</span>
+<span class="pc bpc" id="L2918" title="3 of 4 branches missed.">                    if (rc == 200 || rc == 201) {</span>
+<span class="fc" id="L2919">                        downloadImage(onSuccess, onFail, true);</span>
+                    } else {
+<span class="nc bnc" id="L2921" title="All 2 branches missed.">                        if (nevt.getError() == null) {</span>
+<span class="nc" id="L2922">                            nevt.setError(new IOException(&quot;Failed to get image:  Code was &quot; + nevt.getResponseCode()));</span>
+                        }
+<span class="nc" id="L2924">                        CallbackDispatcher.dispatchError(onFail, nevt.getError());</span>
+                    }
+<span class="fc" id="L2926">                    removeResponseListener(this);</span>
+<span class="fc" id="L2927">                }</span>
+
+
+            };
+<span class="fc" id="L2931">            addResponseListener(onDownload);</span>
+<span class="fc" id="L2932">            NetworkManager.getInstance().addToQueue(this);</span>
+        }
+
+<span class="fc" id="L2935">    }</span>
+
+    /// The request body can be used instead of arguments to pass JSON data to a restful request,
+    /// it can't be used in a get request and will fail if you have arguments
+    ///
+    /// #### Returns
+    ///
+    /// the requestBody
+    public String getRequestBody() {
+<span class="nc bnc" id="L2944" title="All 2 branches missed.">        if (requestBodyData != null) {</span>
+<span class="nc" id="L2945">            ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+            try {
+<span class="nc" id="L2947">                requestBodyData.appendTo(baos);</span>
+<span class="nc" id="L2948">                return new String(baos.toByteArray(), &quot;UTF-8&quot;);</span>
+<span class="nc" id="L2949">            } catch (Exception ex) {</span>
+<span class="nc" id="L2950">                Log.e(ex);</span>
+<span class="nc" id="L2951">                throw new RuntimeException(&quot;Failed to write request body to string&quot;, ex);</span>
+            }
+        }
+<span class="nc" id="L2954">        return requestBody;</span>
+    }
+
+    /// The request body can be used instead of arguments to pass JSON data to a restful request,
+    /// it can't be used in a get request and will fail if you have arguments.
+    ///
+    /// Notice that invoking this method blocks the `#buildRequestBody(java.io.OutputStream)` method
+    /// callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestBody`: a string to pass in the post body
+    public void setRequestBody(String requestBody) {
+<span class="pc bpc" id="L2967" title="1 of 2 branches missed.">        if (requestArguments != null) {</span>
+<span class="nc" id="L2968">            throw new IllegalStateException(&quot;Request body and arguments are mutually exclusive, you can't use both&quot;);</span>
+        }
+<span class="fc" id="L2970">        this.requestBody = requestBody;</span>
+<span class="fc" id="L2971">        this.requestBodyData = null;</span>
+<span class="fc" id="L2972">    }</span>
+
+    /// The request body can be used instead of arguments to pass JSON data to a restful request,
+    /// it can't be used in a get request and will fail if you have arguments.
+    ///
+    /// Notice that invoking this method blocks the `#buildRequestBody(java.io.OutputStream)` method
+    /// callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: a data to pass in the post body
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public void setRequestBody(Data data) {
+<span class="pc bpc" id="L2988" title="1 of 2 branches missed.">        if (requestArguments != null) {</span>
+<span class="nc" id="L2989">            throw new IllegalStateException(&quot;Request body and arguments are mutually exclusive, you can't use both&quot;);</span>
+        }
+<span class="fc" id="L2991">        this.requestBody = null;</span>
+<span class="fc" id="L2992">        this.requestBodyData = data;</span>
+<span class="fc" id="L2993">    }</span>
+
+    /// The request body can be used instead of arguments to pass JSON data to a restful request,
+    /// it can't be used in a get request and will fail if you have arguments
+    ///
+    /// #### Returns
+    ///
+    /// the requestBody
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public Data getRequestBodyData() {
+<span class="nc bnc" id="L3006" title="All 2 branches missed.">        if (requestBody != null) {</span>
+<span class="nc" id="L3007">            return new Data() {</span>
+                @Override
+                public void appendTo(OutputStream output) throws IOException {
+<span class="nc" id="L3010">                    output.write(requestBody.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L3011">                }</span>
+
+                @Override
+                public long getSize() throws IOException {
+<span class="nc" id="L3015">                    return requestBody.getBytes(&quot;UTF-8&quot;).length;</span>
+                }
+            };
+        }
+<span class="nc" id="L3019">        return requestBodyData;</span>
+    }
+
+    /// Returns error message associated with an error response code
+    ///
+    /// #### Returns
+    ///
+    /// the system error message
+    public String getResponseErrorMessage() {
+<span class="fc" id="L3028">        return responseErrorMessge;</span>
+    }
+
+    /// There are 5 caching modes:
+    ///
+    /// - `OFF` is the default, meaning no caching.
+    ///
+    /// - `SMART` means all get requests are cached intelligently and caching is &quot;mostly&quot; seamless.
+    ///
+    /// - `MANUAL` means that the developer is responsible for the actual caching but the system will not do a
+    /// request on a resource that's already &quot;fresh&quot;.
+    ///
+    /// - `OFFLINE` will fetch data from the cache and wont try to go to the server. It will generate a 404 error
+    /// if data isn't available.
+    ///
+    /// - `OFFLINE_FIRST` works the same way as offline but if data isn't available locally it will try to
+    /// connect to the server.
+<span class="fc" id="L3045">    public enum CachingMode {</span>
+<span class="fc" id="L3046">        OFF,</span>
+<span class="fc" id="L3047">        MANUAL,</span>
+<span class="fc" id="L3048">        SMART,</span>
+<span class="fc" id="L3049">        OFFLINE,</span>
+<span class="fc" id="L3050">        OFFLINE_FIRST</span>
+    }
+
+    /// Encapsulates an SSL certificate fingerprint.
+    ///
+    /// SSL Pinning
+    ///
+    /// The recommended approach to SSL Pinning is to override the `#checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[])`
+    /// method in your `ConnectionRequest` object, and check the certificates that are provided
+    /// as a parameter.  This callback if fired before sending data to the server, but after
+    /// the SSL handshake is complete so that you have an opportunity to kill the request before sending
+    /// your POST data.
+    ///
+    /// Example:
+    ///
+    /// ```java
+    /// `ConnectionRequest req = new ConnectionRequest() {
+    /// @Override
+    ///     protected void checkSSLCertificates(ConnectionRequest.SSLCertificate[] certificates) {
+    ///         if (!trust(certificates)) {
+    ///             // Assume that you've implemented method trust(SSLCertificate[] certs)
+    ///             // to tell you whether you trust some certificates.
+    ///             this.kill();`
+    ///     }
+    /// };
+    /// req.setCheckSSLCertificates(true);
+    /// ....
+    /// }
+    /// ```
+    ///
+    /// #### See also
+    ///
+    /// - #getSSLCertificates()
+    ///
+    /// - #canGetSSLCertificates()
+    ///
+    /// - #isCheckSSLCertificates()
+    ///
+    /// - #setCheckSSLCertificates(boolean)
+    ///
+    /// - #checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[])
+<span class="fc" id="L3091">    public static final class SSLCertificate {</span>
+
+        private String certificateUniqueKey;
+        private String certificateAlgorithm;
+
+        /// Gets a fingerprint for the SSL certificate encoded using the algorithm
+        /// specified by `#getCertificteAlgorithm()`
+        public String getCertificteUniqueKey() {
+<span class="fc" id="L3099">            return certificateUniqueKey;</span>
+        }
+
+        /// Gets the algorithm used to encode the fingerprint.  Default is SHA1
+        ///
+        /// #### Returns
+        ///
+        /// The algorithm used to encode the certificate fingerprint.
+        public String getCertificteAlgorithm() {
+<span class="fc" id="L3108">            return certificateAlgorithm;</span>
+        }
+    }
+
+    private static class ImageStorageSuccessCallback implements SuccessCallback&lt;Image&gt; {
+        private final AsyncResource&lt;Image&gt; out;
+
+<span class="nc" id="L3115">        public ImageStorageSuccessCallback(AsyncResource&lt;Image&gt; out) {</span>
+<span class="nc" id="L3116">            this.out = out;</span>
+<span class="nc" id="L3117">        }</span>
+
+        @Override
+        public void onSucess(Image value) {
+<span class="nc bnc" id="L3121" title="All 2 branches missed.">            if (!out.isDone()) {</span>
+<span class="nc" id="L3122">                out.complete(value);</span>
+            }
+<span class="nc" id="L3124">        }</span>
+    }
+
+    private static class ImageStorageFailureCallback implements FailureCallback&lt;Image&gt; {
+        private final AsyncResource&lt;Image&gt; out;
+
+<span class="nc" id="L3130">        public ImageStorageFailureCallback(AsyncResource&lt;Image&gt; out) {</span>
+<span class="nc" id="L3131">            this.out = out;</span>
+<span class="nc" id="L3132">        }</span>
+
+        @Override
+        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc bnc" id="L3136" title="All 2 branches missed.">            if (!out.isDone()) {</span>
+<span class="nc" id="L3137">                out.error(err);</span>
+            }
+<span class="nc" id="L3139">        }</span>
+    }
+
+    private static class ImageFileSystemSuccessCallback implements SuccessCallback&lt;Image&gt; {
+        private final AsyncResource&lt;Image&gt; out;
+
+<span class="nc" id="L3145">        public ImageFileSystemSuccessCallback(AsyncResource&lt;Image&gt; out) {</span>
+<span class="nc" id="L3146">            this.out = out;</span>
+<span class="nc" id="L3147">        }</span>
+
+        @Override
+        public void onSucess(Image value) {
+<span class="nc bnc" id="L3151" title="All 2 branches missed.">            if (out.isDone()) {</span>
+<span class="nc" id="L3152">                return;</span>
+            }
+<span class="nc" id="L3154">            out.complete(value);</span>
+<span class="nc" id="L3155">        }</span>
+    }
+
+    private static class ImageFileSystemFailureCallback implements FailureCallback&lt;Image&gt; {
+        private final AsyncResource&lt;Image&gt; out;
+
+<span class="nc" id="L3161">        public ImageFileSystemFailureCallback(AsyncResource&lt;Image&gt; out) {</span>
+<span class="nc" id="L3162">            this.out = out;</span>
+<span class="nc" id="L3163">        }</span>
+
+        @Override
+        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc bnc" id="L3167" title="All 2 branches missed.">            if (out.isDone()) {</span>
+<span class="nc" id="L3168">                return;</span>
+            }
+<span class="nc" id="L3170">            out.error(err);</span>
+<span class="nc" id="L3171">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

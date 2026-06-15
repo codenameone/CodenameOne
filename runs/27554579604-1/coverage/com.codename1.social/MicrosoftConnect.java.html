@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MicrosoftConnect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">MicrosoftConnect.java</span></div><h1>MicrosoftConnect.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+/// Sign-in with a Microsoft account (personal, work, or school) backed by
+/// Microsoft Entra ID (formerly Azure Active Directory). Wraps
+/// [com.codename1.io.oidc.OidcClient] against Microsoft's
+/// `v2.0/.well-known/openid-configuration` endpoint.
+///
+/// On iOS and Android, where Microsoft ships the MSAL SDK with broker
+/// integration (Microsoft Authenticator, Company Portal), this class still
+/// uses the system browser flow -- MSAL's broker is only available when the
+/// app embeds the native MSAL SDK and is configured for the conditional
+/// access scenarios that require it. For 95% of Codename One apps the
+/// system-browser flow is the right answer, and lets the same code work in
+/// the simulator and on the web port.
+///
+/// ```java
+/// MicrosoftConnect.getInstance()
+///     .withTenant(&quot;common&quot;)             // or your tenant GUID
+///     .signIn(
+///         &quot;YOUR_CLIENT_ID&quot;,
+///         &quot;com.example.app:/oauth2redirect&quot;,
+///         &quot;openid&quot;, &quot;email&quot;, &quot;profile&quot;, &quot;User.Read&quot;)
+///     .ready(new SuccessCallback&lt;OidcTokens&gt;() {
+///         public void onSucess(OidcTokens t) { ... }
+///     });
+/// ```
+///
+/// @since 7.0.245
+public final class MicrosoftConnect extends Login {
+
+    /// &quot;common&quot; -- accepts personal, work, and school accounts. Use this for
+    /// most multi-tenant apps. Pass a tenant GUID to restrict to a single
+    /// Entra ID tenant; pass &quot;organizations&quot; for work/school only;
+    /// &quot;consumers&quot; for personal only.
+    public static final String COMMON_TENANT = &quot;common&quot;;
+
+    private static MicrosoftConnect INSTANCE;
+<span class="fc" id="L66">    private String tenant = COMMON_TENANT;</span>
+
+<span class="fc" id="L68">    private MicrosoftConnect() {}</span>
+
+    public static synchronized MicrosoftConnect getInstance() {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (INSTANCE == null) {</span>
+<span class="fc" id="L72">            INSTANCE = new MicrosoftConnect();</span>
+        }
+<span class="fc" id="L74">        return INSTANCE;</span>
+    }
+
+    /// Picks the Entra ID tenant to target. Pass [#COMMON_TENANT],
+    /// `&quot;organizations&quot;`, `&quot;consumers&quot;`, or a tenant GUID / verified domain
+    /// (e.g. `&quot;contoso.onmicrosoft.com&quot;`).
+    public MicrosoftConnect withTenant(String tenant) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        this.tenant = tenant != null ? tenant : COMMON_TENANT;</span>
+<span class="fc" id="L82">        return this;</span>
+    }
+
+    public String getTenant() {
+<span class="fc" id="L86">        return tenant;</span>
+    }
+
+    @Override
+    public boolean isNativeLoginSupported() {
+<span class="fc" id="L91">        return false;</span>
+    }
+
+    @Override
+    protected boolean validateToken(String token) {
+<span class="fc bfc" id="L96" title="All 4 branches covered.">        return token != null &amp;&amp; token.length() &gt; 0;</span>
+    }
+
+    /// Drives a full authorization-code-with-PKCE sign-in through the system
+    /// browser and resolves with the issued tokens.
+    public AsyncResource&lt;OidcTokens&gt; signIn(final String clientId,
+                                            final String redirectUri,
+                                            final String... scopes) {
+<span class="nc" id="L104">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="nc" id="L105">        String issuer = &quot;https://login.microsoftonline.com/&quot; + tenant + &quot;/v2.0&quot;;</span>
+<span class="nc" id="L106">        OidcClient.discover(issuer)</span>
+<span class="nc" id="L107">                .ready(new DiscoveredCallback(this, clientId, redirectUri, scopes, out))</span>
+<span class="nc" id="L108">                .except(new ErrorCallback(out));</span>
+<span class="nc" id="L109">        return out;</span>
+    }
+
+    /// Static so SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON stays quiet.
+    /// `host` is passed explicitly because [Login#setAccessToken] is an
+    /// instance method.
+    private static final class DiscoveredCallback implements SuccessCallback&lt;OidcClient&gt; {
+        private final MicrosoftConnect host;
+        private final String clientId;
+        private final String redirectUri;
+        private final String[] scopes;
+        private final AsyncResource&lt;OidcTokens&gt; out;
+
+        DiscoveredCallback(MicrosoftConnect host, String clientId, String redirectUri,
+<span class="nc" id="L123">                           String[] scopes, AsyncResource&lt;OidcTokens&gt; out) {</span>
+<span class="nc" id="L124">            this.host = host;</span>
+<span class="nc" id="L125">            this.clientId = clientId;</span>
+<span class="nc" id="L126">            this.redirectUri = redirectUri;</span>
+<span class="nc" id="L127">            this.scopes = scopes;</span>
+<span class="nc" id="L128">            this.out = out;</span>
+<span class="nc" id="L129">        }</span>
+
+        @Override
+        public void onSucess(OidcClient client) {
+<span class="nc" id="L133">            client.setClientId(clientId)</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">                    .setRedirectUri(redirectUri)</span>
+<span class="nc" id="L135">                    .setScopes(scopes != null &amp;&amp; scopes.length &gt; 0</span>
+                            ? scopes
+                            : new String[] {&quot;openid&quot;, &quot;email&quot;, &quot;profile&quot;,
+                                    &quot;offline_access&quot;});
+<span class="nc" id="L139">            client.authorize()</span>
+<span class="nc" id="L140">                    .ready(new AuthorizedCallback(host, out))</span>
+<span class="nc" id="L141">                    .except(new ErrorCallback(out));</span>
+<span class="nc" id="L142">        }</span>
+    }
+
+    private static final class AuthorizedCallback implements SuccessCallback&lt;OidcTokens&gt; {
+        private final MicrosoftConnect host;
+        private final AsyncResource&lt;OidcTokens&gt; out;
+
+<span class="nc" id="L149">        AuthorizedCallback(MicrosoftConnect host, AsyncResource&lt;OidcTokens&gt; out) {</span>
+<span class="nc" id="L150">            this.host = host;</span>
+<span class="nc" id="L151">            this.out = out;</span>
+<span class="nc" id="L152">        }</span>
+
+        @Override
+        public void onSucess(OidcTokens t) {
+<span class="nc" id="L156">            host.setAccessToken(t.toAccessToken());</span>
+<span class="nc" id="L157">            out.complete(t);</span>
+<span class="nc" id="L158">        }</span>
+    }
+
+    private static final class ErrorCallback implements SuccessCallback&lt;Throwable&gt; {
+        private final AsyncResource&lt;OidcTokens&gt; out;
+
+<span class="nc" id="L164">        ErrorCallback(AsyncResource&lt;OidcTokens&gt; out) {</span>
+<span class="nc" id="L165">            this.out = out;</span>
+<span class="nc" id="L166">        }</span>
+
+        @Override
+        public void onSucess(Throwable err) {
+<span class="nc" id="L170">            out.error(err);</span>
+<span class="nc" id="L171">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

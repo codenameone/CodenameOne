@@ -1,0 +1,1719 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LookAndFeel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">LookAndFeel.java</span></div><h1>LookAndFeel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.plaf;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.InputComponent;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.MenuBar;
+import com.codename1.ui.SideMenuBar;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextSelection;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
+import com.codename1.ui.Toolbar;
+import com.codename1.ui.animations.BubbleTransition;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.list.ListCellRenderer;
+
+/// Allows a UI developer to completely customize the look of the application by
+/// overriding drawing/sizing methods appropriately.
+///
+/// @author Chen Fishbein
+///
+/// #### Deprecated
+///
+/// @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate
+/// our desire to reduce usage/reliance on this class.
+public abstract class LookAndFeel {
+    private static final int fadeScrollEdgeStartAlpha = 0x999999;
+    private static final int fadeScrollEdgeEndAlpha = 0;
+<span class="fc" id="L63">    private final Image[] menuIcons = new Image[3];</span>
+    private final UIManager manager;
+    private Component verticalScroll;
+    private Component horizontalScroll;
+    private Component verticalScrollThumb;
+    private Component horizontalScrollThumb;
+    /// Right-To-Left. Default false.
+    private boolean rtl;
+<span class="fc" id="L71">    private long tickerSpeed = 50;</span>
+    /// Tint color is set when a form is partially covered be it by a menu or by a
+    /// dialog. A look and feel can override this default value.
+<span class="fc" id="L74">    private int defaultFormTintColor = 0x77000000;</span>
+    /// This color is used to paint disable mode.
+<span class="fc" id="L76">    private int disableColor = 0xcccccc;</span>
+    /// This member allows us to define a default animation that will draw the transition for
+    /// entering a form
+    private Transition defaultFormTransitionIn;
+    /// This member allows us to define a default animation that will draw the transition for
+    /// exiting a form
+    private Transition defaultFormTransitionOut;
+    /// This member allows us to define a default animation that will draw the transition for
+    /// entering a menu
+    private Transition defaultMenuTransitionIn;
+    /// This member allows us to define a default animation that will draw the transition for
+    /// exiting a menu
+    private Transition defaultMenuTransitionOut;
+    /// This member allows us to define a default animation that will draw the transition for
+    /// entering a dialog
+    private Transition defaultDialogTransitionIn;
+    /// This member allows us to define a default animation that will draw the transition for
+    /// exiting a form
+    private Transition defaultDialogTransitionOut;
+    /// Indicates whether lists and containers should have smooth scrolling by default
+<span class="fc" id="L96">    private boolean defaultSmoothScrolling = true;</span>
+    /// Indicates whether lists and containers should scroll only via focus and thus &quot;jump&quot; when
+    /// moving to a larger component as was the case in older versions of Codename One.
+    private boolean focusScrolling;
+    /// Indicates the default speed for smooth scrolling
+<span class="fc" id="L101">    private int defaultSmoothScrollingSpeed = 150;</span>
+    private boolean scrollVisible;
+    private boolean fadeScrollEdge;
+    private boolean fadeScrollBar;
+    /// Indicates that scrollbars should behave as interactive desktop scrollbars:
+    /// an always-visible track with a thumb that can be grabbed and dragged and a
+    /// track that pages on click. Enabled via the {@code interactiveScrollBool} theme
+    /// constant which the desktop port injects only when running on the desktop.
+    private boolean interactiveScroll;
+    /// Minimum length (in pixels) of an interactive scrollbar thumb so it stays grabbable even
+    /// when the content is much taller/wider than the viewport. Resolved from the
+    /// {@code scrollThumbMinSizeInt} theme constant, defaulting to roughly 4mm.
+    private int interactiveScrollThumbMin;
+<span class="fc" id="L114">    private int fadeScrollBarSpeed = 5;</span>
+<span class="fc" id="L115">    private int fadeScrollEdgeLength = 15;</span>
+    private Image fadeScrollTop;
+    private Image fadeScrollBottom;
+    private Image fadeScrollRight;
+    private Image fadeScrollLeft;
+    private int textFieldCursorColor;
+    private boolean backgroundImageDetermineSize;
+    /// Indicates whether softbuttons should be reversed from their default orientation
+    private boolean reverseSoftButtons;
+    /// This renderer is assigned to all Forms Menu's by default.
+    private ListCellRenderer menuRenderer;
+    /// Allows defining a tactile touch device that vibrates when the user presses a component
+    /// that should respond with tactile feedback on a touch device (e.g. vibrate).
+    /// Setting this to 0 disables tactile feedback completely
+<span class="fc" id="L129">    private int tactileTouchDuration = 0;</span>
+    /// Indicates whether labels should end with 3 points by default
+<span class="fc" id="L131">    private boolean defaultEndsWith3Points = true;</span>
+    /// Indicates whether tensile drag should be active by default
+<span class="fc" id="L133">    private boolean defaultTensileDrag = true;</span>
+    /// Indicates whether tensile highlight should be active by default
+<span class="fc" id="L135">    private boolean defaultTensileHighlight = false;</span>
+    /// The MenuBar class
+<span class="fc" id="L137">    private Class menuBar = MenuBar.class;</span>
+    private boolean defaultSnapToGrid;
+    private boolean defaultAlwaysTensile;
+    private Image tensileHighlightTopImage;
+    private Image tensileHighlightBottomImage;
+    private Image tensileGlowTopImage;
+    private Image tensileGlowBottomImage;
+
+<span class="fc" id="L145">    public LookAndFeel(UIManager manager) {</span>
+<span class="fc" id="L146">        this.manager = manager;</span>
+<span class="fc" id="L147">    }</span>
+
+    /// Every component binds itself to the look and feel thus allowing the look
+    /// and feel to customize the component.  Binding occurs at the end of the
+    /// constructor when the component is in a valid state and ready to be used.
+    /// Notice that a component might be bound twice or more and it is the
+    /// responsibility of the LookAndFeel to protect against that.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: component instance that may be customized by the look and feel
+    public void bind(Component cmp) {
+<span class="nc" id="L159">    }</span>
+
+    /// Invoked when a look and feel is removed, allows a look and feel to release
+    /// resources related to binding components.
+    ///
+    /// #### See also
+    ///
+    /// - #bind(Component)
+    public void uninstall() {
+<span class="fc" id="L168">    }</span>
+
+    /// Invoked for drawing a button widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `b`: component to draw
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is no longer used by the implementation, we shifted code away to improve performance
+    public abstract void drawButton(Graphics g, Button b);
+
+    /// Invoked for drawing a checkbox widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `cb`: component to draw
+    public abstract void drawCheckBox(Graphics g, Button cb);
+
+    /// Invoked for drawing a combo box widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `cb`: component to draw
+    public abstract void drawComboBox(Graphics g, List cb);
+
+    /// Invoked for drawing a label widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `l`: component to draw
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is no longer used by the implementation, we shifted code away to improve performance
+    public abstract void drawLabel(Graphics g, Label l);
+
+    /// Calculates the text selection spans for a given label
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: TextSelection instance
+    ///
+    /// - `l`: Label
+    ///
+    /// #### Returns
+    ///
+    /// A span representing the positions of characters in the label
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - TextSelection
+    public abstract Span calculateLabelSpan(TextSelection sel, Label l);
+
+    /// Invoked for drawing a list widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `l`: component to draw
+    public abstract void drawList(Graphics g, List l);
+
+    /// Invoked for drawing the radio button widget
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `rb`: component to draw
+    public abstract void drawRadioButton(Graphics g, Button rb);
+
+    /// Draw the given text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `ta`: component to draw
+    public abstract void drawTextArea(Graphics g, TextArea ta);
+
+    /// Calculates the Spans used in text selection for a given text area.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: The current TextSelection instance.
+    ///
+    /// - `ta`: The TextArea to calculate spans for.
+    ///
+    /// #### Returns
+    ///
+    /// The spans for the given text field.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public abstract Spans calculateTextAreaSpan(TextSelection sel, TextArea ta);
+
+    /// Draws the text field without its cursor which is drawn in a separate method
+    /// input mode indication can also be drawn using this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `ta`: component to draw
+    public abstract void drawTextField(Graphics g, TextArea ta);
+
+    /// Calculates the Spans used in text selection for a given text field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: The current TextSelection instance.
+    ///
+    /// - `ta`: The textfield to calculate spans for.
+    ///
+    /// #### Returns
+    ///
+    /// The spans for the given text field.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public abstract Spans calculateTextFieldSpan(TextSelection sel, TextArea ta);
+
+    /// Draws the cursor of the text field, blinking is handled simply by avoiding
+    /// a call to this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `ta`: component to draw
+    public abstract void drawTextFieldCursor(Graphics g, TextArea ta);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the button
+    public abstract Dimension getButtonPreferredSize(Button b);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cb`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
+    public abstract Dimension getCheckBoxPreferredSize(Button cb);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
+    public abstract Dimension getLabelPreferredSize(Label l);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
+    public abstract Dimension getListPreferredSize(List l);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
+    public abstract Dimension getRadioButtonPreferredSize(Button rb);
+
+    //public abstract Dimension getSpinnerPreferredSize(Spinner sp);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `ta`: component whose size should be calculated
+    ///
+    /// - `pref`: indicates whether preferred or scroll size should be returned
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
+    public abstract Dimension getTextAreaSize(TextArea ta, boolean pref);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `ta`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
+    public abstract Dimension getTextFieldPreferredSize(TextArea ta);
+
+    /// Calculate the preferred size of the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `box`: component whose size should be calculated
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size for the component
+    public abstract Dimension getComboBoxPreferredSize(List box);
+
+    /// Draws a vertical scroll bar in the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `c`: component to draw on
+    ///
+    /// - `offsetRatio`: ratio of the scroll bar from 0 to 1
+    ///
+    /// - `blockSizeRatio`: block size for the scroll from 0 to 1
+    public void drawVerticalScroll(Graphics g, Component c, float offsetRatio, float blockSizeRatio) {
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">        if (verticalScroll == null) {</span>
+<span class="nc" id="L421">            initScroll();</span>
+        }
+<span class="fc" id="L423">        int borderW = 0;</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (c.getStyle().getBorder() != null) {</span>
+<span class="fc" id="L425">            borderW = c.getStyle().getBorder().getThickness();</span>
+        }
+<span class="fc" id="L427">        int x = c.getX();</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        if (!c.isRTL()) {</span>
+<span class="fc" id="L429">            x += c.getWidth() - getVerticalScrollWidth() - borderW;</span>
+        } else {
+<span class="nc" id="L431">            x += borderW;</span>
+        }
+<span class="fc" id="L433">        int y = c.getY();</span>
+<span class="fc" id="L434">        int height = c.getHeight();</span>
+<span class="fc" id="L435">        int width = getVerticalScrollWidth();</span>
+<span class="fc" id="L436">        drawScroll(g, c, offsetRatio, blockSizeRatio, true, x, y, width, height, verticalScroll, verticalScrollThumb);</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">        if (fadeScrollEdge) {</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">            if (offsetRatio &gt; 0) {</span>
+<span class="nc bnc" id="L439" title="All 4 branches missed.">                if (fadeScrollTop == null || Display.getInstance().getDisplayWidth() != fadeScrollTop.getWidth()) {</span>
+<span class="nc" id="L440">                    fadeScrollTop = generateFadeImage(fadeScrollEdgeStartAlpha, fadeScrollEdgeEndAlpha, c.getStyle().getBgColor(), false,</span>
+<span class="nc" id="L441">                            Display.getInstance().getDisplayWidth(), fadeScrollEdgeLength);</span>
+                }
+<span class="nc" id="L443">                g.drawImage(fadeScrollTop, c.getX(), c.getY());</span>
+            }
+<span class="nc bnc" id="L445" title="All 2 branches missed.">            if (offsetRatio &lt; 1 - blockSizeRatio) {</span>
+                // special case since when scrolling with the physical keys we leave
+                // the margin out of the equasion
+<span class="nc" id="L448">                int l = c.getScrollY() + c.getHeight() +</span>
+<span class="nc" id="L449">                        c.getStyle().getVerticalMargins() +</span>
+<span class="nc" id="L450">                        c.getStyle().getVerticalPadding();</span>
+
+<span class="nc" id="L452">                int totalScroll = c.getScrollDimension().getHeight();</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">                if (l &gt;= totalScroll) {</span>
+<span class="nc" id="L454">                    return;</span>
+                }
+<span class="nc bnc" id="L456" title="All 4 branches missed.">                if (fadeScrollBottom == null || Display.getInstance().getDisplayWidth() != fadeScrollBottom.getWidth()) {</span>
+<span class="nc" id="L457">                    fadeScrollBottom = generateFadeImage(fadeScrollEdgeEndAlpha, fadeScrollEdgeStartAlpha, c.getStyle().getBgColor(), false,</span>
+<span class="nc" id="L458">                            Display.getInstance().getDisplayWidth(), fadeScrollEdgeLength);</span>
+                }
+<span class="nc" id="L460">                g.drawImage(fadeScrollBottom, c.getX(), c.getY() + c.getHeight() - fadeScrollBottom.getHeight());</span>
+            }
+        }
+<span class="fc" id="L463">    }</span>
+
+    private Image generateFadeImage(int startColor, int endColor, int bgColor, boolean horizontal, int width, int height) {
+<span class="nc" id="L466">        Image mute = Image.createImage(width, height);</span>
+<span class="nc" id="L467">        mute.getGraphics().fillLinearGradient(startColor, endColor, 0, 0, width, height, horizontal);</span>
+<span class="nc" id="L468">        Object mask = mute.createMask();</span>
+<span class="nc" id="L469">        mute = Image.createImage(width, height);</span>
+<span class="nc" id="L470">        Graphics gr = mute.getGraphics();</span>
+<span class="nc" id="L471">        gr.setColor(bgColor);</span>
+<span class="nc" id="L472">        gr.fillRect(0, 0, width, height);</span>
+<span class="nc" id="L473">        return mute.applyMask(mask);</span>
+    }
+
+    /// Draws a horizontal scroll bar in the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `c`: component to draw on
+    ///
+    /// - `offsetRatio`: ratio of the scroll bar from 0 to 1
+    ///
+    /// - `blockSizeRatio`: block size for the scroll from 0 to 1
+    public void drawHorizontalScroll(Graphics g, Component c, float offsetRatio, float blockSizeRatio) {
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">        if (horizontalScroll == null) {</span>
+<span class="nc" id="L489">            initScroll();</span>
+        }
+<span class="fc" id="L491">        int borderH = 0;</span>
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (c.getStyle().getBorder() != null) {</span>
+<span class="nc" id="L493">            borderH = c.getStyle().getBorder().getThickness();</span>
+        }
+<span class="fc" id="L495">        int x = c.getX();</span>
+<span class="fc" id="L496">        int y = c.getY() + c.getHeight() - getHorizontalScrollHeight() - borderH;</span>
+
+<span class="fc" id="L498">        int width = c.getWidth();</span>
+<span class="fc" id="L499">        int height = getHorizontalScrollHeight();</span>
+<span class="fc" id="L500">        drawScroll(g, c, offsetRatio, blockSizeRatio, false, x, y, width, height, horizontalScroll, horizontalScrollThumb);</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if (fadeScrollEdge) {</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">            if (offsetRatio &gt; 0) {</span>
+<span class="nc bnc" id="L503" title="All 4 branches missed.">                if (fadeScrollLeft == null || Display.getInstance().getDisplayHeight() != fadeScrollLeft.getHeight()) {</span>
+<span class="nc" id="L504">                    fadeScrollLeft = generateFadeImage(fadeScrollEdgeStartAlpha, fadeScrollEdgeEndAlpha, c.getStyle().getBgColor(), true, fadeScrollEdgeLength,</span>
+<span class="nc" id="L505">                            Display.getInstance().getDisplayHeight());</span>
+                }
+<span class="nc" id="L507">                g.drawImage(fadeScrollLeft, c.getX(), c.getY());</span>
+            }
+<span class="nc bnc" id="L509" title="All 2 branches missed.">            if (offsetRatio &lt; 1 - blockSizeRatio) {</span>
+                // special case since when scrolling with the physical keys we leave
+                // the margin out of the equasion
+<span class="nc" id="L512">                int l = c.getScrollX() + c.getWidth() +</span>
+<span class="nc" id="L513">                        c.getStyle().getHorizontalMargins() +</span>
+<span class="nc" id="L514">                        c.getStyle().getHorizontalPadding();</span>
+<span class="nc" id="L515">                int totalScroll = c.getScrollDimension().getWidth();</span>
+<span class="nc bnc" id="L516" title="All 2 branches missed.">                if (l &gt;= totalScroll) {</span>
+<span class="nc" id="L517">                    return;</span>
+                }
+<span class="nc bnc" id="L519" title="All 4 branches missed.">                if (fadeScrollRight == null || Display.getInstance().getDisplayHeight() != fadeScrollRight.getHeight()) {</span>
+<span class="nc" id="L520">                    fadeScrollRight = generateFadeImage(fadeScrollEdgeEndAlpha, fadeScrollEdgeStartAlpha, c.getStyle().getBgColor(), true, fadeScrollEdgeLength,</span>
+<span class="nc" id="L521">                            Display.getInstance().getDisplayHeight());</span>
+                }
+<span class="nc" id="L523">                g.drawImage(fadeScrollRight, c.getX() + c.getWidth() - fadeScrollRight.getWidth(), c.getY());</span>
+            }
+        }
+<span class="fc" id="L526">    }</span>
+
+    private void drawScroll(Graphics g, Component c, float offsetRatio,
+                            float blockSizeRatio, boolean isVertical, int x, int y, int width, int height,
+                            Component scroll, Component scrollThumb) {
+<span class="fc" id="L531">        Style scrollStyle = scroll.getUnselectedStyle();</span>
+<span class="fc" id="L532">        Style scrollThumbStyle = scrollThumb.getUnselectedStyle();</span>
+
+<span class="fc" id="L534">        int alpha = scrollStyle.getBgTransparency() &amp; 0xff;</span>
+<span class="fc" id="L535">        int thumbAlpha = scrollThumbStyle.getBgTransparency() &amp; 0xff;</span>
+<span class="fc" id="L536">        int originalAlpha = g.getAlpha();</span>
+        // interactive desktop scrollbars are always visible, never faded
+<span class="pc bpc" id="L538" title="3 of 4 branches missed.">        boolean fade = fadeScrollBar &amp;&amp; !interactiveScroll;</span>
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">        if (fade) {</span>
+<span class="nc bnc" id="L540" title="All 2 branches missed.">            if (scrollStyle.getBgTransparency() != 0) {</span>
+<span class="nc" id="L541">                scrollStyle.setBgTransparency(c.getScrollOpacity(), true);</span>
+            }
+<span class="nc" id="L543">            scrollThumbStyle.setBgTransparency(c.getScrollOpacity(), true);</span>
+<span class="nc" id="L544">            g.setAlpha(c.getScrollOpacity());</span>
+        }
+        // take margin into consideration when positioning the scroll
+<span class="fc" id="L547">        int marginLeft = scrollStyle.getMarginLeft(c.isRTL());</span>
+<span class="fc" id="L548">        int marginTop = scrollStyle.getMarginTop();</span>
+<span class="fc" id="L549">        x += marginLeft;</span>
+<span class="fc" id="L550">        width -= (marginLeft + scrollStyle.getMarginRight(c.isRTL()));</span>
+<span class="fc" id="L551">        y += marginTop;</span>
+<span class="fc" id="L552">        height -= (marginTop + scrollStyle.getMarginBottom());</span>
+
+<span class="fc" id="L554">        scroll.setX(x);</span>
+<span class="fc" id="L555">        scroll.setY(y);</span>
+<span class="fc" id="L556">        scroll.setWidth(width);</span>
+<span class="fc" id="L557">        scroll.setHeight(height);</span>
+
+<span class="fc" id="L559">        int cx = g.getClipX();</span>
+<span class="fc" id="L560">        int cy = g.getClipY();</span>
+<span class="fc" id="L561">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L562">        int ch = g.getClipHeight();</span>
+
+<span class="fc bfc" id="L564" title="All 2 branches covered.">        if (interactiveScroll) {</span>
+            // Draw the always-visible track directly rather than via the orphan scroll component's
+            // paintComponent: a component that was never attached to a form does not reliably render
+            // its background on every port (notably the iOS/Metal Mac-native pipeline). A direct fill
+            // is renderer-agnostic. Only the interactive (desktop) path is affected, which has no
+            // pre-existing baselines.
+<span class="fc" id="L570">            int trackBgAlpha = scrollStyle.getBgTransparency() &amp; 0xff;</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">            if (trackBgAlpha &gt; 0) {</span>
+<span class="fc" id="L572">                int prevColor = g.getColor();</span>
+<span class="fc" id="L573">                int prevAlpha = g.getAlpha();</span>
+<span class="fc" id="L574">                g.setColor(scrollStyle.getBgColor());</span>
+<span class="fc" id="L575">                g.setAlpha(trackBgAlpha);</span>
+<span class="fc" id="L576">                g.fillRect(x, y, width, height);</span>
+<span class="fc" id="L577">                g.setAlpha(prevAlpha);</span>
+<span class="fc" id="L578">                g.setColor(prevColor);</span>
+            }
+<span class="fc" id="L580">        } else {</span>
+<span class="fc" id="L581">            scroll.paintComponent(g);</span>
+        }
+
+<span class="fc" id="L584">        marginLeft = scrollThumbStyle.getMarginLeft(c.isRTL());</span>
+<span class="fc" id="L585">        marginTop = scrollThumbStyle.getMarginTop();</span>
+<span class="fc" id="L586">        x += marginLeft;</span>
+<span class="fc" id="L587">        width -= (marginLeft + scrollThumbStyle.getMarginRight(c.isRTL()));</span>
+<span class="fc" id="L588">        y += marginTop;</span>
+<span class="fc" id="L589">        height -= (marginTop + scrollThumbStyle.getMarginBottom());</span>
+
+        int offset;
+        int blockSize;
+
+<span class="fc bfc" id="L594" title="All 2 branches covered.">        if (isVertical) {</span>
+<span class="fc" id="L595">            blockSize = (int) (c.getHeight() * blockSizeRatio) + 2;</span>
+        } else {
+<span class="fc" id="L597">            blockSize = (int) (c.getWidth() * blockSizeRatio) + 2;</span>
+        }
+
+<span class="fc bfc" id="L600" title="All 2 branches covered.">        if (interactiveScroll) {</span>
+            // keep the desktop thumb at least interactiveScrollThumbMin pixels long so it stays
+            // grabbable on very long content, then remap the offset into the reduced travel so the
+            // enlarged thumb never overshoots the track (and stays the inverse of dragScrollThumb).
+            // trackPixels uses the thumb-margin-reduced dimension so the thumb stays inside the track.
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">            int trackPixels = isVertical ? height : width;</span>
+<span class="fc" id="L606">            int minBlock = interactiveScrollThumbMin;</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">            if (minBlock &gt; trackPixels) {</span>
+<span class="nc" id="L608">                minBlock = trackPixels;</span>
+            }
+<span class="fc bfc" id="L610" title="All 2 branches covered.">            if (blockSize &lt; minBlock) {</span>
+<span class="fc" id="L611">                blockSize = minBlock;</span>
+            }
+<span class="fc" id="L613">            float denom = 1f - blockSizeRatio;</span>
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">            float norm = denom &gt; 0f ? offsetRatio / denom : 0f;</span>
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">            if (norm &lt; 0f) {</span>
+<span class="nc" id="L616">                norm = 0f;</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">            } else if (norm &gt; 1f) {</span>
+<span class="nc" id="L618">                norm = 1f;</span>
+            }
+<span class="fc" id="L620">            int travel = trackPixels - blockSize;</span>
+<span class="pc bpc" id="L621" title="1 of 2 branches missed.">            if (travel &lt; 0) {</span>
+<span class="nc" id="L622">                travel = 0;</span>
+            }
+<span class="fc" id="L624">            offset = (int) (travel * norm);</span>
+<span class="fc" id="L625">        } else {</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">            if (isVertical) {</span>
+<span class="fc" id="L627">                offset = (int) ((c.getHeight()) * offsetRatio);</span>
+            } else {
+<span class="fc" id="L629">                offset = (int) ((c.getWidth()) * offsetRatio);</span>
+            }
+        }
+
+<span class="fc bfc" id="L633" title="All 2 branches covered.">        if (isVertical) {</span>
+<span class="fc" id="L634">            scrollThumb.setX(x);</span>
+<span class="fc" id="L635">            scrollThumb.setY(y + offset);</span>
+<span class="fc" id="L636">            scrollThumb.setWidth(width);</span>
+<span class="fc" id="L637">            scrollThumb.setHeight(blockSize);</span>
+        } else {
+<span class="fc" id="L639">            scrollThumb.setX(x + offset);</span>
+<span class="fc" id="L640">            scrollThumb.setY(y);</span>
+<span class="fc" id="L641">            scrollThumb.setWidth(blockSize);</span>
+<span class="fc" id="L642">            scrollThumb.setHeight(height);</span>
+        }
+
+<span class="pc bpc" id="L645" title="1 of 4 branches missed.">        if (interactiveScroll &amp;&amp; scrollThumb instanceof InteractiveScrollThumb) {</span>
+            // push the hover/drag highlight state so the thumb paints its selected/pressed style
+<span class="fc" id="L647">            int st = THUMB_STATE_NORMAL;</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">            if (isVertical) {</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">                if (c.isVScrollThumbGrabbed()) {</span>
+<span class="nc" id="L650">                    st = THUMB_STATE_PRESSED;</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">                } else if (c.isVScrollThumbHover()) {</span>
+<span class="nc" id="L652">                    st = THUMB_STATE_HOVER;</span>
+                }
+            } else {
+<span class="nc bnc" id="L655" title="All 2 branches missed.">                if (c.isHScrollThumbGrabbed()) {</span>
+<span class="nc" id="L656">                    st = THUMB_STATE_PRESSED;</span>
+<span class="nc bnc" id="L657" title="All 2 branches missed.">                } else if (c.isHScrollThumbHover()) {</span>
+<span class="nc" id="L658">                    st = THUMB_STATE_HOVER;</span>
+                }
+            }
+<span class="fc" id="L661">            ((InteractiveScrollThumb) scrollThumb).visualState = st;</span>
+        }
+
+<span class="fc" id="L664">        g.setClip(cx, cy, cw, ch);</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">        if (interactiveScroll) {</span>
+            // Direct fill (see the track comment above) so the always-visible thumb renders on every
+            // port. getStyle() resolves the unselected/hover/pressed style via the visual state set
+            // just above; cn1-round-border thumbs become a pill via the arc radius.
+<span class="fc" id="L669">            Style thumbState = scrollThumb.getStyle();</span>
+<span class="fc" id="L670">            int tAlpha = thumbState.getBgTransparency() &amp; 0xff;</span>
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">            if (tAlpha &gt; 0) {</span>
+<span class="fc" id="L672">                int prevColor = g.getColor();</span>
+<span class="fc" id="L673">                int prevAlpha = g.getAlpha();</span>
+<span class="fc" id="L674">                int tw = scrollThumb.getWidth();</span>
+<span class="fc" id="L675">                int th = scrollThumb.getHeight();</span>
+<span class="fc" id="L676">                g.setColor(thumbState.getBgColor());</span>
+<span class="fc" id="L677">                g.setAlpha(tAlpha);</span>
+                // fillRect (not fillRoundRect) so it renders identically on every port's Graphics
+<span class="fc" id="L679">                g.fillRect(scrollThumb.getX(), scrollThumb.getY(), tw, th);</span>
+<span class="fc" id="L680">                g.setAlpha(prevAlpha);</span>
+<span class="fc" id="L681">                g.setColor(prevColor);</span>
+            }
+<span class="fc" id="L683">        } else {</span>
+<span class="fc" id="L684">            scrollThumb.paintComponent(g);</span>
+        }
+<span class="fc" id="L686">        g.setClip(cx, cy, cw, ch);</span>
+<span class="pc bpc" id="L687" title="1 of 2 branches missed.">        if (fade) {</span>
+<span class="nc" id="L688">            scrollStyle.setBgTransparency(alpha, true);</span>
+<span class="nc" id="L689">            scrollThumbStyle.setBgTransparency(thumbAlpha, true);</span>
+<span class="nc" id="L690">            g.setAlpha(originalAlpha);</span>
+        }
+<span class="fc bfc" id="L692" title="All 2 branches covered.">        if (interactiveScroll) {</span>
+            // record the painted geometry (component-local) so pointer code can hit-test
+            // the thumb and track for grab/drag and click-to-page behavior
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">            if (isVertical) {</span>
+<span class="fc" id="L696">                c.setVerticalScrollBounds(scrollThumb.getX() - c.getX(), scrollThumb.getY() - c.getY(),</span>
+<span class="fc" id="L697">                        scrollThumb.getWidth(), scrollThumb.getHeight(),</span>
+<span class="fc" id="L698">                        scroll.getX() - c.getX(), scroll.getY() - c.getY(),</span>
+<span class="fc" id="L699">                        scroll.getWidth(), scroll.getHeight());</span>
+            } else {
+<span class="nc" id="L701">                c.setHorizontalScrollBounds(scrollThumb.getX() - c.getX(), scrollThumb.getY() - c.getY(),</span>
+<span class="nc" id="L702">                        scrollThumb.getWidth(), scrollThumb.getHeight(),</span>
+<span class="nc" id="L703">                        scroll.getX() - c.getX(), scroll.getY() - c.getY(),</span>
+<span class="nc" id="L704">                        scroll.getWidth(), scroll.getHeight());</span>
+            }
+        }
+<span class="fc" id="L707">    }</span>
+
+
+    /// Sets the foreground color and font for a generic component, reuse-able by most component
+    /// drawing code
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `c`: component from which fg styles should be set
+    public void setFG(Graphics g, Component c) {
+<span class="fc" id="L719">        Style s = c.getStyle();</span>
+<span class="fc" id="L720">        g.setFont(s.getFont());</span>
+<span class="fc" id="L721">        g.setColor(s.getFgColor());</span>
+<span class="fc" id="L722">    }</span>
+
+    /// Returns the default width of a vertical scroll bar
+    ///
+    /// #### Returns
+    ///
+    /// default width of a vertical scroll bar
+    public int getVerticalScrollWidth() {
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">        if (verticalScroll == null) {</span>
+<span class="nc" id="L731">            initScroll();</span>
+        }
+<span class="fc" id="L733">        Style scrollStyle = verticalScroll.getStyle();</span>
+
+        // bidi doesn't matter for width calculations
+<span class="fc" id="L736">        return scrollStyle.getMarginLeftNoRTL() + scrollStyle.getMarginRightNoRTL() +</span>
+<span class="fc" id="L737">                scrollStyle.getPaddingLeftNoRTL() + scrollStyle.getPaddingRightNoRTL();</span>
+    }
+
+    /// Returns the default height of a horizontal scroll bar
+    ///
+    /// #### Returns
+    ///
+    /// default height of a horizontal scroll bar
+    public int getHorizontalScrollHeight() {
+<span class="pc bpc" id="L746" title="1 of 2 branches missed.">        if (horizontalScroll == null) {</span>
+<span class="nc" id="L747">            initScroll();</span>
+        }
+<span class="fc" id="L749">        Style scrollStyle = horizontalScroll.getStyle();</span>
+
+        // bidi doesn't matter for height calculations
+<span class="fc" id="L752">        return scrollStyle.getMarginTop() + scrollStyle.getMarginBottom() +</span>
+<span class="fc" id="L753">                scrollStyle.getPaddingTop() + scrollStyle.getPaddingBottom();</span>
+    }
+
+    /// Draws generic component border
+    void drawBorder(Graphics g, Component c, int color, int borderWidth) {
+<span class="nc" id="L758">        drawBorder(g, c, color, color, borderWidth);</span>
+<span class="nc" id="L759">    }</span>
+
+    /// Draws generic component border
+    void drawBorder(Graphics g, Component c, int topAndRightColor, int bottomAndLeftColor, int borderWidth) {
+<span class="nc" id="L763">        g.setColor(topAndRightColor);     //Text Component upper border color</span>
+
+<span class="nc" id="L765">        g.fillRect(c.getX(), c.getY(), c.getWidth(), borderWidth);</span>
+<span class="nc" id="L766">        g.fillRect(c.getX(), c.getY(), borderWidth, c.getHeight());</span>
+<span class="nc" id="L767">        g.setColor(bottomAndLeftColor);     //Text Component lower border color</span>
+
+<span class="nc" id="L769">        g.fillRect(c.getX(), c.getY() + c.getHeight() - borderWidth, c.getWidth(), borderWidth);</span>
+<span class="nc" id="L770">        g.fillRect(c.getX() + c.getWidth() - borderWidth, c.getY(), borderWidth, c.getHeight());</span>
+<span class="nc" id="L771">    }</span>
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a form
+    ///
+    /// #### Returns
+    ///
+    /// default transition
+    public Transition getDefaultFormTransitionIn() {
+<span class="fc" id="L780">        return defaultFormTransitionIn;</span>
+    }
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a form
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultFormTransitionIn`: the default transition
+    public void setDefaultFormTransitionIn(Transition defaultFormTransitionIn) {
+<span class="nc" id="L790">        this.defaultFormTransitionIn = defaultFormTransitionIn;</span>
+<span class="nc" id="L791">    }</span>
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a form
+    ///
+    /// #### Returns
+    ///
+    /// default transition
+    public Transition getDefaultFormTransitionOut() {
+<span class="fc" id="L800">        return defaultFormTransitionOut;</span>
+    }
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a form
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultFormTransitionOut`: the default transition
+    public void setDefaultFormTransitionOut(Transition defaultFormTransitionOut) {
+<span class="nc" id="L810">        this.defaultFormTransitionOut = defaultFormTransitionOut;</span>
+<span class="nc" id="L811">    }</span>
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a Menu
+    ///
+    /// #### Returns
+    ///
+    /// default transition
+    public Transition getDefaultMenuTransitionIn() {
+<span class="fc" id="L820">        return defaultMenuTransitionIn;</span>
+    }
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a Menu
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultMenuTransitionIn`: the default transition
+    public void setDefaultMenuTransitionIn(Transition defaultMenuTransitionIn) {
+<span class="nc" id="L830">        this.defaultMenuTransitionIn = defaultMenuTransitionIn;</span>
+<span class="nc" id="L831">    }</span>
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a Menu
+    ///
+    /// #### Returns
+    ///
+    /// default transition
+    public Transition getDefaultMenuTransitionOut() {
+<span class="fc" id="L840">        return defaultMenuTransitionOut;</span>
+    }
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a Menu
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultMenuTransitionOut`: the default transition
+    public void setDefaultMenuTransitionOut(Transition defaultMenuTransitionOut) {
+<span class="nc" id="L850">        this.defaultMenuTransitionOut = defaultMenuTransitionOut;</span>
+<span class="nc" id="L851">    }</span>
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a dialog
+    ///
+    /// #### Returns
+    ///
+    /// default transition
+    public Transition getDefaultDialogTransitionIn() {
+<span class="fc" id="L860">        return defaultDialogTransitionIn;</span>
+    }
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// entering a dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultDialogTransitionIn`: the default transition
+    public void setDefaultDialogTransitionIn(Transition defaultDialogTransitionIn) {
+<span class="nc" id="L870">        this.defaultDialogTransitionIn = defaultDialogTransitionIn;</span>
+<span class="nc" id="L871">    }</span>
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a dialog
+    ///
+    /// #### Returns
+    ///
+    /// default transition
+    public Transition getDefaultDialogTransitionOut() {
+<span class="fc" id="L880">        return defaultDialogTransitionOut;</span>
+    }
+
+    /// Allows us to define a default animation that will draw the transition for
+    /// exiting a dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultDialogTransitionOut`: the default transition
+    public void setDefaultDialogTransitionOut(Transition defaultDialogTransitionOut) {
+<span class="nc" id="L890">        this.defaultDialogTransitionOut = defaultDialogTransitionOut;</span>
+<span class="nc" id="L891">    }</span>
+
+    /// Tint color is set when a form is partially covered be it by a menu or by a
+    /// dialog. A look and feel can override this default value.
+    ///
+    /// #### Returns
+    ///
+    /// default tint color
+    public int getDefaultFormTintColor() {
+<span class="fc" id="L900">        return defaultFormTintColor;</span>
+    }
+
+    /// Tint color is set when a form is partially covered be it by a menu or by a
+    /// dialog. A look and feel can override this default value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultFormTintColor`: the default tint color
+    public void setDefaultFormTintColor(int defaultFormTintColor) {
+<span class="nc" id="L910">        this.defaultFormTintColor = defaultFormTintColor;</span>
+<span class="nc" id="L911">    }</span>
+
+    /// This color is used to paint disable mode text color.
+    ///
+    /// #### Returns
+    ///
+    /// the color value
+    public int getDisableColor() {
+<span class="fc" id="L919">        return disableColor;</span>
+    }
+
+    /// Simple setter to disable color
+    ///
+    /// #### Parameters
+    ///
+    /// - `disableColor`: the disable color value
+    public void setDisableColor(int disableColor) {
+<span class="nc" id="L928">        this.disableColor = disableColor;</span>
+<span class="nc" id="L929">    }</span>
+
+    /// Indicates whether lists and containers should have smooth scrolling by default
+    ///
+    /// #### Returns
+    ///
+    /// true if smooth scrolling should be on by default
+    public boolean isDefaultSmoothScrolling() {
+<span class="fc" id="L937">        return defaultSmoothScrolling;</span>
+    }
+
+    /// Indicates whether lists and containers should have smooth scrolling by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultSmoothScrolling`: true if smooth scrolling should be on by default
+    public void setDefaultSmoothScrolling(boolean defaultSmoothScrolling) {
+<span class="nc" id="L946">        this.defaultSmoothScrolling = defaultSmoothScrolling;</span>
+<span class="nc" id="L947">    }</span>
+
+    /// Indicates the default speed for smooth scrolling
+    ///
+    /// #### Returns
+    ///
+    /// speed for smooth scrollin
+    public int getDefaultSmoothScrollingSpeed() {
+<span class="fc" id="L955">        return defaultSmoothScrollingSpeed;</span>
+    }
+
+    /// Indicates the default speed for smooth scrolling
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultSmoothScrollingSpeed`: speed for smooth scrollin
+    public void setDefaultSmoothScrollingSpeed(int defaultSmoothScrollingSpeed) {
+<span class="nc" id="L964">        this.defaultSmoothScrollingSpeed = defaultSmoothScrollingSpeed;</span>
+<span class="nc" id="L965">    }</span>
+
+    /// Indicates whether softbuttons should be reversed from their default orientation
+    ///
+    /// #### Returns
+    ///
+    /// true if softbuttons should be reversed
+    public boolean isReverseSoftButtons() {
+<span class="fc" id="L973">        return reverseSoftButtons;</span>
+    }
+
+    /// Indicates whether softbuttons should be reversed from their default orientation
+    ///
+    /// #### Parameters
+    ///
+    /// - `reverseSoftButtons`: true if softbuttons should be reversed
+    public void setReverseSoftButtons(boolean reverseSoftButtons) {
+<span class="nc" id="L982">        this.reverseSoftButtons = reverseSoftButtons;</span>
+<span class="nc" id="L983">    }</span>
+
+    /// This method returns the MenuBar class.
+    ///
+    /// #### Returns
+    ///
+    /// the MenuBar class.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this is no longer supported, Toolbar should be used as
+    /// the extension point
+    public Class getMenuBarClass() {
+<span class="fc" id="L996">        return menuBar;</span>
+    }
+
+    /// Simple setter for the MenuBar Class
+    ///
+    /// #### Parameters
+    ///
+    /// - `menuBar`
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this is no longer supported, Toolbar should be used as
+    /// the extension point
+    public void setMenuBarClass(Class menuBar) {
+<span class="nc" id="L1010">        this.menuBar = menuBar;</span>
+<span class="nc" id="L1011">    }</span>
+
+
+    /// Returns the Menu default renderer
+    ///
+    /// #### Returns
+    ///
+    /// default renderer for the menu
+    public ListCellRenderer getMenuRenderer() {
+<span class="fc" id="L1020">        return menuRenderer;</span>
+    }
+
+    /// Sets the Menu default renderer
+    ///
+    /// #### Parameters
+    ///
+    /// - `menuRenderer`: default renderer for the menu
+    public void setMenuRenderer(ListCellRenderer menuRenderer) {
+<span class="nc" id="L1029">        this.menuRenderer = menuRenderer;</span>
+<span class="nc" id="L1030">    }</span>
+
+    /// Sets globally the Menu icons
+    ///
+    /// #### Parameters
+    ///
+    /// - `select`: select icon
+    ///
+    /// - `cancel`: cancel icon
+    ///
+    /// - `menu`: menu icon
+    public void setMenuIcons(Image select, Image cancel, Image menu) {
+<span class="nc" id="L1042">        menuIcons[0] = select;</span>
+<span class="nc" id="L1043">        menuIcons[1] = cancel;</span>
+<span class="nc" id="L1044">        menuIcons[2] = menu;</span>
+
+<span class="nc" id="L1046">    }</span>
+
+    /// Simple getter for the menu icons
+    ///
+    /// #### Returns
+    ///
+    /// @return an Image array at size of 3, where the first is the select image
+    /// the second is the cancel image and the last is the menu image.
+    public Image[] getMenuIcons() {
+<span class="fc" id="L1055">        return menuIcons;</span>
+    }
+
+    /// Gets the ticker speed
+    ///
+    /// #### Returns
+    ///
+    /// ticker speed in milliseconds
+    public long getTickerSpeed() {
+<span class="fc" id="L1064">        return tickerSpeed;</span>
+    }
+
+    /// Sets the ticker speed
+    ///
+    /// #### Parameters
+    ///
+    /// - `tickerSpeed`: the speed in milliseconds
+    public void setTickerSpeed(long tickerSpeed) {
+<span class="nc" id="L1073">        this.tickerSpeed = tickerSpeed;</span>
+<span class="nc" id="L1074">    }</span>
+
+    private void initScroll() {
+<span class="fc" id="L1077">        verticalScroll = new Label();</span>
+<span class="fc" id="L1078">        horizontalScroll = new Label();</span>
+<span class="fc bfc" id="L1079" title="All 2 branches covered.">        if (interactiveScroll) {</span>
+            // desktop scrollbars use dedicated UIIDs so the mobile Scroll/ScrollThumb styling is
+            // never affected and platform conventions can be themed separately. The thumb is an
+            // InteractiveScrollThumb so it can render hover (selected) / drag (pressed) states.
+<span class="fc" id="L1083">            verticalScrollThumb = new InteractiveScrollThumb();</span>
+<span class="fc" id="L1084">            horizontalScrollThumb = new InteractiveScrollThumb();</span>
+<span class="fc" id="L1085">            verticalScroll.setUIID(&quot;DesktopScroll&quot;);</span>
+<span class="fc" id="L1086">            horizontalScroll.setUIID(&quot;DesktopHorizontalScroll&quot;);</span>
+<span class="fc" id="L1087">            verticalScrollThumb.setUIID(&quot;DesktopScrollThumb&quot;);</span>
+<span class="fc" id="L1088">            horizontalScrollThumb.setUIID(&quot;DesktopHorizontalScrollThumb&quot;);</span>
+        } else {
+<span class="fc" id="L1090">            verticalScrollThumb = new Label();</span>
+<span class="fc" id="L1091">            horizontalScrollThumb = new Label();</span>
+<span class="fc" id="L1092">            verticalScroll.setUIID(&quot;Scroll&quot;);</span>
+<span class="fc" id="L1093">            horizontalScroll.setUIID(&quot;HorizontalScroll&quot;);</span>
+<span class="fc" id="L1094">            verticalScrollThumb.setUIID(&quot;ScrollThumb&quot;);</span>
+<span class="fc" id="L1095">            horizontalScrollThumb.setUIID(&quot;HorizontalScrollThumb&quot;);</span>
+        }
+<span class="fc" id="L1097">    }</span>
+
+    /// This method is a callback to the LookAndFeel when a theme is being
+    /// changed in the UIManager
+    ///
+    /// #### Parameters
+    ///
+    /// - `completeClear`: indicates that the theme is set and not added
+    public void refreshTheme(boolean completeClear) {
+<span class="fc" id="L1106">        fadeScrollTop = null;</span>
+<span class="fc" id="L1107">        fadeScrollBottom = null;</span>
+<span class="fc" id="L1108">        fadeScrollRight = null;</span>
+<span class="fc" id="L1109">        fadeScrollLeft = null;</span>
+        // must be resolved before initScroll() so the correct scroll UIIDs are applied
+<span class="fc" id="L1111">        interactiveScroll = manager.isThemeConstant(&quot;interactiveScrollBool&quot;, false);</span>
+<span class="fc" id="L1112">        interactiveScrollThumbMin = manager.getThemeConstant(&quot;scrollThumbMinSizeInt&quot;,</span>
+<span class="fc" id="L1113">                Display.getInstance().convertToPixels(4f));</span>
+<span class="fc" id="L1114">        initScroll();</span>
+<span class="pc bpc" id="L1115" title="1 of 2 branches missed.">        if (menuRenderer != null) {</span>
+<span class="nc bnc" id="L1116" title="All 2 branches missed.">            if (menuRenderer instanceof Component) {</span>
+<span class="nc" id="L1117">                ((Component) menuRenderer).refreshTheme();</span>
+            }
+        }
+
+<span class="fc" id="L1121">        Toolbar.setGlobalToolbar(manager.isThemeConstant(&quot;globalToobarBool&quot;, Toolbar.isGlobalToolbar()));</span>
+
+<span class="fc" id="L1123">        boolean isTouch = Display.getInstance().isTouchScreenDevice();</span>
+<span class="fc" id="L1124">        scrollVisible = manager.isThemeConstant(&quot;scrollVisibleBool&quot;, true);</span>
+<span class="fc" id="L1125">        fadeScrollEdge = manager.isThemeConstant(&quot;fadeScrollEdgeBool&quot;, false);</span>
+<span class="fc" id="L1126">        fadeScrollEdgeLength = manager.getThemeConstant(&quot;fadeScrollEdgeInt&quot;, fadeScrollEdgeLength);</span>
+<span class="fc" id="L1127">        fadeScrollBar = manager.isThemeConstant(&quot;fadeScrollBarBool&quot;, false);</span>
+
+<span class="fc" id="L1129">        InputComponent.setMultiLineErrorMessage(manager.isThemeConstant(&quot;inputComponentErrorMultilineBool&quot;, false));</span>
+
+        try {
+<span class="fc" id="L1132">            tickerSpeed = Long.parseLong(manager.getThemeConstant(&quot;tickerSpeedInt&quot;, &quot;&quot; + tickerSpeed));</span>
+<span class="pc bpc" id="L1133" title="1 of 2 branches missed.">            Label.setDefaultTickerEnabled(tickerSpeed &gt;= 1);</span>
+<span class="nc" id="L1134">        } catch (NumberFormatException err) {</span>
+<span class="nc" id="L1135">            Log.e(err);</span>
+<span class="fc" id="L1136">        }</span>
+
+<span class="fc" id="L1138">        Button.setCapsTextDefault(manager.isThemeConstant(&quot;capsButtonTextBool&quot;, false));</span>
+<span class="fc" id="L1139">        Button.setButtonRippleEffectDefault(manager.isThemeConstant(&quot;buttonRippleBool&quot;, false));</span>
+
+<span class="fc" id="L1141">        defaultFormTintColor = (int) Long.parseLong(manager.getThemeConstant(&quot;tintColor&quot;, Integer.toHexString(defaultFormTintColor)), 16);</span>
+<span class="fc" id="L1142">        disableColor = Integer.parseInt(manager.getThemeConstant(&quot;disabledColor&quot;, Integer.toHexString(disableColor)), 16);</span>
+<span class="fc" id="L1143">        Dialog.setDefaultDialogPosition(manager.getThemeConstant(&quot;dialogPosition&quot;, Dialog.getDefaultDialogPosition()));</span>
+<span class="fc" id="L1144">        Dialog.setCommandsAsButtons(manager.isThemeConstant(&quot;dialogButtonCommandsBool&quot;, Dialog.isCommandsAsButtons()));</span>
+<span class="fc" id="L1145">        Dialog.setDefaultBlurBackgroundRadius(manager.getThemeConstant(&quot;dialogBlurRadiusInt&quot;, (int) Dialog.getDefaultBlurBackgroundRadius()));</span>
+
+<span class="fc" id="L1147">        List.setDefaultIgnoreFocusComponentWhenUnfocused(manager.isThemeConstant(&quot;ignorListFocusBool&quot;, List.isDefaultIgnoreFocusComponentWhenUnfocused()));</span>
+
+<span class="pc bpc" id="L1149" title="1 of 2 branches missed.">        if (isTouch) {</span>
+<span class="fc" id="L1150">            Display.getInstance().setPureTouch(manager.isThemeConstant(&quot;pureTouchBool&quot;, Display.getInstance().isPureTouch()));</span>
+        }
+
+<span class="fc" id="L1153">        int defaultTransitionSpeed = Integer.parseInt(manager.getThemeConstant(&quot;transitionSpeedInt&quot;, &quot;220&quot;));</span>
+<span class="fc" id="L1154">        String slideDir = manager.getThemeConstant(&quot;slideDirection&quot;, &quot;horizontal&quot;);</span>
+<span class="fc" id="L1155">        String dialogSlideDir = manager.getThemeConstant(&quot;dlgSlideDirection&quot;, &quot;vertical&quot;);</span>
+<span class="fc" id="L1156">        String menuSlideDir = manager.getThemeConstant(&quot;menuSlideDirection&quot;, dialogSlideDir);</span>
+<span class="fc" id="L1157">        boolean outdir = manager.isThemeConstant(&quot;slideOutDirBool&quot;, false);</span>
+<span class="fc" id="L1158">        boolean indir = manager.isThemeConstant(&quot;slideInDirBool&quot;, true);</span>
+<span class="fc" id="L1159">        boolean dialogOutdir = manager.isThemeConstant(&quot;dlgSlideOutDirBool&quot;, false);</span>
+<span class="fc" id="L1160">        boolean dialogIndir = manager.isThemeConstant(&quot;dlgSlideInDirBool&quot;, true);</span>
+<span class="fc" id="L1161">        boolean menuOutdir = manager.isThemeConstant(&quot;menuSlideOutDirBool&quot;, false);</span>
+<span class="fc" id="L1162">        boolean menuIndir = manager.isThemeConstant(&quot;menuSlideInDirBool&quot;, true);</span>
+<span class="fc" id="L1163">        defaultFormTransitionIn = getTransitionConstant(defaultFormTransitionIn, &quot;formTransitionIn&quot;, slideDir, defaultTransitionSpeed, indir);</span>
+<span class="fc" id="L1164">        defaultFormTransitionOut = getTransitionConstant(defaultFormTransitionOut, &quot;formTransitionOut&quot;, slideDir, defaultTransitionSpeed, outdir);</span>
+<span class="fc" id="L1165">        defaultMenuTransitionIn = getTransitionConstant(defaultMenuTransitionIn, &quot;menuTransitionIn&quot;, menuSlideDir, defaultTransitionSpeed, menuIndir);</span>
+<span class="fc" id="L1166">        defaultMenuTransitionOut = getTransitionConstant(defaultMenuTransitionOut, &quot;menuTransitionOut&quot;, menuSlideDir, defaultTransitionSpeed, menuOutdir);</span>
+<span class="fc" id="L1167">        defaultDialogTransitionIn = getTransitionConstant(defaultDialogTransitionIn, &quot;dialogTransitionIn&quot;, dialogSlideDir, defaultTransitionSpeed, dialogIndir);</span>
+<span class="fc" id="L1168">        defaultDialogTransitionOut = getTransitionConstant(defaultDialogTransitionOut, &quot;dialogTransitionOut&quot;, dialogSlideDir, defaultTransitionSpeed, dialogOutdir);</span>
+<span class="fc" id="L1169">        initCommandBehaviorConstant(manager.getThemeConstant(&quot;commandBehavior&quot;, null), completeClear);</span>
+<span class="fc" id="L1170">        reverseSoftButtons = manager.isThemeConstant(&quot;reverseSoftButtonsBool&quot;, reverseSoftButtons);</span>
+<span class="fc" id="L1171">        textFieldCursorColor = manager.getThemeConstant(&quot;textFieldCursorColorInt&quot;, 0);</span>
+
+<span class="fc" id="L1173">        String gap = manager.getThemeConstant(&quot;labelGap&quot;, null);</span>
+<span class="pc bpc" id="L1174" title="1 of 2 branches missed.">        if (gap != null) {</span>
+<span class="nc" id="L1175">            Label.setDefaultGap(Display.getInstance().convertToPixels(Util.toFloatValue(gap)));</span>
+        }
+
+<span class="fc" id="L1178">        InfiniteProgress.setDefaultMaterialDesignMode(</span>
+<span class="fc" id="L1179">                manager.isThemeConstant(&quot;infiniteProgressMaterialModeBool&quot;, false));</span>
+<span class="fc" id="L1180">        InfiniteProgress.setDefaultMaterialDesignColor(</span>
+<span class="fc" id="L1181">                manager.getThemeConstant(&quot;infiniteProgressMaterialColorInt&quot;, 0x6200ee));</span>
+
+<span class="fc" id="L1183">        TextArea.setDefaultValign(manager.getThemeConstant(&quot;textCmpVAlignInt&quot;, TextArea.getDefaultValign()));</span>
+<span class="fc" id="L1184">        defaultSnapToGrid = manager.isThemeConstant(&quot;snapGridBool&quot;, false);</span>
+<span class="fc" id="L1185">        defaultAlwaysTensile = manager.isThemeConstant(&quot;alwaysTensileBool&quot;, false);</span>
+<span class="fc" id="L1186">        defaultTensileDrag = manager.isThemeConstant(&quot;tensileDragBool&quot;, true);</span>
+<span class="fc" id="L1187">        defaultEndsWith3Points = manager.isThemeConstant(&quot;endsWith3PointsBool&quot;, false);</span>
+<span class="fc" id="L1188">        defaultTensileHighlight = manager.isThemeConstant(&quot;tensileHighlightBool&quot;, false);</span>
+<span class="fc" id="L1189">        tensileHighlightBottomImage = null;</span>
+<span class="fc" id="L1190">        tensileHighlightTopImage = null;</span>
+<span class="pc bpc" id="L1191" title="1 of 2 branches missed.">        if (defaultTensileHighlight) {</span>
+<span class="nc" id="L1192">            tensileHighlightBottomImage = manager.getThemeImageConstant(&quot;tensileHighlightBottomImage&quot;);</span>
+<span class="nc" id="L1193">            tensileHighlightTopImage = manager.getThemeImageConstant(&quot;tensileHighlightTopImage&quot;);</span>
+<span class="nc" id="L1194">            tensileGlowBottomImage = manager.getThemeImageConstant(&quot;tensileGlowBottomImage&quot;);</span>
+<span class="nc" id="L1195">            tensileGlowTopImage = manager.getThemeImageConstant(&quot;tensileGlowTopImage&quot;);</span>
+<span class="nc bnc" id="L1196" title="All 4 branches missed.">            if (tensileHighlightBottomImage != null &amp;&amp; tensileHighlightTopImage != null) {</span>
+<span class="nc" id="L1197">                defaultTensileDrag = true;</span>
+<span class="nc" id="L1198">                defaultAlwaysTensile = false;</span>
+            } else {
+<span class="nc" id="L1200">                defaultTensileHighlight = false;</span>
+            }
+        }
+<span class="fc" id="L1203">        backgroundImageDetermineSize = manager.isThemeConstant(&quot;bgImageSizeBool&quot;, false);</span>
+<span class="fc" id="L1204">    }</span>
+
+    private void initCommandBehaviorConstant(String c, boolean complete) {
+<span class="fc bfc" id="L1207" title="All 2 branches covered.">        if (c != null) {</span>
+<span class="pc bpc" id="L1208" title="1 of 2 branches missed.">            if (&quot;SoftKey&quot;.equalsIgnoreCase(c)) {</span>
+<span class="nc" id="L1209">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SOFTKEY);</span>
+<span class="nc" id="L1210">                return;</span>
+            }
+<span class="pc bpc" id="L1212" title="1 of 2 branches missed.">            if (&quot;Touch&quot;.equalsIgnoreCase(c)) {</span>
+<span class="nc" id="L1213">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU);</span>
+<span class="nc" id="L1214">                return;</span>
+            }
+<span class="pc bpc" id="L1216" title="1 of 2 branches missed.">            if (&quot;Bar&quot;.equalsIgnoreCase(c)) {</span>
+<span class="nc" id="L1217">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR);</span>
+<span class="nc" id="L1218">                return;</span>
+            }
+<span class="pc bpc" id="L1220" title="1 of 2 branches missed.">            if (&quot;Title&quot;.equalsIgnoreCase(c)) {</span>
+<span class="nc" id="L1221">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK);</span>
+<span class="nc" id="L1222">                return;</span>
+            }
+<span class="pc bpc" id="L1224" title="1 of 2 branches missed.">            if (&quot;Right&quot;.equalsIgnoreCase(c)) {</span>
+<span class="nc" id="L1225">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT);</span>
+<span class="nc" id="L1226">                return;</span>
+            }
+<span class="pc bpc" id="L1228" title="1 of 2 branches missed.">            if (&quot;Native&quot;.equalsIgnoreCase(c)) {</span>
+<span class="fc" id="L1229">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);</span>
+<span class="fc" id="L1230">                return;</span>
+            }
+<span class="nc bnc" id="L1232" title="All 2 branches missed.">            if (&quot;ICS&quot;.equalsIgnoreCase(c)) {</span>
+<span class="nc" id="L1233">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_ICS);</span>
+<span class="nc" id="L1234">                return;</span>
+            }
+<span class="nc bnc" id="L1236" title="All 2 branches missed.">            if (&quot;SIDE&quot;.equalsIgnoreCase(c)) {</span>
+<span class="nc" id="L1237">                Log.p(&quot;WARNING: Theme sets the commandBehavior constant which is deprecated.  Please update the theme to NOT include this theme constant.  Using commandBehavior may cause your app to perform in unexpected ways.  In particular, using SIDE command behavior in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime exceptions.&quot;, Log.WARNING);</span>
+<span class="nc" id="L1238">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);</span>
+<span class="nc" id="L1239">                setMenuBarClass(SideMenuBar.class);</span>
+            }
+        } else {
+<span class="fc bfc" id="L1242" title="All 2 branches covered.">            if (complete) {</span>
+<span class="fc" id="L1243">                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);</span>
+            }
+        }
+<span class="fc" id="L1246">    }</span>
+
+    private Transition getTransitionConstant(Transition t, String constant, String slideDir, int speed, boolean forward) {
+<span class="fc" id="L1249">        Image img = manager.getThemeImageConstant(constant + &quot;Image&quot;);</span>
+<span class="pc bpc" id="L1250" title="1 of 2 branches missed.">        if (img != null) {</span>
+<span class="nc" id="L1251">            return CommonTransitions.createTimeline(img);</span>
+        }
+<span class="fc" id="L1253">        String val = manager.getThemeConstant(constant, null);</span>
+<span class="pc bpc" id="L1254" title="1 of 2 branches missed.">        if (val == null) {</span>
+<span class="fc" id="L1255">            return t;</span>
+        }
+<span class="nc bnc" id="L1257" title="All 2 branches missed.">        if (&quot;empty&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1258">            return CommonTransitions.createEmpty();</span>
+        }
+<span class="nc bnc" id="L1260" title="All 2 branches missed.">        if (&quot;slide&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc bnc" id="L1261" title="All 2 branches missed.">            if (&quot;horizontal&quot;.equalsIgnoreCase(slideDir)) {</span>
+<span class="nc" id="L1262">                return CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);</span>
+            } else {
+<span class="nc" id="L1264">                return CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, forward, speed);</span>
+            }
+        }
+<span class="nc bnc" id="L1267" title="All 2 branches missed.">        if (&quot;cover&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc bnc" id="L1268" title="All 2 branches missed.">            if (&quot;horizontal&quot;.equalsIgnoreCase(slideDir)) {</span>
+<span class="nc" id="L1269">                return CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);</span>
+            } else {
+<span class="nc" id="L1271">                return CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, forward, speed);</span>
+            }
+        }
+<span class="nc bnc" id="L1274" title="All 2 branches missed.">        if (&quot;uncover&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc bnc" id="L1275" title="All 2 branches missed.">            if (&quot;horizontal&quot;.equalsIgnoreCase(slideDir)) {</span>
+<span class="nc" id="L1276">                return CommonTransitions.createUncover(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);</span>
+            } else {
+<span class="nc" id="L1278">                return CommonTransitions.createUncover(CommonTransitions.SLIDE_VERTICAL, forward, speed);</span>
+            }
+        }
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">        if (&quot;fslide&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc bnc" id="L1282" title="All 2 branches missed.">            if (&quot;horizontal&quot;.equalsIgnoreCase(slideDir)) {</span>
+<span class="nc" id="L1283">                return CommonTransitions.createFastSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);</span>
+            } else {
+<span class="nc" id="L1285">                return CommonTransitions.createFastSlide(CommonTransitions.SLIDE_VERTICAL, forward, speed);</span>
+            }
+        }
+<span class="nc bnc" id="L1288" title="All 2 branches missed.">        if (&quot;fade&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1289">            return CommonTransitions.createFade(speed);</span>
+        }
+<span class="nc bnc" id="L1291" title="All 2 branches missed.">        if (&quot;slidefade&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1292">            return CommonTransitions.createSlideFadeTitle(forward, speed);</span>
+        }
+<span class="nc bnc" id="L1294" title="All 2 branches missed.">        if (&quot;pulse&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1295">            return CommonTransitions.createDialogPulsate();</span>
+        }
+<span class="nc bnc" id="L1297" title="All 2 branches missed.">        if (&quot;bubble&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1298">            BubbleTransition transition = new BubbleTransition(speed);</span>
+<span class="nc" id="L1299">            transition.setRoundBubble(false);</span>
+<span class="nc" id="L1300">            return transition;</span>
+        }
+<span class="nc" id="L1302">        return t;</span>
+    }
+
+    /// Indicates whether the menu UI should target a touch based device or a
+    /// standard cell phone
+    ///
+    /// #### Returns
+    ///
+    /// true for touch menus
+    ///
+    /// #### Deprecated
+    ///
+    /// use Display.getCommandBehavior() == Display.COMMAND_BEHAVIOR_TOUCH_MENU
+    public boolean isTouchMenus() {
+<span class="nc" id="L1316">        int t = Display.getInstance().getCommandBehavior();</span>
+<span class="nc bnc" id="L1317" title="All 4 branches missed.">        return t == Display.COMMAND_BEHAVIOR_TOUCH_MENU ||</span>
+<span class="nc bnc" id="L1318" title="All 2 branches missed.">                (t == Display.COMMAND_BEHAVIOR_DEFAULT &amp;&amp; Display.getInstance().isTouchScreenDevice());</span>
+    }
+
+    /// Indicates whether the menu UI should target a touch based device or a
+    /// standard cell phone
+    ///
+    /// #### Parameters
+    ///
+    /// - `touchMenus`: true to enable touch menus false to disable
+    ///
+    /// #### Deprecated
+    ///
+    /// use Display.setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU)
+    public void setTouchMenus(boolean touchMenus) {
+<span class="nc bnc" id="L1332" title="All 2 branches missed.">        if (touchMenus) {</span>
+<span class="nc" id="L1333">            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU);</span>
+        } else {
+<span class="nc" id="L1335">            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SOFTKEY);</span>
+        }
+<span class="nc" id="L1337">    }</span>
+
+    /// Use this to check if the LookAndFeel is in RTL mode
+    ///
+    /// #### Returns
+    ///
+    /// true if the LookAndFeel is in right-to-left mode, false otherwise
+    public boolean isRTL() {
+<span class="fc" id="L1345">        return rtl;</span>
+    }
+
+    /// Sets this LookAndFeel to operate in right-to-left mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: - true if right-to-left, false if left-to-right
+    public void setRTL(boolean rtl) {
+<span class="pc bpc" id="L1354" title="1 of 2 branches missed.">        if (UIManager.localeAccessible) {</span>
+<span class="fc" id="L1355">            this.rtl = rtl;</span>
+<span class="fc bfc" id="L1356" title="All 2 branches covered.">            if (rtl) {</span>
+<span class="fc" id="L1357">                Display.getInstance().setBidiAlgorithm(true);</span>
+            }
+        }
+<span class="fc" id="L1360">    }</span>
+
+    /// Allows defining a tactile touch device that vibrates when the user presses a component
+    /// that should respond with tactile feedback on a touch device (e.g. vibrate).
+    /// Setting this to 0 disables tactile feedback completely
+    ///
+    /// #### Returns
+    ///
+    /// the tactileTouchDuration
+    public int getTactileTouchDuration() {
+<span class="fc" id="L1370">        return tactileTouchDuration;</span>
+    }
+
+    /// Allows defining a tactile touch device that vibrates when the user presses a component
+    /// that should respond with tactile feedback on a touch device (e.g. vibrate).
+    /// Setting this to 0 disables tactile feedback completely
+    ///
+    /// #### Parameters
+    ///
+    /// - `tactileTouchDuration`: the duration of vibration
+    public void setTactileTouchDuration(int tactileTouchDuration) {
+<span class="nc" id="L1381">        this.tactileTouchDuration = tactileTouchDuration;</span>
+<span class="nc" id="L1382">    }</span>
+
+    /// Indicates whether labels should end with 3 points by default
+    ///
+    /// #### Returns
+    ///
+    /// whether labels should end with 3 points by default
+    public boolean isDefaultEndsWith3Points() {
+<span class="fc" id="L1390">        return defaultEndsWith3Points;</span>
+    }
+
+    /// Indicates whether labels should end with 3 points by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultEndsWith3Points`: True to indicates that labels should end with 3 points by default
+    public void setDefaultEndsWith3Points(boolean defaultEndsWith3Points) {
+<span class="nc" id="L1399">        this.defaultEndsWith3Points = defaultEndsWith3Points;</span>
+<span class="nc" id="L1400">    }</span>
+
+    /// Indicates whether tensile drag should be active by default
+    ///
+    /// #### Returns
+    ///
+    /// whether tensile drag should be active by default
+    public boolean isDefaultTensileDrag() {
+<span class="fc" id="L1408">        return defaultTensileDrag;</span>
+    }
+
+    /// Indicates whether tensile drag should be active by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultTensileDrag`: true if tensile drag should be active by default
+    public void setDefaultTensileDrag(boolean defaultTensileDrag) {
+<span class="nc" id="L1417">        this.defaultTensileDrag = defaultTensileDrag;</span>
+<span class="nc" id="L1418">    }</span>
+
+    /// Indicates whether lists and containers should scroll only via focus and thus &quot;jump&quot; when
+    /// moving to a larger component as was the case in older versions of Codename One.
+    ///
+    /// #### Returns
+    ///
+    /// true if focus scrolling is enabled
+    public boolean isFocusScrolling() {
+<span class="fc" id="L1427">        return focusScrolling;</span>
+    }
+
+    /// Indicates whether lists and containers should scroll only via focus and thus &quot;jump&quot; when
+    /// moving to a larger component as was the case in older versions of Codename One.
+    ///
+    /// #### Parameters
+    ///
+    /// - `focusScrolling`: true to enable focus scrolling
+    public void setFocusScrolling(boolean focusScrolling) {
+<span class="nc" id="L1437">        this.focusScrolling = focusScrolling;</span>
+<span class="nc" id="L1438">    }</span>
+
+    /// Indicates whether the edge of a scrollable area should fade out
+    ///
+    /// #### Returns
+    ///
+    /// the fadeScrollEdge
+    public boolean isFadeScrollEdge() {
+<span class="nc" id="L1446">        return fadeScrollEdge;</span>
+    }
+
+    /// Indicates whether the edge of a scrollable area should fade out
+    ///
+    /// #### Parameters
+    ///
+    /// - `fadeScrollEdge`: the fadeScrollEdge to set
+    public void setFadeScrollEdge(boolean fadeScrollEdge) {
+<span class="nc" id="L1455">        this.fadeScrollEdge = fadeScrollEdge;</span>
+<span class="nc" id="L1456">    }</span>
+
+    /// Indicates whether the scrollbar should fade when unused
+    ///
+    /// #### Returns
+    ///
+    /// the fadeScrollBar
+    public boolean isFadeScrollBar() {
+<span class="fc" id="L1464">        return fadeScrollBar;</span>
+    }
+
+    /// Indicates whether the scrollbar should fade when unused
+    ///
+    /// #### Parameters
+    ///
+    /// - `fadeScrollBar`: the fadeScrollBar to set
+    public void setFadeScrollBar(boolean fadeScrollBar) {
+<span class="nc" id="L1473">        this.fadeScrollBar = fadeScrollBar;</span>
+<span class="nc" id="L1474">    }</span>
+
+    /// Indicates the width/height of the fading edge to indicate scrolling
+    ///
+    /// #### Returns
+    ///
+    /// the fadeScrollEdgeLength
+    public int getFadeScrollEdgeLength() {
+<span class="nc" id="L1482">        return fadeScrollEdgeLength;</span>
+    }
+
+    /// Indicates the width/height of the fading edge to indicate scrolling
+    ///
+    /// #### Parameters
+    ///
+    /// - `fadeScrollEdgeLength`: the fadeScrollEdgeLength to set
+    public void setFadeScrollEdgeLength(int fadeScrollEdgeLength) {
+<span class="nc" id="L1491">        this.fadeScrollEdgeLength = fadeScrollEdgeLength;</span>
+<span class="nc" id="L1492">    }</span>
+
+    /// The color of the text field cursor
+    ///
+    /// #### Returns
+    ///
+    /// the textFieldCursorColor
+    public int getTextFieldCursorColor() {
+<span class="fc" id="L1500">        return textFieldCursorColor;</span>
+    }
+
+    /// The color of the text field cursor
+    ///
+    /// #### Parameters
+    ///
+    /// - `textFieldCursorColor`: the textFieldCursorColor to set
+    public void setTextFieldCursorColor(int textFieldCursorColor) {
+<span class="nc" id="L1509">        this.textFieldCursorColor = textFieldCursorColor;</span>
+<span class="nc" id="L1510">    }</span>
+
+    /// Indicates whether scrolling this component should jump to a specific location
+    /// in a grid
+    ///
+    /// #### Returns
+    ///
+    /// the defaultSnapToGrid
+    public boolean isDefaultSnapToGrid() {
+<span class="fc" id="L1519">        return defaultSnapToGrid;</span>
+    }
+
+    /// Indicates whether scrolling this component should jump to a specific location
+    /// in a grid
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultSnapToGrid`: the defaultSnapToGrid to set
+    public void setDefaultSnapToGrid(boolean defaultSnapToGrid) {
+<span class="nc" id="L1529">        this.defaultSnapToGrid = defaultSnapToGrid;</span>
+<span class="nc" id="L1530">    }</span>
+
+    /// Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
+    ///
+    /// #### Returns
+    ///
+    /// the defaultAlwaysTensile
+    public boolean isDefaultAlwaysTensile() {
+<span class="fc" id="L1538">        return defaultAlwaysTensile;</span>
+    }
+
+    /// Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultAlwaysTensile`: the defaultAlwaysTensile to set
+    public void setDefaultAlwaysTensile(boolean defaultAlwaysTensile) {
+<span class="nc" id="L1547">        this.defaultAlwaysTensile = defaultAlwaysTensile;</span>
+<span class="nc" id="L1548">    }</span>
+
+    /// Indicates whether tensile highlight should be active by default
+    ///
+    /// #### Returns
+    ///
+    /// the defaultTensileHighlight
+    public boolean isDefaultTensileHighlight() {
+<span class="fc" id="L1556">        return defaultTensileHighlight;</span>
+    }
+
+    /// Paints the tensile hightlight image
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics destination for the tensile highlight image
+    ///
+    /// - `top`: destination of the tensile highlight image
+    ///
+    /// - `opacity`: the opacity of the image
+    public void paintTensileHighlight(Component t, Graphics g, boolean top, int opacity) {
+<span class="nc bnc" id="L1569" title="All 6 branches missed.">        if (opacity &gt; 0 &amp;&amp; tensileHighlightTopImage != null &amp;&amp; tensileHighlightBottomImage != null) {</span>
+<span class="nc" id="L1570">            int absX = t.getAbsoluteX();</span>
+<span class="nc" id="L1571">            int absY = t.getAbsoluteY();</span>
+<span class="nc bnc" id="L1572" title="All 2 branches missed.">            if (tensileGlowTopImage != null) {</span>
+<span class="nc" id="L1573">                int a = g.getAlpha();</span>
+<span class="nc" id="L1574">                float aspect = ((float) tensileGlowTopImage.getWidth()) / ((float) Display.getInstance().getDisplayWidth());</span>
+<span class="nc" id="L1575">                int newHeight = (int) (((float) tensileGlowTopImage.getHeight()) * aspect);</span>
+<span class="nc bnc" id="L1576" title="All 2 branches missed.">                if (top) {</span>
+                    // this is a pull to refresh operation
+<span class="nc bnc" id="L1578" title="All 2 branches missed.">                    if (t.isAlwaysTensile()) {</span>
+<span class="nc" id="L1579">                        return;</span>
+                    }
+<span class="nc" id="L1581">                    g.drawImage(tensileHighlightTopImage, absX, absY, t.getWidth(), tensileHighlightTopImage.getHeight());</span>
+<span class="nc" id="L1582">                    g.setAlpha(opacity / 3);</span>
+<span class="nc" id="L1583">                    g.drawImage(tensileGlowTopImage, absX, absY, t.getWidth(), newHeight);</span>
+<span class="nc" id="L1584">                    g.setAlpha(a);</span>
+                } else {
+<span class="nc" id="L1586">                    g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - tensileHighlightBottomImage.getHeight()), t.getWidth(), tensileHighlightBottomImage.getHeight());</span>
+<span class="nc" id="L1587">                    g.setAlpha(opacity / 3);</span>
+<span class="nc" id="L1588">                    g.drawImage(tensileGlowBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - newHeight), t.getWidth(), newHeight);</span>
+<span class="nc" id="L1589">                    g.setAlpha(a);</span>
+                }
+<span class="nc" id="L1591">            } else {</span>
+<span class="nc" id="L1592">                int a = g.getAlpha();</span>
+<span class="nc" id="L1593">                g.setAlpha(opacity);</span>
+<span class="nc bnc" id="L1594" title="All 2 branches missed.">                if (top) {</span>
+                    // this is a pull to refresh operation
+<span class="nc bnc" id="L1596" title="All 2 branches missed.">                    if (t.isAlwaysTensile()) {</span>
+<span class="nc" id="L1597">                        g.setAlpha(a);</span>
+<span class="nc" id="L1598">                        return;</span>
+                    }
+<span class="nc" id="L1600">                    g.drawImage(tensileHighlightTopImage, absX, absY, Display.getInstance().getDisplayWidth(), tensileHighlightTopImage.getHeight());</span>
+                } else {
+<span class="nc" id="L1602">                    g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + t.getHeight() - tensileHighlightBottomImage.getHeight(), Display.getInstance().getDisplayWidth(), tensileHighlightBottomImage.getHeight());</span>
+                }
+<span class="nc" id="L1604">                g.setAlpha(a);</span>
+            }
+        }
+<span class="nc" id="L1607">    }</span>
+
+
+    UIManager getUIManager() {
+<span class="fc" id="L1611">        return manager;</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the fadeScrollBarSpeed
+    public int getFadeScrollBarSpeed() {
+<span class="fc" id="L1618">        return fadeScrollBarSpeed;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `fadeScrollBarSpeed`: per-frame opacity decrement used for fading the scrollbar.
+    ///   Larger values fade out faster.
+    ///
+    /// #### Notes
+    ///
+    /// - This value is **not milliseconds**.
+    /// - Approximate fade duration in milliseconds:
+    ///   `durationMs ~= (255 / fadeScrollBarSpeed) * (1000 / Display.getInstance().getFrameRate())`
+    /// - At 60 FPS, common values are:
+    ///   - `5`  -&gt; about `850ms`
+    ///   - `3`  -&gt; about `1400ms`
+    ///   - `2`  -&gt; about `2100ms`
+    ///   - `1`  -&gt; about `4250ms`
+    public void setFadeScrollBarSpeed(int fadeScrollBarSpeed) {
+<span class="nc" id="L1637">        this.fadeScrollBarSpeed = fadeScrollBarSpeed;</span>
+<span class="nc" id="L1638">    }</span>
+
+    /// #### Returns
+    ///
+    /// scrollVisible
+    public boolean isScrollVisible() {
+<span class="fc" id="L1644">        return scrollVisible;</span>
+    }
+
+    /// Indicates whether scrollbars behave as interactive desktop scrollbars (grab-able
+    /// thumb, click-to-page track, always visible). Controlled by the
+    /// {@code interactiveScrollBool} theme constant.
+    ///
+    /// #### Returns
+    ///
+    /// true if interactive desktop scrollbars are enabled
+    public boolean isInteractiveScroll() {
+<span class="fc" id="L1655">        return interactiveScroll;</span>
+    }
+
+    /// Scrollbar thumb used for interactive desktop scrollbars. It renders its selected style
+    /// when the pointer hovers the thumb and its pressed style while the thumb is being dragged,
+    /// giving the desktop-conventional highlight feedback. The visual state is pushed in by the
+    /// look and feel right before the thumb is painted (see {@code drawScroll}).
+    private static final int THUMB_STATE_NORMAL = 0;
+    private static final int THUMB_STATE_HOVER = 1;
+    private static final int THUMB_STATE_PRESSED = 2;
+
+    private static final class InteractiveScrollThumb extends Label {
+<span class="fc" id="L1667">        int visualState = THUMB_STATE_NORMAL;</span>
+
+        InteractiveScrollThumb() {
+<span class="fc" id="L1670">            super(&quot;&quot;);</span>
+<span class="fc" id="L1671">        }</span>
+
+        @Override
+        public Style getStyle() {
+<span class="pc bpc" id="L1675" title="2 of 3 branches missed.">            switch (visualState) {</span>
+                case THUMB_STATE_PRESSED:
+<span class="nc" id="L1677">                    return getPressedStyle();</span>
+                case THUMB_STATE_HOVER:
+<span class="nc" id="L1679">                    return getSelectedStyle();</span>
+                default:
+<span class="fc" id="L1681">                    return getUnselectedStyle();</span>
+            }
+        }
+    }
+
+    /// Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+    ///
+    /// #### Returns
+    ///
+    /// the backgroundImageDetermineSize
+    public boolean isBackgroundImageDetermineSize() {
+<span class="fc" id="L1692">        return backgroundImageDetermineSize;</span>
+    }
+
+    /// Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundImageDetermineSize`: the backgroundImageDetermineSize to set
+    public void setBackgroundImageDetermineSize(boolean backgroundImageDetermineSize) {
+<span class="nc" id="L1701">        this.backgroundImageDetermineSize = backgroundImageDetermineSize;</span>
+<span class="nc" id="L1702">    }</span>
+
+    /// Paints the pull to refresh
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context
+    ///
+    /// - `cmp`: the Component which we draw the pull to refresh beneath it
+    ///
+    /// - `taskExecuted`: an indication if the refresh task is currently running
+    public abstract void drawPullToRefresh(Graphics g, Component cmp, boolean taskExecuted);
+
+    /// Returns the required height of the pull to refresh feature
+    public abstract int getPullToRefreshHeight();
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IndexEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">IndexEvaluator.java</span></div><h1>IndexEvaluator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Vector;
+
+/// Internal class, do not use.
+///
+/// This evaluator handles expressions that involve the index. Example:
+///
+/// `
+///
+///  Get the name of the second player
+///
+///  /tournament/player[2]/name
+///
+///  Get the name of the last player
+///
+///  /tournament/player[last()]/name
+///
+///  Get the name of the second last player
+///
+///  //player[last()-1]/name
+///
+///  Get players 4 and greater
+///
+///  //player[position() &gt; 3]/name
+///
+///  Get players 0 to 4
+///
+///  //player[position() &lt; 5]/name`
+///
+/// @author Eric Coolman
+class IndexEvaluator extends AbstractEvaluator {
+
+<span class="fc" id="L58">    static String FUNC_LAST = &quot;last()&quot;;</span>
+<span class="fc" id="L59">    static String FUNC_POSITION = &quot;position()&quot;;</span>
+
+    /// Construct with a full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`: a full predicate expression
+    public IndexEvaluator(String expr) {
+<span class="fc" id="L67">        super(expr);</span>
+<span class="fc" id="L68">    }</span>
+
+    /// Select all elements from the array with an index less than the given
+    /// value.
+    ///
+    /// Example:
+    ///
+    /// `[position() &lt; 5]`
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: array of StructuredContent elements
+    ///
+    /// - `rvalue`: index value
+    ///
+    /// #### Returns
+    ///
+    /// an array of matching elements.
+    private List getByPositionLess(List elements, int rvalue) {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (rvalue &gt; elements.size()) {</span>
+<span class="nc" id="L88">            return elements;</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (rvalue &lt; 0) {</span>
+<span class="nc" id="L91">            return null;</span>
+        }
+        List array;
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (elements instanceof Vector) {</span>
+<span class="fc" id="L95">            array = new Vector();</span>
+        } else {
+<span class="nc" id="L97">            array = new ArrayList();</span>
+        }
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (int i = 0; i &lt; rvalue; i++) {</span>
+<span class="fc" id="L100">            array.add(elements.get(i));</span>
+        }
+<span class="fc" id="L102">        return array;</span>
+    }
+
+    /// Select all elements from the array with an index greater than the given
+    /// value.
+    ///
+    /// Example:
+    ///
+    /// `[position() &gt; 5]`
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: array of StructuredContent elements
+    ///
+    /// - `rvalue`: index value
+    ///
+    /// #### Returns
+    ///
+    /// an array of matching elements.
+    private List getByPositionGreater(List elements, int rvalue) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (rvalue &gt;= elements.size()) {</span>
+<span class="nc" id="L123">            return null;</span>
+        }
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (rvalue &lt;= 0) {</span>
+<span class="fc" id="L126">            return elements;</span>
+        }
+        List array;
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (elements instanceof Vector) {</span>
+<span class="nc" id="L130">            array = new Vector();</span>
+        } else {
+<span class="nc" id="L132">            array = new ArrayList();</span>
+        }
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (int i = rvalue; i &lt; elements.size(); i++) {</span>
+<span class="nc" id="L135">            array.add(elements.get(i));</span>
+        }
+<span class="nc" id="L137">        return array;</span>
+    }
+
+    /// Select a single element from an array, relative to the last element. Ie.
+    ///
+    /// `Fifth last element:
+    ///
+    ///  [last() - 5]
+    ///
+    ///  Last element:
+    ///
+    ///  [last()]`
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: array of StructuredContent elements
+    ///
+    /// - `rvalue`: index value
+    ///
+    /// #### Returns
+    ///
+    /// an array of matching elements.
+    private StructuredContent getByLast(List elements, String expr) throws IllegalArgumentException {
+<span class="nc" id="L160">        int index = expr.indexOf(&quot;-&quot;);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (index == -1) {</span>
+<span class="nc" id="L162">            throw new IllegalArgumentException(&quot;Could not handle expression: &quot; + expr);</span>
+        }
+<span class="nc" id="L164">        String rvalue = expr.substring(index + 1).trim();</span>
+<span class="nc" id="L165">        int dim = (elements.size() - 1) - Integer.parseInt(rvalue);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (dim &lt; 0) {</span>
+<span class="nc" id="L167">            return null;</span>
+        }
+<span class="nc" id="L169">        return (StructuredContent) elements.get(dim);</span>
+    }
+
+    /* (non-Javadoc)
+     * @see com.codename1.path.impl.AbstractEvaluator#evaluateSingle(java.util.List, java.lang.String)
+     */
+    @Override
+    protected Object evaluateSingle(List elements, String expr) {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (isNumeric(expr)) {</span>
+<span class="fc" id="L178">            int dim = Integer.parseInt(expr);</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">            if ((dim &lt; 0) || (dim &gt;= elements.size())) {</span>
+<span class="nc" id="L180">                return null;</span>
+            }
+<span class="fc" id="L182">            return elements.get(dim);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        } else if (expr.equals(FUNC_LAST)) {</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (elements.isEmpty()) {</span>
+<span class="nc" id="L185">                return null;</span>
+            }
+<span class="fc" id="L187">            return elements.get(elements.size() - 1);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        } else if (expr.indexOf(FUNC_LAST) != -1) {</span>
+<span class="nc" id="L189">            return getByLast(elements, expr);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        } else if (expr.equals(FUNC_POSITION)) {</span>
+<span class="nc" id="L191">            return elements;</span>
+        }
+<span class="nc" id="L193">        return null;</span>
+    }
+
+    /* (non-Javadoc)
+     * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(java.util.List, java.lang.String, java.lang.String)
+     */
+    @Override
+    protected Object evaluateLeftLessRight(List elements, String lvalue,
+                                           String rvalue) {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (FUNC_POSITION.equals(lvalue)) {</span>
+<span class="fc" id="L203">            return getByPositionLess(elements, Integer.parseInt(rvalue));</span>
+        }
+<span class="nc" id="L205">        return null;</span>
+    }
+
+    /* (non-Javadoc)
+     * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftGreaterRight(java.util.List, java.lang.String, java.lang.String)
+     */
+    @Override
+    protected Object evaluateLeftGreaterRight(List elements, String lvalue,
+                                              String rvalue) {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (FUNC_POSITION.equals(lvalue)) {</span>
+<span class="fc" id="L215">            return getByPositionGreater(elements, Integer.parseInt(rvalue));</span>
+        }
+<span class="nc" id="L217">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

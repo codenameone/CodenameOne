@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FloatingActionButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">FloatingActionButton.java</span></div><h1>FloatingActionButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Floating action buttons are a material design element used to promote a special action in a Form.
+/// They are represented as a floating circle with a flat icon floating above the UI typically in the bottom right
+/// area.
+///
+/// Simple use cases include just the button as a standalone:
+///
+/// ```java
+/// FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
+/// fab.addActionListener(e -&gt; ToastBar.showErrorMessage(&quot;Not implemented yet...&quot;));
+/// fab.bindFabToContainer(hi.getContentPane());
+/// ```
+///
+/// The button can also nest sub actions
+///
+/// ```java
+/// FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
+/// fab.createSubFAB(FontImage.MATERIAL_PEOPLE, &quot;&quot;);
+/// fab.createSubFAB(FontImage.MATERIAL_IMPORT_CONTACTS, &quot;&quot;);
+/// fab.bindFabToContainer(hi.getContentPane());
+/// ```
+///
+/// @author Chen
+public class FloatingActionButton extends Button {
+
+    /// The FloatingActionButton tries to size/pad itself automatically but
+    /// this means that manual padding is ignored. Setting this to false
+    /// disables that behavior
+<span class="fc" id="L74">    private static boolean autoSizing = true;</span>
+    /// The default icon size for the fab
+<span class="fc" id="L76">    private static float fabDefaultSize = 3.8f;</span>
+    private List&lt;FloatingActionButton&gt; subMenu;
+    /// The UIID of the sub action texts can be overriden. It defaults to `FloatingActionText`
+<span class="fc" id="L79">    private String floatingActionTextUIID = &quot;FloatingActionText&quot;;</span>
+    private String text;
+<span class="fc" id="L81">    private int shadowOpacity = 100;</span>
+    private Dialog current;
+    private boolean rectangle;
+    private boolean isBadge;
+<span class="fc" id="L85">    private float sizeMm = fabDefaultSize;</span>
+
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `text`: the text of the sub FloatingActionButton
+    ///
+    /// - `size`: the size in millimeters
+    protected FloatingActionButton(char icon, String text, float size) {
+<span class="fc" id="L97">        this(icon, text, &quot;FloatingActionButton&quot;, size);</span>
+<span class="fc" id="L98">    }</span>
+
+    /// Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `text`: the text of the sub FloatingActionButton
+    ///
+    /// - `uiid`: the uiid of the FAB
+    ///
+    /// - `size`: the size in millimeters
+<span class="fc" id="L111">    protected FloatingActionButton(char icon, String text, String uiid, float size) {</span>
+<span class="fc" id="L112">        FontImage image = FontImage.createMaterial(icon, uiid, size);</span>
+<span class="fc" id="L113">        setGap(0);</span>
+<span class="fc" id="L114">        image.setBgTransparency(0);</span>
+<span class="fc" id="L115">        sizeMm = size;</span>
+<span class="fc" id="L116">        setIcon(image);</span>
+<span class="fc" id="L117">        setText(&quot;&quot;);</span>
+<span class="fc" id="L118">        this.text = text;</span>
+<span class="fc" id="L119">        setUIIDFinal(uiid);</span>
+<span class="fc" id="L120">        Style all = getAllStyles();</span>
+<span class="fc" id="L121">        all.setAlignment(CENTER);</span>
+<span class="fc" id="L122">        updateBorder();</span>
+<span class="fc" id="L123">    }</span>
+
+    /// This constructor is used by text badges
+<span class="fc" id="L126">    private FloatingActionButton(String text) {</span>
+<span class="fc" id="L127">        super.setText(text);</span>
+<span class="fc" id="L128">        rectangle = true;</span>
+<span class="fc" id="L129">        shadowOpacity = 0;</span>
+<span class="fc" id="L130">        setUIIDFinal(&quot;Badge&quot;);</span>
+<span class="fc" id="L131">        updateBorder();</span>
+<span class="fc" id="L132">        isBadge = true;</span>
+<span class="fc" id="L133">    }</span>
+
+    /// The default icon size for the fab icon in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// the fabDefaultSize
+    public static float getIconDefaultSize() {
+<span class="fc" id="L141">        return fabDefaultSize;</span>
+    }
+
+    /// The default icon size for the fab icon in millimeters
+    ///
+    /// #### Parameters
+    ///
+    /// - `aFabDefaultSize`: the fabDefaultSize to set
+    public static void setIconDefaultSize(float aFabDefaultSize) {
+<span class="fc" id="L150">        fabDefaultSize = aFabDefaultSize;</span>
+<span class="fc" id="L151">    }</span>
+
+    /// The FloatingActionButton tries to size/pad itself automatically but
+    /// this means that manual padding is ignored. Setting this to false
+    /// disables that behavior
+    ///
+    /// #### Returns
+    ///
+    /// the autoSizing
+    public static boolean isAutoSizing() {
+<span class="fc" id="L161">        return autoSizing;</span>
+    }
+
+    /// The FloatingActionButton tries to size/pad itself automatically but
+    /// this means that manual padding is ignored. Setting this to false
+    /// disables that behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `aAutoSizing`: the autoSizing to set
+    public static void setAutoSizing(boolean aAutoSizing) {
+<span class="fc" id="L172">        autoSizing = aAutoSizing;</span>
+<span class="fc" id="L173">    }</span>
+
+    /// Creates a text badge
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text of the badge
+    ///
+    /// #### Returns
+    ///
+    /// a badge component
+    public static FloatingActionButton createBadge(String text) {
+<span class="fc" id="L185">        return new FloatingActionButton(text);</span>
+    }
+
+    /// a factory method to create a FloatingActionButton.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// #### Returns
+    ///
+    /// a FloatingActionButton instance
+    public static FloatingActionButton createFAB(char icon) {
+<span class="nc" id="L198">        return new FloatingActionButton(icon, null, fabDefaultSize);</span>
+    }
+
+    /// a factory method to create a FloatingActionButton.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `uiid`: the uiid for the fab
+    ///
+    /// #### Returns
+    ///
+    /// a FloatingActionButton instance
+    public static FloatingActionButton createFAB(char icon, String uiid) {
+<span class="nc" id="L213">        return new FloatingActionButton(icon, null, uiid, fabDefaultSize);</span>
+    }
+
+    /// Overriden to update the icon
+    /// {@inheritDoc}
+    @Override
+    public void setUIID(String id) {
+<span class="nc" id="L220">        super.setUIID(id);</span>
+<span class="nc" id="L221">        FontImage i = (FontImage) getIcon();</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (i != null) {</span>
+<span class="nc" id="L223">            Style all = getAllStyles();</span>
+<span class="nc" id="L224">            all.setAlignment(CENTER);</span>
+<span class="nc" id="L225">            updateBorder();</span>
+<span class="nc" id="L226">            FontImage image = FontImage.createMaterial(i.getText().charAt(0), id, sizeMm);</span>
+<span class="nc" id="L227">            image.setBgTransparency(0);</span>
+<span class="nc" id="L228">            setIcon(image);</span>
+        }
+<span class="nc" id="L230">    }</span>
+
+    private void updateBorder() {
+<span class="fc" id="L233">        getUnselectedStyle().setBorder(RoundBorder.create().</span>
+<span class="fc" id="L234">                color(getUnselectedStyle().getBgColor()).</span>
+<span class="fc" id="L235">                shadowOpacity(shadowOpacity).rectangle(rectangle));</span>
+<span class="fc" id="L236">        getSelectedStyle().setBorder(RoundBorder.create().</span>
+<span class="fc" id="L237">                color(getSelectedStyle().getBgColor()).</span>
+<span class="fc" id="L238">                shadowOpacity(shadowOpacity).rectangle(rectangle));</span>
+<span class="fc" id="L239">        getPressedStyle().setBorder(RoundBorder.create().</span>
+<span class="fc" id="L240">                color(getPressedStyle().getBgColor()).</span>
+<span class="fc" id="L241">                shadowOpacity(shadowOpacity).rectangle(rectangle));</span>
+<span class="fc" id="L242">    }</span>
+
+    /// We override this method to track style changes to the background color and map them to the border
+    ///
+    /// {@inheritDoc}
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (Style.BG_COLOR.equals(propertyName)) {</span>
+<span class="nc" id="L250">            updateBorder();</span>
+        }
+<span class="pc bpc" id="L252" title="1 of 4 branches missed.">        if (getIcon() instanceof FontImage &amp;&amp; Style.FG_COLOR.equals(propertyName)) {</span>
+<span class="nc" id="L253">            FontImage i = (FontImage) getIcon();</span>
+<span class="nc" id="L254">            FontImage image = FontImage.createMaterial(i.getText().charAt(0), &quot;FloatingActionButton&quot;, sizeMm);</span>
+<span class="nc" id="L255">            image.setBgTransparency(0);</span>
+<span class="nc" id="L256">            setIcon(image);</span>
+        }
+<span class="fc" id="L258">    }</span>
+
+    /// Adds a sub FAB to the FloatingActionButton instance. Once pressed all its
+    /// sub FAB's are displayed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: one of the FontImage.MATERIAL_* constants
+    ///
+    /// - `text`: the text of the sub FloatingActionButton
+    ///
+    /// #### Returns
+    ///
+    /// a FloatingActionButton instance for the sub FAB added
+    public FloatingActionButton createSubFAB(char icon, String text) {
+<span class="fc" id="L273">        FloatingActionButton sub = new FloatingActionButton(icon, text, 2.8f);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (subMenu == null) {</span>
+<span class="fc" id="L275">            subMenu = new ArrayList&lt;FloatingActionButton&gt;();</span>
+        }
+<span class="fc" id="L277">        subMenu.add(sub);</span>
+<span class="fc" id="L278">        return sub;</span>
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">        if (autoSizing &amp;&amp; getIcon() != null) {</span>
+<span class="fc" id="L284">            return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);</span>
+        }
+<span class="nc" id="L286">        return super.calcPreferredSize();</span>
+    }
+
+    /// This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+    /// use the layered pane if the container is a content pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the Container to add the FAB to
+    ///
+    /// #### Returns
+    ///
+    /// a new Container that contains the cnt and the FAB on top or null in the case of a content pane
+    public Container bindFabToContainer(Component cnt) {
+<span class="nc" id="L300">        return bindFabToContainer(cnt, Component.RIGHT, Component.BOTTOM);</span>
+    }
+
+    /// This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+    /// use the layered pane if the container is a content pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the Container to add the FAB to
+    ///
+    /// - `orientation`: one of Component.RIGHT/LEFT/CENTER
+    ///
+    /// - `valign`: one of Component.TOP/BOTTOM/CENTER
+    ///
+    /// #### Returns
+    ///
+    /// a new Container that contains the cnt and the FAB on top or null in the case of a content pane
+    public Container bindFabToContainer(Component cnt, int orientation, int valign) {
+<span class="nc" id="L318">        FlowLayout flow = new FlowLayout(orientation);</span>
+<span class="nc" id="L319">        flow.setValign(valign);</span>
+
+<span class="nc" id="L321">        Form f = cnt.getComponentForm();</span>
+<span class="nc bnc" id="L322" title="All 6 branches missed.">        if (f != null &amp;&amp; (f.getContentPane() == cnt || f == cnt)) { //NOPMD CompareObjectsWithEquals</span>
+            // special case for content pane installs the button directly on the content pane
+<span class="nc" id="L324">            Container layers = f.getLayeredPane(getClass(), true);</span>
+<span class="nc" id="L325">            layers.setSafeArea(true);</span>
+<span class="nc" id="L326">            layers.setLayout(flow);</span>
+<span class="nc" id="L327">            layers.add(this);</span>
+<span class="nc" id="L328">            return null;</span>
+        }
+
+<span class="nc" id="L331">        Container conUpper = new Container(flow);</span>
+<span class="nc" id="L332">        conUpper.add(this);</span>
+<span class="nc" id="L333">        return LayeredLayout.encloseIn(cnt, conUpper);</span>
+    }
+
+    /// Removes the floating action button from its parent
+    public void unbind() {
+<span class="nc" id="L338">        Container cnt = getParent();</span>
+<span class="nc" id="L339">        remove();</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        if (cnt != null) {</span>
+<span class="nc" id="L341">            cnt.remove();</span>
+        }
+<span class="nc" id="L343">    }</span>
+
+    @Override
+    public void setText(String text) {
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (isBadge) {</span>
+<span class="fc" id="L348">            super.setText(text);</span>
+        }
+<span class="fc" id="L350">        this.text = text;</span>
+<span class="fc" id="L351">    }</span>
+
+    @Override
+    protected void fireActionEvent(int x, int y) {
+<span class="fc" id="L355">        Form current = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (current instanceof Dialog) {</span>
+<span class="nc" id="L357">            ((Dialog) current).dispose();</span>
+        }
+<span class="fc" id="L359">        super.fireActionEvent(x, y);</span>
+<span class="fc" id="L360">    }</span>
+
+
+    @Override
+    public void released(int x, int y) {
+<span class="fc" id="L365">        super.released(x, y);</span>
+
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (current != null) {</span>
+<span class="nc" id="L368">            current.dispose();</span>
+<span class="nc" id="L369">            current = null;</span>
+        }
+        //if this fab has sub fab's display them
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">        if (subMenu != null) {</span>
+<span class="nc" id="L373">            final Container con = createPopupContent(subMenu);</span>
+<span class="nc" id="L374">            Dialog d = new Dialog();</span>
+<span class="nc" id="L375">            d.setDialogUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L376">            d.getContentPane().setUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L377">            d.setLayout(new BorderLayout());</span>
+<span class="nc" id="L378">            d.add(BorderLayout.CENTER, con);</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">            for (FloatingActionButton next : subMenu) {</span>
+<span class="nc" id="L380">                next.current = d;</span>
+<span class="nc" id="L381">            }</span>
+<span class="nc" id="L382">            d.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L383">            d.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            for (Component c : con) {</span>
+<span class="nc" id="L385">                c.setVisible(false);</span>
+<span class="nc" id="L386">            }</span>
+<span class="nc" id="L387">            Form f = getComponentForm();</span>
+<span class="nc" id="L388">            int oldTint = f.getTintColor();</span>
+<span class="nc" id="L389">            f.setTintColor(0);</span>
+<span class="nc" id="L390">            d.setBlurBackgroundRadius(-1);</span>
+<span class="nc" id="L391">            d.addShowListener(new ReleaseActionListener(con));</span>
+<span class="nc" id="L392">            showPopupDialog(d);</span>
+<span class="nc" id="L393">            f.setTintColor(oldTint);</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">            for (FloatingActionButton next : subMenu) {</span>
+<span class="nc" id="L395">                next.remove();</span>
+<span class="nc" id="L396">            }</span>
+<span class="nc" id="L397">            con.removeAll();</span>
+        }
+<span class="fc" id="L399">    }</span>
+
+    /// Creates the popup content container to display on the dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fabs`: List of sub FloatingActionButton
+    ///
+    /// #### Returns
+    ///
+    /// a Container that contains all fabs
+    protected Container createPopupContent(List&lt;FloatingActionButton&gt; fabs) {
+<span class="fc" id="L411">        Container con = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        for (final FloatingActionButton next : subMenu) {</span>
+<span class="fc" id="L413">            next.setPreferredW(getWidth());</span>
+<span class="fc" id="L414">            Container c = new Container(new BorderLayout());</span>
+<span class="fc" id="L415">            Button txt = new Button(next.text);</span>
+<span class="fc" id="L416">            txt.setUIID(floatingActionTextUIID);</span>
+<span class="fc" id="L417">            c.add(BorderLayout.CENTER, FlowLayout.encloseRight(txt));</span>
+<span class="fc" id="L418">            c.add(BorderLayout.EAST, next);</span>
+<span class="fc" id="L419">            con.add(c);</span>
+<span class="fc" id="L420">            txt.addActionListener(new CreatePopupContentActionListener(next));</span>
+<span class="fc" id="L421">        }</span>
+<span class="fc" id="L422">        return con;</span>
+    }
+
+    /// Shows the popup Dialog with the sub FABs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dialog`: the Dialog with all sub FAB's Components
+    protected void showPopupDialog(Dialog dialog) {
+<span class="nc" id="L431">        dialog.setPopupDirectionBiasPortrait(Boolean.TRUE);</span>
+<span class="nc" id="L432">        dialog.showPopupDialog(this);</span>
+<span class="nc" id="L433">    }</span>
+
+    /// #### Returns
+    ///
+    /// the floatingActionTextUIID
+    public String getFloatingActionTextUIID() {
+<span class="nc" id="L439">        return floatingActionTextUIID;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `floatingActionTextUIID`: the floatingActionTextUIID to set
+    public void setFloatingActionTextUIID(String floatingActionTextUIID) {
+<span class="fc" id="L446">        this.floatingActionTextUIID = floatingActionTextUIID;</span>
+<span class="fc" id="L447">    }</span>
+
+    private static class ReleaseActionListener implements ActionListener&lt;ActionEvent&gt; {
+        private final Container con;
+
+<span class="nc" id="L452">        public ReleaseActionListener(Container con) {</span>
+<span class="nc" id="L453">            this.con = con;</span>
+<span class="nc" id="L454">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L458" title="All 2 branches missed.">            for (Component c : con) {</span>
+<span class="nc" id="L459">                c.setY(con.getHeight());</span>
+<span class="nc" id="L460">                c.setVisible(true);</span>
+<span class="nc" id="L461">            }</span>
+<span class="nc" id="L462">            con.animateLayout(200);</span>
+<span class="nc" id="L463">        }</span>
+    }
+
+    private static class CreatePopupContentActionListener implements ActionListener&lt;ActionEvent&gt; {
+        private final FloatingActionButton next;
+
+<span class="fc" id="L469">        public CreatePopupContentActionListener(FloatingActionButton next) {</span>
+<span class="fc" id="L470">            this.next = next;</span>
+<span class="fc" id="L471">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L475">            next.pressed();</span>
+<span class="fc" id="L476">            next.released();</span>
+<span class="fc" id="L477">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

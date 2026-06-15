@@ -1,0 +1,533 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LayoutUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">LayoutUtil.java</span></div><h1>LayoutUtil.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+import com.codename1.util.MathUtil;
+
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.TreeSet;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/// A utility class that has only static helper methods.
+public final class LayoutUtil {
+    /// A substitute value for aa really large value. Integer.MAX_VALUE is not used since that means a lot of defensive code
+    /// for potential overflow must exist in many places. This value is large enough for being unreasonable yet it is hard to
+    /// overflow.
+    public static final int INF = (Integer.MAX_VALUE &gt;&gt; 10) - 100; // To reduce likelihood of overflow errors when calculating.
+    // Index for the different sizes
+    public static final int MIN = 0;
+    public static final int PREF = 1;
+    public static final int MAX = 2;
+    public static final int HORIZONTAL = 0;
+    public static final int VERTICAL = 1;
+<span class="fc" id="L55">    public static final boolean HAS_BEANS = hasBeans();</span>
+    /// Tag int for a value that in considered &quot;not set&quot;. Used as &quot;null&quot; element in int arrays.
+    static final int NOT_SET = Integer.MIN_VALUE + 12346;   // Magic value...
+<span class="fc" id="L58">    private static final IdentityHashMap&lt;Object, Object&gt; SER_MAP = new IdentityHashMap&lt;Object, Object&gt;(2);</span>
+<span class="fc" id="L59">    private static HashMap&lt;Object, String&gt; CR_MAP = null;</span>
+<span class="fc" id="L60">    private static HashMap&lt;Object, Boolean&gt; DT_MAP = null;      // The Containers that have design time. Value not used.</span>
+<span class="fc" id="L61">    private static int eSz = 0;</span>
+<span class="fc" id="L62">    private static int globalDebugMillis = 0;</span>
+
+    private LayoutUtil() {
+    }
+
+    private static boolean hasBeans() {
+<span class="fc" id="L68">        return false;</span>
+    }
+
+    /// Returns the current version of MiG Layout.
+    ///
+    /// #### Returns
+    ///
+    /// The current version of MiG Layout. E.g. &quot;3.6.3&quot; or &quot;4.0&quot;
+    public static String getVersion() {
+<span class="nc" id="L77">        return &quot;5.0&quot;;</span>
+    }
+
+    /// If global debug should be on or off. If &gt; 0 then debug is turned on for all MigLayout
+    /// instances.
+    ///
+    /// #### Returns
+    ///
+    /// The current debug milliseconds.
+    ///
+    /// #### See also
+    ///
+    /// - LC#setDebugMillis(int)
+    public static int getGlobalDebugMillis() {
+<span class="nc" id="L91">        return globalDebugMillis;</span>
+    }
+
+    /// If global debug should be on or off. If &gt; 0 then debug is turned on for all MigLayout
+    /// instances.
+    ///
+    /// Note! This is a passive value and will be read by panels when the needed, which is normally
+    /// when they repaint/layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `millis`: @param millis The new debug milliseconds. 0 turns of global debug and leaves debug up to every
+    /// individual panel.
+    ///
+    /// #### See also
+    ///
+    /// - LC#setDebugMillis(int)
+    public static void setGlobalDebugMillis(int millis) {
+<span class="nc" id="L109">        globalDebugMillis = millis;</span>
+<span class="nc" id="L110">    }</span>
+
+    /// Sets if design time is turned on for a Container in `ContainerWrapper`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cw`: @param cw The container to set design time for. `null` is legal and can be used as
+    /// a key to turn on/off design time &quot;in general&quot;. Note though that design time &quot;in general&quot; is
+    /// always on as long as there is at least one ContainerWrapper with design time.
+    ///
+    ///
+    /// **If this method has not ever been called it will default to what
+    /// `Beans.isDesignTime()` returns.** This means that if you call
+    /// this method you indicate that you will take responsibility for the design time value.
+    ///
+    /// - `b`: `true` means design time on.
+    @SuppressWarnings(&quot;PMD.NonThreadSafeSingleton&quot;)
+    public static void setDesignTime(ContainerWrapper cw, boolean b) {
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (DT_MAP == null) {</span>
+<span class="fc" id="L129">            DT_MAP = new HashMap&lt;Object, Boolean&gt;();</span>
+        }
+
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        DT_MAP.put((cw != null ? cw.getComponent() : null), b);</span>
+<span class="fc" id="L133">    }</span>
+
+    /// Returns if design time is turned on for a Container in `ContainerWrapper`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cw`: @param cw The container to set design time for. `null` is legal will return `true`
+    /// if there is at least one `ContainerWrapper` (or `null`) that have design time
+    /// turned on.
+    ///
+    /// #### Returns
+    ///
+    /// If design time is set for `cw`.
+    public static boolean isDesignTime(ContainerWrapper cw) {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (DT_MAP == null) {</span>
+<span class="fc" id="L148">            return HAS_BEANS;</span>
+        }
+
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">        if (cw != null &amp;&amp; !DT_MAP.containsKey(cw.getComponent())) {</span>
+<span class="fc" id="L152">            cw = null;</span>
+        }
+
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        Boolean b = DT_MAP.get(cw != null ? cw.getComponent() : null);</span>
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">        return b != null &amp;&amp; b;</span>
+    }
+
+    /// The size of an empty row or columns in a grid during design time.
+    ///
+    /// #### Returns
+    ///
+    /// The number of pixels. Default is 15.
+    public static int getDesignTimeEmptySize() {
+<span class="nc" id="L165">        return eSz;</span>
+    }
+
+    /// The size of an empty row or columns in a grid during design time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pixels`: @param pixels The number of pixels. Default is 0 (it was 15 prior to v3.7.2, but since that meant different behaviour
+    /// under design time by default it was changed to be 0, same as non-design time). IDE vendors can still set it to 15 to
+    /// get the old behaviour.
+    public static void setDesignTimeEmptySize(int pixels) {
+<span class="nc" id="L176">        eSz = pixels;</span>
+<span class="nc" id="L177">    }</span>
+
+    /// Associates `con` with the creation string `s`. The `con` object should
+    /// probably have an equals method that compares identities or `con` objects that .equals() will only
+    /// be able to have **one** creation string.
+    ///
+    /// If `LayoutUtil#isDesignTime(ContainerWrapper)` returns `false` the method does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `con`: The object. if `null` the method does nothing.
+    ///
+    /// - `s`: The creation string. if `null` the method does nothing.
+    @SuppressWarnings(&quot;PMD.NonThreadSafeSingleton&quot;)
+    static void putCCString(Object con, String s) {
+<span class="pc bpc" id="L192" title="2 of 6 branches missed.">        if (s != null &amp;&amp; con != null &amp;&amp; isDesignTime(null)) {</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            if (CR_MAP == null) {</span>
+<span class="nc" id="L194">                CR_MAP = new HashMap&lt;Object, String&gt;(64);</span>
+            }
+
+<span class="nc" id="L197">            CR_MAP.put(con, s);</span>
+        }
+<span class="fc" id="L199">    }</span>
+
+    /// Returns strings set with `String)` or `null` if nothing is associated or
+    /// `LayoutUtil#isDesignTime(ContainerWrapper)` returns `false`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `con`: The constrain object.
+    ///
+    /// #### Returns
+    ///
+    /// The creation string or `null` if nothing is registered with the `con` object.
+    static String getCCString(Object con) {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        return CR_MAP != null ? CR_MAP.get(con) : null;</span>
+    }
+
+    static void throwCC() {
+<span class="nc" id="L216">        throw new IllegalStateException(&quot;setStoreConstraintData(true) must be set for strings to be saved.&quot;);</span>
+    }
+
+    /// Takes a number on min/preferred/max sizes and resize constraints and returns the calculated sizes which sum should add up to `bounds`. Whether the sum
+    /// will actually equal `bounds` is dependent om the pref/max sizes and resize constraints.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sizes`: @param sizes          [ix],[MIN][PREF][MAX]. Grid.CompWrap.NOT_SET will be treated as N/A or 0. A &quot;[MIN][PREF][MAX]&quot; array with null elements will be interpreted as very flexible (no bounds)
+    /// but if the array itself is null it will not get any size.
+    ///
+    /// - `resConstr`: @param resConstr      Elements can be `null` and the whole array can be `null`. `null` means that the size will not be flexible at all.
+    /// Can have length less than `sizes` in which case the last element should be used for the elements missing.
+    ///
+    /// - `defPushWeights`: @param defPushWeights If there is no grow weight for a resConstr the corresponding value of this array is used.
+    /// These forced resConstr will be grown last though and only if needed to fill to the bounds.
+    ///
+    /// - `startSizeType`: The initial size to use. E.g. `net.miginfocom.layout.LayoutUtil#MIN`.
+    ///
+    /// - `bounds`: To use for relative sizes.
+    ///
+    /// #### Returns
+    ///
+    /// The sizes. Array length will match `sizes`.
+    static int[] calculateSerial(int[][] sizes, ResizeConstraint[] resConstr, Float[] defPushWeights, int startSizeType, int bounds) {
+<span class="fc" id="L241">        float[] lengths = new float[sizes.length];    // heights/widths that are set</span>
+<span class="fc" id="L242">        float usedLength = 0.0f;</span>
+
+        // Give all preferred size to start with
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (int i = 0; i &lt; sizes.length; i++) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (sizes[i] != null) {</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                float len = sizes[i][startSizeType] != NOT_SET ? sizes[i][startSizeType] : 0;</span>
+<span class="fc" id="L248">                int newSizeBounded = getBrokenBoundary(len, sizes[i][MIN], sizes[i][MAX]);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                if (newSizeBounded != NOT_SET) {</span>
+<span class="nc" id="L250">                    len = newSizeBounded;</span>
+                }
+
+<span class="fc" id="L253">                usedLength += len;</span>
+<span class="fc" id="L254">                lengths[i] = len;</span>
+            }
+        }
+
+<span class="fc" id="L258">        int useLengthI = MathUtil.round(usedLength);</span>
+<span class="pc bpc" id="L259" title="1 of 4 branches missed.">        if (useLengthI != bounds &amp;&amp; resConstr != null) {</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">            boolean isGrow = useLengthI &lt; bounds;</span>
+
+            // Create a Set with the available priorities
+<span class="fc" id="L263">            TreeSet&lt;Integer&gt; prioList = new TreeSet&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            for (int i = 0; i &lt; sizes.length; i++) {</span>
+<span class="fc" id="L265">                ResizeConstraint resC = (ResizeConstraint) getIndexSafe(resConstr, i);</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                if (resC != null) {</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                    prioList.add(Integer.valueOf(isGrow ? resC.growPrio : resC.shrinkPrio));</span>
+                }
+            }
+<span class="fc" id="L270">            Integer[] prioIntegers = prioList.toArray(new Integer[prioList.size()]);</span>
+
+<span class="pc bpc" id="L272" title="1 of 6 branches missed.">            for (int force = 0; force &lt;= ((isGrow &amp;&amp; defPushWeights != null) ? 1 : 0); force++) {    // Run twice if defGrow and the need for growing.</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                for (int pr = prioIntegers.length - 1; pr &gt;= 0; pr--) {</span>
+<span class="fc" id="L274">                    int curPrio = prioIntegers[pr];</span>
+
+<span class="fc" id="L276">                    float totWeight = 0f;</span>
+<span class="fc" id="L277">                    Float[] resizeWeight = new Float[sizes.length];</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                    for (int i = 0; i &lt; sizes.length; i++) {</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                        if (sizes[i] == null) {</span>
+                            // if no min/pref/max size at all do not grow or shrink.
+<span class="fc" id="L281">                            continue;</span>
+                        }
+
+<span class="fc" id="L284">                        ResizeConstraint resC = (ResizeConstraint) getIndexSafe(resConstr, i);</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                        if (resC != null) {</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                            int prio = isGrow ? resC.growPrio : resC.shrinkPrio;</span>
+
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                            if (curPrio == prio) {</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                                if (isGrow) {</span>
+<span class="pc bpc" id="L290" title="5 of 6 branches missed.">                                    resizeWeight[i] = (force == 0 || resC.grow != null) ? resC.grow : (defPushWeights[i &lt; defPushWeights.length ? i : defPushWeights.length - 1]);</span>
+                                } else {
+<span class="fc" id="L292">                                    resizeWeight[i] = resC.shrink;</span>
+                                }
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                                if (resizeWeight[i] != null) {</span>
+<span class="fc" id="L295">                                    totWeight += resizeWeight[i];</span>
+                                }
+                            }
+                        }
+                    }
+
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                    if (totWeight &gt; 0f) {</span>
+                        boolean hit;
+                        do {
+<span class="fc" id="L304">                            float toChange = bounds - usedLength;</span>
+<span class="fc" id="L305">                            hit = false;</span>
+<span class="fc" id="L306">                            float changedWeight = 0f;</span>
+<span class="fc bfc" id="L307" title="All 4 branches covered.">                            for (int i = 0; i &lt; sizes.length &amp;&amp; totWeight &gt; 0.0001f; i++) {</span>
+
+<span class="fc" id="L309">                                Float weight = resizeWeight[i];</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">                                if (weight != null) {</span>
+<span class="fc" id="L311">                                    float sizeDelta = toChange * weight / totWeight;</span>
+<span class="fc" id="L312">                                    float newSize = lengths[i] + sizeDelta;</span>
+
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                                    if (sizes[i] != null) {</span>
+<span class="fc" id="L315">                                        int newSizeBounded = getBrokenBoundary(newSize, sizes[i][MIN], sizes[i][MAX]);</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                                        if (newSizeBounded != NOT_SET) {</span>
+<span class="fc" id="L317">                                            resizeWeight[i] = null;</span>
+<span class="fc" id="L318">                                            hit = true;</span>
+<span class="fc" id="L319">                                            changedWeight += weight;</span>
+<span class="fc" id="L320">                                            newSize = newSizeBounded;</span>
+<span class="fc" id="L321">                                            sizeDelta = newSize - lengths[i];</span>
+                                        }
+                                    }
+
+<span class="fc" id="L325">                                    lengths[i] = newSize;</span>
+<span class="fc" id="L326">                                    usedLength += sizeDelta;</span>
+                                }
+                            }
+<span class="fc" id="L329">                            totWeight -= changedWeight;</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                        } while (hit);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L335">        return roundSizes(lengths);</span>
+    }
+
+    static Object getIndexSafe(Object[] arr, int ix) {
+<span class="pc bpc" id="L339" title="2 of 4 branches missed.">        return arr != null ? arr[ix &lt; arr.length ? ix : arr.length - 1] : null;</span>
+    }
+
+    /// Returns the broken boundary if `sz` is outside the boundaries `lower` or `upper`. If both boundaries
+    /// are broken, the lower one is returned. If `sz` is &lt; 0 then `new Float(0f)` is returned so that no sizes can be
+    /// negative.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sz`: The size to check
+    ///
+    /// - `lower`: The lower boundary (or `null` fo no boundary).
+    ///
+    /// - `upper`: The upper boundary (or `null` fo no boundary).
+    ///
+    /// #### Returns
+    ///
+    /// The broken boundary.
+    private static int getBrokenBoundary(float sz, int lower, int upper) {
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        if (lower != NOT_SET) {</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">            if (sz &lt; lower) {</span>
+<span class="fc" id="L360">                return lower;</span>
+            }
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        } else if (sz &lt; 0f) {</span>
+<span class="nc" id="L363">            return 0;</span>
+        }
+
+<span class="pc bpc" id="L366" title="2 of 4 branches missed.">        if (upper != NOT_SET &amp;&amp; sz &gt; upper) {</span>
+<span class="nc" id="L367">            return upper;</span>
+        }
+
+<span class="fc" id="L370">        return NOT_SET;</span>
+    }
+
+    static int sum(int[] terms, int start, int len) {
+<span class="nc" id="L374">        int s = 0;</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        for (int i = start, iSz = start + len; i &lt; iSz; i++) {</span>
+<span class="nc" id="L376">            s += terms[i];</span>
+        }
+<span class="nc" id="L378">        return s;</span>
+    }
+
+    static int sum(int[] terms) {
+<span class="nc" id="L382">        return sum(terms, 0, terms.length);</span>
+    }
+
+    public static int getSizeSafe(int[] sizes, int sizeType) {
+<span class="pc bpc" id="L386" title="2 of 4 branches missed.">        if (sizes == null || sizes[sizeType] == NOT_SET) {</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">            return sizeType == MAX ? LayoutUtil.INF : 0;</span>
+        }
+<span class="fc" id="L389">        return sizes[sizeType];</span>
+    }
+
+    static BoundSize derive(BoundSize bs, UnitValue min, UnitValue pref, UnitValue max) {
+<span class="nc bnc" id="L393" title="All 4 branches missed.">        if (bs == null || bs.isUnset()) {</span>
+<span class="nc" id="L394">            return new BoundSize(min, pref, max, null);</span>
+        }
+
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        return new BoundSize(</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                min != null ? min : bs.getMin(),</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                pref != null ? pref : bs.getPreferred(),</span>
+<span class="nc" id="L400">                max != null ? max : bs.getMax(),</span>
+<span class="nc" id="L401">                bs.getGapPush(),</span>
+                null);
+    }
+
+    /// Returns if left-to-right orientation is used. If not set explicitly in the layout constraints the Locale
+    /// of the `parent` is used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lc`: The constraint if there is one. Can be `null`.
+    ///
+    /// - `container`: The parent that may be used to get the left-to-right if ffc does not specify this.
+    ///
+    /// #### Returns
+    ///
+    /// If left-to-right orientation is currently used.
+    public static boolean isLeftToRight(LC lc, ContainerWrapper container) {
+<span class="pc bpc" id="L418" title="2 of 4 branches missed.">        if (lc != null &amp;&amp; lc.getLeftToRight() != null) {</span>
+<span class="nc" id="L419">            return lc.getLeftToRight();</span>
+        }
+
+<span class="pc bpc" id="L422" title="2 of 4 branches missed.">        return container == null || container.isLeftToRight();</span>
+    }
+
+    /// Round a number of float sizes into int sizes so that the total length match up
+    ///
+    /// #### Parameters
+    ///
+    /// - `sizes`: The sizes to round
+    ///
+    /// #### Returns
+    ///
+    /// An array of equal length as `sizes`.
+    static int[] roundSizes(float[] sizes) {
+<span class="fc" id="L435">        int[] retInts = new int[sizes.length];</span>
+<span class="fc" id="L436">        float posD = 0;</span>
+
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        for (int i = 0; i &lt; retInts.length; i++) {</span>
+<span class="fc" id="L439">            int posI = (int) (posD + 0.5f);</span>
+
+<span class="fc" id="L441">            posD += sizes[i];</span>
+
+<span class="fc" id="L443">            retInts[i] = (int) (posD + 0.5f) - posI;</span>
+        }
+
+<span class="fc" id="L446">        return retInts;</span>
+    }
+
+//    static int getBaselineCorrect(Component comp)
+//    {
+//        Dimension pSize = comp.getPreferredSize();
+//        int baseline = comp.getBaseline(pSize.width, pSize.height);
+//        int nextBaseline = comp.getBaseline(pSize.width, pSize.height + 1);
+//
+//        // Amount to add to height when calculating where baseline
+//        // lands for a particular height:
+//        int padding = 0;
+//
+//        // Where the baseline is relative to the mid point
+//        int baselineOffset = baseline - pSize.height / 2;
+//        if (pSize.height % 2 == 0 &amp;&amp; baseline != nextBaseline) {
+//            padding = 1;
+//        } else if (pSize.height % 2 == 1 &amp;&amp; baseline == nextBaseline) {
+//            baselineOffset--;
+//            padding = 1;
+//        }
+//
+//        // The following calculates where the baseline lands for
+//        // the height z:
+//        return (pSize.height + padding) / 2 + baselineOffset;
+//    }
+
+    /// Safe equals. null == null, but null never equals anything else.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o1`: The first object. May be `null`.
+    ///
+    /// - `o2`: The second object. May be `null`.
+    ///
+    /// #### Returns
+    ///
+    /// Returns `true` if `o1` and `o2` are equal (using .equals()) or both are `null`.
+    @SuppressWarnings(&quot;PMD.SuspiciousEqualsMethodName&quot;)
+    static boolean equals(Object o1, Object o2) {
+<span class="nc bnc" id="L486" title="All 8 branches missed.">        return o1 == o2 || (o1 != null &amp;&amp; o2 != null &amp;&amp; o1.equals(o2)); //NOPMD CompareObjectsWithEquals</span>
+    }
+
+    /// Returns the inset for the side.
+    ///
+    /// #### Parameters
+    ///
+    /// - `side`: top == 0, left == 1, bottom = 2, right = 3.
+    ///
+    /// - `getDefault`: If `true` the default insets will get retrieved if `lc` has none set.
+    ///
+    /// #### Returns
+    ///
+    /// The inset for the side. Never `null`.
+    static UnitValue getInsets(LC lc, int side, boolean getDefault) {
+<span class="fc" id="L501">        UnitValue[] i = lc.getInsets();</span>
+<span class="pc bpc" id="L502" title="4 of 6 branches missed.">        return (i != null &amp;&amp; i[side] != null) ? i[side] : (getDefault ? PlatformDefaults.getPanelInsets(side) : UnitValue.ZERO);</span>
+    }
+
+    /// Sets the serialized object and associates it with `caller`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `caller`: The object created `o`
+    ///
+    /// - `o`: The just serialized object.
+    public static void setSerializedObject(Object caller, Object o) {
+<span class="nc" id="L513">        synchronized (SER_MAP) {</span>
+<span class="nc" id="L514">            SER_MAP.put(caller, o);</span>
+<span class="nc" id="L515">        }</span>
+<span class="nc" id="L516">    }</span>
+
+    /// Returns the serialized object that are associated with `caller`. It also removes it from the list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `caller`: The original creator of the object.
+    ///
+    /// #### Returns
+    ///
+    /// The object.
+    public static Object getSerializedObject(Object caller) {
+<span class="nc" id="L528">        synchronized (SER_MAP) {</span>
+<span class="nc" id="L529">            return SER_MAP.remove(caller);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

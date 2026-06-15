@@ -1,0 +1,1414 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TableLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">TableLayout.java</span></div><h1>TableLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.table;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+
+import java.util.Vector;
+
+/// TableLayout is a very elaborate **constraint based** layout manager that can arrange elements
+/// in rows/columns while defining constraints to control complex behavior such as spanning, alignment/weight
+/// etc.
+///
+/// Notice that the table layout is in the `com.codename1.ui.table` package and not in the
+/// layouts package.
+///
+/// This is due to the fact that `TableLayout` was originally designed for the
+/// `Table` class.
+///
+/// Despite being constraint based the table layout isn't strict about constraints and will implicitly add a
+/// constraint when one is missing. However, unlike grid layout table layout won't implicitly add a row if the
+/// row/column count is incorrect
+///
+/// E.g this creates a 2x2 table but adds 5 elements. The 5th element won't show:
+///
+/// ```java
+/// Form hi = new Form(&quot;Table Layout 2x2&quot;, new TableLayout(2, 2));
+/// hi.add(new Label(&quot;First&quot;)).
+///     add(new Label(&quot;Second&quot;)).
+///     add(new Label(&quot;Third&quot;)).
+///     add(new Label(&quot;Fourth&quot;)).
+///     add(new Label(&quot;Fifth&quot;));
+/// hi.show();
+/// ```
+///
+/// Table layout supports the ability to grow the last column which can be enabled using the
+/// `setGrowHorizontally` method. You can also use a shortened terse syntax to construct a table
+/// layout however since the table layout is a constraint based layout you won't be able to utilize its full power
+/// with this syntax.
+///
+/// The default usage of the encloseIn below uses the `setGrowHorizontally` flag.
+///
+/// ```java
+/// Container tl = TableLayout.encloseIn(2, new Label(&quot;First&quot;),
+///                 new Label(&quot;Second&quot;),
+///                 new Label(&quot;Third&quot;),
+///                 new Label(&quot;Fourth&quot;),
+///                 new Label(&quot;Fifth&quot;));
+/// ```
+///
+/// The Full Potential
+///
+/// To truly appreciate the `TableLayout` we need to use the constraint syntax which allows
+/// us to span, align and set width/height for the rows &amp; columns.
+///
+/// Table layout works with a `Constraint` instance that can communicate our intentions into the
+/// layout manager. Such constraints can include more than one attribute e.g. span and height.
+///
+/// Notice that table layout constraints can't be reused for more than one component.
+///
+/// The constraint class supports the following attributes:
+///
+///
+/// column        The column for the table cell. This defaults to -1 which will just place the component in the next available cell
+///
+///
+/// row              Similar to column, defaults to -1 as well
+///
+///
+/// width            The column width in percentages, -1 will use the preferred size. -2 for width will take up the rest of the available space
+///
+///
+/// height           The row height in percentages, -1 will use the preferred size. -2 for height will take up the rest of the available space
+///
+///
+/// spanHorizontal   The cells that should be occupied horizontally defaults to 1 and can't exceed the column count - current offset.
+///
+///
+/// spanVertical     Similar to spanHorizontal with the same limitations
+///
+///
+/// horizontalAlign  The horizontal alignment of the content within the cell, defaults to the special case -1 value to take up all the cell space can be either `-1`, `Component.LEFT`, `Component.RIGHT` or `Component.CENTER`
+///
+///
+/// verticalAlign    Similar to horizontalAlign can be one of `-1`, `Component.TOP`, `Component.BOTTOM` or `Component.CENTER`
+///
+///
+///  Notice that you only need to set `width`/`height` to one cell in a column/row.
+///
+/// The table layout constraint sample tries to demonstrate some of the unique things you can do with constraints.
+///
+/// We go into further details on this in the [developer guide](https://www.codenameone.com/manual/basics.html#_table_layout)
+/// so check that out.
+///
+/// ```java
+/// TableLayout tl = new TableLayout(2, 3);
+/// Form hi = new Form(&quot;Table Layout Cons&quot;, tl);
+/// hi.setScrollable(false);
+/// hi.add(tl.createConstraint().
+///             widthPercentage(20),
+///                 new Label(&quot;AAA&quot;)).
+///
+///         add(tl.createConstraint().
+///             horizontalSpan(2).
+///             heightPercentage(80).
+///             verticalAlign(Component.CENTER).
+///             horizontalAlign(Component.CENTER),
+///                 new Label(&quot;Span H&quot;)).
+///
+///         add(new Label(&quot;BBB&quot;)).
+///
+///         add(tl.createConstraint().
+///             widthPercentage(60).
+///             heightPercentage(20),
+///                 new Label(&quot;CCC&quot;)).
+///
+///         add(tl.createConstraint().
+///             widthPercentage(20),
+///                 new Label(&quot;DDD&quot;));
+/// ```
+///
+/// @author Shai Almog
+public class TableLayout extends Layout {
+
+    /// Special case marker SPAN constraint reserving place for other elements
+<span class="fc" id="L151">    private static final Constraint H_SPAN_CONSTRAINT = new Constraint();</span>
+<span class="fc" id="L152">    private static final Constraint V_SPAN_CONSTRAINT = new Constraint();</span>
+<span class="fc" id="L153">    private static final Constraint VH_SPAN_CONSTRAINT = new Constraint();</span>
+<span class="fc" id="L154">    private static int minimumSizePerColumn = 10;</span>
+<span class="fc" id="L155">    private static int defaultColumnWidth = -1;</span>
+<span class="fc" id="L156">    private static int defaultRowHeight = -1;</span>
+    private final int columns;
+    private int currentRow;
+    private int currentColumn;
+    private Constraint[] tablePositions;
+    private int[] columnPositions;
+    private int[] rowPositions;
+    private boolean horizontalSpanningExists;
+    private boolean verticalSpanningExists;
+    private int rows;
+    private boolean growHorizontally;
+    private boolean truncateHorizontally; //whether we should truncate or shrink the table if the prefered width of all elements exceed the available width. default = false = shrink
+    private boolean truncateVertically;
+
+    /// A table must declare the amount of rows and columns in advance
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: rows of the table
+    ///
+    /// - `columns`: columns of the table
+<span class="fc" id="L177">    public TableLayout(int rows, int columns) {</span>
+<span class="fc" id="L178">        this.rows = rows;</span>
+<span class="fc" id="L179">        this.columns = columns;</span>
+<span class="fc" id="L180">        tablePositions = new Constraint[rows * columns];</span>
+<span class="fc" id="L181">    }</span>
+
+    /// Indicates the minimum size for a column in the table, this is applicable for tables that are
+    /// not scrollable on the X axis. This will force the earlier columns to leave room for
+    /// the latter columns.
+    ///
+    /// #### Returns
+    ///
+    /// the minimum width of the column
+    public static int getMinimumSizePerColumn() {
+<span class="nc" id="L191">        return minimumSizePerColumn;</span>
+    }
+
+    /// Sets the minimum size for a column in the table, this is applicable for tables that are
+    /// not scrollable on the X axis. This will force the earlier columns to leave room for
+    /// the latter columns.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumSize`: the minimum width of the column
+    public static void setMinimumSizePerColumn(int minimumSize) {
+<span class="nc" id="L202">        minimumSizePerColumn = minimumSize;</span>
+<span class="nc" id="L203">    }</span>
+
+    /// Indicates the default (in percentage) for the column width, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Returns
+    ///
+    /// width in percentage
+    public static int getDefaultColumnWidth() {
+<span class="nc" id="L212">        return defaultColumnWidth;</span>
+    }
+
+    /// Indicates the default (in percentage) for the column width, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: width in percentage
+    public static void setDefaultColumnWidth(int w) {
+<span class="nc" id="L222">        defaultColumnWidth = w;</span>
+<span class="nc" id="L223">    }</span>
+
+    /// Indicates the default (in percentage) for the row height, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Returns
+    ///
+    /// height in percentage
+    public static int getDefaultRowHeight() {
+<span class="nc" id="L232">        return defaultRowHeight;</span>
+    }
+
+    /// Indicates the default (in percentage) for the row height, -1 indicates
+    /// automatic sizing
+    ///
+    /// #### Parameters
+    ///
+    /// - `h`: height in percentage
+    public static void setDefaultRowHeight(int h) {
+<span class="nc" id="L242">        defaultRowHeight = h;</span>
+<span class="nc" id="L243">    }</span>
+
+    /// Creates a table layout container that grows the last column horizontally, the number of rows is automatically
+    /// calculated based on the number of columns. See usage:
+    ///
+    /// ```java
+    /// Container tl = TableLayout.encloseIn(2, new Label(&quot;First&quot;),
+    ///                 new Label(&quot;Second&quot;),
+    ///                 new Label(&quot;Third&quot;),
+    ///                 new Label(&quot;Fourth&quot;),
+    ///                 new Label(&quot;Fifth&quot;));
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of columns
+    ///
+    /// - `cmps`: components to add
+    ///
+    /// #### Returns
+    ///
+    /// a newly created table layout container with the components in it
+    public static Container encloseIn(int columns, Component... cmps) {
+<span class="nc" id="L266">        return encloseIn(columns, true, cmps);</span>
+    }
+
+    /// Creates a table layout container, the number of rows is automatically calculated based on the number
+    /// of columns. See usage:
+    ///
+    /// ```java
+    /// Container tl = TableLayout.encloseIn(2, new Label(&quot;First&quot;),
+    ///                 new Label(&quot;Second&quot;),
+    ///                 new Label(&quot;Third&quot;),
+    ///                 new Label(&quot;Fourth&quot;),
+    ///                 new Label(&quot;Fifth&quot;));
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of columns
+    ///
+    /// - `growHorizontally`: true to grow the last column to fit available width
+    ///
+    /// - `cmps`: components to add
+    ///
+    /// #### Returns
+    ///
+    /// a newly created table layout container with the components in it
+    public static Container encloseIn(int columns, boolean growHorizontally, Component... cmps) {
+<span class="nc" id="L292">        int rows = cmps.length;</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (rows % columns &gt; 0) {</span>
+<span class="nc" id="L294">            rows = rows / columns + 1;</span>
+        } else {
+<span class="nc" id="L296">            rows = rows / columns;</span>
+        }
+<span class="nc" id="L298">        TableLayout tl = new TableLayout(rows, columns);</span>
+<span class="nc" id="L299">        tl.setGrowHorizontally(growHorizontally);</span>
+<span class="nc" id="L300">        return Container.encloseIn(tl, cmps);</span>
+    }
+
+    /// Get the number of rows
+    ///
+    /// #### Returns
+    ///
+    /// number of rows
+    public int getRows() {
+<span class="nc" id="L309">        return rows;</span>
+    }
+
+    /// Get the number of columns
+    ///
+    /// #### Returns
+    ///
+    /// number of columns
+    public int getColumns() {
+<span class="nc" id="L318">        return columns;</span>
+    }
+
+    /// Returns the component at the given row/column
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the component
+    ///
+    /// - `column`: the column of the component
+    ///
+    /// #### Returns
+    ///
+    /// the component instance
+    public Component getComponentAt(int row, int column) {
+<span class="fc" id="L333">        int pos = row * columns + column;</span>
+<span class="pc bpc" id="L334" title="2 of 4 branches missed.">        if (pos &gt; -1 &amp;&amp; pos &lt; tablePositions.length) {</span>
+<span class="fc" id="L335">            Constraint c = tablePositions[pos];</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            return c != null ? c.parent : null;</span>
+        }
+<span class="nc" id="L338">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void layoutContainer(Container parent) {
+        try {
+<span class="fc" id="L345">            verticalSpanningExists = false;</span>
+<span class="fc" id="L346">            horizontalSpanningExists = false;</span>
+
+            // column and row size in pixels
+<span class="fc" id="L349">            Style s = parent.getStyle();</span>
+<span class="fc" id="L350">            int top = s.getPaddingTop();</span>
+<span class="fc" id="L351">            int left = s.getPaddingLeft(parent.isRTL());</span>
+<span class="fc" id="L352">            int bottom = s.getPaddingBottom();</span>
+<span class="fc" id="L353">            int right = s.getPaddingRight(parent.isRTL());</span>
+
+<span class="fc" id="L355">            boolean rtl = parent.isRTL();</span>
+
+
+            //compute columns width and X position
+<span class="fc" id="L359">            int[] columnSizes = new int[columns];</span>
+<span class="fc" id="L360">            boolean[] modifableColumnSize = new boolean[columns];</span>
+<span class="fc" id="L361">            boolean[] growingColumnSize = new boolean[columns];</span>
+<span class="fc" id="L362">            columnPositions = new int[columns];</span>
+
+<span class="fc" id="L364">            int pWidth = parent.getLayoutWidth() - parent.getSideGap() - left - right;</span>
+<span class="fc" id="L365">            int cslen = columnSizes.length;</span>
+<span class="fc" id="L366">            int availableReminder = pWidth;</span>
+<span class="fc" id="L367">            int growingWidth = 0;</span>
+<span class="fc" id="L368">            boolean hasGrowingCols = false;</span>
+<span class="fc" id="L369">            int totalWidth = 0;</span>
+<span class="fc" id="L370">            int totalModifyablePixels = 0;</span>
+
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            for (int iter = 0; iter &lt; cslen; iter++) {</span>
+<span class="fc" id="L373">                int[] psize = getColumnWidthPixels(iter, pWidth);</span>
+<span class="fc" id="L374">                columnSizes[iter] = psize[0];</span>
+<span class="fc" id="L375">                availableReminder -= columnSizes[iter];</span>
+<span class="fc" id="L376">                totalWidth += columnSizes[iter];</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                if (psize[1] &lt; 0) {</span>
+<span class="fc" id="L378">                    modifableColumnSize[iter] = true;</span>
+<span class="fc" id="L379">                    totalModifyablePixels += columnSizes[iter];</span>
+                }
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                if (psize[1] &lt; -1) {</span>
+<span class="fc" id="L382">                    growingColumnSize[iter] = true;</span>
+<span class="fc" id="L383">                    hasGrowingCols = true;</span>
+<span class="fc" id="L384">                    growingWidth += columnSizes[iter];</span>
+                }
+            }
+
+            //If there is some space left and some &quot;auto growing&quot; columns, attribute them the availableReminder space
+<span class="pc bpc" id="L389" title="1 of 4 branches missed.">            if (hasGrowingCols &amp;&amp; availableReminder &gt; 0) {</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">                for (int iter = 0; iter &lt; cslen; iter++) {</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                    if (growingColumnSize[iter]) {</span>
+<span class="fc" id="L392">                        int sp = (int) (((float) columnSizes[iter]) / ((float) growingWidth) * availableReminder);</span>
+<span class="fc" id="L393">                        columnSizes[iter] += sp;</span>
+                    }
+                }
+            }
+
+            // For horizontally scrollable tables, if not enough room is available
+            // to correctly display all the components given their preferred width, truncate or shrink the table
+<span class="pc bpc" id="L400" title="2 of 4 branches missed.">            if (!parent.isScrollableX() &amp;&amp; pWidth &lt; totalWidth) {</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                if (truncateHorizontally) {</span>
+                    //TODO: see if this is actually necessary to recompute the column size for truncated columns as the drawer should already automatically clip components with pixels out of the drawing boundaries
+<span class="nc" id="L403">                    availableReminder = pWidth;</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; cslen; iter++) {</span>
+<span class="nc" id="L405">                        columnSizes[iter] = Math.min(columnSizes[iter], Math.max(0, availableReminder));</span>
+<span class="nc" id="L406">                        availableReminder -= columnSizes[iter];</span>
+                    }
+                } else { // try to recalculate the columns width so they are distributed sensibly
+<span class="nc" id="L409">                    int totalPixelsToRemove = totalWidth - pWidth;</span>
+<span class="nc" id="L410">                    int totalPixelsNecessary = totalModifyablePixels - totalPixelsToRemove;</span>
+                    // Go over the modifyable columns and remove the right pixels according to the ratio
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; cslen; iter++) {</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">                        if (modifableColumnSize[iter]) {</span>
+<span class="nc" id="L414">                            columnSizes[iter] = (int) (((float) columnSizes[iter]) / ((float) totalModifyablePixels) * totalPixelsNecessary);</span>
+                        }
+                    }
+                }
+            }
+
+            //Compute X position
+<span class="fc" id="L421">            int currentX = left;</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">            for (int iter = 0; iter &lt; cslen; iter++) {</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L424">                    currentX += columnSizes[iter];</span>
+<span class="nc" id="L425">                    columnPositions[iter] = pWidth - currentX;</span>
+                } else {
+<span class="fc" id="L427">                    columnPositions[iter] = currentX;</span>
+<span class="fc" id="L428">                    currentX += columnSizes[iter];</span>
+                }
+            }
+
+
+            //Compute rows height and Y position
+<span class="fc" id="L434">            int[] rowSizes = new int[rows];</span>
+<span class="fc" id="L435">            boolean[] modifableRowSize = new boolean[rows];</span>
+<span class="fc" id="L436">            boolean[] growingRowSize = new boolean[rows];</span>
+<span class="fc" id="L437">            rowPositions = new int[rows];</span>
+
+<span class="fc" id="L439">            int pHeight = parent.getLayoutHeight() - parent.getBottomGap() - top - bottom;</span>
+<span class="fc" id="L440">            int rlen = rowSizes.length;</span>
+<span class="fc" id="L441">            availableReminder = pHeight;</span>
+<span class="fc" id="L442">            int growingHeight = 0;</span>
+<span class="fc" id="L443">            boolean hasGrowingRows = false;</span>
+<span class="fc" id="L444">            int totalHeight = 0;</span>
+<span class="fc" id="L445">            totalModifyablePixels = 0;</span>
+
+<span class="fc bfc" id="L447" title="All 2 branches covered.">            for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="fc" id="L448">                int[] psize = getRowHeightPixels(iter, pHeight);</span>
+<span class="fc" id="L449">                rowSizes[iter] = psize[0];</span>
+<span class="fc" id="L450">                availableReminder -= rowSizes[iter];</span>
+<span class="fc" id="L451">                totalHeight += rowSizes[iter];</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">                if (psize[0] &lt; 0) {</span>
+<span class="nc" id="L453">                    modifableRowSize[iter] = true;</span>
+<span class="nc" id="L454">                    totalModifyablePixels += rowSizes[iter];</span>
+                }
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                if (psize[0] &lt; -1) {</span>
+<span class="nc" id="L457">                    growingRowSize[iter] = true;</span>
+<span class="nc" id="L458">                    hasGrowingRows = true;</span>
+<span class="nc" id="L459">                    growingHeight += rowSizes[iter];</span>
+                }
+            }
+
+            //If there is some space left and some &quot;auto growing&quot; rows, attribute them the availableReminder space
+<span class="pc bpc" id="L464" title="3 of 4 branches missed.">            if (hasGrowingRows &amp;&amp; availableReminder &gt; 0) {</span>
+<span class="nc bnc" id="L465" title="All 2 branches missed.">                for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                    if (growingRowSize[iter]) {</span>
+<span class="nc" id="L467">                        int sp = (int) (((float) rowSizes[iter]) / ((float) growingHeight) * availableReminder);</span>
+<span class="nc" id="L468">                        rowSizes[iter] += sp;</span>
+                    }
+                }
+            }
+
+            // For vertically scrollable tables, if not enough room is available
+            // to correctly display all the components given their preferred height, truncate or shrink the table
+<span class="pc bpc" id="L475" title="1 of 4 branches missed.">            if (!parent.isScrollableY() &amp;&amp; pHeight &lt; totalHeight) {</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">                if (truncateVertically) {</span>
+                    //TODO: see if this is actually necessary to recompute the row size for truncated rows as the drawer should already automatically clip components with pixels out of the drawing boundaries
+<span class="nc" id="L478">                    availableReminder = pHeight;</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="nc" id="L480">                        rowSizes[iter] = Math.min(rowSizes[iter], Math.max(0, availableReminder));</span>
+<span class="nc" id="L481">                        availableReminder -= rowSizes[iter];</span>
+                    }
+                } else { // try to recalculate the rows height so they are distributed sensibly
+<span class="fc" id="L484">                    int totalPixelsToRemove = totalHeight - pHeight;</span>
+<span class="fc" id="L485">                    int totalPixelsNecessary = totalModifyablePixels - totalPixelsToRemove;</span>
+                    // Go over the modifyable rows and remove the bottom pixels according to the ratio
+<span class="fc bfc" id="L487" title="All 2 branches covered.">                    for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">                        if (modifableRowSize[iter]) {</span>
+<span class="nc" id="L489">                            rowSizes[iter] = (int) (((float) rowSizes[iter]) / ((float) totalModifyablePixels) * totalPixelsNecessary);</span>
+                        }
+                    }
+                }
+            }
+
+            //Compute Y position
+<span class="fc" id="L496">            int currentY = top;</span>
+<span class="fc bfc" id="L497" title="All 2 branches covered.">            for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="fc" id="L498">                rowPositions[iter] = currentY;</span>
+<span class="fc" id="L499">                currentY += rowSizes[iter];</span>
+            }
+
+
+            //Place each cell component
+<span class="fc" id="L504">            int clen = columnSizes.length;</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">            for (int r = 0; r &lt; rlen; r++) {</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">                for (int c = 0; c &lt; clen; c++) {</span>
+<span class="fc" id="L507">                    Constraint con = tablePositions[r * columns + c];</span>
+                    int conX;
+                    int conY;
+                    int conW;
+                    int conH;
+<span class="pc bpc" id="L512" title="4 of 8 branches missed.">                    if (con != null &amp;&amp; con != H_SPAN_CONSTRAINT &amp;&amp; con != V_SPAN_CONSTRAINT &amp;&amp; con != VH_SPAN_CONSTRAINT) {</span>
+<span class="fc" id="L513">                        Style componentStyle = con.parent.getStyle();</span>
+<span class="fc" id="L514">                        int leftMargin = componentStyle.getMarginLeft(parent.isRTL());</span>
+<span class="fc" id="L515">                        int topMargin = componentStyle.getMarginTop();</span>
+                        //                    conX = left + leftMargin + columnPositions[c]; // bugfix table with padding not drawn correctly
+                        //                    conY = top + topMargin + rowPositions[r]; // bugfix table with padding not drawn correctly
+<span class="fc" id="L518">                        conX = leftMargin + columnPositions[c];</span>
+<span class="fc" id="L519">                        conY = topMargin + rowPositions[r];</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">                        if (con.spanHorizontal &gt; 1) {</span>
+<span class="nc" id="L521">                            horizontalSpanningExists = true;</span>
+<span class="nc" id="L522">                            int w = columnSizes[c];</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">                            for (int sh = 1; sh &lt; con.spanHorizontal; sh++) {</span>
+<span class="nc" id="L524">                                w += columnSizes[Math.min(c + sh, columnSizes.length - 1)];</span>
+                            }
+
+                            // for RTL we need to move the component to the side so spanning will work
+<span class="nc bnc" id="L528" title="All 2 branches missed.">                            if (rtl) {</span>
+<span class="nc" id="L529">                                int spanEndPos = c + con.spanHorizontal - 1;</span>
+
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                                if (spanEndPos &lt; 0) {</span>
+<span class="nc" id="L532">                                    spanEndPos = 0;</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">                                } else if (spanEndPos &gt; clen - 1) {</span>
+<span class="nc" id="L534">                                    spanEndPos = clen - 1;</span>
+
+                                }
+<span class="nc" id="L537">                                conX = left + leftMargin + columnPositions[spanEndPos];</span>
+
+                            }
+<span class="nc" id="L540">                            conW = w - leftMargin - componentStyle.getMarginRight(parent.isRTL());</span>
+<span class="nc" id="L541">                        } else {</span>
+<span class="fc" id="L542">                            conW = columnSizes[c] - leftMargin - componentStyle.getMarginRight(parent.isRTL());</span>
+                        }
+<span class="fc bfc" id="L544" title="All 2 branches covered.">                        if (con.spanVertical &gt; 1) {</span>
+<span class="fc" id="L545">                            verticalSpanningExists = true;</span>
+<span class="fc" id="L546">                            int h = rowSizes[r];</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">                            for (int sv = 1; sv &lt; con.spanVertical; sv++) {</span>
+<span class="fc" id="L548">                                h += rowSizes[Math.min(r + sv, rowSizes.length - 1)];</span>
+                            }
+<span class="fc" id="L550">                            conH = h - topMargin - componentStyle.getMarginBottom();</span>
+<span class="fc" id="L551">                        } else {</span>
+<span class="fc" id="L552">                            conH = rowSizes[r] - topMargin - componentStyle.getMarginBottom();</span>
+                        }
+<span class="fc" id="L554">                        placeComponent(rtl, con, conX, conY, conW, conH);</span>
+                    }
+                }
+            }
+<span class="nc" id="L558">        } catch (ArrayIndexOutOfBoundsException err) {</span>
+<span class="nc" id="L559">            Log.e(err);</span>
+<span class="fc" id="L560">        }</span>
+<span class="fc" id="L561">    }</span>
+
+    /// Returns the position of the given table row. A valid value is only returned after the
+    /// layout occurred.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row in the table
+    ///
+    /// #### Returns
+    ///
+    /// the Y position in pixels or -1 if layout hasn't occured/row is too large etc.
+    public int getRowPosition(int row) {
+<span class="pc bpc" id="L574" title="2 of 4 branches missed.">        if (rowPositions != null &amp;&amp; rowPositions.length &gt; row) {</span>
+<span class="fc" id="L575">            return rowPositions[row];</span>
+        }
+<span class="nc" id="L577">        return -1;</span>
+    }
+
+    /// Returns the position of the given table column. A valid value is only returned after the
+    /// layout occurred.
+    ///
+    /// #### Parameters
+    ///
+    /// - `col`: the column in the table
+    ///
+    /// #### Returns
+    ///
+    /// the X position in pixels or -1 if layout hasn't occured/column is too large etc.
+    public int getColumnPosition(int col) {
+<span class="pc bpc" id="L591" title="2 of 4 branches missed.">        if (columnPositions != null &amp;&amp; columnPositions.length &gt; col) {</span>
+<span class="fc" id="L592">            return columnPositions[col];</span>
+        }
+<span class="nc" id="L594">        return -1;</span>
+    }
+
+    /// Places the component/constraint in the proper alignment within the cell whose bounds are given
+    private void placeComponent(boolean rtl, Constraint con, int x, int y, int width, int height) {
+<span class="fc" id="L599">        con.parent.setX(x);</span>
+<span class="fc" id="L600">        con.parent.setY(y);</span>
+<span class="fc" id="L601">        con.parent.setWidth(width);</span>
+<span class="fc" id="L602">        con.parent.setHeight(height);</span>
+<span class="fc" id="L603">        Dimension pref = con.parent.getPreferredSize();</span>
+<span class="fc" id="L604">        int pWidth = pref.getWidth();</span>
+<span class="fc" id="L605">        int pHeight = pref.getHeight();</span>
+<span class="fc bfc" id="L606" title="All 2 branches covered.">        if (pWidth &lt; width) {</span>
+<span class="fc" id="L607">            int d = (width - pWidth);</span>
+<span class="fc" id="L608">            int a = con.align;</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">            if (rtl) {</span>
+<span class="nc bnc" id="L610" title="All 3 branches missed.">                switch (a) {</span>
+                    case Component.LEFT:
+<span class="nc" id="L612">                        a = Component.RIGHT;</span>
+<span class="nc" id="L613">                        break;</span>
+                    case Component.RIGHT:
+<span class="nc" id="L615">                        a = Component.LEFT;</span>
+<span class="nc" id="L616">                        break;</span>
+                    default:
+                        break;
+                }
+            }
+<span class="pc bpc" id="L621" title="3 of 4 branches missed.">            switch (a) {</span>
+                case Component.LEFT:
+<span class="nc" id="L623">                    con.parent.setX(x);</span>
+<span class="nc" id="L624">                    con.parent.setWidth(width - d);</span>
+<span class="nc" id="L625">                    break;</span>
+                case Component.RIGHT:
+<span class="nc" id="L627">                    con.parent.setX(x + d);</span>
+<span class="nc" id="L628">                    con.parent.setWidth(width - d);</span>
+<span class="nc" id="L629">                    break;</span>
+                case Component.CENTER:
+<span class="nc" id="L631">                    con.parent.setX(x + d / 2);</span>
+<span class="nc" id="L632">                    con.parent.setWidth(width - d);</span>
+<span class="nc" id="L633">                    break;</span>
+                default:
+                    break;
+            }
+        }
+<span class="fc bfc" id="L638" title="All 2 branches covered.">        if (pHeight &lt; height) {</span>
+<span class="fc" id="L639">            int d = (height - pHeight);</span>
+<span class="pc bpc" id="L640" title="3 of 4 branches missed.">            switch (con.valign) {</span>
+                case Component.TOP:
+<span class="nc" id="L642">                    con.parent.setY(y);</span>
+<span class="nc" id="L643">                    con.parent.setHeight(height - d);</span>
+<span class="nc" id="L644">                    break;</span>
+                case Component.BOTTOM:
+<span class="nc" id="L646">                    con.parent.setY(y + d);</span>
+<span class="nc" id="L647">                    con.parent.setHeight(height - d);</span>
+<span class="nc" id="L648">                    break;</span>
+                case Component.CENTER:
+<span class="nc" id="L650">                    con.parent.setY(y + d / 2);</span>
+<span class="nc" id="L651">                    con.parent.setHeight(height - d);</span>
+<span class="nc" id="L652">                    break;</span>
+                default:
+                    break;
+            }
+        }
+<span class="fc" id="L657">    }</span>
+
+    /// #### Parameters
+    ///
+    /// - `column:`: the column index
+    ///
+    /// - `percentageOf:`: the table width to take into account to compute percentages constraints. if &lt;0 these constraints are ignored and the max prefered width of the components of this column is returned
+    ///
+    /// #### Returns
+    ///
+    /// a size 2 int array with: the prefered width of the column , in pixels, as first element of the array and a constraint code for this column as second element. 0=column width is fixed, -1=column width is modifiable, -2=column width can automatically grow to take all the available space
+    private int[] getColumnWidthPixels(int column, int percentageOf) {
+<span class="fc" id="L669">        int current = 0;</span>
+<span class="fc" id="L670">        boolean foundExplicitWidth = false;</span>
+<span class="fc" id="L671">        boolean growable = false;</span>
+<span class="fc bfc" id="L672" title="All 2 branches covered.">        for (int iter = 0; iter &lt; rows; iter++) {</span>
+<span class="fc" id="L673">            Constraint c = tablePositions[iter * columns + column];</span>
+
+            //ignore &quot;virtual&quot; cells (i.e. cells that are part of a merge)
+<span class="pc bpc" id="L676" title="5 of 10 branches missed.">            if (c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanHorizontal &gt; 1) {</span>
+<span class="nc" id="L677">                continue;</span>
+            }
+
+            // width in percentage of the parent container
+<span class="fc bfc" id="L681" title="All 4 branches covered.">            if (c.width &gt; 0 &amp;&amp; percentageOf &gt; -1) {</span>
+<span class="fc" id="L682">                current = Math.max(current, c.width * percentageOf / 100);</span>
+<span class="fc" id="L683">                foundExplicitWidth = true;</span>
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">            } else if (!foundExplicitWidth) {</span>
+                // special case, width -2 gives the column the rest of the available space (and growHorizontally=true is the same as setting -2 in the width constraint of a cell from the last column. Kept here for historical reasons)
+<span class="pc bpc" id="L686" title="2 of 6 branches missed.">                if (c.width == -2 || (growHorizontally &amp;&amp; column == columns - 1)) {</span>
+<span class="fc" id="L687">                    growable = true;</span>
+                }
+<span class="fc" id="L689">                Style s = c.parent.getStyle();</span>
+<span class="fc" id="L690">                current = Math.max(current, c.parent.getPreferredW() + s.getMarginLeftNoRTL() + s.getMarginRightNoRTL());</span>
+            }
+        }
+
+<span class="fc bfc" id="L694" title="All 4 branches covered.">        return new int[]{current, (foundExplicitWidth ? 0 : (growable ? -2 : -1))};</span>
+    }
+
+    private int[] getRowHeightPixels(int row, int percentageOf) {
+<span class="fc" id="L698">        int current = 0;</span>
+<span class="fc" id="L699">        boolean foundExplicitHeight = false;</span>
+<span class="fc" id="L700">        boolean growable = false;</span>
+<span class="fc bfc" id="L701" title="All 2 branches covered.">        for (int iter = 0; iter &lt; columns; iter++) {</span>
+<span class="fc" id="L702">            Constraint c = tablePositions[row * columns + iter];</span>
+
+<span class="pc bpc" id="L704" title="4 of 10 branches missed.">            if (c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanVertical &gt; 1) {</span>
+<span class="fc" id="L705">                continue;</span>
+            }
+
+            // height in percentage of the parent container
+<span class="pc bpc" id="L709" title="1 of 4 branches missed.">            if (c.height &gt; 0 &amp;&amp; percentageOf &gt; -1) {</span>
+<span class="fc" id="L710">                current = Math.max(current, c.height * percentageOf / 100);</span>
+<span class="fc" id="L711">                foundExplicitHeight = true;</span>
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">            } else if (!foundExplicitHeight) {</span>
+                // special case, height -2 gives the row the possibility to take the rest of the available space -&gt; tag these rows
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">                if (c.height == -2) {</span>
+<span class="nc" id="L715">                    growable = true;</span>
+                }
+<span class="fc" id="L717">                Style s = c.parent.getStyle();</span>
+<span class="fc" id="L718">                current = Math.max(current, c.parent.getPreferredH() + s.getMarginTop() + s.getMarginBottom());</span>
+            }
+        }
+
+<span class="pc bpc" id="L722" title="1 of 4 branches missed.">        return new int[]{current, (foundExplicitHeight ? 0 : (growable ? -2 : -1))};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L728">        Style s = parent.getStyle();</span>
+<span class="fc" id="L729">        int w = s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL();</span>
+<span class="fc" id="L730">        int h = s.getPaddingTop() + s.getPaddingBottom();</span>
+
+<span class="fc bfc" id="L732" title="All 2 branches covered.">        for (int iter = 0; iter &lt; columns; iter++) {</span>
+<span class="fc" id="L733">            w += getColumnWidthPixels(iter, -1)[0];</span>
+        }
+
+<span class="fc bfc" id="L736" title="All 2 branches covered.">        for (int iter = 0; iter &lt; rows; iter++) {</span>
+<span class="fc" id="L737">            h += getRowHeightPixels(iter, -1)[0];</span>
+        }
+
+<span class="fc" id="L740">        return new Dimension(w, h);</span>
+    }
+
+    /// Returns the row where the next operation of add will appear
+    ///
+    /// #### Returns
+    ///
+    /// the row where the next operation of add will appear
+    public int getNextRow() {
+<span class="nc" id="L749">        return currentRow;</span>
+    }
+
+    /// Returns the column where the next operation of add will appear
+    ///
+    /// #### Returns
+    ///
+    /// the column where the next operation of add will appear
+    public int getNextColumn() {
+<span class="nc" id="L758">        return currentColumn;</span>
+    }
+
+    private void shiftCell(int row, int column) {
+<span class="nc" id="L762">        Constraint currentConstraint = tablePositions[row * columns + column];</span>
+<span class="nc bnc" id="L763" title="All 2 branches missed.">        for (int iter = column + 1; iter &lt; columns; iter++) {</span>
+<span class="nc bnc" id="L764" title="All 2 branches missed.">            if (tablePositions[row * columns + iter] != null) {</span>
+<span class="nc" id="L765">                Constraint tmp = tablePositions[row * columns + iter];</span>
+<span class="nc" id="L766">                tablePositions[row * columns + iter] = currentConstraint;</span>
+<span class="nc" id="L767">                currentConstraint = tmp;</span>
+<span class="nc" id="L768">            } else {</span>
+<span class="nc" id="L769">                tablePositions[row * columns + iter] = currentConstraint;</span>
+<span class="nc" id="L770">                return;</span>
+            }
+        }
+<span class="nc bnc" id="L773" title="All 2 branches missed.">        for (int rowIter = row + 1; rowIter &lt; getRows(); rowIter++) {</span>
+<span class="nc bnc" id="L774" title="All 2 branches missed.">            for (int colIter = 0; colIter &lt; getColumns(); colIter++) {</span>
+<span class="nc bnc" id="L775" title="All 2 branches missed.">                if (tablePositions[rowIter * columns + colIter] != null) {</span>
+<span class="nc" id="L776">                    Constraint tmp = tablePositions[rowIter * columns + colIter];</span>
+<span class="nc" id="L777">                    tablePositions[rowIter * columns + colIter] = currentConstraint;</span>
+<span class="nc" id="L778">                    currentConstraint = tmp;</span>
+<span class="nc" id="L779">                } else {</span>
+<span class="nc" id="L780">                    tablePositions[rowIter * columns + colIter] = currentConstraint;</span>
+<span class="nc" id="L781">                    return;</span>
+                }
+            }
+        }
+
+        // if we reached this point there aren't enough rows
+<span class="nc" id="L787">        addRow();</span>
+<span class="nc" id="L788">    }</span>
+
+    private void addRow() {
+<span class="nc" id="L791">        rows++;</span>
+<span class="nc" id="L792">        Constraint[] newArr = new Constraint[rows * columns];</span>
+<span class="nc" id="L793">        System.arraycopy(tablePositions, 0, newArr, 0, tablePositions.length);</span>
+<span class="nc" id="L794">        tablePositions = newArr;</span>
+<span class="nc" id="L795">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void addLayoutComponent(Object value, Component comp, Container c) {
+<span class="fc" id="L800">        Constraint con = null;</span>
+<span class="pc bpc" id="L801" title="1 of 2 branches missed.">        if (!(value instanceof Constraint)) {</span>
+<span class="nc" id="L802">            con = createConstraint();</span>
+        } else {
+<span class="fc" id="L804">            con = (Constraint) value;</span>
+<span class="pc bpc" id="L805" title="1 of 2 branches missed.">            if (con.parent != null) {</span>
+<span class="nc" id="L806">                Constraint con2 = createConstraint();</span>
+<span class="nc" id="L807">                con2.align = con.align;</span>
+<span class="nc" id="L808">                con2.column = con.column;</span>
+<span class="nc" id="L809">                con2.height = con.height;</span>
+<span class="nc" id="L810">                con2.parent = c;</span>
+<span class="nc" id="L811">                con2.row = con.row;</span>
+<span class="nc" id="L812">                con2.spanHorizontal = con.spanHorizontal;</span>
+<span class="nc" id="L813">                con2.spanVertical = con.spanVertical;</span>
+<span class="nc" id="L814">                con2.valign = con.valign;</span>
+<span class="nc" id="L815">                con2.width = con.width;</span>
+<span class="nc" id="L816">                con = con2;</span>
+            }
+        }
+<span class="fc" id="L819">        con.actualRow = con.row;</span>
+<span class="fc" id="L820">        con.actualColumn = con.column;</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">        if (con.actualRow &lt; 0) {</span>
+<span class="fc" id="L822">            con.actualRow = currentRow;</span>
+        }
+<span class="fc bfc" id="L824" title="All 2 branches covered.">        if (con.actualColumn &lt; 0) {</span>
+<span class="fc" id="L825">            con.actualColumn = currentColumn;</span>
+        }
+<span class="fc" id="L827">        con.parent = comp;</span>
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">        if (con.actualRow &gt;= rows) {</span>
+            // increase the table row count implicitly
+<span class="nc" id="L830">            addRow();</span>
+        }
+<span class="pc bpc" id="L832" title="1 of 2 branches missed.">        if (tablePositions[con.actualRow * columns + con.actualColumn] != null) {</span>
+<span class="nc bnc" id="L833" title="All 4 branches missed.">            if (tablePositions[con.actualRow * columns + con.actualColumn].row != -1 || tablePositions[con.actualRow * columns + con.actualColumn].column != -1) {</span>
+<span class="nc" id="L834">                throw new IllegalArgumentException(&quot;Row: &quot; + con.row + &quot; and column: &quot; + con.column + &quot; already occupied&quot;);</span>
+            }
+
+            // try to reflow the table from this row/column onwards
+<span class="nc" id="L838">            shiftCell(con.actualRow, con.actualColumn);</span>
+<span class="nc" id="L839">            tablePositions[con.actualRow * columns + con.actualColumn] = con;</span>
+        }
+<span class="fc" id="L841">        tablePositions[con.actualRow * columns + con.actualColumn] = con;</span>
+<span class="fc bfc" id="L842" title="All 4 branches covered.">        if (con.spanHorizontal &gt; 1 || con.spanVertical &gt; 1) {</span>
+<span class="fc bfc" id="L843" title="All 2 branches covered.">            for (int sh = 0; sh &lt; con.spanHorizontal; sh++) {</span>
+<span class="fc bfc" id="L844" title="All 2 branches covered.">                for (int sv = 0; sv &lt; con.spanVertical; sv++) {</span>
+<span class="pc bpc" id="L845" title="1 of 8 branches missed.">                    if ((sh &gt; 0 || sv &gt; 0) &amp;&amp; rows &gt; con.actualRow + sv &amp;&amp;</span>
+                            columns &gt; con.actualColumn + sh) {
+<span class="pc bpc" id="L847" title="1 of 2 branches missed.">                        if (tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] == null) {</span>
+<span class="pc bpc" id="L848" title="1 of 2 branches missed.">                            if (con.spanHorizontal &gt; 1) {</span>
+<span class="pc bpc" id="L849" title="1 of 2 branches missed.">                                if (con.spanVertical &gt; 1) {</span>
+<span class="nc" id="L850">                                    tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = VH_SPAN_CONSTRAINT;</span>
+                                } else {
+<span class="fc" id="L852">                                    tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = V_SPAN_CONSTRAINT;</span>
+                                }
+                            } else {
+<span class="nc" id="L855">                                tablePositions[(con.actualRow + sv) * columns + con.actualColumn + sh] = H_SPAN_CONSTRAINT;</span>
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+<span class="fc" id="L863">        updateRowColumn();</span>
+<span class="fc" id="L864">    }</span>
+
+    private void updateRowColumn() {
+<span class="pc bpc" id="L867" title="1 of 2 branches missed.">        if (currentRow &gt;= rows) {</span>
+<span class="nc" id="L868">            return;</span>
+        }
+<span class="fc bfc" id="L870" title="All 2 branches covered.">        while (tablePositions[currentRow * columns + currentColumn] != null) {</span>
+<span class="fc" id="L871">            currentColumn++;</span>
+<span class="fc bfc" id="L872" title="All 2 branches covered.">            if (currentColumn &gt;= columns) {</span>
+<span class="fc" id="L873">                currentColumn = 0;</span>
+<span class="fc" id="L874">                currentRow++;</span>
+<span class="fc bfc" id="L875" title="All 2 branches covered.">                if (currentRow &gt;= rows) {</span>
+<span class="fc" id="L876">                    return;</span>
+                }
+            }
+        }
+<span class="fc" id="L880">    }</span>
+
+    /// Returns the spanning for the table cell at the given coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: row in the table
+    ///
+    /// - `column`: column within the table
+    ///
+    /// #### Returns
+    ///
+    /// the amount of spanning 1 for no spanning
+    public int getCellHorizontalSpan(int row, int column) {
+<span class="nc" id="L894">        return tablePositions[row * columns + column].spanHorizontal;</span>
+    }
+
+    /// Returns the spanning for the table cell at the given coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: row in the table
+    ///
+    /// - `column`: column within the table
+    ///
+    /// #### Returns
+    ///
+    /// the amount of spanning 1 for no spanning
+    public int getCellVerticalSpan(int row, int column) {
+<span class="nc" id="L909">        return tablePositions[row * columns + column].spanVertical;</span>
+    }
+
+    /// Returns true if the cell at the given position is spanned through vertically
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: cell row
+    ///
+    /// - `column`: cell column
+    ///
+    /// #### Returns
+    ///
+    /// true if the cell is a part of a span for another cell
+    public boolean isCellSpannedThroughVertically(int row, int column) {
+<span class="nc bnc" id="L924" title="All 4 branches missed.">        return tablePositions[row * columns + column] == V_SPAN_CONSTRAINT || tablePositions[row * columns + column] == VH_SPAN_CONSTRAINT;</span>
+    }
+
+    /// Returns true if the cell at the given position is spanned through horizontally
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: cell row
+    ///
+    /// - `column`: cell column
+    ///
+    /// #### Returns
+    ///
+    /// true if the cell is a part of a span for another cell
+    public boolean isCellSpannedThroughHorizontally(int row, int column) {
+<span class="nc bnc" id="L939" title="All 4 branches missed.">        return tablePositions[row * columns + column] == H_SPAN_CONSTRAINT || tablePositions[row * columns + column] == VH_SPAN_CONSTRAINT;</span>
+    }
+
+    /// Indicates whether there is spanning within this layout
+    ///
+    /// #### Returns
+    ///
+    /// true if the layout makes use of spanning
+    public boolean hasVerticalSpanning() {
+<span class="fc" id="L948">        return verticalSpanningExists;</span>
+    }
+
+    /// Indicates whether there is spanning within this layout
+    ///
+    /// #### Returns
+    ///
+    /// true if the layout makes use of spanning
+    public boolean hasHorizontalSpanning() {
+<span class="fc" id="L957">        return horizontalSpanningExists;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removeLayoutComponent(Component comp) {
+        // reflow the table
+<span class="fc" id="L964">        Vector comps = new Vector();</span>
+<span class="fc bfc" id="L965" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L966" title="All 2 branches covered.">            for (int c = 0; c &lt; columns; c++) {</span>
+<span class="fc bfc" id="L967" title="All 2 branches covered.">                if (tablePositions[r * columns + c] != null) {</span>
+<span class="fc bfc" id="L968" title="All 2 branches covered.">                    if (tablePositions[r * columns + c].parent != comp) {</span>
+<span class="fc" id="L969">                        comps.addElement(tablePositions[r * columns + c]);</span>
+                    } else {
+<span class="fc" id="L971">                        tablePositions[r * columns + c].parent = null;</span>
+                    }
+                }
+<span class="fc" id="L974">                tablePositions[r * columns + c] = null;</span>
+            }
+        }
+<span class="fc" id="L977">        currentRow = 0;</span>
+<span class="fc" id="L978">        currentColumn = 0;</span>
+<span class="fc" id="L979">        int count = comps.size();</span>
+<span class="fc bfc" id="L980" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L981">            Constraint con = (Constraint) comps.elementAt(iter);</span>
+<span class="pc bpc" id="L982" title="3 of 6 branches missed.">            if (con == H_SPAN_CONSTRAINT || con == V_SPAN_CONSTRAINT || con == VH_SPAN_CONSTRAINT) {</span>
+<span class="nc" id="L983">                continue;</span>
+            }
+<span class="fc" id="L985">            Component c = con.parent;</span>
+<span class="fc" id="L986">            con.parent = null;</span>
+<span class="fc" id="L987">            addLayoutComponent(con, c, c.getParent());</span>
+        }
+<span class="fc" id="L989">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Object getComponentConstraint(Component comp) {
+<span class="pc bpc" id="L994" title="1 of 2 branches missed.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L995" title="All 2 branches covered.">            for (int c = 0; c &lt; columns; c++) {</span>
+<span class="fc bfc" id="L996" title="All 4 branches covered.">                if (tablePositions[r * columns + c] != null &amp;&amp; tablePositions[r * columns + c].parent == comp) {</span>
+<span class="fc" id="L997">                    return tablePositions[r * columns + c];</span>
+                }
+            }
+        }
+<span class="nc" id="L1001">        return null;</span>
+    }
+
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Returns
+    ///
+    /// the default constraint
+    public Constraint createConstraint() {
+<span class="fc" id="L1010">        return new Constraint();</span>
+    }
+
+    /// Creates a new Constraint instance to add to the layout, same as
+    /// `createConstraint` only shorter syntax
+    ///
+    /// #### Returns
+    ///
+    /// the default constraint
+    public Constraint cc() {
+<span class="nc" id="L1020">        return new Constraint();</span>
+    }
+
+    /// Creates a new Constraint instance to add to the layout, same as
+    /// `createConstraint` only shorter syntax
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row for the table starting with 0
+    ///
+    /// - `column`: the column for the table starting with 0
+    ///
+    /// #### Returns
+    ///
+    /// the new constraint
+    public Constraint cc(int row, int column) {
+<span class="fc" id="L1036">        return createConstraint(row, column);</span>
+    }
+
+    /// Creates a new Constraint instance to add to the layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row for the table starting with 0
+    ///
+    /// - `column`: the column for the table starting with 0
+    ///
+    /// #### Returns
+    ///
+    /// the new constraint
+    public Constraint createConstraint(int row, int column) {
+<span class="fc" id="L1051">        Constraint c = createConstraint();</span>
+<span class="fc" id="L1052">        c.row = row;</span>
+<span class="fc" id="L1053">        c.column = column;</span>
+<span class="fc" id="L1054">        return c;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String toString() {
+<span class="nc" id="L1060">        return &quot;TableLayout&quot;;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L1066" title="All 6 branches missed.">        return super.equals(o) &amp;&amp; ((TableLayout) o).getRows() == getRows() &amp;&amp; ((TableLayout) o).getColumns() == getColumns();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L1071">        return super.hashCode() ^ getRows() ^ getColumns();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isConstraintTracking() {
+<span class="fc" id="L1077">        return true;</span>
+    }
+
+    /// Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
+    ///
+    /// #### Returns
+    ///
+    /// the growHorizontally
+    public boolean isGrowHorizontally() {
+<span class="nc" id="L1086">        return growHorizontally;</span>
+    }
+
+    /// Indicates whether the table layout should grow horizontally to take up available space by stretching the last column
+    ///
+    /// #### Parameters
+    ///
+    /// - `growHorizontally`: the growHorizontally to set
+    public void setGrowHorizontally(boolean growHorizontally) {
+<span class="fc" id="L1095">        this.growHorizontally = growHorizontally;</span>
+<span class="fc" id="L1096">    }</span>
+
+    /// Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
+    ///
+    /// #### Returns
+    ///
+    /// the truncateHorizontally
+    public boolean isTruncateHorizontally() {
+<span class="nc" id="L1104">        return truncateHorizontally;</span>
+    }
+
+    /// Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
+    ///
+    /// #### Parameters
+    ///
+    /// - `truncateHorizontally`: the truncateHorizontally to set
+    public void setTruncateHorizontally(boolean truncateHorizontally) {
+<span class="nc" id="L1113">        this.truncateHorizontally = truncateHorizontally;</span>
+<span class="nc" id="L1114">    }</span>
+
+    /// Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
+    ///
+    /// #### Returns
+    ///
+    /// the truncateVertically
+    public boolean isTruncateVertically() {
+<span class="nc" id="L1122">        return truncateVertically;</span>
+    }
+
+    /// Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
+    ///
+    /// #### Parameters
+    ///
+    /// - `truncateVertically`: the truncateVertically to set
+    public void setTruncateVertically(boolean truncateVertically) {
+<span class="nc" id="L1131">        this.truncateVertically = truncateVertically;</span>
+<span class="nc" id="L1132">    }</span>
+
+    @Override
+    public boolean overridesTabIndices(Container parent) {
+<span class="nc" id="L1136">        return true;</span>
+    }
+
+    @Override
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+<span class="nc" id="L1141">        int len = tablePositions.length;</span>
+<span class="nc" id="L1142">        Component[] out = new Component[len];</span>
+<span class="nc bnc" id="L1143" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L1144">            Constraint con = tablePositions[i];</span>
+<span class="nc bnc" id="L1145" title="All 2 branches missed.">            if (con != null) {</span>
+<span class="nc" id="L1146">                out[i] = tablePositions[i].parent;</span>
+            }
+        }
+<span class="nc" id="L1149">        return out;</span>
+    }
+
+    /// Represents the layout constraint for an entry within the table indicating
+    /// the desired position/behavior of the component.
+<span class="fc" id="L1154">    public static class Constraint {</span>
+<span class="fc" id="L1155">        int actualRow = -1;</span>
+<span class="fc" id="L1156">        int actualColumn = -1;</span>
+        private Component parent;
+<span class="fc" id="L1158">        private int row = -1;</span>
+<span class="fc" id="L1159">        private int column = -1;</span>
+<span class="fc" id="L1160">        private int width = defaultColumnWidth;</span>
+<span class="fc" id="L1161">        private int height = defaultRowHeight;</span>
+<span class="fc" id="L1162">        private int spanHorizontal = 1;</span>
+<span class="fc" id="L1163">        private int spanVertical = 1;</span>
+<span class="fc" id="L1164">        private int align = -1;</span>
+<span class="fc" id="L1165">        private int valign = -1;</span>
+
+        /// {@inheritDoc}
+        @Override
+        public String toString() {
+<span class="nc" id="L1170">            return &quot;row: &quot; + row + &quot; column: &quot; + column + &quot; width: &quot; + width + &quot; height: &quot; + height + &quot; hspan: &quot; +</span>
+                    spanHorizontal + &quot; vspan: &quot; + spanVertical + &quot; align &quot; + align + &quot; valign &quot; + valign;
+        }
+
+        /// Sets the cells to span vertically, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        ///
+        /// #### Returns
+        ///
+        /// this
+        public Constraint verticalSpan(int span) {
+<span class="fc" id="L1184">            setVerticalSpan(span);</span>
+<span class="fc" id="L1185">            return this;</span>
+        }
+
+        /// Sets the cells to span vertically, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        ///
+        /// #### Returns
+        ///
+        /// this
+        public Constraint vs(int span) {
+<span class="nc" id="L1198">            return verticalSpan(span);</span>
+        }
+
+        /// Sets the cells to span horizontally, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        public Constraint horizontalSpan(int span) {
+<span class="fc" id="L1207">            setHorizontalSpan(span);</span>
+<span class="fc" id="L1208">            return this;</span>
+        }
+
+        /// Sets the cells to span horizontally, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        public Constraint hs(int span) {
+<span class="nc" id="L1217">            return horizontalSpan(span);</span>
+        }
+
+        /// Sets the column width based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: negative number indicates ignoring this member
+        public Constraint widthPercentage(int width) {
+<span class="fc" id="L1226">            this.width = width;</span>
+<span class="fc" id="L1227">            return this;</span>
+        }
+
+        /// Sets the column width based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: negative number indicates ignoring this member
+        public Constraint wp(int width) {
+<span class="fc" id="L1236">            return widthPercentage(width);</span>
+        }
+
+        /// Sets the row height based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `height`: negative number indicates ignoring this member
+        public Constraint heightPercentage(int height) {
+<span class="fc" id="L1245">            this.height = height;</span>
+<span class="fc" id="L1246">            return this;</span>
+        }
+
+        /// Sets the row height based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `height`: negative number indicates ignoring this member
+        public Constraint hp(int height) {
+<span class="fc" id="L1255">            return heightPercentage(height);</span>
+        }
+
+        /// Sets the horizontal alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `align`: Component.LEFT/RIGHT/CENTER
+        public Constraint horizontalAlign(int align) {
+<span class="fc" id="L1264">            this.align = align;</span>
+<span class="fc" id="L1265">            return this;</span>
+        }
+
+        /// Sets the horizontal alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `align`: Component.LEFT/RIGHT/CENTER
+        public Constraint ha(int align) {
+<span class="nc" id="L1274">            return horizontalAlign(align);</span>
+        }
+
+        /// Sets the vertical alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `valign`: Component.TOP/BOTTOM/CENTER
+        public Constraint verticalAlign(int valign) {
+<span class="fc" id="L1283">            this.valign = valign;</span>
+<span class="fc" id="L1284">            return this;</span>
+        }
+
+        /// Sets the vertical alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `valign`: Component.TOP/BOTTOM/CENTER
+        public Constraint va(int valign) {
+<span class="nc" id="L1293">            return verticalAlign(valign);</span>
+        }
+
+        /// #### Returns
+        ///
+        /// the row
+        public int getRow() {
+<span class="fc" id="L1300">            return row;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// the column
+        public int getColumn() {
+<span class="fc" id="L1307">            return column;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// the width
+        public int getWidthPercentage() {
+<span class="fc" id="L1314">            return width;</span>
+        }
+
+        /// Sets the column width based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: negative number indicates ignoring this member
+        public void setWidthPercentage(int width) {
+<span class="nc" id="L1323">            this.width = width;</span>
+<span class="nc" id="L1324">        }</span>
+
+        /// #### Returns
+        ///
+        /// the height
+        public int getHeightPercentage() {
+<span class="fc" id="L1330">            return height;</span>
+        }
+
+        /// Sets the row height based on percentage of the parent
+        ///
+        /// #### Parameters
+        ///
+        /// - `height`: negative number indicates ignoring this member
+        public void setHeightPercentage(int height) {
+<span class="nc" id="L1339">            this.height = height;</span>
+<span class="nc" id="L1340">        }</span>
+
+        /// #### Returns
+        ///
+        /// the spanHorizontal
+        public int getHorizontalSpan() {
+<span class="nc" id="L1346">            return spanHorizontal;</span>
+        }
+
+        /// Sets the cells to span horizontally, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        public void setHorizontalSpan(int span) {
+<span class="pc bpc" id="L1355" title="1 of 2 branches missed.">            if (span &lt; 1) {</span>
+<span class="nc" id="L1356">                throw new IllegalArgumentException(&quot;Illegal span&quot;);</span>
+            }
+<span class="fc" id="L1358">            spanHorizontal = span;</span>
+<span class="fc" id="L1359">        }</span>
+
+        /// #### Returns
+        ///
+        /// the spanVertical
+        public int getVerticalSpan() {
+<span class="fc" id="L1365">            return spanVertical;</span>
+        }
+
+        /// Sets the cells to span vertically, this number must never be smaller than 1
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`: a number larger than 1
+        public void setVerticalSpan(int span) {
+<span class="pc bpc" id="L1374" title="1 of 2 branches missed.">            if (span &lt; 1) {</span>
+<span class="nc" id="L1375">                throw new IllegalArgumentException(&quot;Illegal span&quot;);</span>
+            }
+<span class="fc" id="L1377">            spanVertical = span;</span>
+<span class="fc" id="L1378">        }</span>
+
+        /// #### Returns
+        ///
+        /// the align
+        public int getHorizontalAlign() {
+<span class="fc" id="L1384">            return align;</span>
+        }
+
+        /// Sets the horizontal alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `align`: Component.LEFT/RIGHT/CENTER
+        public void setHorizontalAlign(int align) {
+<span class="nc" id="L1393">            this.align = align;</span>
+<span class="nc" id="L1394">        }</span>
+
+        /// #### Returns
+        ///
+        /// the valign
+        public int getVerticalAlign() {
+<span class="fc" id="L1400">            return valign;</span>
+        }
+
+        /// Sets the vertical alignment of the table cell
+        ///
+        /// #### Parameters
+        ///
+        /// - `valign`: Component.TOP/BOTTOM/CENTER
+        public void setVerticalAlign(int valign) {
+<span class="nc" id="L1409">            this.valign = valign;</span>
+<span class="nc" id="L1410">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

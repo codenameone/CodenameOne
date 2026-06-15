@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbeddingRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">EmbeddingRequest.java</span></div><h1>EmbeddingRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+/// Request payload for [LlmClient#embed(EmbeddingRequest)]. Carries
+/// one or more input strings plus optional `dimensions` (OpenAI's
+/// `dimensions`, Gemini's `outputDimensionality`). A `null` value means
+/// &quot;use the model's default dimensionality&quot;.
+public final class EmbeddingRequest {
+    private final String model;
+    private final List&lt;String&gt; inputs;
+    private final Integer dimensions;
+
+<span class="fc" id="L39">    private EmbeddingRequest(Builder b) {</span>
+<span class="fc" id="L40">        this.model = b.model;</span>
+<span class="fc" id="L41">        this.inputs = Collections.unmodifiableList(new ArrayList&lt;String&gt;(b.inputs));</span>
+<span class="fc" id="L42">        this.dimensions = b.dimensions;</span>
+<span class="fc" id="L43">    }</span>
+
+    public static Builder builder() {
+<span class="fc" id="L46">        return new Builder();</span>
+    }
+
+    /// Convenience for the single-input case.
+    public static EmbeddingRequest of(String model, String text) {
+<span class="fc" id="L51">        return builder().model(model).inputs(Arrays.asList(text)).build();</span>
+    }
+
+    public String getModel() {
+<span class="fc" id="L55">        return model;</span>
+    }
+
+    public List&lt;String&gt; getInputs() {
+<span class="fc" id="L59">        return inputs;</span>
+    }
+
+    public Integer getDimensions() {
+<span class="fc" id="L63">        return dimensions;</span>
+    }
+
+    public static final class Builder {
+        private String model;
+<span class="fc" id="L68">        private List&lt;String&gt; inputs = new ArrayList&lt;String&gt;();</span>
+        private Integer dimensions;
+
+<span class="fc" id="L71">        Builder() {</span>
+<span class="fc" id="L72">        }</span>
+
+        public Builder model(String m) {
+<span class="fc" id="L75">            this.model = m;</span>
+<span class="fc" id="L76">            return this;</span>
+        }
+
+        public Builder inputs(List&lt;String&gt; in) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            this.inputs = in == null ? new ArrayList&lt;String&gt;()</span>
+                    : new ArrayList&lt;String&gt;(in);
+<span class="fc" id="L82">            return this;</span>
+        }
+
+        public Builder addInput(String s) {
+<span class="fc" id="L86">            this.inputs.add(s);</span>
+<span class="fc" id="L87">            return this;</span>
+        }
+
+        public Builder dimensions(Integer d) {
+<span class="fc" id="L91">            this.dimensions = d;</span>
+<span class="fc" id="L92">            return this;</span>
+        }
+
+        public EmbeddingRequest build() {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (inputs.isEmpty()) {</span>
+<span class="nc" id="L97">                throw new IllegalStateException(&quot;at least one input is required&quot;);</span>
+            }
+<span class="fc" id="L99">            return new EmbeddingRequest(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

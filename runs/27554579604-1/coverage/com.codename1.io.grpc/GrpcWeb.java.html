@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GrpcWeb.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.grpc</a> &gt; <span class="el_source">GrpcWeb.java</span></div><h1>GrpcWeb.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.io.grpc;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Data;
+import com.codename1.ui.CN;
+import com.codename1.util.OnComplete;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+
+/// High-level gRPC-Web invoker used by generated `@GrpcClient`
+/// implementations. Handles HTTP-level transport, gRPC-Web payload
+/// framing (`flags + length + payload`), and trailer parsing
+/// (`grpc-status`, `grpc-message`).
+///
+/// Wire details (from the upstream gRPC-Web spec):
+///
+/// - URL: `&lt;baseUrl&gt;/&lt;service-fqn&gt;/&lt;method-name&gt;` (no trailing slash).
+/// - HTTP method: `POST`.
+/// - Request `Content-Type`: `application/grpc-web+proto`.
+/// - Request headers: `X-Grpc-Web: 1`, `X-User-Agent: grpc-web-cn1/&lt;ver&gt;`.
+/// - Request body: `0x00 &lt;length-be32&gt; &lt;payload&gt;` -- one data frame.
+/// - Response body: zero or more data frames (flags low bit 0)
+///   followed by one trailer frame (flags high bit `0x80`) carrying
+///   `grpc-status:&lt;n&gt;\r\ngrpc-message:&lt;text&gt;\r\n`.
+///
+/// All methods are static. Generated impls call [#invokeUnary] and
+/// receive the parsed [GrpcResponse] on the supplied callback.
+public final class GrpcWeb {
+
+    /// Content type for binary gRPC-Web payloads. The text variant
+    /// (`application/grpc-web-text`, base64-encoded) is not
+    /// supported -- modern Envoy/gRPC-Web proxies all speak binary.
+    public static final String CONTENT_TYPE = &quot;application/grpc-web+proto&quot;;
+
+    /// gRPC-Web frame flag set in the trailer frame's first byte.
+    public static final int FLAG_TRAILER = 0x80;
+
+    private GrpcWeb() {
+    }
+
+    /// Sends a unary gRPC-Web request and invokes `callback` with
+    /// the decoded response (or a transport-failure marker).
+    ///
+    /// The `baseUrl` should not include a trailing slash; the
+    /// `service` is the fully qualified service path
+    /// (e.g. `helloworld.Greeter`) and `method` is the gRPC method
+    /// name (e.g. `SayHello`). The resulting URL is
+    /// `&lt;baseUrl&gt;/&lt;service&gt;/&lt;method&gt;`.
+    public static &lt;Req, Resp&gt; void invokeUnary(
+            String baseUrl,
+            String service,
+            String method,
+            String bearerToken,
+            Req request,
+            ProtoCodec&lt;Req&gt; reqCodec,
+            ProtoCodec&lt;Resp&gt; respCodec,
+            final OnComplete&lt;GrpcResponse&lt;Resp&gt;&gt; callback) {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (callback == null) {</span>
+<span class="fc" id="L70">            throw new IllegalArgumentException(&quot;callback must not be null&quot;);</span>
+        }
+        byte[] framed;
+        try {
+<span class="fc" id="L74">            framed = frame(request, reqCodec);</span>
+<span class="nc" id="L75">        } catch (IOException ioe) {</span>
+<span class="nc" id="L76">            callback.completed(new GrpcResponse&lt;Resp&gt;(</span>
+                    GrpcResponse.STATUS_INTERNAL, 0, null,
+<span class="nc" id="L78">                    &quot;Failed to encode request: &quot; + ioe.getMessage()));</span>
+<span class="nc" id="L79">            return;</span>
+<span class="fc" id="L80">        }</span>
+
+<span class="fc" id="L82">        String url = joinUrl(baseUrl, service, method);</span>
+<span class="fc" id="L83">        final GrpcConnection conn = new GrpcConnection(respCodec, callback);</span>
+<span class="fc" id="L84">        conn.setUrl(url);</span>
+<span class="fc" id="L85">        conn.setHttpMethod(&quot;POST&quot;);</span>
+<span class="fc" id="L86">        conn.setPost(true);</span>
+<span class="fc" id="L87">        conn.setContentType(CONTENT_TYPE);</span>
+<span class="fc" id="L88">        conn.addRequestHeader(&quot;X-Grpc-Web&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L89">        conn.addRequestHeader(&quot;Accept&quot;, CONTENT_TYPE);</span>
+<span class="pc bpc" id="L90" title="3 of 4 branches missed.">        if (bearerToken != null &amp;&amp; bearerToken.length() &gt; 0) {</span>
+<span class="nc" id="L91">            conn.addRequestHeader(&quot;Authorization&quot;, bearerToken);</span>
+        }
+<span class="fc" id="L93">        conn.setRequestBody(new ByteData(framed));</span>
+<span class="fc" id="L94">        CN.addToQueue(conn);</span>
+<span class="fc" id="L95">    }</span>
+
+    /// Wraps a serialised request message in a single gRPC-Web data
+    /// frame: `[0x00][length-be32][payload]`. Public so unit tests
+    /// can verify framing independently of the network path.
+    public static &lt;T&gt; byte[] frame(T request, ProtoCodec&lt;T&gt; codec) throws IOException {
+<span class="fc" id="L101">        ByteArrayOutputStream bodyBuf = new ByteArrayOutputStream();</span>
+<span class="fc" id="L102">        ProtoWriter w = new ProtoWriter(bodyBuf);</span>
+<span class="fc" id="L103">        codec.write(w, request);</span>
+<span class="fc" id="L104">        byte[] body = bodyBuf.toByteArray();</span>
+<span class="fc" id="L105">        byte[] out = new byte[5 + body.length];</span>
+<span class="fc" id="L106">        out[0] = 0; // data frame, no compression</span>
+<span class="fc" id="L107">        out[1] = (byte) ((body.length &gt;&gt;&gt; 24) &amp; 0xFF);</span>
+<span class="fc" id="L108">        out[2] = (byte) ((body.length &gt;&gt;&gt; 16) &amp; 0xFF);</span>
+<span class="fc" id="L109">        out[3] = (byte) ((body.length &gt;&gt;&gt; 8) &amp; 0xFF);</span>
+<span class="fc" id="L110">        out[4] = (byte) (body.length &amp; 0xFF);</span>
+<span class="fc" id="L111">        System.arraycopy(body, 0, out, 5, body.length);</span>
+<span class="fc" id="L112">        return out;</span>
+    }
+
+    /// Decodes a complete gRPC-Web response body. Iterates frames,
+    /// concatenates data payloads, and parses the trailer frame for
+    /// `grpc-status` / `grpc-message`. Public so callers can replay
+    /// canned responses in unit tests.
+    public static &lt;Resp&gt; GrpcResponse&lt;Resp&gt; decode(byte[] response, int httpCode,
+                                                   ProtoCodec&lt;Resp&gt; respCodec) {
+<span class="fc bfc" id="L121" title="All 4 branches covered.">        if (response == null || response.length == 0) {</span>
+<span class="fc" id="L122">            return new GrpcResponse&lt;Resp&gt;(GrpcResponse.STATUS_TRANSPORT_FAILURE,</span>
+                    httpCode, null, &quot;Empty response body&quot;);
+        }
+<span class="fc" id="L125">        ByteArrayOutputStream payload = new ByteArrayOutputStream();</span>
+<span class="fc" id="L126">        int status = GrpcResponse.STATUS_OK;</span>
+<span class="fc" id="L127">        String message = null;</span>
+<span class="fc" id="L128">        boolean sawTrailer = false;</span>
+<span class="fc" id="L129">        int pos = 0;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        while (pos + 5 &lt;= response.length) {</span>
+<span class="fc" id="L131">            int flags = response[pos] &amp; 0xFF;</span>
+<span class="fc" id="L132">            int len = ((response[pos + 1] &amp; 0xFF) &lt;&lt; 24)</span>
+                    | ((response[pos + 2] &amp; 0xFF) &lt;&lt; 16)
+                    | ((response[pos + 3] &amp; 0xFF) &lt;&lt; 8)
+                    | (response[pos + 4] &amp; 0xFF);
+<span class="fc" id="L136">            pos += 5;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (pos + len &gt; response.length) {</span>
+<span class="fc" id="L138">                return new GrpcResponse&lt;Resp&gt;(GrpcResponse.STATUS_TRANSPORT_FAILURE,</span>
+                        httpCode, null, &quot;Truncated gRPC-Web frame (need &quot;
+                                + len + &quot; bytes, have &quot; + (response.length - pos) + &quot;)&quot;);
+            }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if ((flags &amp; FLAG_TRAILER) != 0) {</span>
+                String trailer;
+                try {
+<span class="fc" id="L145">                    trailer = new String(response, pos, len, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L146">                } catch (java.io.UnsupportedEncodingException uee) {</span>
+<span class="nc" id="L147">                    trailer = &quot;&quot;;</span>
+<span class="fc" id="L148">                }</span>
+<span class="fc" id="L149">                int[] parsed = parseTrailerStatus(trailer);</span>
+<span class="fc" id="L150">                status = parsed[0];</span>
+<span class="fc" id="L151">                message = trailerMessage(trailer);</span>
+<span class="fc" id="L152">                sawTrailer = true;</span>
+<span class="fc" id="L153">            } else {</span>
+<span class="fc" id="L154">                payload.write(response, pos, len);</span>
+            }
+<span class="fc" id="L156">            pos += len;</span>
+<span class="fc" id="L157">        }</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (!sawTrailer) {</span>
+<span class="fc" id="L159">            return new GrpcResponse&lt;Resp&gt;(GrpcResponse.STATUS_TRANSPORT_FAILURE,</span>
+                    httpCode, null,
+                    &quot;gRPC-Web response is missing the trailer frame&quot;);
+        }
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (status != GrpcResponse.STATUS_OK) {</span>
+<span class="fc" id="L164">            return new GrpcResponse&lt;Resp&gt;(status, httpCode, null, message);</span>
+        }
+        Resp parsed;
+        try {
+<span class="fc" id="L168">            ProtoReader r = new ProtoReader(payload.toByteArray());</span>
+<span class="fc" id="L169">            parsed = respCodec.read(r);</span>
+<span class="nc" id="L170">        } catch (IOException ioe) {</span>
+<span class="nc" id="L171">            return new GrpcResponse&lt;Resp&gt;(GrpcResponse.STATUS_INTERNAL, httpCode, null,</span>
+<span class="nc" id="L172">                    &quot;Failed to decode response: &quot; + ioe.getMessage());</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return new GrpcResponse&lt;Resp&gt;(GrpcResponse.STATUS_OK, httpCode, parsed, null);</span>
+    }
+
+    private static int[] parseTrailerStatus(String trailer) {
+        // Lines are CRLF-separated; the spec allows LF too.
+<span class="fc" id="L179">        int idx = indexOfHeader(trailer, &quot;grpc-status&quot;);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (idx &lt; 0) {</span>
+<span class="fc" id="L181">            return new int[]{GrpcResponse.STATUS_UNKNOWN};</span>
+        }
+<span class="fc" id="L183">        int eol = endOfLine(trailer, idx);</span>
+<span class="fc" id="L184">        String value = trailer.substring(idx, eol).trim();</span>
+        try {
+<span class="fc" id="L186">            return new int[]{Integer.parseInt(value)};</span>
+<span class="fc" id="L187">        } catch (NumberFormatException nfe) {</span>
+<span class="fc" id="L188">            return new int[]{GrpcResponse.STATUS_UNKNOWN};</span>
+        }
+    }
+
+    private static String trailerMessage(String trailer) {
+<span class="fc" id="L193">        int idx = indexOfHeader(trailer, &quot;grpc-message&quot;);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (idx &lt; 0) {</span>
+<span class="fc" id="L195">            return null;</span>
+        }
+<span class="fc" id="L197">        int eol = endOfLine(trailer, idx);</span>
+<span class="fc" id="L198">        return trailer.substring(idx, eol).trim();</span>
+    }
+
+    /// Returns the character index just past the `&lt;name&gt;:` prefix,
+    /// or -1 if `name` is absent. Header names are matched
+    /// case-insensitively per gRPC-Web spec.
+    private static int indexOfHeader(String trailer, String name) {
+<span class="fc" id="L205">        int i = 0;</span>
+<span class="fc" id="L206">        int n = trailer.length();</span>
+<span class="fc" id="L207">        int nameLen = name.length();</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        while (i &lt; n) {</span>
+<span class="fc" id="L209">            int lineStart = i;</span>
+            // Scan to end of line.
+<span class="fc" id="L211">            int eol = i;</span>
+<span class="pc bpc" id="L212" title="1 of 6 branches missed.">            while (eol &lt; n &amp;&amp; trailer.charAt(eol) != '\n' &amp;&amp; trailer.charAt(eol) != '\r') {</span>
+<span class="fc" id="L213">                eol++;</span>
+            }
+<span class="fc" id="L215">            int colon = trailer.indexOf(':', lineStart);</span>
+<span class="pc bpc" id="L216" title="2 of 6 branches missed.">            if (colon &gt;= 0 &amp;&amp; colon &lt; eol &amp;&amp; (colon - lineStart) == nameLen) {</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                if (trailer.regionMatches(true, lineStart, name, 0, nameLen)) {</span>
+<span class="fc" id="L218">                    return colon + 1;</span>
+                }
+            }
+            // Skip CRLF / LF.
+<span class="fc" id="L222">            i = eol;</span>
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">            if (i &lt; n &amp;&amp; trailer.charAt(i) == '\r') {</span>
+<span class="fc" id="L224">                i++;</span>
+            }
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">            if (i &lt; n &amp;&amp; trailer.charAt(i) == '\n') {</span>
+<span class="fc" id="L227">                i++;</span>
+            }
+<span class="fc" id="L229">        }</span>
+<span class="fc" id="L230">        return -1;</span>
+    }
+
+    private static int endOfLine(String s, int from) {
+<span class="fc" id="L234">        int n = s.length();</span>
+<span class="fc" id="L235">        int i = from;</span>
+<span class="pc bpc" id="L236" title="1 of 6 branches missed.">        while (i &lt; n &amp;&amp; s.charAt(i) != '\n' &amp;&amp; s.charAt(i) != '\r') {</span>
+<span class="fc" id="L237">            i++;</span>
+        }
+<span class="fc" id="L239">        return i;</span>
+    }
+
+    private static String joinUrl(String baseUrl, String service, String method) {
+<span class="fc" id="L243">        StringBuilder sb = new StringBuilder();</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        sb.append(baseUrl == null ? &quot;&quot; : baseUrl);</span>
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">        if (sb.length() &gt; 0 &amp;&amp; sb.charAt(sb.length() - 1) == '/') {</span>
+<span class="nc" id="L246">            sb.setLength(sb.length() - 1);</span>
+        }
+<span class="fc" id="L248">        sb.append('/').append(service).append('/').append(method);</span>
+<span class="fc" id="L249">        return sb.toString();</span>
+    }
+
+    /// Body adapter so a raw `byte[]` can flow through
+    /// `ConnectionRequest.setRequestBody(Data)` without an extra
+    /// copy.
+    private static final class ByteData implements Data {
+        private final byte[] body;
+
+<span class="fc" id="L258">        ByteData(byte[] body) {</span>
+<span class="fc" id="L259">            this.body = body;</span>
+<span class="fc" id="L260">        }</span>
+
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+<span class="fc" id="L264">            output.write(body);</span>
+<span class="fc" id="L265">        }</span>
+
+        @Override
+        public long getSize() throws IOException {
+<span class="nc" id="L269">            return body.length;</span>
+        }
+    }
+
+    /// Subclasses `ConnectionRequest` so we can suppress its default
+    /// &quot;non-2xx is an error&quot; handling -- gRPC-Web always returns
+    /// 200 OK and surfaces failures in the trailer, so a 4xx/5xx
+    /// from the proxy itself is the only HTTP-level failure mode we
+    /// need to translate.
+    private static final class GrpcConnection extends ConnectionRequest {
+        private final ProtoCodec respCodec;
+        private final OnComplete callback;
+        private boolean failed;
+        private int failedCode;
+        private String failedMessage;
+
+        @Override
+        public boolean equals(Object o) {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            if (!(o instanceof GrpcConnection)) {</span>
+<span class="nc" id="L288">                return false;</span>
+            }
+<span class="nc" id="L290">            GrpcConnection that = (GrpcConnection) o;</span>
+<span class="nc bnc" id="L291" title="All 10 branches missed.">            return super.equals(o)</span>
+                    &amp;&amp; failed == that.failed
+                    &amp;&amp; failedCode == that.failedCode
+<span class="nc bnc" id="L294" title="All 6 branches missed.">                    &amp;&amp; (respCodec == null ? that.respCodec == null : respCodec.equals(that.respCodec))</span>
+<span class="nc bnc" id="L295" title="All 6 branches missed.">                    &amp;&amp; (callback == null ? that.callback == null : callback.equals(that.callback))</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                    &amp;&amp; (failedMessage == null ? that.failedMessage == null : failedMessage.equals(that.failedMessage));</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L301">            int result = super.hashCode();</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            result = 31 * result + (respCodec == null ? 0 : respCodec.hashCode());</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            result = 31 * result + (callback == null ? 0 : callback.hashCode());</span>
+<span class="nc" id="L304">            return result;</span>
+        }
+
+<span class="fc" id="L307">        GrpcConnection(ProtoCodec respCodec, OnComplete callback) {</span>
+<span class="fc" id="L308">            this.respCodec = respCodec;</span>
+<span class="fc" id="L309">            this.callback = callback;</span>
+            // Disable framework's modal error dialog; we surface
+            // failures via the callback.
+<span class="fc" id="L312">            setFailSilently(true);</span>
+<span class="fc" id="L313">        }</span>
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+<span class="fc" id="L317">            failed = true;</span>
+<span class="fc" id="L318">            failedCode = code;</span>
+<span class="fc" id="L319">            failedMessage = message;</span>
+            // Do not call super -- swallow the framework default
+            // (which would post an error event); we report through
+            // the callback in postResponse.
+<span class="fc" id="L323">        }</span>
+
+        @Override
+        protected void handleException(Exception err) {
+<span class="nc" id="L327">            failed = true;</span>
+<span class="nc" id="L328">            failedCode = 0;</span>
+<span class="nc" id="L329">            failedMessage = err.getMessage();</span>
+<span class="nc" id="L330">        }</span>
+
+        @Override
+        @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+        protected void postResponse() {
+<span class="fc" id="L335">            super.postResponse();</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            if (failed) {</span>
+<span class="fc" id="L337">                callback.completed(new GrpcResponse(GrpcResponse.STATUS_TRANSPORT_FAILURE,</span>
+                        failedCode, null, failedMessage));
+<span class="fc" id="L339">                return;</span>
+            }
+<span class="fc" id="L341">            byte[] body = getResponseData();</span>
+<span class="fc" id="L342">            GrpcResponse parsed = decode(body, getResponseCode(), respCodec);</span>
+<span class="fc" id="L343">            callback.completed(parsed);</span>
+<span class="fc" id="L344">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

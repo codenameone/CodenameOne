@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CameraInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.camera</a> &gt; <span class="el_source">CameraInfo.java</span></div><h1>CameraInfo.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.camera;
+
+import com.codename1.ui.geom.Dimension;
+
+/// Describes a physical camera available on the device.
+///
+/// Returned by `Camera#getCameras()` and `Camera#getDefault(CameraFacing)`.
+/// Instances are immutable and may be passed to `Camera#open(CameraInfo, CameraSessionOptions)`.
+public final class CameraInfo {
+    private final String id;
+    private final CameraFacing facing;
+    private final Dimension[] photoSizes;
+    private final Dimension[] previewSizes;
+    private final boolean hasFlash;
+    private final boolean hasAutoFocus;
+
+    /// Used by platform implementations. Application code obtains instances through
+    /// `Camera#getCameras()`.
+    public CameraInfo(String id, CameraFacing facing,
+                      Dimension[] photoSizes, Dimension[] previewSizes,
+<span class="fc" id="L43">                      boolean hasFlash, boolean hasAutoFocus) {</span>
+<span class="fc" id="L44">        this.id = id;</span>
+<span class="fc" id="L45">        this.facing = facing;</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        this.photoSizes = photoSizes == null ? new Dimension[0] : photoSizes;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        this.previewSizes = previewSizes == null ? new Dimension[0] : previewSizes;</span>
+<span class="fc" id="L48">        this.hasFlash = hasFlash;</span>
+<span class="fc" id="L49">        this.hasAutoFocus = hasAutoFocus;</span>
+<span class="fc" id="L50">    }</span>
+
+    /// Opaque, platform-specific identifier. Stable for the lifetime of the process.
+    public String getId() {
+<span class="fc" id="L54">        return id;</span>
+    }
+
+    /// Direction this camera faces relative to the device screen.
+    public CameraFacing getFacing() {
+<span class="fc" id="L59">        return facing;</span>
+    }
+
+    /// Supported still-photo resolutions, largest first. May be empty on platforms
+    /// (e.g. the JavaSE simulator) that don't expose a discrete list.
+    public Dimension[] getPhotoSizes() {
+<span class="nc" id="L65">        return photoSizes;</span>
+    }
+
+    /// Supported preview/frame-stream resolutions. May be empty on platforms that
+    /// don't expose a discrete list.
+    public Dimension[] getPreviewSizes() {
+<span class="nc" id="L71">        return previewSizes;</span>
+    }
+
+    /// True if this camera has a flash/torch the application can drive
+    /// via `CameraSession#setFlashMode(FlashMode)`.
+    public boolean hasFlash() {
+<span class="nc" id="L77">        return hasFlash;</span>
+    }
+
+    /// True if this camera supports tap-to-focus / autofocus.
+    public boolean hasAutoFocus() {
+<span class="nc" id="L82">        return hasAutoFocus;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

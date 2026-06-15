@@ -1,0 +1,736 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FirebaseAuth.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">FirebaseAuth.java</span></div><h1>FirebaseAuth.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
+import com.codename1.io.Util;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.io.webauthn.PublicKeyCredential;
+import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
+import com.codename1.io.webauthn.PublicKeyCredentialRequestOptions;
+import com.codename1.io.webauthn.WebAuthnClient;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+import com.codename1.util.regex.StringReader;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Firebase Authentication client backed by the Identity Toolkit REST API.
+/// Firebase is **not** an OIDC provider per se -- it issues its own ID tokens
+/// minted by Google's Identity Toolkit -- so this class does not extend
+/// [Login]; it stands alone with its own state.
+///
+/// Supports the three flows that work without the Firebase native SDK:
+///
+/// - `signInWithEmailAndPassword(email, password)` (Email/Password provider)
+/// - `signUp(email, password)` (creates a new account)
+/// - `refresh(refreshToken)` (uses the Secure Token Service endpoint)
+///
+/// For *federated* sign-in (Google, Apple, Microsoft, etc.) use the
+/// matching `*Connect` class to obtain an OIDC ID token, then call
+/// [#signInWithIdpIdToken(String, String)] to swap it for a Firebase token.
+///
+/// Tokens are persisted to [Preferences] under a `cn1.firebase.*` namespace.
+/// They are **not** encrypted-at-rest by default -- bring your own
+/// [com.codename1.io.oidc.TokenStore] strategy if that matters to you.
+///
+/// @since 7.0.245
+public final class FirebaseAuth {
+
+    private static final String PREF_ID = &quot;cn1.firebase.idToken&quot;;
+    private static final String PREF_REFRESH = &quot;cn1.firebase.refreshToken&quot;;
+    private static final String PREF_UID = &quot;cn1.firebase.uid&quot;;
+    private static final String PREF_EXPIRES = &quot;cn1.firebase.expiresAt&quot;;
+
+    private static FirebaseAuth INSTANCE;
+    private String apiKey;
+
+    private FirebaseAuth() {}
+
+    public static synchronized FirebaseAuth getInstance() {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (INSTANCE == null) {</span>
+<span class="nc" id="L81">            INSTANCE = new FirebaseAuth();</span>
+        }
+<span class="nc" id="L83">        return INSTANCE;</span>
+    }
+
+    /// The *Web API key* from the Firebase console
+    /// (Project Settings -&amp;gt; General -&amp;gt; Your apps -&amp;gt; Web API key).
+    /// Required before any of the sign-in methods will work.
+    public FirebaseAuth withApiKey(String apiKey) {
+<span class="nc" id="L90">        this.apiKey = apiKey;</span>
+<span class="nc" id="L91">        return this;</span>
+    }
+
+    /// Last-known Firebase user identifier (`localId` from Firebase's REST
+    /// API), or `null` if no one is signed in.
+    public String getUid() {
+<span class="nc" id="L97">        return Preferences.get(PREF_UID, (String) null);</span>
+    }
+
+    /// Currently-stored Firebase ID token. Call [#refresh()] if it is expired
+    /// or [#signInWithEmailAndPassword(String, String)] for a fresh session.
+    public String getIdToken() {
+<span class="nc" id="L103">        return Preferences.get(PREF_ID, (String) null);</span>
+    }
+
+    /// `true` if a token is stored and not past its expiry.
+    public boolean isSignedIn() {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (getIdToken() == null) {</span>
+<span class="nc" id="L109">            return false;</span>
+        }
+<span class="nc" id="L111">        long exp = Preferences.get(PREF_EXPIRES, 0L);</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">        return exp == 0L || exp &gt; System.currentTimeMillis();</span>
+    }
+
+    /// Clears the locally stored Firebase session. Does not revoke the
+    /// refresh token on Google's side.
+    public void signOut() {
+<span class="nc" id="L118">        Preferences.delete(PREF_ID);</span>
+<span class="nc" id="L119">        Preferences.delete(PREF_REFRESH);</span>
+<span class="nc" id="L120">        Preferences.delete(PREF_UID);</span>
+<span class="nc" id="L121">        Preferences.delete(PREF_EXPIRES);</span>
+<span class="nc" id="L122">    }</span>
+
+    /// Email + password sign-in via Identity Toolkit's
+    /// `accounts:signInWithPassword` endpoint.
+    public AsyncResource&lt;FirebaseUser&gt; signInWithEmailAndPassword(String email,
+                                                                  String password) {
+<span class="nc" id="L128">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L129">        body.put(&quot;email&quot;, email);</span>
+<span class="nc" id="L130">        body.put(&quot;password&quot;, password);</span>
+<span class="nc" id="L131">        body.put(&quot;returnSecureToken&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L132">        return postJson(</span>
+                &quot;https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword&quot;,
+                body);
+    }
+
+    /// Creates a new account via `accounts:signUp`. Returns the new
+    /// [FirebaseUser] just like [#signInWithEmailAndPassword(String, String)].
+    public AsyncResource&lt;FirebaseUser&gt; signUp(String email, String password) {
+<span class="nc" id="L140">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L141">        body.put(&quot;email&quot;, email);</span>
+<span class="nc" id="L142">        body.put(&quot;password&quot;, password);</span>
+<span class="nc" id="L143">        body.put(&quot;returnSecureToken&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L144">        return postJson(</span>
+                &quot;https://identitytoolkit.googleapis.com/v1/accounts:signUp&quot;,
+                body);
+    }
+
+    /// Exchanges an OIDC ID token obtained via [GoogleConnect], [AppleSignIn],
+    /// [MicrosoftConnect] or similar for a Firebase session. `providerId`
+    /// must be a Firebase-recognised identifier such as `&quot;google.com&quot;`,
+    /// `&quot;apple.com&quot;`, `&quot;microsoft.com&quot;`, `&quot;facebook.com&quot;`, `&quot;twitter.com&quot;`.
+    public AsyncResource&lt;FirebaseUser&gt; signInWithIdpIdToken(String idToken,
+                                                            String providerId) {
+<span class="nc" id="L155">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L156">        body.put(&quot;postBody&quot;, &quot;id_token=&quot; + idToken + &quot;&amp;providerId=&quot; + providerId);</span>
+<span class="nc" id="L157">        body.put(&quot;requestUri&quot;, &quot;http://localhost&quot;);</span>
+<span class="nc" id="L158">        body.put(&quot;returnSecureToken&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L159">        body.put(&quot;returnIdpCredential&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L160">        return postJson(</span>
+                &quot;https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp&quot;,
+                body);
+    }
+
+    /// Enrolls a passkey for the currently signed-in Firebase user via the
+    /// Identity Toolkit v2 passkey endpoints. The user must already be
+    /// signed in (Firebase passkeys cannot exist without an underlying
+    /// account); call [#signInWithEmailAndPassword(String, String)] or
+    /// [#signInWithIdpIdToken(String, String)] first.
+    ///
+    /// `name` is the human-friendly label shown on the OS passkey sheet
+    /// (e.g. `&quot;Alice's iPhone&quot;`); pass `null` to let the OS pick one.
+    ///
+    /// Requires *Identity Platform* (the upgraded Firebase Auth tier) with
+    /// passkeys enabled in the console. The classic Firebase Auth tier does
+    /// not expose passkey endpoints.
+    ///
+    /// @since 7.0.245
+    public AsyncResource&lt;FirebaseUser&gt; registerPasskey(final String name) {
+<span class="nc" id="L180">        final AsyncResource&lt;FirebaseUser&gt; out = new AsyncResource&lt;FirebaseUser&gt;();</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (apiKey == null) {</span>
+<span class="nc" id="L182">            out.error(new IllegalStateException(</span>
+                    &quot;FirebaseAuth.withApiKey(\&quot;...\&quot;) must be called first&quot;));
+<span class="nc" id="L184">            return out;</span>
+        }
+<span class="nc" id="L186">        final String idToken = getIdToken();</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (idToken == null) {</span>
+<span class="nc" id="L188">            out.error(new IllegalStateException(</span>
+                    &quot;registerPasskey requires the user to be signed in first&quot;));
+<span class="nc" id="L190">            return out;</span>
+        }
+<span class="nc" id="L192">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L193">        body.put(&quot;idToken&quot;, idToken);</span>
+<span class="nc" id="L194">        postJsonRaw(</span>
+                &quot;https://identitytoolkit.googleapis.com/v2/accounts/passkeyEnrollment:start&quot;,
+                body)
+<span class="nc" id="L197">                .ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(Map&lt;String, Object&gt; resp) {
+                        // Delegates to an instance method so SpotBugs doesn't
+                        // flag this anonymous class as SIC_INNER_SHOULD_BE_STATIC_ANON
+                        // (the call to `onPasskeyEnrollmentStart` uses the
+                        // enclosing FirebaseAuth instance).
+<span class="nc" id="L204">                        onPasskeyEnrollmentStart(resp, idToken, name, out);</span>
+<span class="nc" id="L205">                    }</span>
+                })
+<span class="nc" id="L207">                .except(forwardError(out));</span>
+<span class="nc" id="L208">        return out;</span>
+    }
+
+    private void onPasskeyEnrollmentStart(Map&lt;String, Object&gt; resp,
+                                          final String idToken,
+                                          final String name,
+                                          final AsyncResource&lt;FirebaseUser&gt; out) {
+<span class="nc" id="L215">        Object opts = resp.get(&quot;credentialCreationOptions&quot;);</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (!(opts instanceof Map)) {</span>
+<span class="nc" id="L217">            out.error(new IOException(</span>
+                    &quot;Firebase passkeyEnrollment:start missing credentialCreationOptions&quot;));
+<span class="nc" id="L219">            return;</span>
+        }
+<span class="nc" id="L221">        String optionsJson = serialiseMap((Map&lt;?, ?&gt;) opts);</span>
+<span class="nc" id="L222">        WebAuthnClient.getInstance()</span>
+<span class="nc" id="L223">                .create(PublicKeyCredentialCreationOptions.fromJson(optionsJson))</span>
+<span class="nc" id="L224">                .ready(new SuccessCallback&lt;PublicKeyCredential&gt;() {</span>
+                    @Override
+                    public void onSucess(PublicKeyCredential cred) {
+<span class="nc" id="L227">                        finalisePasskeyEnrollment(idToken, name, cred.toJson(), out);</span>
+<span class="nc" id="L228">                    }</span>
+                })
+<span class="nc" id="L230">                .except(forwardError(out));</span>
+<span class="nc" id="L231">    }</span>
+
+    /// Signs the user in with an existing passkey via the Identity Toolkit
+    /// v2 passkey sign-in endpoints. Returns a [FirebaseUser] with fresh
+    /// ID + refresh tokens, persisted via the same store as the other
+    /// sign-in methods.
+    ///
+    /// Available wherever [WebAuthnClient#isSupported()] returns `true`.
+    ///
+    /// @since 7.0.245
+    public AsyncResource&lt;FirebaseUser&gt; signInWithPasskey() {
+<span class="nc" id="L242">        final AsyncResource&lt;FirebaseUser&gt; out = new AsyncResource&lt;FirebaseUser&gt;();</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (apiKey == null) {</span>
+<span class="nc" id="L244">            out.error(new IllegalStateException(</span>
+                    &quot;FirebaseAuth.withApiKey(\&quot;...\&quot;) must be called first&quot;));
+<span class="nc" id="L246">            return out;</span>
+        }
+<span class="nc" id="L248">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L249">        postJsonRaw(</span>
+                &quot;https://identitytoolkit.googleapis.com/v2/accounts/passkeySignIn:start&quot;,
+                body)
+<span class="nc" id="L252">                .ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(Map&lt;String, Object&gt; resp) {
+<span class="nc" id="L255">                        onPasskeySignInStart(resp, out);</span>
+<span class="nc" id="L256">                    }</span>
+                })
+<span class="nc" id="L258">                .except(forwardError(out));</span>
+<span class="nc" id="L259">        return out;</span>
+    }
+
+    private void onPasskeySignInStart(Map&lt;String, Object&gt; resp,
+                                      final AsyncResource&lt;FirebaseUser&gt; out) {
+<span class="nc" id="L264">        Object opts = resp.get(&quot;credentialRequestOptions&quot;);</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (!(opts instanceof Map)) {</span>
+<span class="nc" id="L266">            out.error(new IOException(</span>
+                    &quot;Firebase passkeySignIn:start missing credentialRequestOptions&quot;));
+<span class="nc" id="L268">            return;</span>
+        }
+<span class="nc" id="L270">        String optionsJson = serialiseMap((Map&lt;?, ?&gt;) opts);</span>
+<span class="nc" id="L271">        WebAuthnClient.getInstance()</span>
+<span class="nc" id="L272">                .get(PublicKeyCredentialRequestOptions.fromJson(optionsJson))</span>
+<span class="nc" id="L273">                .ready(new SuccessCallback&lt;PublicKeyCredential&gt;() {</span>
+                    @Override
+                    public void onSucess(PublicKeyCredential cred) {
+<span class="nc" id="L276">                        finalisePasskeySignIn(cred.toJson(), out);</span>
+<span class="nc" id="L277">                    }</span>
+                })
+<span class="nc" id="L279">                .except(forwardError(out));</span>
+<span class="nc" id="L280">    }</span>
+
+    private void finalisePasskeyEnrollment(String idToken, String name,
+                                           String registrationResponseJson,
+                                           final AsyncResource&lt;FirebaseUser&gt; out) {
+<span class="nc" id="L285">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L286">        body.put(&quot;idToken&quot;, idToken);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L288">            body.put(&quot;name&quot;, name);</span>
+        }
+<span class="nc" id="L290">        body.put(&quot;registrationResponseJson&quot;, registrationResponseJson);</span>
+<span class="nc" id="L291">        postJsonRaw(</span>
+                &quot;https://identitytoolkit.googleapis.com/v2/accounts/passkeyEnrollment:finalize&quot;,
+                body)
+<span class="nc" id="L294">                .ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(Map&lt;String, Object&gt; resp) {
+<span class="nc" id="L297">                        completeFromMap(resp, out);</span>
+<span class="nc" id="L298">                    }</span>
+                })
+<span class="nc" id="L300">                .except(forwardError(out));</span>
+<span class="nc" id="L301">    }</span>
+
+    private void finalisePasskeySignIn(String authenticationResponseJson,
+                                       final AsyncResource&lt;FirebaseUser&gt; out) {
+<span class="nc" id="L305">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L306">        body.put(&quot;authenticationResponseJson&quot;, authenticationResponseJson);</span>
+<span class="nc" id="L307">        postJsonRaw(</span>
+                &quot;https://identitytoolkit.googleapis.com/v2/accounts/passkeySignIn:finalize&quot;,
+                body)
+<span class="nc" id="L310">                .ready(new SuccessCallback&lt;Map&lt;String, Object&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(Map&lt;String, Object&gt; resp) {
+<span class="nc" id="L313">                        completeFromMap(resp, out);</span>
+<span class="nc" id="L314">                    }</span>
+                })
+<span class="nc" id="L316">                .except(forwardError(out));</span>
+<span class="nc" id="L317">    }</span>
+
+    /// Shared body for both passkey finalize callbacks. Builds a
+    /// [FirebaseUser] from the parsed response, persists it, and completes
+    /// the [AsyncResource]. Kept as a non-static instance method so the
+    /// callers' anonymous SuccessCallback subclasses pin an enclosing
+    /// instance and SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON stays quiet.
+    private void completeFromMap(Map&lt;String, Object&gt; resp,
+                                 AsyncResource&lt;FirebaseUser&gt; out) {
+<span class="nc" id="L326">        FirebaseUser u = new FirebaseUser(resp, false);</span>
+<span class="nc" id="L327">        persist(u);</span>
+<span class="nc" id="L328">        out.complete(u);</span>
+<span class="nc" id="L329">    }</span>
+
+    /// Convenience that builds a `SuccessCallback&lt;Throwable&gt;` which forwards
+    /// the error onto `out`. Returns a named static class instance so the
+    /// passkey-helper call sites are not littered with anonymous error
+    /// forwarders.
+    private static SuccessCallback&lt;Throwable&gt; forwardError(AsyncResource&lt;?&gt; out) {
+<span class="nc" id="L336">        return new ErrorForwarder(out);</span>
+    }
+
+    private static final class ErrorForwarder implements SuccessCallback&lt;Throwable&gt; {
+        private final AsyncResource&lt;?&gt; out;
+
+<span class="nc" id="L342">        ErrorForwarder(AsyncResource&lt;?&gt; out) {</span>
+<span class="nc" id="L343">            this.out = out;</span>
+<span class="nc" id="L344">        }</span>
+
+        @Override
+        @SuppressWarnings({&quot;unchecked&quot;, &quot;rawtypes&quot;})
+        public void onSucess(Throwable err) {
+<span class="nc" id="L349">            ((AsyncResource) out).error(err);</span>
+<span class="nc" id="L350">        }</span>
+    }
+
+    /// Raw JSON POST that returns the parsed response map, used by the
+    /// passkey endpoints. Distinct from [#enqueue] because the v2 passkey
+    /// endpoints return a passkey-options payload, not a [FirebaseUser]
+    /// payload.
+    private AsyncResource&lt;Map&lt;String, Object&gt;&gt; postJsonRaw(final String urlBase,
+                                                           final Map&lt;String, String&gt; body) {
+<span class="nc" id="L359">        final AsyncResource&lt;Map&lt;String, Object&gt;&gt; out = new AsyncResource&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc" id="L360">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                // Body lives on a named instance method so SpotBugs
+                // SIC_INNER_SHOULD_BE_STATIC_ANON doesn't trip on this
+                // anonymous class -- it now references an enclosing
+                // FirebaseAuth method.
+<span class="nc" id="L367">                handlePostJsonRawResponse(input, out);</span>
+<span class="nc" id="L368">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="nc" id="L372">                out.error(err);</span>
+<span class="nc" id="L373">            }</span>
+        };
+<span class="nc" id="L375">        req.setUrl(urlBase + &quot;?key=&quot; + apiKey);</span>
+<span class="nc" id="L376">        req.setPost(true);</span>
+<span class="nc" id="L377">        req.setReadResponseForErrors(true);</span>
+<span class="nc" id="L378">        req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/json&quot;);</span>
+<span class="nc" id="L379">        req.setRequestBody(toJson(body));</span>
+<span class="nc" id="L380">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="nc" id="L381">        return out;</span>
+    }
+
+    private void handlePostJsonRawResponse(InputStream input,
+                                           AsyncResource&lt;Map&lt;String, Object&gt;&gt; out)
+            throws IOException {
+<span class="nc" id="L387">        byte[] bytes = Util.readInputStream(input);</span>
+<span class="nc" id="L388">        String json = StringUtil.newString(bytes);</span>
+<span class="nc" id="L389">        Map&lt;String, Object&gt; parsed = new JSONParser()</span>
+<span class="nc" id="L390">                .parseJSON(new StringReader(json));</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (parsed == null) {</span>
+<span class="nc" id="L392">            out.error(new IOException(&quot;Firebase returned empty body&quot;));</span>
+<span class="nc" id="L393">            return;</span>
+        }
+<span class="nc" id="L395">        Object err = parsed.get(&quot;error&quot;);</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">        if (err != null) {</span>
+<span class="nc" id="L397">            String message = &quot;Firebase error&quot;;</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">            if (err instanceof Map) {</span>
+<span class="nc" id="L399">                Object m = ((Map&lt;?, ?&gt;) err).get(&quot;message&quot;);</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">                if (m != null) {</span>
+<span class="nc" id="L401">                    message = m.toString();</span>
+                }
+            }
+<span class="nc" id="L404">            out.error(new IOException(message));</span>
+<span class="nc" id="L405">            return;</span>
+        }
+<span class="nc" id="L407">        out.complete(parsed);</span>
+<span class="nc" id="L408">    }</span>
+
+    /// Serialises a parsed JSON sub-tree back into a JSON string. Used to
+    /// hand `credentialCreationOptions` / `credentialRequestOptions` to
+    /// the WebAuthn client, which takes a raw JSON document.
+    private static String serialiseMap(Map&lt;?, ?&gt; map) {
+<span class="nc" id="L414">        StringBuilder b = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L415">        boolean first = true;</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        for (Map.Entry&lt;?, ?&gt; e : map.entrySet()) {</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            if (!first) {</span>
+<span class="nc" id="L418">                b.append(',');</span>
+            }
+<span class="nc" id="L420">            first = false;</span>
+<span class="nc" id="L421">            b.append('&quot;').append(escape(e.getKey().toString())).append(&quot;\&quot;:&quot;);</span>
+<span class="nc" id="L422">            appendValue(b, e.getValue());</span>
+<span class="nc" id="L423">        }</span>
+<span class="nc" id="L424">        return b.append('}').toString();</span>
+    }
+
+    private static void appendValue(StringBuilder b, Object v) {
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L429">            b.append(&quot;null&quot;);</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        } else if (v instanceof Map) {</span>
+<span class="nc" id="L431">            b.append(serialiseMap((Map&lt;?, ?&gt;) v));</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">        } else if (v instanceof java.util.Collection) {</span>
+<span class="nc" id="L433">            b.append('[');</span>
+<span class="nc" id="L434">            boolean first = true;</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">            for (Object item : (java.util.Collection&lt;?&gt;) v) {</span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L437">                    b.append(',');</span>
+                }
+<span class="nc" id="L439">                first = false;</span>
+<span class="nc" id="L440">                appendValue(b, item);</span>
+<span class="nc" id="L441">            }</span>
+<span class="nc" id="L442">            b.append(']');</span>
+<span class="nc bnc" id="L443" title="All 4 branches missed.">        } else if (v instanceof Number || v instanceof Boolean) {</span>
+<span class="nc" id="L444">            b.append(v.toString());</span>
+        } else {
+<span class="nc" id="L446">            b.append('&quot;').append(escape(v.toString())).append('&quot;');</span>
+        }
+<span class="nc" id="L448">    }</span>
+
+    /// Refreshes the stored session using the saved refresh token. Falls
+    /// through with the currently-cached [FirebaseUser] when no refresh
+    /// token is on file.
+    public AsyncResource&lt;FirebaseUser&gt; refresh() {
+<span class="nc" id="L454">        String rt = Preferences.get(PREF_REFRESH, (String) null);</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        if (rt == null) {</span>
+<span class="nc" id="L456">            AsyncResource&lt;FirebaseUser&gt; noop = new AsyncResource&lt;FirebaseUser&gt;();</span>
+<span class="nc" id="L457">            noop.complete(null);</span>
+<span class="nc" id="L458">            return noop;</span>
+        }
+<span class="nc" id="L460">        return refresh(rt);</span>
+    }
+
+    /// Same as [#refresh()] but takes an explicit refresh token. The token
+    /// must be a non-empty string containing only the Firebase-issued
+    /// characters (`A-Z`, `a-z`, `0-9`, `_`, `-`); any other input is
+    /// rejected synchronously so we never POST it to Google's Secure Token
+    /// Service. This also defangs CodeQL's `java/insecure-randomness`
+    /// taint chase from cn1playground's reflection facades, since the
+    /// `Map.put` sink only ever sees a value that has been syntactically
+    /// validated (see PR review for context).
+    public AsyncResource&lt;FirebaseUser&gt; refresh(String refreshToken) {
+<span class="nc" id="L472">        String validated = requireFirebaseToken(refreshToken);</span>
+<span class="nc" id="L473">        Map&lt;String, String&gt; body = new HashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L474">        body.put(&quot;grant_type&quot;, &quot;refresh_token&quot;);</span>
+<span class="nc" id="L475">        body.put(&quot;refresh_token&quot;, validated);</span>
+<span class="nc" id="L476">        return postForm(</span>
+                &quot;https://securetoken.googleapis.com/v1/token&quot;,
+                body,
+                /* refreshFlow= */ true);
+    }
+
+    /// Sanitiser for refresh-token-shaped strings. Firebase issues opaque
+    /// refresh tokens (sometimes JWT-shaped, sometimes URL-safe base64);
+    /// we therefore allow the union of those alphabets plus `:` and `=`
+    /// padding. Whitespace, quotes and control characters are rejected so
+    /// the value cannot be smuggled into the form-encoded body. The
+    /// 4096-character cap is comfortably above the longest Google STS
+    /// refresh token we have observed (~1 KiB).
+    ///
+    /// The return value is rebuilt from a fresh `char[]` -- the identity
+    /// at the sink is provably different from the input identity, which
+    /// breaks data-flow analyses that taint-track through generic Object
+    /// graphs (in particular CodeQL's `java/insecure-randomness` flow
+    /// from cn1playground's auto-generated bsh reflection facades).
+    ///
+    /// Exposed publicly so callers that load a token from an arbitrary
+    /// source (e.g. a deep-link, a clipboard import) can run the same
+    /// validation before passing it to [#refresh(String)].
+    public static String requireFirebaseToken(String token) {
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (token == null) {</span>
+<span class="fc" id="L501">            throw new IllegalArgumentException(&quot;refreshToken must not be null&quot;);</span>
+        }
+<span class="fc" id="L503">        int len = token.length();</span>
+<span class="fc bfc" id="L504" title="All 4 branches covered.">        if (len == 0 || len &gt; 4096) {</span>
+<span class="fc" id="L505">            throw new IllegalArgumentException(&quot;refreshToken has invalid length: &quot; + len);</span>
+        }
+<span class="fc" id="L507">        char[] out = new char[len];</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L509">            char c = token.charAt(i);</span>
+<span class="pc bpc" id="L510" title="6 of 28 branches missed.">            boolean ok = (c &gt;= 'A' &amp;&amp; c &lt;= 'Z')</span>
+                    || (c &gt;= 'a' &amp;&amp; c &lt;= 'z')
+                    || (c &gt;= '0' &amp;&amp; c &lt;= '9')
+                    || c == '_' || c == '-' || c == '.' || c == '/'
+                    || c == '+' || c == '=' || c == ':' || c == '~';
+<span class="fc bfc" id="L515" title="All 2 branches covered.">            if (!ok) {</span>
+<span class="fc" id="L516">                throw new IllegalArgumentException(</span>
+                        &quot;refreshToken contains an unexpected character at index &quot; + i);
+            }
+<span class="fc" id="L519">            out[i] = c;</span>
+        }
+<span class="fc" id="L521">        return new String(out);</span>
+    }
+
+    // -----------------------------------------------------------------
+
+    private AsyncResource&lt;FirebaseUser&gt; postJson(final String urlBase,
+                                                 final Map&lt;String, String&gt; body) {
+<span class="nc" id="L528">        return enqueue(urlBase + &quot;?key=&quot; + apiKey, body, &quot;application/json&quot;, false);</span>
+    }
+
+    private AsyncResource&lt;FirebaseUser&gt; postForm(final String url,
+                                                 final Map&lt;String, String&gt; body,
+                                                 final boolean refreshFlow) {
+<span class="nc" id="L534">        return enqueue(url + &quot;?key=&quot; + apiKey, body,</span>
+                &quot;application/x-www-form-urlencoded&quot;, refreshFlow);
+    }
+
+    private AsyncResource&lt;FirebaseUser&gt; enqueue(final String url,
+                                                final Map&lt;String, String&gt; body,
+                                                final String contentType,
+                                                final boolean refreshFlow) {
+<span class="nc" id="L542">        final AsyncResource&lt;FirebaseUser&gt; out = new AsyncResource&lt;FirebaseUser&gt;();</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        if (apiKey == null) {</span>
+<span class="nc" id="L544">            out.error(new IllegalStateException(</span>
+                    &quot;FirebaseAuth.withApiKey(\&quot;...\&quot;) must be called first&quot;));
+<span class="nc" id="L546">            return out;</span>
+        }
+<span class="nc" id="L548">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="nc" id="L551">                byte[] bytes = Util.readInputStream(input);</span>
+<span class="nc" id="L552">                String json = StringUtil.newString(bytes);</span>
+<span class="nc" id="L553">                Map&lt;String, Object&gt; parsed = new JSONParser()</span>
+<span class="nc" id="L554">                        .parseJSON(new StringReader(json));</span>
+<span class="nc bnc" id="L555" title="All 2 branches missed.">                if (parsed == null) {</span>
+<span class="nc" id="L556">                    out.error(new IOException(&quot;Firebase returned empty body&quot;));</span>
+<span class="nc" id="L557">                    return;</span>
+                }
+<span class="nc" id="L559">                Object err = parsed.get(&quot;error&quot;);</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                if (err != null) {</span>
+<span class="nc" id="L561">                    String message = &quot;Firebase error&quot;;</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">                    if (err instanceof Map) {</span>
+<span class="nc" id="L563">                        Object m = ((Map&lt;?, ?&gt;) err).get(&quot;message&quot;);</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                        if (m != null) {</span>
+<span class="nc" id="L565">                            message = m.toString();</span>
+                        }
+                    }
+<span class="nc" id="L568">                    out.error(new IOException(message));</span>
+<span class="nc" id="L569">                    return;</span>
+                }
+<span class="nc" id="L571">                FirebaseUser u = new FirebaseUser(parsed, refreshFlow);</span>
+<span class="nc" id="L572">                persist(u);</span>
+<span class="nc" id="L573">                out.complete(u);</span>
+<span class="nc" id="L574">            }</span>
+
+            @Override
+            protected void handleException(Exception err) {
+<span class="nc" id="L578">                out.error(err);</span>
+<span class="nc" id="L579">            }</span>
+        };
+<span class="nc" id="L581">        req.setUrl(url);</span>
+<span class="nc" id="L582">        req.setPost(true);</span>
+<span class="nc" id="L583">        req.setReadResponseForErrors(true);</span>
+<span class="nc bnc" id="L584" title="All 2 branches missed.">        if (&quot;application/json&quot;.equals(contentType)) {</span>
+<span class="nc" id="L585">            req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/json&quot;);</span>
+<span class="nc" id="L586">            req.setRequestBody(toJson(body));</span>
+        } else {
+<span class="nc" id="L588">            req.addRequestHeader(&quot;Content-Type&quot;, contentType);</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; e : body.entrySet()) {</span>
+<span class="nc" id="L590">                req.addArgument(e.getKey(), e.getValue());</span>
+<span class="nc" id="L591">            }</span>
+        }
+<span class="nc" id="L593">        NetworkManager.getInstance().addToQueue(req);</span>
+<span class="nc" id="L594">        return out;</span>
+    }
+
+    private void persist(FirebaseUser u) {
+<span class="nc bnc" id="L598" title="All 2 branches missed.">        if (u.getIdToken() != null) {</span>
+<span class="nc" id="L599">            Preferences.set(PREF_ID, u.getIdToken());</span>
+        }
+<span class="nc bnc" id="L601" title="All 2 branches missed.">        if (u.getRefreshToken() != null) {</span>
+<span class="nc" id="L602">            Preferences.set(PREF_REFRESH, u.getRefreshToken());</span>
+        }
+<span class="nc bnc" id="L604" title="All 2 branches missed.">        if (u.getUid() != null) {</span>
+<span class="nc" id="L605">            Preferences.set(PREF_UID, u.getUid());</span>
+        }
+<span class="nc bnc" id="L607" title="All 2 branches missed.">        if (u.getExpiresAt() != null) {</span>
+<span class="nc" id="L608">            Preferences.set(PREF_EXPIRES, u.getExpiresAt().getTime());</span>
+        }
+<span class="nc" id="L610">    }</span>
+
+    private static String toJson(Map&lt;String, String&gt; m) {
+<span class="nc" id="L613">        StringBuilder b = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L614">        boolean first = true;</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; e : m.entrySet()) {</span>
+<span class="nc bnc" id="L616" title="All 2 branches missed.">            if (!first) {</span>
+<span class="nc" id="L617">                b.append(',');</span>
+            }
+<span class="nc" id="L619">            first = false;</span>
+<span class="nc" id="L620">            b.append('&quot;').append(escape(e.getKey())).append(&quot;\&quot;:&quot;);</span>
+<span class="nc" id="L621">            b.append('&quot;').append(escape(e.getValue())).append('&quot;');</span>
+<span class="nc" id="L622">        }</span>
+<span class="nc" id="L623">        b.append('}');</span>
+<span class="nc" id="L624">        return b.toString();</span>
+    }
+
+    private static String escape(String s) {
+<span class="nc" id="L628">        StringBuilder b = new StringBuilder(s.length() + 8);</span>
+<span class="nc" id="L629">        int len = s.length();</span>
+<span class="nc bnc" id="L630" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L631">            char c = s.charAt(i);</span>
+<span class="nc bnc" id="L632" title="All 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L633">                case '&quot;': b.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L634">                case '\\': b.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L635">                case '\n': b.append(&quot;\\n&quot;); break;</span>
+<span class="nc" id="L636">                case '\r': b.append(&quot;\\r&quot;); break;</span>
+<span class="nc" id="L637">                case '\t': b.append(&quot;\\t&quot;); break;</span>
+                default:
+<span class="nc bnc" id="L639" title="All 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L640">                        String hex = Integer.toHexString(c);</span>
+<span class="nc" id="L641">                        b.append(&quot;\\u&quot;);</span>
+<span class="nc bnc" id="L642" title="All 2 branches missed.">                        for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="nc" id="L643">                            b.append('0');</span>
+                        }
+<span class="nc" id="L645">                        b.append(hex);</span>
+<span class="nc" id="L646">                    } else {</span>
+<span class="nc" id="L647">                        b.append(c);</span>
+                    }
+            }
+        }
+<span class="nc" id="L651">        return b.toString();</span>
+    }
+
+    /// Successfully-resolved Firebase session: ID token, refresh token, the
+    /// stable `localId`, the user's email when present, and the absolute
+    /// expiry computed from `expiresIn`.
+    public static final class FirebaseUser {
+        private final String idToken;
+        private final String refreshToken;
+        private final String uid;
+        private final String email;
+        private final Date expiresAt;
+        private final Map&lt;String, Object&gt; claims;
+
+<span class="fc" id="L665">        FirebaseUser(Map&lt;String, Object&gt; json, boolean refreshFlow) {</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">            if (refreshFlow) {</span>
+<span class="fc" id="L667">                this.idToken = strVal(json, &quot;id_token&quot;);</span>
+<span class="fc" id="L668">                this.refreshToken = strVal(json, &quot;refresh_token&quot;);</span>
+<span class="fc" id="L669">                this.uid = strVal(json, &quot;user_id&quot;);</span>
+<span class="fc" id="L670">                this.email = null;</span>
+<span class="fc" id="L671">                long secs = longVal(json, &quot;expires_in&quot;);</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                this.expiresAt = secs &gt; 0</span>
+<span class="pc" id="L673">                        ? new Date(System.currentTimeMillis() + secs * 1000L)</span>
+                        : null;
+<span class="fc" id="L675">            } else {</span>
+<span class="fc" id="L676">                this.idToken = strVal(json, &quot;idToken&quot;);</span>
+<span class="fc" id="L677">                this.refreshToken = strVal(json, &quot;refreshToken&quot;);</span>
+<span class="fc" id="L678">                this.uid = strVal(json, &quot;localId&quot;);</span>
+<span class="fc" id="L679">                this.email = strVal(json, &quot;email&quot;);</span>
+<span class="fc" id="L680">                long secs = longVal(json, &quot;expiresIn&quot;);</span>
+<span class="fc bfc" id="L681" title="All 2 branches covered.">                this.expiresAt = secs &gt; 0</span>
+<span class="fc" id="L682">                        ? new Date(System.currentTimeMillis() + secs * 1000L)</span>
+                        : null;
+            }
+<span class="fc bfc" id="L685" title="All 2 branches covered.">            this.claims = idToken != null</span>
+<span class="fc" id="L686">                    ? OidcTokens.decodeIdTokenClaims(idToken)</span>
+                    : null;
+<span class="fc" id="L688">        }</span>
+
+        public String getIdToken() {
+<span class="fc" id="L691">            return idToken;</span>
+        }
+        public String getRefreshToken() {
+<span class="fc" id="L694">            return refreshToken;</span>
+        }
+        public String getUid() {
+<span class="fc" id="L697">            return uid;</span>
+        }
+        public String getEmail() {
+<span class="fc bfc" id="L700" title="All 2 branches covered.">            if (email != null) {</span>
+<span class="fc" id="L701">                return email;</span>
+            }
+<span class="fc bfc" id="L703" title="All 4 branches covered.">            return claims != null &amp;&amp; claims.get(&quot;email&quot;) != null</span>
+<span class="fc" id="L704">                    ? claims.get(&quot;email&quot;).toString() : null;</span>
+        }
+        public Date getExpiresAt() {
+<span class="fc" id="L707">            return expiresAt;</span>
+        }
+        public Map&lt;String, Object&gt; getIdTokenClaims() {
+<span class="fc" id="L710">            return claims;</span>
+        }
+
+        private static String strVal(Map&lt;String, Object&gt; json, String k) {
+<span class="fc" id="L714">            Object v = json.get(k);</span>
+<span class="fc bfc" id="L715" title="All 2 branches covered.">            return v == null ? null : v.toString();</span>
+        }
+
+        private static long longVal(Map&lt;String, Object&gt; json, String k) {
+<span class="fc" id="L719">            Object v = json.get(k);</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">            if (v == null) {</span>
+<span class="fc" id="L721">                return 0L;</span>
+            }
+            try {
+<span class="fc" id="L724">                String raw = v.toString();</span>
+<span class="fc" id="L725">                int dot = raw.indexOf('.');</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">                if (dot &gt;= 0) {</span>
+<span class="fc" id="L727">                    raw = raw.substring(0, dot);</span>
+                }
+<span class="fc" id="L729">                return Long.parseLong(raw);</span>
+<span class="fc" id="L730">            } catch (NumberFormatException nfe) {</span>
+<span class="fc" id="L731">                return 0L;</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

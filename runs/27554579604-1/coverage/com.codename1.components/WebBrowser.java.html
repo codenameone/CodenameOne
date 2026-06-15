@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebBrowser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">WebBrowser.java</span></div><h1>WebBrowser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Painter;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.BrowserNavigationCallback;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.html.DefaultHTMLCallback;
+import com.codename1.ui.html.DocumentInfo;
+import com.codename1.ui.html.HTMLCallback;
+import com.codename1.ui.html.HTMLComponent;
+import com.codename1.ui.html.IOCallback;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.util.Base64;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+
+/// A simple browser view that encapsulates a usable version of HTMLComponent or BrowserComponent and
+/// automatically picks the right component for the platform preferring BrowserComponent whenever it
+/// is supported.
+///
+/// On Android this component might show a native progress indicator dialog. You can disable that functionality
+/// using `Display.getInstance().setProperty(&quot;WebLoadingHidden&quot;, &quot;true&quot;);`.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// Use`com.codename1.ui.BrowserComponent` instead. The original purpose of this class was to work as an interim solution for platforms where `com.codename1.ui.BrowserComponent` isn't supported however all currently supported platforms work with `BrowserComponent` so there is no real reason to use this class
+public class WebBrowser extends Container {
+
+    private Component internal;
+    private boolean isNative;
+    private String page;
+    private Loading loading;
+
+    /// Constructor with a URL
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url
+    public WebBrowser(String url) {
+<span class="nc" id="L78">        this();</span>
+<span class="nc" id="L79">        setURL(url);</span>
+<span class="nc" id="L80">    }</span>
+
+    /// Default constructor
+    public WebBrowser() {
+<span class="fc" id="L84">        super(new BorderLayout());</span>
+        try {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (BrowserComponent.isNativeBrowserSupported()) {</span>
+<span class="nc" id="L87">                isNative = true;</span>
+<span class="nc" id="L88">                BrowserComponent b = new BrowserComponent();</span>
+<span class="nc" id="L89">                b.addWebEventListener(&quot;onStart&quot;, new ActionListener() {</span>
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L93">                        onStart((String) evt.getSource());</span>
+<span class="nc" id="L94">                    }</span>
+                });
+
+<span class="nc" id="L97">                b.addWebEventListener(&quot;onLoad&quot;, new ActionListener() {</span>
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L101">                        onLoad((String) evt.getSource());</span>
+<span class="nc" id="L102">                    }</span>
+                });
+<span class="nc" id="L104">                b.addWebEventListener(&quot;onError&quot;, new ActionListener() {</span>
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L108">                        onError((String) evt.getSource(), evt.getKeyEvent());</span>
+<span class="nc" id="L109">                    }</span>
+                });
+<span class="nc" id="L111">                internal = b;</span>
+<span class="nc" id="L112">                addComponent(BorderLayout.CENTER, internal);</span>
+<span class="nc" id="L113">                return;</span>
+            }
+<span class="nc" id="L115">        } catch (Throwable t) {</span>
+            // workaround for issue in the designer related to JavaFX, fallback to lightweight mode...
+<span class="nc" id="L117">            Log.e(t);</span>
+<span class="fc" id="L118">        }</span>
+
+<span class="fc" id="L120">        isNative = false;</span>
+<span class="fc" id="L121">        HTMLComponent h = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {</span>
+
+            @Override
+            protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
+                                                                final IOCallback callback, final Object[] response) {
+<span class="fc" id="L126">                return new ConnectionRequest() {</span>
+
+                    @Override
+                    protected void buildRequestBody(OutputStream os) throws IOException {
+                        // PMD Fix (CollapsibleIfStatements): Merge the post and parameter checks into a single conditional.
+<span class="nc bnc" id="L131" title="All 4 branches missed.">                        if (isPost() &amp;&amp; docInfo.getParams() != null) {</span>
+<span class="nc" id="L132">                            String enc = docInfo.getEncoding();</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                            if (enc.indexOf('/') &gt; -1) {</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                                if (enc.indexOf(&quot;charset=&quot;) &gt; -1) {</span>
+<span class="nc" id="L135">                                    enc = enc.substring(enc.indexOf(&quot;charset=&quot;) + 8);</span>
+                                } else {
+<span class="nc" id="L137">                                    enc = DocumentInfo.ENCODING_UTF8;</span>
+                                }
+                            }
+<span class="nc" id="L140">                            OutputStreamWriter w = new OutputStreamWriter(os, enc);</span>
+<span class="nc" id="L141">                            w.write(docInfo.getParams());</span>
+<span class="nc" id="L142">                            w.flush();</span>
+                        }
+<span class="nc" id="L144">                    }</span>
+
+                    @Override
+                    protected void handleIOException(IOException err) {
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                        if (callback == null) {</span>
+<span class="nc" id="L149">                            response[0] = err;</span>
+                        }
+<span class="nc" id="L151">                        super.handleIOException(err);</span>
+<span class="nc" id="L152">                    }</span>
+
+                    @Override
+                    protected boolean shouldAutoCloseResponse() {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                        return callback != null;</span>
+                    }
+
+                    @Override
+                    protected void readResponse(InputStream input) throws IOException {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                        if (callback != null) {</span>
+<span class="fc" id="L162">                            callback.streamReady(input, docInfo);</span>
+                        } else {
+<span class="nc" id="L164">                            synchronized (LOCK) {</span>
+<span class="nc" id="L165">                                response[0] = input;</span>
+<span class="nc" id="L166">                                LOCK.notifyAll();</span>
+<span class="nc" id="L167">                            }</span>
+                        }
+<span class="fc" id="L169">                    }</span>
+
+                    @Override
+                    protected void handleErrorResponseCode(int code, String message) {
+<span class="nc" id="L173">                        onError(message, code);</span>
+<span class="nc" id="L174">                    }</span>
+
+                    @Override
+                    protected void handleException(Exception err) {
+<span class="nc" id="L178">                        System.out.println(&quot;Error occured&quot;);</span>
+<span class="nc" id="L179">                        Log.e(err);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                        if (loading != null) {</span>
+<span class="nc" id="L181">                            loading.unInstall();</span>
+                        }
+<span class="nc" id="L183">                    }</span>
+
+                    @Override
+                    public boolean onRedirect(String url) {
+<span class="nc" id="L187">                        onStart(url);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                        if (((HTMLComponent) internal).getPageStatus() == HTMLCallback.STATUS_CANCELLED) {</span>
+<span class="nc" id="L189">                            return true;</span>
+                        }
+<span class="nc" id="L191">                        return super.onRedirect(url);</span>
+                    }
+
+
+                };
+
+            }
+        });
+<span class="fc" id="L199">        h.setIgnoreCSS(true);</span>
+<span class="fc" id="L200">        h.setHTMLCallback(new DefaultHTMLCallback() {</span>
+
+            @Override
+            public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
+<span class="fc" id="L204">                Form f = htmlC.getComponentForm();</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                if (f != null) {</span>
+<span class="pc bpc" id="L206" title="1 of 6 branches missed.">                    if (status == STATUS_REQUESTED || (loading == null &amp;&amp; status == STATUS_CONNECTED)) {</span>
+<span class="fc" id="L207">                        loading = new Loading(f);</span>
+<span class="fc" id="L208">                        loading.install();</span>
+                    } else {
+<span class="pc bpc" id="L210" title="2 of 8 branches missed.">                        if (loading != null &amp;&amp; (status == STATUS_DISPLAYED ||</span>
+                                status == STATUS_ERROR || status == STATUS_CANCELLED)) {
+<span class="fc" id="L212">                            loading.unInstall();</span>
+                        }
+                    }
+                }
+<span class="pc bpc" id="L216" title="1 of 4 branches missed.">                if (status == STATUS_REQUESTED &amp;&amp; url != null) {</span>
+<span class="fc" id="L217">                    onStart(url);</span>
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">                } else if (status == STATUS_DISPLAYED &amp;&amp; url != null) {</span>
+<span class="nc" id="L219">                    onLoad(url);</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                } else if (status == STATUS_ERROR) {</span>
+<span class="nc" id="L221">                    onError(&quot;error on page&quot;, -1);</span>
+                }
+<span class="fc" id="L223">            }</span>
+        });
+
+<span class="fc" id="L226">        internal = h;</span>
+
+<span class="fc" id="L228">        addComponent(BorderLayout.CENTER, internal);</span>
+<span class="fc" id="L229">    }</span>
+
+    /// This method creates a [data URI](http://en.wikipedia.org/wiki/Data_URI_scheme)
+    /// which allows developers creating HTML for local use to embed local images into the HTML by
+    /// appending them as a URI. E.g. instead of referencing a file or URL just load the image data
+    /// and place the contents of this string into the src attribute.
+    ///
+    /// This is the easiest way to get an HTML with local images to work on all mobile platforms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: data of an image
+    ///
+    /// - `mime`: the mime type of the image e.g. image/png
+    ///
+    /// #### Returns
+    ///
+    /// a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
+    public static String createDataURI(byte[] data, String mime) {
+<span class="nc" id="L248">        return &quot;data:&quot; + mime + &quot;;base64,&quot; + Base64.encodeNoNewline(data);</span>
+    }
+
+    /// This is a callback method, this method is called before the url has been
+    /// loaded
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`
+    public void onStart(String url) {
+<span class="nc" id="L258">    }</span>
+
+    /// This is a callback method, this method is called after the url has been
+    /// loaded
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`
+    public void onLoad(String url) {
+<span class="nc" id="L267">    }</span>
+
+    /// The browser navigation callback interface allows handling a case where
+    /// a URL invocation can be delegated to Java code. This allows binding
+    /// Java side functionality to JavaScript functionality in the same
+    /// way PhoneGap/Cordova work
+    ///
+    /// #### Returns
+    ///
+    /// the callback interface
+    public BrowserNavigationCallback getBrowserNavigationCallback() {
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (BrowserComponent.isNativeBrowserSupported()) {</span>
+<span class="nc" id="L279">            return ((BrowserComponent) this.getInternal()).getBrowserNavigationCallback();</span>
+        } else {
+<span class="nc" id="L281">            return null;</span>
+        }
+    }
+
+    /// Set the browser navigation callback which allows handling a case where
+    /// a URL invocation can be delegated to Java code. This allows binding
+    /// Java side functionality to JavaScript functionality in the same
+    /// way PhoneGap/Cordova work
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: the callback interface
+    public void setBrowserNavigationCallback(BrowserNavigationCallback callback) {
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (BrowserComponent.isNativeBrowserSupported()) {</span>
+<span class="nc" id="L295">            ((BrowserComponent) this.getInternal()).setBrowserNavigationCallback(callback);</span>
+        }
+<span class="fc" id="L297">    }</span>
+
+    /// This is a callback method to inform on an error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`
+    ///
+    /// - `errorCode`
+    public void onError(String message, int errorCode) {
+<span class="nc" id="L307">    }</span>
+
+    /// Since the internal component can be either an HTMLComponent or a BrowserComponent one of them
+    /// will be returned. If you are targeting modern smartphones only you can rely on this method
+    /// returning a BrowserComponent instance.
+    ///
+    /// #### Returns
+    ///
+    /// BrowserComponent or HTMLComponent
+    public Component getInternal() {
+<span class="nc" id="L317">        return internal;</span>
+    }
+
+    /// Returns the title for the browser page
+    ///
+    /// #### Returns
+    ///
+    /// the title
+    public String getTitle() {
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (isNative) {</span>
+<span class="nc" id="L327">            return ((BrowserComponent) internal).getTitle();</span>
+        } else {
+<span class="nc" id="L329">            return ((HTMLComponent) internal).getTitle();</span>
+        }
+    }
+
+    /// The page URL
+    ///
+    /// #### Returns
+    ///
+    /// the URL
+    public String getURL() {
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (isNative) {</span>
+<span class="nc" id="L340">            return ((BrowserComponent) internal).getURL();</span>
+        } else {
+<span class="fc" id="L342">            return ((HTMLComponent) internal).getPageURL();</span>
+        }
+    }
+
+    /// Sets the page URL, jar: URL's must be supported by the implementation
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL
+    public void setURL(String url) {
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">        if (isNative) {</span>
+<span class="nc" id="L353">            ((BrowserComponent) internal).setURL(url);</span>
+        } else {
+<span class="fc" id="L355">            ((HTMLComponent) internal).setPage(url);</span>
+        }
+<span class="fc" id="L357">    }</span>
+
+    /// Reload the current page
+    public void reload() {
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (isNative) {</span>
+<span class="nc" id="L362">            ((BrowserComponent) internal).reload();</span>
+        } else {
+<span class="nc" id="L364">            ((HTMLComponent) internal).refreshDOM();</span>
+        }
+<span class="nc" id="L366">    }</span>
+
+    /// Stop loading the current page
+    public void stop() {
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (isNative) {</span>
+<span class="nc" id="L371">            ((BrowserComponent) internal).stop();</span>
+        } else {
+<span class="fc" id="L373">            ((HTMLComponent) internal).cancel();</span>
+        }
+<span class="fc" id="L375">    }</span>
+
+    /// Release WebBrowser native resources.
+    public void destroy() {
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        if (isNative) {</span>
+            // workaround for issue 827
+<span class="nc" id="L381">            ((BrowserComponent) internal).setPage(&quot;&lt;html&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;&quot;, null);</span>
+<span class="nc" id="L382">            ((BrowserComponent) internal).destroy();</span>
+        }
+<span class="nc" id="L384">        internal = null;</span>
+<span class="nc" id="L385">    }</span>
+
+    /// Shows the given HTML in the native viewer
+    ///
+    /// #### Parameters
+    ///
+    /// - `html`: HTML web page
+    ///
+    /// - `baseUrl`: base URL to associate with the HTML
+    public void setPage(String html, String baseUrl) {
+<span class="fc" id="L395">        page = html;</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (isNative) {</span>
+<span class="nc" id="L397">            ((BrowserComponent) internal).setPage(html, baseUrl);</span>
+        } else {
+<span class="fc" id="L399">            ((HTMLComponent) internal).setHTML(html, &quot;UTF-8&quot;, null, true);</span>
+        }
+<span class="fc" id="L401">    }</span>
+
+    /// Returns the page set by getPage for the GUI builder
+    ///
+    /// #### Returns
+    ///
+    /// the HTML page set manually
+    public String getPage() {
+<span class="nc" id="L409">        return page;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="fc" id="L415">        return new String[]{&quot;url&quot;, &quot;html&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="fc" id="L421">        return new Class[]{String.class, String.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L427">        return new String[]{&quot;String&quot;, &quot;String&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L433" title="All 2 branches missed.">        if (&quot;url&quot;.equals(name)) {</span>
+<span class="nc" id="L434">            return getURL();</span>
+        }
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        if (&quot;html&quot;.equals(name)) {</span>
+<span class="nc" id="L437">            return getPage();</span>
+        }
+<span class="nc" id="L439">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L445" title="All 2 branches missed.">        if (&quot;url&quot;.equals(name)) {</span>
+<span class="nc" id="L446">            setURL((String) value);</span>
+<span class="nc" id="L447">            return null;</span>
+        }
+<span class="nc bnc" id="L449" title="All 2 branches missed.">        if (&quot;html&quot;.equals(name)) {</span>
+<span class="nc" id="L450">            setPage((String) value, null);</span>
+<span class="nc" id="L451">            return null;</span>
+        }
+<span class="nc" id="L453">        return super.setPropertyValue(name, value);</span>
+    }
+
+    static class Loading implements Painter, Animation {
+
+        private final Form f;
+
+<span class="fc" id="L460">        private final InfiniteProgress progress = new InfiniteProgress();</span>
+
+<span class="fc" id="L462">        Loading(Form f) {</span>
+<span class="fc" id="L463">            this.f = f;</span>
+<span class="fc" id="L464">        }</span>
+
+        @Override
+        public void paint(Graphics g, Rectangle rect) {
+<span class="nc" id="L468">            int x = f.getWidth() / 2 - progress.getPreferredW() / 2;</span>
+<span class="nc" id="L469">            int y = f.getHeight() / 2 - progress.getPreferredH() / 2;</span>
+<span class="nc" id="L470">            progress.setX(x);</span>
+<span class="nc" id="L471">            progress.setY(y);</span>
+<span class="nc" id="L472">            progress.setWidth(progress.getPreferredW());</span>
+<span class="nc" id="L473">            progress.setHeight(progress.getPreferredH());</span>
+<span class="nc" id="L474">            progress.paintComponent(g, true);</span>
+<span class="nc" id="L475">        }</span>
+
+        @Override
+        public boolean animate() {
+<span class="fc" id="L479">            return true;</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="nc" id="L484">            paint(g, null);</span>
+<span class="nc" id="L485">        }</span>
+
+        void install() {
+<span class="fc" id="L488">            f.setGlassPane(this);</span>
+<span class="fc" id="L489">            f.registerAnimated(this);</span>
+<span class="fc" id="L490">        }</span>
+
+        void unInstall() {
+<span class="fc" id="L493">            f.setGlassPane(null);</span>
+<span class="fc" id="L494">            f.deregisterAnimated(this);</span>
+<span class="fc" id="L495">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

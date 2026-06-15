@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MediaRecorderBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">MediaRecorderBuilder.java</span></div><h1>MediaRecorderBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+
+/// A builder class to generate a Media recorder with specific settings.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
+<span class="fc" id="L36">public class MediaRecorderBuilder {</span>
+<span class="fc" id="L37">    private int audioChannels = 1,</span>
+            bitRate = 64000,
+            samplingRate = 44100;
+    private boolean redirectToAudioBuffer;
+
+
+<span class="fc" id="L43">    private String mimeType = Display.getInstance().getAvailableRecordingMimeTypes()[0],</span>
+            path;
+
+    /// Set the number of audio channels in the media recorder.  Default 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numChannels`: The number of audio channels in the media recorder.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining
+    public MediaRecorderBuilder audioChannels(int numChannels) {
+<span class="fc" id="L56">        this.audioChannels = numChannels;</span>
+<span class="fc" id="L57">        return this;</span>
+    }
+
+    /// Sets the bit rate for the recorder.  Default 64000.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bitRate`: The bit rate for the recorder.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    public MediaRecorderBuilder bitRate(int bitRate) {
+<span class="nc" id="L70">        this.bitRate = bitRate;</span>
+<span class="nc" id="L71">        return this;</span>
+    }
+
+    /// Sets the sampling rate for the recorder.  Default 44100
+    ///
+    /// #### Parameters
+    ///
+    /// - `samplingRate`: The sample rate for the recorder.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    public MediaRecorderBuilder samplingRate(int samplingRate) {
+<span class="nc" id="L84">        this.samplingRate = samplingRate;</span>
+<span class="nc" id="L85">        return this;</span>
+    }
+
+    /// Sets the mimetype to use for encoding the audio file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: The mimetype to use for encoding the audio file.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - MediaManager#getAvailableRecordingMimeTypes()
+    public MediaRecorderBuilder mimeType(String mimeType) {
+<span class="fc" id="L102">        this.mimeType = mimeType;</span>
+<span class="fc" id="L103">        return this;</span>
+    }
+
+    /// Sets the output path where the audio recording should be saved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: @param path The output path where the recording should be saved as
+    /// a `com.codename1.io.FileSystemStorage` path
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    public MediaRecorderBuilder path(String path) {
+<span class="fc" id="L117">        this.path = path;</span>
+<span class="fc" id="L118">        return this;</span>
+    }
+
+    /// Set this flag to true to redirect the microphone input to an audio buffer.
+    /// This is handy if you just want to capture the raw PCM data from the microphone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `redirect`: @param redirect True to redirect output to an audio buffer.  The `#path(java.lang.String)`
+    /// parameter would then be used as the path to the audio buffer instead of the output file.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    public MediaRecorderBuilder redirectToAudioBuffer(boolean redirect) {
+<span class="fc" id="L133">        this.redirectToAudioBuffer = redirect;</span>
+<span class="fc" id="L134">        return this;</span>
+    }
+
+    /// Builds the MediaRecorder with the given settings.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    /// - `IllegalStateException`: If `#path(java.lang.String)` is not set.
+    public Media build() throws IOException {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L146">            throw new IllegalStateException(&quot;Must set path for MediaRecorderBuilder&quot;);</span>
+        }
+
+<span class="fc" id="L149">        return Display.getInstance().createMediaRecorder(this);</span>
+    }
+
+    /// Gets the current audio channels settings.
+    ///
+    /// #### Returns
+    ///
+    /// the audioChannels
+    public int getAudioChannels() {
+<span class="nc" id="L158">        return audioChannels;</span>
+    }
+
+    /// Gets the current bit rate.
+    ///
+    /// #### Returns
+    ///
+    /// the bitRate
+    public int getBitRate() {
+<span class="nc" id="L167">        return bitRate;</span>
+    }
+
+    /// Gets the current sampling rate.
+    ///
+    /// #### Returns
+    ///
+    /// the samplingRate
+    public int getSamplingRate() {
+<span class="nc" id="L176">        return samplingRate;</span>
+    }
+
+
+    /// Gets the current mimetype.
+    ///
+    /// #### Returns
+    ///
+    /// the mimeType
+    public String getMimeType() {
+<span class="fc" id="L186">        return mimeType;</span>
+    }
+
+    /// Gets the current output path.
+    ///
+    /// #### Returns
+    ///
+    /// the path
+    public String getPath() {
+<span class="fc" id="L195">        return path;</span>
+    }
+
+    /// True if the media recorder should redirect output to an audio buffer instead
+    /// of a file.
+    public boolean isRedirectToAudioBuffer() {
+<span class="fc" id="L201">        return redirectToAudioBuffer;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

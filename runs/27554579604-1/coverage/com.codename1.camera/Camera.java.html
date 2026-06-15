@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Camera.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.camera</a> &gt; <span class="el_source">Camera.java</span></div><h1>Camera.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.camera;
+
+import com.codename1.impl.CameraImpl;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import com.codename1.util.SuccessCallback;
+
+import java.io.IOException;
+
+/// Entry point for the low-level cross-platform camera API.
+///
+/// This API gives the application direct access to the device camera: live
+/// preview, frame streaming, still capture, video recording, flash and focus
+/// control. It is intended for use cases that the file-based
+/// `com.codename1.capture.Capture` API cannot serve - real-time barcode
+/// scanning, document boundary detection, custom in-app camera UIs.
+///
+/// **Permissions**: simply referencing classes in this package causes the build
+/// pipeline to inject `NSCameraUsageDescription` /
+/// `NSMicrophoneUsageDescription` (iOS) and `android.permission.CAMERA` /
+/// `android.permission.RECORD_AUDIO` plus the CameraX gradle dependencies
+/// (Android). Developers may override the plist strings via the
+/// `ios.NSCameraUsageDescription` build hint.
+///
+/// **Coexistence with `Capture`**: the old `com.codename1.capture.Capture`
+/// API continues to work unchanged. Both may be used in the same app, but
+/// only one camera consumer may hold the device at a time. Call
+/// `CameraSession#pause()` before invoking `Capture.capturePhoto(...)` and
+/// `CameraSession#resume()` afterwards.
+///
+/// ```java
+/// if (Camera.isSupported()) {
+///     CameraSession s = Camera.open(Camera.getDefault(CameraFacing.BACK),
+///                                   new CameraSessionOptions());
+///     CameraView v = s.createView();
+///     // add v to a Form...
+///     s.setFrameListener(frame -&gt;
+///         BarcodeScanner.scan(frame.getJpegBytes()).ready(codes -&gt; { ... }));
+/// }
+/// ```
+public final class Camera {
+<span class="fc" id="L64">    private static final Object ACTIVE_LOCK = new Object();</span>
+    private static CameraSession active;
+
+    private Camera() { }
+
+    /// True when the running platform has a working camera implementation.
+    /// False on platforms (or simulator runs) where the camera back-end could
+    /// not be initialized.
+    public static boolean isSupported() {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        return Display.getInstance().getCameraBackend() != null;</span>
+    }
+
+    /// Enumerate cameras visible to the platform. May be empty.
+    public static CameraInfo[] getCameras() {
+<span class="fc" id="L78">        CameraImpl probe = newImpl();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (probe == null) {</span>
+<span class="fc" id="L80">            return new CameraInfo[0];</span>
+        }
+        try {
+<span class="fc" id="L83">            CameraInfo[] out = probe.enumerateCameras();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            return out == null ? new CameraInfo[0] : out;</span>
+        } finally {
+            try {
+<span class="fc" id="L87">                probe.close();</span>
+<span class="nc" id="L88">            } catch (Throwable t) {</span>
+<span class="nc" id="L89">                Log.e(t);</span>
+<span class="fc" id="L90">            }</span>
+        }
+    }
+
+    /// Convenience that returns the first camera matching the given facing,
+    /// or `null` if none. When no facing-specific camera is found and any
+    /// camera exists, the first available camera is returned.
+    public static CameraInfo getDefault(CameraFacing facing) {
+<span class="fc" id="L98">        CameraInfo[] all = getCameras();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (CameraInfo c : all) {</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (c.getFacing() == facing) {</span>
+<span class="fc" id="L101">                return c;</span>
+            }
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        return all.length &gt; 0 ? all[0] : null;</span>
+    }
+
+    /// Open a camera session. Throws `IllegalStateException` if a session is
+    /// already open; close the old session first.
+    public static CameraSession open(CameraInfo info, CameraSessionOptions opts) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (info == null) {</span>
+<span class="fc" id="L111">            throw new IllegalArgumentException(&quot;CameraInfo must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (opts == null) {</span>
+<span class="fc" id="L114">            opts = new CameraSessionOptions();</span>
+        }
+        // The check-and-set has to be atomic to keep SpotBugs happy and to
+        // honour the &quot;one open session at a time&quot; contract under
+        // concurrent open() calls. The native impl.open() call below runs
+        // under the lock as well -- it's a foreground operation that the
+        // user kicked off, contention is essentially zero, and we'd rather
+        // serialise the rare race than ship a TOCTOU bug.
+<span class="fc" id="L122">        synchronized (ACTIVE_LOCK) {</span>
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">            if (active != null &amp;&amp; !active.isClosed()) {</span>
+<span class="fc" id="L124">                throw new IllegalStateException(</span>
+                    &quot;Only one CameraSession may be open at a time. Close the existing session first.&quot;);
+            }
+<span class="fc" id="L127">            CameraImpl impl = newImpl();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (impl == null) {</span>
+<span class="fc" id="L129">                throw new IllegalStateException(&quot;Camera is not supported on this platform.&quot;);</span>
+            }
+            try {
+<span class="fc" id="L132">                impl.open(info.getId(), opts);</span>
+<span class="fc" id="L133">            } catch (IOException e) {</span>
+                try {
+<span class="fc" id="L135">                    impl.close();</span>
+<span class="nc" id="L136">                } catch (Throwable t) {</span>
+<span class="nc" id="L137">                    Log.e(t);</span>
+<span class="fc" id="L138">                }</span>
+<span class="fc" id="L139">                throw new RuntimeException(&quot;Could not open camera &quot; + info.getId(), e);</span>
+<span class="fc" id="L140">            }</span>
+<span class="fc" id="L141">            active = new CameraSession(impl, info, opts);</span>
+<span class="fc" id="L142">            return active;</span>
+        }
+    }
+
+    /// Request runtime permission for camera (and optionally microphone). The
+    /// callback receives `true` when both are granted, `false` otherwise.
+    /// On iOS this is a no-op that delivers `true` immediately; the system
+    /// prompts the first time the camera is actually started.
+    public static void requestPermissions(final boolean audio, final SuccessCallback&lt;Boolean&gt; callback) {
+<span class="fc" id="L151">        CameraImpl impl = newImpl();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (impl == null) {</span>
+<span class="fc" id="L153">            fireLater(callback, Boolean.FALSE);</span>
+<span class="fc" id="L154">            return;</span>
+        }
+        try {
+<span class="fc" id="L157">            impl.open(&quot;__permission_probe__&quot;, new CameraSessionOptions().captureAudio(audio));</span>
+            // open() throws on permission denial; if we get here permissions are granted.
+<span class="fc" id="L159">            fireLater(callback, Boolean.TRUE);</span>
+<span class="fc" id="L160">        } catch (Throwable t) {</span>
+<span class="fc" id="L161">            fireLater(callback, Boolean.FALSE);</span>
+        } finally {
+            try {
+<span class="fc" id="L164">                impl.close();</span>
+<span class="nc" id="L165">            } catch (Throwable t) {</span>
+<span class="nc" id="L166">                Log.e(t);</span>
+<span class="fc" id="L167">            }</span>
+        }
+<span class="fc" id="L169">    }</span>
+
+    private static void fireLater(final SuccessCallback&lt;Boolean&gt; callback, final Boolean value) {
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (callback == null) {</span>
+<span class="fc" id="L173">            return;</span>
+        }
+<span class="fc" id="L175">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override public void run() {
+<span class="fc" id="L177">                callback.onSucess(value);</span>
+<span class="fc" id="L178">            }</span>
+        });
+<span class="fc" id="L180">    }</span>
+
+    private static CameraImpl newImpl() {
+<span class="fc" id="L183">        return Display.getInstance().getCameraBackend();</span>
+    }
+
+    // Identity comparison is intentional: only the exact CameraSession
+    // instance we returned from open() may clear the active slot, so
+    // PMD.CompareObjectsWithEquals doesn't apply.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    static void clearActive(CameraSession s) {
+<span class="fc" id="L191">        synchronized (ACTIVE_LOCK) {</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (active == s) {</span>
+<span class="fc" id="L193">                active = null;</span>
+            }
+<span class="fc" id="L195">        }</span>
+<span class="fc" id="L196">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

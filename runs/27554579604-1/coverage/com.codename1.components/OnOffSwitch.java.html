@@ -1,0 +1,748 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OnOffSwitch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">OnOffSwitch.java</span></div><h1>OnOffSwitch.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Collection;
+import java.util.Vector;
+
+/// The on/off switch is a checkbox of sort (although it derives container) that represents its state as
+/// a switch each of which has a short label associated with it.
+/// It has two types: Android and iOS. The types differ in the way that they are rendered.
+/// The Android type (the default) is just a button with a label that can be moved/dragged between
+/// the two states. The iOS version is more elaborate due to the look of that platform.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// Use new `Switch` class instead as it conforms to the latest platform looks and feels.
+public class OnOffSwitch extends Container implements ActionSource {
+<span class="fc" id="L57">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+<span class="fc" id="L58">    private String on = &quot;ON&quot;;</span>
+<span class="fc" id="L59">    private String off = &quot;OFF&quot;;</span>
+    private boolean iosMode;
+    private boolean noTextMode;
+    private boolean value;
+    private CheckBox button;
+    private boolean dragged;
+    private int pressX;
+    private int buttonWidth;
+    private Image switchOnImage;
+    private Image switchOffImage;
+    private Image switchMaskImage;
+    private int deltaX;
+    private boolean animationLock;
+
+    /// Default constructor
+<span class="fc" id="L74">    public OnOffSwitch() {</span>
+<span class="fc" id="L75">        setUIIDFinal(&quot;OnOffSwitch&quot;);</span>
+<span class="fc" id="L76">        initialize();</span>
+<span class="fc" id="L77">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (iosMode) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (switchMaskImage == null) {</span>
+<span class="nc" id="L84">                switchMaskImage = UIManager.getInstance().getThemeImageConstant(&quot;switchMaskImage&quot;);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                if (switchMaskImage == null) {</span>
+<span class="nc" id="L86">                    return super.calcPreferredSize();</span>
+                }
+            }
+<span class="nc" id="L89">            return new Dimension(switchMaskImage.getWidth(), switchMaskImage.getHeight());</span>
+        }
+<span class="nc" id="L91">        return super.calcPreferredSize();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void resetFocusable() {
+<span class="nc" id="L97">        setFocusable(true);</span>
+<span class="nc" id="L98">    }</span>
+
+    private void initialize() {
+<span class="fc" id="L101">        iosMode = UIManager.getInstance().isThemeConstant(&quot;onOffIOSModeBool&quot;, false);</span>
+<span class="fc" id="L102">        removeAll();</span>
+<span class="fc" id="L103">        setFocusable(true);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (iosMode) {</span>
+<span class="nc" id="L105">            button = null;</span>
+<span class="nc" id="L106">            switchMaskImage = UIManager.getInstance().getThemeImageConstant(&quot;switchMaskImage&quot;);</span>
+<span class="nc" id="L107">            switchOnImage = UIManager.getInstance().getThemeImageConstant(&quot;switchOnImage&quot;);</span>
+<span class="nc" id="L108">            switchOffImage = UIManager.getInstance().getThemeImageConstant(&quot;switchOffImage&quot;);</span>
+<span class="nc" id="L109">            noTextMode = UIManager.getInstance().isThemeConstant(&quot;noTextModeBool&quot;, false);</span>
+        } else {
+<span class="fc" id="L111">            setLayout(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L112">            button = new CheckBox(on);</span>
+<span class="fc" id="L113">            button.setToggle(true);</span>
+<span class="fc" id="L114">            button.setUIID(&quot;Button&quot;);</span>
+<span class="fc" id="L115">            button.setEndsWith3Points(false);</span>
+<span class="fc" id="L116">            button.getUnselectedStyle().setFont(getUnselectedStyle().getFont());</span>
+<span class="fc" id="L117">            button.getSelectedStyle().setFont(getSelectedStyle().getFont());</span>
+<span class="fc" id="L118">            button.getPressedStyle().setFont(getSelectedStyle().getFont());</span>
+
+<span class="fc" id="L120">            Dimension d = button.getPreferredSize();</span>
+<span class="fc" id="L121">            button.setText(off);</span>
+<span class="fc" id="L122">            int pw = button.getPreferredW();</span>
+<span class="fc" id="L123">            d.setWidth(Math.max(pw, d.getWidth()));</span>
+
+            // prevents the button from growing/shrinking as its states flip
+<span class="fc" id="L126">            button.setPreferredSize(d);</span>
+
+<span class="fc" id="L128">            buttonWidth = button.getPreferredW();</span>
+<span class="fc" id="L129">            button.setFocusable(false);</span>
+<span class="fc" id="L130">            updateButton();</span>
+<span class="fc" id="L131">            addComponent(button);</span>
+<span class="fc" id="L132">            button.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L135">                    flip();</span>
+<span class="nc" id="L136">                }</span>
+            });
+        }
+<span class="fc" id="L139">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isStickyDrag() {
+<span class="nc" id="L144">        return true;</span>
+    }
+
+    /// Adds a listener to the switch which will cause an event to dispatch on click
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
+    @Override
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L154">        dispatcher.addListener(l);</span>
+<span class="fc" id="L155">    }</span>
+
+    /// Removes the given action listener from the switch
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
+    @Override
+    public void removeActionListener(ActionListener l) {
+<span class="fc" id="L164">        dispatcher.removeListener(l);</span>
+<span class="fc" id="L165">    }</span>
+
+    /// Returns a vector containing the action listeners for this button
+    ///
+    /// #### Returns
+    ///
+    /// the action listeners
+    ///
+    /// #### Deprecated
+    ///
+    /// use the version that returns a collection
+    public Vector getActionListeners() {
+<span class="nc" id="L177">        return dispatcher.getListenerVector();</span>
+    }
+
+    /// Returns a collection containing the action listeners for this button
+    ///
+    /// #### Returns
+    ///
+    /// the action listeners
+    public Collection getListeners() {
+<span class="nc" id="L186">        return dispatcher.getListenerCollection();</span>
+    }
+
+    private void fireOnOffActionEvent() {
+<span class="fc" id="L190">        dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed));</span>
+<span class="fc" id="L191">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (d.isBuiltinSoundsEnabled()) {</span>
+<span class="fc" id="L193">            d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);</span>
+        }
+<span class="fc" id="L195">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (iosMode) {</span>
+<span class="nc" id="L201">            int switchButtonPadInt = UIManager.getInstance().getThemeConstant(&quot;switchButtonPadInt&quot;, 16);</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            if (Display.getInstance().getDisplayWidth() &gt; 480) {</span>
+                // is retina
+<span class="nc" id="L204">                switchButtonPadInt *= 2;</span>
+            }
+<span class="nc" id="L206">            Style s = getStyle();</span>
+<span class="nc" id="L207">            int x = getX() + s.getPaddingLeftNoRTL();</span>
+<span class="nc" id="L208">            int y = getY() + s.getPaddingTop();</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            if (!value) {</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">                if (deltaX &gt; 0) {</span>
+<span class="nc" id="L211">                    dragged = false;</span>
+                } else {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                    if (deltaX &lt; -switchOnImage.getWidth()) {</span>
+<span class="nc" id="L214">                        deltaX = -switchOnImage.getWidth();</span>
+                    }
+                }
+            } else {
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                if (deltaX &lt; 0) {</span>
+<span class="nc" id="L219">                    dragged = false;</span>
+                } else {
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                    if (deltaX &gt; switchOnImage.getWidth()) {</span>
+<span class="nc" id="L222">                        deltaX = switchOnImage.getWidth();</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (dragged) {</span>
+                int onX;
+                int offX;
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                if (value) {</span>
+<span class="nc" id="L230">                    onX = x - deltaX;</span>
+<span class="nc" id="L231">                    offX = x - deltaX + switchOnImage.getWidth() - 2 * switchButtonPadInt;</span>
+                } else {
+<span class="nc" id="L233">                    onX = x - deltaX - switchOnImage.getWidth() + 2 * switchButtonPadInt;</span>
+<span class="nc" id="L234">                    offX = x - deltaX;</span>
+                }
+<span class="nc" id="L236">                switchButtonPadInt /= 2;</span>
+<span class="nc" id="L237">                int oldClipX = g.getClipX();</span>
+<span class="nc" id="L238">                int oldClipY = g.getClipY();</span>
+<span class="nc" id="L239">                int oldClipW = g.getClipWidth();</span>
+<span class="nc" id="L240">                int oldClipH = g.getClipHeight();</span>
+<span class="nc" id="L241">                g.clipRect(getX(), getY(), switchMaskImage.getWidth(), switchMaskImage.getHeight());</span>
+<span class="nc" id="L242">                g.drawImage(switchOnImage, onX, y);</span>
+<span class="nc" id="L243">                g.drawImage(switchOffImage, offX, y);</span>
+<span class="nc" id="L244">                int strWidth = s.getFont().stringWidth(on);</span>
+<span class="nc" id="L245">                int sX = onX + switchMaskImage.getWidth() / 2 - strWidth / 2 - switchButtonPadInt;</span>
+<span class="nc" id="L246">                int sY = y + switchMaskImage.getHeight() / 2 - s.getFont().getHeight() / 2;</span>
+<span class="nc" id="L247">                g.setFont(s.getFont());</span>
+<span class="nc" id="L248">                g.setColor(0xffffff);</span>
+<span class="nc" id="L249">                int alpha = g.concatenateAlpha(s.getFgAlpha());</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">                if (!noTextMode) {</span>
+<span class="nc" id="L251">                    g.drawString(on, sX, sY, Style.TEXT_DECORATION_3D);</span>
+                }
+
+<span class="nc" id="L254">                strWidth = s.getFont().stringWidth(off);</span>
+<span class="nc" id="L255">                g.setColor(0x333333);</span>
+<span class="nc" id="L256">                sX = offX + switchMaskImage.getWidth() / 2 - strWidth / 2 + switchButtonPadInt;</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                if (!noTextMode) {</span>
+<span class="nc" id="L258">                    g.drawString(off, sX, sY);</span>
+                }
+<span class="nc" id="L260">                g.setAlpha(alpha);</span>
+<span class="nc" id="L261">                g.setClip(oldClipX, oldClipY, oldClipW, oldClipH);</span>
+<span class="nc" id="L262">            } else {</span>
+                String str;
+<span class="nc" id="L264">                switchButtonPadInt /= 2;</span>
+<span class="nc" id="L265">                int alpha = g.concatenateAlpha(s.getFgAlpha());</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                if (value) {</span>
+<span class="nc" id="L267">                    g.drawImage(switchOnImage, x, y);</span>
+<span class="nc" id="L268">                    str = on;</span>
+<span class="nc" id="L269">                    g.setColor(0xffffff);</span>
+<span class="nc" id="L270">                    switchButtonPadInt *= -1;</span>
+                } else {
+<span class="nc" id="L272">                    g.drawImage(switchOffImage, x, y);</span>
+<span class="nc" id="L273">                    str = off;</span>
+<span class="nc" id="L274">                    g.setColor(0x333333);</span>
+                }
+<span class="nc" id="L276">                int strWidth = s.getFont().stringWidth(str);</span>
+<span class="nc" id="L277">                int sX = x + switchMaskImage.getWidth() / 2 - strWidth / 2 + switchButtonPadInt;</span>
+<span class="nc" id="L278">                int sY = y + switchMaskImage.getHeight() / 2 - s.getFont().getHeight() / 2;</span>
+<span class="nc" id="L279">                g.setFont(s.getFont());</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                if (!noTextMode) {</span>
+<span class="nc" id="L281">                    g.drawString(str, sX, sY);</span>
+                }
+<span class="nc" id="L283">                g.setAlpha(alpha);</span>
+            }
+
+<span class="nc" id="L286">            g.drawImage(switchMaskImage, x, y);</span>
+<span class="nc" id="L287">        } else {</span>
+<span class="nc" id="L288">            super.paint(g);</span>
+        }
+<span class="nc" id="L290">    }</span>
+
+    private void updateButton() {
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (value) {</span>
+<span class="fc" id="L294">            button.setText(on);</span>
+<span class="fc" id="L295">            getUnselectedStyle().setPadding(LEFT, buttonWidth);</span>
+<span class="fc" id="L296">            getUnselectedStyle().setPadding(RIGHT, 0);</span>
+<span class="fc" id="L297">            getSelectedStyle().setPadding(LEFT, buttonWidth);</span>
+<span class="fc" id="L298">            getSelectedStyle().setPadding(RIGHT, 0);</span>
+        } else {
+<span class="fc" id="L300">            button.setText(off);</span>
+<span class="fc" id="L301">            getUnselectedStyle().setPadding(RIGHT, buttonWidth);</span>
+<span class="fc" id="L302">            getUnselectedStyle().setPadding(LEFT, 0);</span>
+<span class="fc" id="L303">            getSelectedStyle().setPadding(RIGHT, buttonWidth);</span>
+<span class="fc" id="L304">            getSelectedStyle().setPadding(LEFT, 0);</span>
+        }
+<span class="fc" id="L306">    }</span>
+
+    private void flip() {
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        setValue(!value);</span>
+<span class="nc" id="L310">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L315">        super.initComponent();</span>
+<span class="nc" id="L316">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void deinitialize() {
+<span class="nc" id="L321">        super.deinitialize();</span>
+<span class="nc" id="L322">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if (iosMode) {</span>
+<span class="nc" id="L328">            super.pointerPressed(x, y);</span>
+        }
+<span class="nc" id="L330">        pressX = x;</span>
+<span class="nc" id="L331">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="nc" id="L336">        dragged = true;</span>
+<span class="nc" id="L337">        deltaX = pressX - x;</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (!iosMode) {</span>
+<span class="nc" id="L339">            button.setText(on);</span>
+<span class="nc" id="L340">            int left = Math.max(0, buttonWidth - deltaX);</span>
+<span class="nc" id="L341">            int right = Math.min(buttonWidth, deltaX);</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            if (deltaX &lt; 0) {</span>
+<span class="nc" id="L343">                left = Math.min(buttonWidth, deltaX * -1);</span>
+<span class="nc" id="L344">                right = Math.max(0, buttonWidth + deltaX);</span>
+            }
+<span class="nc" id="L346">            getUnselectedStyle().setPadding(RIGHT, right);</span>
+<span class="nc" id="L347">            getUnselectedStyle().setPadding(LEFT, left);</span>
+<span class="nc" id="L348">            getSelectedStyle().setPadding(RIGHT, right);</span>
+<span class="nc" id="L349">            getSelectedStyle().setPadding(LEFT, left);</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            if (right &lt; left) {</span>
+<span class="nc" id="L351">                button.setText(on);</span>
+            } else {
+<span class="nc" id="L353">                button.setText(off);</span>
+            }
+<span class="nc" id="L355">            revalidate();</span>
+        }
+<span class="nc" id="L357">    }</span>
+
+    private void animateTo(final boolean value, final int position) {
+<span class="nc" id="L360">        int switchButtonPadInt = UIManager.getInstance().getThemeConstant(&quot;switchButtonPadInt&quot;, 16);</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (Display.getInstance().getDisplayWidth() &gt; 480) {</span>
+            // is retina
+<span class="nc" id="L363">            switchButtonPadInt *= 2;</span>
+        }
+<span class="nc" id="L365">        final Motion current = Motion.createEaseInOutMotion(Math.abs(position), switchMaskImage.getWidth() - 2 * switchButtonPadInt, 100);</span>
+<span class="nc" id="L366">        current.start();</span>
+<span class="nc" id="L367">        deltaX = position;</span>
+<span class="nc" id="L368">        getComponentForm().registerAnimated(new Animation() {</span>
+            @Override
+            public boolean animate() {
+<span class="nc" id="L371">                deltaX = current.getValue();</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                if (value) {</span>
+<span class="nc" id="L373">                    deltaX *= -1;</span>
+                }
+<span class="nc" id="L375">                dragged = true;</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">                if (current.isFinished()) {</span>
+<span class="nc" id="L377">                    dragged = false;</span>
+<span class="nc" id="L378">                    Form f = getComponentForm();</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                    if (f != null) {</span>
+<span class="nc" id="L380">                        f.deregisterAnimated(this);</span>
+                    }
+<span class="nc" id="L382">                    OnOffSwitch.this.setValue(value);</span>
+                }
+<span class="nc" id="L384">                repaint();</span>
+<span class="nc" id="L385">                return false;</span>
+            }
+
+            @Override
+            public void paint(Graphics g) {
+<span class="nc" id="L390">            }</span>
+        });
+<span class="nc" id="L392">        dragged = true;</span>
+<span class="nc" id="L393">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        if (animationLock) {</span>
+<span class="nc" id="L399">            return;</span>
+        }
+<span class="nc" id="L401">        animationLock = true;</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">        if (iosMode) {</span>
+<span class="nc" id="L403">            int switchButtonPadInt = UIManager.getInstance().getThemeConstant(&quot;switchButtonPadInt&quot;, 16);</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            if (dragged) {</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                if (deltaX &gt; 0) {</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                    animateTo(deltaX &lt;= switchMaskImage.getWidth() / 2 - switchButtonPadInt, deltaX);</span>
+                } else {
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                    animateTo(deltaX * -1 &gt; switchMaskImage.getWidth() / 2 - switchButtonPadInt, deltaX);</span>
+                }
+            } else {
+<span class="nc bnc" id="L411" title="All 2 branches missed.">                animateTo(!value, 0);</span>
+            }
+<span class="nc" id="L413">            animationLock = false;</span>
+<span class="nc" id="L414">            return;</span>
+        } else {
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            if (!dragged) {</span>
+<span class="nc" id="L417">                flip();</span>
+            } else {
+<span class="nc" id="L419">                int w = buttonWidth;</span>
+<span class="nc" id="L420">                deltaX = pressX - x;</span>
+<span class="nc" id="L421">                int left = Math.max(0, w - deltaX);</span>
+<span class="nc" id="L422">                int right = Math.min(w, deltaX);</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                if (deltaX &lt; 0) {</span>
+<span class="nc" id="L424">                    left = Math.min(buttonWidth, deltaX * -1);</span>
+<span class="nc" id="L425">                    right = Math.max(0, buttonWidth + deltaX);</span>
+                }
+<span class="nc bnc" id="L427" title="All 2 branches missed.">                setValue(right &lt; left);</span>
+
+<span class="nc" id="L429">                updateButton();</span>
+<span class="nc" id="L430">                animateLayoutAndWait(150);</span>
+            }
+        }
+<span class="nc" id="L433">        dragged = false;</span>
+<span class="nc" id="L434">        animationLock = false;</span>
+<span class="nc" id="L435">    }</span>
+
+    /// Label for the on mode
+    ///
+    /// #### Returns
+    ///
+    /// the on
+    public String getOn() {
+<span class="fc" id="L443">        return on;</span>
+    }
+
+    /// Label for the on mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `on`: the on to set
+    public void setOn(String on) {
+<span class="fc" id="L452">        this.on = on;</span>
+<span class="fc" id="L453">        initialize();</span>
+<span class="fc" id="L454">    }</span>
+
+    /// Label for the off mode
+    ///
+    /// #### Returns
+    ///
+    /// the off
+    public String getOff() {
+<span class="fc" id="L462">        return off;</span>
+    }
+
+    /// Label for the off mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `off`: the off to set
+    public void setOff(String off) {
+<span class="fc" id="L471">        this.off = off;</span>
+<span class="fc" id="L472">        initialize();</span>
+<span class="fc" id="L473">    }</span>
+
+    /// The value of the switch
+    ///
+    /// #### Returns
+    ///
+    /// the value
+    public boolean isValue() {
+<span class="fc" id="L481">        return value;</span>
+    }
+
+    /// The value of the switch
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
+    public void setValue(boolean value) {
+<span class="fc" id="L490">        boolean orig = animationLock;</span>
+<span class="fc" id="L491">        animationLock = true;</span>
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        boolean fireEvent = this.value != value;</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">        if (fireEvent) {</span>
+<span class="fc" id="L494">            this.value = value;</span>
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">            if (button != null) {</span>
+<span class="fc" id="L496">                button.setSelected(value);</span>
+            }
+<span class="fc" id="L498">            fireOnOffActionEvent();</span>
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">            if (iosMode) {</span>
+<span class="nc" id="L500">                repaint();</span>
+            } else {
+<span class="fc" id="L502">                updateButton();</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">                if (isInitialized()) {</span>
+<span class="nc" id="L504">                    animateLayoutAndWait(150);</span>
+                }
+            }
+        }
+<span class="fc" id="L508">        animationLock = orig;</span>
+<span class="fc" id="L509">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="fc" id="L514">        return new String[]{</span>
+                &quot;value&quot;, &quot;on&quot;, &quot;off&quot;
+        };
+    }
+
+    /// Some components may optionally generate a state which can then be restored
+    /// using setCompnentState(). This method is used by the UIBuilder.
+    ///
+    /// #### Returns
+    ///
+    /// the component state or null for undefined state.
+    @Override
+    public Object getComponentState() {
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        if (value) {</span>
+<span class="nc" id="L528">            return Boolean.TRUE;</span>
+        }
+<span class="nc" id="L530">        return Boolean.FALSE;</span>
+    }
+
+    /// If getComponentState returned a value the setter can update the value and restore
+    /// the prior state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the non-null state
+    @Override
+    public void setComponentState(Object state) {
+<span class="nc" id="L541">        value = ((Boolean) state).booleanValue();</span>
+<span class="nc" id="L542">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="fc" id="L547">        return new Class[]{</span>
+                Boolean.class,
+                String.class,
+                String.class
+        };
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (&quot;on&quot;.equals(name)) {</span>
+<span class="nc" id="L558">            return on;</span>
+        }
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">        if (&quot;off&quot;.equals(name)) {</span>
+<span class="nc" id="L561">            return off;</span>
+        }
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">        if (&quot;value&quot;.equals(name)) {</span>
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">            if (value) {</span>
+<span class="fc" id="L565">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L567">            return Boolean.FALSE;</span>
+        }
+<span class="nc" id="L569">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        if (&quot;on&quot;.equals(name)) {</span>
+<span class="nc" id="L576">            setOn((String) value);</span>
+<span class="nc" id="L577">            return null;</span>
+        }
+<span class="pc bpc" id="L579" title="1 of 2 branches missed.">        if (&quot;off&quot;.equals(name)) {</span>
+<span class="nc" id="L580">            setOff((String) value);</span>
+<span class="nc" id="L581">            return null;</span>
+        }
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">        if (&quot;value&quot;.equals(name)) {</span>
+<span class="fc" id="L584">            setValue(((Boolean) value).booleanValue());</span>
+<span class="fc" id="L585">            return null;</span>
+        }
+<span class="nc" id="L587">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// iOS 7 changed the switch to not include any text
+    ///
+    /// #### Returns
+    ///
+    /// the noTextMode
+    public boolean isNoTextMode() {
+<span class="nc" id="L596">        return noTextMode;</span>
+    }
+
+    /// iOS 7 changed the switch to not include any text
+    ///
+    /// #### Parameters
+    ///
+    /// - `noTextMode`: the noTextMode to set
+    public void setNoTextMode(boolean noTextMode) {
+<span class="nc" id="L605">        this.noTextMode = noTextMode;</span>
+<span class="nc" id="L606">    }</span>
+
+    /// Gets the image that is used for the &quot;On&quot; state of the switch.
+    ///
+    /// #### Returns
+    ///
+    /// @return The image that will be used for the &quot;On&quot; state.  If the &quot;onOffIOSModeBool&quot; theme constant
+    /// is false and the switchOnImage hasn't been explicitly set by the `#setSwitchOnImage(com.codename1.ui.Image)`
+    /// method, then this will return null.
+    ///
+    /// #### See also
+    ///
+    /// - #setSwitchOnImage(com.codename1.ui.Image)
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #getSwitchMaskImage()
+    public Image getSwitchOnImage() {
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if (iosMode) {</span>
+<span class="nc" id="L625">            return switchOnImage;</span>
+        }
+<span class="nc" id="L627">        return null;</span>
+    }
+
+    /// Sets the image that should be used for the &quot;Off&quot; state. **Note:** This option is only used
+    /// if the &quot;onOffIOSModeBool&quot; theme constant is enabled.
+    ///
+    /// Note: If the &quot;onOffIOSModeBool&quot; theme constant is false and you set this image, you must also
+    /// set the &quot;Off&quot; image with `#setSwitchOffImage(com.codename1.ui.Image)` and the
+    /// &quot;Mask&quot; image with `#setSwitchMaskImage(com.codename1.ui.Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `switchOnImage`: the switchOnImage to set
+    ///
+    /// #### See also
+    ///
+    /// - #getSwitchOnImage()
+    ///
+    /// - #setSwitchMaskImage(com.codename1.ui.Image)
+    ///
+    /// - #setSwitchOffImage(com.codename1.ui.Image)
+    public void setSwitchOnImage(Image switchOnImage) {
+<span class="nc" id="L649">        this.switchOnImage = switchOnImage;</span>
+<span class="nc" id="L650">        iosMode = true;</span>
+<span class="nc" id="L651">    }</span>
+
+    /// Gets the image that is used for the &quot;Off&quot; state of the switch.
+    ///
+    /// #### Returns
+    ///
+    /// @return The image that will be used for the &quot;Off&quot; state.  If the &quot;onOffIOSModeBool&quot; theme constant
+    /// is false and the switchOffImage hasn't been explicitly set by the `#setSwitchOffImage(com.codename1.ui.Image)`
+    /// method, then this will return null.
+    ///
+    /// #### See also
+    ///
+    /// - #setSwitchOffImage(com.codename1.ui.Image)
+    ///
+    /// - #getSwitchOnImage()
+    ///
+    /// - #getSwitchMaskImage()
+    public Image getSwitchOffImage() {
+<span class="nc bnc" id="L669" title="All 2 branches missed.">        if (iosMode) {</span>
+<span class="nc" id="L670">            return switchOffImage;</span>
+        }
+<span class="nc" id="L672">        return null;</span>
+    }
+
+    /// Sets the image that should be used for the &quot;Off&quot; state. **Note:** This option is only used
+    /// if the &quot;onOffIOSModeBool&quot; theme constant is enabled.
+    ///
+    /// Note: If the &quot;onOffIOSModeBool&quot; theme constant is false and you set this image, you must also
+    /// set the &quot;On&quot; image with `#setSwitchOnImage(com.codename1.ui.Image)` and the
+    /// &quot;Mask&quot; image with `#setSwitchMaskImage(com.codename1.ui.Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `switchOffImage`: the switchOffImage to set
+    ///
+    /// #### See also
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #setSwitchMaskImage(com.codename1.ui.Image)
+    ///
+    /// - #setSwitchOnImage(com.codename1.ui.Image)
+    public void setSwitchOffImage(Image switchOffImage) {
+<span class="nc" id="L694">        this.switchOffImage = switchOffImage;</span>
+<span class="nc" id="L695">        this.iosMode = true;</span>
+<span class="nc" id="L696">    }</span>
+
+    /// Gets the image that is used for the mask.  **Note:** This option is only used
+    /// if the &quot;onOffIOSModeBool&quot; theme constant is enabled.
+    ///
+    /// This image will generally
+    /// consist of an opaque border/frame with a transparent center such that the
+    /// &quot;on&quot; and &quot;off&quot; images can be painted inside the transparent part, and anything
+    /// that is outside that center will be painted over by the frame, or clipped.
+    ///
+    /// #### Returns
+    ///
+    /// @return the switchMaskImage image if the &quot;onOffIOSModeBool&quot; flag is set or the mask
+    /// image has been explicitly set on this OnOffSwitch using `#setSwitchMaskImage(com.codename1.ui.Image)`
+    ///
+    /// #### See also
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #getSwitchOffImage()
+    ///
+    /// - #setSwitchOnImage(com.codename1.ui.Image)
+    ///
+    /// - #getSwitchMaskImage()
+    ///
+    /// - #setSwitchMaskImage(com.codename1.ui.Image)
+    public Image getSwitchMaskImage() {
+<span class="nc bnc" id="L723" title="All 2 branches missed.">        if (iosMode) {</span>
+<span class="nc" id="L724">            return switchMaskImage;</span>
+        }
+<span class="nc" id="L726">        return null;</span>
+    }
+
+    /// Sets the image that should be used for the &quot;On&quot; state.
+    ///
+    /// Note: If the &quot;onOffIOSModeBool&quot; is false and you set this mask, you must also
+    /// set the &quot;On&quot; image with `#setSwitchOnImage(com.codename1.ui.Image)` and the
+    /// &quot;Off&quot; image with `#setSwitchOffImage(com.codename1.ui.Image)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `switchMaskImage`: @param switchMaskImage the switchMaskImage image to set as the mask for the on-off
+    /// switch.
+    public void setSwitchMaskImage(Image switchMaskImage) {
+<span class="nc" id="L740">        this.switchMaskImage = switchMaskImage;</span>
+<span class="nc" id="L741">        iosMode = true;  // If we are explicitly setting this, then we will enable</span>
+        // iosMode automatically because that is the only
+        // state in which these images will be used.
+<span class="nc" id="L744">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,995 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UIFragment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">UIFragment.java</span></div><h1>UIFragment.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.io.CharArrayReader;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.table.TableLayout;
+import com.codename1.xml.Element;
+import com.codename1.xml.XMLParser;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/// Encapsulates an XML or JSON template for a UI component hierarchy.  The UI can be defined
+/// using XML.  The XML is compiled into a view at runtime.  Custom components may be
+/// injected into the template using special placeholder tags (i.e. tags where the tag
+/// name begins with '$'.
+///
+/// Supported Tags
+///
+/// - **border** - A container with layout=BorderLayout
+///
+/// - **y** - A container with layout=BoxLayout Y
+///
+/// - **x** - A container with layout=BoxLayout X
+///
+/// - **flow** - A container with layout=FlowLayout
+///
+/// - **layered** - A container with layout=LayeredLayout
+///
+/// - **grid** - A container with layout=GridLayout.  Accepted attributes rows and cols
+///
+/// - **table** - A container with layout=TableLayout.  Accepted attributes rows and cols.  May have zero or more nested  tags.
+///
+/// - **label** - A Label
+///
+/// - **button** - A button
+///
+/// Layout Variant Tags
+///
+/// BorderLayout and BoxLayout include some variant tags to customize their behaviour also:
+///
+///
+/// - **borderAbs, borderAbsolute** - BorderLayout with center absolute behaviour.  This is the same as ``
+///
+/// - **borderTotalBelow** - BorderLayout with Total Below center behaviour. This is the same as ``
+///
+/// - **yBottomLast, ybl** - BoxLayout with Y_BOTTOM_LAST setting.
+///
+/// - **xNoGrow, xng** - BoxLayout X with No Grow option.  This is the same as ``
+///
+/// Supported Attributes
+///
+/// - **uiid** - The UIID of the component.  I.e. `Component#getUIID()`
+///
+/// - **id** - The ID of the component so that it can be retrieved using `#findById(java.lang.String)`
+///
+/// - **name** - The name of the component (i.e. `Component#getName()`
+///
+/// - **constraint** - The layout constraint used for adding to
+/// the parent. Supports north, south, east, west, center, when parent is
+/// border
+///
+/// - **rows** - Used by grid only. Represents number of rows in
+/// grid or table.
+///
+/// - **cols** - Used by grid only. Represents number of columns
+/// in grid or table.
+///
+/// - **behavior, behaviour** - Used by Border Layout only.  Specifies the center behaviour.  Accepts values &quot;scale&quot;, &quot;absolute&quot;, and &quot;totalBelow&quot;.
+///
+/// - **noGrow** - Used by `` only.  Specifies that BoxLayout should be X_AXIS_NO_GROW.  Accepts values &quot;true&quot; and &quot;false&quot;.
+///
+/// - **bottomLast** - Used by `` only.  Specifies that BoxLayout should use Y_AXIS_BOTTOM_LAST option.  Accepts values &quot;true&quot; and &quot;false&quot;
+///
+/// Example XML Notation
+///
+/// ```java
+/// `Form f = new Form(&quot;Test&quot;, new BorderLayout());
+/// String tpl = &quot;&quot;
+///     + &quot;&quot;
+///     + &quot;&quot;
+///     + &quot;&quot;;
+///
+/// f.setFormBottomPaddingEditingMode(true);
+/// TextField searchField = new TextField();
+/// searchField.addActionListener(e-&gt;{
+///    Log.p(&quot;Search field action performed&quot;);`);
+/// Button submit = new Button(&quot;Submit&quot;);
+/// submit.addActionListener(e-&gt;{
+///     Log.p(&quot;Button action performed&quot;);
+/// });
+///
+/// UIFragment template = UIFragment.parseXML(tpl)
+///     .set(&quot;button&quot;, submit)
+///     .set(&quot;search&quot;, searchField);
+/// f.add(BorderLayout.CENTER, template.getView());
+/// f.show();
+/// }
+/// ```
+///
+/// JSON Notation
+///
+/// When trying to express a UI structure inside a Java String, the XML notation may be
+/// a little bit verbose and cumbersome.  For this reason, there is an alternative JSON-based
+/// notation that will allow you to express a UI structure more succinctly.
+///
+/// A JSON object (i.e. curly braces) denotes a Container.  If this object includes properties
+/// corresponding to the constraints of `BorderLayout` (e.g. center, east, west, north, south, or overlay), then
+/// the container will use a `BorderLayout`, and the associated properties will represent its children
+/// with the appropriate constraint.
+///
+/// E.g.:
+///
+/// ```java
+/// `{center:'Center Label', south:'South Content'`}
+/// ```
+///
+/// Will create a Container with labels in its `BorderLayout#CENTER` and `BorderLayout#SOUTH` positions.
+///
+/// To make things even more succinct, it supports single-character property keys for the BorderLayout constraint values.  E.g. The following
+/// is equivalent to the previous example:
+///
+/// ```java
+/// `{c:'Center Label', s:'South Content'`}
+///
+/// **Other Layouts**:
+///
+///
+/// - **Flow Layout** - `{flow:[...]`}
+///
+/// - **Grid Layout** - `{grid:[...], cols:3, rows:2`}
+///
+/// - **Box Layout X** - `{x:[...]`}
+///
+/// - **Box Layout Y** - `{y:[...]`}
+///
+/// - **Layered Layout** - `{layered:[...]`}
+///
+/// - **Table Layout** - `{table:[['A1', 'B1', 'C1'], ['A2', 'B2', 'C2'], ...]`}
+///
+/// **Layout Variants**
+///
+/// BoxLayout and BorderLayout include variant shorthands to customize their behaviour.
+///
+///
+/// - **xNoGrow, xng** - Same as `{x:[...], noGrow:true`}
+///
+/// - **yBottomLast, ybl** - Same as `{y:[...], bottomLast:true`}
+///
+/// - **centerAbsolute, centerAbs, ca** - Same as `{center:[...], behavior:absolute`}
+///
+/// - **centerTotalBelow, ctb** - Same as `{center:[...], behavior:totalBelow`}
+///
+/// **Embedding Placeholders/Parameters**
+///
+/// The notation for embedding placeholder components (which must be injected via `com.codename1.ui.Component)`),
+/// is similar to the XML equivalent.  Just place the parmeter name, prefixed with '$'.  E.g.
+///
+/// `$submitButton`
+/// ```
+///
+/// Example JSON Notation
+///
+/// ```java
+/// `Component view = UIFragment.parseJSON(&quot;{n:['Hello', 'World', $checkbox], c:[y, {class:'MyTable', table:[['Username', $username], ['Password', $password]]`, {flow:['Some text'], align:center}], s:$submit}&quot;)
+///     .set(&quot;username&quot;, new TextField())
+///     .set(&quot;password&quot;, new TextField())
+///     .set(&quot;submit&quot;, new Button(&quot;Submit&quot;))
+///     .set(&quot;checkbox&quot;, new CheckBox(&quot;Check Me&quot;))
+///     .getView();
+/// }
+/// ```
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
+public final class UIFragment {
+
+
+    // The root element of this template
+    private final Element root;
+    // Index that stores any component which included an &quot;id&quot; attribute
+<span class="fc" id="L221">    private final Map&lt;String, Component&gt; index = new HashMap&lt;String, Component&gt;();</span>
+    // Parameters for the template.  Any tag with tag name startign with $ will
+    // be replaced by a corresponding parameter
+<span class="fc" id="L224">    private final Map&lt;String, Component&gt; parameters = new HashMap&lt;String, Component&gt;();</span>
+    // The root view of the template
+    private Container view;
+    // The factory that creates components from XML elements
+<span class="fc" id="L228">    private ComponentFactory factory = new DefaultComponentFactory();</span>
+
+<span class="fc" id="L230">    private UIFragment(Element el) {</span>
+<span class="fc" id="L231">        this.root = el;</span>
+<span class="fc" id="L232">    }</span>
+
+    /// Parses input stream of XML into a Template
+    ///
+    /// #### Parameters
+    ///
+    /// - `input`: InputStream with XML content to parse
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding template, or a RuntimeException if parsing failed.
+    public static UIFragment parseXML(InputStream input) {
+        try {
+<span class="nc" id="L245">            XMLParser p = new XMLParser();</span>
+<span class="nc" id="L246">            Element el = p.parse(Util.getReader(input));</span>
+<span class="nc" id="L247">            return new UIFragment(el);</span>
+<span class="nc" id="L248">        } catch (Exception ex) {</span>
+<span class="nc" id="L249">            Log.e(ex);</span>
+<span class="nc" id="L250">            throw new RuntimeException(ex.getMessage(), ex);</span>
+        }
+    }
+
+    /// Parses XML string into a Template
+    ///
+    /// #### Parameters
+    ///
+    /// - `xml`: XML string describing a UI.
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding template, or a RuntimeException if parsing failed.
+    public static UIFragment parseXML(String xml) {
+        try {
+<span class="fc" id="L265">            XMLParser p = new XMLParser();</span>
+<span class="fc" id="L266">            p.setCaseSensitive(true);</span>
+<span class="fc" id="L267">            Element el = p.parse(new CharArrayReader(xml.toCharArray()));</span>
+<span class="fc" id="L268">            return new UIFragment(el);</span>
+<span class="nc" id="L269">        } catch (Exception ex) {</span>
+<span class="nc" id="L270">            Log.e(ex);</span>
+<span class="nc" id="L271">            throw new RuntimeException(ex.getMessage(), ex);</span>
+        }
+    }
+
+    /// Parses a JSON string into a template.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: A JSON string representing a UI hierarchy.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    public static UIFragment parseJSON(String json) {
+        try {
+<span class="fc" id="L286">            Element el = UINotationParser.parseJSONNotation(json);</span>
+<span class="fc" id="L287">            return new UIFragment(el);</span>
+<span class="nc" id="L288">        } catch (Exception ex) {</span>
+<span class="nc" id="L289">            Log.e(ex);</span>
+<span class="nc" id="L290">            throw new RuntimeException(ex.getMessage(), ex);</span>
+        }
+    }
+
+    private static boolean inArray(Object needle, Object[] haystack) {
+<span class="nc" id="L295">        int len = haystack.length;</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">            if (needle.equals(haystack[i])) {</span>
+<span class="nc" id="L298">                return true;</span>
+            }
+        }
+<span class="nc" id="L301">        return false;</span>
+    }
+
+    /// Gets the view that is generated by this template.
+    public Container getView() {
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (view == null) {</span>
+<span class="fc" id="L307">            view = (Container) getFactory().newComponent(root);</span>
+<span class="fc" id="L308">            decorate(root, view);</span>
+<span class="fc" id="L309">            build(root, view);</span>
+        }
+<span class="fc" id="L311">        return view;</span>
+    }
+
+    private void decorate(Element el, Component cmp) {
+<span class="fc" id="L315">        String classAttr = el.getAttribute(&quot;class&quot;);</span>
+<span class="pc bpc" id="L316" title="3 of 4 branches missed.">        if (classAttr != null &amp;&amp; classAttr.length() &gt; 0) {</span>
+<span class="nc" id="L317">            String[] tags = Util.split(classAttr, &quot; &quot;);</span>
+<span class="nc" id="L318">            $(cmp).addTags(tags);</span>
+        }
+<span class="fc" id="L320">        String uiid = el.getAttribute(&quot;uiid&quot;);</span>
+<span class="pc bpc" id="L321" title="1 of 4 branches missed.">        if (uiid != null &amp;&amp; uiid.length() &gt; 0) {</span>
+<span class="fc" id="L322">            cmp.setUIID(uiid);</span>
+        }
+<span class="fc" id="L324">        String id = el.getAttribute(&quot;id&quot;);</span>
+<span class="pc bpc" id="L325" title="1 of 4 branches missed.">        if (id != null &amp;&amp; id.length() &gt; 0) {</span>
+<span class="fc" id="L326">            index.put(id, cmp);</span>
+        }
+
+<span class="fc" id="L329">        String name = el.getAttribute(&quot;name&quot;);</span>
+<span class="pc bpc" id="L330" title="3 of 4 branches missed.">        if (name != null &amp;&amp; name.length() &gt; 0) {</span>
+<span class="nc" id="L331">            cmp.setName(name);</span>
+        }
+<span class="fc" id="L333">        String flags = el.getAttribute(&quot;flags&quot;);</span>
+
+<span class="pc bpc" id="L335" title="5 of 6 branches missed.">        if (flags != null &amp;&amp; flags.indexOf(&quot;safeArea&quot;) &gt;= 0 &amp;&amp; (cmp instanceof Container)) {</span>
+<span class="nc" id="L336">            ((Container) cmp).setSafeArea(true);</span>
+        }
+<span class="fc" id="L338">    }</span>
+
+    private List&lt;Element&gt; getChildren(Element el) {
+<span class="fc" id="L341">        String tagName = el.getTagName();</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (&quot;table&quot;.equals(tagName)) {</span>
+<span class="nc" id="L343">            List&lt;Element&gt; out = new ArrayList&lt;Element&gt;();</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">            for (Object row : el.getChildrenByTagName(&quot;tr&quot;)) {</span>
+<span class="nc" id="L345">                Element erow = (Element) row;</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                for (Object cell : erow.getChildrenByTagName(&quot;td&quot;)) {</span>
+<span class="nc" id="L347">                    Element ecell = (Element) cell;</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                    if (ecell.getNumChildren() &gt; 0) {</span>
+<span class="nc" id="L349">                        out.add(ecell.getChildAt(0));</span>
+                    }
+<span class="nc" id="L351">                }</span>
+
+<span class="nc" id="L353">            }</span>
+<span class="nc" id="L354">            return out;</span>
+        } else {
+<span class="fc" id="L356">            List&lt;Element&gt; out = new ArrayList&lt;Element&gt;();</span>
+<span class="fc" id="L357">            int len = el.getNumChildren();</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L359">                out.add(el.getChildAt(i));</span>
+            }
+<span class="fc" id="L361">            return out;</span>
+        }
+    }
+
+    private void build(Element model, Container view) {
+<span class="fc" id="L366">        List&lt;Element&gt; children = getChildren(model);</span>
+<span class="fc" id="L367">        int len = children.size();</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L369">            Element child = children.get(i);</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            if (child.isTextElement()) {</span>
+<span class="nc" id="L371">                continue;</span>
+            }
+<span class="fc" id="L373">            String tagName = child.getTagName();</span>
+
+            Component cmp;
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (tagName.startsWith(&quot;$&quot;)) {</span>
+<span class="fc" id="L377">                String pname = tagName.substring(1);</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">                if (!parameters.containsKey(pname)) {</span>
+<span class="nc" id="L379">                    throw new IllegalArgumentException(&quot;Missing parameter &quot; + pname);</span>
+                }
+<span class="fc" id="L381">                cmp = parameters.get(pname);</span>
+<span class="fc" id="L382">                decorate(child, cmp);</span>
+<span class="fc" id="L383">            } else {</span>
+<span class="fc" id="L384">                cmp = getFactory().newComponent(child);</span>
+<span class="fc" id="L385">                decorate(child, cmp);</span>
+            }
+
+<span class="fc" id="L388">            Object constraint = getFactory().newConstraint(view, model, cmp, child);</span>
+<span class="fc" id="L389">            view.add(constraint, cmp);</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">            if (cmp instanceof Container) {</span>
+<span class="fc" id="L391">                build(child, (Container) cmp);</span>
+            }
+
+        }
+<span class="fc" id="L395">    }</span>
+
+    private void reset() {
+<span class="fc" id="L398">        view = null;</span>
+<span class="fc" id="L399">        index.clear();</span>
+
+<span class="fc" id="L401">    }</span>
+
+    /// Sets a parameter component in this template.  Templates that include &quot;parameter&quot;
+    /// tags will inject these parameters into the resulting view.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paramName`: The name of the parameter.
+    ///
+    /// - `param`: The component to inject into the template.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    public UIFragment set(String paramName, Component param) {
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (view != null) {</span>
+<span class="fc" id="L417">            reset();</span>
+        }
+<span class="fc" id="L419">        parameters.put(paramName, param);</span>
+<span class="pc bpc" id="L420" title="2 of 4 branches missed.">        if (param != null &amp;&amp; param.getName() == null) {</span>
+<span class="fc" id="L421">            param.setName(paramName);</span>
+        }
+<span class="fc" id="L423">        return this;</span>
+    }
+
+    /// Gets a component in the template by its ID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The ID of the component.
+    ///
+    /// #### Returns
+    ///
+    /// The component with matching ID.
+    public Component findById(String id) {
+<span class="fc" id="L436">        getView();</span>
+<span class="fc" id="L437">        return index.get(id.toLowerCase());</span>
+    }
+
+    /// Gets the component factory that is currently set for this fragment.
+    ///
+    /// #### Returns
+    ///
+    /// the factory
+    public ComponentFactory getFactory() {
+<span class="fc" id="L446">        return factory;</span>
+    }
+
+    /// Sets the component factory to be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `factory`: the factory to set
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining
+    public UIFragment setFactory(ComponentFactory factory) {
+<span class="fc" id="L459">        this.factory = factory;</span>
+<span class="fc" id="L460">        return this;</span>
+    }
+
+    /// A factory for converting XML elements to Components.
+    ///
+    /// #### See also
+    ///
+    /// - #setFactory(com.codename1.ui.UIFragment.ComponentFactory)
+    ///
+    /// - #getFactory()
+    public interface ComponentFactory {
+        /// Creates a new component given its XML description.
+        ///
+        /// #### Parameters
+        ///
+        /// - `el`: The XML element
+        ///
+        /// #### Returns
+        ///
+        /// A Component.
+        Component newComponent(Element el);
+
+        /// Creates a layout constraint for adding a child component to a parent component.
+        ///
+        /// #### Parameters
+        ///
+        /// - `parent`: The parent component.
+        ///
+        /// - `parentEl`: The XML element for the parent component.
+        ///
+        /// - `child`: The child component.
+        ///
+        /// - `childEl`: The XML element for the child component.
+        ///
+        /// #### Returns
+        ///
+        /// Layout constraint for adding to the parent component.
+        Object newConstraint(Container parent, Element parentEl, Component child, Element childEl);
+    }
+
+    /// Default component factory that is used in templates.  Supports the following tags:
+    ///
+    /// - y
+    ///
+    /// - x
+    ///
+    /// - flow
+    ///
+    /// - layered
+    ///
+    /// - border
+    ///
+    /// - table
+    ///
+    /// - label
+    ///
+    /// - button
+<span class="fc" id="L517">    public static class DefaultComponentFactory implements ComponentFactory {</span>
+
+        private static int centerBehaviour(String behaviour) {
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">            if (&quot;scale&quot;.equalsIgnoreCase(behaviour)) {</span>
+<span class="nc" id="L521">                return BorderLayout.CENTER_BEHAVIOR_SCALE;</span>
+            }
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">            if (&quot;absolute&quot;.equalsIgnoreCase(behaviour)) {</span>
+<span class="fc" id="L524">                return BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;</span>
+            }
+<span class="nc bnc" id="L526" title="All 2 branches missed.">            if (&quot;center&quot;.equalsIgnoreCase(behaviour)) {</span>
+<span class="nc" id="L527">                return BorderLayout.CENTER_BEHAVIOR_CENTER;</span>
+            }
+<span class="nc bnc" id="L529" title="All 2 branches missed.">            if (&quot;totalBelow&quot;.equalsIgnoreCase(behaviour)) {</span>
+<span class="nc" id="L530">                return BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW;</span>
+            }
+<span class="nc" id="L532">            return BorderLayout.CENTER_BEHAVIOR_SCALE;</span>
+        }
+
+        private static int align(String align) {
+<span class="nc bnc" id="L536" title="All 2 branches missed.">            if (&quot;left&quot;.equals(align)) {</span>
+<span class="nc" id="L537">                return Component.LEFT;</span>
+            }
+<span class="nc bnc" id="L539" title="All 2 branches missed.">            if (&quot;right&quot;.equals(align)) {</span>
+<span class="nc" id="L540">                return Component.RIGHT;</span>
+            }
+<span class="nc bnc" id="L542" title="All 2 branches missed.">            if (&quot;center&quot;.equals(align)) {</span>
+<span class="nc" id="L543">                return Component.CENTER;</span>
+            }
+<span class="nc" id="L545">            return 0;</span>
+        }
+
+        private static int valign(String valign) {
+<span class="nc bnc" id="L549" title="All 2 branches missed.">            if (&quot;top&quot;.equals(valign)) {</span>
+<span class="nc" id="L550">                return Component.TOP;</span>
+            }
+<span class="nc bnc" id="L552" title="All 2 branches missed.">            if (&quot;center&quot;.equals(valign)) {</span>
+<span class="nc" id="L553">                return Component.CENTER;</span>
+            }
+<span class="nc bnc" id="L555" title="All 2 branches missed.">            if (&quot;bottom&quot;.equals(valign)) {</span>
+<span class="nc" id="L556">                return Component.BOTTOM;</span>
+            }
+<span class="nc" id="L558">            return 0;</span>
+        }
+
+        private static boolean empty(Element el, String attName) {
+<span class="fc" id="L562">            String val = el.getAttribute(attName);</span>
+<span class="pc bpc" id="L563" title="1 of 4 branches missed.">            return val == null || val.length() == 0;</span>
+        }
+
+        @Override
+        public Component newComponent(Element el) {
+<span class="fc" id="L568">            String name = el.getTagName().toLowerCase();</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">            if (name.startsWith(&quot;border&quot;)) {</span>
+<span class="fc" id="L570">                BorderLayout l = new BorderLayout();</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">                if (name.startsWith(&quot;borderabs&quot;)) {</span>
+<span class="fc" id="L572">                    l.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">                } else if (name.startsWith(&quot;borderscale&quot;)) {</span>
+<span class="nc" id="L574">                    l.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">                } else if (name.startsWith(&quot;bordertotalbelow&quot;)) {</span>
+<span class="nc" id="L576">                    l.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);</span>
+                } else {
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">                    if (!empty(el, &quot;behaviour&quot;)) {</span>
+<span class="nc" id="L579">                        l.setCenterBehavior(centerBehaviour(el.getAttribute(&quot;behaviour&quot;)));</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">                    } else if (!empty(el, &quot;behavior&quot;)) {</span>
+<span class="fc" id="L581">                        l.setCenterBehavior(centerBehaviour(el.getAttribute(&quot;behavior&quot;)));</span>
+                    }
+                }
+<span class="fc" id="L584">                return new Container(l);</span>
+            }
+<span class="fc bfc" id="L586" title="All 2 branches covered.">            if (name.startsWith(&quot;y&quot;)) {</span>
+                BoxLayout l;
+<span class="pc bpc" id="L588" title="2 of 4 branches missed.">                if (name.startsWith(&quot;ybottom&quot;) || &quot;ybl&quot;.equals(name)) {</span>
+<span class="nc" id="L589">                    l = new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);</span>
+                } else {
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">                    if (&quot;true&quot;.equalsIgnoreCase(el.getAttribute(&quot;bottomLast&quot;))) {</span>
+<span class="nc" id="L592">                        l = new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);</span>
+                    } else {
+<span class="fc" id="L594">                        l = new BoxLayout(BoxLayout.Y_AXIS);</span>
+                    }
+                }
+<span class="fc" id="L597">                return new Container(l);</span>
+            }
+<span class="fc bfc" id="L599" title="All 2 branches covered.">            if (name.startsWith(&quot;x&quot;)) {</span>
+                BoxLayout l;
+<span class="pc bpc" id="L601" title="1 of 4 branches missed.">                if (name.startsWith(&quot;xnogrow&quot;) || &quot;xng&quot;.equals(name)) {</span>
+<span class="fc" id="L602">                    l = new BoxLayout(BoxLayout.X_AXIS_NO_GROW);</span>
+                } else {
+<span class="pc bpc" id="L604" title="1 of 4 branches missed.">                    if (&quot;true&quot;.equalsIgnoreCase(el.getAttribute(&quot;noGrow&quot;)) || &quot;false&quot;.equalsIgnoreCase(el.getAttribute(&quot;grow&quot;))) {</span>
+<span class="fc" id="L605">                        l = new BoxLayout(BoxLayout.X_AXIS_NO_GROW);</span>
+                    } else {
+<span class="fc" id="L607">                        l = new BoxLayout(BoxLayout.X_AXIS);</span>
+                    }
+                }
+<span class="fc" id="L610">                return new Container(l);</span>
+            }
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">            if (&quot;flow&quot;.equals(name)) {</span>
+<span class="nc" id="L613">                FlowLayout fl = new FlowLayout();</span>
+<span class="nc" id="L614">                String align = el.getAttribute(&quot;align&quot;);</span>
+<span class="nc" id="L615">                String valign = el.getAttribute(&quot;valign&quot;);</span>
+<span class="nc bnc" id="L616" title="All 4 branches missed.">                if (align != null &amp;&amp; align.length() &gt; 0) {</span>
+<span class="nc" id="L617">                    fl.setAlign(align(align));</span>
+                }
+<span class="nc bnc" id="L619" title="All 4 branches missed.">                if (valign != null &amp;&amp; valign.length() &gt; 0) {</span>
+<span class="nc" id="L620">                    fl.setValign(valign(valign));</span>
+                }
+<span class="nc" id="L622">                return new Container(fl);</span>
+            }
+<span class="pc bpc" id="L624" title="1 of 2 branches missed.">            if (&quot;grid&quot;.equals(name)) {</span>
+<span class="nc" id="L625">                String colsStr = el.getAttribute(&quot;cols&quot;);</span>
+                int cols;
+                try {
+<span class="nc" id="L628">                    cols = Integer.parseInt(colsStr);</span>
+<span class="nc" id="L629">                } catch (Throwable t) {</span>
+
+<span class="nc" id="L631">                    throw new RuntimeException(&quot;grid requires cols attribute.&quot;, t);</span>
+<span class="nc" id="L632">                }</span>
+<span class="nc" id="L633">                String rowsStr = el.getAttribute(&quot;rows&quot;);</span>
+<span class="nc" id="L634">                int rows = -1;</span>
+                try {
+<span class="nc" id="L636">                    rows = Integer.parseInt(rowsStr);</span>
+<span class="nc" id="L637">                } catch (Throwable t) {</span>
+<span class="nc" id="L638">                    rows = (int) Math.ceil(el.getNumChildren() / (double) cols);</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">                    if (rows == 0) {</span>
+<span class="nc" id="L640">                        rows = 1;</span>
+                    }
+<span class="nc" id="L642">                }</span>
+<span class="nc" id="L643">                return new Container(new GridLayout(rows, cols));</span>
+            }
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">            if (&quot;table&quot;.equals(name)) {</span>
+<span class="nc" id="L646">                String colsStr = el.getAttribute(&quot;cols&quot;);</span>
+<span class="nc" id="L647">                String rowsStr = el.getAttribute(&quot;rows&quot;);</span>
+<span class="nc" id="L648">                int rows = -1;</span>
+<span class="nc" id="L649">                int cols = -1;</span>
+<span class="nc bnc" id="L650" title="All 4 branches missed.">                if (colsStr != null &amp;&amp; colsStr.length() &gt; 0) {</span>
+<span class="nc" id="L651">                    cols = Integer.parseInt(colsStr);</span>
+                }
+<span class="nc bnc" id="L653" title="All 4 branches missed.">                if (rowsStr != null &amp;&amp; rowsStr.length() &gt; 0) {</span>
+<span class="nc" id="L654">                    rows = Integer.parseInt(rowsStr);</span>
+                }
+<span class="nc" id="L656">                Vector children = el.getChildrenByTagName(&quot;tr&quot;);</span>
+<span class="nc bnc" id="L657" title="All 2 branches missed.">                if (rows &lt; 0) {</span>
+<span class="nc" id="L658">                    rows = children.size();</span>
+                }
+<span class="nc bnc" id="L660" title="All 2 branches missed.">                if (cols &lt; 0) {</span>
+<span class="nc bnc" id="L661" title="All 2 branches missed.">                    if (!children.isEmpty()) {</span>
+<span class="nc" id="L662">                        Element firstRow = (Element) children.get(0);</span>
+<span class="nc" id="L663">                        Vector firstRowCols = firstRow.getChildrenByTagName(&quot;td&quot;);</span>
+<span class="nc" id="L664">                        cols = firstRowCols.size();</span>
+                    }
+                }
+
+<span class="nc" id="L668">                rows = Math.max(1, rows);</span>
+<span class="nc" id="L669">                cols = Math.max(1, cols);</span>
+<span class="nc" id="L670">                TableLayout tl = new TableLayout(rows, cols);</span>
+<span class="nc" id="L671">                return new Container(tl);</span>
+
+
+            }
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">            if (&quot;layered&quot;.equals(name)) {</span>
+<span class="nc" id="L676">                return new Container(new LayeredLayout());</span>
+            }
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">            if (&quot;label&quot;.equals(name)) {</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">                Element textEl = el.getNumChildren() &gt; 0 ? el.getChildAt(0) : null;</span>
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">                String text = textEl != null ? textEl.getText() : &quot;&quot;;</span>
+<span class="fc" id="L681">                return new Label(text);</span>
+            }
+<span class="nc bnc" id="L683" title="All 2 branches missed.">            if (&quot;button&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L684" title="All 2 branches missed.">                Element textEl = el.getNumChildren() &gt; 0 ? el.getChildAt(0) : null;</span>
+<span class="nc bnc" id="L685" title="All 2 branches missed.">                String text = textEl != null ? textEl.getText() : &quot;&quot;;</span>
+<span class="nc" id="L686">                return new Button(text);</span>
+            }
+<span class="nc" id="L688">            throw new IllegalArgumentException(&quot;Unsupported element &quot; + name);</span>
+        }
+
+        @Override
+        public Object newConstraint(Container parent, Element parentEl, Component child, Element childEl) {
+<span class="fc" id="L693">            Layout l = parent.getLayout();</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">            if (l instanceof BorderLayout) {</span>
+<span class="fc" id="L695">                String cnst = childEl.getAttribute(&quot;constraint&quot;);</span>
+<span class="pc bpc" id="L696" title="1 of 2 branches missed.">                if (cnst == null) {</span>
+<span class="nc" id="L697">                    return BorderLayout.CENTER;</span>
+                }
+<span class="fc" id="L699">                cnst = cnst.toLowerCase();</span>
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">                if (&quot;north&quot;.equals(cnst)) {</span>
+<span class="nc" id="L701">                    return BorderLayout.NORTH;</span>
+                }
+<span class="fc bfc" id="L703" title="All 2 branches covered.">                if (&quot;south&quot;.equals(cnst)) {</span>
+<span class="fc" id="L704">                    return BorderLayout.SOUTH;</span>
+                }
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">                if (&quot;east&quot;.equals(cnst)) {</span>
+<span class="nc" id="L707">                    return BorderLayout.EAST;</span>
+                }
+<span class="pc bpc" id="L709" title="1 of 2 branches missed.">                if (&quot;west&quot;.equals(cnst)) {</span>
+<span class="nc" id="L710">                    return BorderLayout.WEST;</span>
+                }
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">                if (&quot;center&quot;.equals(cnst)) {</span>
+<span class="fc" id="L713">                    return BorderLayout.CENTER;</span>
+                }
+<span class="nc bnc" id="L715" title="All 2 branches missed.">                if (&quot;overlay&quot;.equals(cnst)) {</span>
+<span class="nc" id="L716">                    return BorderLayout.OVERLAY;</span>
+                }
+<span class="nc" id="L718">                throw new IllegalArgumentException(&quot;Unsupported constraint &quot; + cnst);</span>
+
+            }
+<span class="fc" id="L721">            return null;</span>
+        }
+
+    }
+
+    private static class UINotationParser {
+
+<span class="fc" id="L728">        private static final String[] ATTRIBUTES = new String[]{&quot;uiid&quot;, &quot;id&quot;, &quot;class&quot;, &quot;cols&quot;, &quot;rows&quot;, &quot;align&quot;, &quot;valign&quot;, &quot;name&quot;, &quot;grow&quot;, &quot;noGrow&quot;, &quot;behaviour&quot;, &quot;behavior&quot;, &quot;bottomLast&quot;};</span>
+<span class="fc" id="L729">        private static final String[] BORDER_LAYOUT_CONSTRAINTS = new String[]{&quot;north&quot;, &quot;south&quot;, &quot;east&quot;, &quot;west&quot;, &quot;overlay&quot;, &quot;center&quot;};</span>
+<span class="fc" id="L730">        private static final String[] BORDER_LAYOUT_SINGLE_CHAR_ALIASES = new String[]{&quot;n&quot;, &quot;s&quot;, &quot;e&quot;, &quot;w&quot;, &quot;c&quot;, &quot;o&quot;};</span>
+<span class="fc" id="L731">        private static final String[] BORDER_LAYOUT_KEYS = new String[]{&quot;north&quot;, &quot;south&quot;, &quot;east&quot;, &quot;west&quot;, &quot;overlay&quot;, &quot;center&quot;, &quot;n&quot;, &quot;s&quot;, &quot;e&quot;, &quot;w&quot;, &quot;c&quot;, &quot;o&quot;, &quot;centerAbsolute&quot;, &quot;centerScale&quot;, &quot;centerAbs&quot;, &quot;centerTotalBelow&quot;, &quot;ca&quot;, &quot;cs&quot;, &quot;ctb&quot;};</span>
+<span class="fc" id="L732">        private static final String[] BORDER_LAYOUT_CENTER_ALIASES = new String[]{&quot;c&quot;, &quot;centerAbsolute&quot;, &quot;centerScale&quot;, &quot;centerAbs&quot;, &quot;centerTotalBelow&quot;, &quot;ca&quot;, &quot;cs&quot;, &quot;ctb&quot;};</span>
+
+        private static Map parseJSON(String json) throws IOException {
+<span class="fc" id="L735">            JSONParser parser = new JSONParser();</span>
+<span class="fc" id="L736">            parser.setStrict(false);</span>
+<span class="fc" id="L737">            return parser.parseJSON(new CharArrayReader(json.toCharArray()));</span>
+
+        }
+
+        private static Element parseJSONNotation(String json) throws IOException {
+<span class="fc" id="L742">            Map m = parseJSON(json);</span>
+<span class="fc" id="L743">            return buildXMLFromJSONNotation(m);</span>
+
+        }
+
+        private static boolean isBorderLayout(Map m) {
+<span class="fc bfc" id="L748" title="All 2 branches covered.">            for (String key : BORDER_LAYOUT_KEYS) {</span>
+<span class="fc bfc" id="L749" title="All 2 branches covered.">                if (m.containsKey(key)) {</span>
+<span class="fc" id="L750">                    return true;</span>
+                }
+            }
+<span class="fc" id="L753">            return false;</span>
+        }
+
+        private static void setBorderLayoutBehaviour(Map m) {
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">            if (m.containsKey(&quot;behavior&quot;)) {</span>
+<span class="nc" id="L758">                return;</span>
+            }
+<span class="pc bpc" id="L760" title="2 of 6 branches missed.">            if (m.containsKey(&quot;centerAbsolute&quot;) || m.containsKey(&quot;ca&quot;) || m.containsKey(&quot;centerAbs&quot;)) {</span>
+<span class="fc" id="L761">                m.put(&quot;behavior&quot;, &quot;absolute&quot;);</span>
+<span class="fc" id="L762">                return;</span>
+            }
+<span class="pc bpc" id="L764" title="2 of 4 branches missed.">            if (m.containsKey(&quot;centerScale&quot;) || m.containsKey(&quot;cs&quot;)) {</span>
+<span class="nc" id="L765">                m.put(&quot;behavior&quot;, &quot;scale&quot;);</span>
+<span class="nc" id="L766">                return;</span>
+            }
+<span class="pc bpc" id="L768" title="2 of 4 branches missed.">            if (m.containsKey(&quot;centerTotalBelow&quot;) || m.containsKey(&quot;ctb&quot;)) {</span>
+<span class="nc" id="L769">                m.put(&quot;behavior&quot;, &quot;totalBelow&quot;);</span>
+            }
+
+
+<span class="fc" id="L773">        }</span>
+
+        private static boolean isBoxLayoutX(Map m) {
+<span class="pc bpc" id="L776" title="3 of 6 branches missed.">            return m.containsKey(&quot;x&quot;) || m.containsKey(&quot;xng&quot;) || m.containsKey(&quot;xNoGrow&quot;);</span>
+        }
+
+        private static void setBoxLayoutXNoGrow(Map m) {
+<span class="pc bpc" id="L780" title="1 of 2 branches missed.">            if (m.containsKey(&quot;xNoGrow&quot;)) {</span>
+<span class="nc" id="L781">                m.put(&quot;x&quot;, m.get(&quot;xNoGrow&quot;));</span>
+<span class="nc" id="L782">                m.put(&quot;noGrow&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L783">                return;</span>
+            }
+<span class="fc bfc" id="L785" title="All 2 branches covered.">            if (m.containsKey(&quot;xng&quot;)) {</span>
+<span class="fc" id="L786">                m.put(&quot;x&quot;, m.get(&quot;xng&quot;));</span>
+<span class="fc" id="L787">                m.put(&quot;noGrow&quot;, &quot;true&quot;);</span>
+            }
+<span class="fc" id="L789">        }</span>
+
+        private static void setBoxLayoutYBottomLast(Map m) {
+<span class="nc bnc" id="L792" title="All 2 branches missed.">            if (m.containsKey(&quot;yBottom&quot;)) {</span>
+<span class="nc" id="L793">                m.put(&quot;y&quot;, m.get(&quot;yBottom&quot;));</span>
+<span class="nc" id="L794">                m.put(&quot;bottomLast&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L795">                return;</span>
+            }
+<span class="nc bnc" id="L797" title="All 2 branches missed.">            if (m.containsKey(&quot;yBottomLast&quot;)) {</span>
+<span class="nc" id="L798">                m.put(&quot;y&quot;, m.get(&quot;yBottomLast&quot;));</span>
+<span class="nc" id="L799">                m.put(&quot;bottomLast&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L800">                return;</span>
+            }
+<span class="nc bnc" id="L802" title="All 2 branches missed.">            if (m.containsKey(&quot;ybl&quot;)) {</span>
+<span class="nc" id="L803">                m.put(&quot;y&quot;, m.get(&quot;ybl&quot;));</span>
+<span class="nc" id="L804">                m.put(&quot;bottomLast&quot;, &quot;true&quot;);</span>
+            }
+<span class="nc" id="L806">        }</span>
+
+        private static boolean isBoxLayoutY(Map m) {
+<span class="nc bnc" id="L809" title="All 8 branches missed.">            return m.containsKey(&quot;y&quot;) || m.containsKey(&quot;yBottom&quot;) || m.containsKey(&quot;yBottomLast&quot;) || m.containsKey(&quot;ybl&quot;);</span>
+        }
+
+        private static boolean isGridLayout(Map m) {
+<span class="nc" id="L813">            return m.containsKey(&quot;grid&quot;);</span>
+        }
+
+        private static boolean isFlowLayout(Map m) {
+<span class="nc" id="L817">            return m.containsKey(&quot;flow&quot;);</span>
+        }
+
+        private static boolean isLayered(Map m) {
+<span class="nc" id="L821">            return m.containsKey(&quot;layered&quot;);</span>
+        }
+
+        private static boolean isTableLayout(Map m) {
+<span class="fc" id="L825">            return m.containsKey(&quot;table&quot;);</span>
+        }
+
+
+        private static Element buildXMLFromJSONNotation(Object o) throws IOException {
+<span class="fc" id="L830">            Element el = null;</span>
+            //System.out.println(&quot;Building &quot;+o);
+<span class="fc bfc" id="L832" title="All 2 branches covered.">            if (o instanceof Map) {</span>
+<span class="fc" id="L833">                Map m = (Map) o;</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">                if (m.get(&quot;root&quot;) != null) {</span>
+                    // The root is an array.
+<span class="nc" id="L836">                    return buildXMLFromJSONNotation(m.get(&quot;root&quot;));</span>
+                } else {
+<span class="fc" id="L838">                    Object children = null;</span>
+<span class="fc bfc" id="L839" title="All 2 branches covered.">                    if (isBorderLayout(m)) {</span>
+<span class="fc" id="L840">                        setBorderLayoutBehaviour(m);</span>
+<span class="fc" id="L841">                        el = new Element(&quot;border&quot;);</span>
+<span class="pc bpc" id="L842" title="1 of 2 branches missed.">                    } else if (isBoxLayoutX(m)) {</span>
+<span class="fc" id="L843">                        setBoxLayoutXNoGrow(m);</span>
+<span class="fc" id="L844">                        el = new Element(&quot;x&quot;);</span>
+<span class="fc" id="L845">                        children = m.get(&quot;x&quot;);</span>
+<span class="nc bnc" id="L846" title="All 2 branches missed.">                    } else if (isBoxLayoutY(m)) {</span>
+<span class="nc" id="L847">                        setBoxLayoutYBottomLast(m);</span>
+<span class="nc" id="L848">                        el = new Element(&quot;y&quot;);</span>
+<span class="nc" id="L849">                        children = m.get(&quot;y&quot;);</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">                    } else if (isGridLayout(m)) {</span>
+<span class="nc" id="L851">                        el = new Element(&quot;grid&quot;);</span>
+<span class="nc" id="L852">                        children = m.get(&quot;grid&quot;);</span>
+<span class="nc bnc" id="L853" title="All 2 branches missed.">                    } else if (isLayered(m)) {</span>
+<span class="nc" id="L854">                        el = new Element(&quot;layered&quot;);</span>
+<span class="nc" id="L855">                        children = m.get(&quot;layered&quot;);</span>
+<span class="nc bnc" id="L856" title="All 2 branches missed.">                    } else if (isFlowLayout(m)) {</span>
+<span class="nc" id="L857">                        el = new Element(&quot;flow&quot;);</span>
+<span class="nc" id="L858">                        children = m.get(&quot;flow&quot;);</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">                    } else if (isTableLayout(m)) {</span>
+<span class="nc" id="L860">                        el = new Element(&quot;table&quot;);</span>
+<span class="nc" id="L861">                        children = m.get(&quot;table&quot;);</span>
+                    }
+<span class="fc bfc" id="L863" title="All 2 branches covered.">                    if (children instanceof List) {</span>
+<span class="pc bpc" id="L864" title="1 of 2 branches missed.">                        if (isTableLayout(m)) {</span>
+<span class="nc bnc" id="L865" title="All 2 branches missed.">                            for (Object child : (List) children) {</span>
+<span class="nc bnc" id="L866" title="All 2 branches missed.">                                if (child instanceof List) {</span>
+<span class="nc" id="L867">                                    Element row = new Element(&quot;tr&quot;);</span>
+<span class="nc bnc" id="L868" title="All 2 branches missed.">                                    for (Object cell : (List) child) {</span>
+<span class="nc" id="L869">                                        Element td = new Element(&quot;td&quot;);</span>
+<span class="nc" id="L870">                                        td.addChild(buildXMLFromJSONNotation(cell));</span>
+<span class="nc" id="L871">                                        row.addChild(td);</span>
+<span class="nc" id="L872">                                    }</span>
+<span class="nc" id="L873">                                    el.addChild(row);</span>
+<span class="nc" id="L874">                                } else {</span>
+<span class="nc" id="L875">                                    throw new RuntimeException(&quot;Tables require 2D array representing rows and columns&quot;);</span>
+                                }
+<span class="nc" id="L877">                            }</span>
+                        } else {
+<span class="fc bfc" id="L879" title="All 2 branches covered.">                            for (Object child : (List) children) {</span>
+<span class="fc" id="L880">                                el.addChild(buildXMLFromJSONNotation(child));</span>
+<span class="fc" id="L881">                            }</span>
+                        }
+<span class="pc bpc" id="L883" title="1 of 2 branches missed.">                    } else if (isBorderLayout(m)) {</span>
+<span class="fc bfc" id="L884" title="All 2 branches covered.">                        for (String constraint : BORDER_LAYOUT_SINGLE_CHAR_ALIASES) {</span>
+<span class="fc bfc" id="L885" title="All 2 branches covered.">                            if (m.containsKey(constraint)) {</span>
+<span class="fc" id="L886">                                char c = constraint.charAt(0);</span>
+<span class="pc bpc" id="L887" title="5 of 7 branches missed.">                                switch (c) {</span>
+                                    case 'n':
+<span class="nc" id="L889">                                        m.put(&quot;north&quot;, m.get(&quot;n&quot;));</span>
+<span class="nc" id="L890">                                        break;</span>
+                                    case 's':
+<span class="fc" id="L892">                                        m.put(&quot;south&quot;, m.get(&quot;s&quot;));</span>
+<span class="fc" id="L893">                                        break;</span>
+                                    case 'e':
+<span class="nc" id="L895">                                        m.put(&quot;east&quot;, m.get(&quot;e&quot;));</span>
+<span class="nc" id="L896">                                        break;</span>
+                                    case 'w':
+<span class="nc" id="L898">                                        m.put(&quot;west&quot;, m.get(&quot;w&quot;));</span>
+<span class="nc" id="L899">                                        break;</span>
+                                    case 'c':
+<span class="fc" id="L901">                                        m.put(&quot;center&quot;, m.get(&quot;c&quot;));</span>
+<span class="fc" id="L902">                                        break;</span>
+                                    case 'o':
+<span class="nc" id="L904">                                        m.put(&quot;overlay&quot;, m.get(&quot;o&quot;));</span>
+<span class="nc" id="L905">                                        break;</span>
+                                    default:
+                                        break;
+                                }
+                            }
+                        }
+<span class="fc bfc" id="L911" title="All 2 branches covered.">                        if (!m.containsKey(&quot;center&quot;)) {</span>
+<span class="pc bpc" id="L912" title="1 of 2 branches missed.">                            for (String constraint : BORDER_LAYOUT_CENTER_ALIASES) {</span>
+<span class="fc bfc" id="L913" title="All 2 branches covered.">                                if (m.containsKey(constraint)) {</span>
+<span class="fc" id="L914">                                    m.put(&quot;center&quot;, m.get(constraint));</span>
+<span class="fc" id="L915">                                    break;</span>
+                                }
+                            }
+                        }
+<span class="fc bfc" id="L919" title="All 2 branches covered.">                        for (String constraint : BORDER_LAYOUT_CONSTRAINTS) {</span>
+<span class="fc bfc" id="L920" title="All 2 branches covered.">                            if (m.containsKey(constraint)) {</span>
+<span class="fc" id="L921">                                Element north = buildXMLFromJSONNotation(m.get(constraint));</span>
+<span class="fc" id="L922">                                north.setAttribute(&quot;constraint&quot;, constraint);</span>
+<span class="fc" id="L923">                                el.addChild(north);</span>
+                            }
+                        }
+
+                    } else {
+<span class="nc" id="L928">                        el.addChild(buildXMLFromJSONNotation(children));</span>
+                    }
+<span class="fc bfc" id="L930" title="All 2 branches covered.">                    for (String k : ATTRIBUTES) {</span>
+<span class="fc bfc" id="L931" title="All 2 branches covered.">                        if (m.containsKey(k)) {</span>
+<span class="fc" id="L932">                            Object val = m.get(k);</span>
+<span class="pc bpc" id="L933" title="5 of 6 branches missed.">                            if (val instanceof Double &amp;&amp; (&quot;cols&quot;.equals(k) || &quot;rows&quot;.equals(k))) {</span>
+<span class="nc" id="L934">                                val = ((Double) val).intValue();</span>
+                            }
+<span class="fc" id="L936">                            el.setAttribute(k, String.valueOf(val));</span>
+                        }
+                    }
+
+<span class="fc" id="L940">                    return el;</span>
+                }
+<span class="pc bpc" id="L942" title="1 of 2 branches missed.">            } else if (o instanceof List) {</span>
+<span class="nc" id="L943">                List l = (List) o;</span>
+<span class="nc" id="L944">                int len = l.size();</span>
+<span class="nc bnc" id="L945" title="All 2 branches missed.">                if (len &gt; 0) {</span>
+<span class="nc" id="L946">                    Object first = l.get(0);</span>
+<span class="nc bnc" id="L947" title="All 2 branches missed.">                    if (first instanceof String) {</span>
+<span class="nc" id="L948">                        String s = (String) first;</span>
+<span class="nc bnc" id="L949" title="All 2 branches missed.">                        if (&quot;x&quot;.equals(first)) {</span>
+<span class="nc" id="L950">                            el = new Element(&quot;x&quot;);</span>
+<span class="nc bnc" id="L951" title="All 2 branches missed.">                        } else if (&quot;y&quot;.equals(first)) {</span>
+<span class="nc" id="L952">                            el = new Element(&quot;y&quot;);</span>
+<span class="nc bnc" id="L953" title="All 2 branches missed.">                        } else if (&quot;grid&quot;.equals(first)) {</span>
+<span class="nc" id="L954">                            el = new Element(&quot;grid&quot;);</span>
+<span class="nc bnc" id="L955" title="All 2 branches missed.">                        } else if (&quot;layered&quot;.equals(first)) {</span>
+<span class="nc" id="L956">                            el = new Element(&quot;layered&quot;);</span>
+                        } else {
+
+<span class="nc" id="L959">                            el = new Element(&quot;flow&quot;);</span>
+
+                        }
+<span class="nc bnc" id="L962" title="All 2 branches missed.">                        if (!inArray(s, new String[]{&quot;x&quot;, &quot;y&quot;, &quot;grid&quot;, &quot;flow&quot;, &quot;layered&quot;})) {</span>
+<span class="nc" id="L963">                            el.addChild(buildXMLFromJSONNotation(first));</span>
+                        }
+<span class="nc" id="L965">                    } else {</span>
+<span class="nc" id="L966">                        el = new Element(&quot;flow&quot;);</span>
+<span class="nc" id="L967">                        el.addChild(buildXMLFromJSONNotation(first));</span>
+                    }
+<span class="nc bnc" id="L969" title="All 2 branches missed.">                    for (int i = 1; i &lt; len; i++) {</span>
+<span class="nc" id="L970">                        Element child = buildXMLFromJSONNotation(l.get(i));</span>
+<span class="nc" id="L971">                        el.addChild(child);</span>
+                    }
+<span class="nc" id="L973">                } else {</span>
+<span class="nc" id="L974">                    el = new Element(&quot;flow&quot;);</span>
+                }
+<span class="nc" id="L976">                return el;</span>
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">            } else if (o instanceof String) {</span>
+<span class="fc" id="L978">                String str = (String) o;</span>
+<span class="fc bfc" id="L979" title="All 2 branches covered.">                if (str.startsWith(&quot;$&quot;)) {</span>
+<span class="fc" id="L980">                    el = new Element(str);</span>
+<span class="fc" id="L981">                    return el;</span>
+                } else {
+<span class="fc" id="L983">                    el = new Element(&quot;label&quot;);</span>
+<span class="fc" id="L984">                    Element textEl = new Element(null, true);</span>
+<span class="fc" id="L985">                    textEl.setText(str);</span>
+<span class="fc" id="L986">                    el.addChild(textEl);</span>
+<span class="fc" id="L987">                    return el;</span>
+                }
+            } else {
+<span class="nc" id="L990">                throw new IOException(&quot;Unexpected token type in UINotation: &quot; + o);</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

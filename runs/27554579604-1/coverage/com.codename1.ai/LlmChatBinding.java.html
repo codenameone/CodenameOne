@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LlmChatBinding.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">LlmChatBinding.java</span></div><h1>LlmChatBinding.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import com.codename1.components.ChatBubble;
+import com.codename1.components.ChatView;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Convenience wiring that turns a [ChatView] into an LLM-driven
+/// chat surface in one call. Pulls the user's input out of the
+/// view's [com.codename1.components.ChatInput], appends it as a USER
+/// message, opens a streaming chat call against the supplied
+/// [LlmClient], and pipes deltas into a freshly-appended assistant
+/// bubble.
+///
+/// `ChatView` itself has no dependency on the AI package, so apps
+/// that want a peer-to-peer messaging UI (a WhatsApp clone, for
+/// example) can keep using `ChatView` without pulling LlmClient
+/// onto their classpath -- it's only when you call
+/// [#bind(ChatView, LlmClient, ChatRequest)] that the binding is
+/// established.
+///
+/// #### Example
+///
+/// ```
+/// LlmClient client = LlmClient.openai(SecureStorage.getInstance().get(&quot;openai_key&quot;));
+/// ChatRequest base = ChatRequest.builder()
+///         .model(&quot;gpt-4o-mini&quot;)
+///         .addMessage(ChatMessage.system(&quot;You are a terse assistant.&quot;))
+///         .build();
+/// ChatView view = new ChatView();
+/// LlmChatBinding.bind(view, client, base);
+/// // ...add view to a Form and that's it.
+/// ```
+///
+/// The view's accumulated history is replayed on every turn so the
+/// model has full conversation context. The original `baseRequest`
+/// is treated as a template -- its model, tools, temperature, etc.
+/// are preserved across turns; its messages are used only when the
+/// view's own history is empty (e.g. to seed a system prompt).
+public final class LlmChatBinding {
+
+    private LlmChatBinding() {
+    }
+
+    public static void bind(final ChatView view,
+                            final LlmClient client,
+                            final ChatRequest baseRequest) {
+<span class="nc" id="L75">        view.setOnSend(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L78">                String text = view.getInput().getText();</span>
+<span class="nc bnc" id="L79" title="All 4 branches missed.">                if (text == null || text.length() == 0) {</span>
+<span class="nc" id="L80">                    return;</span>
+                }
+<span class="nc" id="L82">                view.getInput().clear();</span>
+<span class="nc" id="L83">                view.addMessage(ChatMessage.user(text));</span>
+<span class="nc" id="L84">                view.setTypingIndicatorVisible(true);</span>
+<span class="nc" id="L85">                final ChatBubble assistant = view.beginAssistantStream();</span>
+<span class="nc" id="L86">                ChatRequest replay = baseRequest.toBuilder()</span>
+<span class="nc" id="L87">                        .messages(buildOutgoingMessages(view, baseRequest))</span>
+<span class="nc" id="L88">                        .build();</span>
+<span class="nc" id="L89">                AsyncResource&lt;ChatResponse&gt; result = client.chatStream(replay,</span>
+<span class="nc" id="L90">                        new StreamingListener() {</span>
+                            @Override
+                            public void onContentDelta(String textDelta) {
+<span class="nc" id="L93">                                assistant.appendText(textDelta);</span>
+<span class="nc" id="L94">                            }</span>
+
+                            @Override
+                            public void onToolCallDelta(int index, String id, String name, String argumentsFragment) {
+                                // The default binding doesn't surface
+                                // tool calls -- apps that use tools
+                                // should wire up their own handler
+                                // around client.chatStream(...).
+<span class="nc" id="L102">                            }</span>
+
+                            @Override
+                            public void onUsage(Usage usage) {
+<span class="nc" id="L106">                            }</span>
+
+                            @Override
+                            public void onError(Throwable t) {
+<span class="nc" id="L110">                                assistant.appendText(&quot;\n\n[error: &quot; + t.getMessage() + &quot;]&quot;);</span>
+<span class="nc" id="L111">                            }</span>
+                        });
+<span class="nc" id="L113">                result.ready(new SuccessCallback&lt;ChatResponse&gt;() {</span>
+                    @Override
+                    public void onSucess(ChatResponse arg) {
+<span class="nc" id="L116">                        view.setTypingIndicatorVisible(false);</span>
+<span class="nc" id="L117">                    }</span>
+                });
+<span class="nc" id="L119">            }</span>
+        });
+<span class="nc" id="L121">    }</span>
+
+    private static List&lt;ChatMessage&gt; buildOutgoingMessages(ChatView view, ChatRequest baseRequest) {
+<span class="nc" id="L124">        List&lt;ChatMessage&gt; history = view.getHistory();</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (history.isEmpty()) {</span>
+<span class="nc" id="L126">            return baseRequest.getMessages();</span>
+        }
+<span class="nc" id="L128">        return new ArrayList&lt;ChatMessage&gt;(history);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

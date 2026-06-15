@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MultipleGradientPaint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">MultipleGradientPaint.java</span></div><h1>MultipleGradientPaint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+/// A base class for Paints that use multiple gradients.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
+public abstract class MultipleGradientPaint implements Paint {
+
+
+    private int[] colors;
+    private CycleMethod cycleMethod;
+    private ColorSpaceType colorSpace;
+    private float[] fractions;
+    private Transform transform;
+<span class="fc" id="L40">    private int transparency = 255;</span>
+
+    /// Creates a new MultipleGradient paint
+    ///
+    /// #### Parameters
+    ///
+    /// - `fractions`: The fractions representing positions where the corresponding color starts.  Values between 0 and 1.
+    ///
+    /// - `colors`: The colors that are part of the gradient.  Should have same number of colors as fractions.
+    ///
+    /// - `cycleMethod`: The cycle method for the gradient.
+    ///
+    /// - `colorSpace`: The color space for the gradient.
+    ///
+    /// - `gradientTransform`: Transform for the gradient.  Not used.
+<span class="fc" id="L55">    protected MultipleGradientPaint(float[] fractions, int[] colors, MultipleGradientPaint.CycleMethod cycleMethod, MultipleGradientPaint.ColorSpaceType colorSpace, Transform gradientTransform) {</span>
+<span class="fc" id="L56">        this.fractions = fractions;</span>
+<span class="fc" id="L57">        this.colors = colors;</span>
+<span class="fc" id="L58">        this.cycleMethod = cycleMethod;</span>
+<span class="fc" id="L59">        this.colorSpace = colorSpace;</span>
+<span class="fc" id="L60">        this.transform = gradientTransform;</span>
+
+
+<span class="fc" id="L63">    }</span>
+
+    /// Gets the color space for the gradient.
+    ///
+    /// #### Returns
+    ///
+    /// the colorSpaceType
+    public ColorSpaceType getColorSpace() {
+<span class="fc" id="L71">        return colorSpace;</span>
+    }
+
+    /// Sets the color space for the gradient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `colorSpaceType`: the colorSpaceType to set
+    public void setColorSpace(ColorSpaceType colorSpaceType) {
+<span class="fc" id="L80">        this.colorSpace = colorSpaceType;</span>
+<span class="fc" id="L81">    }</span>
+
+    /// Gets the colors used in the gradient.
+    ///
+    /// #### Returns
+    ///
+    /// the colors
+    public int[] getColors() {
+<span class="fc" id="L89">        return colors;</span>
+    }
+
+    /// Sets the colors used in the gradient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `colors`: the colors to set
+    public void setColors(int[] colors) {
+<span class="fc" id="L98">        this.colors = colors;</span>
+<span class="fc" id="L99">    }</span>
+
+    /// Gets the cycle method.
+    ///
+    /// #### Returns
+    ///
+    /// the cycleMethod
+    public CycleMethod getCycleMethod() {
+<span class="fc" id="L107">        return cycleMethod;</span>
+    }
+
+    /// Sets the cycle method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cycleMethod`: the cycleMethod to set
+    public void setCycleMethod(CycleMethod cycleMethod) {
+<span class="fc" id="L116">        this.cycleMethod = cycleMethod;</span>
+<span class="fc" id="L117">    }</span>
+
+    /// Gets the fractional positions for the color gradients.
+    ///
+    /// #### Returns
+    ///
+    /// the fractions
+    public float[] getFractions() {
+<span class="fc" id="L125">        return fractions;</span>
+    }
+
+    /// Sets the fractional positions of the color gradients.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fractions`: the fractions to set
+    public void setFractions(float[] fractions) {
+<span class="fc" id="L134">        this.fractions = fractions;</span>
+<span class="fc" id="L135">    }</span>
+
+    /// Gets the gradient transform.  Not used currently.
+    ///
+    /// #### Returns
+    ///
+    /// the transform
+    public Transform getTransform() {
+<span class="fc" id="L143">        return transform;</span>
+    }
+
+    /// Sets the transform for the gradient.  NOt used currently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transform`: the transform to set
+    public void setTransform(Transform transform) {
+<span class="nc" id="L152">        this.transform = transform;</span>
+<span class="nc" id="L153">    }</span>
+
+    /// Gets the transparency for the gradient.
+    ///
+    /// #### Returns
+    ///
+    /// the transparency
+    public int getTransparency() {
+<span class="fc" id="L161">        return transparency;</span>
+    }
+
+    /// Sets the transparency for the gradient.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transparency`: the transparency to set
+    public void setTransparency(int transparency) {
+<span class="fc" id="L170">        this.transparency = transparency;</span>
+<span class="fc" id="L171">    }</span>
+
+    /// Cycle methods for gradients.
+<span class="fc" id="L174">    public enum CycleMethod {</span>
+        /// The gradient should not cycle at all.
+<span class="fc" id="L176">        NO_CYCLE,</span>
+
+        /// The gradient should cycle with reflection.
+<span class="fc" id="L179">        REFLECT,</span>
+
+        /// The gradient should repeat to fill the space.
+<span class="fc" id="L182">        REPEAT</span>
+    }
+
+    /// Colors spaces for gradients.
+<span class="fc" id="L186">    public enum ColorSpaceType {</span>
+<span class="fc" id="L187">        LINEAR_RGB,</span>
+<span class="fc" id="L188">        SRGB</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

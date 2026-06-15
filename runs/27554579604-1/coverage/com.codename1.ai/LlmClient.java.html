@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LlmClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">LlmClient.java</span></div><h1>LlmClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import com.codename1.util.AsyncResource;
+
+/// Provider-agnostic chat / embeddings client. Built via one of the
+/// static factory methods:
+///
+/// ```
+/// LlmClient gpt    = LlmClient.openai(&quot;sk-...&quot;);
+/// LlmClient claude = LlmClient.anthropic(&quot;sk-ant-...&quot;);
+/// LlmClient gemini = LlmClient.gemini(&quot;AIza...&quot;);
+/// LlmClient ollama = LlmClient.ollama();                   // localhost:11434
+/// LlmClient local  = LlmClient.localOpenAiCompatible(
+///                        &quot;http://10.0.0.5:8080/v1&quot;, &quot;&quot;, &quot;qwen2.5-7b&quot;);
+/// ```
+///
+/// All calls return [AsyncResource] so they compose naturally with the
+/// rest of the Codename One async API. `chatStream` additionally fires
+/// per-token deltas through a [StreamingListener]; both that listener
+/// and the final `AsyncResource` complete on the EDT.
+///
+/// #### Simulator behaviour
+///
+/// When running in the JavaSE simulator with `cn1.ai.simulatorRedirect`
+/// set to `ollama` (or `auto` with Ollama detected on the loopback),
+/// the static factories transparently route through a local Ollama
+/// endpoint instead of the public provider -- so unchanged production
+/// code can be debugged offline without API charges.
+public abstract class LlmClient {
+    // Centralised endpoint defaults. Override with setBaseUrl(...)
+    // for self-hosted gateways, regional endpoints, or to pin a
+    // specific API version. The provider's v1 / v1beta / v2 path
+    // segment is part of these URLs intentionally so a caller who
+    // points setBaseUrl at &quot;https://my-proxy.example.com/openai/v2&quot;
+    // does not need to remember which suffix the official endpoint
+    // uses.
+    //
+    // Versions reflect the providers' production REST shapes as of
+    // mid-2026. Anthropic and Gemini both publish an OpenAI-compatible
+    // `/chat/completions` endpoint, which is what this client targets
+    // -- one shared wire format, three providers.
+    //   - OpenAI Chat Completions       -- /v1
+    //   - Anthropic Messages compat     -- /v1
+    //   - Google Gemini OpenAI compat   -- /v1beta/openai
+    //   - Ollama OpenAI-compat shim     -- /v1
+    public static final String DEFAULT_OPENAI_URL    = &quot;https://api.openai.com/v1&quot;;
+    public static final String DEFAULT_ANTHROPIC_URL = &quot;https://api.anthropic.com/v1&quot;;
+    public static final String DEFAULT_GEMINI_URL    = &quot;https://generativelanguage.googleapis.com/v1beta/openai&quot;;
+    public static final String DEFAULT_OLLAMA_URL    = &quot;http://localhost:11434/v1&quot;;
+
+    private String baseUrl;
+<span class="fc" id="L74">    private int httpTimeoutMs = 60000;</span>
+
+<span class="fc" id="L76">    protected LlmClient(String baseUrl) {</span>
+<span class="fc" id="L77">        this.baseUrl = baseUrl;</span>
+<span class="fc" id="L78">    }</span>
+
+    /// OpenAI / OpenAI-compatible (Together, Groq, Fireworks, vLLM,
+    /// Ollama, etc.). Uses the public endpoint by default; override
+    /// with [#setBaseUrl(String)].
+    public static LlmClient openai(String apiKey) {
+<span class="nc" id="L84">        return SimulatorRedirect.maybeWrap(new OpenAiClient(apiKey, DEFAULT_OPENAI_URL));</span>
+    }
+
+    public static LlmClient anthropic(String apiKey) {
+<span class="nc" id="L88">        return SimulatorRedirect.maybeWrap(new AnthropicClient(apiKey, DEFAULT_ANTHROPIC_URL));</span>
+    }
+
+    public static LlmClient gemini(String apiKey) {
+<span class="nc" id="L92">        return SimulatorRedirect.maybeWrap(new GeminiClient(apiKey, DEFAULT_GEMINI_URL));</span>
+    }
+
+    /// Default Ollama install: `http://localhost:11434/v1`, model
+    /// `llama3.2`.
+    public static LlmClient ollama() {
+<span class="fc" id="L98">        return ollama(&quot;llama3.2&quot;);</span>
+    }
+
+    public static LlmClient ollama(String defaultModel) {
+<span class="fc" id="L102">        return ollama(DEFAULT_OLLAMA_URL, defaultModel);</span>
+    }
+
+    public static LlmClient ollama(String baseUrl, String defaultModel) {
+<span class="fc" id="L106">        OpenAiClient c = new OpenAiClient(&quot;ollama&quot;, baseUrl);</span>
+<span class="fc" id="L107">        c.setDefaultModel(defaultModel);</span>
+<span class="fc" id="L108">        return c;</span>
+    }
+
+    /// Generic OpenAI-compatible endpoint (llama.cpp server, vLLM,
+    /// LM Studio, a custom proxy). `apiKey` may be empty for local
+    /// services that don't authenticate.
+    public static LlmClient localOpenAiCompatible(String baseUrl, String apiKey, String defaultModel) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        OpenAiClient c = new OpenAiClient(apiKey == null ? &quot;&quot; : apiKey, baseUrl);</span>
+<span class="fc" id="L116">        c.setDefaultModel(defaultModel);</span>
+<span class="fc" id="L117">        return c;</span>
+    }
+
+    /// Non-streaming chat. Equivalent to `chatStream` with a no-op
+    /// listener but optimized -- the provider skips the SSE response
+    /// and returns a single JSON object.
+    public abstract AsyncResource&lt;ChatResponse&gt; chat(ChatRequest req);
+
+    /// Streaming chat. `listener` fires for every content delta /
+    /// tool-call fragment on the EDT. The returned `AsyncResource`
+    /// completes with the aggregated final response once the stream
+    /// ends; cancel it to close the underlying socket.
+    public abstract AsyncResource&lt;ChatResponse&gt; chatStream(ChatRequest req, StreamingListener listener);
+
+    public abstract AsyncResource&lt;EmbeddingResponse&gt; embed(EmbeddingRequest req);
+
+    /// One of `&quot;openai&quot;`, `&quot;anthropic&quot;`, `&quot;gemini&quot;`, `&quot;ollama&quot;`,
+    /// `&quot;local&quot;`. Used by `ChatView` and tests to vary behaviour by
+    /// provider.
+    public abstract String getProvider();
+
+    public String getBaseUrl() {
+<span class="fc" id="L139">        return baseUrl;</span>
+    }
+
+    public void setBaseUrl(String baseUrl) {
+<span class="fc" id="L143">        this.baseUrl = baseUrl;</span>
+<span class="fc" id="L144">    }</span>
+
+    public int getHttpTimeoutMs() {
+<span class="fc" id="L147">        return httpTimeoutMs;</span>
+    }
+
+    public void setHttpTimeoutMs(int httpTimeoutMs) {
+<span class="fc" id="L151">        this.httpTimeoutMs = httpTimeoutMs;</span>
+<span class="fc" id="L152">    }</span>
+
+    /// Helper for subclasses: applies the active [SafetyFilter] (if
+    /// any) before the network call. Returns the rejection reason on
+    /// failure, `null` to proceed.
+    protected String runSafetyFilter(ChatRequest req) {
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (req.getSafetyFilter() == null) {</span>
+<span class="fc" id="L159">            return null;</span>
+        }
+<span class="fc" id="L161">        return req.getSafetyFilter().check(req.getMessages());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

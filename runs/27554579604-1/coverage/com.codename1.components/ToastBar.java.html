@@ -1,0 +1,1117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ToastBar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">ToastBar.java</span></div><h1>ToastBar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.Slider;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/// An API to present status messages to the user in an unobtrusive manner.  This is useful if
+/// there are background tasks that need to display information to the user.  E.g. If a network request fails,
+/// of let the user know that &quot;Jobs are being synchronized&quot;.
+///
+/// Example Usage
+///
+/// ```java
+/// Form hi = new Form(&quot;ToastBarDemo&quot;, BoxLayout.y());
+///
+/// Button basic = new Button(&quot;Basic&quot;);
+/// Button progress = new Button(&quot;Progress&quot;);
+/// Button expires = new Button(&quot;Expires&quot;);
+/// Button delayed = new Button(&quot;Delayed&quot;);
+/// hi.add(basic).add(progress).add(expires).add(delayed);
+///
+/// basic.addActionListener(e -&gt; {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage(&quot;Hello world&quot;);
+///   status.show();
+///   //...  Some time later you must clear the status
+///   // status.clear();
+/// });
+///
+/// progress.addActionListener(e -&gt; {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage(&quot;Hello world&quot;);
+///   status.setShowProgressIndicator(true);
+///   status.show();
+///   // ... Some time later you must clear it
+/// });
+///
+/// expires.addActionListener(e -&gt; {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage(&quot;Hello world&quot;);
+///   status.setExpires(3000);  // only show the status for 3 seconds, then have it automatically clear
+///   status.show();
+/// });
+///
+/// delayed.addActionListener(e -&gt; {
+///   ToastBar.Status status = ToastBar.getInstance().createStatus();
+///   status.setMessage(&quot;Hello world&quot;);
+///   status.showDelayed(300); // Wait 300 ms to show the status
+///   // ... Some time later, clear the status... this may be before it shows at all
+/// });
+///
+/// hi.show();
+/// ```
+///
+/// Advanced Usage
+///
+/// See the [StatusBarDemo](https://github.com/codenameone/codenameone-demos/blob/master/ToastBarDemo/src/com/codename1/demos/status/ToastBarDemo.java)
+///
+/// Screenshots
+///
+/// Status With Progress Bar
+///
+/// Status With Multi-Line Message
+///
+/// Video Demo
+///
+/// Note: the video above refers to the `ToastBar` based on its development name of StatusBar. This
+/// was changed to avoid confusion with the iOS StatusBar.
+///
+/// @author shannah
+public final class ToastBar {
+
+    /// The default timeout for info/error messages
+<span class="fc" id="L123">    private static int defaultMessageTimeout = 4000;</span>
+    /// Keeps track of the currently active status messages.
+<span class="fc" id="L125">    private final ArrayList&lt;Status&gt; statuses = new ArrayList&lt;Status&gt;();</span>
+<span class="fc" id="L126">    private int position = Component.BOTTOM;</span>
+    /// The default UIID that to be used for the `ToastBar` component.  This is the
+    /// style of the box that appears at the bottom of the screen.
+<span class="fc" id="L129">    private String defaultUIID = &quot;ToastBar&quot;;</span>
+    /// The default UIID that is to be used for the text in the `ToastBar`.
+<span class="fc" id="L131">    private String defaultMessageUIID = &quot;ToastBarMessage&quot;;</span>
+    //FIXME SH Need to style the {@code ToastBar} so that it looks nicer
+    private boolean useFormLayeredPane;
+    /// Flag to indicate that the status is updating.  This is used to prevent
+    /// two status updates from happening at the same time.
+    private boolean updatingStatus;
+    /// Flag to indicate that a request to update the status was received while
+    /// updateStatus() was running.
+    private boolean pendingUpdateStatus;
+
+<span class="fc" id="L141">    private ToastBar() {</span>
+
+<span class="fc" id="L143">    }</span>
+
+    /// The default timeout for info/error messages
+    ///
+    /// #### Returns
+    ///
+    /// the defaultMessageTimeout
+    public static int getDefaultMessageTimeout() {
+<span class="fc" id="L151">        return defaultMessageTimeout;</span>
+    }
+
+    /// The default timeout for info/error messages
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultMessageTimeout`: the defaultMessageTimeout to set
+    public static void setDefaultMessageTimeout(int aDefaultMessageTimeout) {
+<span class="fc" id="L160">        defaultMessageTimeout = aDefaultMessageTimeout;</span>
+<span class="fc" id="L161">    }</span>
+
+    /// Gets reference to the singleton StatusBar instance
+    public static ToastBar getInstance() {
+<span class="fc" id="L165">        return ToastBarHolder.INSTANCE;</span>
+    }
+
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the error message
+    public static void showErrorMessage(String msg) {
+<span class="fc" id="L174">        showErrorMessage(msg, defaultMessageTimeout);</span>
+<span class="fc" id="L175">    }</span>
+
+    /// Simplifies a common use case of showing a message with an icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `timeout`: the timeout value in milliseconds
+    ///
+    /// - `listener`: the action to perform when the ToastBar is tapped
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
+    public static Status showMessage(String msg, char icon, int timeout, ActionListener listener) {
+<span class="fc" id="L193">        Status s = ToastBar.getInstance().createStatus();</span>
+<span class="fc" id="L194">        Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());</span>
+<span class="fc" id="L195">        s.setIcon(FontImage.createMaterial(icon, stl, 4));</span>
+<span class="fc" id="L196">        s.setMessage(msg);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (listener != null) {</span>
+<span class="nc" id="L198">            s.setListener(listener);</span>
+        }
+<span class="fc" id="L200">        s.setExpires(timeout);</span>
+<span class="fc" id="L201">        s.show();</span>
+<span class="fc" id="L202">        return s;</span>
+    }
+
+    /// Simplifies a common use case of showing a message with an icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `timeout`: the timeout value in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
+    public static Status showMessage(String msg, char icon, int timeout) {
+<span class="fc" id="L219">        return showMessage(msg, icon, timeout, null);</span>
+    }
+
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `listener`: the action to perform when the ToastBar is tapped
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
+    public static Status showMessage(String msg, char icon, ActionListener listener) {
+<span class="nc" id="L236">        return showMessage(msg, icon, defaultMessageTimeout, listener);</span>
+    }
+
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    ///
+    /// - `msg`: the message
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
+    public static Status showMessage(String msg, char icon) {
+<span class="nc" id="L251">        return showMessage(msg, icon, defaultMessageTimeout);</span>
+    }
+
+    /// Simplifies a common use case of showing an information message with an info icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the message
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
+    public static Status showInfoMessage(String msg) {
+<span class="fc" id="L264">        return showMessage(msg, FontImage.MATERIAL_INFO, defaultMessageTimeout);</span>
+    }
+
+    /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+    ///
+    /// #### Parameters
+    ///
+    /// - `msg`: the error message
+    ///
+    /// - `timeout`: the timeout value in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the status if we want to clear it before timeout elapses
+    public static Status showErrorMessage(String msg, int timeout) {
+<span class="fc" id="L279">        return showMessage(msg, FontImage.MATERIAL_ERROR, timeout);</span>
+    }
+
+    /*
+     * Shows a progress indicator based on connection request, this is incomplete but it meant to serve as
+     * a replacement for the inifinte progress
+     *
+     * @param message a message to show on the progress indicator
+     * @param cr the connection request whose progress should be shown
+     * @param onSuccess invoked when the connection request completes, can be null
+     * @param onError invoked on case of an error, can be null
+     */
+    public static void showConnectionProgress(String message, final ConnectionRequest cr,
+                                              final SuccessCallback&lt;NetworkEvent&gt; onSuccess, final FailureCallback&lt;NetworkEvent&gt; onError) {
+<span class="nc" id="L293">        final ToastBar.Status s = ToastBar.getInstance().createStatus();</span>
+<span class="nc" id="L294">        s.setProgress(-1);</span>
+<span class="nc" id="L295">        s.setMessage(message);</span>
+<span class="nc" id="L296">        s.show();</span>
+<span class="nc" id="L297">        final ActionListener[] progListener = new ActionListener[1];</span>
+<span class="nc" id="L298">        final ActionListener&lt;NetworkEvent&gt; errorListener = new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+<span class="nc" id="L301">                s.clear();</span>
+<span class="nc" id="L302">                NetworkManager.getInstance().removeErrorListener(this);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                if (progListener[0] != null) {</span>
+<span class="nc" id="L304">                    NetworkManager.getInstance().removeProgressListener(progListener[0]);</span>
+                }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if (onError != null) {</span>
+<span class="nc" id="L307">                    onError.onError(cr, evt.getError(), evt.getResponseCode(), evt.getMessage());</span>
+                }
+<span class="nc" id="L309">            }</span>
+        };
+<span class="nc" id="L311">        NetworkManager.getInstance().addErrorListener(errorListener);</span>
+<span class="nc" id="L312">        progListener[0] = new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+<span class="nc bnc" id="L315" title="All 3 branches missed.">                switch (evt.getProgressType()) {</span>
+                    case NetworkEvent.PROGRESS_TYPE_INITIALIZING:
+<span class="nc" id="L317">                        s.setProgress(-1);</span>
+<span class="nc" id="L318">                        break;</span>
+                    case NetworkEvent.PROGRESS_TYPE_INPUT:
+                    case NetworkEvent.PROGRESS_TYPE_OUTPUT:
+<span class="nc" id="L321">                        int currentLength = cr.getContentLength();</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                        if (currentLength &gt; 0) {</span>
+<span class="nc" id="L323">                            int sentReceived = evt.getSentReceived();</span>
+<span class="nc" id="L324">                            float prog = ((float) sentReceived) / ((float) currentLength) * 100f;</span>
+<span class="nc" id="L325">                            s.setProgress((int) prog);</span>
+<span class="nc" id="L326">                        } else {</span>
+<span class="nc" id="L327">                            s.setProgress(-1);</span>
+                        }
+<span class="nc" id="L329">                        break;</span>
+                    default:
+                        break;
+                }
+<span class="nc" id="L333">            }</span>
+        };
+<span class="nc" id="L335">        cr.addResponseListener(new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+<span class="nc" id="L338">                NetworkManager.getInstance().removeErrorListener(errorListener);</span>
+<span class="nc" id="L339">                NetworkManager.getInstance().removeProgressListener(progListener[0]);</span>
+<span class="nc" id="L340">                s.clear();</span>
+<span class="nc" id="L341">                int rc = cr.getResponseCode();</span>
+<span class="nc bnc" id="L342" title="All 8 branches missed.">                if (onSuccess != null &amp;&amp; (rc == 200 || rc == 201 || rc == 202)) {</span>
+<span class="nc" id="L343">                    onSuccess.onSucess(evt);</span>
+                }
+<span class="nc" id="L345">            }</span>
+        });
+<span class="nc" id="L347">        NetworkManager.getInstance().addProgressListener(progListener[0]);</span>
+<span class="nc" id="L348">    }</span>
+
+    /// Gets the default UIID to be used for the style of the `ToastBar` component.
+    /// By default this is &quot;ToastBarComponent&quot;.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultUIID
+    public String getDefaultUIID() {
+<span class="fc" id="L357">        return defaultUIID;</span>
+    }
+
+    /// Sets the defaults UIID to be used for the style of the `ToastBar` component.  By default
+    /// this is &quot;ToastBarComponent&quot;
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultUIID`: the defaultUIID to set
+    public void setDefaultUIID(String defaultUIID) {
+<span class="fc" id="L367">        this.defaultUIID = defaultUIID;</span>
+<span class="fc" id="L368">    }</span>
+
+    /// Gets the default UIID to be used for the style of the `ToastBar` text.  By default
+    /// this is &quot;ToastBarMessage&quot;
+    ///
+    /// #### Returns
+    ///
+    /// the defaultMessageUIID
+    public String getDefaultMessageUIID() {
+<span class="fc" id="L377">        return defaultMessageUIID;</span>
+    }
+
+    /// Sets the default UIID to be used for the style of the `ToastBar` text.  By default this is
+    /// &quot;ToastBarMessage&quot;
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultMessageUIID`: the defaultMessageUIID to set
+    public void setDefaultMessageUIID(String defaultMessageUIID) {
+<span class="fc" id="L387">        this.defaultMessageUIID = defaultMessageUIID;</span>
+<span class="fc" id="L388">    }</span>
+
+    /// By default the ToastBar uses the LayeredPane.  However, it may be better in many
+    /// cases to use the FormLayerd pane.  This allows you to toggle whether to use
+    /// the FormLayeredPane.
+    ///
+    /// Key use-case is for displaying the ToastBar over a Sheet, which is on the FormLayeredPane.
+    /// If you don't set this to true, then the ToastBar will be displayed behind the Sheet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `useFormLayeredPane`: True to use the form layered pane to display the toastbar.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public ToastBar useFormLayeredPane(boolean useFormLayeredPane) {
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (useFormLayeredPane != this.useFormLayeredPane) {</span>
+<span class="fc" id="L410">            ToastBarComponent c = getToastBarComponent(false);</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L412">                c.remove();</span>
+<span class="nc" id="L413">                getLayeredPane().remove();</span>
+            }
+
+<span class="fc" id="L416">            this.useFormLayeredPane = useFormLayeredPane;</span>
+
+        }
+<span class="fc" id="L419">        return this;</span>
+    }
+
+    /// Gets the position of the toast bar on the screen.  Either `Component#TOP` or `Component#BOTTOM`.
+    ///
+    /// #### Returns
+    ///
+    /// the position
+    public int getPosition() {
+<span class="fc" id="L428">        return position;</span>
+    }
+
+    /// Sets the position of the toast bar on the screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: the position to set Should be one of `Component#TOP` and `Component#BOTTOM`
+    public void setPosition(int position) {
+<span class="fc" id="L437">        this.position = position;</span>
+<span class="fc" id="L438">    }</span>
+
+    /// Updates the ToastBar UI component with the settings of the current status.
+    private void updateStatus() {
+<span class="fc" id="L442">        final ToastBarComponent c = getToastBarComponent();</span>
+<span class="fc" id="L443">        moveLayerToFront();</span>
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (c != null) {</span>
+
+            try {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">                if (updatingStatus) {</span>
+<span class="nc" id="L448">                    pendingUpdateStatus = true;</span>
+<span class="nc" id="L449">                    return;</span>
+                }
+
+<span class="fc" id="L452">                updatingStatus = true;</span>
+<span class="fc bfc" id="L453" title="All 4 branches covered.">                if (c.currentlyShowing != null &amp;&amp; !statuses.contains(c.currentlyShowing)) {</span>
+<span class="fc" id="L454">                    c.currentlyShowing = null;</span>
+                }
+<span class="pc bpc" id="L456" title="1 of 4 branches missed.">                if (c.currentlyShowing == null || statuses.isEmpty()) {</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">                    if (!statuses.isEmpty()) {</span>
+<span class="fc" id="L458">                        c.currentlyShowing = statuses.get(statuses.size() - 1);</span>
+                    } else {
+<span class="fc" id="L460">                        setVisible(false);</span>
+<span class="fc" id="L461">                        return;</span>
+                    }
+
+                }
+<span class="fc" id="L465">                Status s = c.currentlyShowing;</span>
+
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                Label l = new Label(s.getMessage() != null ? s.getMessage() : &quot;&quot;, defaultMessageUIID);</span>
+
+<span class="fc" id="L469">                c.leadButton.getListeners().clear();</span>
+<span class="fc" id="L470">                c.leadButton.addActionListener(s.getListener());</span>
+<span class="fc" id="L471">                c.leadButton.addActionListener(new ActionListener() {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L474" title="All 4 branches missed.">                        if (c.currentlyShowing != null &amp;&amp; !c.currentlyShowing.showProgressIndicator) {</span>
+<span class="nc" id="L475">                            c.currentlyShowing.clear();</span>
+<span class="nc" id="L476">                            evt.consume();</span>
+                        }
+<span class="nc" id="L478">                        ToastBar.this.setVisible(false);</span>
+<span class="nc" id="L479">                    }</span>
+                });
+
+<span class="fc" id="L482">                c.progressLabel.setVisible(s.isShowProgressIndicator());</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">                if (c.progressLabel.isVisible()) {</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                    if (!c.contains(c.progressLabel)) {</span>
+<span class="nc" id="L485">                        c.addComponent(BorderLayout.EAST, c.progressLabel);</span>
+                    }
+<span class="fc" id="L487">                    Image anim = c.progressLabel.getAnimation();</span>
+<span class="pc bpc" id="L488" title="3 of 4 branches missed.">                    if (anim != null &amp;&amp; anim.getWidth() &gt; 0) {</span>
+<span class="nc" id="L489">                        c.progressLabel.setWidth(anim.getWidth());</span>
+                    }
+<span class="pc bpc" id="L491" title="3 of 4 branches missed.">                    if (anim != null &amp;&amp; anim.getHeight() &gt; 0) {</span>
+<span class="nc" id="L492">                        c.progressLabel.setHeight(anim.getHeight());</span>
+                    }
+<span class="fc" id="L494">                } else {</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">                    if (c.contains(c.progressLabel)) {</span>
+<span class="fc" id="L496">                        c.removeComponent(c.progressLabel);</span>
+                    }
+                }
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">                c.progressBar.setVisible(s.getProgress() &gt;= -1);</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">                if (s.getProgress() &gt;= -1) {</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                    if (!c.contains(c.progressBar)) {</span>
+<span class="nc" id="L502">                        c.addComponent(BorderLayout.SOUTH, c.progressBar);</span>
+                    }
+<span class="nc bnc" id="L504" title="All 2 branches missed.">                    if (s.getProgress() &lt; 0) {</span>
+<span class="nc" id="L505">                        c.progressBar.setInfinite(true);</span>
+                    } else {
+<span class="nc" id="L507">                        c.progressBar.setInfinite(false);</span>
+<span class="nc" id="L508">                        c.progressBar.setProgress(s.getProgress());</span>
+                    }
+                } else {
+<span class="fc" id="L511">                    c.removeComponent(c.progressBar);</span>
+                }
+<span class="fc bfc" id="L513" title="All 2 branches covered.">                c.icon.setVisible(s.getIcon() != null);</span>
+<span class="fc bfc" id="L514" title="All 4 branches covered.">                if (s.getIcon() != null &amp;&amp; c.icon.getIcon() != s.getIcon()) {</span>
+<span class="fc" id="L515">                    c.icon.setIcon(s.getIcon());</span>
+                }
+<span class="fc bfc" id="L517" title="All 4 branches covered.">                if (s.getIcon() == null &amp;&amp; c.contains(c.icon)) {</span>
+<span class="fc" id="L518">                    c.removeComponent(c.icon);</span>
+<span class="fc bfc" id="L519" title="All 4 branches covered.">                } else if (s.getIcon() != null &amp;&amp; !c.contains(c.icon)) {</span>
+
+<span class="fc" id="L521">                    c.addComponent(BorderLayout.WEST, c.icon);</span>
+                }
+<span class="fc" id="L523">                String oldText = c.label.getText();</span>
+
+<span class="fc bfc" id="L525" title="All 2 branches covered.">                if (!oldText.equals(l.getText())) {</span>
+
+
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">                    if (s.getUiid() != null) {</span>
+<span class="fc" id="L529">                        c.setUIID(s.getUiid());</span>
+<span class="nc bnc" id="L530" title="All 2 branches missed.">                    } else if (defaultUIID != null) {</span>
+<span class="nc" id="L531">                        c.setUIID(defaultUIID);</span>
+                    }
+
+<span class="fc bfc" id="L534" title="All 2 branches covered.">                    if (c.isVisible()) {</span>
+<span class="fc" id="L535">                        TextArea newLabel = new TextArea();</span>
+<span class="fc" id="L536">                        newLabel.setUIID(defaultMessageUIID);</span>
+                        //newLabel.setColumns(l.getText().length()+1);
+                        //newLabel.setRows(l.getText().length()+1);
+<span class="fc" id="L539">                        newLabel.setFocusable(false);</span>
+<span class="fc" id="L540">                        newLabel.setEditable(false);</span>
+<span class="fc" id="L541">                        newLabel.setVerticalAlignment(Component.CENTER);</span>
+
+                        //newLabel.getAllStyles().setFgColor(0xffffff);
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">                        if (s.getMessageUIID() != null) {</span>
+<span class="fc" id="L545">                            newLabel.setUIID(s.getMessageUIID());</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">                        } else if (defaultMessageUIID != null) {</span>
+<span class="nc" id="L547">                            newLabel.setUIID(defaultMessageUIID);</span>
+                        } else {
+<span class="nc" id="L549">                            newLabel.setUIID(c.label.getUIID());</span>
+                        }
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">                        if (s.getUiid() != null) {</span>
+<span class="fc" id="L552">                            c.setUIID(s.getUiid());</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                        } else if (defaultUIID != null) {</span>
+<span class="nc" id="L554">                            c.setUIID(defaultUIID);</span>
+                        }
+<span class="fc" id="L556">                        newLabel.setWidth(c.label.getWidth());</span>
+
+<span class="fc" id="L558">                        newLabel.setText(l.getText());</span>
+
+<span class="fc" id="L560">                        Dimension oldTextAreaSize = UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true);</span>
+<span class="fc" id="L561">                        Dimension newTexAreaSize = UIManager.getInstance().getLookAndFeel().getTextAreaSize(newLabel, true);</span>
+
+                        // this can happen in an edge case where animateHierarchyAndWait and replaceAndWait
+                        // are stuck in blocking mode between them and the label just got discarded see:
+                        // https://stackoverflow.com/questions/46172993/codename-one-toastbar-nullpointerexception
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">                        if (c.label.getParent() != null) {</span>
+<span class="fc" id="L567">                            c.label.getParent().replaceAndWait(c.label, newLabel, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 300));</span>
+<span class="fc" id="L568">                            c.label = newLabel;</span>
+
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">                            if (oldTextAreaSize.getHeight() != newTexAreaSize.getHeight()) {</span>
+
+<span class="nc" id="L572">                                c.label.setPreferredH(newTexAreaSize.getHeight());</span>
+<span class="nc" id="L573">                                c.getParent().animateHierarchyAndWait(300);</span>
+                            }
+                        }
+
+<span class="fc" id="L577">                    } else {</span>
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">                        if (s.getMessageUIID() != null) {</span>
+<span class="fc" id="L579">                            c.label.setUIID(s.getMessageUIID());</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">                        } else if (defaultMessageUIID != null) {</span>
+<span class="nc" id="L581">                            c.label.setUIID(defaultMessageUIID);</span>
+                        }
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">                        if (s.getUiid() != null) {</span>
+<span class="fc" id="L584">                            c.setUIID(s.getUiid());</span>
+<span class="nc bnc" id="L585" title="All 2 branches missed.">                        } else if (defaultUIID != null) {</span>
+<span class="nc" id="L586">                            c.setUIID(defaultUIID);</span>
+                        }
+<span class="fc" id="L588">                        c.label.setText(l.getText());</span>
+                        //c.label.setColumns(l.getText().length()+1);
+                        //c.label.setRows(l.getText().length()+1);
+<span class="fc" id="L591">                        c.label.setPreferredW(c.getWidth());</span>
+<span class="fc" id="L592">                        c.revalidate();</span>
+                    }
+                } else {
+<span class="fc" id="L595">                    c.revalidate();</span>
+                }
+            } finally {
+<span class="fc" id="L598">                updatingStatus = false;</span>
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">                if (pendingUpdateStatus) {</span>
+<span class="nc" id="L600">                    pendingUpdateStatus = false;</span>
+<span class="nc" id="L601">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L604">                            updateStatus();</span>
+<span class="nc" id="L605">                        }</span>
+                    });
+                }
+            }
+        }
+<span class="fc" id="L610">    }</span>
+
+    /// Creates a new Status.
+    public Status createStatus() {
+<span class="fc" id="L614">        Status s = new Status();</span>
+<span class="fc" id="L615">        statuses.add(s);</span>
+<span class="fc" id="L616">        return s;</span>
+    }
+
+    private void removeStatus(Status status) {
+<span class="pc bpc" id="L620" title="1 of 2 branches missed.">        if (status.timer != null) {</span>
+<span class="nc" id="L621">            status.timer.cancel();</span>
+<span class="nc" id="L622">            status.timer = null;</span>
+        }
+<span class="fc" id="L624">        statuses.remove(status);</span>
+<span class="fc" id="L625">        updateStatus();</span>
+<span class="fc" id="L626">    }</span>
+
+    private Container getLayeredPane() {
+<span class="fc" id="L629">        Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L631">            throw new IllegalStateException(&quot;Cannot get layered pane when form is null&quot;);</span>
+        }
+<span class="fc bfc" id="L633" title="All 2 branches covered.">        if (useFormLayeredPane) {</span>
+<span class="fc" id="L634">            return f.getFormLayeredPane(this.getClass(), true);</span>
+        } else {
+<span class="fc" id="L636">            return f.getLayeredPane(this.getClass(), true);</span>
+        }
+    }
+
+    private void moveLayerToFront() {
+<span class="fc" id="L641">        Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L643">            return;</span>
+        }
+<span class="fc" id="L645">        final Container layered = getLayeredPane();</span>
+<span class="fc" id="L646">        final Container parent = layered.getParent();</span>
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">        if (parent == null) {</span>
+<span class="nc" id="L648">            return;</span>
+        }
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">        if (parent.getComponentIndex(layered) != parent.getComponentCount() - 1) {</span>
+<span class="nc" id="L651">            f.getAnimationManager().flushAnimation(new FlushAnimationCallback(parent, layered));</span>
+        }
+<span class="fc" id="L653">    }</span>
+
+    private ToastBarComponent getToastBarComponent() {
+<span class="fc" id="L656">        return getToastBarComponent(true);</span>
+    }
+
+    private ToastBarComponent getToastBarComponent(boolean create) {
+<span class="fc" id="L660">        Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L661" title="2 of 4 branches missed.">        if (f != null &amp;&amp; !(f instanceof Dialog)) {</span>
+<span class="fc" id="L662">            ToastBarComponent c = (ToastBarComponent) f.getClientProperty(&quot;ToastBarComponent&quot;);</span>
+<span class="fc bfc" id="L663" title="All 4 branches covered.">            if (c == null &amp;&amp; !create) {</span>
+<span class="fc" id="L664">                return null;</span>
+            }
+<span class="pc bpc" id="L666" title="1 of 4 branches missed.">            if (c == null || c.getParent() == null) {</span>
+<span class="fc" id="L667">                c = new ToastBarComponent();</span>
+<span class="fc" id="L668">                c.hidden = true;</span>
+<span class="fc" id="L669">                f.putClientProperty(&quot;ToastBarComponent&quot;, c);</span>
+<span class="fc" id="L670">                Container layered = getLayeredPane();</span>
+<span class="fc" id="L671">                layered.setLayout(new BorderLayout());</span>
+<span class="fc bfc" id="L672" title="All 2 branches covered.">                layered.addComponent(position == Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);</span>
+<span class="fc" id="L673">                updateStatus();</span>
+            }
+<span class="fc" id="L675">            Rectangle safeArea = Display.getInstance().getDisplaySafeArea(new Rectangle(0, 0, 0, 0));</span>
+            // PMD Fix (CollapsibleIfStatements): Combine nested position checks to simplify the layout adjustments.
+<span class="pc bpc" id="L677" title="1 of 4 branches missed.">            if (position == Component.BOTTOM &amp;&amp; f.getInvisibleAreaUnderVKB() &gt; 0) {</span>
+<span class="nc" id="L678">                Style s = c.getAllStyles();</span>
+<span class="nc" id="L679">                s.setMarginUnit(Style.UNIT_TYPE_PIXELS);</span>
+<span class="nc" id="L680">                s.setMarginBottom(f.getInvisibleAreaUnderVKB());</span>
+            }
+<span class="fc" id="L682">            int safeBottomMargin = Display.getInstance().getDisplayHeight()</span>
+<span class="fc" id="L683">                    - safeArea.getY()</span>
+<span class="fc" id="L684">                    - safeArea.getHeight();</span>
+<span class="fc bfc" id="L685" title="All 4 branches covered.">            if (position == Component.BOTTOM &amp;&amp; safeBottomMargin &gt; 0) {</span>
+<span class="fc" id="L686">                Style s = c.getAllStyles();</span>
+<span class="fc" id="L687">                s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);</span>
+<span class="fc" id="L688">                s.setPaddingBottom(safeBottomMargin);</span>
+<span class="fc bfc" id="L689" title="All 4 branches covered.">            } else if (position == Component.TOP &amp;&amp; safeArea.getY() &gt; 0) {</span>
+<span class="fc" id="L690">                Container parent = c.getParent();</span>
+<span class="pc bpc" id="L691" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L692">                    int neededPadding = safeArea.getY() - parent.getAbsoluteY();</span>
+<span class="pc bpc" id="L693" title="1 of 2 branches missed.">                    if (neededPadding &gt; 0) {</span>
+<span class="fc" id="L694">                        Style s = c.getAllStyles();</span>
+<span class="fc" id="L695">                        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);</span>
+<span class="fc" id="L696">                        s.setPaddingTop(neededPadding);</span>
+                    }
+                }
+            }
+
+<span class="fc" id="L701">            return c;</span>
+        }
+<span class="nc" id="L703">        return null;</span>
+    }
+
+    /// Shows or hides the `ToastBar`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`
+    public void setVisible(boolean visible) {
+<span class="fc" id="L712">        final ToastBarComponent c = getToastBarComponent();</span>
+<span class="pc bpc" id="L713" title="1 of 4 branches missed.">        if (c == null || c.isVisible() == visible) {</span>
+<span class="fc" id="L714">            return;</span>
+        }
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">        if (visible) {</span>
+<span class="fc" id="L717">            c.hidden = true;</span>
+<span class="fc" id="L718">            c.setVisible(false);</span>
+<span class="fc" id="L719">            c.setHeight(0);</span>
+<span class="fc" id="L720">            c.setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L721">            Form f = c.getComponentForm();</span>
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L723">                f.revalidate();</span>
+            } else {
+<span class="nc" id="L725">                c.getParent().revalidate();</span>
+            }
+<span class="fc" id="L727">            c.hidden = false;</span>
+
+<span class="fc" id="L729">            c.label.setPreferredH(UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true).getHeight());</span>
+<span class="fc" id="L730">            c.setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L731">            $(c).slideUpAndWait(2);</span>
+<span class="fc" id="L732">            $(c).slideDownAndWait(800);</span>
+<span class="fc" id="L733">            c.setVisible(true);</span>
+<span class="fc" id="L734">            updateStatus();</span>
+
+<span class="fc" id="L736">        } else {</span>
+<span class="nc" id="L737">            Form f = c.getComponentForm();</span>
+<span class="nc bnc" id="L738" title="All 4 branches missed.">            if (Display.getInstance().getCurrent() == f &amp;&amp; !f.getMenuBar().isMenuShowing()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">                if (this.position == Component.BOTTOM) {</span>
+<span class="nc" id="L740">                    c.setY(c.getY() + c.getHeight());</span>
+                }
+<span class="nc" id="L742">                $(c).slideUpAndWait(500);</span>
+            } else {
+<span class="nc" id="L744">                c.getParent().revalidate();</span>
+            }
+<span class="nc" id="L746">            c.hidden = true;</span>
+<span class="nc" id="L747">            c.setVisible(false);</span>
+        }
+<span class="fc" id="L749">    }</span>
+
+    private static class ToastBarHolder {
+<span class="fc" id="L752">        private static final ToastBar INSTANCE = new ToastBar();</span>
+    }
+
+    private static class FlushAnimationCallback implements Runnable {
+        private final Container parent;
+        private final Container layered;
+
+<span class="nc" id="L759">        public FlushAnimationCallback(Container parent, Container layered) {</span>
+<span class="nc" id="L760">            this.parent = parent;</span>
+<span class="nc" id="L761">            this.layered = layered;</span>
+<span class="nc" id="L762">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc" id="L766">            parent.removeComponent(layered);</span>
+<span class="nc" id="L767">            parent.addComponent(layered);</span>
+<span class="nc" id="L768">            parent.revalidate();</span>
+<span class="nc" id="L769">        }</span>
+    }
+
+    /// Represents a single status message.
+    public class Status {
+
+        /// The start time of the process this status is tracking.
+        /// This UIID that should be used to style the ToastBar text while this
+        /// message is being displayed.
+<span class="fc" id="L778">        private String messageUIID = defaultMessageUIID;</span>
+        /// The UIID that should be used to style the ToastBar component while
+        /// this message is being displayed.
+<span class="fc" id="L781">        private String uiid = defaultUIID;</span>
+        /// Timer used to &quot;expire&quot; the message after a certain time.
+        ///
+        /// #### See also
+        ///
+        /// - #setExpires(int)
+        private Timer timer;
+        /// Timer used to delay the showing of the message.  Useful if you only want
+        /// to show the message if the task ends up taking a long time.
+        ///
+        /// #### See also
+        ///
+        /// - #showDelayed(int)
+        private Timer showTimer;
+
+        /// The message to be displayed in the `ToastBar`.
+        private String message;
+
+        /// An action to perform when the ToastBar is tapped `ToastBar`.
+        private ActionListener listener;
+
+        /// Optional progress for the task.  (Not tested or implemented yet).
+<span class="fc" id="L803">        private int progress = -2;</span>
+
+        /// Optional icon to show in the `ToastBar`.  (Not tested or implemented yet).
+        private Image icon;
+
+        /// Whether this status message should show an infinite progress indicator. (e.g. spinning beachball).
+        private boolean showProgressIndicator;
+
+<span class="fc" id="L811">        private Status() {</span>
+<span class="fc" id="L812">        }</span>
+
+        /// Directs the status to be cleared (if it isn't already cleared() after a given number of milliseconds.
+        ///
+        /// #### Parameters
+        ///
+        /// - `millis`: @param millis The maximum number of milliseconds that the status message should be displayed for.
+        /// Helpful for error messages that only need to be displayed for a few seconds.
+        public void setExpires(int millis) {
+<span class="pc bpc" id="L821" title="3 of 4 branches missed.">            if (millis &lt; 0 &amp;&amp; timer != null) {</span>
+<span class="nc" id="L822">                timer.cancel();</span>
+<span class="nc" id="L823">                timer = null;</span>
+<span class="pc bpc" id="L824" title="1 of 2 branches missed.">            } else if (millis &gt; 0) {</span>
+<span class="pc bpc" id="L825" title="1 of 2 branches missed.">                if (timer != null) {</span>
+<span class="nc" id="L826">                    timer.cancel();</span>
+<span class="nc" id="L827">                    timer = null;</span>
+                }
+<span class="fc" id="L829">                timer = new Timer();</span>
+<span class="fc" id="L830">                timer.schedule(new TimerTask() {</span>
+
+                    @Override
+                    public void run() {
+<span class="fc" id="L834">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="fc" id="L837">                                timer = null;</span>
+<span class="fc" id="L838">                                Status.this.clear();</span>
+<span class="fc" id="L839">                            }</span>
+                        });
+<span class="fc" id="L841">                    }</span>
+
+                }, millis);
+            }
+<span class="fc" id="L845">        }</span>
+
+        /// Shows this status message.  Call this method after making any changes
+        /// to the status that you want to have displayed.  This will always cause
+        /// any currently-displayed status to be replaced by this status.
+        ///
+        /// If you don't want to show the status immediately, but rather to wait some delay, you can use
+        /// the `#showDelayed(int)` method instead.
+        ///
+        /// #### See also
+        ///
+        /// - #showDelayed(int)
+        public void show() {
+<span class="pc bpc" id="L858" title="1 of 2 branches missed.">            if (showTimer != null) {</span>
+<span class="nc" id="L859">                showTimer.cancel();</span>
+<span class="nc" id="L860">                showTimer = null;</span>
+            }
+<span class="fc" id="L862">            ToastBarComponent c = getToastBarComponent();</span>
+<span class="pc bpc" id="L863" title="1 of 2 branches missed.">            if (c != null) {</span>
+<span class="fc" id="L864">                c.currentlyShowing = this;</span>
+<span class="fc" id="L865">                updateStatus();</span>
+<span class="fc" id="L866">                setVisible(true);</span>
+
+            }
+<span class="fc" id="L869">        }</span>
+
+        /// Schedules this status message to be shown after a specified number of milliseconds,
+        /// if it hasn't been cleared or shown first.
+        ///
+        /// This is handy if you want to show a status for an operation that usually completes very quickly, but could
+        /// potentially hang.  In such a case you might decide not to display a status message at all unless the operation
+        /// takes more than 500ms to complete.
+        ///
+        /// If you want to show the status immediately, use the `#show()` method instead.
+        ///
+        /// #### Parameters
+        ///
+        /// - `millis`: Number of milliseconds to wait before showing the status.
+        public void showDelayed(int millis) {
+<span class="nc" id="L884">            showTimer = new Timer();</span>
+<span class="nc" id="L885">            showTimer.schedule(new TimerTask() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L888">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc bnc" id="L891" title="All 2 branches missed.">                            if (showTimer != null) {</span>
+<span class="nc" id="L892">                                showTimer = null;</span>
+<span class="nc" id="L893">                                show();</span>
+                            }
+<span class="nc" id="L895">                        }</span>
+                    });
+<span class="nc" id="L897">                }</span>
+
+            }, millis);
+<span class="nc" id="L900">        }</span>
+
+        /// Clears this status message. This any pending &quot;showDelayed&quot; requests for this status.
+        public void clear() {
+<span class="pc bpc" id="L904" title="1 of 2 branches missed.">            if (showTimer != null) {</span>
+<span class="nc" id="L905">                showTimer.cancel();</span>
+<span class="nc" id="L906">                showTimer = null;</span>
+            }
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">            if (timer != null) {</span>
+<span class="nc" id="L909">                timer.cancel();</span>
+<span class="nc" id="L910">                timer = null;</span>
+            }
+<span class="fc" id="L912">            removeStatus(this);</span>
+<span class="fc" id="L913">        }</span>
+
+        /// Returns the text that will be displayed for this status.
+        ///
+        /// #### Returns
+        ///
+        /// the message
+        public String getMessage() {
+<span class="fc" id="L921">            return message;</span>
+        }
+
+        /// Sets the message that should be displayed in the `ToastBar`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `message`
+        public void setMessage(String message) {
+<span class="fc" id="L930">            this.message = message;</span>
+
+<span class="fc" id="L932">        }</span>
+
+        /// Returns the listener added to perform a particular action.
+        ///
+        /// #### Returns
+        ///
+        /// the listener
+        public ActionListener getListener() {
+<span class="fc" id="L940">            return listener;</span>
+        }
+
+        /// Sets the action listener needed to perform an action when the bar is tapped `ToastBar`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `listener`
+        public void setListener(ActionListener listener) {
+<span class="nc" id="L949">            this.listener = listener;</span>
+<span class="nc" id="L950">        }</span>
+
+        /// Returns the progress of this status.  A value of -1 indicates that the progress
+        /// bar should not be shown.  Values between 0 and 100 inclusive will be rendered
+        /// on a progress bar (slider) in the status component.
+        ///
+        /// #### Returns
+        ///
+        /// the progress
+        public int getProgress() {
+<span class="fc" id="L960">            return progress;</span>
+        }
+
+        /// Sets the progress (-1..100) that should be displayed in the progress bar
+        /// for this status.  When set to -1 it will act as an infinite progress
+        ///
+        /// #### Parameters
+        ///
+        /// - `progress`
+        public void setProgress(int progress) {
+<span class="nc" id="L970">            this.progress = progress;</span>
+<span class="nc" id="L971">            updateStatus();</span>
+<span class="nc" id="L972">        }</span>
+
+        /// Gets the icon (may be null) that is displayed with this status.
+        ///
+        /// #### Returns
+        ///
+        /// the icon
+        public Image getIcon() {
+<span class="fc" id="L980">            return icon;</span>
+        }
+
+        /// Sets the icon that is to be displayed with this status.  Set this to null to not show an icon.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`: the icon to set
+        public void setIcon(Image icon) {
+<span class="fc" id="L989">            this.icon = icon;</span>
+<span class="fc" id="L990">        }</span>
+
+        /// #### Returns
+        ///
+        /// the showProgressIndicator
+        public boolean isShowProgressIndicator() {
+<span class="fc" id="L996">            return showProgressIndicator;</span>
+        }
+
+        /// Sets whether this status message should include an infinite progress indicator (e.g. spinning beach ball).
+        ///
+        /// #### Parameters
+        ///
+        /// - `showProgressIndicator`: the showProgressIndicator to set
+        public void setShowProgressIndicator(boolean showProgressIndicator) {
+<span class="fc" id="L1005">            this.showProgressIndicator = showProgressIndicator;</span>
+<span class="fc" id="L1006">        }</span>
+
+        /// Gets the UIID to use for styling the text of this status message.
+        ///
+        /// #### Returns
+        ///
+        /// the messageUIID
+        public String getMessageUIID() {
+<span class="fc" id="L1014">            return messageUIID;</span>
+        }
+
+        /// Sets the UIID to use for styling the text of this status message.
+        ///
+        /// #### Parameters
+        ///
+        /// - `messageUIID`: the messageUIID to set
+        public void setMessageUIID(String messageUIID) {
+<span class="nc" id="L1023">            this.messageUIID = messageUIID;</span>
+<span class="nc" id="L1024">        }</span>
+
+        /// Gets the UIID that should be used for styling the status component while
+        /// this status is displayed.
+        ///
+        /// #### Returns
+        ///
+        /// the uiid
+        public String getUiid() {
+<span class="fc" id="L1033">            return uiid;</span>
+        }
+
+        /// Sets the UIID that should be used for styling the status component while
+        /// this status is displayed.
+        ///
+        /// #### Parameters
+        ///
+        /// - `uiid`: the uiid to set
+        public void setUiid(String uiid) {
+<span class="nc" id="L1043">            this.uiid = uiid;</span>
+<span class="nc" id="L1044">        }</span>
+
+    }
+
+    /// The actual component for the `ToastBar`.  This is added to the layered pane of
+    /// the top-level form.
+    private class ToastBarComponent extends Container {
+        private final InfiniteProgress progressLabel;
+        private final Slider progressBar;
+        private final Label icon;
+<span class="fc" id="L1054">        boolean hidden = true;</span>
+<span class="fc" id="L1055">        Button leadButton = new Button();</span>
+        private TextArea label;
+        private Status currentlyShowing;
+
+<span class="fc" id="L1059">        public ToastBarComponent() {</span>
+<span class="fc" id="L1060">            this.getAllStyles().setBgColor(0x0);</span>
+<span class="fc" id="L1061">            this.getAllStyles().setBackgroundType(Style.BACKGROUND_NONE);</span>
+<span class="fc" id="L1062">            this.getAllStyles().setBgTransparency(128);</span>
+<span class="fc" id="L1063">            super.setVisible(false);</span>
+<span class="fc" id="L1064">            label = new TextArea();</span>
+<span class="fc" id="L1065">            label.setUIID(defaultMessageUIID);</span>
+<span class="fc" id="L1066">            label.setEditable(false);</span>
+<span class="fc" id="L1067">            label.setFocusable(false);</span>
+<span class="fc" id="L1068">            label.setVerticalAlignment(CENTER);</span>
+
+<span class="fc" id="L1070">            progressLabel = new InfiniteProgress();</span>
+
+<span class="fc" id="L1072">            progressLabel.setAngleIncrease(4);</span>
+<span class="fc" id="L1073">            progressLabel.setVisible(false);</span>
+<span class="fc" id="L1074">            icon = new Label();</span>
+<span class="fc" id="L1075">            icon.setVisible(false);</span>
+<span class="fc" id="L1076">            progressBar = new Slider();</span>
+<span class="fc" id="L1077">            progressBar.setVisible(false);</span>
+
+<span class="fc" id="L1079">            leadButton.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1082" title="All 4 branches missed.">                    if (currentlyShowing != null &amp;&amp; !currentlyShowing.showProgressIndicator) {</span>
+<span class="nc" id="L1083">                        currentlyShowing.clear();</span>
+                    }
+<span class="nc" id="L1085">                    ToastBar.this.setVisible(false);</span>
+<span class="nc" id="L1086">                }</span>
+            });
+<span class="fc" id="L1088">            leadButton.setVisible(false);</span>
+
+<span class="fc" id="L1090">            this.setLeadComponent(leadButton);</span>
+
+<span class="fc" id="L1092">            setLayout(new BorderLayout());</span>
+<span class="fc" id="L1093">            addComponent(BorderLayout.WEST, icon);</span>
+<span class="fc" id="L1094">            addComponent(BorderLayout.CENTER, label);</span>
+<span class="fc" id="L1095">            addComponent(BorderLayout.SOUTH, progressBar);</span>
+<span class="fc" id="L1096">            addComponent(BorderLayout.EAST, progressLabel);</span>
+
+<span class="fc" id="L1098">            progressBar.setVisible(false);</span>
+<span class="fc" id="L1099">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc bfc" id="L1103" title="All 2 branches covered.">            if (hidden) {</span>
+<span class="fc" id="L1104">                return new Dimension(Display.getInstance().getDisplayWidth(),</span>
+                        0
+                );
+            } else {
+<span class="fc" id="L1108">                return super.calcPreferredSize();</span>
+                /*
+                return new Dimension(Display.getInstance().getDisplayWidth(),
+                        Display.getInstance().convertToPixels(10, false)
+                );*/
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

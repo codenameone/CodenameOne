@@ -1,0 +1,1204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UiBinding.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">UiBinding.java</span></div><h1>UiBinding.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import com.codename1.io.Util;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextComponent;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.table.AbstractTableModel;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.validation.Constraint;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/// The binding framework can implicitly bind UI elements to properties, this allow seamless model to
+/// UI mapping. Most cases allow simple binding by just using the `com.codename1.ui.Component)` method to seamlessly update
+/// a property/component based on changes.
+///
+/// It contains the following base concepts:
+///
+/// 1. `com.codename1.properties.UiBinding.ObjectConverter` - a converter converts from one
+/// type to another. E.g. if we want a `com.codename1.ui.TextArea` to map to an `Integer`
+/// property we'd use an `com.codename1.properties.UiBinding.IntegerConverter` to indicate the
+/// desired destination value.
+///
+/// 2. `com.codename1.properties.UiBinding.ComponentAdapter` - takes two `com.codename1.properties.UiBinding.ObjectConverter` to convert to/from the component and
+/// property. It provides the API for event binding and value extraction/setting on the component.
+///
+/// 3. `com.codename1.properties.UiBinding.Binding` - the commit mode.
+///
+/// 4. `com.codename1.ui.Component)` - the `bind` helper methods allow us to bind a component easily without exposure to these complexities.
+///
+/// @author Shai Almog
+<span class="fc" id="L70">public class UiBinding {</span>
+<span class="fc" id="L71">    private boolean autoCommit = true;</span>
+
+    /// Allows us to unbind the property from binding, this is equivalent to calling `com.codename1.properties.UiBinding.Binding#disconnect()` on all bindings...
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
+    public static void unbind(PropertyBase prop) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (prop.getListeners() != null) {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            for (Object l : prop.getListeners()) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (l instanceof Binding) {</span>
+<span class="nc" id="L82">                    ((Binding) l).disconnect();</span>
+
+                    // prevent a concurrent modification exception by returning and recursing
+<span class="nc" id="L85">                    unbind(prop);</span>
+<span class="nc" id="L86">                    return;</span>
+                }
+<span class="nc" id="L88">            }</span>
+        }
+<span class="nc" id="L90">    }</span>
+
+    /// Unbinds all the properties within the business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `po`: the business object
+    public static void unbind(PropertyBusinessObject po) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        for (PropertyBase pb : po.getPropertyIndex()) {</span>
+<span class="nc" id="L99">            unbind(pb);</span>
+<span class="nc" id="L100">        }</span>
+<span class="nc" id="L101">    }</span>
+
+    private static ObjectConverter pickerTypeToConverter(int type) {
+<span class="pc bpc" id="L104" title="3 of 4 branches missed.">        switch (type) {</span>
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+<span class="nc" id="L107">                return new DateConverter();</span>
+            case Display.PICKER_TYPE_TIME:
+<span class="nc" id="L109">                return new IntegerConverter();</span>
+            case Display.PICKER_TYPE_STRINGS:
+<span class="fc" id="L111">                return new StringConverter();</span>
+            default:
+<span class="nc" id="L113">                throw new IllegalArgumentException(&quot;Unsupported picker type: &quot; + type);</span>
+        }
+    }
+
+    /// Is auto-commit mode on by default see `#setAutoCommit(boolean)`
+    ///
+    /// #### Returns
+    ///
+    /// true if auto-commit is on
+    public boolean isAutoCommit() {
+<span class="nc" id="L123">        return autoCommit;</span>
+    }
+
+    /// Default value for auto-commit mode, in auto-commit mode changes to the component/property are
+    /// instantly reflected otherwise `com.codename1.properties.UiBinding.CommitMode#commit()`
+    /// should be invoked explicitly
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to enable auto commit mode
+    public void setAutoCommit(boolean b) {
+<span class="fc" id="L134">        autoCommit = b;</span>
+<span class="fc" id="L135">    }</span>
+
+    private ObjectConverter getPropertyConverter(PropertyBase prop) {
+<span class="fc" id="L138">        Class gt = prop.getGenericType();</span>
+<span class="fc bfc" id="L139" title="All 4 branches covered.">        if (gt == null || gt == String.class) {</span>
+<span class="fc" id="L140">            return new StringConverter();</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (gt == Integer.class) {</span>
+<span class="nc" id="L143">            return new IntegerConverter();</span>
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (gt == Long.class) {</span>
+<span class="nc" id="L146">            return new LongConverter();</span>
+        }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (gt == Double.class) {</span>
+<span class="nc" id="L149">            return new DoubleConverter();</span>
+        }
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (gt == Float.class) {</span>
+<span class="nc" id="L152">            return new FloatConverter();</span>
+        }
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (gt == Boolean.class) {</span>
+<span class="fc" id="L155">            return new BooleanConverter();</span>
+        }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (gt == Date.class) {</span>
+<span class="nc" id="L158">            return new DateConverter();</span>
+        }
+<span class="nc" id="L160">        throw new RuntimeException(&quot;Unsupported property converter: &quot; + gt.getName());</span>
+    }
+
+    GroupBinding createGroupBinding(List&lt;Binding&gt; allBindings) {
+<span class="fc" id="L164">        return new GroupBinding(allBindings);</span>
+    }
+
+    /// Binds a hierarchy of Components to a business object by searching the tree and collecting the
+    /// bindings. Components are associated with properties based on their name attribute
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the business object with the properties to bind
+    ///
+    /// - `cnt`: a container that will be recursed for binding
+    ///
+    /// #### Returns
+    ///
+    /// a Binding object that manipulates all of the individual bindings at once
+    public Binding bind(final PropertyBusinessObject obj, final Container cnt) {
+<span class="nc" id="L180">        ArrayList&lt;Binding&gt; allBindings = new ArrayList&lt;Binding&gt;();</span>
+<span class="nc" id="L181">        bind(obj, cnt, allBindings);</span>
+
+<span class="nc" id="L183">        return new GroupBinding(allBindings);</span>
+    }
+
+    private void bind(
+            final PropertyBusinessObject obj, final Container cnt, ArrayList&lt;Binding&gt; allBindings) {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        for (Component cmp : cnt) {</span>
+<span class="nc bnc" id="L189" title="All 4 branches missed.">            if (cmp instanceof Container &amp;&amp; ((Container) cmp).getLeadComponent() == null) {</span>
+<span class="nc" id="L190">                bind(obj, ((Container) cmp), allBindings);</span>
+<span class="nc" id="L191">                continue;</span>
+            }
+<span class="nc" id="L193">            String n = cmp.getName();</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            if (n != null) {</span>
+<span class="nc" id="L195">                PropertyBase b = obj.getPropertyIndex().get(n);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                if (b != null) {</span>
+<span class="nc" id="L197">                    allBindings.add(bind(b, cmp));</span>
+                }
+            }
+<span class="nc" id="L200">        }</span>
+<span class="nc" id="L201">    }</span>
+
+    /// Binds the given property to the selected value from the set based on the multiple components.
+    /// This is useful for binding multiple radio buttons to a single property value based on selection
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
+    ///
+    /// - `values`: the values that can be used
+    ///
+    /// - `cmps`: the components
+    ///
+    /// #### Returns
+    ///
+    /// a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
+    public Binding bindGroup(
+            final PropertyBase prop, final Object[] values, final Component... cmps) {
+<span class="fc" id="L219">        ObjectConverter cnv = getPropertyConverter(prop);</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (cmps[0] instanceof RadioButton) {</span>
+<span class="fc" id="L221">            RadioButton[] rb = new RadioButton[cmps.length];</span>
+<span class="fc" id="L222">            System.arraycopy(cmps, 0, rb, 0, cmps.length);</span>
+<span class="fc" id="L223">            return bindImpl(prop, rb, new RadioListAdapter(cnv, values));</span>
+        }
+<span class="nc" id="L225">        throw new RuntimeException(&quot;Unsupported binding type: &quot; + cmps[0].getClass().getName());</span>
+    }
+
+    /// Binds the given property to the component using default adapters
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
+    ///
+    /// - `cmp`: the component
+    ///
+    /// #### Returns
+    ///
+    /// a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
+    public Binding bind(final PropertyBase prop, final Component cmp) {
+<span class="fc" id="L240">        ObjectConverter cnv = getPropertyConverter(prop);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (cmp instanceof TextArea) {</span>
+<span class="fc" id="L242">            return bind(prop, cmp, new TextAreaAdapter(cnv));</span>
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (cmp instanceof TextComponent) {</span>
+<span class="nc" id="L245">            return bind(prop, cmp, new TextComponentAdapter(cnv));</span>
+        }
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (cmp instanceof CheckBox) {</span>
+<span class="fc" id="L248">            return bind(prop, cmp, new CheckBoxRadioSelectionAdapter(cnv));</span>
+        }
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if (cmp instanceof RadioButton) {</span>
+<span class="nc" id="L251">            return bind(prop, cmp, new CheckBoxRadioSelectionAdapter(cnv));</span>
+        }
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (cmp instanceof Picker) {</span>
+<span class="nc" id="L254">            return bind(prop, cmp, new PickerAdapter(cnv, ((Picker) cmp).getType()));</span>
+        }
+<span class="nc" id="L256">        throw new RuntimeException(&quot;Unsupported binding type: &quot; + cmp.getClass().getName());</span>
+    }
+
+    /// Binds the given property to the component using a custom adapter class
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property
+    ///
+    /// - `cmp`: the component
+    ///
+    /// - `adapt`: @param adapt an implementation of `com.codename1.properties.UiBinding.ComponentAdapter`
+    /// that allows us to define the way the component maps to/from the property
+    ///
+    /// #### Returns
+    ///
+    /// a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
+    public Binding bind(final PropertyBase prop, final Component cmp, final ComponentAdapter adapt) {
+<span class="fc" id="L274">        return bindImpl(prop, cmp, adapt);</span>
+    }
+
+    /// Creates a table model which is implicitly bound to the properties
+    ///
+    /// #### Parameters
+    ///
+    /// - `objects`: list of business objects
+    ///
+    /// - `prototype`: the type by which we determine the structure of the table
+    ///
+    /// #### Returns
+    ///
+    /// a bound table model that can be used in the `Table` class
+    public BoundTableModel createTableModel(
+            List&lt;? extends PropertyBusinessObject&gt; objects, PropertyBusinessObject prototype) {
+<span class="fc" id="L290">        return new BoundTableModel(objects, prototype);</span>
+    }
+
+    /// Creates a table model which is implicitly bound to the properties
+    ///
+    /// #### Parameters
+    ///
+    /// - `objects`: list of business objects
+    ///
+    /// - `prototype`: the type by which we determine the structure of the table
+    ///
+    /// #### Returns
+    ///
+    /// a bound table model that can be used in the `Table` class
+    public BoundTableModel createTableModel(
+            CollectionProperty&lt;? extends PropertyBusinessObject, ? extends Object&gt; objects,
+            PropertyBusinessObject prototype) {
+<span class="nc" id="L307">        return new BoundTableModel(objects, prototype);</span>
+    }
+
+    private Binding bindImpl(
+            final PropertyBase prop, final Object cmp, final ComponentAdapter adapt) {
+<span class="fc" id="L312">        adapt.assignTo(prop.get(), cmp);</span>
+
+<span class="fc" id="L314">        class BindingImpl extends Binding</span>
+                implements PropertyChangeListener, ActionListener&lt;ActionEvent&gt; {
+            private boolean lock;
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                if (super.isAutoCommit()) {</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                    if (lock) {</span>
+<span class="nc" id="L322">                        return;</span>
+                    }
+<span class="fc" id="L324">                    lock = true;</span>
+<span class="fc" id="L325">                    ((Property) prop).set(adapt.getFrom(cmp));</span>
+<span class="fc" id="L326">                    lock = false;</span>
+                }
+<span class="fc" id="L328">            }</span>
+
+            @Override
+            public void propertyChanged(PropertyBase p) {
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">                if (super.isAutoCommit()) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">                    if (lock) {</span>
+<span class="fc" id="L334">                        return;</span>
+                    }
+<span class="fc" id="L336">                    lock = true;</span>
+<span class="fc" id="L337">                    adapt.assignTo(prop.get(), cmp);</span>
+<span class="fc" id="L338">                    lock = false;</span>
+                }
+<span class="fc" id="L340">            }</span>
+
+            @Override
+            public void commit() {
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                if (super.isAutoCommit()) {</span>
+<span class="nc" id="L345">                    throw new RuntimeException(&quot;Can't commit in autocommit mode&quot;);</span>
+                }
+<span class="nc" id="L347">                ((Property) prop).set(adapt.getFrom(cmp));</span>
+<span class="nc" id="L348">            }</span>
+
+            @Override
+            public void rollback() {
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                if (super.isAutoCommit()) {</span>
+<span class="nc" id="L353">                    throw new RuntimeException(&quot;Can't rollback in autocommit mode&quot;);</span>
+                }
+<span class="nc" id="L355">                adapt.assignTo(prop.get(), cmp);</span>
+<span class="nc" id="L356">            }</span>
+
+            @Override
+            public void disconnect() {
+<span class="nc" id="L360">                adapt.removeListener(cmp, this);</span>
+<span class="nc" id="L361">                prop.removeChangeListener(this);</span>
+<span class="nc" id="L362">            }</span>
+        }
+<span class="fc" id="L364">        BindingImpl b = new BindingImpl();</span>
+<span class="fc" id="L365">        adapt.bindListener(cmp, b);</span>
+<span class="fc" id="L366">        prop.addChangeListener(b);</span>
+<span class="fc" id="L367">        return b;</span>
+    }
+
+    /// Changes to the text area are automatically reflected to the given property and visa versa
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property value
+    ///
+    /// - `ta`: the text area
+    ///
+    /// #### Deprecated
+    ///
+    /// this code was experimental we will use the more generic Adapter/bind framework
+    public void bindString(Property&lt;String, ? extends Object&gt; prop, TextArea ta) {
+<span class="nc" id="L382">        bind(prop, ta);</span>
+<span class="nc" id="L383">    }</span>
+
+    /// Changes to the text area are automatically reflected to the given property and visa versa
+    ///
+    /// #### Parameters
+    ///
+    /// - `prop`: the property value
+    ///
+    /// - `ta`: the text area
+    ///
+    /// #### Deprecated
+    ///
+    /// this code was experimental we will use the more generic Adapter/bind framework
+    public void bindInteger(Property&lt;Integer, ? extends Object&gt; prop, TextArea ta) {
+<span class="nc" id="L397">        bind(prop, ta);</span>
+<span class="nc" id="L398">    }</span>
+
+    /// Object converter can convert an object from one type to another e.g. a String to an integer an
+    /// array to a list model. Use this object converter to keep source/values the same e.g. when
+    /// converting using a `com.codename1.properties.UiBinding.TextAreaAdapter` to a String
+    /// property.
+<span class="fc" id="L404">    public static class ObjectConverter {</span>
+        /// Converts an object of source type to the type matching this class, the default implementation
+        /// does nothing and can be used as a stand-in
+        ///
+        /// #### Parameters
+        ///
+        /// - `source`: an object or null
+        ///
+        /// #### Returns
+        ///
+        /// null or a new object instance
+        public Object convert(Object source) {
+<span class="nc" id="L416">            return source;</span>
+        }
+    }
+
+    /// Converts the source value to a String.
+<span class="fc" id="L421">    public static class StringConverter extends ObjectConverter {</span>
+        @Override
+        public Object convert(Object source) {
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (source == null) {</span>
+<span class="nc" id="L425">                return null;</span>
+            }
+<span class="fc" id="L427">            return source.toString();</span>
+        }
+    }
+
+    /// Converts the source value to an Integer.
+<span class="fc" id="L432">    public static class IntegerConverter extends ObjectConverter {</span>
+        @Override
+        public Object convert(Object source) {
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            if (source == null) {</span>
+<span class="fc" id="L436">                return null;</span>
+            }
+<span class="fc" id="L438">            return Util.toIntValue(source);</span>
+        }
+    }
+
+    /// Converts the source value to a Date.
+<span class="fc" id="L443">    public static class DateConverter extends ObjectConverter {</span>
+        @Override
+        public Object convert(Object source) {
+<span class="fc bfc" id="L446" title="All 2 branches covered.">            if (source == null) {</span>
+<span class="fc" id="L447">                return null;</span>
+            }
+<span class="fc bfc" id="L449" title="All 2 branches covered.">            if (source instanceof Date) {</span>
+<span class="fc" id="L450">                return source;</span>
+            }
+<span class="fc" id="L452">            return new Date(Util.toLongValue(source));</span>
+        }
+    }
+
+    /// Converts the source value to a Long.
+<span class="fc" id="L457">    public static class LongConverter extends ObjectConverter {</span>
+        @Override
+        public Object convert(Object source) {
+<span class="fc bfc" id="L460" title="All 2 branches covered.">            if (source == null) {</span>
+<span class="fc" id="L461">                return null;</span>
+            }
+<span class="fc" id="L463">            return Util.toLongValue(source);</span>
+        }
+    }
+
+    /// Converts the source value to a Float.
+<span class="fc" id="L468">    public static class FloatConverter extends ObjectConverter {</span>
+        @Override
+        public Object convert(Object source) {
+<span class="fc bfc" id="L471" title="All 2 branches covered.">            if (source == null) {</span>
+<span class="fc" id="L472">                return null;</span>
+            }
+<span class="fc" id="L474">            return Util.toFloatValue(source);</span>
+        }
+    }
+
+    /// Converts the source value to a Double.
+<span class="fc" id="L479">    public static class DoubleConverter extends ObjectConverter {</span>
+        @Override
+        public Object convert(Object source) {
+<span class="fc bfc" id="L482" title="All 2 branches covered.">            if (source == null) {</span>
+<span class="fc" id="L483">                return null;</span>
+            }
+<span class="fc" id="L485">            return Util.toDoubleValue(source);</span>
+        }
+    }
+
+    /// Converts the source value to a Boolean.
+<span class="fc" id="L490">    public static class BooleanConverter extends ObjectConverter {</span>
+        @Override
+        public Object convert(Object source) {
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">            if (source == null) {</span>
+<span class="nc" id="L494">                return null;</span>
+            }
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">            if (source instanceof Boolean) {</span>
+<span class="fc" id="L497">                return source;</span>
+            }
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            if (source instanceof String) {</span>
+<span class="nc" id="L500">                String s = ((String) source).toLowerCase();</span>
+<span class="nc bnc" id="L501" title="All 6 branches missed.">                return s.contains(&quot;true&quot;) || s.contains(&quot;yes&quot;) || s.contains(&quot;1&quot;);</span>
+            }
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            return Util.toIntValue(source) &gt; 0;</span>
+        }
+    }
+
+    /// Maps values to other values for conversion in a similar way to a Map this is pretty useful for
+    /// API's like picker where we have a list of Strings and we might want a list of other objects to
+    /// match every string
+    public static class MappingConverter extends ObjectConverter {
+        private final Map&lt;Object, Object&gt; m;
+
+<span class="fc" id="L513">        public MappingConverter(Map&lt;Object, Object&gt; m) {</span>
+<span class="fc" id="L514">            this.m = m;</span>
+<span class="fc" id="L515">        }</span>
+
+        @Override
+        public Object convert(Object source) {
+<span class="fc bfc" id="L519" title="All 2 branches covered.">            if (source == null) {</span>
+<span class="fc" id="L520">                return null;</span>
+            }
+<span class="fc" id="L522">            return m.get(source);</span>
+        }
+    }
+
+    /// Adapters can be extended to allow any component to bind to a property via a converter
+    public abstract static class ComponentAdapter&lt;PropertyType, ComponentType&gt; {
+        /// Used by the subclass to convert values from the component to the property
+        protected final ObjectConverter toPropertyType;
+
+        /// Used by the subclass to convert values from the property to the component
+        protected final ObjectConverter toComponentType;
+
+        /// Subclasses usually provide the toComponentType and allow their callers to define the
+        /// toPropertyType
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: @param toPropertyType  Used by the subclass to convert values from the component to the
+        /// property
+        ///
+        /// - `toComponentType`: @param toComponentType Used by the subclass to convert values from the property to the
+        /// component
+<span class="fc" id="L544">        public ComponentAdapter(ObjectConverter toPropertyType, ObjectConverter toComponentType) {</span>
+<span class="fc" id="L545">            this.toPropertyType = toPropertyType;</span>
+<span class="fc" id="L546">            this.toComponentType = toComponentType;</span>
+<span class="fc" id="L547">        }</span>
+
+        /// Assigns the value from the property into the component
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: the value that was returned from the property get method
+        ///
+        /// - `cmp`: the component instance
+        public abstract void assignTo(PropertyType value, ComponentType cmp);
+
+        /// Returns the value for the set method of the property from the given component
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: the component
+        ///
+        /// #### Returns
+        ///
+        /// the value we can place into the set method
+        public abstract PropertyType getFrom(ComponentType cmp);
+
+        /// Binds an action listener to changes in the component
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: the component
+        ///
+        /// - `l`: listener
+        public abstract void bindListener(ComponentType cmp, ActionListener&lt;ActionEvent&gt; l);
+
+        /// Removes the action listener from changes in the component
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: the component
+        ///
+        /// - `l`: listener
+        public abstract void removeListener(ComponentType cmp, ActionListener&lt;ActionEvent&gt; l);
+    }
+
+    /// Adapts a `com.codename1.ui.TextArea` (and it's subclass `com.codename1.ui.TextField` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
+    public static class TextAreaAdapter&lt;PropertyType&gt;
+            extends ComponentAdapter&lt;PropertyType, TextArea&gt; {
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
+        public TextAreaAdapter(ObjectConverter toPropertyType) {
+<span class="fc" id="L601">            super(toPropertyType, new StringConverter());</span>
+<span class="fc" id="L602">        }</span>
+
+        /// Constructs a new binding assuming a String property
+        public TextAreaAdapter() {
+<span class="nc" id="L606">            super(new ObjectConverter(), new ObjectConverter());</span>
+<span class="nc" id="L607">        }</span>
+
+        @Override
+        public void assignTo(PropertyType value, TextArea cmp) {
+<span class="fc" id="L611">            cmp.setText((String) toComponentType.convert(value));</span>
+<span class="fc" id="L612">        }</span>
+
+        @Override
+        public PropertyType getFrom(TextArea cmp) {
+<span class="nc" id="L616">            return (PropertyType) toPropertyType.convert(cmp.getText());</span>
+        }
+
+        @Override
+        public void bindListener(TextArea cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L621">            cmp.addActionListener(l);</span>
+<span class="fc" id="L622">        }</span>
+
+        @Override
+        public void removeListener(TextArea cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="nc" id="L626">            cmp.removeActionListener(l);</span>
+<span class="nc" id="L627">        }</span>
+    }
+
+    /// Adapts a `com.codename1.ui.TextComponent` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
+    public static class TextComponentAdapter&lt;PropertyType&gt;
+            extends ComponentAdapter&lt;PropertyType, TextComponent&gt; {
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
+        public TextComponentAdapter(ObjectConverter toPropertyType) {
+<span class="fc" id="L643">            super(toPropertyType, new StringConverter());</span>
+<span class="fc" id="L644">        }</span>
+
+        /// Constructs a new binding assuming a String property
+        public TextComponentAdapter() {
+<span class="nc" id="L648">            super(new ObjectConverter(), new ObjectConverter());</span>
+<span class="nc" id="L649">        }</span>
+
+        @Override
+        public void assignTo(PropertyType value, TextComponent cmp) {
+<span class="fc" id="L653">            cmp.getField().setText((String) toComponentType.convert(value));</span>
+<span class="fc" id="L654">        }</span>
+
+        @Override
+        public PropertyType getFrom(TextComponent cmp) {
+<span class="fc" id="L658">            return (PropertyType) toPropertyType.convert(cmp.getText());</span>
+        }
+
+        @Override
+        public void bindListener(TextComponent cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L663">            cmp.getField().addActionListener(l);</span>
+<span class="fc" id="L664">        }</span>
+
+        @Override
+        public void removeListener(TextComponent cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L668">            cmp.getField().removeActionListener(l);</span>
+<span class="fc" id="L669">        }</span>
+    }
+
+    /// Adapts a `com.codename1.ui.CheckBox` or `com.codename1.ui.RadioButton` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
+    public static class CheckBoxRadioSelectionAdapter&lt;PropertyType&gt;
+            extends ComponentAdapter&lt;PropertyType, Button&gt; {
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
+        public CheckBoxRadioSelectionAdapter(ObjectConverter toPropertyType) {
+<span class="fc" id="L685">            super(toPropertyType, new BooleanConverter());</span>
+<span class="fc" id="L686">        }</span>
+
+        @Override
+        public void assignTo(PropertyType value, Button cmp) {
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">            if (cmp instanceof CheckBox) {</span>
+<span class="fc" id="L691">                ((CheckBox) cmp).setSelected((Boolean) toComponentType.convert(value));</span>
+            } else {
+<span class="nc bnc" id="L693" title="All 2 branches missed.">                if (cmp instanceof RadioButton) {</span>
+<span class="nc" id="L694">                    ((RadioButton) cmp).setSelected((Boolean) toComponentType.convert(value));</span>
+                }
+            }
+<span class="fc" id="L697">        }</span>
+
+        @Override
+        public PropertyType getFrom(Button cmp) {
+<span class="nc" id="L701">            return (PropertyType) toPropertyType.convert(cmp.isSelected());</span>
+        }
+
+        @Override
+        public void bindListener(Button cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L706">            cmp.addActionListener(l);</span>
+<span class="fc" id="L707">        }</span>
+
+        @Override
+        public void removeListener(Button cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="nc" id="L711">            cmp.removeActionListener(l);</span>
+<span class="nc" id="L712">        }</span>
+    }
+
+    /// Adapts a set of `com.codename1.ui.RadioButton` to a selection within a list of values
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
+    public static class RadioListAdapter&lt;PropertyType&gt;
+            extends ComponentAdapter&lt;PropertyType, RadioButton[]&gt; {
+        private final PropertyType[] values;
+
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
+        ///
+        /// - `values`: potential values for the selection
+        public RadioListAdapter(ObjectConverter toPropertyType, PropertyType... values) {
+<span class="fc" id="L732">            super(toPropertyType, null);</span>
+<span class="fc" id="L733">            this.values = values;</span>
+<span class="fc" id="L734">        }</span>
+
+        @Override
+        public void assignTo(PropertyType value, RadioButton[] cmp) {
+<span class="fc bfc" id="L738" title="All 2 branches covered.">            for (int iter = 0; iter &lt; values.length; iter++) {</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">                if (values[iter].equals(value)) {</span>
+<span class="fc" id="L740">                    cmp[iter].setSelected(true);</span>
+<span class="fc" id="L741">                    return;</span>
+                }
+            }
+<span class="fc" id="L744">        }</span>
+
+        @Override
+        public PropertyType getFrom(RadioButton[] cmp) {
+<span class="pc bpc" id="L748" title="1 of 2 branches missed.">            for (int iter = 0; iter &lt; values.length; iter++) {</span>
+<span class="fc bfc" id="L749" title="All 2 branches covered.">                if (cmp[iter].isSelected()) {</span>
+<span class="fc" id="L750">                    return values[iter];</span>
+                }
+            }
+<span class="nc" id="L753">            return null;</span>
+        }
+
+        @Override
+        public void bindListener(RadioButton[] cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc bfc" id="L758" title="All 2 branches covered.">            for (RadioButton r : cmp) {</span>
+<span class="fc" id="L759">                r.addActionListener(l);</span>
+            }
+<span class="fc" id="L761">        }</span>
+
+        @Override
+        public void removeListener(RadioButton[] cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="nc bnc" id="L765" title="All 2 branches missed.">            for (RadioButton r : cmp) {</span>
+<span class="nc" id="L766">                r.removeActionListener(l);</span>
+            }
+<span class="nc" id="L768">        }</span>
+    }
+
+    /// Adapts a `com.codename1.ui.spinner.Picker` to binding
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: type of the property generic
+    public static class PickerAdapter&lt;PropertyType&gt; extends ComponentAdapter&lt;PropertyType, Picker&gt; {
+        /// Constructs a new binding
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: the conversion logic to the property
+        ///
+        /// - `pickerType`: the type of the picker
+        public PickerAdapter(ObjectConverter toPropertyType, int pickerType) {
+<span class="fc" id="L785">            super(toPropertyType, pickerTypeToConverter(pickerType));</span>
+<span class="fc" id="L786">        }</span>
+
+        /// Constructs a new binding for mapping back and forth of a String Picker
+        ///
+        /// #### Parameters
+        ///
+        /// - `toPropertyType`: map to convert objects forth
+        ///
+        /// - `toComponentType`: map to convert objects back
+        public PickerAdapter(MappingConverter toPropertyType, MappingConverter toComponentType) {
+<span class="nc" id="L796">            super(toPropertyType, toComponentType);</span>
+<span class="nc" id="L797">        }</span>
+
+        @Override
+        public void assignTo(PropertyType value, Picker cmp) {
+<span class="pc bpc" id="L801" title="3 of 4 branches missed.">            switch (cmp.getType()) {</span>
+                case Display.PICKER_TYPE_DATE:
+                case Display.PICKER_TYPE_DATE_AND_TIME:
+<span class="nc" id="L804">                    cmp.setDate((Date) toComponentType.convert(value));</span>
+<span class="nc" id="L805">                    break;</span>
+                case Display.PICKER_TYPE_TIME:
+<span class="nc" id="L807">                    cmp.setTime((Integer) toComponentType.convert(value));</span>
+<span class="nc" id="L808">                    break;</span>
+                case Display.PICKER_TYPE_STRINGS:
+<span class="pc bpc" id="L810" title="1 of 2 branches missed.">                    if (value instanceof Integer) {</span>
+<span class="nc" id="L811">                        cmp.setSelectedStringIndex((Integer) toComponentType.convert(value));</span>
+                    } else {
+<span class="fc" id="L813">                        cmp.setSelectedString((String) toComponentType.convert(value));</span>
+                    }
+<span class="fc" id="L815">                    break;</span>
+                default:
+                    break;
+            }
+<span class="fc" id="L819">        }</span>
+
+        @Override
+        public PropertyType getFrom(Picker cmp) {
+<span class="pc bpc" id="L823" title="3 of 4 branches missed.">            switch (cmp.getType()) {</span>
+                case Display.PICKER_TYPE_DATE:
+                case Display.PICKER_TYPE_DATE_AND_TIME:
+<span class="nc" id="L826">                    return (PropertyType) toPropertyType.convert(cmp.getDate());</span>
+                case Display.PICKER_TYPE_TIME:
+<span class="nc" id="L828">                    return (PropertyType) toPropertyType.convert(cmp.getTime());</span>
+                case Display.PICKER_TYPE_STRINGS:
+<span class="pc bpc" id="L830" title="1 of 2 branches missed.">                    if (toPropertyType instanceof IntegerConverter) {</span>
+<span class="nc" id="L831">                        return (PropertyType) Integer.valueOf(cmp.getSelectedStringIndex());</span>
+                    }
+<span class="fc" id="L833">                    return (PropertyType) toPropertyType.convert(cmp.getSelectedString());</span>
+                default:
+<span class="nc" id="L835">                    throw new RuntimeException(&quot;Illegal state for picker binding&quot;);</span>
+            }
+        }
+
+        @Override
+        public void bindListener(Picker cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L841">            cmp.addActionListener(l);</span>
+<span class="fc" id="L842">        }</span>
+
+        @Override
+        public void removeListener(Picker cmp, ActionListener&lt;ActionEvent&gt; l) {
+<span class="nc" id="L846">            cmp.removeActionListener(l);</span>
+<span class="nc" id="L847">        }</span>
+    }
+
+    /// Implements table model binding, this is implemented as a class to allow additional features
+    /// such as adding/removing rows
+    public static class BoundTableModel extends AbstractTableModel {
+        private final PropertyBusinessObject prototype;
+<span class="pc" id="L854">        private final Set&lt;String&gt; exclude = new HashSet&lt;String&gt;();</span>
+<span class="pc" id="L855">        private final Set&lt;String&gt; uneditable = new HashSet&lt;String&gt;();</span>
+<span class="pc" id="L856">        private final EventDispatcher listeners = new EventDispatcher();</span>
+        private List&lt;? extends PropertyBusinessObject&gt; objects;
+        private CollectionProperty objectProperty;
+        private List&lt;String&gt; included;
+        private PropertyBase[] columnOrder;
+
+        /// Creates a table model with the business objects
+        ///
+        /// #### Parameters
+        ///
+        /// - `objects`: the objects of the model
+        ///
+        /// - `prototype`: the type by which we determine the structure of the table
+        public BoundTableModel(
+<span class="fc" id="L870">                List&lt;? extends PropertyBusinessObject&gt; objects, PropertyBusinessObject prototype) {</span>
+<span class="fc" id="L871">            this.objects = objects;</span>
+<span class="fc" id="L872">            this.prototype = prototype;</span>
+<span class="fc" id="L873">        }</span>
+
+        /// Creates a table model with the business objects
+        ///
+        /// #### Parameters
+        ///
+        /// - `objectProperty`: the objects of the model
+        ///
+        /// - `prototype`: the type by which we determine the structure of the table
+<span class="nc" id="L882">        public BoundTableModel(CollectionProperty objectProperty, PropertyBusinessObject prototype) {</span>
+<span class="nc" id="L883">            this.objectProperty = objectProperty;</span>
+<span class="nc" id="L884">            this.prototype = prototype;</span>
+<span class="nc" id="L885">        }</span>
+
+        /// The properties that are ignored
+        ///
+        /// #### Parameters
+        ///
+        /// - `b`: the property to ignore
+        public void excludeProperty(PropertyBase b) {
+<span class="nc" id="L893">            exclude.add(b.getName());</span>
+<span class="nc bnc" id="L894" title="All 2 branches missed.">            if (included == null) {</span>
+<span class="nc" id="L895">                included = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L896" title="All 2 branches missed.">                for (PropertyBase pb : prototype.getPropertyIndex()) {</span>
+<span class="nc" id="L897">                    included.add(pb.getName());</span>
+<span class="nc" id="L898">                }</span>
+            }
+<span class="nc" id="L900">            included.remove(b.getName());</span>
+<span class="nc" id="L901">        }</span>
+
+        /// Sets the order of the columns explicitly
+        ///
+        /// #### Parameters
+        ///
+        /// - `columnOrder`: the order of the columns based on the prototype
+        public void setColumnOrder(PropertyBase... columnOrder) {
+<span class="nc" id="L909">            this.columnOrder = columnOrder;</span>
+<span class="nc" id="L910">        }</span>
+
+        /// Makes the property editable or uneditable
+        ///
+        /// #### Parameters
+        ///
+        /// - `pb`: the property base
+        ///
+        /// - `editable`: true for editable (the default)
+        public void setEditable(PropertyBase pb, boolean editable) {
+<span class="nc bnc" id="L920" title="All 2 branches missed.">            if (editable) {</span>
+<span class="nc" id="L921">                uneditable.remove(pb.getName());</span>
+            } else {
+<span class="nc" id="L923">                uneditable.add(pb.getName());</span>
+            }
+<span class="nc" id="L925">        }</span>
+
+        /// {@inheritDoc}
+        @Override
+        public int getRowCount() {
+<span class="pc bpc" id="L930" title="1 of 2 branches missed.">            if (objects != null) {</span>
+<span class="fc" id="L931">                return objects.size();</span>
+            }
+<span class="nc" id="L933">            return objectProperty.size();</span>
+        }
+
+        /// Adds a new business object to the table
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: the index of the addition
+        ///
+        /// - `b`: the business object
+        public void addRow(int index, PropertyBusinessObject b) {
+<span class="pc bpc" id="L944" title="1 of 2 branches missed.">            if (objects != null) {</span>
+<span class="fc" id="L945">                ((List) objects).add(index, b);</span>
+            } else {
+<span class="nc bnc" id="L947" title="All 2 branches missed.">                if (objectProperty instanceof ListProperty) {</span>
+<span class="nc" id="L948">                    ((ListProperty) objectProperty).add(index, b);</span>
+                } else {
+<span class="nc" id="L950">                    objectProperty.add(b);</span>
+                }
+            }
+<span class="fc bfc" id="L953" title="All 2 branches covered.">            for (int col = 0; col &lt; getColumnCount(); col++) {</span>
+<span class="fc" id="L954">                listeners.fireDataChangeEvent(col, index);</span>
+            }
+<span class="fc" id="L956">        }</span>
+
+        /// Removes the row at the given index
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: the position in the table
+        public void removeRow(int index) {
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">            if (objects != null) {</span>
+<span class="fc" id="L965">                objects.remove(index);</span>
+            } else {
+<span class="nc bnc" id="L967" title="All 2 branches missed.">                if (objectProperty instanceof ListProperty) {</span>
+<span class="nc" id="L968">                    objectProperty.remove(index);</span>
+                } else {
+<span class="nc" id="L970">                    Iterator i = objectProperty.iterator();</span>
+<span class="nc bnc" id="L971" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; index - 1; iter++) {</span>
+<span class="nc" id="L972">                        i.next();</span>
+                    }
+<span class="nc" id="L974">                    i.remove();</span>
+                }
+            }
+<span class="fc" id="L977">            listeners.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);</span>
+<span class="fc" id="L978">        }</span>
+
+        /// {@inheritDoc}
+        @Override
+        public int getColumnCount() {
+<span class="pc bpc" id="L983" title="1 of 2 branches missed.">            if (columnOrder != null) {</span>
+<span class="nc" id="L984">                return columnOrder.length;</span>
+            }
+<span class="fc" id="L986">            return prototype.getPropertyIndex().getSize() - exclude.size();</span>
+        }
+
+        private PropertyBase getProperty(int index) {
+<span class="pc bpc" id="L990" title="1 of 2 branches missed.">            if (included != null) {</span>
+<span class="nc" id="L991">                return prototype.getPropertyIndex().get(included.get(index));</span>
+            }
+<span class="fc" id="L993">            return prototype.getPropertyIndex().get(index);</span>
+        }
+
+        @Override
+        public String getColumnName(int i) {
+<span class="pc bpc" id="L998" title="1 of 2 branches missed.">            if (columnOrder != null) {</span>
+<span class="nc" id="L999">                return columnOrder[i].getLabel();</span>
+            }
+<span class="fc" id="L1001">            return getProperty(i).getLabel();</span>
+        }
+
+        @Override
+        public boolean isCellEditable(int row, int column) {
+<span class="nc bnc" id="L1006" title="All 4 branches missed.">            if (columnOrder != null &amp;&amp; columnOrder.length &gt; 0) {</span>
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">                return !uneditable.contains(columnOrder[column].getName());</span>
+            }
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">            return !uneditable.contains(getProperty(column).getName());</span>
+        }
+
+        private PropertyBusinessObject getRow(int row) {
+<span class="pc bpc" id="L1013" title="1 of 2 branches missed.">            if (objects != null) {</span>
+<span class="fc" id="L1014">                return objects.get(row);</span>
+            } else {
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">                if (objectProperty instanceof ListProperty) {</span>
+<span class="nc" id="L1017">                    return (PropertyBusinessObject) ((ListProperty) objectProperty).get(row);</span>
+                } else {
+<span class="nc" id="L1019">                    Iterator i = objectProperty.iterator();</span>
+<span class="nc bnc" id="L1020" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; row - 1; iter++) {</span>
+<span class="nc" id="L1021">                        i.next();</span>
+                    }
+<span class="nc" id="L1023">                    return (PropertyBusinessObject) i.next();</span>
+                }
+            }
+        }
+
+        @Override
+        public Object getValueAt(int row, int column) {
+<span class="fc" id="L1030">            PropertyBusinessObject pb = getRow(row);</span>
+            String n;
+<span class="pc bpc" id="L1032" title="1 of 2 branches missed.">            if (columnOrder != null) {</span>
+<span class="nc" id="L1033">                n = columnOrder[column].getName();</span>
+            } else {
+<span class="fc" id="L1035">                n = getProperty(column).getName();</span>
+            }
+<span class="fc" id="L1037">            return pb.getPropertyIndex().get(n).get();</span>
+        }
+
+        @Override
+        public Class getCellType(int row, int column) {
+<span class="nc" id="L1042">            PropertyBusinessObject pb = getRow(row);</span>
+            String n;
+<span class="nc bnc" id="L1044" title="All 2 branches missed.">            if (columnOrder != null) {</span>
+<span class="nc" id="L1045">                n = columnOrder[column].getName();</span>
+            } else {
+<span class="nc" id="L1047">                n = getProperty(column).getName();</span>
+            }
+<span class="nc" id="L1049">            return pb.getPropertyIndex().get(n).getGenericType();</span>
+        }
+
+        private PropertyBase getPropertyAt(int row, int column) {
+<span class="nc" id="L1053">            PropertyBusinessObject pb = getRow(row);</span>
+            String n;
+<span class="nc bnc" id="L1055" title="All 2 branches missed.">            if (columnOrder != null) {</span>
+<span class="nc" id="L1056">                n = columnOrder[column].getName();</span>
+            } else {
+<span class="nc" id="L1058">                n = getProperty(column).getName();</span>
+            }
+<span class="nc" id="L1060">            return pb.getPropertyIndex().get(n);</span>
+        }
+
+        /// {@inheritDoc}
+        @Override
+        public String[] getMultipleChoiceOptions(int row, int column) {
+<span class="nc" id="L1066">            return (String[]) getPropertyAt(row, column).getClientProperty(&quot;multipleChoiceOptions&quot;);</span>
+        }
+
+        /// Sets the multiple choice option for a string entry, this is useful if a string property can
+        /// have one of several values. It will be rendered as a picker in the table
+        ///
+        /// #### Parameters
+        ///
+        /// - `prop`: the property
+        ///
+        /// - `values`: the supported values
+        public void setMultipleChoiceOptions(PropertyBase prop, String... values) {
+<span class="nc" id="L1078">            prop.putClientProperty(&quot;multipleChoiceOptions&quot;, values);</span>
+<span class="nc" id="L1079">        }</span>
+
+        /// {@inheritDoc}
+        @Override
+        public Constraint getValidationConstraint(int row, int column) {
+<span class="nc" id="L1084">            return (Constraint) getPropertyAt(row, column).getClientProperty(&quot;validationConstraint&quot;);</span>
+        }
+
+        /// Sets a validator constraint on the table
+        ///
+        /// #### Parameters
+        ///
+        /// - `prop`: the property matching the constraint
+        ///
+        /// - `c`: the constraint value
+        public void setValidationConstraint(PropertyBase prop, Constraint c) {
+<span class="nc" id="L1095">            prop.putClientProperty(&quot;validationConstraint&quot;, c);</span>
+<span class="nc" id="L1096">        }</span>
+
+        @Override
+        public void setValueAt(int row, int column, Object o) {
+<span class="fc" id="L1100">            PropertyBusinessObject pb = getRow(row);</span>
+            String n;
+<span class="pc bpc" id="L1102" title="1 of 2 branches missed.">            if (columnOrder != null) {</span>
+<span class="nc" id="L1103">                n = columnOrder[column].getName();</span>
+            } else {
+<span class="fc" id="L1105">                n = getProperty(column).getName();</span>
+            }
+<span class="fc" id="L1107">            pb.getPropertyIndex().get(n).setImpl(o);</span>
+<span class="fc" id="L1108">            listeners.fireDataChangeEvent(column, row);</span>
+<span class="fc" id="L1109">        }</span>
+
+        @Override
+        public void addDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L1113">            listeners.addListener(d);</span>
+<span class="nc" id="L1114">        }</span>
+
+        @Override
+        public void removeDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L1118">            listeners.removeListener(d);</span>
+<span class="nc" id="L1119">        }</span>
+    }
+
+    /// Binding allows us to have commit/auto-commit mode. This allows changes to properties to reflect
+    /// immediately or only when committed, e.g. if a `Form` has &quot;OK&quot; &amp; &quot;Cancel&quot; buttons you
+    /// might want to do a commit on OK. We also provide a &quot;rollback&quot; method to reset to the original
+    /// property values.
+    ///
+    /// `UiBinding` has a boolean auto commit flag that can be toggled to set the default for
+    /// new bindings.
+    ///
+    /// Binding also provides the ability to disengage a &quot;binding&quot; between a property and a UI
+    /// component
+<span class="fc" id="L1132">    public abstract class Binding {</span>
+<span class="fc" id="L1133">        private boolean autoCommit = UiBinding.this.autoCommit;</span>
+
+        /// Gets the autocommit value see `#setAutoCommit(boolean)`
+        ///
+        /// #### Returns
+        ///
+        /// true if autocommit is on
+        public boolean isAutoCommit() {
+<span class="fc" id="L1141">            return autoCommit;</span>
+        }
+
+        /// Toggles auto-commit mode and overrides the `UiBinding` autocommit default. Autocommit
+        /// instantly reflects changes to the property or component values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `b`: true to enable auto-commit
+        public void setAutoCommit(boolean b) {
+<span class="nc" id="L1151">            autoCommit = b;</span>
+<span class="nc" id="L1152">        }</span>
+
+        /// Set the value from the component into the property, note that this will throw an exception if
+        /// autocommit is on
+        public abstract void commit();
+
+        /// Sets the value from the property into the component, note that this will throw an exception
+        /// if autocommit is on
+        public abstract void rollback();
+
+        /// Clears the listeners and disengages binding, this can be important for GC as binding can keep
+        /// object references in RAM
+        public abstract void disconnect();
+    }
+
+    class GroupBinding extends Binding {
+        private final List&lt;Binding&gt; allBindings;
+
+<span class="fc" id="L1170">        public GroupBinding(List&lt;Binding&gt; allBindings) {</span>
+<span class="fc" id="L1171">            this.allBindings = allBindings;</span>
+<span class="fc" id="L1172">        }</span>
+
+        @Override
+        public void setAutoCommit(boolean b) {
+<span class="nc" id="L1176">            super.setAutoCommit(b);</span>
+<span class="nc bnc" id="L1177" title="All 2 branches missed.">            for (Binding bb : allBindings) {</span>
+<span class="nc" id="L1178">                bb.setAutoCommit(b);</span>
+<span class="nc" id="L1179">            }</span>
+<span class="nc" id="L1180">        }</span>
+
+        @Override
+        public void commit() {
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">            for (Binding bb : allBindings) {</span>
+<span class="nc" id="L1185">                bb.commit();</span>
+<span class="nc" id="L1186">            }</span>
+<span class="nc" id="L1187">        }</span>
+
+        @Override
+        public void rollback() {
+<span class="nc bnc" id="L1191" title="All 2 branches missed.">            for (Binding bb : allBindings) {</span>
+<span class="nc" id="L1192">                bb.rollback();</span>
+<span class="nc" id="L1193">            }</span>
+<span class="nc" id="L1194">        }</span>
+
+        @Override
+        public void disconnect() {
+<span class="nc bnc" id="L1198" title="All 2 branches missed.">            for (Binding bb : allBindings) {</span>
+<span class="nc" id="L1199">                bb.disconnect();</span>
+<span class="nc" id="L1200">            }</span>
+<span class="nc" id="L1201">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

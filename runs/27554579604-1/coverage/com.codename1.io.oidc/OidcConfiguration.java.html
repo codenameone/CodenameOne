@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OidcConfiguration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.oidc</a> &gt; <span class="el_source">OidcConfiguration.java</span></div><h1>OidcConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.oidc;
+
+import java.util.Map;
+
+/// The subset of an OpenID Connect provider's `.well-known/openid-configuration`
+/// document that [OidcClient] cares about. Construct directly when you already
+/// know the endpoints, or obtain via [OidcClient#discover(String)] which fetches
+/// and parses the document.
+///
+/// All fields are immutable after construction. Use [#newBuilder()] to start
+/// from a blank slate; use [#newBuilder(OidcConfiguration)] to derive one from
+/// an existing instance.
+///
+/// @since 7.0.245
+public final class OidcConfiguration {
+
+    private final String issuer;
+    private final String authorizationEndpoint;
+    private final String tokenEndpoint;
+    private final String userInfoEndpoint;
+    private final String revocationEndpoint;
+    private final String endSessionEndpoint;
+    private final String jwksUri;
+
+<span class="fc" id="L48">    private OidcConfiguration(Builder b) {</span>
+<span class="fc" id="L49">        this.issuer = b.issuer;</span>
+<span class="fc" id="L50">        this.authorizationEndpoint = b.authorizationEndpoint;</span>
+<span class="fc" id="L51">        this.tokenEndpoint = b.tokenEndpoint;</span>
+<span class="fc" id="L52">        this.userInfoEndpoint = b.userInfoEndpoint;</span>
+<span class="fc" id="L53">        this.revocationEndpoint = b.revocationEndpoint;</span>
+<span class="fc" id="L54">        this.endSessionEndpoint = b.endSessionEndpoint;</span>
+<span class="fc" id="L55">        this.jwksUri = b.jwksUri;</span>
+<span class="fc" id="L56">    }</span>
+
+    /// Builds an [OidcConfiguration] from a parsed discovery JSON document.
+    /// Only the fields this client needs are extracted; anything else is ignored.
+    public static OidcConfiguration fromDiscoveryJson(Map&lt;String, Object&gt; json) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (json == null) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;json must not be null&quot;);</span>
+        }
+<span class="fc" id="L64">        Builder b = new Builder();</span>
+<span class="fc" id="L65">        b.issuer = stringOrNull(json.get(&quot;issuer&quot;));</span>
+<span class="fc" id="L66">        b.authorizationEndpoint = stringOrNull(json.get(&quot;authorization_endpoint&quot;));</span>
+<span class="fc" id="L67">        b.tokenEndpoint = stringOrNull(json.get(&quot;token_endpoint&quot;));</span>
+<span class="fc" id="L68">        b.userInfoEndpoint = stringOrNull(json.get(&quot;userinfo_endpoint&quot;));</span>
+<span class="fc" id="L69">        b.revocationEndpoint = stringOrNull(json.get(&quot;revocation_endpoint&quot;));</span>
+<span class="fc" id="L70">        b.endSessionEndpoint = stringOrNull(json.get(&quot;end_session_endpoint&quot;));</span>
+<span class="fc" id="L71">        b.jwksUri = stringOrNull(json.get(&quot;jwks_uri&quot;));</span>
+<span class="fc" id="L72">        return b.build();</span>
+    }
+
+    public String getIssuer() {
+<span class="fc" id="L76">        return issuer;</span>
+    }
+
+    public String getAuthorizationEndpoint() {
+<span class="fc" id="L80">        return authorizationEndpoint;</span>
+    }
+
+    public String getTokenEndpoint() {
+<span class="fc" id="L84">        return tokenEndpoint;</span>
+    }
+
+    public String getUserInfoEndpoint() {
+<span class="nc" id="L88">        return userInfoEndpoint;</span>
+    }
+
+    public String getRevocationEndpoint() {
+<span class="fc" id="L92">        return revocationEndpoint;</span>
+    }
+
+    public String getEndSessionEndpoint() {
+<span class="nc" id="L96">        return endSessionEndpoint;</span>
+    }
+
+    public String getJwksUri() {
+<span class="fc" id="L100">        return jwksUri;</span>
+    }
+
+    public static Builder newBuilder() {
+<span class="fc" id="L104">        return new Builder();</span>
+    }
+
+    public static Builder newBuilder(OidcConfiguration source) {
+<span class="nc" id="L108">        Builder b = new Builder();</span>
+<span class="nc" id="L109">        b.issuer = source.issuer;</span>
+<span class="nc" id="L110">        b.authorizationEndpoint = source.authorizationEndpoint;</span>
+<span class="nc" id="L111">        b.tokenEndpoint = source.tokenEndpoint;</span>
+<span class="nc" id="L112">        b.userInfoEndpoint = source.userInfoEndpoint;</span>
+<span class="nc" id="L113">        b.revocationEndpoint = source.revocationEndpoint;</span>
+<span class="nc" id="L114">        b.endSessionEndpoint = source.endSessionEndpoint;</span>
+<span class="nc" id="L115">        b.jwksUri = source.jwksUri;</span>
+<span class="nc" id="L116">        return b;</span>
+    }
+
+    private static String stringOrNull(Object o) {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        return o instanceof String ? (String) o : null;</span>
+    }
+
+    /// Fluent builder for [OidcConfiguration].
+<span class="fc" id="L124">    public static final class Builder {</span>
+        private String issuer;
+        private String authorizationEndpoint;
+        private String tokenEndpoint;
+        private String userInfoEndpoint;
+        private String revocationEndpoint;
+        private String endSessionEndpoint;
+        private String jwksUri;
+
+        public Builder issuer(String v) {
+<span class="fc" id="L134">            this.issuer = v;</span>
+<span class="fc" id="L135">            return this;</span>
+        }
+
+        public Builder authorizationEndpoint(String v) {
+<span class="fc" id="L139">            this.authorizationEndpoint = v;</span>
+<span class="fc" id="L140">            return this;</span>
+        }
+
+        public Builder tokenEndpoint(String v) {
+<span class="fc" id="L144">            this.tokenEndpoint = v;</span>
+<span class="fc" id="L145">            return this;</span>
+        }
+
+        public Builder userInfoEndpoint(String v) {
+<span class="nc" id="L149">            this.userInfoEndpoint = v;</span>
+<span class="nc" id="L150">            return this;</span>
+        }
+
+        public Builder revocationEndpoint(String v) {
+<span class="fc" id="L154">            this.revocationEndpoint = v;</span>
+<span class="fc" id="L155">            return this;</span>
+        }
+
+        public Builder endSessionEndpoint(String v) {
+<span class="nc" id="L159">            this.endSessionEndpoint = v;</span>
+<span class="nc" id="L160">            return this;</span>
+        }
+
+        public Builder jwksUri(String v) {
+<span class="nc" id="L164">            this.jwksUri = v;</span>
+<span class="nc" id="L165">            return this;</span>
+        }
+
+        public OidcConfiguration build() {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (authorizationEndpoint == null) {</span>
+<span class="fc" id="L170">                throw new IllegalStateException(&quot;authorizationEndpoint is required&quot;);</span>
+            }
+<span class="fc" id="L172">            return new OidcConfiguration(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

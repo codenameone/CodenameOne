@@ -1,0 +1,687 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StickyHeaderContainer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">StickyHeaderContainer.java</span></div><h1>StickyHeaderContainer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A scrollable container that pins the most recently scrolled-past section
+/// header to the top of its viewport, in the style of the iOS contacts list
+/// or sectioned material lists. As the next section's header rises into the
+/// pinned slot the previous header is replaced through a configurable
+/// scroll-driven transition: a directional slide where the rising header
+/// pushes the pinned one up and out, or a cover where the rising header
+/// progressively slides on top of the pinned one. The outgoing header can
+/// optionally fade out alongside either transition via
+/// [#setHeaderFadeOut(boolean)]. Transitions are driven by scroll position
+/// so the visual stays in sync with the user's gesture and there is no
+/// time-based animation that lags behind a slow drag or skips ahead on a
+/// fling.
+///
+/// Sections are added with `addSection(header, content)`. The header is a
+/// real component that participates in the scroll: when it is the active
+/// section's header it is moved into a pinned overlay slot at the top of
+/// the container, and a same-sized invisible placeholder is left behind in
+/// the scroll content so nothing jumps. Because the pinned header is the
+/// same instance, action listeners and child components remain interactive
+/// while it is pinned.
+///
+/// ```java
+/// StickyHeaderContainer sticky = new StickyHeaderContainer();
+/// sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
+/// for (char c = 'A'; c &lt;= 'Z'; c++) {
+///     Label header = new Label(&quot;&quot; + c, &quot;StickyHeader&quot;);
+///     Container items = new Container(BoxLayout.y());
+///     for (int i = 0; i &lt; 5; i++) {
+///         items.add(new Label(c + &quot; entry &quot; + i));
+///     }
+///     sticky.addSection(header, items);
+/// }
+/// form.add(BorderLayout.CENTER, sticky);
+/// ```
+///
+/// @author Shai Almog
+public class StickyHeaderContainer extends Container {
+    /// Replace the pinned header without any visible movement of the
+    /// pinned header. The rising section's header stays hidden behind
+    /// the pinned slot during the overlap and the swap is instant once
+    /// it reaches the slot top. Generally [#TRANSITION_COVER] is a more
+    /// useful choice, since with `TRANSITION_NONE` the rising header
+    /// disappears under the pinned one with no visual feedback that the
+    /// swap is approaching. Kept for backward compatibility.
+    public static final int TRANSITION_NONE = 0;
+    /// As the next section's header rises into the pinned slot from below
+    /// it pushes the pinned header up and out of the slot in sync with
+    /// the scroll, replacing it once the rising header reaches the top.
+    public static final int TRANSITION_SLIDE = 1;
+    /// Convenience equivalent to [#TRANSITION_SLIDE] combined with
+    /// [#setHeaderFadeOut(boolean)] set to `true`: the pinned header
+    /// both slides up and fades to transparency as the rising header
+    /// closes the gap. Prefer composing
+    /// `setTransitionStyle(TRANSITION_SLIDE)` with
+    /// `setHeaderFadeOut(true)` -- or
+    /// `setTransitionStyle(TRANSITION_COVER)` with
+    /// `setHeaderFadeOut(true)` -- when you want a fade-out on top of
+    /// another transition. Kept for backward compatibility.
+    public static final int TRANSITION_FADE = 2;
+    /// As the next section's header rises into the pinned slot from
+    /// below it progressively slides on top of the pinned header,
+    /// covering it from the bottom up while the pinned header stays
+    /// fixed in the slot. The swap happens once the rising header
+    /// reaches the slot top, at which point it has fully replaced the
+    /// pinned one with no jump in position. Combine with
+    /// [#setHeaderFadeOut(boolean)] to also fade the covered header out
+    /// during the overlap.
+    public static final int TRANSITION_COVER = 3;
+
+    private final ScrollContainer scroller;
+    private final Container stickyHost;
+<span class="fc" id="L110">    private final List&lt;Section&gt; sections = new ArrayList&lt;Section&gt;();</span>
+
+<span class="fc" id="L112">    private int activeIndex = -1;</span>
+
+<span class="fc" id="L114">    private int transitionStyle = TRANSITION_SLIDE;</span>
+    private int transitionDurationMillis;
+    private boolean headerFadeOut;
+
+    /// Pixels of overlap between the pinned header's slot and the next
+    /// section's header. `0` means the next section is still fully below
+    /// the slot; equal to the pinned header's height means the swap is
+    /// imminent.
+    private int pushOffset;
+    private int stickyHostBaseY;
+
+    /// Reverse-activation hysteresis. Once a section is pinned, scroll
+    /// inertia tends to bounce a few pixels past the swap boundary; if
+    /// each bounce flipped the active section the pinned header would
+    /// visibly jitter as it teleports between scroller-tracked and
+    /// slot-fixed positions. Suppressing tiny reverse swaps inside this
+    /// window absorbs the bounce.
+    private static final int SWAP_HYSTERESIS_PIXELS = 4;
+
+    private static class Section {
+        final Component header;
+        final Container placeholder;
+        int height;
+
+<span class="fc" id="L138">        Section(Component header) {</span>
+<span class="fc" id="L139">            this.header = header;</span>
+<span class="fc" id="L140">            this.placeholder = new Container();</span>
+<span class="fc" id="L141">            this.placeholder.setVisible(false);</span>
+<span class="fc" id="L142">        }</span>
+    }
+
+    /// Creates an empty sticky header container. Add sections via
+    /// `addSection(header, content)`.
+    public StickyHeaderContainer() {
+<span class="fc" id="L148">        super();</span>
+<span class="fc" id="L149">        scroller = new ScrollContainer();</span>
+<span class="fc" id="L150">        stickyHost = new StickyHostContainer();</span>
+
+<span class="fc" id="L152">        setLayout(new StickyOverlayLayout());</span>
+<span class="fc" id="L153">        super.addComponent(scroller);</span>
+<span class="fc" id="L154">        super.addComponent(stickyHost);</span>
+
+<span class="fc" id="L156">        scroller.addScrollListener(new ScrollListener() {</span>
+            @Override
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                // The ScrollContainer fires this event before its
+                // internal scrollY field is updated, so reading it back
+                // via getScrollY() returns the previous value. Drive the
+                // recompute off the new scroll position the listener was
+                // handed: a single multi-pixel drag/momentum step that
+                // crosses the push window otherwise sees pushOffset stuck
+                // at 0 and the rising header appears to slide *under* the
+                // pinned header instead of pushing it out.
+<span class="fc" id="L167">                updateSticky(scrollY);</span>
+<span class="fc" id="L168">            }</span>
+        });
+<span class="fc" id="L170">    }</span>
+
+    /// Paints the COVER overlay on top of the pinned slot: when the
+    /// transition style is [#TRANSITION_COVER] and a push is in flight,
+    /// the rising section's header is rendered again above the pinned
+    /// host so it visibly slides over the pinned header instead of
+    /// being hidden underneath it. The natural paint in the scroller is
+    /// at the same viewport position, so re-painting the header after
+    /// `super.paint(g)` simply moves it to the top of the z-order in
+    /// the slot region; outside that region the second paint draws over
+    /// identical scroller content and is invisible. No-op for any other
+    /// transition style or when no swap is mid-flight.
+    @Override
+    public void paint(Graphics g) {
+<span class="nc" id="L184">        super.paint(g);</span>
+<span class="nc bnc" id="L185" title="All 6 branches missed.">        if (transitionStyle != TRANSITION_COVER || pushOffset &lt;= 0 || activeIndex &lt; 0) {</span>
+<span class="nc" id="L186">            return;</span>
+        }
+<span class="nc" id="L188">        int nextIdx = activeIndex + 1;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (nextIdx &gt;= sections.size()) {</span>
+<span class="nc" id="L190">            return;</span>
+        }
+<span class="nc" id="L192">        Component rising = sections.get(nextIdx).header;</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">        if (rising.getParent() != scroller || !rising.isVisible()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L194">            return;</span>
+        }
+<span class="nc" id="L196">        rising.paintComponent(g);</span>
+<span class="nc" id="L197">    }</span>
+
+    /// Overlay host that always paints its parent's background under the
+    /// pinned header. This keeps a transparent header UIID from showing
+    /// scroller content through the slot during a transition.
+    private final class StickyHostContainer extends Container {
+<span class="fc" id="L203">        StickyHostContainer() {</span>
+<span class="fc" id="L204">            super(new BorderLayout());</span>
+<span class="fc" id="L205">        }</span>
+
+        @Override
+        public void paintBackground(Graphics g) {
+<span class="nc" id="L209">            Container parent = StickyHeaderContainer.this;</span>
+<span class="nc" id="L210">            Style ps = parent.getStyle();</span>
+<span class="nc" id="L211">            byte transparency = ps.getBgTransparency();</span>
+<span class="nc bnc" id="L212" title="All 4 branches missed.">            if (transparency != 0 &amp;&amp; g.isAlphaSupported()) {</span>
+<span class="nc" id="L213">                int oldColor = g.getColor();</span>
+<span class="nc" id="L214">                int oldAlpha = g.getAlpha();</span>
+<span class="nc" id="L215">                g.setColor(ps.getBgColor());</span>
+<span class="nc" id="L216">                g.setAlpha(transparency &amp; 0xff);</span>
+<span class="nc" id="L217">                g.fillRect(getX(), getY(), getWidth(), getHeight());</span>
+<span class="nc" id="L218">                g.setColor(oldColor);</span>
+<span class="nc" id="L219">                g.setAlpha(oldAlpha);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            } else if (transparency != 0) {</span>
+<span class="nc" id="L221">                int oldColor = g.getColor();</span>
+<span class="nc" id="L222">                g.setColor(ps.getBgColor());</span>
+<span class="nc" id="L223">                g.fillRect(getX(), getY(), getWidth(), getHeight());</span>
+<span class="nc" id="L224">                g.setColor(oldColor);</span>
+            }
+<span class="nc" id="L226">            super.paintBackground(g);</span>
+<span class="nc" id="L227">        }</span>
+    }
+
+    private static final class ScrollContainer extends Container {
+        boolean suppressLaidOutClamp;
+
+        ScrollContainer() {
+<span class="fc" id="L234">            super(BoxLayout.y());</span>
+<span class="fc" id="L235">            setScrollableY(true);</span>
+<span class="fc" id="L236">        }</span>
+
+        void setScrollYExposed(int y) {
+<span class="fc" id="L239">            setScrollY(y);</span>
+<span class="fc" id="L240">        }</span>
+
+        @Override
+        protected void laidOut() {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            if (suppressLaidOutClamp) {</span>
+                // applyActivation() relayouts the scroller from inside
+                // the ScrollListener, before the outer setScrollY has
+                // committed the new scrollY. Component#laidOut() would
+                // then read the stale scrollY, decide it overflows, and
+                // recursively call setScrollY(maxScroll) -- which fires
+                // our listener again, flips the activation back, and
+                // leaves activeIndex inconsistent with the scroll the
+                // user requested. The outer setScrollY will write the
+                // correct scrollY moments later, so skip the clamp.
+<span class="fc" id="L254">                return;</span>
+            }
+<span class="fc" id="L256">            super.laidOut();</span>
+<span class="fc" id="L257">        }</span>
+    }
+
+    /// Adds a section consisting of a sticky header and its content. The
+    /// content may be `null` for a header-only section. Returns this for
+    /// chaining.
+    public StickyHeaderContainer addSection(Component header, Component content) {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (header == null) {</span>
+<span class="fc" id="L265">            throw new IllegalArgumentException(&quot;header cannot be null&quot;);</span>
+        }
+<span class="fc" id="L267">        Section s = new Section(header);</span>
+<span class="fc" id="L268">        sections.add(s);</span>
+<span class="fc" id="L269">        scroller.addComponent(header);</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (content != null) {</span>
+<span class="fc" id="L271">            scroller.addComponent(content);</span>
+        }
+<span class="fc" id="L273">        return this;</span>
+    }
+
+    /// Adds a header-only section.
+    public StickyHeaderContainer addSection(Component header) {
+<span class="fc" id="L278">        return addSection(header, null);</span>
+    }
+
+    /// Returns the inner scrolling container that hosts the section content.
+    /// Use this to add non-section components such as a footer, or for
+    /// programmatic scrolling via [#setScrollPosition(int)].
+    public Container getScrollContainer() {
+<span class="fc" id="L285">        return scroller;</span>
+    }
+
+    /// Returns the overlay container that hosts the currently-pinned header.
+    /// While a section is active its header lives here; otherwise the host
+    /// is empty and zero-height.
+    public Container getStickyHost() {
+<span class="fc" id="L292">        return stickyHost;</span>
+    }
+
+    /// Returns an unmodifiable view of the registered sticky headers in the
+    /// order they were added.
+    public List&lt;Component&gt; getStickyHeaders() {
+<span class="fc" id="L298">        List&lt;Component&gt; out = new ArrayList&lt;Component&gt;(sections.size());</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (Section s : sections) {</span>
+<span class="fc" id="L300">            out.add(s.header);</span>
+<span class="fc" id="L301">        }</span>
+<span class="fc" id="L302">        return Collections.unmodifiableList(out);</span>
+    }
+
+    /// Returns the index of the currently pinned section, or `-1` if no
+    /// header is currently pinned.
+    public int getActiveSectionIndex() {
+<span class="fc" id="L308">        return activeIndex;</span>
+    }
+
+    /// Selects how the pinned header is replaced when the next section
+    /// rises into the slot. One of [#TRANSITION_NONE], [#TRANSITION_SLIDE]
+    /// (default), [#TRANSITION_FADE] or [#TRANSITION_COVER]. The fade-out
+    /// of the pinned header is a separate, composable concern controlled
+    /// by [#setHeaderFadeOut(boolean)].
+    public void setTransitionStyle(int style) {
+<span class="fc bfc" id="L317" title="All 8 branches covered.">        if (style != TRANSITION_NONE &amp;&amp; style != TRANSITION_SLIDE</span>
+                &amp;&amp; style != TRANSITION_FADE &amp;&amp; style != TRANSITION_COVER) {
+<span class="fc" id="L319">            throw new IllegalArgumentException(&quot;Unknown transition style: &quot; + style);</span>
+        }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (this.transitionStyle == style) {</span>
+<span class="fc" id="L322">            return;</span>
+        }
+<span class="fc" id="L324">        this.transitionStyle = style;</span>
+<span class="fc" id="L325">        applyPushVisuals();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L327">            repaint();</span>
+        }
+<span class="fc" id="L329">    }</span>
+
+    public int getTransitionStyle() {
+<span class="fc" id="L332">        return transitionStyle;</span>
+    }
+
+    /// When `true` the pinned header fades to transparency in proportion
+    /// to the push progress as the next section rises into the slot.
+    /// This is independent of the transition style and composes with
+    /// [#TRANSITION_SLIDE] (slide + fade), [#TRANSITION_COVER] (cover +
+    /// fade) and [#TRANSITION_NONE] (fade only). [#TRANSITION_FADE]
+    /// implies the fade-out behaviour regardless of this flag.
+    /// Defaults to `false`.
+    public void setHeaderFadeOut(boolean fade) {
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (this.headerFadeOut == fade) {</span>
+<span class="nc" id="L344">            return;</span>
+        }
+<span class="fc" id="L346">        this.headerFadeOut = fade;</span>
+<span class="fc" id="L347">        applyPushVisuals();</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L349">            repaint();</span>
+        }
+<span class="fc" id="L351">    }</span>
+
+    /// Returns whether the pinned header is configured to fade out
+    /// during a swap. See [#setHeaderFadeOut(boolean)].
+    public boolean isHeaderFadeOut() {
+<span class="fc" id="L356">        return headerFadeOut;</span>
+    }
+
+    /// Retained for API compatibility. Transitions are now scroll-driven so
+    /// the per-frame duration no longer affects visuals; the value is
+    /// validated and stored but otherwise unused.
+    public void setTransitionDurationMillis(int millis) {
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (millis &lt; 0) {</span>
+<span class="fc" id="L364">            throw new IllegalArgumentException(&quot;duration cannot be negative&quot;);</span>
+        }
+<span class="nc" id="L366">        this.transitionDurationMillis = millis;</span>
+<span class="nc" id="L367">    }</span>
+
+    public int getTransitionDurationMillis() {
+<span class="nc" id="L370">        return transitionDurationMillis;</span>
+    }
+
+    /// Returns true while the next section's header is overlapping the
+    /// pinned slot, i.e. the scroll-driven transition is mid-flight.
+    public boolean isTransitionInProgress() {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        return pushOffset &gt; 0;</span>
+    }
+
+    /// Returns the progress of the in-flight transition as a fraction in
+    /// `[0, 1]`: `0` when the next section is just touching the slot from
+    /// below and `1` when it has fully displaced the pinned header.
+    /// Returns `0` when no transition is in progress.
+    public float getTransitionProgress() {
+<span class="pc bpc" id="L384" title="1 of 4 branches missed.">        if (activeIndex &lt; 0 || pushOffset &lt;= 0) {</span>
+<span class="fc" id="L385">            return 0f;</span>
+        }
+<span class="fc" id="L387">        int activeH = activeHeightFor(activeIndex);</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">        if (activeH &lt;= 0) {</span>
+<span class="nc" id="L389">            return 0f;</span>
+        }
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (pushOffset &gt;= activeH) {</span>
+<span class="nc" id="L392">            return 1f;</span>
+        }
+<span class="fc" id="L394">        return (float) pushOffset / (float) activeH;</span>
+    }
+
+    /// Sets the scroll position of the inner scroll container. The value is
+    /// clamped to the valid range and triggers a sticky-header recompute.
+    public void setScrollPosition(int y) {
+<span class="fc" id="L400">        scroller.setScrollYExposed(y);</span>
+<span class="fc" id="L401">    }</span>
+
+    /// Returns the current scroll position of the inner scroll container.
+    public int getScrollPosition() {
+<span class="nc" id="L405">        return scroller.getScrollY();</span>
+    }
+
+    /// Removes all sections and content from the container.
+    public void clearSections() {
+<span class="fc" id="L410">        deactivate();</span>
+<span class="fc" id="L411">        scroller.removeAll();</span>
+<span class="fc" id="L412">        sections.clear();</span>
+<span class="fc" id="L413">    }</span>
+
+    /// Recomputes which section header should be pinned and how far the
+    /// next section has displaced it. Called internally on every scroll
+    /// event; call it explicitly when section content has been mutated
+    /// outside of a normal layout cycle.
+    public void updateSticky() {
+<span class="fc" id="L420">        updateSticky(scroller.getScrollY());</span>
+<span class="fc" id="L421">    }</span>
+
+    private void updateSticky(int sy) {
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        if (sections.isEmpty()) {</span>
+<span class="nc" id="L425">            deactivate();</span>
+<span class="nc" id="L426">            return;</span>
+        }
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        if (scroller.getHeight() &lt;= 0) {</span>
+<span class="nc" id="L429">            return;</span>
+        }
+<span class="fc" id="L431">        int newActive = -1;</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        for (int i = 0; i &lt; sections.size(); i++) {</span>
+<span class="fc" id="L433">            Section s = sections.get(i);</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            Component anchor = s.placeholder.getParent() == scroller ? s.placeholder : s.header; //NOPMD CompareObjectsWithEquals</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            if (anchor.getParent() != scroller) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L436">                continue;</span>
+            }
+<span class="fc" id="L438">            int aH = anchor.getHeight();</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">            if (aH &lt;= 0) {</span>
+<span class="nc" id="L440">                aH = anchor.getPreferredH();</span>
+            }
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">            if (aH &lt;= 0) {</span>
+<span class="nc" id="L443">                continue;</span>
+            }
+<span class="fc" id="L445">            int relY = anchor.getY() - sy;</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">            if (relY &lt; 0) {</span>
+<span class="fc" id="L447">                newActive = i;</span>
+            }
+        }
+
+<span class="pc bpc" id="L451" title="1 of 4 branches missed.">        if (newActive &lt; activeIndex &amp;&amp; activeIndex &gt;= 0) {</span>
+            // Inertial bounce on iOS routinely overshoots the swap
+            // boundary by a few pixels. If we deactivate immediately the
+            // pinned header teleports back into the scroller and is
+            // re-activated on the next forward bounce, producing a
+            // visible jitter. Hold the current active section across
+            // tiny reverse excursions; a real backwards scroll past the
+            // hysteresis window still deactivates normally.
+<span class="fc" id="L459">            Section curr = sections.get(activeIndex);</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            if (curr.placeholder.getParent() == scroller) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L461">                int distancePastBoundary = curr.placeholder.getY() - sy;</span>
+<span class="fc bfc" id="L462" title="All 4 branches covered.">                if (distancePastBoundary &gt; 0 &amp;&amp; distancePastBoundary &lt;= SWAP_HYSTERESIS_PIXELS) {</span>
+<span class="fc" id="L463">                    newActive = activeIndex;</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        boolean activationChanged = (newActive != activeIndex);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if (activationChanged) {</span>
+<span class="fc" id="L470">            applyActivation(newActive);</span>
+            // Don't re-read scroller.getScrollY() here: when invoked
+            // from the ScrollListener, the scroller hasn't yet updated
+            // its internal scrollY field, so getScrollY() would return
+            // the stale value and undo the parameter we were handed.
+        }
+
+<span class="fc" id="L477">        int newPush = computePushOffset(sy);</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        boolean pushChanged = (newPush != pushOffset);</span>
+<span class="fc" id="L479">        pushOffset = newPush;</span>
+
+<span class="fc bfc" id="L481" title="All 4 branches covered.">        if (activationChanged || pushChanged) {</span>
+<span class="fc" id="L482">            applyPushVisuals();</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            if (isInitialized()) {</span>
+<span class="nc" id="L484">                repaint();</span>
+            }
+        }
+<span class="fc" id="L487">    }</span>
+
+    private int activeHeightFor(int index) {
+<span class="fc" id="L490">        Section s = sections.get(index);</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">        if (s.height &gt; 0) {</span>
+<span class="fc" id="L492">            return s.height;</span>
+        }
+<span class="nc" id="L494">        int h = s.header.getHeight();</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">        if (h &lt;= 0) {</span>
+<span class="nc" id="L496">            h = s.header.getPreferredH();</span>
+        }
+<span class="nc" id="L498">        return h;</span>
+    }
+
+    private int computePushOffset(int sy) {
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        if (activeIndex &lt; 0) {</span>
+<span class="fc" id="L503">            return 0;</span>
+        }
+<span class="fc" id="L505">        int activeH = activeHeightFor(activeIndex);</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">        if (activeH &lt;= 0) {</span>
+<span class="nc" id="L507">            return 0;</span>
+        }
+<span class="fc" id="L509">        int nextIdx = activeIndex + 1;</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        if (nextIdx &gt;= sections.size()) {</span>
+<span class="fc" id="L511">            return 0;</span>
+        }
+<span class="fc" id="L513">        Section next = sections.get(nextIdx);</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        Component anchor = next.placeholder.getParent() == scroller ? next.placeholder : next.header; //NOPMD CompareObjectsWithEquals</span>
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">        if (anchor.getParent() != scroller) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L516">            return 0;</span>
+        }
+<span class="fc" id="L518">        int aH = anchor.getHeight();</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">        if (aH &lt;= 0) {</span>
+<span class="nc" id="L520">            aH = anchor.getPreferredH();</span>
+        }
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        if (aH &lt;= 0) {</span>
+<span class="nc" id="L523">            return 0;</span>
+        }
+<span class="fc" id="L525">        int relY = anchor.getY() - sy;</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        if (relY &gt;= activeH) {</span>
+<span class="fc" id="L527">            return 0;</span>
+        }
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        if (relY &lt;= 0) {</span>
+<span class="nc" id="L530">            return activeH;</span>
+        }
+<span class="fc" id="L532">        return activeH - relY;</span>
+    }
+
+    private void applyActivation(int newActive) {
+<span class="fc bfc" id="L536" title="All 2 branches covered.">        if (activeIndex &gt;= 0) {</span>
+<span class="fc" id="L537">            Section prev = sections.get(activeIndex);</span>
+<span class="fc" id="L538">            stickyHost.removeAll();</span>
+<span class="fc" id="L539">            int idx = scroller.getComponentIndex(prev.placeholder);</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if (idx &gt;= 0) {</span>
+<span class="fc" id="L541">                scroller.removeComponent(prev.placeholder);</span>
+<span class="fc" id="L542">                scroller.addComponent(idx, prev.header);</span>
+            }
+        }
+
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        if (newActive &gt;= 0) {</span>
+<span class="fc" id="L547">            Section next = sections.get(newActive);</span>
+<span class="fc" id="L548">            int idx = scroller.getComponentIndex(next.header);</span>
+<span class="fc" id="L549">            int h = next.header.getHeight();</span>
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">            if (h &lt;= 0) {</span>
+<span class="nc" id="L551">                h = next.header.getPreferredH();</span>
+            }
+<span class="fc" id="L553">            int w = next.header.getWidth();</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">            if (w &lt;= 0) {</span>
+<span class="nc" id="L555">                w = scroller.getWidth();</span>
+            }
+<span class="fc" id="L557">            next.height = h;</span>
+<span class="fc" id="L558">            next.placeholder.setPreferredSize(new Dimension(w, h));</span>
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">            if (idx &gt;= 0) {</span>
+<span class="fc" id="L560">                scroller.removeComponent(next.header);</span>
+<span class="fc" id="L561">                scroller.addComponent(idx, next.placeholder);</span>
+            }
+<span class="fc" id="L563">            stickyHost.addComponent(BorderLayout.CENTER, next.header);</span>
+        }
+
+<span class="fc" id="L566">        activeIndex = newActive;</span>
+        // The newly active section starts fresh: no overlap with the
+        // section after it until further scrolling brings it into the
+        // push window.
+<span class="fc" id="L570">        pushOffset = 0;</span>
+
+<span class="fc" id="L572">        scroller.suppressLaidOutClamp = true;</span>
+        try {
+<span class="fc" id="L574">            scroller.layoutContainer();</span>
+        } finally {
+<span class="fc" id="L576">            scroller.suppressLaidOutClamp = false;</span>
+        }
+<span class="fc" id="L578">        stickyHost.layoutContainer();</span>
+<span class="fc" id="L579">        layoutContainer();</span>
+<span class="fc" id="L580">    }</span>
+
+    private void deactivate() {
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">        if (activeIndex &lt; 0) {</span>
+<span class="nc" id="L584">            return;</span>
+        }
+<span class="fc" id="L586">        applyActivation(-1);</span>
+<span class="fc" id="L587">        applyPushVisuals();</span>
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L589">            repaint();</span>
+        }
+<span class="fc" id="L591">    }</span>
+
+    private void applyPushVisuals() {
+<span class="fc bfc" id="L594" title="All 4 branches covered.">        if (activeIndex &lt; 0 || pushOffset &lt;= 0) {</span>
+<span class="fc" id="L595">            stickyHost.setY(stickyHostBaseY);</span>
+<span class="fc" id="L596">            stickyHost.getAllStyles().setOpacity(255);</span>
+<span class="fc" id="L597">            stickyHost.setVisible(true);</span>
+<span class="fc" id="L598">            return;</span>
+        }
+<span class="fc" id="L600">        int activeH = activeHeightFor(activeIndex);</span>
+        // TRANSITION_FADE is a legacy convenience for &quot;slide + fade out&quot;;
+        // outside of that, the fade is governed solely by the separate
+        // headerFadeOut flag.
+<span class="fc bfc" id="L604" title="All 4 branches covered.">        boolean fadeOutgoing = headerFadeOut || transitionStyle == TRANSITION_FADE;</span>
+<span class="fc" id="L605">        int alpha = 255;</span>
+<span class="pc bpc" id="L606" title="1 of 4 branches missed.">        if (fadeOutgoing &amp;&amp; activeH &gt; 0) {</span>
+<span class="fc" id="L607">            alpha = 255 - (pushOffset * 255) / activeH;</span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">            if (alpha &lt; 0) {</span>
+<span class="nc" id="L609">                alpha = 0;</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">            } else if (alpha &gt; 255) {</span>
+<span class="nc" id="L611">                alpha = 255;</span>
+            }
+        }
+<span class="fc bfc" id="L614" title="All 2 branches covered.">        switch (transitionStyle) {</span>
+            case TRANSITION_SLIDE:
+            case TRANSITION_FADE: {
+                // FADE shares SLIDE's movement so the rising header is
+                // visibly filling the slot from below while the pinned
+                // header dissolves on its way out. With a fade-only
+                // implementation the user sees the slot become empty as
+                // the pinned header alpha drops, since the rising
+                // header is still well below the slot top.
+<span class="fc" id="L623">                stickyHost.setY(stickyHostBaseY - pushOffset);</span>
+<span class="fc" id="L624">                break;</span>
+            }
+            case TRANSITION_COVER:
+            case TRANSITION_NONE:
+            default: {
+                // Keep the pinned header in place. For COVER the rising
+                // header is painted on top of the slot in paint(g) so
+                // the user sees the cover progress; for NONE the rising
+                // section stays hidden behind the pinned host until the
+                // swap, which is instant. Hiding the host in NONE would
+                // expose scroller content where the slot used to be.
+<span class="fc" id="L635">                stickyHost.setY(stickyHostBaseY);</span>
+                break;
+            }
+        }
+<span class="fc" id="L639">        stickyHost.getAllStyles().setOpacity(alpha);</span>
+<span class="fc" id="L640">        stickyHost.setVisible(true);</span>
+<span class="fc" id="L641">    }</span>
+
+<span class="fc" id="L643">    private final class StickyOverlayLayout extends Layout {</span>
+        @Override
+        public void layoutContainer(Container parent) {
+<span class="fc" id="L646">            Style ps = parent.getStyle();</span>
+<span class="fc" id="L647">            int x = ps.getPaddingLeft(parent.isRTL());</span>
+<span class="fc" id="L648">            int y = ps.getPaddingTop();</span>
+<span class="fc" id="L649">            int innerW = parent.getLayoutWidth() - parent.getSideGap() - ps.getHorizontalPadding();</span>
+<span class="fc" id="L650">            int innerH = parent.getLayoutHeight() - parent.getBottomGap() - ps.getVerticalPadding();</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">            if (innerW &lt; 0) {</span>
+<span class="nc" id="L652">                innerW = 0;</span>
+            }
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">            if (innerH &lt; 0) {</span>
+<span class="nc" id="L655">                innerH = 0;</span>
+            }
+
+<span class="fc" id="L658">            scroller.setX(x);</span>
+<span class="fc" id="L659">            scroller.setY(y);</span>
+<span class="fc" id="L660">            scroller.setWidth(innerW);</span>
+<span class="fc" id="L661">            scroller.setHeight(innerH);</span>
+
+<span class="fc bfc" id="L663" title="All 2 branches covered.">            int headerH = activeIndex &gt;= 0 ? activeHeightFor(activeIndex) : 0;</span>
+<span class="fc" id="L664">            stickyHostBaseY = y;</span>
+<span class="fc" id="L665">            stickyHost.setX(x);</span>
+<span class="fc" id="L666">            stickyHost.setWidth(innerW);</span>
+<span class="fc" id="L667">            stickyHost.setHeight(headerH);</span>
+            // Re-apply any in-flight push so the host's Y matches the
+            // current push offset relative to the freshly computed base.
+<span class="fc" id="L670">            applyPushVisuals();</span>
+<span class="fc" id="L671">        }</span>
+
+        @Override
+        public Dimension getPreferredSize(Container parent) {
+<span class="nc" id="L675">            Dimension d = scroller.getPreferredSize();</span>
+<span class="nc" id="L676">            Style ps = parent.getStyle();</span>
+<span class="nc" id="L677">            return new Dimension(d.getWidth() + ps.getHorizontalPadding(),</span>
+<span class="nc" id="L678">                    d.getHeight() + ps.getVerticalPadding());</span>
+        }
+
+        @Override
+        public boolean isOverlapSupported() {
+<span class="nc" id="L683">            return true;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

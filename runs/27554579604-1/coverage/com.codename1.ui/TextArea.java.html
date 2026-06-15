@@ -1,0 +1,2444 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextArea.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TextArea.java</span></div><h1>TextArea.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.cloud.BindTarget;
+import com.codename1.compat.java.util.Objects;
+import com.codename1.io.Log;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.util.UITimer;
+
+import java.util.ArrayList;
+
+/// An optionally multi-line editable region that can display text and allow a user to edit it.
+/// By default the text area will grow based on its content.
+///
+/// `TextArea` is useful both for text input and for displaying multi-line data, it is used internally
+/// by components such as `com.codename1.components.SpanLabel` &amp;
+/// `com.codename1.components.SpanButton`.
+///
+/// `TextArea` &amp; `com.codename1.ui.TextField` are very similar, we discuss the main differences
+/// between the two `here`.  In fact they are so similar that our sample code
+/// below was written for `com.codename1.ui.TextField` but should be interchangeable with `TextArea`.
+///
+/// ```java
+/// TableLayout tl;
+/// int spanButton = 2;
+/// if(Display.getInstance().isTablet()) {
+///     tl = new TableLayout(7, 2);
+/// } else {
+///     tl = new TableLayout(14, 1);
+///     spanButton = 1;
+/// }
+/// tl.setGrowHorizontally(true);
+/// hi.setLayout(tl);
+///
+/// TextField firstName = new TextField(&quot;&quot;, &quot;First Name&quot;, 20, TextArea.ANY);
+/// TextField surname = new TextField(&quot;&quot;, &quot;Surname&quot;, 20, TextArea.ANY);
+/// TextField email = new TextField(&quot;&quot;, &quot;E-Mail&quot;, 20, TextArea.EMAILADDR);
+/// TextField url = new TextField(&quot;&quot;, &quot;URL&quot;, 20, TextArea.URL);
+/// TextField phone = new TextField(&quot;&quot;, &quot;Phone&quot;, 20, TextArea.PHONENUMBER);
+///
+/// TextField num1 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+/// TextField num2 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+/// TextField num3 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+/// TextField num4 = new TextField(&quot;&quot;, &quot;1234&quot;, 4, TextArea.NUMERIC);
+///
+/// Button submit = new Button(&quot;Submit&quot;);
+/// TableLayout.Constraint cn = tl.createConstraint();
+/// cn.setHorizontalSpan(spanButton);
+/// cn.setHorizontalAlign(Component.RIGHT);
+/// hi.add(&quot;First Name&quot;).add(firstName).
+///         add(&quot;Surname&quot;).add(surname).
+///         add(&quot;E-Mail&quot;).add(email).
+///         add(&quot;URL&quot;).add(url).
+///         add(&quot;Phone&quot;).add(phone).
+///         add(&quot;Credit Card&quot;).
+///                 add(GridLayout.encloseIn(4, num1, num2, num3, num4)).
+///         add(cn, submit);
+/// ```
+///
+/// @author Chen Fishbein
+public class TextArea extends Component implements ActionSource, TextHolder {
+    /// Allows any type of input into a text field, if a constraint is not supported
+    /// by an underlying implementation this will be the default.
+    public static final int ANY = 0;
+    /// The user is allowed to enter an e-mail address.
+    public static final int EMAILADDR = 1;
+    /// The user is allowed to enter only an integer value.
+    public static final int NUMERIC = 2;
+    /// The user is allowed to enter a phone number.
+    public static final int PHONENUMBER = 3;
+    /// The user is allowed to enter a URL.
+    public static final int URL = 4;
+    /// The user is allowed to enter numeric values with optional decimal
+    /// fractions, for example &quot;-123&quot;, &quot;0.123&quot;, or &quot;.5&quot;.
+    public static final int DECIMAL = 5;
+    /// Indicates that the text entered is confidential data that should be
+    /// obscured whenever possible.
+    public static final int PASSWORD = 0x10000;
+    /// Indicates that editing is currently disallowed.
+    public static final int UNEDITABLE = 0x20000;
+    /// Indicates that the text entered is sensitive data that the
+    /// implementation must never store into a dictionary or table for use
+    /// in predictive, auto-completing, or other accelerated input schemes.
+    public static final int SENSITIVE = 0x40000;
+    /// Indicates that the text entered does not consist of words that are
+    /// likely to be found in dictionaries typically used by predictive input
+    /// schemes.
+    public static final int NON_PREDICTIVE = 0x80000;
+    /// This flag is a hint to the implementation that during text editing,
+    /// the initial letter of each word should be capitalized.
+    public static final int INITIAL_CAPS_WORD = 0x100000;
+    /// This flag is a hint to the implementation that during text editing,
+    /// the initial letter of each sentence should be capitalized.
+    public static final int INITIAL_CAPS_SENTENCE = 0x200000;
+    /// This flag is a hint to the implementation that this field contains
+    /// a username.
+    public static final int USERNAME = 0x400000;
+    /// This flag is a hint to the implementation that the text in this
+    /// field should be upper case
+    public static final int UPPERCASE = 0x800000;
+    /// Indicates the enter key to be used for editing the text area and by the
+    /// text field
+    private static final char ENTER_KEY = '\n';
+    private static final boolean hadSuccessfulEdit = false;
+<span class="fc" id="L138">    private static int defaultValign = TOP;</span>
+<span class="fc" id="L139">    private static int defaultMaxSize = 124;</span>
+<span class="fc" id="L140">    private static boolean autoDegradeMaxSize = false;</span>
+    /// By default text area uses charWidth since its much faster on some devices
+    /// than string width. However, with some fonts and especially some languages (such
+    /// as Arabic, Korean etc.) the width of the string drawn might not equal the summary
+    /// of the width of the chars. Hence for portability to those languages/fonts this
+    /// flag must be set to true.
+    private static boolean useStringWidth;
+    /// Indicates the widest character in the alphabet, this is useful for detecting
+    /// linebreaks internally. In CJK languages the widest char is different than W
+    /// hence this functionality is exposed to developers.
+<span class="fc" id="L150">    private static char widestChar = 'W';</span>
+<span class="fc" id="L151">    private final EventDispatcher listeners = new EventDispatcher();</span>
+    private ActionListener doneListener;
+<span class="fc" id="L153">    private int valign = defaultValign;</span>
+<span class="fc" id="L154">    private int linesToScroll = 1;</span>
+    //private int modifierFlag = 0x00000;
+    /// Unsupported characters is a string that contains characters that cause issues
+    /// when rendering on some problematic fonts. The rendering engine can thus remove them
+    /// when drawing.
+<span class="fc" id="L159">    private String unsupportedChars = &quot;\t\r&quot;;</span>
+    /// Input constraint which should be one of ANY, NUMERIC,
+    /// PHONENUMBER, URL or EMAIL
+<span class="fc" id="L162">    private int constraint = INITIAL_CAPS_SENTENCE;</span>
+<span class="fc" id="L163">    private String text = &quot;&quot;;</span>
+<span class="fc" id="L164">    private boolean editable = true;</span>
+<span class="fc" id="L165">    private int maxSize = defaultMaxSize; //maximum size (number of characters) that can be stored in this TextField.</span>
+<span class="fc" id="L166">    private int rows = 1;</span>
+<span class="fc" id="L167">    private int columns = 3;</span>
+<span class="fc" id="L168">    private int growLimit = -1;</span>
+<span class="fc" id="L169">    private boolean endsWith3Points = false;</span>
+    /// This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+    /// this might make it slower as a result
+    private boolean actAsLabel;
+    private ArrayList rowStrings;
+
+
+    // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
+<span class="fc" id="L177">    private int widthForRowCalculations = -1;</span>
+<span class="fc" id="L178">    private int rowsGap = 2;</span>
+    private boolean triggerClose;
+<span class="fc" id="L180">    private EventDispatcher actionListeners = null;</span>
+<span class="fc" id="L181">    private EventDispatcher bindListeners = null;</span>
+<span class="fc" id="L182">    private EventDispatcher closeListeners = null;</span>
+<span class="fc" id="L183">    private String lastTextValue = &quot;&quot;;</span>
+    /// Indicates that the text area should &quot;grow&quot; in height based on the content beyond the
+    /// limits indicate by the rows variable
+<span class="fc" id="L186">    private boolean growByContent = true;</span>
+    /// Indicates whether this is a single line text area, in which case &quot;growing&quot; won't
+    /// work as expected.
+    private boolean singleLineTextArea;
+    private int currentRowWidth;
+    private Label hintLabel;
+    /// Flag to indicate whether the action event is suppressed.
+    /// FocusLost will trigger an action event if editing is in progress,
+    /// and then set this flag.
+    /// The flag should be unset on focus gained, and on start editing.
+    private boolean suppressActionEvent;
+    /// To work around race conditions in UI bindings (on Android at least), we want to
+    /// send action events early.  Even the focusLost() event isn't early enough to ensure
+    /// that the action event is sent before an action event in a button that would trigger
+    /// focus lost.  We add this form press listener to the form when we add the textarea
+    /// and remove it when we remove the textarea.
+    ///
+    /// Reference bug https://github.com/codenameone/CodenameOne/issues/2472
+<span class="fc" id="L204">    private final ActionListener formPressListener = new ActionListener() {</span>
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L207">            Form f = getComponentForm();</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="pc bpc" id="L209" title="3 of 4 branches missed.">                if (isEditing() &amp;&amp; f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L210">                    fireActionEvent();</span>
+<span class="nc" id="L211">                    setSuppressActionEvent(true);</span>
+                }
+            }
+<span class="fc" id="L214">        }</span>
+    };
+    private boolean textSelectionEnabled;
+    private TextSelection.Spans span;
+    private TextSelection.TextSelectionSupport textSelectionSupport;
+
+    /// Creates an area with the given rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt;= 0 or columns &lt;= 1
+    public TextArea(int rows, int columns) {
+<span class="fc" id="L232">        this(&quot;&quot;, defaultMaxSize, rows, columns, ANY);</span>
+<span class="fc" id="L233">    }</span>
+
+    /// Creates an area with the given rows, columns and constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt;= 0 or columns &lt;= 1
+    public TextArea(int rows, int columns, int constraint) {
+<span class="nc" id="L251">        this(&quot;&quot;, defaultMaxSize, rows, columns, constraint);</span>
+<span class="nc" id="L252">    }</span>
+
+    /// Creates an area with the given text, rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text    the text to be displayed; if text is null, the empty
+    /// string &quot;&quot; will be displayed
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt;= 0 or columns &lt;= 1
+    public TextArea(String text, int rows, int columns) {
+<span class="fc" id="L269">        this(text, defaultMaxSize, rows, columns, ANY); //String , maxSize, constraints= 0 (ANY)</span>
+<span class="fc" id="L270">    }</span>
+
+    /// Creates an area with the given text, rows, columns and constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text       the text to be displayed; if text is null, the empty
+    /// string &quot;&quot; will be displayed
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt;= 0 or columns &lt;= 1
+    public TextArea(String text, int rows, int columns, int constraint) {
+<span class="fc" id="L291">        this(text, defaultMaxSize, rows, columns, constraint);</span>
+<span class="fc" id="L292">    }</span>
+
+    /// Creates an area with the given text and maximum size, this constructor
+    /// will create a single line text area similar to a text field!
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text    the text to be displayed; if text is null, the empty
+    /// string &quot;&quot; will be displayed
+    ///
+    /// - `maxSize`: text area maximum size
+    public TextArea(String text, int maxSize) {
+<span class="nc" id="L304">        this(text, maxSize, 1, 3, ANY);</span>
+<span class="nc" id="L305">    }</span>
+
+    /// Creates an area with the given text, this constructor
+    /// will create a single line text area similar to a text field!
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text the text to be displayed; if text is null, the empty
+    /// string &quot;&quot; will be displayed
+    public TextArea(String text) {
+<span class="fc" id="L315">        this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);</span>
+<span class="fc" id="L316">    }</span>
+
+    /// Creates an empty text area, this constructor
+    /// will create a single line text area similar to a text field!
+    public TextArea() {
+<span class="fc" id="L321">        this(&quot;&quot;);</span>
+<span class="fc" id="L322">    }</span>
+
+    /// Creates an area with the given text, maximum size, rows, columns and constraint
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: @param text       the text to be displayed; if text is null, the empty
+    /// string &quot;&quot; will be displayed
+    ///
+    /// - `maxSize`: text area maximum size
+    ///
+    /// - `rows`: the number of rows
+    ///
+    /// - `columns`: - the number of columns
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt;= 0 or columns &lt;= 1
+<span class="fc" id="L344">    private TextArea(String text, int maxSize, int rows, int columns, int constraint) {</span>
+<span class="fc" id="L345">        setUIIDFinal(&quot;TextArea&quot;);</span>
+<span class="fc" id="L346">        setPreferredTabIndex(0);</span>
+<span class="fc" id="L347">        this.maxSize = maxSize;</span>
+<span class="fc" id="L348">        setText(text);</span>
+<span class="fc" id="L349">        setConstraint(constraint);</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">        if (rows &lt;= 0) {</span>
+<span class="nc" id="L351">            throw new IllegalArgumentException(&quot;rows must be positive&quot;);</span>
+        }
+<span class="pc bpc" id="L353" title="1 of 4 branches missed.">        if (columns &lt;= 1 &amp;&amp; rows != 1) {</span>
+<span class="nc" id="L354">            throw new IllegalArgumentException(&quot;columns must be larger than 1&quot;);</span>
+        }
+<span class="fc" id="L356">        this.rows = rows;</span>
+<span class="fc" id="L357">        this.columns = columns;</span>
+<span class="fc" id="L358">        setCursor(Component.TEXT_CURSOR);</span>
+<span class="fc" id="L359">    }</span>
+
+    /// Indicates the default vertical alignment for a text field.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultValign
+    public static int getDefaultValign() {
+<span class="fc" id="L367">        return defaultValign;</span>
+    }
+
+    /// Indicates the default vertical alignment for a text field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultValign`: the defaultValign to set
+    public static void setDefaultValign(int aDefaultValign) {
+<span class="fc" id="L376">        defaultValign = aDefaultValign;</span>
+<span class="fc" id="L377">    }</span>
+
+    private static int numCols(String t) {
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L381">            return 3;</span>
+        }
+<span class="fc" id="L383">        int s = t.length();</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (s &lt; 3) {</span>
+<span class="fc" id="L385">            return 3;</span>
+        }
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (s &gt; 80) {</span>
+<span class="fc" id="L388">            return 80;</span>
+        }
+<span class="fc" id="L390">        return s;</span>
+    }
+
+    private static int nl(String t) {
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L395">            return 0;</span>
+        }
+<span class="fc" id="L397">        return t.length();</span>
+    }
+
+    /// Sets the default limit for the native text box size
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: default value for the size of the native text box
+    public static void setDefaultMaxSize(int value) {
+<span class="nc" id="L406">        defaultMaxSize = value;</span>
+<span class="nc" id="L407">    }</span>
+
+    /// Indicates whether a high value for default maxSize will be reduced to a lower
+    /// value if the underlying platform throws an exception.
+    ///
+    /// #### Returns
+    ///
+    /// value for autoDegradeMaxSize
+    public static boolean isAutoDegradeMaxSize() {
+<span class="nc" id="L416">        return autoDegradeMaxSize;</span>
+    }
+
+    /// Indicates whether a high value for default maxSize will be reduced to a lower
+    /// value if the underlying platform throws an exception.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: new value for autoDegradeMaxSize
+    public static void setAutoDegradeMaxSize(boolean value) {
+<span class="nc" id="L426">        autoDegradeMaxSize = value;</span>
+<span class="nc" id="L427">    }</span>
+
+    /// Indicates the widest character in the alphabet, this is useful for detecting
+    /// linebreaks internally. In CJK languages the widest char is different than W
+    /// hence this functionality is exposed to developers.
+    ///
+    /// #### Returns
+    ///
+    /// the widest character
+    public static char getWidestChar() {
+<span class="fc" id="L437">        return widestChar;</span>
+    }
+
+    /// Indicates the widest character in the alphabet, this is useful for detecting
+    /// linebreaks internally. In CJK languages the widest char is different than W
+    /// hence this functionality is exposed to developers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `widestC`: the widest character
+    public static void setWidestChar(char widestC) {
+<span class="fc" id="L448">        widestChar = widestC;</span>
+<span class="fc" id="L449">    }</span>
+
+    /// Searches the given string for the widest character using char width, this operation should only
+    /// be performed once and it solves cases where a devices language might have a char bigger than 'W'
+    /// that isn't consistently bigger.
+    /// Notice that this method will use the TextArea style font which might differ when switching themes etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: string to search using charWidth
+    public static void autoDetectWidestChar(String s) {
+<span class="fc" id="L460">        Font f = UIManager.getInstance().getComponentStyle(&quot;TextArea&quot;).getFont();</span>
+<span class="fc" id="L461">        int widest = 0;</span>
+<span class="fc" id="L462">        int slen = s.length();</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="fc" id="L464">            char c = s.charAt(iter);</span>
+<span class="fc" id="L465">            int w = f.charWidth(c);</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            if (w &gt; widest) {</span>
+<span class="fc" id="L467">                widest = w;</span>
+<span class="fc" id="L468">                setWidestChar(c);</span>
+            }
+        }
+<span class="fc" id="L471">    }</span>
+
+    /// By default text area uses charWidth since its much faster on some devices
+    /// than string width. However, with some fonts and especially some languages (such
+    /// as Arabic, Korean etc.) the width of the string drawn might not equal the summary
+    /// of the width of the chars. Hence for portability to those languages/fonts this
+    /// flag must be set to true.
+    ///
+    /// #### Returns
+    ///
+    /// the value of useStringWidth
+    public static boolean isUseStringWidth() {
+<span class="nc" id="L483">        return useStringWidth;</span>
+    }
+
+    /// By default text area uses charWidth since its much faster on some devices
+    /// than string width. However, with some fonts and especially some languages (such
+    /// as Arabic, Korean etc.) the width of the string drawn might not equal the summary
+    /// of the width of the chars. Hence for portability to those languages/fonts this
+    /// flag must be set to true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aUseStringWidth`: the new value for useStringWidth
+    public static void setUseStringWidth(boolean aUseStringWidth) {
+<span class="nc" id="L496">        useStringWidth = aUseStringWidth;</span>
+<span class="nc" id="L497">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L501">        super.initComponent();</span>
+<span class="fc" id="L502">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">        if (f != null) {</span>
+            // To be able to send action events early.
+            // https://github.com/codenameone/CodenameOne/issues/2472
+<span class="fc" id="L506">            f.addPointerPressedListener(formPressListener);</span>
+        }
+<span class="fc" id="L508">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L512">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (f != null) {</span>
+            // For sending action events early
+            // https://github.com/codenameone/CodenameOne/issues/2472
+<span class="fc" id="L516">            f.removePointerPressedListener(formPressListener);</span>
+        }
+<span class="fc" id="L518">        super.deinitialize();</span>
+<span class="fc" id="L519">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void initLaf(UIManager uim) {
+<span class="fc" id="L524">        super.initLaf(uim);</span>
+<span class="fc" id="L525">        setSelectCommandText(uim.localize(&quot;edit&quot;, &quot;Edit&quot;));</span>
+<span class="fc" id="L526">        LookAndFeel laf = uim.getLookAndFeel();</span>
+<span class="fc" id="L527">        setSmoothScrolling(laf.isDefaultSmoothScrolling());</span>
+<span class="fc" id="L528">    }</span>
+
+    /// Returns the editing constraint value
+    ///
+    /// #### Returns
+    ///
+    /// the editing constraint value
+    ///
+    /// #### See also
+    ///
+    /// - #setConstraint
+    public int getConstraint() {
+<span class="fc" id="L540">        return constraint;</span>
+    }
+
+    /// Sets the constraint which provides a hint to the virtual keyboard input, notice this **doesn't**
+    /// limit input type in any way!
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
+    /// it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
+    /// INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+    public void setConstraint(int constraint) {
+<span class="fc" id="L552">        this.constraint = constraint;</span>
+<span class="fc" id="L553">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setWidth(int width) {
+<span class="fc bfc" id="L558" title="All 2 branches covered.">        if (width != getWidth()) {</span>
+<span class="fc" id="L559">            rowStrings = null;</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">            if (growByContent) {</span>
+<span class="fc" id="L561">                setShouldCalcPreferredSize(true);</span>
+            }
+        }
+<span class="fc" id="L564">        super.setWidth(width);</span>
+<span class="fc" id="L565">    }</span>
+
+    /// Returns the text in the text area
+    ///
+    /// #### Returns
+    ///
+    /// the text in the text area
+    @Override
+    public String getText() {
+<span class="fc" id="L574">        return text;</span>
+    }
+
+    /// Sets the text within this text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: new value for the text area
+    @Override
+    public void setText(String t) {
+<span class="fc" id="L584">        String old = this.text;</span>
+<span class="fc bfc" id="L585" title="All 2 branches covered.">        if (!Objects.equals(t, old)) {</span>
+            // If we've previously suppressed action events,
+            // we need to unsuppress them upon the text changing again.
+<span class="fc" id="L588">            setSuppressActionEvent(false);</span>
+        }
+<span class="fc bfc" id="L590" title="All 2 branches covered.">        this.text = (t != null) ? t : &quot;&quot;;</span>
+<span class="fc" id="L591">        setShouldCalcPreferredSize(true);</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">        if (maxSize &lt; text.length()) {</span>
+<span class="fc" id="L593">            maxSize = text.length() + 1;</span>
+        }
+
+<span class="fc" id="L596">        synchronized (this) {</span>
+            //zero the ArrayList in order to initialize it on the next paint
+<span class="fc" id="L598">            rowStrings = null;</span>
+<span class="fc" id="L599">        }</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">        if (growByContent</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">                &amp;&amp; !Objects.equals(text, old)</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">                &amp;&amp; getParent() != null</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">                &amp;&amp; Display.getInstance().isTextEditing(this)</span>
+<span class="fc bfc" id="L604" title="All 2 branches covered.">                &amp;&amp; textMightGrowByContent(old, text)) {</span>
+<span class="fc" id="L605">            getParent().revalidateLater();</span>
+        }
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (!Objects.equals(text, old)) {</span>
+<span class="fc" id="L608">            fireDataChanged(DataChangedListener.CHANGED, -1);</span>
+        }
+        // while native editing we don't need the cursor animations
+<span class="pc bpc" id="L611" title="3 of 4 branches missed.">        if (Display.getInstance().isNativeInputSupported() &amp;&amp; Display.getInstance().isTextEditing(this)) {</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">            if (!text.equals(old)) {</span>
+<span class="nc" id="L613">                Display.impl.updateNativeEditorText(this, text);</span>
+            }
+<span class="nc" id="L615">            return;</span>
+        }
+<span class="fc" id="L617">        repaint();</span>
+<span class="fc" id="L618">    }</span>
+
+    private boolean textMightGrowByContent(String oldText, String newText) {
+<span class="pc bpc" id="L621" title="2 of 4 branches missed.">        if (newText == null || oldText == null) {</span>
+<span class="nc" id="L622">            return true;</span>
+        }
+        // An added hard newline always adds a row.
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        if (countNewLines(newText) &gt; countNewLines(oldText)) {</span>
+<span class="fc" id="L626">            return true;</span>
+        }
+        // Any growth in length can push the content onto an extra wrapped row.
+        // We deliberately do NOT try to predict the wrap point here: the previous
+        // character-column estimate ignored the font and padding, so proportional
+        // text wrapped a row earlier than predicted and the field clipped the prior
+        // line while editing (#4854). revalidateLater() coalesces and the layout's
+        // getLines() (real font metrics, real width) determines the actual size, so
+        // erring toward an extra revalidate is cheap and never under-grows.
+<span class="fc bfc" id="L635" title="All 2 branches covered.">        return newText.length() &gt; oldText.length();</span>
+    }
+
+    private int countNewLines(String value) {
+<span class="pc bpc" id="L639" title="1 of 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="fc" id="L640">            return 0;</span>
+        }
+<span class="fc" id="L642">        int count = 0;</span>
+<span class="fc bfc" id="L643" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">            if (value.charAt(i) == '\n') {</span>
+<span class="fc" id="L645">                count++;</span>
+            }
+        }
+<span class="fc" id="L648">        return count;</span>
+    }
+
+    /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
+    /// text field isn't a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `invalid`: in case the text isn't an integer this number will be returned
+    ///
+    /// #### Returns
+    ///
+    /// the int value of the text field
+    public int getAsInt(int invalid) {
+        try {
+<span class="fc" id="L663">            return Integer.parseInt(text);</span>
+<span class="fc" id="L664">        } catch (NumberFormatException e) {</span>
+<span class="fc" id="L665">            return invalid;</span>
+        }
+    }
+
+    /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
+    /// text field isn't a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `invalid`: in case the text isn't a long this number will be returned
+    ///
+    /// #### Returns
+    ///
+    /// the long value of the text field
+    public long getAsLong(long invalid) {
+        try {
+<span class="fc" id="L681">            return Long.parseLong(text);</span>
+<span class="nc" id="L682">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L683">            return invalid;</span>
+        }
+    }
+
+    /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the
+    /// text field isn't a number
+    ///
+    /// #### Parameters
+    ///
+    /// - `invalid`: in case the text isn't an double this number will be returned
+    ///
+    /// #### Returns
+    ///
+    /// the double value of the text field
+    public double getAsDouble(double invalid) {
+        try {
+<span class="fc" id="L699">            return Double.parseDouble(text);</span>
+<span class="nc" id="L700">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L701">            return invalid;</span>
+        }
+    }
+
+    /// Returns true if this area is editable
+    ///
+    /// #### Returns
+    ///
+    /// true if this area is editable
+    @Override
+    public boolean isEditable() {
+<span class="fc" id="L712">        return editable;</span>
+    }
+
+    /// Sets this text area to be editable or readonly
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true is text are is editable; otherwise false
+    public void setEditable(boolean b) {
+<span class="fc" id="L721">        editable = b;</span>
+<span class="fc" id="L722">        updateCursor();</span>
+<span class="fc" id="L723">    }</span>
+
+    @Override
+    public int getPreferredTabIndex() {
+<span class="fc bfc" id="L727" title="All 2 branches covered.">        if (isEditable()) {</span>
+<span class="fc" id="L728">            return super.getPreferredTabIndex();</span>
+        }
+<span class="fc" id="L730">        return -1;</span>
+    }
+
+    private void updateCursor() {
+<span class="fc bfc" id="L734" title="All 4 branches covered.">        setCursor(isEditable() || isTextSelectionEnabled() ? TEXT_CURSOR : DEFAULT_CURSOR);</span>
+<span class="fc" id="L735">    }</span>
+
+    /// Returns the maximum size for the text area
+    ///
+    /// #### Returns
+    ///
+    /// the maximum size for the text area
+    public int getMaxSize() {
+<span class="fc" id="L743">        return maxSize;</span>
+    }
+
+    /// Sets the maximum size of the text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxSize`: the maximum size of the text area
+    public void setMaxSize(int maxSize) {
+<span class="fc" id="L752">        this.maxSize = maxSize;</span>
+<span class="fc" id="L753">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="fc" id="L758">        super.keyPressed(keyCode);</span>
+<span class="fc" id="L759">        setSuppressActionEvent(false);</span>
+<span class="fc" id="L760">        int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);</span>
+
+        // this works around a bug where fire is also a softkey on devices such as newer Nokia
+        // series 40's (e.g. the Nokia emulator). It closes its native text box on fire then
+        // as a result of a Nokia bug we get the key released of that closing and assume the
+        // users wants to edit the text... When means the only way to exit the native text box
+        // is via the cancel option (after pressing OK once).
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">        triggerClose = action == Display.GAME_FIRE;</span>
+
+        //scroll the TextArea
+<span class="fc" id="L770">        Rectangle rect = new Rectangle(getScrollX(), getScrollY(), getWidth(), getHeight());</span>
+<span class="fc" id="L771">        Font textFont = getStyle().getFont();</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">        if (action == Display.GAME_DOWN) {</span>
+<span class="nc bnc" id="L773" title="All 2 branches missed.">            if ((getScrollY() + getHeight()) &lt; (rowsGap + getStyle().getFont().getHeight()) * getLines()) {</span>
+<span class="nc" id="L774">                rect.setY(rect.getY() + (textFont.getHeight() + rowsGap) * linesToScroll);</span>
+<span class="nc" id="L775">                scrollRectToVisible(rect, this);</span>
+            } else {
+<span class="nc" id="L777">                setHandlesInput(false);</span>
+            }
+        } else {
+<span class="pc bpc" id="L780" title="1 of 2 branches missed.">            if (action == Display.GAME_UP) {</span>
+<span class="nc bnc" id="L781" title="All 2 branches missed.">                if (getScrollY() &gt; 0) {</span>
+<span class="nc" id="L782">                    rect.setY(Math.max(0, rect.getY() - (textFont.getHeight() + rowsGap) * linesToScroll));</span>
+<span class="nc" id="L783">                    scrollRectToVisible(rect, this);</span>
+                } else {
+<span class="nc" id="L785">                    setHandlesInput(false);</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L789" title="2 of 4 branches missed.">        if (action == Display.GAME_RIGHT || action == Display.GAME_LEFT) {</span>
+<span class="nc" id="L790">            setHandlesInput(false);</span>
+        }
+<span class="fc" id="L792">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void fireClicked() {
+<span class="nc" id="L797">        onClick();</span>
+<span class="nc" id="L798">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isSelectableInteraction() {
+<span class="fc" id="L803">        return editable;</span>
+    }
+
+    private boolean isTypedKey(int code) {
+<span class="nc bnc" id="L807" title="All 2 branches missed.">        return code &gt; 0;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="fc" id="L813">        int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);</span>
+<span class="pc bpc" id="L814" title="1 of 2 branches missed.">        if (isEditable()) {</span>
+            // this works around a bug where fire is also a softkey on devices such as newer Nokia
+            // series 40's
+<span class="pc bpc" id="L817" title="5 of 6 branches missed.">            if (triggerClose &amp;&amp; (action == Display.GAME_FIRE || isEnterKey(keyCode))) {</span>
+<span class="nc" id="L818">                triggerClose = false;</span>
+<span class="nc" id="L819">                onClick();</span>
+<span class="nc" id="L820">                return;</span>
+            }
+<span class="pc bpc" id="L822" title="3 of 4 branches missed.">            if (action == 0 &amp;&amp; isTypedKey(keyCode)) {</span>
+                //registerAsInputDevice();
+<span class="nc" id="L824">                Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText(), keyCode);</span>
+            }
+        }
+<span class="fc" id="L827">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isScrollableY() {
+<span class="fc bfc" id="L832" title="All 4 branches covered.">        return isFocusable() &amp;&amp; getScrollDimension().getHeight() &gt; getHeight();</span>
+    }
+
+    @Override
+    void deinitializeImpl() {
+<span class="fc" id="L837">        super.deinitializeImpl();</span>
+<span class="fc" id="L838">        Display.getInstance().stopEditing(this);</span>
+<span class="fc" id="L839">    }</span>
+
+    void onClick() {
+<span class="nc bnc" id="L842" title="All 2 branches missed.">        if (isEditable()) {</span>
+<span class="nc" id="L843">            editString();</span>
+        }
+<span class="nc" id="L845">    }</span>
+
+    void editString() {
+<span class="nc bnc" id="L848" title="All 4 branches missed.">        if (autoDegradeMaxSize &amp;&amp; (!hadSuccessfulEdit) &amp;&amp; (maxSize &gt; 1024)) {</span>
+            try {
+                //registerAsInputDevice();
+<span class="nc" id="L851">                Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText());</span>
+<span class="nc" id="L852">            } catch (IllegalArgumentException err) {</span>
+<span class="nc" id="L853">                maxSize -= 1024;</span>
+<span class="nc" id="L854">                setDefaultMaxSize(maxSize);</span>
+<span class="nc" id="L855">                editString();</span>
+<span class="nc" id="L856">            }</span>
+        } else {
+            //registerAsInputDevice();
+<span class="nc" id="L859">            Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText());</span>
+        }
+<span class="nc" id="L861">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+<span class="nc bnc" id="L866" title="All 2 branches missed.">        if (!Display.getInstance().isDesktop()) {</span>
+<span class="nc" id="L867">            requestFocus();</span>
+        }
+<span class="nc" id="L869">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHoverReleased(int[] x, int[] y) {
+<span class="nc bnc" id="L874" title="All 2 branches missed.">        if (!Display.getInstance().isDesktop()) {</span>
+<span class="nc" id="L875">            requestFocus();</span>
+        }
+<span class="nc" id="L877">    }</span>
+
+    boolean showLightweightVKB() {
+<span class="nc" id="L880">        return false;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+        // prevent a drag operation from going into edit mode
+<span class="pc bpc" id="L887" title="1 of 2 branches missed.">        if (isDragActivated()) {</span>
+<span class="nc" id="L888">            super.pointerReleased(x, y);</span>
+        } else {
+<span class="fc" id="L890">            super.pointerReleased(x, y);</span>
+<span class="pc bpc" id="L891" title="3 of 6 branches missed.">            if (isEditable() &amp;&amp; isEnabled() &amp;&amp; !isCellRenderer()) {</span>
+<span class="pc bpc" id="L892" title="1 of 2 branches missed.">                if (Display.impl.isNativeInputImmediate()) {</span>
+<span class="nc" id="L893">                    editString();</span>
+<span class="nc" id="L894">                    return;</span>
+                }
+<span class="pc bpc" id="L896" title="1 of 2 branches missed.">                if (Display.getInstance().isTouchScreenDevice()) {</span>
+<span class="pc bpc" id="L897" title="3 of 4 branches missed.">                    if (showLightweightVKB() || !(Display.getInstance().getDefaultVirtualKeyboard() instanceof Dialog)) {</span>
+<span class="pc bpc" id="L898" title="1 of 2 branches missed.">                        if (!Display.getInstance().isVirtualKeyboardShowing()) {</span>
+<span class="fc" id="L899">                            Display.getInstance().setShowVirtualKeyboard(true);</span>
+                        }
+                    } else {
+<span class="nc" id="L902">                        onClick();</span>
+                    }
+                } else {
+<span class="nc" id="L905">                    onClick();</span>
+                }
+            }
+        }
+
+<span class="fc" id="L910">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void focusGainedInternal() {
+<span class="fc" id="L915">        setSuppressActionEvent(false);</span>
+<span class="fc" id="L916">        super.focusGainedInternal();</span>
+<span class="fc" id="L917">        setHandlesInput(isScrollableY());</span>
+
+<span class="fc" id="L919">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void focusLostInternal() {
+<span class="nc" id="L924">        super.focusLostInternal();</span>
+<span class="nc" id="L925">        setHandlesInput(false);</span>
+<span class="nc bnc" id="L926" title="All 2 branches missed.">        if (isEditing()) {</span>
+<span class="nc" id="L927">            fireActionEvent();</span>
+<span class="nc" id="L928">            setSuppressActionEvent(true);</span>
+        }
+<span class="nc" id="L930">    }</span>
+
+    /// Returns the number of columns in the text area
+    ///
+    /// #### Returns
+    ///
+    /// the number of columns in the text area
+    public int getColumns() {
+<span class="fc" id="L938">        return columns;</span>
+    }
+
+    /// Sets the number of columns in the text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: number of columns
+    public void setColumns(int columns) {
+<span class="fc" id="L947">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L948">        this.columns = columns;</span>
+<span class="fc" id="L949">    }</span>
+
+    /// Returns the number of actual rows in the text area taking into consideration
+    /// growsByContent
+    ///
+    /// #### Returns
+    ///
+    /// the number of rows in the text area
+    public int getActualRows() {
+<span class="fc bfc" id="L958" title="All 2 branches covered.">        if (growByContent) {</span>
+<span class="pc bpc" id="L959" title="1 of 2 branches missed.">            if (growLimit &gt; -1) {</span>
+<span class="nc" id="L960">                return Math.min(Math.max(rows, getLines()), growLimit);</span>
+            }
+<span class="fc" id="L962">            return Math.max(rows, getLines());</span>
+        }
+<span class="fc" id="L964">        return rows;</span>
+    }
+
+    /// Returns the number of rows in the text area
+    ///
+    /// #### Returns
+    ///
+    /// the number of rows in the text area
+    public int getRows() {
+<span class="fc" id="L973">        return rows;</span>
+    }
+
+    /// Sets the number of rows in the text area
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: number of rows
+    public void setRows(int rows) {
+<span class="fc" id="L982">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L983">        this.rows = rows;</span>
+<span class="fc" id="L984">    }</span>
+
+    @Override
+    void initComponentImpl() {
+<span class="fc" id="L988">        getRowStrings();</span>
+<span class="fc" id="L989">        super.initComponentImpl();</span>
+<span class="fc" id="L990">    }</span>
+
+    private ArrayList getRowStrings() {
+<span class="fc bfc" id="L993" title="All 4 branches covered.">        if (rowStrings == null || widthForRowCalculations != getWidth() - getUnselectedStyle().getHorizontalPadding()) {</span>
+<span class="fc" id="L994">            initRowString();</span>
+<span class="fc" id="L995">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L997">        return rowStrings;</span>
+    }
+
+    /// Returns the number of text lines in the TextArea
+    ///
+    /// #### Returns
+    ///
+    /// the number of text lines in the TextArea
+    public int getLines() {
+        int retVal;
+<span class="fc" id="L1007">        ArrayList v = getRowStrings();</span>
+<span class="fc" id="L1008">        retVal = v.size();</span>
+<span class="fc" id="L1009">        return retVal;</span>
+    }
+
+    /// Returns the text in the given row of the text box
+    ///
+    /// #### Parameters
+    ///
+    /// - `line`: the line number in the text box
+    ///
+    /// #### Returns
+    ///
+    /// the text of the line
+    public String getTextAt(int line) {
+<span class="fc" id="L1022">        ArrayList rowsV = getRowStrings();</span>
+<span class="fc" id="L1023">        int size = rowsV.size();</span>
+<span class="fc bfc" id="L1024" title="All 2 branches covered.">        if (size == 0) {</span>
+<span class="fc" id="L1025">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L1027" title="1 of 2 branches missed.">        if (line &gt;= size) {</span>
+<span class="nc" id="L1028">            return (String) rowsV.get(size - 1);</span>
+        }
+<span class="fc" id="L1030">        return (String) rowsV.get(line);</span>
+    }
+
+    private int indexOf(char[] t, char c, int offset, int length) {
+<span class="fc" id="L1034">        int tlen = t.length;</span>
+<span class="fc bfc" id="L1035" title="All 4 branches covered.">        for (int iter = offset; iter &lt; tlen &amp;&amp; iter &lt; offset + length; iter++) {</span>
+<span class="fc bfc" id="L1036" title="All 2 branches covered.">            if (t[iter] == c) {</span>
+<span class="fc" id="L1037">                return iter;</span>
+            }
+        }
+<span class="fc" id="L1040">        return -1;</span>
+    }
+
+    /// Override this to modify the text for rendering in cases of invalid characters
+    /// for display, this method allows the developer to replace such characters e.g.:
+    /// replace &quot;\\t&quot; with 4 spaces
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to process
+    ///
+    /// #### Returns
+    ///
+    /// the given string as a processed char array ready for rendering
+    protected char[] preprocess(String text) {
+<span class="fc" id="L1055">        return text.toCharArray();</span>
+    }
+
+    private int updateRowWidth(char c, Font font) {
+<span class="fc" id="L1059">        currentRowWidth += font.charWidth(c);</span>
+<span class="fc" id="L1060">        return currentRowWidth;</span>
+    }
+
+    private int updateRowWidth(String str, Font font) {
+<span class="nc" id="L1064">        currentRowWidth += font.stringWidth(str);</span>
+<span class="nc" id="L1065">        return currentRowWidth;</span>
+    }
+
+    private boolean fastCharWidthCheck(char[] chrs, int off, int length, int width, int charWidth, Font f) {
+<span class="fc bfc" id="L1069" title="All 2 branches covered.">        if (length * charWidth &lt; width) {</span>
+<span class="fc" id="L1070">            return true;</span>
+        }
+<span class="fc" id="L1072">        length = Math.min(chrs.length, length);</span>
+<span class="pc bpc" id="L1073" title="1 of 2 branches missed.">        return f.charsWidth(chrs, off, length) &lt; width;</span>
+    }
+
+    private void initRowString() {
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="fc bfc" id="L1078" title="All 2 branches covered.">            if (rowStrings == null) {</span>
+<span class="fc" id="L1079">                rowStrings = new ArrayList();</span>
+<span class="fc" id="L1080">                rowStrings.add(getText());</span>
+<span class="fc" id="L1081">                return;</span>
+            }
+        }
+<span class="fc" id="L1084">        Style style = getUnselectedStyle();</span>
+<span class="fc" id="L1085">        rowStrings = new ArrayList();</span>
+<span class="fc" id="L1086">        widthForRowCalculations = getWidth() - style.getHorizontalPadding();</span>
+        // single line text area is essentially a text field, we call the method
+        // to allow subclasses to override it
+<span class="fc bfc" id="L1089" title="All 2 branches covered.">        if (isSingleLineTextArea()) {</span>
+<span class="fc" id="L1090">            rowStrings.add(getText());</span>
+<span class="fc" id="L1091">            return;</span>
+        }
+<span class="fc bfc" id="L1093" title="All 2 branches covered.">        if (widthForRowCalculations &lt;= 0) {</span>
+<span class="fc" id="L1094">            rowStrings.add(getText());</span>
+<span class="fc" id="L1095">            setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L1096">            return;</span>
+        }
+<span class="pc bpc" id="L1098" title="1 of 4 branches missed.">        if (text == null || &quot;&quot;.equals(text)) {</span>
+<span class="fc" id="L1099">            return;</span>
+        }
+<span class="fc" id="L1101">        Font font = style.getFont();</span>
+<span class="fc bfc" id="L1102" title="All 6 branches covered.">        if (actAsLabel &amp;&amp; text.length() &lt;= columns &amp;&amp; text.indexOf('\n') &lt; 0) {</span>
+<span class="fc" id="L1103">            int w = font.stringWidth(text);</span>
+<span class="fc bfc" id="L1104" title="All 2 branches covered.">            if (w &lt;= getWidth()) {</span>
+<span class="pc bpc" id="L1105" title="1 of 2 branches missed.">                if (rowStrings == null) {</span>
+<span class="nc" id="L1106">                    rowStrings = new ArrayList();</span>
+<span class="nc" id="L1107">                    rowStrings.add(getText());</span>
+<span class="nc" id="L1108">                    return;</span>
+                } else {
+<span class="fc" id="L1110">                    rowStrings.clear();</span>
+<span class="fc" id="L1111">                    rowStrings.add(getText());</span>
+<span class="fc" id="L1112">                    return;</span>
+                }
+            }
+        }
+<span class="fc" id="L1116">        char[] text = preprocess(getText());</span>
+<span class="fc" id="L1117">        int rows = this.rows;</span>
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">        if (growByContent) {</span>
+<span class="fc" id="L1119">            rows = Math.max(rows, getLines());</span>
+        }
+
+<span class="fc" id="L1122">        int charWidth = font.charWidth(widestChar);</span>
+<span class="fc" id="L1123">        Style selectedStyle = getSelectedStyle();</span>
+<span class="pc bpc" id="L1124" title="1 of 2 branches missed.">        if (selectedStyle.getFont() != style.getFont()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1125">            int cw = selectedStyle.getFont().charWidth(widestChar);</span>
+<span class="nc bnc" id="L1126" title="All 2 branches missed.">            if (cw &gt; charWidth) {</span>
+<span class="nc" id="L1127">                charWidth = cw;</span>
+<span class="nc" id="L1128">                font = selectedStyle.getFont();</span>
+            }
+        }
+<span class="fc" id="L1131">        style = getStyle();</span>
+<span class="fc" id="L1132">        int tPadding = style.getHorizontalPadding();</span>
+<span class="fc" id="L1133">        int textAreaWidth = getWidth() - tPadding;</span>
+        /*if(textAreaWidth &lt;= 0) {
+            if(columns &lt; 1) {
+                textAreaWidth = Math.min(Display.getInstance().getDisplayWidth() - tPadding, getText().length()) * charWidth;
+            } else {
+                textAreaWidth = Math.min(Display.getInstance().getDisplayWidth() - tPadding, columns) * charWidth;
+            }
+        }*/
+<span class="pc bpc" id="L1141" title="1 of 2 branches missed.">        if (textAreaWidth &lt;= charWidth) {</span>
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">            if (!isInitialized()) {</span>
+<span class="nc" id="L1143">                rowStrings.add(getText());</span>
+            } else {
+                // special case for the edge case of &quot;no room&quot;.
+                // Its important since sometimes this case occurs in the GUI builder by accident
+<span class="nc" id="L1147">                int tlen = text.length;</span>
+<span class="nc bnc" id="L1148" title="All 2 branches missed.">                for (int iter = 0; iter &lt; tlen; iter++) {</span>
+<span class="nc" id="L1149">                    rowStrings.add(&quot;&quot; + text[iter]);</span>
+                }
+            }
+<span class="nc" id="L1152">            return;</span>
+        }
+
+<span class="fc" id="L1155">        int minCharactersInRow = Math.max(1, textAreaWidth / charWidth);</span>
+<span class="fc" id="L1156">        int from = 0;</span>
+<span class="fc" id="L1157">        int to = from + minCharactersInRow;</span>
+<span class="fc" id="L1158">        int textLength = text.length;</span>
+<span class="fc" id="L1159">        String rowText = null;</span>
+        int i;
+        int spaceIndex;
+
+        // if there is any possibility of a scrollbar we need to reduce the textArea
+        // width to accommodate it
+<span class="fc bfc" id="L1165" title="All 2 branches covered.">        if (textLength / minCharactersInRow &gt; Math.max(2, rows)) {</span>
+<span class="fc" id="L1166">            textAreaWidth -= getUIManager().getLookAndFeel().getVerticalScrollWidth();</span>
+<span class="fc" id="L1167">            textAreaWidth -= charWidth / 2;</span>
+        }
+<span class="fc" id="L1169">        String unsupported = getUnsupportedChars();</span>
+
+        /*
+        iteration over the string using indexes, from - the beginning of the row , to - end of a row
+        for each row we will try to search for a &quot;space&quot; character at the end of the row ( row is text area available width)
+        indorder to improve the efficiency we do not search an entire row but we start from minCharactersInRow which indicates
+        what is the minimum amount of characters that can feet in the text area width.
+        if we dont find we will go backwards and search for the first space available,
+        if there is no space in the entire row we will cut the line inorder to fit in.
+         */
+
+        //Don't rely on the fact that short text has no newline character. we always have to parse the text.
+<span class="fc" id="L1181">        to = Math.max(Math.min(textLength - 1, to), 0);</span>
+<span class="fc bfc" id="L1182" title="All 2 branches covered.">        while (to &lt; textLength) {</span>
+<span class="pc bpc" id="L1183" title="1 of 2 branches missed.">            if (to &gt; textLength) {</span>
+<span class="nc" id="L1184">                to = textLength;</span>
+            }
+
+<span class="fc" id="L1187">            spaceIndex = -1;</span>
+<span class="fc" id="L1188">            rowText = &quot;&quot;;</span>
+<span class="fc" id="L1189">            int maxLength = to;</span>
+
+<span class="pc bpc" id="L1191" title="1 of 4 branches missed.">            if (useStringWidth || actAsLabel) {</span>
+                // fix for an infinite loop issue: http://forums.java.net/jive/thread.jspa?messageID=482802
+                //currentRowWidth = 0;
+<span class="fc" id="L1194">                StringBuilder currentRowBuilder = new StringBuilder();</span>
+
+                // search for &quot;space&quot; character at close as possible to the end of the row
+<span class="fc bfc" id="L1197" title="All 4 branches covered.">                for (i = to; i &lt; textLength &amp;&amp; fastCharWidthCheck(text, from, i - from + 1, textAreaWidth, charWidth, font); i++) {</span>
+<span class="fc" id="L1198">                    char c = text[i];</span>
+                    /*if(updateRowWidth(c, font) &gt;= textAreaWidth) {
+                        break;
+                    }*/
+<span class="fc" id="L1202">                    currentRowBuilder.append(c);</span>
+<span class="fc bfc" id="L1203" title="All 4 branches covered.">                    if (i &lt; textLength - 1 &amp;&amp; Character.isSurrogatePair(c, text[i + 1])) {</span>
+                        // Surrogate pairs (e.g. emojis) shouldn't be split up.
+<span class="fc" id="L1205">                        currentRowBuilder.append(text[++i]);</span>
+<span class="fc" id="L1206">                        maxLength += 2;</span>
+<span class="fc bfc" id="L1207" title="All 2 branches covered.">                        if (font.stringWidth(currentRowBuilder.toString()) &gt;= textAreaWidth) {</span>
+<span class="fc" id="L1208">                            break;</span>
+                        }
+                        continue;
+                    }
+<span class="pc bpc" id="L1212" title="1 of 2 branches missed.">                    if (font.stringWidth(currentRowBuilder.toString()) &gt;= textAreaWidth) {</span>
+<span class="nc" id="L1213">                        break;</span>
+                    }
+<span class="pc bpc" id="L1215" title="1 of 2 branches missed.">                    if (unsupported.indexOf(c) &gt; -1) {</span>
+<span class="nc" id="L1216">                        text[i] = ' ';</span>
+<span class="nc" id="L1217">                        c = ' ';</span>
+                    }
+<span class="fc bfc" id="L1219" title="All 4 branches covered.">                    if (c == ' ' || c == '\n') {</span>
+<span class="fc" id="L1220">                        spaceIndex = i;</span>
+                        // newline has been found. We can end the loop here as the line cannot grow more
+<span class="fc bfc" id="L1222" title="All 2 branches covered.">                        if (c == '\n') {</span>
+<span class="fc" id="L1223">                            break;</span>
+                        }
+                    }
+<span class="fc" id="L1226">                    maxLength++;</span>
+                }
+<span class="fc" id="L1228">            } else {</span>
+<span class="fc" id="L1229">                currentRowWidth = 0;</span>
+<span class="fc bfc" id="L1230" title="All 2 branches covered.">                if (to != from) {</span>
+<span class="fc" id="L1231">                    currentRowWidth = font.charsWidth(text, from, to - from);</span>
+                }
+
+                // search for &quot;space&quot; character at close as possible to the end of the row
+<span class="fc bfc" id="L1235" title="All 2 branches covered.">                for (i = to; i &lt; textLength; i++) {</span>
+<span class="fc" id="L1236">                    char c = text[i];</span>
+<span class="pc bpc" id="L1237" title="1 of 4 branches missed.">                    if (i &lt; textLength - 1 &amp;&amp; Character.isSurrogatePair(c, text[i + 1])) {</span>
+                        // Surrogate pairs (e.g. emojis) shouldn't be split up.
+
+<span class="nc" id="L1240">                        String testStr = new String(new char[]{text[i], text[i + 1]});</span>
+
+<span class="nc" id="L1242">                        i++;</span>
+<span class="nc bnc" id="L1243" title="All 2 branches missed.">                        if (updateRowWidth(testStr, font) &gt;= textAreaWidth) {</span>
+<span class="nc" id="L1244">                            break;</span>
+                        }
+<span class="nc" id="L1246">                        maxLength += 2;</span>
+
+<span class="nc" id="L1248">                        continue;</span>
+                    }
+<span class="fc bfc" id="L1250" title="All 2 branches covered.">                    if (updateRowWidth(c, font) &gt;= textAreaWidth) {</span>
+<span class="fc" id="L1251">                        break;</span>
+                    }
+<span class="pc bpc" id="L1253" title="1 of 2 branches missed.">                    if (unsupported.indexOf(c) &gt; -1) {</span>
+<span class="nc" id="L1254">                        text[i] = ' ';</span>
+<span class="nc" id="L1255">                        c = ' ';</span>
+                    }
+<span class="fc bfc" id="L1257" title="All 4 branches covered.">                    if (c == ' ' || c == '\n') {</span>
+<span class="fc" id="L1258">                        spaceIndex = i;</span>
+                        // newline has been found. We can end the loop here as the line cannot grow more
+<span class="fc bfc" id="L1260" title="All 2 branches covered.">                        if (c == '\n') {</span>
+<span class="fc" id="L1261">                            break;</span>
+                        }
+                    }
+<span class="fc" id="L1264">                    maxLength++;</span>
+                }
+            }
+            // if we got to the end of the text use the entire row,
+            // also if space is next character (in the next row) we can cut the line
+<span class="fc bfc" id="L1269" title="All 6 branches covered.">            if (i == textLength || text[i] == ' ' || text[i] == '\n') {</span>
+<span class="fc" id="L1270">                spaceIndex = i;</span>
+            }
+
+            // if we found space in the limit width of the row (searched only from minCharactersInRow)
+<span class="fc bfc" id="L1274" title="All 2 branches covered.">            if (spaceIndex != -1) {</span>
+                // make sure that if we have a newline character before the end of the line we should
+                // break there instead
+<span class="fc" id="L1277">                int newLine = indexOf(text, '\n', from, spaceIndex - from);</span>
+<span class="pc bpc" id="L1278" title="1 of 4 branches missed.">                if (newLine &gt; -1 &amp;&amp; newLine &lt; spaceIndex) {</span>
+<span class="fc" id="L1279">                    spaceIndex = newLine;</span>
+                }
+
+<span class="fc" id="L1282">                rowText = new String(text, from, spaceIndex - from);</span>
+<span class="fc" id="L1283">                from = spaceIndex + 1;</span>
+
+<span class="fc" id="L1285">            } else {</span>
+                // if there is no space from minCharactersInRow to limit need to search backwards
+<span class="pc bpc" id="L1287" title="1 of 4 branches missed.">                for (i = to; spaceIndex == -1 &amp;&amp; i &gt;= from; i--) {</span>
+<span class="fc" id="L1288">                    char chr = text[i];</span>
+<span class="pc bpc" id="L1289" title="2 of 6 branches missed.">                    if (chr == ' ' || chr == '\n' || chr == '\t') {</span>
+<span class="fc" id="L1290">                        spaceIndex = i;</span>
+
+                        // don't forget to search for line breaks in the
+                        // remaining part. otherwise we overlook possible
+                        // line breaks!
+<span class="fc" id="L1295">                        int newLine = indexOf(text, '\n', from, i - from);</span>
+<span class="pc bpc" id="L1296" title="1 of 4 branches missed.">                        if (newLine &gt; -1 &amp;&amp; newLine &lt; spaceIndex) {</span>
+<span class="fc" id="L1297">                            spaceIndex = newLine;</span>
+                        }
+<span class="fc" id="L1299">                        rowText = new String(text, from, spaceIndex - from);</span>
+<span class="fc" id="L1300">                        from = spaceIndex + 1;</span>
+                    }
+
+                }
+<span class="pc bpc" id="L1304" title="1 of 2 branches missed.">                if (spaceIndex == -1) {</span>
+                    // from = to + 1;
+<span class="nc bnc" id="L1306" title="All 2 branches missed.">                    if (maxLength &lt;= 0) {</span>
+<span class="nc" id="L1307">                        maxLength = 1;</span>
+                    }
+<span class="nc" id="L1309">                    spaceIndex = maxLength;</span>
+<span class="nc bnc" id="L1310" title="All 6 branches missed.">                    if (spaceIndex &gt; 0 &amp;&amp; spaceIndex &lt; textLength &amp;&amp; Character.isSurrogatePair(text[spaceIndex - 1], text[spaceIndex])) {</span>
+                        // Make sure the space index isn't on the 2nd char of a surrogate pair (e.g. for emojis).
+<span class="nc" id="L1312">                        spaceIndex++;</span>
+<span class="nc" id="L1313">                        maxLength++;</span>
+                    }
+<span class="nc" id="L1315">                    rowText = new String(text, from, spaceIndex - from);</span>
+<span class="nc" id="L1316">                    from = spaceIndex;</span>
+                }
+            }
+<span class="fc bfc" id="L1319" title="All 2 branches covered.">            if (rowText.length() == 0) {</span>
+                // This happens due to a race condition or something, no idea why???
+<span class="pc bpc" id="L1321" title="1 of 2 branches missed.">                if (textAreaWidth &lt;= charWidth) {</span>
+<span class="nc bnc" id="L1322" title="All 2 branches missed.">                    if (!isInitialized()) {</span>
+<span class="nc" id="L1323">                        rowStrings.add(getText());</span>
+                    } else {
+                        // special case for the edge case of &quot;no room&quot;.
+                        // Its important since sometimes this case occurs in the GUI builder by accident
+<span class="nc" id="L1327">                        int tlen = text.length;</span>
+<span class="nc bnc" id="L1328" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; tlen; iter++) {</span>
+<span class="nc" id="L1329">                            rowStrings.add(&quot;&quot; + text[iter]);</span>
+                        }
+                    }
+<span class="nc" id="L1332">                    return;</span>
+                }
+            }
+<span class="fc" id="L1335">            rowStrings.add(rowText);</span>
+            //adding minCharactersInRow doesn't work if what is left is less
+            //then minCharactersInRow
+<span class="fc" id="L1338">            to = from; //+minCharactersInRow;</span>
+<span class="fc" id="L1339">        }</span>
+<span class="fc bfc" id="L1340" title="All 2 branches covered.">        if (text[text.length - 1] == '\n') {</span>
+<span class="fc" id="L1341">            rowStrings.add(&quot;&quot;);</span>
+        }
+<span class="fc" id="L1343">    }</span>
+
+    /// Gets the num of pixels gap between the rows
+    ///
+    /// #### Returns
+    ///
+    /// the gap between rows in pixels
+    public int getRowsGap() {
+<span class="fc" id="L1351">        return rowsGap;</span>
+    }
+
+    /// The gap in pixels between rows
+    ///
+    /// #### Parameters
+    ///
+    /// - `rowsGap`: num of pixels to gap between rows
+    public void setRowsGap(int rowsGap) {
+<span class="nc" id="L1360">        this.rowsGap = rowsGap;</span>
+<span class="nc" id="L1361">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+
+<span class="pc bpc" id="L1367" title="1 of 2 branches missed.">        if (Display.getInstance().isNativeEditorVisible(this)) {</span>
+<span class="nc bnc" id="L1368" title="All 2 branches missed.">            if (!Display.impl.nativeEditorPaintsHint()) {</span>
+<span class="nc" id="L1369">                paintHint(g);</span>
+            }
+<span class="nc" id="L1371">            return;</span>
+        }
+
+<span class="fc" id="L1374">        getUIManager().getLookAndFeel().drawTextArea(g, this);</span>
+<span class="fc" id="L1375">        paintHint(g);</span>
+<span class="fc" id="L1376">    }</span>
+
+    @Override
+    void paintHint(Graphics g) {
+<span class="pc bpc" id="L1380" title="3 of 4 branches missed.">        if (Display.getInstance().isNativeEditorVisible(this) &amp;&amp; Display.impl.nativeEditorPaintsHint()) {</span>
+<span class="nc" id="L1381">            return;</span>
+        }
+<span class="fc" id="L1383">        super.paintHint(g);</span>
+<span class="fc" id="L1384">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc bfc" id="L1389" title="All 2 branches covered.">        if (shouldShowHint()) {</span>
+<span class="fc" id="L1390">            Label l = getHintLabelImpl();</span>
+<span class="fc bfc" id="L1391" title="All 2 branches covered.">            if (l != null) {</span>
+<span class="fc" id="L1392">                Dimension d1 = getUIManager().getLookAndFeel().getTextAreaSize(this, true);</span>
+<span class="fc" id="L1393">                Dimension d2 = l.getPreferredSize();</span>
+<span class="fc" id="L1394">                return new Dimension(Math.max(d1.getWidth(), d2.getWidth()), Math.max(d1.getHeight(), d2.getHeight()));</span>
+            }
+        }
+<span class="fc" id="L1397">        return getUIManager().getLookAndFeel().getTextAreaSize(this, true);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcScrollSize() {
+<span class="fc" id="L1403">        return getUIManager().getLookAndFeel().getTextAreaSize(this, false);</span>
+    }
+
+    /// Add an action listener which is invoked when the text area was modified not during
+    /// modification. A text **field** might never fire an action event if it is edited
+    /// in place and the user never leaves the text field!
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: actionListener
+    @Override
+    public void addActionListener(ActionListener a) {
+<span class="pc bpc" id="L1415" title="1 of 2 branches missed.">        if (actionListeners == null) {</span>
+<span class="fc" id="L1416">            actionListeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L1418">        actionListeners.addListener(a);</span>
+<span class="fc" id="L1419">    }</span>
+
+    /// Removes an action listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: actionListener
+    @Override
+    public void removeActionListener(ActionListener a) {
+<span class="pc bpc" id="L1428" title="1 of 2 branches missed.">        if (actionListeners == null) {</span>
+<span class="nc" id="L1429">            return;</span>
+        }
+<span class="fc" id="L1431">        actionListeners.removeListener(a);</span>
+<span class="pc bpc" id="L1432" title="1 of 2 branches missed.">        if (!actionListeners.hasListeners()) {</span>
+<span class="fc" id="L1433">            actionListeners = null;</span>
+        }
+<span class="fc" id="L1435">    }</span>
+
+    /// Checks to see if the action event is suppressed.
+    boolean isSuppressActionEvent() {
+<span class="nc" id="L1439">        return suppressActionEvent;</span>
+    }
+
+    /// Since the action event is triggered on the end of editing, and that may not
+    /// happen until a couple of EDT cycles after the onFocus event, we want to be
+    /// able to fire the action event in focus lost, and then suppress the normal
+    /// action event that would be fired on editing end.  We use this flag to
+    /// suppress action events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `suppress`
+    void setSuppressActionEvent(boolean suppress) {
+<span class="fc" id="L1452">        suppressActionEvent = suppress;</span>
+
+<span class="fc" id="L1454">    }</span>
+
+    /// Notifies listeners of a change to the text area
+    @Override
+    void fireActionEvent() {
+<span class="pc bpc" id="L1459" title="1 of 2 branches missed.">        if (suppressActionEvent) {</span>
+<span class="nc" id="L1460">            return;</span>
+        }
+<span class="fc bfc" id="L1462" title="All 2 branches covered.">        if (actionListeners != null) {</span>
+<span class="fc" id="L1463">            ActionEvent evt = new ActionEvent(this, ActionEvent.Type.Edit);</span>
+<span class="fc" id="L1464">            actionListeners.fireActionEvent(evt);</span>
+        }
+<span class="pc bpc" id="L1466" title="1 of 2 branches missed.">        if (bindListeners != null) {</span>
+<span class="nc" id="L1467">            String t = getText();</span>
+<span class="nc" id="L1468">            bindListeners.fireBindTargetChange(this, &quot;text&quot;, lastTextValue, t);</span>
+<span class="nc" id="L1469">            lastTextValue = t;</span>
+        }
+<span class="fc" id="L1471">    }</span>
+
+    /// Adds a listener to be called with this TextArea is &quot;closed&quot;.  I.e. when it is
+    /// no longer the active virtual input device for the form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### See also
+    ///
+    /// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
+    public void addCloseListener(ActionListener l) {
+<span class="pc bpc" id="L1484" title="1 of 2 branches missed.">        if (closeListeners == null) {</span>
+<span class="fc" id="L1485">            closeListeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L1487">        closeListeners.addListener(l);</span>
+<span class="fc" id="L1488">    }</span>
+
+    /// Removes close listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    ///
+    /// #### See also
+    ///
+    /// - #addCloseListener(com.codename1.ui.events.ActionListener)
+    ///
+    /// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
+    public void removeCloseListener(ActionListener l) {
+<span class="nc bnc" id="L1502" title="All 4 branches missed.">        if (closeListeners != null &amp;&amp; closeListeners.hasListeners()) {</span>
+<span class="nc" id="L1503">            closeListeners.removeListener(l);</span>
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">            if (!closeListeners.hasListeners()) {</span>
+<span class="nc" id="L1505">                closeListeners = null;</span>
+            }
+        }
+<span class="nc" id="L1508">    }</span>
+
+    /// Fires a close event.  This is fired when the TextArea is no longer the active
+    /// virtual input device for the form.
+    ///
+    /// #### See also
+    ///
+    /// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
+    void fireCloseEvent() {
+<span class="pc bpc" id="L1517" title="1 of 4 branches missed.">        if (closeListeners != null &amp;&amp; closeListeners.hasListeners()) {</span>
+<span class="fc" id="L1518">            ActionEvent evt = new ActionEvent(this);</span>
+<span class="fc" id="L1519">            closeListeners.fireActionEvent(evt);</span>
+        }
+<span class="fc" id="L1521">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void onEditComplete(String text) {
+<span class="pc bpc" id="L1526" title="1 of 2 branches missed.">        if (!Display.getInstance().getImplementation().isAsyncEditMode()) {</span>
+<span class="nc" id="L1527">            setText(text);</span>
+        }
+<span class="pc bpc" id="L1529" title="1 of 2 branches missed.">        if (getParent() != null) {</span>
+<span class="fc" id="L1530">            getParent().revalidate();</span>
+        }
+<span class="fc" id="L1532">    }</span>
+
+    /// Indicates that the text area should &quot;grow&quot; in height based on the content beyond the
+    /// limits indicate by the rows variable
+    ///
+    /// #### Returns
+    ///
+    /// true if the text component should grow and false otherwise
+    public boolean isGrowByContent() {
+<span class="fc" id="L1541">        return growByContent;</span>
+    }
+
+    /// Indicates that the text area should &quot;grow&quot; in height based on the content beyond the
+    /// limits indicate by the rows variable
+    ///
+    /// #### Parameters
+    ///
+    /// - `growByContent`: true if the text component should grow and false otherwise
+    public void setGrowByContent(boolean growByContent) {
+<span class="fc" id="L1551">        this.growByContent = growByContent;</span>
+<span class="fc" id="L1552">    }</span>
+
+    /// Unsupported characters is a string that contains characters that cause issues
+    /// when rendering on some problematic fonts. The rendering engine can thus remove them
+    /// when drawing.
+    ///
+    /// #### Returns
+    ///
+    /// unsupported characters string
+    public String getUnsupportedChars() {
+<span class="fc" id="L1562">        return unsupportedChars;</span>
+    }
+
+    /// Unsupported characters is a string that contains characters that cause issues
+    /// when rendering on some problematic fonts. The rendering engine can thus remove them
+    /// when drawing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unsupportedChars`: the unsupported character string
+    public void setUnsupportedChars(String unsupportedChars) {
+<span class="nc" id="L1573">        this.unsupportedChars = unsupportedChars;</span>
+<span class="nc" id="L1574">    }</span>
+
+    /// Indicates the number of lines to scroll with every scroll operation
+    ///
+    /// #### Returns
+    ///
+    /// number bigger or equal to 1
+    public int getLinesToScroll() {
+<span class="fc" id="L1582">        return linesToScroll;</span>
+    }
+
+    /// Indicates the number of lines to scroll with every scroll operation
+    ///
+    /// #### Parameters
+    ///
+    /// - `linesToScroll`: number bigger or equal to 1
+    public void setLinesToScroll(int linesToScroll) {
+<span class="pc bpc" id="L1591" title="1 of 2 branches missed.">        if (linesToScroll &lt; 1) {</span>
+<span class="nc" id="L1592">            throw new IllegalArgumentException(&quot;lines to scroll has to be &gt;= 1&quot;);</span>
+        }
+<span class="fc" id="L1594">        this.linesToScroll = linesToScroll;</span>
+<span class="fc" id="L1595">    }</span>
+
+    /// Indicates whether this is a single line text area, in which case &quot;growing&quot; won't
+    /// work as expected.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a single line text area
+    public boolean isSingleLineTextArea() {
+<span class="fc" id="L1604">        return singleLineTextArea;</span>
+    }
+
+    /// Indicates whether this is a single line text area, in which case &quot;growing&quot; won't
+    /// work as expected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `singleLineTextArea`: set to true to force a single line text
+    public void setSingleLineTextArea(boolean singleLineTextArea) {
+<span class="fc" id="L1614">        this.singleLineTextArea = singleLineTextArea;</span>
+<span class="fc" id="L1615">    }</span>
+
+    /// Returns the alignment of the TextArea
+    ///
+    /// #### Returns
+    ///
+    /// the alignment of the TextArea one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Deprecated
+    ///
+    /// use Style.getAlignment instead
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    public int getAlignment() {
+<span class="fc" id="L1635">        return getStyle().getAlignment();</span>
+    }
+
+    /// Sets the Alignment of the TextArea to one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: alignment value
+    ///
+    /// #### Deprecated
+    ///
+    /// use Style.setAlignment instead
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    public void setAlignment(int align) {
+<span class="fc" id="L1656">        getAllStyles().setAlignment(align);</span>
+<span class="fc" id="L1657">    }</span>
+
+    /// Returns the absolute alignment of the TextArea
+    /// In RTL LEFT alignment is actually RIGHT, but this method returns the actual alignment
+    ///
+    /// #### Returns
+    ///
+    /// the alignment of the TextArea one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Deprecated
+    ///
+    /// this method is redundant and no longer used
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #LEFT
+    ///
+    /// - #RIGHT
+    public int getAbsoluteAlignment() {
+<span class="nc" id="L1678">        int a = getAlignment();</span>
+<span class="nc bnc" id="L1679" title="All 2 branches missed.">        if (isRTL()) {</span>
+<span class="nc bnc" id="L1680" title="All 3 branches missed.">            switch (a) {</span>
+                case RIGHT:
+<span class="nc" id="L1682">                    return LEFT;</span>
+                case LEFT:
+<span class="nc" id="L1684">                    return RIGHT;</span>
+                default:
+                    // unnecessary, but makes the flow clearer and makes PMD happy
+<span class="nc" id="L1687">                    return a;</span>
+            }
+        }
+<span class="nc" id="L1690">        return a;</span>
+    }
+
+    /// Returns true if the text field is waiting for a commit on editing
+    ///
+    /// #### Returns
+    ///
+    /// true if a commit is pending
+    public boolean isPendingCommit() {
+<span class="nc" id="L1699">        return false;</span>
+    }
+
+    /// Returns the position of the cursor char position
+    ///
+    /// #### Returns
+    ///
+    /// the cursor position
+    public int getCursorPosition() {
+<span class="nc" id="L1708">        return -1;</span>
+    }
+
+    /// Returns the position of the cursor line position
+    ///
+    /// #### Returns
+    ///
+    /// the cursor line position
+    public int getCursorY() {
+<span class="nc" id="L1717">        return -1;</span>
+    }
+
+    /// Returns the position of the cursor char position in the current line.
+    ///
+    /// #### Returns
+    ///
+    /// the cursor char position in the current line
+    public int getCursorX() {
+<span class="nc" id="L1726">        return -1;</span>
+    }
+
+    /// True is this is a qwerty device or a device that is currently in
+    /// qwerty mode.
+    ///
+    /// #### Returns
+    ///
+    /// currently defaults to false
+    public boolean isQwertyInput() {
+<span class="fc" id="L1736">        return false;</span>
+    }
+
+    /// Returns the currently selected input mode
+    ///
+    /// #### Returns
+    ///
+    /// @return the display name of the input mode by default the following modes
+    /// are supported: Abc, ABC, abc, 123
+    public String getInputMode() {
+<span class="nc" id="L1746">        return null;</span>
+    }
+
+    /// Returns the order in which input modes are toggled
+    ///
+    /// #### Returns
+    ///
+    /// the order of the input modes
+    public String[] getInputModeOrder() {
+<span class="nc" id="L1755">        return null;</span>
+    }
+
+    /// Indicates whether text field input should scroll to the right side when no
+    /// more room for the input is present.
+    ///
+    /// #### Returns
+    ///
+    /// true if scrolling is enabled
+    public boolean isEnableInputScroll() {
+<span class="nc" id="L1765">        return false;</span>
+    }
+
+    /// Indicates the enter key to be used for editing the text area and by the
+    /// text field
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key tested
+    protected boolean isEnterKey(int keyCode) {
+<span class="nc bnc" id="L1775" title="All 2 branches missed.">        return keyCode == ENTER_KEY;</span>
+    }
+
+    /// Returns the hint text
+    ///
+    /// #### Returns
+    ///
+    /// the hint text or null
+    @Override
+    public String getHint() {
+<span class="fc" id="L1785">        return super.getHint();</span>
+    }
+
+    /// Sets the TextArea hint text, the hint text  is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
+    public void setHint(String hint) {
+<span class="fc" id="L1795">        super.setHint(hint, getHintIcon());</span>
+<span class="fc" id="L1796">    }</span>
+
+    /// Returns the hint icon
+    ///
+    /// #### Returns
+    ///
+    /// the hint icon
+    @Override
+    public Image getHintIcon() {
+<span class="fc" id="L1805">        return super.getHintIcon();</span>
+    }
+
+    /// Sets the TextArea hint icon, the hint is displayed on the TextArea
+    /// When there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon
+    public void setHintIcon(Image icon) {
+<span class="fc" id="L1815">        setHint(getHint(), icon);</span>
+<span class="fc" id="L1816">    }</span>
+
+    /// Sets the TextArea hint text and Icon, the hint text and icon are
+    /// displayed on the TextArea when there is no text in the TextArea
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the hint text to display
+    ///
+    /// - `icon`: the hint icon to display
+    @Override
+    public void setHint(String hint, Image icon) {
+<span class="fc" id="L1828">        super.setHint(hint, icon);</span>
+<span class="fc" id="L1829">    }</span>
+
+    /// Returns the hint label component that can be customized directly
+    ///
+    /// #### Returns
+    ///
+    /// hint label component
+    public Label getHintLabel() {
+<span class="fc" id="L1837">        return getHintLabelImpl();</span>
+    }
+
+    @Override
+    Label getHintLabelImpl() {
+<span class="fc" id="L1842">        return hintLabel;</span>
+    }
+
+    @Override
+    void setHintLabelImpl(Label hintLabel) {
+<span class="fc" id="L1847">        this.hintLabel = hintLabel;</span>
+<span class="fc" id="L1848">    }</span>
+
+    @Override
+    boolean shouldShowHint() {
+<span class="fc" id="L1852">        return &quot;&quot;.equals(getText());</span>
+    }
+
+    /// Returns the vertical alignment of the text field.
+    ///
+    /// For multi-line text areas, this alignment is applied only while there is extra
+    /// vertical space in the component. If the text content uses all available height
+    /// (or overflows), the rendering naturally starts from the top.
+    ///
+    /// #### Returns
+    ///
+    /// the vertical alignment of the TextField one of: CENTER, TOP, BOTTOM
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #TOP
+    ///
+    /// - #BOTTOM
+    public int getVerticalAlignment() {
+<span class="fc" id="L1873">        return valign;</span>
+    }
+
+    /// Sets the vertical alignment of the text field to one of: CENTER, TOP, BOTTOM
+    ///
+    /// For multi-line text areas, this alignment is applied only when there is extra
+    /// vertical space in the component. If there is no extra room, alignment becomes
+    /// effectively top-aligned because content already fills the available area.
+    ///
+    /// #### Parameters
+    ///
+    /// - `valign`: alignment value
+    ///
+    /// #### See also
+    ///
+    /// - #CENTER
+    ///
+    /// - #TOP
+    ///
+    /// - #BOTTOM
+    public void setVerticalAlignment(int valign) {
+<span class="fc bfc" id="L1894" title="All 6 branches covered.">        if (valign != CENTER &amp;&amp; valign != TOP &amp;&amp; valign != BOTTOM) {</span>
+<span class="fc" id="L1895">            throw new IllegalArgumentException(&quot;Alignment can't be set to &quot; + valign);</span>
+        }
+<span class="fc" id="L1897">        this.valign = valign;</span>
+<span class="fc" id="L1898">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getBindablePropertyNames() {
+<span class="nc" id="L1903">        return new String[]{&quot;text&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getBindablePropertyTypes() {
+<span class="nc" id="L1909">        return new Class[]{String.class};</span>
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
+    @Override
+    public void bindProperty(String prop, BindTarget target) {
+<span class="nc bnc" id="L1919" title="All 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="nc bnc" id="L1920" title="All 2 branches missed.">            if (bindListeners == null) {</span>
+<span class="nc" id="L1921">                bindListeners = new EventDispatcher();</span>
+            }
+<span class="nc" id="L1923">            bindListeners.addListener(target);</span>
+<span class="nc" id="L1924">            return;</span>
+        }
+<span class="nc" id="L1926">        super.bindProperty(prop, target);</span>
+<span class="nc" id="L1927">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// uses the deprecated BindTarget interface
+    @Override
+    public void unbindProperty(String prop, BindTarget target) {
+<span class="nc bnc" id="L1936" title="All 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="nc bnc" id="L1937" title="All 2 branches missed.">            if (bindListeners == null) {</span>
+<span class="nc" id="L1938">                return;</span>
+            }
+<span class="nc" id="L1940">            bindListeners.removeListener(target);</span>
+<span class="nc bnc" id="L1941" title="All 2 branches missed.">            if (!bindListeners.hasListeners()) {</span>
+<span class="nc" id="L1942">                bindListeners = null;</span>
+            }
+<span class="nc" id="L1944">            return;</span>
+        }
+<span class="nc" id="L1946">        super.unbindProperty(prop, target);</span>
+<span class="nc" id="L1947">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Object getBoundPropertyValue(String prop) {
+<span class="nc bnc" id="L1952" title="All 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="nc" id="L1953">            return getText();</span>
+        }
+<span class="nc" id="L1955">        return super.getBoundPropertyValue(prop);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setBoundPropertyValue(String prop, Object value) {
+<span class="nc bnc" id="L1961" title="All 2 branches missed.">        if (&quot;text&quot;.equals(prop)) {</span>
+<span class="nc bnc" id="L1962" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L1963">                setText(&quot;&quot;);</span>
+            } else {
+<span class="nc" id="L1965">                setText((String) value);</span>
+            }
+<span class="nc" id="L1967">            return;</span>
+        }
+<span class="nc" id="L1969">        super.setBoundPropertyValue(prop, value);</span>
+<span class="nc" id="L1970">    }</span>
+
+    /// Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
+    ///
+    /// #### Returns
+    ///
+    /// the growLimit
+    public int getGrowLimit() {
+<span class="nc" id="L1978">        return growLimit;</span>
+    }
+
+    /// Indicates the maximum number of rows in a text area after it has grown, -1 indicates no limit
+    ///
+    /// #### Parameters
+    ///
+    /// - `growLimit`: the growLimit to set
+    public void setGrowLimit(int growLimit) {
+<span class="fc" id="L1987">        this.growLimit = growLimit;</span>
+<span class="fc" id="L1988">    }</span>
+
+    /// If the TextArea text is too long to fit the text to the widget this will add &quot;...&quot;
+    /// at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+    /// E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated
+    /// and end with 3 points. By default this is set to false
+    ///
+    /// #### Returns
+    ///
+    /// true if this TextArea adds &quot;...&quot; when the text is too long
+    public boolean isEndsWith3Points() {
+<span class="fc" id="L1999">        return endsWith3Points;</span>
+    }
+
+    /// If the TextArea text is too long to fit the text to the widget this will add &quot;...&quot;
+    /// at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+    /// E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated
+    /// and end with 3 points. By default this is set to false
+    ///
+    /// #### Parameters
+    ///
+    /// - `endsWith3Points`: true if text should add &quot;...&quot; at the end
+    public void setEndsWith3Points(boolean endsWith3Points) {
+<span class="fc" id="L2011">        this.endsWith3Points = endsWith3Points;</span>
+<span class="fc" id="L2012">    }</span>
+
+    /// Registers this TextArea as the current input device for the current form.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated Don't call this method directly, unless you really know what you're doing.  It is used
+    /// primarily by implementation APIs.
+    public void registerAsInputDevice() {
+<span class="fc" id="L2021">        Form f = this.getComponentForm();</span>
+
+<span class="pc bpc" id="L2023" title="2 of 4 branches missed.">        if (f != null &amp;&amp; Display.impl.getEditingText() != this) { //NOPMD CompareObjectsWithEquals</span>
+            try {
+<span class="fc" id="L2025">                TextAreaInputDevice previousInput = null; //NOPMD CloseResource - managed by Form#setCurrentInputDevice</span>
+<span class="pc bpc" id="L2026" title="1 of 2 branches missed.">                if (f.getCurrentInputDevice() instanceof TextAreaInputDevice) {</span>
+<span class="nc" id="L2027">                    previousInput = (TextAreaInputDevice) f.getCurrentInputDevice();</span>
+<span class="nc bnc" id="L2028" title="All 2 branches missed.">                    if (previousInput.editedTextArea == this) {</span>
+                        // If the previous input is the same input, let's disable it's close
+                        // handler altogether.
+<span class="nc" id="L2031">                        previousInput.enabled = false;</span>
+                    }
+
+                }
+<span class="pc bpc" id="L2035" title="1 of 2 branches missed.">                if (previousInput != null) {</span>
+<span class="nc" id="L2036">                    previousInput.deferStopEditingToNativeLayer = true;</span>
+                }
+<span class="fc" id="L2038">                TextAreaInputDevice currInput = new TextAreaInputDevice(this); //NOPMD CloseResource - managed by Form#setCurrentInputDevice</span>
+<span class="fc" id="L2039">                f.setCurrentInputDevice(currInput);</span>
+
+
+<span class="nc" id="L2042">            } catch (Exception ex) {</span>
+<span class="nc" id="L2043">                Log.e(ex);</span>
+                // Failed to edit string because the previous input device would not
+                // give up control
+<span class="fc" id="L2046">            }</span>
+        }
+<span class="fc" id="L2048">    }</span>
+
+    /// Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
+    public void startEditing() {
+<span class="nc bnc" id="L2052" title="All 2 branches missed.">        if (!Display.getInstance().isTextEditing(this)) {</span>
+            //registerAsInputDevice();
+<span class="nc" id="L2054">            Display.getInstance().editString(this, maxSize, constraint, text);</span>
+        }
+<span class="nc" id="L2056">    }</span>
+
+    /// Launches the text field editing in a callserially call
+    @Override
+    public void startEditingAsync() {
+<span class="pc bpc" id="L2061" title="1 of 2 branches missed.">        if (!Display.getInstance().isTextEditing(this)) {</span>
+<span class="pc bpc" id="L2062" title="1 of 2 branches missed.">            if (Display.impl.usesInvokeAndBlockForEditString()) {</span>
+                // Implementations that use invokeAndBlock for edit string
+                // need to have the existing text area's editing stopped
+                // before starting a new edit session or the previous text
+                // field won't be updated until the next one is finished editing.
+<span class="nc" id="L2067">                Component c = Display.impl.getEditingText();</span>
+<span class="nc bnc" id="L2068" title="All 4 branches missed.">                if (c != this &amp;&amp; c != null) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L2069" title="All 2 branches missed.">                    if (c instanceof TextArea) {</span>
+                        //System.out.println(&quot;Stopping editing&quot;);
+<span class="nc" id="L2071">                        ((TextArea) c).stopEditing();</span>
+<span class="nc" id="L2072">                        final TextArea ta = (TextArea) c;</span>
+<span class="nc" id="L2073">                        UITimer.timer(30, false, new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="nc" id="L2076">                                ta.repaint();</span>
+                                //registerAsInputDevice();
+<span class="nc" id="L2078">                                Display.getInstance().editString(TextArea.this, maxSize, constraint, text);</span>
+<span class="nc" id="L2079">                            }</span>
+                        });
+<span class="nc" id="L2081">                        return;</span>
+                    }
+                }
+            }
+<span class="fc" id="L2085">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+                    //registerAsInputDevice();
+<span class="fc" id="L2089">                    Display.getInstance().editString(TextArea.this, maxSize, constraint, text);</span>
+<span class="fc" id="L2090">                }</span>
+            });
+        }
+<span class="fc" id="L2093">    }</span>
+
+    /// Indicates whether we are currently editing this text area
+    ///
+    /// #### Returns
+    ///
+    /// true if Display.getInstance().isTextEditing(this)
+    @Override
+    public boolean isEditing() {
+<span class="fc" id="L2102">        return Display.getInstance().isTextEditing(this);</span>
+    }
+
+    /// Stops text editing of this field if it is being edited
+    public void stopEditing() {
+<span class="fc bfc" id="L2107" title="All 2 branches covered.">        if (isEditing()) {</span>
+<span class="fc" id="L2108">            Display.getInstance().stopEditing(this);</span>
+        }
+<span class="fc" id="L2110">    }</span>
+
+    /// Stops text editing of this field if it is being edited
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: invoked when editing stopped
+    @Override
+    public void stopEditing(Runnable onFinish) {
+<span class="nc bnc" id="L2119" title="All 2 branches missed.">        if (isEditing()) {</span>
+<span class="nc" id="L2120">            Display.getInstance().stopEditing(this, onFinish);</span>
+        } else {
+<span class="nc bnc" id="L2122" title="All 2 branches missed.">            if (onFinish != null) {</span>
+<span class="nc" id="L2123">                onFinish.run();</span>
+            }
+        }
+<span class="nc" id="L2126">    }</span>
+
+    /// {@inheritDoc}
+    /// We override get style here to return the selected style when editing
+    ///
+    /// #### Returns
+    ///
+    /// the selected style if editing, `super.getStyle()` otherwise
+    @Override
+    public Style getStyle() {
+<span class="fc bfc" id="L2136" title="All 2 branches covered.">        if (isEditing()) {</span>
+<span class="fc" id="L2137">            return getSelectedStyle();</span>
+        }
+<span class="fc" id="L2139">        return super.getStyle();</span>
+    }
+
+    /// Adds a listener for data change events it will be invoked for every change
+    /// made to the text field, notice most platforms will invoke only the
+    /// DataChangedListener.CHANGED event
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
+    public void addDataChangedListener(DataChangedListener d) {
+<span class="fc" id="L2150">        listeners.addListener(d);</span>
+<span class="fc" id="L2151">    }</span>
+
+    /// Removes the listener for data change events
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
+    public void removeDataChangedListener(DataChangedListener d) {
+<span class="nc" id="L2159">        listeners.removeListener(d);</span>
+<span class="nc" id="L2160">    }</span>
+
+    /// Adds a listener for data change events it will be invoked for every change
+    /// made to the text field, notice most platforms will invoke only the
+    /// DataChangedListener.CHANGED event
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
+    ///
+    /// #### Deprecated
+    ///
+    /// use #addDataChangedListener(DataChangedListener) instead
+    public void addDataChangeListener(DataChangedListener d) {
+<span class="fc" id="L2174">        listeners.addListener(d);</span>
+<span class="fc" id="L2175">    }</span>
+
+    /// Removes the listener for data change events
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
+    ///
+    /// #### Deprecated
+    ///
+    /// use #removeDataChangedListener(DataChangedListener) instead
+    public void removeDataChangeListener(DataChangedListener d) {
+<span class="fc" id="L2187">        listeners.removeListener(d);</span>
+<span class="fc" id="L2188">    }</span>
+
+    /// Alert the TextField listeners the text has been changed on the TextField
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event type: Added, Removed or Change
+    ///
+    /// - `index`: cursor location of the event
+    public void fireDataChanged(int type, int index) {
+<span class="pc bpc" id="L2198" title="1 of 2 branches missed.">        if (listeners != null) {</span>
+<span class="fc" id="L2199">            listeners.fireDataChangeEvent(index, type);</span>
+        }
+<span class="fc" id="L2201">    }</span>
+
+    /// Gets the done listener of this TextField.
+    ///
+    /// #### Returns
+    ///
+    /// the done listener or null if not exists
+    public ActionListener getDoneListener() {
+<span class="nc" id="L2209">        return doneListener;</span>
+    }
+
+    /// Sets a Done listener on the TextField - notice this listener will be called
+    /// only on supported platforms that supports done action on the keyboard
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void setDoneListener(ActionListener l) {
+<span class="fc" id="L2219">        doneListener = l;</span>
+<span class="fc" id="L2220">    }</span>
+
+    /// Fire the done event to done listener
+    public void fireDoneEvent() {
+<span class="nc" id="L2224">        fireDoneEvent(-1);</span>
+<span class="nc" id="L2225">    }</span>
+
+    public void fireDoneEvent(final int keyEvent) {
+<span class="nc bnc" id="L2228" title="All 2 branches missed.">        if (doneListener != null) {</span>
+<span class="nc bnc" id="L2229" title="All 2 branches missed.">            if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L2230">                Display.getInstance().callSerially(new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+<span class="nc" id="L2234">                        fireDoneEvent(keyEvent);</span>
+<span class="nc" id="L2235">                    }</span>
+                });
+<span class="nc" id="L2237">                return;</span>
+            }
+<span class="nc" id="L2239">            doneListener.actionPerformed(new ActionEvent(this, ActionEvent.Type.Done, keyEvent));</span>
+        }
+<span class="nc" id="L2241">    }</span>
+
+    /// This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+    /// this might make it slower as a result
+    ///
+    /// #### Returns
+    ///
+    /// the actAsLabel
+    public boolean isActAsLabel() {
+<span class="fc" id="L2250">        return actAsLabel;</span>
+    }
+
+    /// This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+    /// this might make it slower as a result
+    ///
+    /// #### Parameters
+    ///
+    /// - `actAsLabel`: the actAsLabel to set
+    public void setActAsLabel(boolean actAsLabel) {
+<span class="fc" id="L2260">        this.actAsLabel = actAsLabel;</span>
+<span class="fc" id="L2261">    }</span>
+
+    /// Special case for text components, if they are editing they should always render the selected state
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// true if editing
+    @Override
+    protected boolean shouldRenderComponentSelection() {
+<span class="nc bnc" id="L2271" title="All 4 branches missed.">        return isEditing() || super.shouldRenderComponentSelection();</span>
+    }
+
+    /// Calculates the spans for the the given text selection.  This should generally
+    /// just delegate to the appropriate method in the look and feel for performing the
+    /// layout calculation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`: The TextSelection
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    protected Spans calculateTextSelectionSpan(TextSelection sel) {
+<span class="fc" id="L2286">        return getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, this);</span>
+    }
+
+    /// Returns true if text selection is enabled on this label.  Default is false.  To enable text selection,
+    /// you must enable text selection on the Form with `Form#getTextSelection()` and `TextSelection#setEnabled(boolean)`,
+    /// and also ensure that the label's text selection is enabled via `#setTextSelectionEnabled(boolean)`.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setTextSelectionEnabled(boolean)
+    public boolean isTextSelectionEnabled() {
+<span class="fc" id="L2301">        return textSelectionEnabled;</span>
+    }
+
+    /// Enables text selection on this TextArea.  Text selection must also be enabled on the Form in order to
+    /// text selection to be activated.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    ///
+    /// #### See also
+    ///
+    /// - #setTextSelectionEnabled(boolean)
+    ///
+    /// - Form#getTextSelection()
+    ///
+    /// - TextSelection#setEnabled(boolean)
+    public void setTextSelectionEnabled(boolean enabled) {
+<span class="fc" id="L2323">        this.textSelectionEnabled = enabled;</span>
+<span class="fc" id="L2324">        updateCursor();</span>
+<span class="fc" id="L2325">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public TextSelection.TextSelectionSupport getTextSelectionSupport() {
+<span class="fc bfc" id="L2330" title="All 2 branches covered.">        if (textSelectionSupport == null) {</span>
+<span class="fc" id="L2331">            textSelectionSupport = new TextSelection.TextSelectionSupport() {</span>
+
+                @Override
+                public TextSelection.Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds) {
+<span class="fc" id="L2335">                    span = calculateTextSelectionSpan(sel);</span>
+<span class="pc bpc" id="L2336" title="1 of 2 branches missed.">                    if (span == null) {</span>
+<span class="nc" id="L2337">                        return sel.newSpans();</span>
+                    }
+
+<span class="fc" id="L2340">                    TextSelection.Spans result = span.getIntersection(bounds, true);</span>
+<span class="fc" id="L2341">                    TextSelection.Spans out = sel.newSpans();</span>
+<span class="fc" id="L2342">                    out.add(result);</span>
+<span class="fc" id="L2343">                    return out;</span>
+
+                }
+
+
+                @Override
+                public boolean isTextSelectionEnabled(TextSelection sel) {
+<span class="pc bpc" id="L2350" title="3 of 8 branches missed.">                    return (!isEditable() &amp;&amp; textSelectionEnabled) || (isEditable() &amp;&amp; !isEnabled());</span>
+                }
+
+
+                @Override
+                public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
+<span class="nc bnc" id="L2356" title="All 8 branches missed.">                    return (!isEditable() &amp;&amp; textSelectionEnabled) || (isEditable() &amp;&amp; !isEnabled());</span>
+                }
+
+
+                @Override
+                public TextSelection.Span triggerSelectionAt(TextSelection sel, int x, int y) {
+<span class="nc" id="L2362">                    span = getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, TextArea.this);</span>
+<span class="nc bnc" id="L2363" title="All 2 branches missed.">                    if (span.isEmpty()) {</span>
+<span class="nc" id="L2364">                        return null;</span>
+                    }
+<span class="nc" id="L2366">                    TextSelection.Char charAtPoint = span.charAt(x, y);</span>
+<span class="nc bnc" id="L2367" title="All 2 branches missed.">                    if (charAtPoint == null) {</span>
+<span class="nc" id="L2368">                        return null;</span>
+                    }
+<span class="nc" id="L2370">                    Span sp = span.spanOfCharAt(x, y);</span>
+<span class="nc" id="L2371">                    int startPos = charAtPoint.getPosition();</span>
+<span class="nc" id="L2372">                    int endPos = charAtPoint.getPosition() + 1;</span>
+<span class="nc" id="L2373">                    String dividers = &quot; \t\r\n-.;&quot;;</span>
+
+<span class="nc bnc" id="L2375" title="All 2 branches missed.">                    while (startPos &gt; sp.first().getPosition()) {</span>
+<span class="nc bnc" id="L2376" title="All 2 branches missed.">                        if (dividers.indexOf(TextArea.this.getText().substring(startPos, startPos + 1)) &lt; 0) {</span>
+<span class="nc" id="L2377">                            startPos--;</span>
+                        } else {
+<span class="nc bnc" id="L2379" title="All 2 branches missed.">                            if (startPos &lt; sp.last().getPosition()) {</span>
+<span class="nc" id="L2380">                                startPos++;</span>
+                            }
+                            break;
+                        }
+                    }
+
+<span class="nc bnc" id="L2386" title="All 2 branches missed.">                    while (endPos &lt; sp.last().getPosition() + 1) {</span>
+<span class="nc bnc" id="L2387" title="All 2 branches missed.">                        if (dividers.indexOf(TextArea.this.getText().substring(endPos - 1, endPos)) &lt; 0) {</span>
+<span class="nc" id="L2388">                            endPos++;</span>
+                        } else {
+<span class="nc bnc" id="L2390" title="All 2 branches missed.">                            if (endPos &gt; sp.first().getPosition()) {</span>
+<span class="nc" id="L2391">                                endPos--;</span>
+                            }
+                            break;
+                        }
+                    }
+
+<span class="nc" id="L2397">                    return sp.subspan(startPos, endPos);</span>
+                }
+
+
+                @Override
+                public String getTextForSpan(TextSelection sel, TextSelection.Span span) {
+<span class="fc" id="L2403">                    int offset = span.getStartPos();</span>
+<span class="fc" id="L2404">                    offset = Math.max(0, offset);</span>
+<span class="fc" id="L2405">                    offset = Math.min(getText().length() - 1, offset);</span>
+<span class="fc" id="L2406">                    int end = span.getEndPos() + 1;</span>
+<span class="fc" id="L2407">                    end = Math.min(getText().length(), end);</span>
+<span class="fc" id="L2408">                    return getText().substring(offset, end);</span>
+
+                }
+
+            };
+        }
+<span class="fc" id="L2414">        return textSelectionSupport;</span>
+    }
+
+    private static class TextAreaInputDevice implements VirtualInputDevice {
+        private final TextArea editedTextArea;
+        private boolean deferStopEditingToNativeLayer;
+<span class="fc" id="L2420">        private boolean enabled = true;</span>
+
+<span class="fc" id="L2422">        TextAreaInputDevice(TextArea ta) {</span>
+<span class="fc" id="L2423">            editedTextArea = ta;</span>
+<span class="fc" id="L2424">        }</span>
+
+
+        @Override
+        public void close() throws Exception {
+<span class="pc bpc" id="L2429" title="1 of 2 branches missed.">            if (!enabled) {</span>
+<span class="nc" id="L2430">                return;</span>
+            }
+<span class="fc" id="L2432">            editedTextArea.fireCloseEvent();</span>
+<span class="pc bpc" id="L2433" title="1 of 2 branches missed.">            if (deferStopEditingToNativeLayer) {</span>
+<span class="nc" id="L2434">                return;</span>
+            }
+<span class="fc bfc" id="L2436" title="All 2 branches covered.">            if (editedTextArea.isEditing()) {</span>
+<span class="fc" id="L2437">                editedTextArea.stopEditing();</span>
+            }
+<span class="fc" id="L2439">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

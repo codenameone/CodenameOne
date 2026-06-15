@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>URL.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">URL.java</span></div><h1>URL.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.impl.CodenameOneImplementation;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// This class provides a similar API to `URL` making it almost into a &quot;drop in&quot; replacement.
+/// It is placed in a different package because it is incompatible to `URL` by definition.  It is useful
+/// in getting some simple code to work without too many changes
+///
+/// @author Shai Almog
+public class URL {
+    private final URI u;
+
+<span class="fc" id="L47">    public URL(String url) throws URISyntaxException {</span>
+<span class="fc" id="L48">        u = new URI(url);</span>
+<span class="fc" id="L49">    }</span>
+
+<span class="nc" id="L51">    URL(URI u) {</span>
+<span class="nc" id="L52">        this.u = u;</span>
+<span class="nc" id="L53">    }</span>
+
+    public String getQuery() {
+<span class="fc" id="L56">        return u.getQuery();</span>
+    }
+
+    public String getPath() {
+<span class="fc" id="L60">        return u.getPath();</span>
+    }
+
+    public String getUserInfo() {
+<span class="fc" id="L64">        return u.getUserInfo();</span>
+    }
+
+    public String getAuthority() {
+<span class="fc" id="L68">        return u.getAuthority();</span>
+    }
+
+    public int getPort() {
+<span class="fc" id="L72">        return u.getPort();</span>
+    }
+
+    public int getDefaultPort() {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (u.toASCIIString().startsWith(&quot;https&quot;)) {</span>
+<span class="fc" id="L77">            return 443;</span>
+        }
+<span class="nc" id="L79">        return 80;</span>
+    }
+
+    public String getProtocol() {
+<span class="fc" id="L83">        String s = u.toASCIIString();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (s.startsWith(&quot;https&quot;)) {</span>
+<span class="fc" id="L85">            return &quot;https&quot;;</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (s.startsWith(&quot;file&quot;)) {</span>
+<span class="fc" id="L88">            return &quot;file&quot;;</span>
+        }
+<span class="fc" id="L90">        return &quot;http&quot;;</span>
+    }
+
+    public String getHost() {
+<span class="fc" id="L94">        return u.getHost();</span>
+    }
+
+    public String getFile() {
+<span class="nc" id="L98">        return u.toASCIIString();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">        return o instanceof URL &amp;&amp; u.equals(((URL) o).u);</span>
+    }
+
+    @Override
+    public synchronized int hashCode() {
+<span class="fc" id="L108">        return u.hashCode();</span>
+    }
+
+    public boolean sameFile(URL u) {
+<span class="fc" id="L112">        return equals(u);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L117">        return u.toASCIIString();</span>
+    }
+
+    public String toExternalForm() {
+<span class="nc" id="L121">        return u.toASCIIString();</span>
+    }
+
+    public URI toURI() throws URISyntaxException {
+<span class="fc" id="L125">        return u;</span>
+    }
+
+    public URLConnection openConnection() throws IOException {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (&quot;file&quot;.equals(getProtocol())) {</span>
+<span class="fc" id="L130">            return new FileURLConnection(new File(u));</span>
+        }
+<span class="fc" id="L132">        return new HttpURLConnection(u.toASCIIString());</span>
+    }
+
+    public final InputStream openStream() throws IOException {
+<span class="nc" id="L136">        return openConnection().getInputStream();</span>
+    }
+
+
+<span class="fc" id="L140">    public abstract class URLConnection {</span>
+<span class="fc" id="L141">        final Map&lt;String, String&gt; properties = new HashMap&lt;String, String&gt;();</span>
+        int connectTimeout;
+        int readTimeout;
+<span class="fc" id="L144">        boolean doInput = true;</span>
+        boolean doOutput;
+
+        public abstract void connect() throws IOException;
+
+        public int getConnectTimeout() {
+<span class="nc" id="L150">            return connectTimeout;</span>
+        }
+
+        public void setConnectTimeout(int connectTimeout) {
+<span class="nc" id="L154">            this.connectTimeout = connectTimeout;</span>
+<span class="nc" id="L155">        }</span>
+
+        public int getReadTimeout() {
+<span class="nc" id="L158">            return readTimeout;</span>
+        }
+
+        public void setReadTimeout(int readTimeout) {
+<span class="nc" id="L162">            this.readTimeout = readTimeout;</span>
+<span class="nc" id="L163">        }</span>
+
+        public URL getURL() {
+<span class="nc" id="L166">            return URL.this;</span>
+        }
+
+        public abstract int getContentLength();
+
+        public long getContentLengthLong() {
+<span class="nc" id="L172">            return getContentLength();</span>
+        }
+
+        public abstract String getContentType();
+
+        public abstract String getHeaderField(String s);
+
+        public abstract Map&lt;String, List&lt;String&gt;&gt; getHeaderFields();
+
+        public abstract InputStream getInputStream() throws IOException;
+
+        public abstract OutputStream getOutputStream() throws IOException;
+
+        /// Sets the request property, replacing existing property with same key, if it already exists.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: The key of the request property.
+        ///
+        /// - `value`: The value of the request property.
+        ///
+        /// #### Since
+        ///
+        /// 7.0
+        public void setRequestProperty(String key,
+                                       String value) {
+<span class="fc" id="L198">            properties.put(key, value);</span>
+
+<span class="fc" id="L200">        }</span>
+
+        public boolean getDoInput() {
+<span class="nc" id="L203">            return doInput;</span>
+        }
+
+        public void setDoInput(boolean i) {
+<span class="nc" id="L207">            doInput = i;</span>
+<span class="nc" id="L208">        }</span>
+
+        public boolean getDoOutput() {
+<span class="nc" id="L211">            return doOutput;</span>
+        }
+
+        public void setDoOutput(boolean i) {
+<span class="fc" id="L215">            doOutput = i;</span>
+<span class="fc" id="L216">        }</span>
+    }
+
+    private class FileURLConnection extends URLConnection {
+        private final File file;
+
+<span class="fc" id="L222">        private FileURLConnection(File f) {</span>
+<span class="fc" id="L223">            this.file = f;</span>
+<span class="fc" id="L224">        }</span>
+
+        @Override
+        public void connect() throws IOException {
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (!file.exists()) {</span>
+<span class="nc" id="L229">                throw new IOException(&quot;Failed to connect to file because it doesn't exist&quot;);</span>
+            }
+<span class="fc" id="L231">        }</span>
+
+        @Override
+        public int getContentLength() {
+<span class="fc" id="L235">            return (int) file.length();</span>
+        }
+
+        @Override
+        public String getContentType() {
+<span class="nc" id="L240">            return null;</span>
+        }
+
+        @Override
+        public String getHeaderField(String s) {
+<span class="nc" id="L245">            return null;</span>
+        }
+
+        @Override
+        public Map&lt;String, List&lt;String&gt;&gt; getHeaderFields() {
+<span class="nc" id="L250">            return new HashMap();</span>
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+<span class="fc" id="L255">            return FileSystemStorage.getInstance().openInputStream(file.getAbsolutePath());</span>
+        }
+
+        @Override
+        public OutputStream getOutputStream() throws IOException {
+<span class="fc" id="L260">            return FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());</span>
+        }
+
+    }
+
+    public class HttpURLConnection extends URLConnection {
+        private final String url;
+        private final CodenameOneImplementation impl;
+        private Object connection;
+<span class="fc" id="L269">        private String requestMethod = &quot;GET&quot;;</span>
+
+<span class="fc" id="L271">        HttpURLConnection(String url) {</span>
+<span class="fc" id="L272">            this.url = url;</span>
+<span class="fc" id="L273">            impl = Util.getImplementation();</span>
+<span class="fc" id="L274">        }</span>
+
+        @Override
+        public void connect() throws IOException {
+<span class="fc" id="L278">            connection = impl.connect(url, doInput, doOutput);</span>
+<span class="fc" id="L279">            impl.setHttpMethod(connection, requestMethod);</span>
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">            if (properties != null &amp;&amp; !properties.isEmpty()) {</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                for (Map.Entry&lt;String, String&gt; entry : properties.entrySet()) {</span>
+<span class="fc" id="L282">                    impl.setHeader(connection, entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L283">                }</span>
+            }
+<span class="fc" id="L285">        }</span>
+
+        public void setRequestMethod(String method) {
+<span class="fc" id="L288">            requestMethod = method;</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (connection != null) {</span>
+                try {
+<span class="fc" id="L291">                    impl.setHttpMethod(connection, requestMethod);</span>
+<span class="fc" id="L292">                } catch (IOException ex) {</span>
+<span class="fc" id="L293">                    throw new IllegalArgumentException(&quot;Failed to set request method &quot; + method + &quot;. &quot; + ex.getMessage(), ex);</span>
+<span class="fc" id="L294">                }</span>
+            }
+<span class="fc" id="L296">        }</span>
+
+        @Override
+        public int getContentLength() {
+<span class="fc" id="L300">            return impl.getContentLength(connection);</span>
+        }
+
+        @Override
+        public String getContentType() {
+<span class="nc" id="L305">            return getHeaderField(&quot;Content-Type&quot;);</span>
+        }
+
+        @Override
+        public String getHeaderField(String s) {
+            try {
+<span class="nc" id="L311">                return impl.getHeaderField(s, connection);</span>
+<span class="nc" id="L312">            } catch (IOException err) {</span>
+<span class="nc" id="L313">                return null;</span>
+            }
+        }
+
+        @Override
+        public Map&lt;String, List&lt;String&gt;&gt; getHeaderFields() {
+            try {
+<span class="fc" id="L320">                String[] dat = impl.getHeaderFieldNames(connection);</span>
+<span class="fc" id="L321">                Map&lt;String, List&lt;String&gt;&gt; response = new HashMap&lt;String, List&lt;String&gt;&gt;();</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">                for (String s : dat) {</span>
+<span class="fc" id="L323">                    String[] vals = impl.getHeaderFields(s, connection);</span>
+<span class="fc" id="L324">                    ArrayList&lt;String&gt; a = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L325">                    response.put(s, a);</span>
+<span class="fc" id="L326">                    Collections.addAll(a, vals);</span>
+                }
+<span class="fc" id="L328">                return response;</span>
+<span class="nc" id="L329">            } catch (IOException err) {</span>
+<span class="nc" id="L330">                return null;</span>
+            }
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            if (connection == null) {</span>
+<span class="nc" id="L337">                connect();</span>
+            }
+<span class="fc" id="L339">            return impl.openInputStream(connection);</span>
+        }
+
+        @Override
+        public OutputStream getOutputStream() throws IOException {
+<span class="nc bnc" id="L344" title="All 2 branches missed.">            if (connection == null) {</span>
+<span class="nc" id="L345">                connect();</span>
+            }
+<span class="nc" id="L347">            return impl.openOutputStream(connection);</span>
+        }
+
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

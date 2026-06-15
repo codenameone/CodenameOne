@@ -1,0 +1,1099 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>URLImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">URLImage.java</span></div><h1>URLImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.Storage;
+import com.codename1.io.Util;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.Resources;
+import com.codename1.util.EasyThread;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
+
+/// `URLImage` allows us to create an image from a URL. If the image was downloaded
+/// already it is fetched from cache; if not it is downloaded optionally scaled/adapted
+/// and placed in cache.
+///
+/// By default an image is fetched lazily as it is asked for by the GUI unless
+/// the fetch() method is invoked in which case the IO code is executed immediately.
+///
+/// This sample code show a `URLImage` that is fetched to the title area background and scaled/cropped
+/// to fit device specific dimensions.
+///
+/// ```java
+/// Toolbar.setGlobalToolbar(true);
+///
+/// Form hi = new Form(&quot;Toolbar&quot;, new BoxLayout(BoxLayout.Y_AXIS));
+/// EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(hi.getWidth(), hi.getWidth() / 5, 0xffff0000), true);
+/// URLImage background = URLImage.createToStorage(placeholder, &quot;400px-AGameOfThrones.jpg&quot;,
+///         &quot;http://awoiaf.westeros.org/images/thumb/9/93/AGameOfThrones.jpg/400px-AGameOfThrones.jpg&quot;);
+/// background.fetch();
+/// Style stitle = hi.getToolbar().getTitleComponent().getUnselectedStyle();
+/// stitle.setBgImage(background);
+/// stitle.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
+/// stitle.setPaddingUnit(Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS);
+/// stitle.setPaddingTop(15);
+/// SpanButton credit = new SpanButton(&quot;This excerpt is from A Wiki Of Ice And Fire. Please check it out by clicking here!&quot;);
+/// credit.addActionListener((e) -&gt; Display.getInstance().execute(&quot;http://awoiaf.westeros.org/index.php/A_Game_of_Thrones&quot;));
+/// hi.add(new SpanLabel(&quot;A Game of Thrones is the first of seven planned novels in A Song of Ice and Fire, an epic fantasy series by American author George R. R. Martin. It was first published on 6 August 1996. The novel was nominated for the 1998 Nebula Award and the 1997 World Fantasy Award,[1] and won the 1997 Locus Award.[2] The novella Blood of the Dragon, comprising the Daenerys Targaryen chapters from the novel, won the 1997 Hugo Award for Best Novella. &quot;)).
+///         add(new Label(&quot;Plot introduction&quot;, &quot;Heading&quot;)).
+///         add(new SpanLabel(&quot;A Game of Thrones is set in the Seven Kingdoms of Westeros, a land reminiscent of Medieval Europe. In Westeros the seasons last for years, sometimes decades, at a time.\n\n&quot; +
+///             &quot;Fifteen years prior to the novel, the Seven Kingdoms were torn apart by a civil war, known alternately as \&quot;Robert's Rebellion\&quot; and the \&quot;War of the Usurper.\&quot; Prince Rhaegar Targaryen kidnapped Lyanna Stark, arousing the ire of her family and of her betrothed, Lord Robert Baratheon (the war's titular rebel). The Mad King, Aerys II Targaryen, had Lyanna's father and eldest brother executed when they demanded her safe return. Her second brother, Eddard, joined his boyhood friend Robert Baratheon and Jon Arryn, with whom they had been fostered as children, in declaring war against the ruling Targaryen dynasty, securing the allegiances of House Tully and House Arryn through a network of dynastic marriages (Lord Eddard to Catelyn Tully and Lord Arryn to Lysa Tully). The powerful House Tyrell continued to support the King, but House Lannister and House Martell both stalled due to insults against their houses by the Targaryens. The civil war climaxed with the Battle of the Trident, when Prince Rhaegar was killed in battle by Robert Baratheon. The Lannisters finally agreed to support King Aerys, but then brutally... &quot;)).
+///         add(credit);
+///
+/// ComponentAnimation title = hi.getToolbar().getTitleComponent().createStyleAnimation(&quot;Title&quot;, 200);
+/// hi.getAnimationManager().onTitleScrollAnimation(title);
+/// hi.show();
+/// ```
+///
+/// This sample code shows the usage of the nestoria API to fill out an infinitely scrolling list in it
+/// we use `URLImage` to fetch the icon.
+///
+/// ```java
+/// Form hi = new Form(&quot;InfiniteScrollAdapter&quot;, BoxLayout.y());
+///
+/// Style s = UIManager.getInstance().getComponentStyle(&quot;MultiLine1&quot;);
+/// FontImage p = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, s);
+/// EncodedImage placeholder = EncodedImage.createFromImage(
+///         p.scaled(p.getWidth() * 3, p.getHeight() * 3),
+///         false);
+///
+/// InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -&gt; {
+///     MultiButton[] cmps = new MultiButton[10];
+///     for (int i = 0; i &lt; cmps.length; i++) {
+///         String imageKey = &quot;listing-&quot; + i;
+///         String imageUrl = &quot;https://example.com/images/&quot; + i + &quot;.png&quot;;
+///         MultiButton row = new MultiButton(&quot;Listing &quot; + i);
+///         row.setIcon(URLImage.createToStorage(placeholder, imageKey, imageUrl));
+///         cmps[i] = row;
+///     }
+///     InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, true);
+/// }, true);
+/// hi.show();
+/// ```
+///
+/// You can use adapters with masks using syntax similar to this to create a round image mask for a `URLImage`:
+///
+/// ```java
+/// Image roundMask = Image.createImage(placeholder.getWidth(), placeholder.getHeight(), 0xff000000);
+/// Graphics gr = roundMask.getGraphics();
+/// gr.setColor(0xffffff);
+/// gr.fillArc(0, 0, placeholder.getWidth(), placeholder.getHeight(), 0, 360);
+///
+/// URLImage.ImageAdapter ada = URLImage.createMaskAdapter(roundMask);
+/// Image i = URLImage.createToStorage(placeholder, &quot;fileNameInStorage&quot;, &quot;http://xxx/myurl.jpg&quot;, ada);
+/// ```
+///
+/// @author Shai Almog
+public final class URLImage extends EncodedImage {
+
+    /// Flag used by `java.lang.String, com.codename1.ui.Image, int)`.
+    /// Equivalent to `#RESIZE_FAIL`
+    public static final int FLAG_RESIZE_FAIL = 3;
+    /// Will fail if the downloaded image has a different size from the placeholder image
+<span class="fc" id="L125">    public static final ImageAdapter RESIZE_FAIL = new ImageAdapter() {</span>
+        @Override
+        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
+<span class="nc bnc" id="L128" title="All 4 branches missed.">            if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {</span>
+<span class="nc" id="L129">                throw new RuntimeException(&quot;Invalid image size&quot;);</span>
+            }
+<span class="nc" id="L131">            return downloadedImage;</span>
+        }
+
+        @Override
+        public boolean isAsyncAdapter() {
+<span class="nc" id="L136">            return false;</span>
+        }
+    };
+    /// Flag used by `java.lang.String, com.codename1.ui.Image, int)`
+    /// Equivalent to `#RESIZE_SCALE`.
+    public static final int FLAG_RESIZE_SCALE = 1;
+    /// Scales the image to match the size of the new image exactly
+<span class="fc" id="L143">    public static final ImageAdapter RESIZE_SCALE = new ImageAdapter() {</span>
+        @Override
+        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">            if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {</span>
+<span class="nc" id="L147">                return downloadedImage.scaledEncoded(placeholderImage.getWidth(), placeholderImage.getHeight());</span>
+            }
+<span class="fc" id="L149">            return downloadedImage;</span>
+        }
+
+        @Override
+        public boolean isAsyncAdapter() {
+<span class="fc" id="L154">            return false;</span>
+        }
+    };
+    /// Flag used by `java.lang.String, com.codename1.ui.Image, int)`.
+    /// Equivalent to `#RESIZE_SCALE_TO_FILL`.
+    public static final int FLAG_RESIZE_SCALE_TO_FILL = 2;
+    /// Scales the image to match to fill the area while preserving aspect ratio
+<span class="fc" id="L161">    public static final ImageAdapter RESIZE_SCALE_TO_FILL = new ScaleToFill();</span>
+<span class="fc" id="L162">    private static final Map&lt;String, URLImage&gt; pendingToStorage = new HashMap&lt;String, URLImage&gt;();</span>
+<span class="fc" id="L163">    private static final Map&lt;String, URLImage&gt; pendingToFile = new HashMap&lt;String, URLImage&gt;();</span>
+    private static final String IMAGE_SUFFIX = &quot;ImageURLTMP&quot;;
+<span class="fc" id="L165">    private static final EasyThread imageLoader = EasyThread.start(&quot;ImageLoader&quot;);</span>
+    /// The exception handler is used for callbacks in case of an error
+    private static ErrorCallback exceptionHandler;
+    /// Global default applied to every URLImage download request that doesn't
+    /// already carry a per-instance decorator. See `#setDefaultRequestDecorator`.
+    private static RequestDecorator defaultRequestDecorator;
+    private final EncodedImage placeholder;
+    private final String url;
+    private final ImageAdapter adapter;
+    private final String storageFile;
+    private final String fileSystemFile;
+    private final RequestDecorator requestDecorator;
+    private boolean fetching;
+    private byte[] imageData;
+    private boolean repaintImage;
+    private boolean locked;
+
+    private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter, String storageFile, String fileSystemFile) {
+<span class="nc" id="L183">        this(placeholder, url, adapter, storageFile, fileSystemFile, null);</span>
+<span class="nc" id="L184">    }</span>
+
+    private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter,
+                     String storageFile, String fileSystemFile,
+                     RequestDecorator requestDecorator) {
+<span class="fc" id="L189">        super(placeholder.getWidth(), placeholder.getHeight());</span>
+<span class="fc" id="L190">        this.placeholder = placeholder;</span>
+<span class="fc" id="L191">        this.url = url;</span>
+<span class="fc" id="L192">        this.adapter = adapter;</span>
+<span class="fc" id="L193">        this.storageFile = storageFile;</span>
+<span class="fc" id="L194">        this.fileSystemFile = fileSystemFile;</span>
+<span class="fc" id="L195">        this.requestDecorator = requestDecorator;</span>
+<span class="fc" id="L196">    }</span>
+
+    /// Decorator hook applied to the `ConnectionRequest` that loads a
+    /// network-backed `URLImage`. Useful when the image endpoint sits
+    /// behind an `Authorization: Bearer ...` header, when you need to
+    /// override the user-agent, set a cookie, or anything else
+    /// `ConnectionRequest` exposes.
+    ///
+    /// Two ways to install one:
+    ///
+    /// - **Global default**:
+    ///   `URLImage.setDefaultRequestDecorator(req -&gt;
+    ///   req.addRequestHeader(&quot;Authorization&quot;, &quot;Bearer &quot; + token));` --
+    ///   applies to every `URLImage` from then on. This covers the common
+    ///   &quot;all our images are private&quot; case in one app-boot line.
+    ///
+    /// - **Per-image**: use the
+    ///   `createToStorage(EncodedImage, String, String, ImageAdapter,
+    ///   RequestDecorator)` overload. Per-instance decorators run **after**
+    ///   the global default, so the per-call decorator can override or
+    ///   augment headers set by the default.
+    public interface RequestDecorator {
+        void decorate(com.codename1.io.ConnectionRequest req);
+    }
+
+    /// Installs a global `RequestDecorator`. Pass `null` to clear the
+    /// existing default. The decorator runs on every URLImage's
+    /// `ConnectionRequest` immediately before it's queued.
+    public static void setDefaultRequestDecorator(RequestDecorator decorator) {
+<span class="nc" id="L225">        defaultRequestDecorator = decorator;</span>
+<span class="nc" id="L226">    }</span>
+
+    /// Returns the global default decorator installed via
+    /// `#setDefaultRequestDecorator(RequestDecorator)`, or `null`.
+    public static RequestDecorator getDefaultRequestDecorator() {
+<span class="nc" id="L231">        return defaultRequestDecorator;</span>
+    }
+
+    /// Convenience for the most common case: every URLImage fetch should
+    /// carry the same `Authorization: Bearer &lt;token&gt;` header. Equivalent
+    /// to `setDefaultRequestDecorator(req -&gt; req.addRequestHeader(
+    /// &quot;Authorization&quot;, &quot;Bearer &quot; + token))`.
+    ///
+    /// Pass `null` to clear. Subsequent calls replace the previously-set
+    /// header value; the same `Authorization` header is not appended
+    /// twice.
+    public static void setDefaultBearerToken(String token) {
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (token == null) {</span>
+<span class="nc" id="L244">            defaultRequestDecorator = null;</span>
+<span class="nc" id="L245">            return;</span>
+        }
+<span class="nc" id="L247">        final String headerValue = &quot;Bearer &quot; + token;</span>
+<span class="nc" id="L248">        defaultRequestDecorator = new RequestDecorator() {</span>
+            @Override
+            public void decorate(com.codename1.io.ConnectionRequest req) {
+<span class="nc" id="L251">                req.addRequestHeader(&quot;Authorization&quot;, headerValue);</span>
+<span class="nc" id="L252">            }</span>
+        };
+<span class="nc" id="L254">    }</span>
+
+    /// The exception handler is used for callbacks in case of an error
+    ///
+    /// #### Returns
+    ///
+    /// the exceptionHandler
+    public static ErrorCallback getExceptionHandler() {
+<span class="fc" id="L262">        return exceptionHandler;</span>
+    }
+
+    /// The exception handler is used for callbacks in case of an error
+    ///
+    /// #### Parameters
+    ///
+    /// - `aExceptionHandler`: the exceptionHandler to set
+    public static void setExceptionHandler(
+            ErrorCallback aExceptionHandler) {
+<span class="fc" id="L272">        exceptionHandler = aExceptionHandler;</span>
+<span class="fc" id="L273">    }</span>
+
+    /// Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the
+    /// exception that a mask will be applied later on. This adapter requires that the resulting image be in the size
+    /// of the imageMask!
+    ///
+    /// See the sample usage code below that implements a circular image masked downloader:
+    ///
+    /// ```java
+    /// Image roundMask = Image.createImage(placeholder.getWidth(), placeholder.getHeight(), 0xff000000);
+    /// Graphics gr = roundMask.getGraphics();
+    /// gr.setColor(0xffffff);
+    /// gr.fillArc(0, 0, placeholder.getWidth(), placeholder.getHeight(), 0, 360);
+    ///
+    /// URLImage.ImageAdapter ada = URLImage.createMaskAdapter(roundMask);
+    /// Image i = URLImage.createToStorage(placeholder, &quot;fileNameInStorage&quot;, &quot;http://xxx/myurl.jpg&quot;, ada);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageMask`: @param imageMask the mask image see the createMask() method of image for details of what a mask is, it
+    /// will be used as the reference size for the image and resulting images must be of the same size!
+    ///
+    /// #### Returns
+    ///
+    /// the adapter
+    public static ImageAdapter createMaskAdapter(Image imageMask) {
+<span class="nc" id="L300">        final Object mask = imageMask.createMask();</span>
+<span class="nc" id="L301">        return new ScaleToFill() {</span>
+            @Override
+            Image postProcess(Image i) {
+<span class="nc" id="L304">                return i.applyMask(mask);</span>
+            }
+        };
+    }
+
+    public static ImageAdapter createMaskAdapter(final Object mask) {
+<span class="nc" id="L310">        return new ScaleToFill() {</span>
+            @Override
+            Image postProcess(Image i) {
+<span class="nc" id="L313">                return i.applyMask(mask);</span>
+            }
+        };
+    }
+
+    /// Creates an image the will be downloaded on the fly as necessary with RESIZE_SCALE_TO_FILL as
+    /// the default behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `storageFile`: the file in storage to which the image will be stored
+    ///
+    /// - `url`: the url from which the image is fetched
+    ///
+    /// #### Returns
+    ///
+    /// a URLImage that will initialy just delegate to the placeholder
+    public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url) {
+<span class="fc" id="L334">        return createToStorage(placeholder, storageFile, url, RESIZE_SCALE_TO_FILL);</span>
+    }
+
+    /// Creates an image the will be downloaded on the fly as necessary
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `storageFile`: the file in storage to which the image will be stored
+    ///
+    /// - `url`: the url from which the image is fetched
+    ///
+    /// - `adapter`: @param adapter     the adapter used to adapt the image into place, it should scale the image
+    /// if necessary
+    ///
+    /// #### Returns
+    ///
+    /// a URLImage that will initialy just delegate to the placeholder
+    public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url, ImageAdapter adapter) {
+<span class="fc" id="L355">        return createToStorage(placeholder, storageFile, url, adapter, null);</span>
+    }
+
+    /// Same as `#createToStorage(EncodedImage, String, String, ImageAdapter)`,
+    /// plus a per-call `RequestDecorator` applied to the
+    /// `ConnectionRequest` that fetches the image bytes. Use when the URL
+    /// requires authentication, custom headers, or other
+    /// `ConnectionRequest` configuration not covered by the default.
+    ///
+    /// If a global default decorator is also installed via
+    /// `#setDefaultRequestDecorator(RequestDecorator)`, the global default
+    /// runs first, then the per-call decorator -- so the per-call decorator
+    /// can override headers set by the default.
+    public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url,
+                                           ImageAdapter adapter, RequestDecorator decorator) {
+        // intern is used to trigger an NPE in case of a null URL or storage file
+<span class="fc" id="L371">        URLImage out = pendingToStorage.get(storageFile);</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        if (out != null) {</span>
+<span class="fc" id="L373">            return out;</span>
+        }
+<span class="fc" id="L375">        out = new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null, decorator);</span>
+<span class="fc" id="L376">        pendingToStorage.put(storageFile, out);</span>
+<span class="fc" id="L377">        return out;</span>
+    }
+
+    /// Creates an image the will be downloaded on the fly as necessary
+    ///
+    /// #### Parameters
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `file`: the file in the file system to which the image will be stored
+    ///
+    /// - `url`: the url from which the image is fetched
+    ///
+    /// - `adapter`: @param adapter     the adapter used to adapt the image into place, it should scale the image
+    /// if necessary
+    ///
+    /// #### Returns
+    ///
+    /// a URLImage that will initialy just delegate to the placeholder
+    public static URLImage createToFileSystem(EncodedImage placeholder, String file, String url, ImageAdapter adapter) {
+        // intern is used to trigger an NPE in case of a null URL or storage file
+<span class="nc" id="L399">        URLImage out = pendingToFile.get(file);</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        if (out != null) {</span>
+<span class="nc" id="L401">            return out;</span>
+        }
+<span class="nc" id="L403">        out = new URLImage(placeholder, url.intern(), adapter, null, file.intern());</span>
+<span class="nc" id="L404">        pendingToFile.put(file, out);</span>
+<span class="nc" id="L405">        return out;</span>
+    }
+
+    /// Creates an image that will be downloaded on the fly as necessary.  On platforms that support a native
+    /// image cache (e.g. Javascript), the image will be loaded directly from the native cache (i.e. it defers to the
+    /// platform to handle all caching considerations.  On platforms that don't have a native image cache but
+    /// do have a caches directory `FileSystemStorage#hasCachesDir()`, this will call `java.lang.String, java.lang.String, com.codename1.ui.URLImage.ImageAdapter)`
+    /// with a file location in the caches directory.  In all other cases, this will call `java.lang.String, java.lang.String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageName`: The name of the image.
+    ///
+    /// - `url`: the URL from which the image is fetched
+    ///
+    /// - `placeholder`: @param placeholder the image placeholder is shown as the image is loading/downloading
+    /// and serves as the guideline to the size of the downloaded image.
+    ///
+    /// - `resizeRule`: One of `#FLAG_RESIZE_FAIL`, `#FLAG_RESIZE_SCALE`, or `#FLAG_RESIZE_SCALE_TO_FILL`.
+    ///
+    /// #### Returns
+    ///
+    /// a Image that will initially just delegate to the placeholder
+    public static Image createCachedImage(String imageName, String url, Image placeholder, int resizeRule) {
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        if (Display.getInstance().supportsNativeImageCache()) {</span>
+<span class="fc" id="L430">            CachedImage im = new CachedImage(placeholder, url, resizeRule);</span>
+<span class="fc" id="L431">            im.setImageName(imageName);</span>
+<span class="fc" id="L432">            return im;</span>
+        } else {
+<span class="nc" id="L434">            ImageAdapter adapter = null;</span>
+<span class="nc bnc" id="L435" title="All 4 branches missed.">            switch (resizeRule) {</span>
+                case FLAG_RESIZE_FAIL:
+<span class="nc" id="L437">                    adapter = RESIZE_FAIL;</span>
+<span class="nc" id="L438">                    break;</span>
+                case FLAG_RESIZE_SCALE:
+<span class="nc" id="L440">                    adapter = RESIZE_SCALE;</span>
+<span class="nc" id="L441">                    break;</span>
+                case FLAG_RESIZE_SCALE_TO_FILL:
+<span class="nc" id="L443">                    adapter = RESIZE_SCALE_TO_FILL;</span>
+<span class="nc" id="L444">                    break;</span>
+                default:
+<span class="nc" id="L446">                    adapter = RESIZE_SCALE_TO_FILL;</span>
+                    break;
+            }
+<span class="nc" id="L449">            FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc bnc" id="L450" title="All 2 branches missed.">            if (fs.hasCachesDir()) {</span>
+<span class="nc" id="L451">                String name = &quot;cn1_image_cache[&quot; + url + &quot;]&quot;;</span>
+<span class="nc" id="L452">                name = StringUtil.replaceAll(name, &quot;/&quot;, &quot;_&quot;);</span>
+<span class="nc" id="L453">                name = StringUtil.replaceAll(name, &quot;\\&quot;, &quot;_&quot;);</span>
+<span class="nc" id="L454">                name = StringUtil.replaceAll(name, &quot;%&quot;, &quot;_&quot;);</span>
+<span class="nc" id="L455">                name = StringUtil.replaceAll(name, &quot;?&quot;, &quot;_&quot;);</span>
+<span class="nc" id="L456">                name = StringUtil.replaceAll(name, &quot;*&quot;, &quot;_&quot;);</span>
+<span class="nc" id="L457">                name = StringUtil.replaceAll(name, &quot;:&quot;, &quot;_&quot;);</span>
+<span class="nc" id="L458">                name = StringUtil.replaceAll(name, &quot;=&quot;, &quot;_&quot;);</span>
+
+<span class="nc" id="L460">                String filePath = fs.getCachesDir() + fs.getFileSystemSeparator() + name;</span>
+                //System.out.println(&quot;Creating to file system &quot;+filePath);
+<span class="nc" id="L462">                URLImage im = createToFileSystem(</span>
+<span class="nc" id="L463">                        EncodedImage.createFromImage(placeholder, false),</span>
+                        filePath,
+                        url,
+                        adapter
+                );
+<span class="nc" id="L468">                im.setImageName(imageName);</span>
+<span class="nc" id="L469">                return im;</span>
+            } else {
+                //System.out.println(&quot;Creating to storage &quot;);
+<span class="nc" id="L472">                URLImage im = createToStorage(EncodedImage.createFromImage(placeholder, false),</span>
+<span class="nc" id="L473">                        &quot;cn1_image_cache[&quot; + url + &quot;@&quot; + placeholder.getWidth() + &quot;x&quot; + placeholder.getHeight(),</span>
+                        url,
+                        adapter
+                );
+<span class="nc" id="L477">                im.setImageName(imageName);</span>
+<span class="nc" id="L478">                return im;</span>
+            }
+        }
+    }
+
+    private void runAndWait(Runnable r) {
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (platformSupportsImageLoadingOffEdt()) {</span>
+<span class="fc" id="L485">            String oldShowEDTWarnings = CN.getProperty(&quot;platformHint.showEDTWarnings&quot;, &quot;false&quot;);</span>
+<span class="fc" id="L486">            CN.setProperty(&quot;platformHint.showEDTWarnings&quot;, &quot;false&quot;);</span>
+            try {
+<span class="fc" id="L488">                r.run();</span>
+            } finally {
+<span class="fc" id="L490">                CN.setProperty(&quot;platformHint.showEDTWarnings&quot;, oldShowEDTWarnings);</span>
+            }
+<span class="fc" id="L492">        } else {</span>
+<span class="nc" id="L493">            CN.callSeriallyAndWait(r);</span>
+        }
+<span class="fc" id="L495">    }</span>
+
+    private boolean platformSupportsImageLoadingOffEdt() {
+<span class="pc bpc" id="L498" title="2 of 4 branches missed.">        return CN.isSimulator() || !&quot;ios&quot;.equals(CN.getPlatformName());</span>
+    }
+
+    private void loadImageFromLocalUrl(final String targetKey, final boolean useFileSystemStorage) {
+<span class="nc" id="L502">        imageLoader.run(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L506">                    InputStream input = null; //NOPMD CloseResource</span>
+<span class="nc" id="L507">                    OutputStream output = null; //NOPMD CloseResource</span>
+                    try {
+<span class="nc bnc" id="L509" title="All 2 branches missed.">                        if (url.startsWith(&quot;file:/&quot;)) {</span>
+<span class="nc" id="L510">                            input = FileSystemStorage.getInstance().openInputStream(url);</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                        } else if (url.startsWith(&quot;jar:/&quot;)) {</span>
+<span class="nc" id="L512">                            input = CN.getResourceAsStream(url.substring(url.lastIndexOf(&quot;/&quot;)));</span>
+<span class="nc bnc" id="L513" title="All 2 branches missed.">                        } else if (url.startsWith(&quot;image:&quot;)) {</span>
+<span class="nc" id="L514">                            input = null;</span>
+                        } else {
+<span class="nc" id="L516">                            input = Storage.getInstance().createInputStream(url);</span>
+                        }
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                        if (input != null) {</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">                            output = useFileSystemStorage ? FileSystemStorage.getInstance().openOutputStream(targetKey) : Storage.getInstance().createOutputStream(targetKey);</span>
+<span class="nc" id="L520">                            Util.copy(input, output);</span>
+                        }
+                    } finally {
+<span class="nc" id="L523">                        Util.cleanup(output);</span>
+<span class="nc" id="L524">                        Util.cleanup(input);</span>
+                    }
+<span class="nc" id="L526">                    runAndWait(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L529">                            InputStream imageInput = null; //NOPMD CloseResource</span>
+                            try {
+<span class="nc bnc" id="L531" title="All 4 branches missed.">                                Image value = url.startsWith(&quot;image:&quot;) ? Resources.getGlobalResources().getImage(url) :</span>
+<span class="nc" id="L532">                                        Image.createImage(imageInput = useFileSystemStorage ? FileSystemStorage.getInstance().openInputStream(targetKey) : Storage.getInstance().createInputStream(targetKey));</span>
+<span class="nc" id="L533">                                DownloadCompleted onComplete = new DownloadCompleted();</span>
+<span class="nc" id="L534">                                onComplete.setSourceImage(value);</span>
+<span class="nc" id="L535">                                onComplete.actionPerformed(new ActionEvent(value));</span>
+<span class="nc" id="L536">                            } catch (IOException ex) {</span>
+<span class="nc bnc" id="L537" title="All 2 branches missed.">                                if (exceptionHandler != null) {</span>
+<span class="nc" id="L538">                                    exceptionHandler.onError(URLImage.this, ex);</span>
+                                } else {
+<span class="nc" id="L540">                                    Log.e(new RuntimeException(ex.toString()));</span>
+                                }
+                            } finally {
+<span class="nc" id="L543">                                Util.cleanup(imageInput);</span>
+                            }
+<span class="nc" id="L545">                        }</span>
+                    });
+<span class="nc" id="L547">                } catch (IOException t) {</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">                    if (exceptionHandler != null) {</span>
+<span class="nc" id="L549">                        exceptionHandler.onError(URLImage.this, t);</span>
+                    } else {
+<span class="nc" id="L551">                        Log.e(new RuntimeException(t.toString()));</span>
+                    }
+<span class="nc" id="L553">                }</span>
+<span class="nc" id="L554">            }</span>
+        });
+<span class="nc" id="L556">    }</span>
+
+    /// Images are normally fetched from storage or network only as needed,
+    /// however if the download must start before the image is drawn this method
+    /// can be invoked. Notice that &quot;immediately&quot; doesn't mean synchronously, it just
+    /// means that the image will be added to the queue right away but probably won't be
+    /// available by the time the method completes.
+    public void fetch() {
+<span class="pc bpc" id="L564" title="1 of 4 branches missed.">        if (fetching || imageData != null) {</span>
+<span class="fc" id="L565">            return;</span>
+        }
+<span class="fc" id="L567">        fetching = true;</span>
+        try {
+<span class="fc" id="L569">            locked = super.isLocked();</span>
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">            if (storageFile != null) {</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">                if (Storage.getInstance().exists(storageFile)) {</span>
+<span class="fc" id="L572">                    super.unlock();</span>
+<span class="fc" id="L573">                    imageData = new byte[Storage.getInstance().entrySize(storageFile)];</span>
+<span class="fc" id="L574">                    InputStream is = null; //NOPMD CloseResource</span>
+                    try {
+<span class="fc" id="L576">                        is = Storage.getInstance().createInputStream(storageFile);</span>
+<span class="fc" id="L577">                        Util.readFully(is, imageData);</span>
+                    } finally {
+<span class="fc" id="L579">                        Util.cleanup(is);</span>
+                    }
+<span class="fc" id="L581">                    resetCache();</span>
+<span class="fc" id="L582">                    fetching = false;</span>
+<span class="fc" id="L583">                    repaintImage = true;</span>
+<span class="fc" id="L584">                    fireChangedEvent();</span>
+<span class="fc" id="L585">                    return;</span>
+                }
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">                if (adapter != null) {</span>
+<span class="pc bpc" id="L588" title="3 of 4 branches missed.">                    if (url.startsWith(&quot;http://&quot;) || url.startsWith(&quot;https://&quot;)) {</span>
+<span class="fc" id="L589">                        SuccessCallback&lt;Image&gt; downloadCb = new SuccessCallback&lt;Image&gt;() {</span>
+                            @Override
+                            public void onSucess(final Image value) {
+<span class="fc" id="L592">                                imageLoader.run(new Runnable() {</span>
+                                    @Override
+                                    public void run() {
+<span class="fc" id="L595">                                        runAndWait(new Runnable() {</span>
+                                            @Override
+                                            public void run() {
+<span class="fc" id="L598">                                                DownloadCompleted onComplete = new DownloadCompleted();</span>
+<span class="fc" id="L599">                                                onComplete.setSourceImage(value);</span>
+<span class="fc" id="L600">                                                onComplete.actionPerformed(new ActionEvent(value));</span>
+<span class="fc" id="L601">                                            }</span>
+                                        });
+<span class="fc" id="L603">                                    }</span>
+                                });
+<span class="fc" id="L605">                            }</span>
+                        };
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">                        if (hasRequestDecorator()) {</span>
+<span class="nc" id="L608">                            downloadDecorated(url, storageFile + IMAGE_SUFFIX, downloadCb);</span>
+                        } else {
+<span class="fc" id="L610">                            Util.downloadImageToStorage(url, storageFile + IMAGE_SUFFIX, downloadCb);</span>
+                        }
+<span class="fc" id="L612">                    } else {</span>
+                        // from file
+<span class="nc" id="L614">                        loadImageFromLocalUrl(storageFile + IMAGE_SUFFIX, false);</span>
+                    }
+                } else {
+<span class="nc bnc" id="L617" title="All 4 branches missed.">                    if (url.startsWith(&quot;http://&quot;) || url.startsWith(&quot;https://&quot;)) {</span>
+<span class="nc" id="L618">                        SuccessCallback&lt;Image&gt; downloadCb = new SuccessCallback&lt;Image&gt;() {</span>
+                            @Override
+                            public void onSucess(final Image value) {
+<span class="nc" id="L621">                                imageLoader.run(new Runnable() {</span>
+                                    @Override
+                                    public void run() {
+<span class="nc" id="L624">                                        runAndWait(new Runnable() {</span>
+                                            @Override
+                                            public void run() {
+<span class="nc" id="L627">                                                DownloadCompleted onComplete = new DownloadCompleted();</span>
+<span class="nc" id="L628">                                                onComplete.setSourceImage(value);</span>
+<span class="nc" id="L629">                                                onComplete.actionPerformed(new ActionEvent(value));</span>
+<span class="nc" id="L630">                                            }</span>
+                                        });
+<span class="nc" id="L632">                                    }</span>
+                                });
+<span class="nc" id="L634">                            }</span>
+                        };
+<span class="nc bnc" id="L636" title="All 2 branches missed.">                        if (hasRequestDecorator()) {</span>
+<span class="nc" id="L637">                            downloadDecorated(url, storageFile, downloadCb);</span>
+                        } else {
+<span class="nc" id="L639">                            Util.downloadImageToStorage(url, storageFile, downloadCb);</span>
+                        }
+<span class="nc" id="L641">                    } else {</span>
+                        //load image from file system
+<span class="nc" id="L643">                        loadImageFromLocalUrl(storageFile, false);</span>
+                    }
+                }
+            } else {
+<span class="nc bnc" id="L647" title="All 2 branches missed.">                if (FileSystemStorage.getInstance().exists(fileSystemFile)) {</span>
+<span class="nc" id="L648">                    super.unlock();</span>
+<span class="nc" id="L649">                    imageData = new byte[(int) FileSystemStorage.getInstance().getLength(fileSystemFile)];</span>
+<span class="nc" id="L650">                    InputStream is = null; //NOPMD CloseResource</span>
+                    try {
+<span class="nc" id="L652">                        is = FileSystemStorage.getInstance().openInputStream(fileSystemFile);</span>
+<span class="nc" id="L653">                        Util.readFully(is, imageData);</span>
+                    } finally {
+<span class="nc" id="L655">                        Util.cleanup(is);</span>
+                    }
+<span class="nc" id="L657">                    resetCache();</span>
+<span class="nc" id="L658">                    fetching = false;</span>
+<span class="nc" id="L659">                    repaintImage = true;</span>
+<span class="nc" id="L660">                    fireChangedEvent();</span>
+<span class="nc" id="L661">                    return;</span>
+                }
+<span class="nc bnc" id="L663" title="All 2 branches missed.">                if (adapter != null) {</span>
+<span class="nc bnc" id="L664" title="All 4 branches missed.">                    if (url.startsWith(&quot;http://&quot;) || url.startsWith(&quot;https://&quot;)) {</span>
+                        // Load image over http
+<span class="nc" id="L666">                        Util.downloadImageToFileSystem(url, fileSystemFile + IMAGE_SUFFIX,</span>
+<span class="nc" id="L667">                                new SuccessCallback&lt;Image&gt;() {</span>
+
+                                    @Override
+                                    public void onSucess(final Image value) {
+<span class="nc" id="L671">                                        imageLoader.run(new Runnable() {</span>
+                                            @Override
+                                            public void run() {
+<span class="nc" id="L674">                                                runAndWait(new Runnable() {</span>
+                                                    @Override
+                                                    public void run() {
+<span class="nc" id="L677">                                                        DownloadCompleted onComplete = new DownloadCompleted();</span>
+<span class="nc" id="L678">                                                        onComplete.setSourceImage(value);</span>
+<span class="nc" id="L679">                                                        onComplete.actionPerformed(new ActionEvent(value));</span>
+<span class="nc" id="L680">                                                    }</span>
+                                                });
+<span class="nc" id="L682">                                            }</span>
+                                        });
+
+
+<span class="nc" id="L686">                                    }</span>
+
+                                });
+                    } else {
+                        // load image from file system
+<span class="nc" id="L691">                        loadImageFromLocalUrl(fileSystemFile + IMAGE_SUFFIX, true);</span>
+                    }
+                } else {
+<span class="nc bnc" id="L694" title="All 4 branches missed.">                    if (url.startsWith(&quot;http://&quot;) || url.startsWith(&quot;https://&quot;)) {</span>
+<span class="nc" id="L695">                        Util.downloadImageToFileSystem(url, fileSystemFile,</span>
+<span class="nc" id="L696">                                new SuccessCallback&lt;Image&gt;() {</span>
+
+                                    @Override
+                                    public void onSucess(final Image value) {
+<span class="nc" id="L700">                                        imageLoader.run(new Runnable() {</span>
+                                            @Override
+                                            public void run() {
+<span class="nc" id="L703">                                                runAndWait(new Runnable() {</span>
+                                                    @Override
+                                                    public void run() {
+<span class="nc" id="L706">                                                        DownloadCompleted onComplete = new DownloadCompleted();</span>
+<span class="nc" id="L707">                                                        onComplete.setSourceImage(value);</span>
+<span class="nc" id="L708">                                                        onComplete.actionPerformed(new ActionEvent(value));</span>
+<span class="nc" id="L709">                                                    }</span>
+                                                });
+<span class="nc" id="L711">                                            }</span>
+                                        });
+
+
+<span class="nc" id="L715">                                    }</span>
+
+                                });
+                    } else {
+<span class="nc" id="L719">                        loadImageFromLocalUrl(fileSystemFile, true);</span>
+                    }
+                }
+            }
+<span class="nc" id="L723">        } catch (IOException ioErr) {</span>
+<span class="nc bnc" id="L724" title="All 2 branches missed.">            if (exceptionHandler != null) {</span>
+<span class="nc" id="L725">                exceptionHandler.onError(this, ioErr);</span>
+            } else {
+<span class="nc" id="L727">                throw new RuntimeException(ioErr.toString(), ioErr);</span>
+            }
+<span class="fc" id="L729">        }</span>
+<span class="fc" id="L730">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Image getInternal() {
+<span class="pc bpc" id="L735" title="1 of 2 branches missed.">        if (imageData == null) {</span>
+<span class="fc" id="L736">            fetch();</span>
+<span class="fc" id="L737">            return placeholder;</span>
+        }
+<span class="nc" id="L739">        return super.getInternal();</span>
+    }
+
+    @Override
+    public boolean requiresDrawImage() {
+        // IT is important to override this for URLImage because the default implementation will
+        // trigger that the URL image downloads its image, which is disastrous for performance
+        // if you have a lot of URL images.
+        // Ideally, the image doesn't get downloaded until it is needed for painting.
+<span class="nc" id="L748">        return false;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public byte[] getImageData() {
+<span class="pc bpc" id="L754" title="1 of 2 branches missed.">        if (imageData != null) {</span>
+<span class="fc" id="L755">            return imageData;</span>
+        }
+<span class="nc" id="L757">        return placeholder.getImageData();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="nc bnc" id="L763" title="All 2 branches missed.">        if (repaintImage) {</span>
+<span class="nc" id="L764">            repaintImage = false;</span>
+<span class="nc bnc" id="L765" title="All 2 branches missed.">            if (locked) {</span>
+<span class="nc" id="L766">                super.lock();</span>
+<span class="nc" id="L767">                locked = false;</span>
+            }
+<span class="nc" id="L769">            return true;</span>
+        }
+<span class="nc" id="L771">        return false;</span>
+    }
+
+    /// Block this method from external callers as it might break the functionality
+    @Override
+    public void lock() {
+<span class="nc" id="L777">    }</span>
+
+    /// Block this method from external callers as it might break the functionality
+    @Override
+    public void unlock() {
+<span class="nc" id="L782">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isAnimation() {
+<span class="nc bnc" id="L787" title="All 4 branches missed.">        return repaintImage || imageData == null;</span>
+    }
+
+    /// Invoked in a case of an error
+    public interface ErrorCallback {
+        void onError(URLImage source, Exception err);
+    }
+
+    /// Allows applying resize logic to downloaded images you can use constant
+    /// resize behaviors defined in this class. This class allows masking and various
+    /// other effects to be applied to downloaded images.
+    ///
+    /// Notice: adapters happen before the image is saved so they will only happen once
+    /// and the image will be saved as &quot;adapted&quot; which can be great for performance but
+    /// is also permanent. E.g. If you mask an image it will remain masked.
+    public interface ImageAdapter {
+        /// Allows the downloaded image to be adapted e.g if it isn't the same size of the placeholder image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `downloadedImage`: the downloaded image
+        ///
+        /// - `placeholderImage`: the placeholder image
+        ///
+        /// #### Returns
+        ///
+        /// the adapted image or the same image
+        EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage);
+
+        /// Return true if the adapter should work on a separate thread to avoid blocking the EDT
+        /// this is especially important for image masks and heavy image manipulation
+        ///
+        /// #### Returns
+        ///
+        /// true to run off the EDT
+        boolean isAsyncAdapter();
+    }
+
+<span class="fc" id="L825">    static class ScaleToFill implements ImageAdapter {</span>
+        @Override
+        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
+<span class="pc bpc" id="L828" title="2 of 4 branches missed.">            if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {</span>
+<span class="nc" id="L829">                Image tmp = downloadedImage.getInternal().scaledLargerRatio(placeholderImage.getWidth(), placeholderImage.getHeight());</span>
+<span class="nc" id="L830">                Image i = Image.createImage(placeholderImage.getWidth(), placeholderImage.getHeight(), 0);</span>
+<span class="nc" id="L831">                Graphics g = i.getGraphics();</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">                if (tmp.getWidth() &gt; placeholderImage.getWidth()) {</span>
+<span class="nc" id="L833">                    int diff = tmp.getWidth() - placeholderImage.getWidth();</span>
+<span class="nc" id="L834">                    int x = diff / 2;</span>
+<span class="nc" id="L835">                    g.drawImage(tmp, -x, 0);</span>
+<span class="nc" id="L836">                    tmp = i;</span>
+<span class="nc" id="L837">                } else {</span>
+<span class="nc bnc" id="L838" title="All 2 branches missed.">                    if (tmp.getHeight() &gt; placeholderImage.getHeight()) {</span>
+<span class="nc" id="L839">                        int diff = tmp.getHeight() - placeholderImage.getHeight();</span>
+<span class="nc" id="L840">                        int y = diff / 2;</span>
+<span class="nc" id="L841">                        g.drawImage(tmp, 0, -y);</span>
+<span class="nc" id="L842">                        tmp = i;</span>
+                    }
+                }
+<span class="nc" id="L845">                tmp = postProcess(tmp);</span>
+                //return EncodedImage.createFromImage(tmp, tmp.isOpaque());
+<span class="nc" id="L847">                return EncodedImage.createFromImage(tmp, false);</span>
+            }
+<span class="fc" id="L849">            return downloadedImage;</span>
+        }
+
+        Image postProcess(Image i) {
+<span class="nc" id="L853">            return i;</span>
+        }
+
+        @Override
+        public boolean isAsyncAdapter() {
+<span class="nc" id="L858">            return false;</span>
+        }
+    }
+
+    /// Whether this URLImage has an applicable RequestDecorator (per-instance
+     /// or a global default).
+    private boolean hasRequestDecorator() {
+<span class="pc bpc" id="L865" title="2 of 4 branches missed.">        return requestDecorator != null || defaultRequestDecorator != null;</span>
+    }
+
+    /// Downloads `url` to `Storage` under `storageKey`, applying the global
+    /// default `RequestDecorator` then the per-instance one to the
+    /// `ConnectionRequest` before queueing. Mirrors the contract of
+    /// `Util.downloadImageToStorage(url, storageKey, onSuccess)`: invokes
+    /// `onSuccess` on the EDT with the decoded `Image` when the file is
+    /// fully written.
+    ///
+    /// We can't reuse `Util.downloadImageToStorage(...)` directly here
+    /// because it offers no extension point for decorating the underlying
+    /// `ConnectionRequest`; this method assembles an equivalent request
+    /// inline so the decorators can run before the queue dispatch.
+    private void downloadDecorated(final String url, final String storageKey,
+                                   final SuccessCallback&lt;Image&gt; onSuccess) {
+<span class="nc" id="L881">        com.codename1.io.ConnectionRequest cr = new com.codename1.io.ConnectionRequest();</span>
+<span class="nc" id="L882">        cr.setPost(false);</span>
+<span class="nc" id="L883">        cr.setFailSilently(true);</span>
+<span class="nc" id="L884">        cr.setReadResponseForErrors(false);</span>
+<span class="nc" id="L885">        cr.setDuplicateSupported(true);</span>
+<span class="nc" id="L886">        cr.setUrl(url);</span>
+        // Run decorators first so anything they set is in place by the time
+        // the network manager pulls the request off the queue.
+<span class="nc bnc" id="L889" title="All 2 branches missed.">        if (defaultRequestDecorator != null) {</span>
+<span class="nc" id="L890">            defaultRequestDecorator.decorate(cr);</span>
+        }
+<span class="nc bnc" id="L892" title="All 2 branches missed.">        if (requestDecorator != null) {</span>
+<span class="nc" id="L893">            requestDecorator.decorate(cr);</span>
+        }
+<span class="nc" id="L895">        cr.downloadImageToStorage(storageKey, onSuccess, new FailureCallback&lt;Image&gt;() {</span>
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc bnc" id="L898" title="All 2 branches missed.">                if (exceptionHandler != null) {</span>
+<span class="nc" id="L899">                    exceptionHandler.onError(URLImage.this, new IOException(</span>
+                            &quot;Image download failed (&quot; + errorCode + &quot;): &quot; + errorMessage));
+                } else {
+<span class="nc" id="L902">                    Log.e(new RuntimeException(</span>
+                            &quot;URLImage download failed (&quot; + errorCode + &quot;): &quot; + errorMessage));
+                }
+<span class="nc" id="L905">            }</span>
+        });
+<span class="nc" id="L907">    }</span>
+
+    /// CachedImage used by `java.lang.String, com.codename1.ui.Image, int)`
+    private static class CachedImage extends Image {
+        int resizeRule;
+        Object image;
+        Image placeholderImage;
+        String url;
+        boolean repaintImage;
+
+        public CachedImage(Image placeholder, String url, int resize) {
+<span class="fc" id="L918">            super(placeholder.getImage());</span>
+<span class="fc" id="L919">            this.url = url;</span>
+<span class="fc" id="L920">            this.resizeRule = resize;</span>
+<span class="fc" id="L921">            this.placeholderImage = placeholder;</span>
+<span class="fc" id="L922">            Util.downloadImageToCache(url, new SuccessCallback&lt;Image&gt;() {</span>
+                @Override
+                public void onSucess(Image downloadedImage) {
+<span class="nc bnc" id="L925" title="All 4 branches missed.">                    switch (resizeRule) {</span>
+                        case FLAG_RESIZE_FAIL: {
+<span class="nc bnc" id="L927" title="All 4 branches missed.">                            if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {</span>
+<span class="nc" id="L928">                                throw new RuntimeException(&quot;Invalid image size&quot;);</span>
+                            }
+                            break;
+                        }
+                        case FLAG_RESIZE_SCALE: {
+<span class="nc" id="L933">                            downloadedImage = downloadedImage.scaled(placeholderImage.getWidth(), placeholderImage.getHeight());</span>
+<span class="nc" id="L934">                            break;</span>
+                        }
+                        case FLAG_RESIZE_SCALE_TO_FILL: {
+<span class="nc bnc" id="L937" title="All 4 branches missed.">                            if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {</span>
+<span class="nc" id="L938">                                Image tmp = downloadedImage.scaledLargerRatio(placeholderImage.getWidth(), placeholderImage.getHeight());</span>
+<span class="nc" id="L939">                                Image i = Image.createImage(placeholderImage.getWidth(), placeholderImage.getHeight(), 0);</span>
+<span class="nc" id="L940">                                Graphics g = i.getGraphics();</span>
+<span class="nc" id="L941">                                g.setAntiAliased(true);</span>
+<span class="nc bnc" id="L942" title="All 2 branches missed.">                                if (tmp.getWidth() &gt; placeholderImage.getWidth()) {</span>
+<span class="nc" id="L943">                                    int diff = tmp.getWidth() - placeholderImage.getWidth();</span>
+<span class="nc" id="L944">                                    int x = diff / 2;</span>
+<span class="nc" id="L945">                                    g.drawImage(tmp, -x, 0);</span>
+<span class="nc" id="L946">                                    tmp = i;</span>
+<span class="nc" id="L947">                                } else {</span>
+<span class="nc bnc" id="L948" title="All 2 branches missed.">                                    if (tmp.getHeight() &gt; placeholderImage.getHeight()) {</span>
+<span class="nc" id="L949">                                        int diff = tmp.getHeight() - placeholderImage.getHeight();</span>
+<span class="nc" id="L950">                                        int y = diff / 2;</span>
+<span class="nc" id="L951">                                        g.drawImage(tmp, 0, -y);</span>
+<span class="nc" id="L952">                                        tmp = i;</span>
+                                    }
+                                }
+
+<span class="nc" id="L956">                                downloadedImage = tmp;</span>
+<span class="nc" id="L957">                            }</span>
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+
+<span class="nc" id="L964">                    image = downloadedImage.getImage();</span>
+<span class="nc" id="L965">                    repaintImage = true;</span>
+<span class="nc" id="L966">                    fireChangedEvent();</span>
+<span class="nc" id="L967">                }</span>
+
+<span class="fc" id="L969">            }, new FailureCallback&lt;Image&gt;() {</span>
+                @Override
+                public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc" id="L972">                    throw new RuntimeException(&quot;Failed to download image &quot; + CachedImage.this.url + &quot; from cache&quot;);</span>
+                }
+            });
+<span class="fc" id="L975">        }</span>
+
+        @Override
+        public boolean animate() {
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">            if (repaintImage) {</span>
+<span class="nc" id="L980">                repaintImage = false;</span>
+<span class="nc" id="L981">                return true;</span>
+            }
+<span class="fc" id="L983">            return false;</span>
+        }
+
+        @Override
+        public boolean isAnimation() {
+<span class="pc bpc" id="L988" title="2 of 4 branches missed.">            return repaintImage || image == null;</span>
+        }
+
+        @Override
+        public Object getImage() {
+<span class="nc bnc" id="L993" title="All 2 branches missed.">            if (image != null) {</span>
+<span class="nc" id="L994">                return image;</span>
+            }
+<span class="nc" id="L996">            return super.getImage();</span>
+        }
+    }
+
+<span class="fc" id="L1000">    class DownloadCompleted implements ActionListener, Runnable {</span>
+        private EncodedImage adapt;
+        private EncodedImage adaptedIns;
+        private Image sourceImage;
+
+        @Override
+        public void run() {
+<span class="nc" id="L1007">            adaptedIns = adapter.adaptImage(adapt, placeholder);</span>
+<span class="nc" id="L1008">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L1012" title="1 of 2 branches missed.">            if (adapter != null) {</span>
+                try {
+                    EncodedImage img;
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">                    if (sourceImage == null) {</span>
+                        byte[] d;
+                        InputStream is; //NOPMD CloseResource
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">                        if (storageFile != null) {</span>
+<span class="nc" id="L1019">                            d = new byte[Storage.getInstance().entrySize(storageFile + IMAGE_SUFFIX)];</span>
+<span class="nc" id="L1020">                            is = Storage.getInstance().createInputStream(storageFile + IMAGE_SUFFIX);</span>
+                        } else {
+<span class="nc" id="L1022">                            d = new byte[(int) FileSystemStorage.getInstance().getLength(fileSystemFile + IMAGE_SUFFIX)];</span>
+<span class="nc" id="L1023">                            is = FileSystemStorage.getInstance().openInputStream(fileSystemFile + IMAGE_SUFFIX);</span>
+                        }
+                        try {
+<span class="nc" id="L1026">                            Util.readFully(is, d);</span>
+                        } finally {
+<span class="nc" id="L1028">                            Util.cleanup(is);</span>
+                        }
+<span class="nc" id="L1030">                        img = EncodedImage.create(d);</span>
+<span class="nc" id="L1031">                    } else {</span>
+<span class="fc" id="L1032">                        img = EncodedImage.createFromImage(sourceImage, false);</span>
+                    }
+                    EncodedImage adapted;
+<span class="pc bpc" id="L1035" title="1 of 2 branches missed.">                    if (adapter.isAsyncAdapter()) {</span>
+<span class="nc" id="L1036">                        adapt = img;</span>
+<span class="nc" id="L1037">                        Display.getInstance().invokeAndBlock(this);</span>
+<span class="nc" id="L1038">                        adapted = adaptedIns;</span>
+<span class="nc" id="L1039">                        adaptedIns = null;</span>
+<span class="nc" id="L1040">                        adapt = null;</span>
+                    } else {
+                        try {
+<span class="fc" id="L1043">                            adapted = adapter.adaptImage(img, placeholder);</span>
+<span class="nc" id="L1044">                        } catch (Exception err) {</span>
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">                            if (exceptionHandler != null) {</span>
+<span class="nc" id="L1046">                                exceptionHandler.onError(URLImage.this, err);</span>
+                            } else {
+<span class="nc" id="L1048">                                Log.p(&quot;Failed to load image from URL: &quot; + url);</span>
+<span class="nc" id="L1049">                                Log.e(err);</span>
+                            }
+<span class="nc" id="L1051">                            return;</span>
+<span class="fc" id="L1052">                        }</span>
+                    }
+<span class="pc bpc" id="L1054" title="1 of 2 branches missed.">                    if (storageFile != null) {</span>
+<span class="fc" id="L1055">                        OutputStream o = null; //NOPMD CloseResource</span>
+                        try {
+<span class="fc" id="L1057">                            o = Storage.getInstance().createOutputStream(storageFile);</span>
+<span class="fc" id="L1058">                            o.write(adapted.getImageData());</span>
+                        } finally {
+<span class="fc" id="L1060">                            Util.cleanup(o);</span>
+                        }
+<span class="fc" id="L1062">                        Storage.getInstance().deleteStorageFile(storageFile + IMAGE_SUFFIX);</span>
+<span class="fc" id="L1063">                        pendingToStorage.remove(storageFile);</span>
+<span class="pc bnc" id="L1064" title="All 2 branches missed.">                    } else if (fileSystemFile != null) {</span>
+<span class="nc" id="L1065">                        OutputStream o = null; //NOPMD CloseResource</span>
+                        try {
+<span class="nc" id="L1067">                            o = FileSystemStorage.getInstance().openOutputStream(fileSystemFile);</span>
+<span class="nc" id="L1068">                            o.write(adapted.getImageData());</span>
+                        } finally {
+<span class="nc" id="L1070">                            Util.cleanup(o);</span>
+                        }
+<span class="nc" id="L1072">                        FileSystemStorage.getInstance().delete(fileSystemFile + IMAGE_SUFFIX);</span>
+<span class="nc" id="L1073">                        pendingToFile.remove(fileSystemFile);</span>
+                    }
+<span class="nc" id="L1075">                } catch (IOException ex) {</span>
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">                    if (exceptionHandler != null) {</span>
+<span class="nc" id="L1077">                        exceptionHandler.onError(URLImage.this, ex);</span>
+                    } else {
+<span class="nc" id="L1079">                        Log.e(ex);</span>
+                    }
+<span class="nc" id="L1081">                    return;</span>
+<span class="fc" id="L1082">                }</span>
+            }
+<span class="fc" id="L1084">            fetching = false;</span>
+            // invoke fetch again to load the local files
+<span class="fc" id="L1086">            fetch();</span>
+<span class="fc" id="L1087">        }</span>
+
+        /// Used in cases where the source image is already downloaded ( so we don't need to try to load it from storage/file system.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sourceImage`
+        void setSourceImage(Image sourceImage) {
+<span class="fc" id="L1095">            this.sourceImage = sourceImage;</span>
+<span class="fc" id="L1096">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

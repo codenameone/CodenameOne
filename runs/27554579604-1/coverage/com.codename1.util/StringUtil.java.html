@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StringUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">StringUtil.java</span></div><h1>StringUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util;
+
+import com.codename1.impl.CodenameOneImplementation;
+
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Vector;
+
+/// Various utility methods for manipulating strings
+///
+/// @author Chen Fishbein
+<span class="nc" id="L35">public abstract class StringUtil {</span>
+
+
+    private static CodenameOneImplementation impl;
+
+    /// #### Deprecated
+    ///
+    /// exposed as part of an internal optimization, this method isn't meant for general access
+    public static void setImplementation(CodenameOneImplementation i) {
+<span class="fc" id="L44">        impl = i;</span>
+<span class="fc" id="L45">    }</span>
+
+    /// This method replaces all occurrences of the pattern with the
+    /// replacement String
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String source
+    ///
+    /// - `pattern`: String to replace in the source
+    ///
+    /// - `replace`: replacement String
+    ///
+    /// #### Returns
+    ///
+    /// string with replaced elements
+    public static String replaceAll(String source, String pattern, String replace) {
+<span class="fc" id="L62">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L63">        int idx = 0;</span>
+<span class="fc" id="L64">        String workingSource = source;</span>
+<span class="fc" id="L65">        idx = workingSource.indexOf(pattern);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (idx == -1) {</span>
+<span class="fc" id="L67">            return source;</span>
+        }
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        while (idx != -1) {</span>
+<span class="fc" id="L71">            sb.append(workingSource.substring(0, idx));</span>
+<span class="fc" id="L72">            sb.append(replace);</span>
+<span class="fc" id="L73">            workingSource = workingSource.substring(idx + pattern.length());</span>
+<span class="fc" id="L74">            idx = workingSource.indexOf(pattern);</span>
+        }
+<span class="fc" id="L76">        sb.append(workingSource);</span>
+
+<span class="fc" id="L78">        return sb.toString();</span>
+    }
+
+    /// This method replaces the first occurrence of the pattern with the
+    /// replacement String
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String source
+    ///
+    /// - `pattern`: String to replace in the source
+    ///
+    /// - `replace`: replacement String
+    ///
+    /// #### Returns
+    ///
+    /// string with replaced elements
+    public static String replaceFirst(String source, String pattern, String replace) {
+<span class="fc" id="L96">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L97">        int idx = 0;</span>
+<span class="fc" id="L98">        String workingSource = source;</span>
+<span class="fc" id="L99">        idx = workingSource.indexOf(pattern);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (idx == -1) {</span>
+<span class="nc" id="L101">            return source;</span>
+        }
+
+<span class="fc" id="L104">        sb.append(workingSource.substring(0, idx));</span>
+<span class="fc" id="L105">        sb.append(replace);</span>
+<span class="fc" id="L106">        workingSource = workingSource.substring(idx + pattern.length());</span>
+<span class="fc" id="L107">        sb.append(workingSource);</span>
+
+<span class="fc" id="L109">        return sb.toString();</span>
+    }
+
+    /// Breaks a String to multiple strings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the pattern to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
+    ///
+    /// #### Deprecated
+    ///
+    /// use the tokenize() method instead
+    public static Vector tokenizeString(String source, char separator) {
+<span class="fc" id="L128">        Vector tokenized = new Vector();</span>
+<span class="fc" id="L129">        int len = source.length();</span>
+<span class="fc" id="L130">        boolean lastSeparator = false;</span>
+<span class="fc" id="L131">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int iter = 0; iter &lt; len; iter++) {</span>
+<span class="fc" id="L133">            char current = source.charAt(iter);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (current == separator) {</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                if (lastSeparator) {</span>
+<span class="nc" id="L136">                    buf.append(separator);</span>
+<span class="nc" id="L137">                    lastSeparator = false;</span>
+<span class="nc" id="L138">                    continue;</span>
+                }
+<span class="fc" id="L140">                lastSeparator = true;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                if (buf.length() &gt; 0) {</span>
+<span class="fc" id="L142">                    tokenized.addElement(buf.toString());</span>
+<span class="fc" id="L143">                    buf = new StringBuilder();</span>
+                }
+            } else {
+<span class="fc" id="L146">                lastSeparator = false;</span>
+<span class="fc" id="L147">                buf.append(current);</span>
+            }
+        }
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (buf.length() &gt; 0) {</span>
+<span class="fc" id="L151">            tokenized.addElement(buf.toString());</span>
+        }
+<span class="fc" id="L153">        return tokenized;</span>
+    }
+
+
+    /// Breaks a String to multiple strings (similar to string tokenizer)
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the characters that can be used to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
+    ///
+    /// #### Deprecated
+    ///
+    /// use the `java.lang.String)` method instead
+    public static Vector tokenizeString(String source, String separator) {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (separator.length() == 1) {</span>
+            // slightly faster
+<span class="nc" id="L175">            return tokenizeString(source, separator.charAt(0));</span>
+        }
+<span class="nc" id="L177">        Vector tokenized = new Vector();</span>
+<span class="nc" id="L178">        int len = source.length();</span>
+<span class="nc" id="L179">        StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        for (int iter = 0; iter &lt; len; iter++) {</span>
+<span class="nc" id="L181">            char current = source.charAt(iter);</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (separator.indexOf(current) &gt; -1) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                if (buf.length() &gt; 0) {</span>
+<span class="nc" id="L184">                    tokenized.addElement(buf.toString());</span>
+<span class="nc" id="L185">                    buf = new StringBuilder();</span>
+                }
+            } else {
+<span class="nc" id="L188">                buf.append(current);</span>
+            }
+        }
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (buf.length() &gt; 0) {</span>
+<span class="nc" id="L192">            tokenized.addElement(buf.toString());</span>
+        }
+<span class="nc" id="L194">        return tokenized;</span>
+    }
+
+
+    /// Breaks a String to multiple strings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the pattern to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
+    public static List&lt;String&gt; tokenize(String source, char separator) {
+<span class="fc" id="L210">        ArrayList&lt;String&gt; tokenized = new ArrayList&lt;String&gt;();</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (impl == null) {</span>
+<span class="nc" id="L212">            int len = source.length();</span>
+<span class="nc" id="L213">            boolean lastSeparator = false;</span>
+<span class="nc" id="L214">            StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            for (int iter = 0; iter &lt; len; iter++) {</span>
+<span class="nc" id="L216">                char current = source.charAt(iter);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                if (current == separator) {</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                    if (lastSeparator) {</span>
+                        //buf.append(separator);
+<span class="nc" id="L220">                        lastSeparator = false;</span>
+<span class="nc" id="L221">                        continue;</span>
+                    }
+<span class="nc" id="L223">                    lastSeparator = true;</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                    if (buf.length() &gt; 0) {</span>
+<span class="nc" id="L225">                        tokenized.add(buf.toString());</span>
+<span class="nc" id="L226">                        buf = new StringBuilder();</span>
+                    }
+                } else {
+<span class="nc" id="L229">                    lastSeparator = false;</span>
+<span class="nc" id="L230">                    buf.append(current);</span>
+                }
+            }
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (buf.length() &gt; 0) {</span>
+<span class="nc" id="L234">                tokenized.add(buf.toString());</span>
+            }
+<span class="nc" id="L236">        } else {</span>
+<span class="fc" id="L237">            impl.splitString(source, separator, tokenized);</span>
+        }
+<span class="fc" id="L239">        return tokenized;</span>
+    }
+
+
+    /// Breaks a String to multiple strings (similar to string tokenizer)
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the String to break
+    ///
+    /// - `separator`: the characters that can be used to search and break.
+    ///
+    /// #### Returns
+    ///
+    /// a Vector of Strings
+    public static List&lt;String&gt; tokenize(String source, String separator) {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (separator.length() == 1) {</span>
+            // slightly faster
+<span class="fc" id="L257">            return tokenize(source, separator.charAt(0));</span>
+        }
+<span class="fc" id="L259">        ArrayList&lt;String&gt; tokenized = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L260">        int len = source.length();</span>
+<span class="fc" id="L261">        StringBuilder buf = new StringBuilder();</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        for (int iter = 0; iter &lt; len; iter++) {</span>
+<span class="fc" id="L263">            char current = source.charAt(iter);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (separator.indexOf(current) &gt; -1) {</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                if (buf.length() &gt; 0) {</span>
+<span class="fc" id="L266">                    tokenized.add(buf.toString());</span>
+<span class="fc" id="L267">                    buf = new StringBuilder();</span>
+                }
+            } else {
+<span class="fc" id="L270">                buf.append(current);</span>
+            }
+        }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (buf.length() &gt; 0) {</span>
+<span class="fc" id="L274">            tokenized.add(buf.toString());</span>
+        }
+<span class="fc" id="L276">        return tokenized;</span>
+    }
+
+    /// Joins a list or array of objects together using the specified delimiter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strings`: Objects to be converted to strings.
+    ///
+    /// - `delimiter`: The delimiter.
+    ///
+    /// #### Returns
+    ///
+    /// The joined string.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public static String join(Iterable strings, String delimiter) {
+<span class="nc" id="L295">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        for (Object obj : strings) {</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">            if (sb.length() &gt; 0) {</span>
+<span class="nc" id="L298">                sb.append(delimiter);</span>
+            }
+<span class="nc" id="L300">            sb.append(obj);</span>
+<span class="nc" id="L301">        }</span>
+<span class="nc" id="L302">        return sb.toString();</span>
+    }
+
+    /// Joins a list or array of objects together using the specified delimiter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strings`: Objects to be converted to strings.
+    ///
+    /// - `delimiter`: The delimiter.
+    ///
+    /// #### Returns
+    ///
+    /// The joined string.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public static String join(Object[] strings, String delimiter) {
+<span class="nc" id="L321">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        for (Object obj : strings) {</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            if (sb.length() &gt; 0) {</span>
+<span class="nc" id="L324">                sb.append(delimiter);</span>
+            }
+<span class="nc" id="L326">            sb.append(obj);</span>
+        }
+<span class="nc" id="L328">        return sb.toString();</span>
+    }
+
+    /// Helper to get bytes from string with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the string
+    ///
+    /// #### Returns
+    ///
+    /// the bytes
+    public static byte[] getBytes(String s) {
+        try {
+<span class="fc" id="L342">            return s.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L343">        } catch (UnsupportedEncodingException e) {</span>
+            // never happens
+<span class="nc" id="L345">            throw new RuntimeException(e.toString(), e);</span>
+        }
+    }
+
+    /// Helper to get string from bytes with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bytes
+    ///
+    /// #### Returns
+    ///
+    /// the string
+    public static String newString(byte[] b) {
+        try {
+<span class="fc" id="L360">            return new String(b, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L361">        } catch (UnsupportedEncodingException e) {</span>
+            // never happens
+<span class="nc" id="L363">            throw new RuntimeException(e.toString(), e);</span>
+        }
+    }
+
+    /// Helper to get string from bytes with UTF-8 encoding
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bytes
+    ///
+    /// - `offset`: the offset
+    ///
+    /// - `length`: the length
+    ///
+    /// #### Returns
+    ///
+    /// the string
+    public static String newString(byte[] b, int offset, int length) {
+        try {
+<span class="fc" id="L382">            return new String(b, offset, length, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L383">        } catch (UnsupportedEncodingException e) {</span>
+            // never happens
+<span class="nc" id="L385">            throw new RuntimeException(e.toString(), e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

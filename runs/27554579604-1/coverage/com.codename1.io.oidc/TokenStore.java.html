@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TokenStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.oidc</a> &gt; <span class="el_source">TokenStore.java</span></div><h1>TokenStore.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.oidc;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.Storage;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.regex.StringReader;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Pluggable persistence for an [OidcClient]'s tokens. Implement this and pass
+/// to [OidcClient#setTokenStore(TokenStore)] when you want a custom strategy
+/// (e.g. cross-device sync, encrypted-at-rest with your own key, in-memory
+/// only). The default is [DefaultStorageTokenStore], which serialises tokens
+/// to the standard [Storage] under a per-issuer key. For biometric-gated
+/// persistence on iOS / Android, use [SecureStorageTokenStore].
+///
+/// All methods are asynchronous and may run network or biometric prompts on
+/// the calling thread.
+///
+/// @since 7.0.245
+public interface TokenStore {
+
+    /// Reads previously-saved tokens for `key`, or completes with `null` if
+    /// nothing is stored.
+    AsyncResource&lt;OidcTokens&gt; load(String key);
+
+    /// Persists `tokens` under `key`. Implementations should overwrite any
+    /// existing entry atomically.
+    AsyncResource&lt;Boolean&gt; save(String key, OidcTokens tokens);
+
+    /// Removes the entry for `key`. Completing with `Boolean.FALSE` means
+    /// nothing was stored; completing with an error means the underlying
+    /// store failed.
+    AsyncResource&lt;Boolean&gt; clear(String key);
+
+    /// The default store. Serialises the token JSON to [Storage] under a
+    /// `&quot;cn1.oidc.&quot;`-prefixed key. Convenient and zero-config, but not
+    /// encrypted-at-rest -- the underlying storage on Android is the app's
+    /// internal files directory, which is sandboxed but not protected against
+    /// a rooted device with backups enabled.
+<span class="fc" id="L66">    final class DefaultStorageTokenStore implements TokenStore {</span>
+        private static final String PREFIX = &quot;cn1.oidc.&quot;;
+
+        @Override
+        public AsyncResource&lt;OidcTokens&gt; load(String key) {
+<span class="fc" id="L71">            AsyncResource&lt;OidcTokens&gt; r = new AsyncResource&lt;OidcTokens&gt;();</span>
+            try {
+<span class="fc" id="L73">                String stored = (String) Storage.getInstance().readObject(PREFIX + key);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                if (stored == null) {</span>
+<span class="fc" id="L75">                    r.complete(null);</span>
+<span class="fc" id="L76">                    return r;</span>
+                }
+<span class="fc" id="L78">                Map&lt;String, Object&gt; parsed = new JSONParser().parseJSON(new StringReader(stored));</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (parsed == null) {</span>
+<span class="nc" id="L80">                    r.complete(null);</span>
+<span class="nc" id="L81">                    return r;</span>
+                }
+<span class="fc" id="L83">                Map&lt;String, Object&gt; tokenJson = subMap(parsed, &quot;token&quot;);</span>
+<span class="fc" id="L84">                Map&lt;String, Object&gt; claims = subMap(parsed, &quot;claims&quot;);</span>
+<span class="fc" id="L85">                Object expiresMs = parsed.get(&quot;expiresAt&quot;);</span>
+<span class="fc" id="L86">                Date expiresAt = null;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                if (expiresMs != null) {</span>
+                    try {
+<span class="fc" id="L89">                        String raw = expiresMs.toString();</span>
+<span class="fc" id="L90">                        int dot = raw.indexOf('.');</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                        if (dot &gt;= 0) {</span>
+<span class="fc" id="L92">                            raw = raw.substring(0, dot);</span>
+                        }
+<span class="fc" id="L94">                        expiresAt = new Date(Long.parseLong(raw));</span>
+<span class="nc" id="L95">                    } catch (NumberFormatException ignored) {</span>
+                        // Malformed expiry timestamp in persisted storage --
+                        // treat as &quot;unknown expiry&quot; so the caller can decide
+                        // whether to refresh; never let a parse failure tank
+                        // the load.
+<span class="fc" id="L100">                    }</span>
+                }
+<span class="fc" id="L102">                OidcTokens tokens = new OidcTokens(</span>
+<span class="fc" id="L103">                        str(tokenJson.get(&quot;access_token&quot;)),</span>
+<span class="fc" id="L104">                        str(tokenJson.get(&quot;id_token&quot;)),</span>
+<span class="fc" id="L105">                        str(tokenJson.get(&quot;refresh_token&quot;)),</span>
+<span class="fc" id="L106">                        str(tokenJson.get(&quot;token_type&quot;)),</span>
+<span class="fc" id="L107">                        str(tokenJson.get(&quot;scope&quot;)),</span>
+                        expiresAt,
+                        claims,
+                        tokenJson);
+<span class="fc" id="L111">                r.complete(tokens);</span>
+<span class="nc" id="L112">            } catch (Throwable t) {</span>
+<span class="nc" id="L113">                r.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+                        &quot;Failed to load stored tokens&quot;, t));
+<span class="fc" id="L115">            }</span>
+<span class="fc" id="L116">            return r;</span>
+        }
+
+        @Override
+        public AsyncResource&lt;Boolean&gt; save(String key, OidcTokens tokens) {
+<span class="fc" id="L121">            AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+            try {
+<span class="fc" id="L123">                StringBuilder sb = new StringBuilder(&quot;{&quot;);</span>
+<span class="fc" id="L124">                sb.append(&quot;\&quot;token\&quot;:&quot;);</span>
+<span class="fc" id="L125">                appendJsonStringMap(sb, tokens.getRawResponse());</span>
+<span class="fc" id="L126">                sb.append(&quot;,\&quot;claims\&quot;:&quot;);</span>
+<span class="fc" id="L127">                appendJsonStringMap(sb, tokens.getIdTokenClaims());</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                if (tokens.getExpiresAt() != null) {</span>
+<span class="fc" id="L129">                    sb.append(&quot;,\&quot;expiresAt\&quot;:&quot;).append(tokens.getExpiresAt().getTime());</span>
+                }
+<span class="fc" id="L131">                sb.append(&quot;}&quot;);</span>
+<span class="fc" id="L132">                Storage.getInstance().writeObject(PREFIX + key, sb.toString());</span>
+<span class="fc" id="L133">                r.complete(Boolean.TRUE);</span>
+<span class="nc" id="L134">            } catch (Throwable t) {</span>
+<span class="nc" id="L135">                r.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+                        &quot;Failed to save tokens&quot;, t));
+<span class="fc" id="L137">            }</span>
+<span class="fc" id="L138">            return r;</span>
+        }
+
+        @Override
+        public AsyncResource&lt;Boolean&gt; clear(String key) {
+<span class="fc" id="L143">            AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+            try {
+<span class="fc" id="L145">                Storage.getInstance().deleteStorageFile(PREFIX + key);</span>
+<span class="fc" id="L146">                r.complete(Boolean.TRUE);</span>
+<span class="nc" id="L147">            } catch (Throwable t) {</span>
+<span class="nc" id="L148">                r.error(new OidcException(OidcException.TRANSPORT_ERROR,</span>
+                        &quot;Failed to clear tokens&quot;, t));
+<span class="fc" id="L150">            }</span>
+<span class="fc" id="L151">            return r;</span>
+        }
+
+        @SuppressWarnings(&quot;unchecked&quot;)
+        private static Map&lt;String, Object&gt; subMap(Map&lt;String, Object&gt; root, String key) {
+<span class="fc" id="L156">            Object v = root.get(key);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            if (v instanceof Map) {</span>
+<span class="fc" id="L158">                return (Map&lt;String, Object&gt;) v;</span>
+            }
+<span class="nc" id="L160">            return new HashMap&lt;String, Object&gt;();</span>
+        }
+
+        private static String str(Object o) {
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">            return o instanceof String ? (String) o : (o == null ? null : o.toString());</span>
+        }
+
+        private static void appendJsonStringMap(StringBuilder sb, Map&lt;String, Object&gt; map) {
+<span class="fc" id="L168">            sb.append('{');</span>
+<span class="fc" id="L169">            boolean first = true;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; e : map.entrySet()) {</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                if (!first) {</span>
+<span class="fc" id="L172">                    sb.append(',');</span>
+                }
+<span class="fc" id="L174">                first = false;</span>
+<span class="fc" id="L175">                sb.append('&quot;').append(escape(e.getKey())).append(&quot;\&quot;:&quot;);</span>
+<span class="fc" id="L176">                Object v = e.getValue();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                if (v == null) {</span>
+<span class="nc" id="L178">                    sb.append(&quot;null&quot;);</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">                } else if (v instanceof Number || v instanceof Boolean) {</span>
+<span class="nc" id="L180">                    sb.append(v.toString());</span>
+                } else {
+<span class="fc" id="L182">                    sb.append('&quot;').append(escape(v.toString())).append('&quot;');</span>
+                }
+<span class="fc" id="L184">            }</span>
+<span class="fc" id="L185">            sb.append('}');</span>
+<span class="fc" id="L186">        }</span>
+
+        private static String escape(String s) {
+<span class="fc" id="L189">            StringBuilder b = new StringBuilder(s.length() + 8);</span>
+<span class="fc" id="L190">            int len = s.length();</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L192">                char c = s.charAt(i);</span>
+<span class="pc bpc" id="L193" title="7 of 8 branches missed.">                switch (c) {</span>
+<span class="nc" id="L194">                    case '&quot;': b.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L195">                    case '\\': b.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L196">                    case '\n': b.append(&quot;\\n&quot;); break;</span>
+<span class="nc" id="L197">                    case '\r': b.append(&quot;\\r&quot;); break;</span>
+<span class="nc" id="L198">                    case '\t': b.append(&quot;\\t&quot;); break;</span>
+<span class="nc" id="L199">                    case '\b': b.append(&quot;\\b&quot;); break;</span>
+<span class="nc" id="L200">                    case '\f': b.append(&quot;\\f&quot;); break;</span>
+                    default:
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                        if (c &lt; 0x20) {</span>
+<span class="nc" id="L203">                            String hex = Integer.toHexString(c);</span>
+<span class="nc" id="L204">                            b.append(&quot;\\u&quot;);</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                            for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="nc" id="L206">                                b.append('0');</span>
+                            }
+<span class="nc" id="L208">                            b.append(hex);</span>
+<span class="nc" id="L209">                        } else {</span>
+<span class="fc" id="L210">                            b.append(c);</span>
+                        }
+                }
+            }
+<span class="fc" id="L214">            return b.toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

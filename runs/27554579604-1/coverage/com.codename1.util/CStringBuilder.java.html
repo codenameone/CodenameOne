@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CStringBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">CStringBuilder.java</span></div><h1>CStringBuilder.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package com.codename1.util;
+
+/// This is generally the Apache String builder class refactored here so we can
+/// use it regardless of vm limitations/differences for increased performance.
+/// A modifiable `sequence of characters` for use in creating
+/// and modifying Strings. This class is intended as a direct replacement of
+/// `StringBuffer` for non-concurrent use; unlike `StringBuffer` this
+/// class is not synchronized for thread safety.
+///
+/// The majority of the modification methods on this class return `StringBuilder`, so that, like `StringBuffer`s, they can be used in
+/// chaining method calls together. For example, `new StringBuilder(&quot;One
+/// should &quot;).append(&quot;always strive &quot;).append(&quot;to achieve Harmony&quot;)`.
+///
+/// #### Since
+///
+/// 1.5
+///
+/// #### Deprecated
+///
+/// we will be moving to the proper string builder very soon
+///
+/// #### See also
+///
+/// - CharSequence
+///
+/// - Appendable
+///
+/// - StringBuffer
+///
+/// - String
+public final class CStringBuilder extends AbstractStringBuilder {
+    /// Constructs an instance with an initial capacity of `16`.
+    ///
+    /// #### See also
+    ///
+    /// - #capacity()
+    public CStringBuilder() {
+<span class="fc" id="L54">        super();</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Constructs an instance with the specified capacity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capacity`: the initial capacity to use.
+    ///
+    /// #### Throws
+    ///
+    /// - `NegativeArraySizeException`: if the specified `capacity` is negative.
+    ///
+    /// #### See also
+    ///
+    /// - #capacity()
+    public CStringBuilder(int capacity) {
+<span class="nc" id="L71">        super(capacity);</span>
+<span class="nc" id="L72">    }</span>
+
+    /// Constructs an instance that's initialized with the contents of the
+    /// specified `String`. The capacity of the new builder will be the
+    /// length of the `String` plus 16.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: the `String` to copy into the builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `str` is `null`.
+    public CStringBuilder(String str) {
+<span class="nc" id="L86">        super(str);</span>
+<span class="nc" id="L87">    }</span>
+
+    /// Appends the string representation of the specified `boolean` value.
+    /// The `boolean` value is converted to a String according to the rule
+    /// defined by `String#valueOf(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the `boolean` value to append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(boolean)
+    public CStringBuilder append(boolean b) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        append0(b ? &quot;true&quot; : &quot;false&quot;); //$NON-NLS-1$ //$NON-NLS-2$</span>
+<span class="fc" id="L106">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified `char` value.
+    /// The `char` value is converted to a string according to the rule
+    /// defined by `String#valueOf(char)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the `char` value to append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(char)
+    public CStringBuilder append(char c) {
+<span class="fc" id="L125">        append0(c);</span>
+<span class="fc" id="L126">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified `int` value. The
+    /// `int` value is converted to a string according to the rule defined
+    /// by `String#valueOf(int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the `int` value to append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(int)
+    public CStringBuilder append(int i) {
+<span class="fc" id="L145">        append0(Integer.toString(i));</span>
+<span class="fc" id="L146">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified `long` value.
+    /// The `long` value is converted to a string according to the rule
+    /// defined by `String#valueOf(long)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lng`: the `long` value.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(long)
+    public CStringBuilder append(long lng) {
+<span class="fc" id="L165">        append0(Long.toString(lng));</span>
+<span class="fc" id="L166">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified `float` value.
+    /// The `float` value is converted to a string according to the rule
+    /// defined by `String#valueOf(float)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the `float` value to append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(float)
+    public CStringBuilder append(float f) {
+<span class="nc" id="L185">        append0(Float.toString(f));</span>
+<span class="nc" id="L186">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified `double` value.
+    /// The `double` value is converted to a string according to the rule
+    /// defined by `String#valueOf(double)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the `double` value to append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(double)
+    public CStringBuilder append(double d) {
+<span class="nc" id="L205">        append0(Double.toString(d));</span>
+<span class="nc" id="L206">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified `Object`.
+    /// The `Object` value is converted to a string according to the rule
+    /// defined by `String#valueOf(Object)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the `Object` to append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(Object)
+    public CStringBuilder append(Object obj) {
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L226">            appendNull();</span>
+        } else {
+<span class="nc" id="L228">            append0(obj.toString());</span>
+        }
+<span class="nc" id="L230">        return this;</span>
+    }
+
+    /// Appends the contents of the specified string. If the string is `null`, then the string `&quot;null&quot;` is appended.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: the string to append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    public CStringBuilder append(String str) {
+<span class="nc" id="L243">        append0(str);</span>
+<span class="nc" id="L244">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified `char[]`.
+    /// The `char[]` is converted to a string according to the rule
+    /// defined by `String#valueOf(char[])`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ch`: the `char[]` to append..
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(char[])
+    public CStringBuilder append(char[] ch) {
+<span class="nc" id="L263">        append0(ch);</span>
+<span class="nc" id="L264">        return this;</span>
+    }
+
+    /// Appends the string representation of the specified subset of the `char[]`. The `char[]` value is converted to a String according to
+    /// the rule defined by `int, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: the `char[]` to append.
+    ///
+    /// - `offset`: the inclusive offset index.
+    ///
+    /// - `len`: the number of characters.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: @throws ArrayIndexOutOfBoundsException if `offset` and `len` do not specify a valid
+    /// subsequence.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(char[], int, int)
+    public CStringBuilder append(char[] str, int offset, int len) {
+<span class="nc" id="L291">        append0(str, offset, len);</span>
+<span class="nc" id="L292">        return this;</span>
+    }
+
+
+    /// Appends the encoded Unicode code point. The code point is converted to a
+    /// `char[]` as defined by `Character#toChars(int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: the Unicode code point to encode and append.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### See also
+    ///
+    /// - Character#toChars(int)
+    public CStringBuilder appendCodePoint(int codePoint) {
+<span class="nc" id="L311">        append0(Character.toChars(codePoint));</span>
+<span class="nc" id="L312">        return this;</span>
+    }
+
+    /// Deletes a sequence of characters specified by `start` and `end`. Shifts any remaining characters to the left.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the inclusive start index.
+    ///
+    /// - `end`: the exclusive end index.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is less than zero, greater than the current
+    /// length or greater than `end`.
+    public CStringBuilder delete(int start, int end) {
+<span class="nc" id="L332">        delete0(start, end);</span>
+<span class="nc" id="L333">        return this;</span>
+    }
+
+    /// Deletes the character at the specified index. shifts any remaining
+    /// characters to the left.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index of the character to delete.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `index` is less than zero or is greater than or
+    /// equal to the current length.
+    public CStringBuilder deleteCharAt(int index) {
+<span class="nc" id="L352">        deleteCharAt0(index);</span>
+<span class="nc" id="L353">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `boolean` value
+    /// at the specified `offset`. The `boolean` value is converted
+    /// to a string according to the rule defined by
+    /// `String#valueOf(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `b`: the `boolean` value to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length`.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(boolean)
+    public CStringBuilder insert(int offset, boolean b) {
+<span class="nc bnc" id="L380" title="All 2 branches missed.">        insert0(offset, b ? &quot;true&quot; : &quot;false&quot;); //$NON-NLS-1$ //$NON-NLS-2$</span>
+<span class="nc" id="L381">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `char` value at
+    /// the specified `offset`. The `char` value is converted to a
+    /// string according to the rule defined by `String#valueOf(char)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `c`: the `char` value to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(char)
+    public CStringBuilder insert(int offset, char c) {
+<span class="nc" id="L407">        insert0(offset, c);</span>
+<span class="nc" id="L408">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `int` value at
+    /// the specified `offset`. The `int` value is converted to a
+    /// String according to the rule defined by `String#valueOf(int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `i`: the `int` value to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(int)
+    public CStringBuilder insert(int offset, int i) {
+<span class="nc" id="L434">        insert0(offset, Integer.toString(i));</span>
+<span class="nc" id="L435">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `long` value at
+    /// the specified `offset`. The `long` value is converted to a
+    /// String according to the rule defined by `String#valueOf(long)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `l`: the `long` value to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// {code length()}.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(long)
+    public CStringBuilder insert(int offset, long l) {
+<span class="nc" id="L461">        insert0(offset, Long.toString(l));</span>
+<span class="nc" id="L462">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `float` value at
+    /// the specified `offset`. The `float` value is converted to a
+    /// string according to the rule defined by `String#valueOf(float)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `f`: the `float` value to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(float)
+    public CStringBuilder insert(int offset, float f) {
+<span class="nc" id="L488">        insert0(offset, Float.toString(f));</span>
+<span class="nc" id="L489">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `double` value
+    /// at the specified `offset`. The `double` value is converted
+    /// to a String according to the rule defined by
+    /// `String#valueOf(double)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `d`: the `double` value to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(double)
+    public CStringBuilder insert(int offset, double d) {
+<span class="nc" id="L516">        insert0(offset, Double.toString(d));</span>
+<span class="nc" id="L517">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `Object` at the
+    /// specified `offset`. The `Object` value is converted to a
+    /// String according to the rule defined by `String#valueOf(Object)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `obj`: the `Object` to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(Object)
+    public CStringBuilder insert(int offset, Object obj) {
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        insert0(offset, obj == null ? &quot;null&quot; : obj.toString()); //$NON-NLS-1$</span>
+<span class="nc" id="L544">        return this;</span>
+    }
+
+    /// Inserts the specified string at the specified `offset`. If the
+    /// specified string is null, then the String `&quot;null&quot;` is inserted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `str`: the `String` to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`.
+    public CStringBuilder insert(int offset, String str) {
+<span class="fc" id="L565">        insert0(offset, str);</span>
+<span class="fc" id="L566">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified `char[]` at the
+    /// specified `offset`. The `char[]` value is converted to a
+    /// String according to the rule defined by `String#valueOf(char[])`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `ch`: the `char[]` to insert.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(char[])
+    public CStringBuilder insert(int offset, char[] ch) {
+<span class="nc" id="L592">        insert0(offset, ch);</span>
+<span class="nc" id="L593">        return this;</span>
+    }
+
+    /// Inserts the string representation of the specified subsequence of the
+    /// `char[]` at the specified `offset`. The `char[]` value
+    /// is converted to a String according to the rule defined by
+    /// `int, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the index to insert at.
+    ///
+    /// - `str`: the `char[]` to insert.
+    ///
+    /// - `strOffset`: the inclusive index.
+    ///
+    /// - `strLen`: the number of characters.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `offset` is negative or greater than the current
+    /// `length()`, or `strOffset` and `strLen` do
+    /// not specify a valid subsequence.
+    ///
+    /// #### See also
+    ///
+    /// - String#valueOf(char[], int, int)
+    public CStringBuilder insert(int offset, char[] str, int strOffset,
+                                 int strLen) {
+<span class="nc" id="L626">        insert0(offset, str, strOffset, strLen);</span>
+<span class="nc" id="L627">        return this;</span>
+    }
+
+    /// Replaces the specified subsequence in this builder with the specified
+    /// string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the inclusive begin index.
+    ///
+    /// - `end`: the exclusive end index.
+    ///
+    /// - `str`: the replacement string.
+    ///
+    /// #### Returns
+    ///
+    /// this builder.
+    ///
+    /// #### Throws
+    ///
+    /// - `StringIndexOutOfBoundsException`: @throws StringIndexOutOfBoundsException if `start` is negative, greater than the current
+    /// `length()` or greater than `end`.
+    ///
+    /// - `NullPointerException`: if `str` is `null`.
+    public CStringBuilder replace(int start, int end, String str) {
+<span class="nc" id="L652">        replace0(start, end, str);</span>
+<span class="nc" id="L653">        return this;</span>
+    }
+
+    /// Reverses the order of characters in this builder.
+    ///
+    /// #### Returns
+    ///
+    /// this buffer.
+    public CStringBuilder reverse() {
+<span class="nc" id="L662">        reverse0();</span>
+<span class="nc" id="L663">        return this;</span>
+    }
+
+    /// Returns the contents of this builder.
+    ///
+    /// #### Returns
+    ///
+    /// the string representation of the data in this builder.
+    @Override
+    @SuppressWarnings(&quot;PMD.UselessOverridingMethod&quot;)
+    public String toString() {
+        /* Note: This method is required to workaround a compiler bug
+         * in the RI javac (at least in 1.5.0_06) that will generate a
+         * reference to the non-public AbstractStringBuilder if we don't
+         * override it here.
+         */
+<span class="fc" id="L679">        return super.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

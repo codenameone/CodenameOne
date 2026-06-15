@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Binders.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.binding</a> &gt; <span class="el_source">Binders.java</span></div><h1>Binders.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.binding;
+
+import com.codename1.ui.Container;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+/// Public entry point for the build-time component binding framework.
+///
+/// `@Bindable` classes get a generated binder at build time. Each binder's
+/// static initializer self-registers with this registry. The registry stays
+/// empty until something triggers each generated class's `&lt;clinit&gt;`:
+///
+/// - **iOS / Android** -- the build server probes the project zip for
+///   `cn1app.BinderBootstrap` and splices a
+///   `new cn1app.BinderBootstrap();` into the per-build application stub
+///   before `Display.init`.
+/// - **JavaSE simulator + desktop** -- `JavaSEPort#postInit` calls
+///   `Class.forName(&quot;cn1app.BinderBootstrap&quot;)` so the registry is
+///   populated on the same boundary.
+/// - **Unit tests / manual init** -- application code can call
+///   `Binders.register(...)` directly.
+///
+/// ## Two-way bindings and the change-notification contract
+///
+/// A binding declared `twoWay = true` flows in both directions:
+///
+/// 1. **Component -&gt; model.** The generated binder installs a listener on
+///    the editable component (`TextField`, `CheckBox`, etc.). When the
+///    user mutates the component, the binder calls the model's setter (or
+///    writes the public field directly), and the setter's
+///    instrumented exit calls `notifyChanged(this)`.
+/// 2. **Model -&gt; component.** Application code that mutates the model
+///    through a setter (instrumented by the build-time processor) causes
+///    `notifyChanged(this)` to fire, which walks every live binding for
+///    that model and pushes the new value into the matching component.
+///
+/// The two paths together would loop forever if left to themselves -- the
+/// model setter fires a change event, which refreshes the component, which
+/// fires its own change event, which calls the model setter again. To
+/// break the loop, every framework-initiated mutation runs inside an
+/// &quot;update region&quot; guarded by a thread-local flag. While the flag is set,
+/// `notifyChanged` is a no-op, and component listeners short-circuit.
+///
+/// Concretely:
+///
+/// - `Binders.bind(model, container)` enters an update region for the
+///   initial model -&gt; component push.
+/// - `Binding#refresh()` enters an update region for every subsequent
+///   model -&gt; component push.
+/// - `Binding#commit()` enters an update region for the component -&gt; model
+///   pull.
+/// - The generated component listener enters an update region before
+///   calling the setter.
+///
+/// **Limitation:** when a setter synchronously mutates a *second* bound
+/// field (e.g. `setFirstName` also calls `setFullName`), the second field's
+/// notification is also suppressed -- the user must call
+/// `binding.refresh()` explicitly if they want the second component to
+/// catch up. See `Annotation-Component-Binding.asciidoc` for details.
+public final class Binders {
+
+<span class="fc" id="L88">    private static final Map&lt;String, Binder&lt;?&gt;&gt; BY_NAME = new HashMap&lt;String, Binder&lt;?&gt;&gt;();</span>
+
+    /// Active bindings keyed by `model.getClass().getName()` so
+    /// `notifyChanged(model)` can iterate them in O(matches). Each live
+    /// binding registers itself in `Binders#registerBinding` from inside
+    /// `Binder#bind`; the binding removes itself on `disconnect`.
+<span class="fc" id="L94">    private static final Map&lt;String, List&lt;NotifiableBinding&gt;&gt; LIVE_BINDINGS =</span>
+            new HashMap&lt;String, List&lt;NotifiableBinding&gt;&gt;();
+
+<span class="fc" id="L97">    private static final ThreadLocal&lt;int[]&gt; IN_UPDATE = new ThreadLocal&lt;int[]&gt;();</span>
+
+    private Binders() {
+    }
+
+    /// Installs `binder` under `binder.type().getName()`. The generated
+    /// per-class binder's static initializer calls this; hand-written
+    /// binders for classes outside the build's annotation scan call it
+    /// explicitly.
+    public static &lt;T&gt; void register(Binder&lt;T&gt; binder) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (binder == null) {</span>
+<span class="fc" id="L108">            throw new IllegalArgumentException(&quot;binder is null&quot;);</span>
+        }
+<span class="fc" id="L110">        BY_NAME.put(binder.type().getName(), binder);</span>
+<span class="fc" id="L111">    }</span>
+
+    /// Looks up the binder for `type` (by `type.getName()`) or null when
+    /// none is registered.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T&gt; Binder&lt;T&gt; get(Class&lt;T&gt; type) {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (type == null) {</span>
+<span class="fc" id="L118">            return null;</span>
+        }
+<span class="fc" id="L120">        return (Binder&lt;T&gt;) BY_NAME.get(type.getName());</span>
+    }
+
+    /// Pushes the model values into the matching components in
+    /// `container`, wiring up the two-way listeners declared on its
+    /// `@Bind` fields. Throws `IllegalStateException` when no binder is
+    /// registered for `model.getClass()`.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T&gt; Binding bind(T model, Container container) {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (model == null) {</span>
+<span class="fc" id="L130">            throw new IllegalArgumentException(&quot;model is null&quot;);</span>
+        }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (container == null) {</span>
+<span class="fc" id="L133">            throw new IllegalArgumentException(&quot;container is null&quot;);</span>
+        }
+<span class="fc" id="L135">        Binder&lt;T&gt; binder = (Binder&lt;T&gt;) BY_NAME.get(model.getClass().getName());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (binder == null) {</span>
+<span class="fc" id="L137">            throw new IllegalStateException(&quot;No binder registered for &quot;</span>
+<span class="fc" id="L138">                    + model.getClass().getName() + &quot;. Add @Bindable and ensure the &quot;</span>
+                    + &quot;cn1:process-annotations Mojo ran during build, then re-run -- the &quot;
+                    + &quot;generated BinderBootstrap populates this registry at startup.&quot;);
+        }
+<span class="fc" id="L142">        return binder.bind(model, container);</span>
+    }
+
+    // ---------------------------------------------------------------
+    // Binding-aware change notification
+    // ---------------------------------------------------------------
+
+    /// Called from the build-time-instrumented setter at every return
+    /// point. Walks the live bindings for `model.getClass().getName()`
+    /// and refreshes those whose source is `model`. Short-circuits when
+    /// the calling thread is already inside an update region, breaking
+    /// the model -&gt; component -&gt; model loop.
+    ///
+    /// Application code rarely calls this directly; the build-time
+    /// instrumentation wires it into generated setters automatically.
+    public static void notifyChanged(Object model) {
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (model == null) {</span>
+<span class="fc" id="L159">            return;</span>
+        }
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (isInUpdate()) {</span>
+<span class="fc" id="L162">            return;</span>
+        }
+<span class="fc" id="L164">        List&lt;NotifiableBinding&gt; bindings = LIVE_BINDINGS.get(model.getClass().getName());</span>
+<span class="pc bpc" id="L165" title="1 of 4 branches missed.">        if (bindings == null || bindings.isEmpty()) {</span>
+<span class="fc" id="L166">            return;</span>
+        }
+        // Snapshot so a refresh that disconnects/reinstalls bindings
+        // doesn't break the iteration.
+        NotifiableBinding[] snapshot;
+<span class="fc" id="L171">        synchronized (LIVE_BINDINGS) {</span>
+<span class="fc" id="L172">            snapshot = bindings.toArray(new NotifiableBinding[0]);</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (NotifiableBinding b : snapshot) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (b.matches(model)) {</span>
+<span class="fc" id="L176">                enterUpdate();</span>
+                try {
+<span class="fc" id="L178">                    b.refresh();</span>
+                } finally {
+<span class="fc" id="L180">                    exitUpdate();</span>
+                }
+            }
+        }
+<span class="fc" id="L184">    }</span>
+
+    /// Generated binders call this to enroll a new live binding in the
+    /// per-class registry. Call `unregisterBinding` from `disconnect` to
+    /// remove it.
+    public static void registerBinding(NotifiableBinding binding) {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (binding == null) {</span>
+<span class="fc" id="L191">            return;</span>
+        }
+<span class="fc" id="L193">        synchronized (LIVE_BINDINGS) {</span>
+<span class="fc" id="L194">            List&lt;NotifiableBinding&gt; list = LIVE_BINDINGS.get(binding.modelTypeName());</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            if (list == null) {</span>
+<span class="fc" id="L196">                list = new ArrayList&lt;NotifiableBinding&gt;();</span>
+<span class="fc" id="L197">                LIVE_BINDINGS.put(binding.modelTypeName(), list);</span>
+            }
+<span class="fc" id="L199">            list.add(binding);</span>
+<span class="fc" id="L200">        }</span>
+<span class="fc" id="L201">    }</span>
+
+    /// Inverse of `registerBinding`. Called from
+    /// `Binding#disconnect`.
+    public static void unregisterBinding(NotifiableBinding binding) {
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (binding == null) {</span>
+<span class="fc" id="L207">            return;</span>
+        }
+<span class="fc" id="L209">        synchronized (LIVE_BINDINGS) {</span>
+<span class="fc" id="L210">            List&lt;NotifiableBinding&gt; list = LIVE_BINDINGS.get(binding.modelTypeName());</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (list == null) {</span>
+<span class="nc" id="L212">                return;</span>
+            }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            for (Iterator&lt;NotifiableBinding&gt; it = list.iterator(); it.hasNext(); ) {</span>
+<span class="fc" id="L215">                NotifiableBinding b = it.next();</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                if (b == binding) { //NOPMD CompareObjectsWithEquals -- identity dedup</span>
+<span class="fc" id="L217">                    it.remove();</span>
+<span class="fc" id="L218">                    break;</span>
+                }
+<span class="nc" id="L220">            }</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            if (list.isEmpty()) {</span>
+<span class="fc" id="L222">                LIVE_BINDINGS.remove(binding.modelTypeName());</span>
+            }
+<span class="fc" id="L224">        }</span>
+<span class="fc" id="L225">    }</span>
+
+    /// Enter an update region. Generated binder code calls this around
+    /// every framework-initiated mutation -- model-&gt;component pushes and
+    /// component-&gt;model pulls -- so the setter notification and the
+    /// component change listener both short-circuit while we're inside.
+    public static void enterUpdate() {
+<span class="fc" id="L232">        int[] depth = IN_UPDATE.get();</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (depth == null) {</span>
+<span class="fc" id="L234">            depth = new int[]{0};</span>
+<span class="fc" id="L235">            IN_UPDATE.set(depth);</span>
+        }
+<span class="fc" id="L237">        depth[0]++;</span>
+<span class="fc" id="L238">    }</span>
+
+    /// Exit an update region. Call once per `enterUpdate`.
+    public static void exitUpdate() {
+<span class="fc" id="L242">        int[] depth = IN_UPDATE.get();</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (depth == null) {</span>
+<span class="fc" id="L244">            return;</span>
+        }
+<span class="fc" id="L246">        depth[0]--;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (depth[0] &lt;= 0) {</span>
+<span class="fc" id="L248">            IN_UPDATE.remove();</span>
+        }
+<span class="fc" id="L250">    }</span>
+
+    /// True while the calling thread is inside a binding update region.
+    /// Generated component listeners check this and bail out early.
+    public static boolean isInUpdate() {
+<span class="fc" id="L255">        int[] depth = IN_UPDATE.get();</span>
+<span class="pc bpc" id="L256" title="1 of 4 branches missed.">        return depth != null &amp;&amp; depth[0] &gt; 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

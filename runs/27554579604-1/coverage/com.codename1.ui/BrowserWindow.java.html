@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BrowserWindow.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">BrowserWindow.java</span></div><h1>BrowserWindow.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
+
+/// Encapsulates a WebView that is contained in its own separate window when run on a Desktop (e.g. Simulator).  Platforms
+/// that don't have &quot;windows&quot;, will fall back to loading a Form with a BrowserComponent in it.
+///
+/// @author shannah
+///
+/// #### Since
+///
+/// 7.0
+public class BrowserWindow {
+
+    /// Implementation for BrowserWindow provided by the platform implementation.  The default
+    /// implementation in the JavaSE port is a JavaFX Stage with a WebView in it.
+    private final Object nativeWindow;
+
+    /// Fallback form to contain a webview if the platform implementation doesn't
+    /// implement its own BrowserWindow.
+    private BrowserForm form;
+
+    /// Fallback webview to use when platform doesn't implement its own BrowserWindow.  This
+    /// would be contained inside `#form`.
+    private BrowserComponent webview;
+
+    /// Creates a new browser window with the given starting URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startURL`: The URL to start with.
+<span class="fc" id="L58">    public BrowserWindow(String startURL) {</span>
+<span class="fc" id="L59">        nativeWindow = createNativeWindow(startURL);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (nativeWindow == null) {</span>
+<span class="fc" id="L61">            form = new BrowserForm(this);</span>
+<span class="fc" id="L62">            webview.setURL(startURL);</span>
+
+        }
+<span class="fc" id="L65">    }</span>
+
+    /// Creates a platform native Browser window with the given start URL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startURL`: The URL to open in the browser window.
+    ///
+    /// #### Returns
+    ///
+    /// The native browser window.
+    private Object createNativeWindow(String startURL) {
+<span class="fc" id="L77">        return Display.impl.createNativeBrowserWindow(startURL);</span>
+    }
+
+    /// Adds listeners to be notified when a page is loaded in the browser window.  ActionEvents
+    /// will have the URL of the page as a string as its &quot;source&quot; property.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: Listener to add.
+    public void addLoadListener(ActionListener l) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L88">            Display.impl.addNativeBrowserWindowOnLoadListener(nativeWindow, l);</span>
+        } else {
+<span class="fc" id="L90">            webview.addWebEventListener(&quot;onLoad&quot;, l);</span>
+        }
+<span class="fc" id="L92">    }</span>
+
+    /// Removes listeners from being notified when page is loaded in the browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    public void removeLoadListener(ActionListener l) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L101">            Display.impl.removeNativeBrowserWindowOnLoadListener(nativeWindow, l);</span>
+        } else {
+<span class="nc" id="L103">            webview.removeWebEventListener(&quot;onLoad&quot;, l);</span>
+        }
+<span class="fc" id="L105">    }</span>
+
+    /// Sets the window title for the browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the window.
+    public void setTitle(String title) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L114">            Display.impl.nativeBrowserWindowSetTitle(nativeWindow, title);</span>
+        } else {
+<span class="fc" id="L116">            form.setTitle(title);</span>
+        }
+<span class="fc" id="L118">    }</span>
+
+    /// Sets the size in pixels of the browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: The width in pixels
+    ///
+    /// - `height`: The height in pixels
+    public void setSize(int width, int height) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L129">            Display.impl.nativeBrowserWindowSetSize(nativeWindow, width, height);</span>
+        }
+<span class="fc" id="L131">    }</span>
+
+    /// Closes the browser window.
+    public void close() {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L136">            Display.impl.nativeBrowserWindowHide(nativeWindow);</span>
+<span class="fc" id="L137">            Display.impl.nativeBrowserWindowCleanup(nativeWindow);</span>
+        } else {
+<span class="fc" id="L139">            form.close();</span>
+        }
+<span class="fc" id="L141">    }</span>
+
+    /// Adds listener to be notified when the browser window is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    public void addCloseListener(ActionListener l) {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L150">            Display.impl.nativeBrowserWindowAddCloseListener(nativeWindow, l);</span>
+        } else {
+<span class="fc" id="L152">            form.closeListeners.addListener(l);</span>
+        }
+<span class="fc" id="L154">    }</span>
+
+    /// Removes listener from being notified when the browser window is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    public void removeCloseListener(ActionListener l) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L163">            Display.impl.nativeBrowserWindowRemoveCloseListener(nativeWindow, l);</span>
+        } else {
+<span class="nc" id="L165">            form.closeListeners.removeListener(l);</span>
+        }
+<span class="fc" id="L167">    }</span>
+
+    /// Shows the browser window.
+    public void show() {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (nativeWindow != null) {</span>
+<span class="fc" id="L172">            Display.impl.nativeBrowserWindowShow(nativeWindow);</span>
+        } else {
+<span class="fc" id="L174">            form.show();</span>
+        }
+<span class="fc" id="L176">    }</span>
+
+    /// A future that is returned from the eval() method.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+<span class="fc" id="L183">    public static class EvalRequest extends AsyncResource&lt;String&gt; {</span>
+        private String js;
+
+        /// Gets the JS code to be executed.
+        public String getJS() {
+<span class="fc" id="L188">            return js;</span>
+        }
+
+        /// Sets the JS code to be executed
+        ///
+        /// #### Parameters
+        ///
+        /// - `js`
+        public void setJS(String js) {
+<span class="fc" id="L197">            this.js = js;</span>
+<span class="fc" id="L198">        }</span>
+
+
+    }
+
+    /// A fallback form implementation that contains a browser for platforms that don't
+    /// implement their own browser window.
+    private static class BrowserForm extends Form {
+
+        /// Listeners to be notified when the browser is closed.
+<span class="fc" id="L208">        private final EventDispatcher closeListeners = new EventDispatcher();</span>
+        /// The form to go &quot;back&quot; to when browser window is closed.
+        private final Form backForm;
+        /// Flag that is set when closed() called.
+        private boolean closed;
+
+<span class="fc" id="L214">        BrowserForm(BrowserWindow owner) {</span>
+<span class="fc" id="L215">            setLayout(new BorderLayout());</span>
+<span class="fc" id="L216">            owner.webview = new BrowserComponent();</span>
+<span class="fc" id="L217">            add(BorderLayout.CENTER, owner.webview);</span>
+<span class="fc" id="L218">            backForm = Display.getInstance().getCurrent();</span>
+<span class="fc" id="L219">            Toolbar tb = new Toolbar();</span>
+<span class="fc" id="L220">            setToolbar(tb);</span>
+<span class="fc" id="L221">            tb.addMaterialCommandToLeftBar(&quot;&quot;, FontImage.MATERIAL_ARROW_BACK_IOS, new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                    if (closed) {</span>
+<span class="nc" id="L225">                        return;</span>
+                    }
+<span class="nc" id="L227">                    closed = true;</span>
+<span class="nc" id="L228">                    backForm.showBack();</span>
+<span class="nc" id="L229">                    closeListeners.fireActionEvent(evt);</span>
+<span class="nc" id="L230">                }</span>
+
+            });
+<span class="fc" id="L233">            setBackCommand(new Command(&quot;&quot;) {</span>
+                @Override
+                public void actionPerformed(ActionEvent e) {
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                    if (closed) {</span>
+<span class="nc" id="L237">                        return;</span>
+                    }
+<span class="nc" id="L239">                    closed = true;</span>
+<span class="nc" id="L240">                    backForm.showBack();</span>
+<span class="nc" id="L241">                    closeListeners.fireActionEvent(e);</span>
+<span class="nc" id="L242">                }</span>
+            });
+
+
+<span class="fc" id="L246">        }</span>
+
+        /// Closes the browser window - navigating back to the previous form.
+        void close() {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            if (closed) {</span>
+<span class="fc" id="L251">                return;</span>
+            }
+<span class="fc" id="L253">            closed = true;</span>
+<span class="fc" id="L254">            backForm.showBack();</span>
+<span class="fc" id="L255">            closeListeners.fireActionEvent(new ActionEvent(this));</span>
+
+<span class="fc" id="L257">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

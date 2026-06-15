@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchBar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">SearchBar.java</span></div><h1>SearchBar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.plaf.UIManager;
+
+/// SearchBar Toolbar.
+///
+/// @author Chen
+class SearchBar extends Toolbar {
+
+    private final TextField search;
+
+    private final Toolbar parent;
+    private final float iconSize;
+
+    /// Creates the SearchBar Toolbar
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the Toolbar parent
+<span class="fc" id="L44">    public SearchBar(Toolbar parent, float iconSize) {</span>
+<span class="fc" id="L45">        this.parent = parent;</span>
+<span class="fc" id="L46">        this.iconSize = iconSize;</span>
+<span class="fc" id="L47">        search = new TextField();</span>
+<span class="fc" id="L48">        search.putClientProperty(&quot;searchField&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L49">        search.setUIID(&quot;TextFieldSearch&quot;);</span>
+        Image img;
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (iconSize &gt; 0) {</span>
+<span class="nc" id="L52">            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle(&quot;TextHintSearch&quot;), iconSize);</span>
+        } else {
+<span class="fc" id="L54">            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle(&quot;TextHintSearch&quot;));</span>
+        }
+<span class="fc" id="L56">        String s = getUIManager().localize(&quot;m.search&quot;, &quot;Search&quot;);</span>
+<span class="fc" id="L57">        Label hint = new Label(s, img);</span>
+<span class="fc" id="L58">        hint.setUIID(&quot;TextHintSearch&quot;);</span>
+<span class="fc" id="L59">        search.setHint(s);</span>
+<span class="fc" id="L60">        search.setHintLabelImpl(hint);</span>
+
+<span class="fc" id="L62">        search.addDataChangedListener(new DataChangedListener() {</span>
+
+            @Override
+            public void dataChanged(int type, int index) {
+<span class="fc" id="L66">                onSearch(search.getText());</span>
+<span class="fc" id="L67">            }</span>
+        });
+<span class="fc" id="L69">        setUIIDFinal(&quot;ToolbarSearch&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (parent.getComponentForm() == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L71">            search.startEditingAsync();</span>
+        } else {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (parent.getComponentForm() != null) {</span>
+<span class="nc" id="L74">                parent.getComponentForm().setEditOnShow(search);</span>
+            }
+        }
+<span class="fc" id="L77">    }</span>
+
+    void initSearchBar() {
+<span class="fc" id="L80">        setTitleComponent(search);</span>
+<span class="fc" id="L81">        setBackCommand(new Command(&quot;&quot;) {</span>
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L85">                search.stopEditing();</span>
+<span class="nc" id="L86">                Display.getInstance().callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc" id="L89">                        onSearch(&quot;&quot;);</span>
+<span class="nc" id="L90">                        final Form f = (Form) SearchBar.this.getParent();</span>
+<span class="nc" id="L91">                        f.getAnimationManager().flushAnimation(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="nc" id="L94">                                f.removeComponentFromForm(SearchBar.this);</span>
+<span class="nc" id="L95">                                f.setToolbar(parent);</span>
+<span class="nc" id="L96">                                parent.setHidden(false);</span>
+<span class="nc" id="L97">                                f.animateLayout(100);</span>
+<span class="nc" id="L98">                            }</span>
+                        });
+<span class="nc" id="L100">                    }</span>
+                });
+<span class="nc" id="L102">            }</span>
+
+        }, BackCommandPolicy.AS_ARROW, iconSize);
+<span class="fc" id="L105">        Command clear = new Command(&quot;&quot;) {</span>
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L109">                search.clear();</span>
+<span class="fc" id="L110">            }</span>
+
+        };
+        Image img;
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (iconSize &gt; 0) {</span>
+<span class="nc" id="L115">            img = FontImage.createMaterial(FontImage.MATERIAL_CLOSE, UIManager.getInstance().getComponentStyle(&quot;TitleCommand&quot;), iconSize);</span>
+        } else {
+<span class="fc" id="L117">            img = FontImage.createMaterial(FontImage.MATERIAL_CLOSE, UIManager.getInstance().getComponentStyle(&quot;TitleCommand&quot;));</span>
+        }
+<span class="fc" id="L119">        clear.setIcon(img);</span>
+<span class="fc" id="L120">        addCommandToRightBar(clear);</span>
+<span class="fc" id="L121">    }</span>
+
+    /// This method gets called when a text has changed on the search bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the search string
+    public void onSearch(String text) {
+
+<span class="nc" id="L130">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

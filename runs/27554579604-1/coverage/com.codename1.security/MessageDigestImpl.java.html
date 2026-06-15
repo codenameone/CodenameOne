@@ -1,0 +1,758 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageDigestImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">MessageDigestImpl.java</span></div><h1>MessageDigestImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+// Pure-Java implementations of MD5 / SHA-1 / SHA-2 (224, 256, 384, 512). These
+// are the well-known reference algorithms (RFC 1321, RFC 3174, FIPS 180-4).
+//
+// One class with a small dispatch is more compact than five separate classes
+// and keeps all the round constants close to the rounds that use them.
+<span class="fc" id="L30">abstract class MessageDigestImpl {</span>
+
+    abstract void update(byte[] data, int offset, int length);
+    abstract void update(byte b);
+    abstract byte[] digest();
+    abstract int digestLength();
+    abstract void reset();
+
+    static MessageDigestImpl create(String algorithm) {
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (algorithm == null) {</span>
+<span class="nc" id="L40">            throw new CryptoException(&quot;algorithm must not be null&quot;);</span>
+        }
+<span class="fc" id="L42">        String a = normalise(algorithm);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (&quot;MD5&quot;.equals(a)) {</span>
+<span class="fc" id="L44">            return new Md5();</span>
+        }
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (&quot;SHA1&quot;.equals(a)) {</span>
+<span class="fc" id="L47">            return new Sha1();</span>
+        }
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (&quot;SHA224&quot;.equals(a)) {</span>
+<span class="nc" id="L50">            return new Sha256Family(true);</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (&quot;SHA256&quot;.equals(a)) {</span>
+<span class="fc" id="L53">            return new Sha256Family(false);</span>
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (&quot;SHA384&quot;.equals(a)) {</span>
+<span class="fc" id="L56">            return new Sha512Family(true);</span>
+        }
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (&quot;SHA512&quot;.equals(a)) {</span>
+<span class="fc" id="L59">            return new Sha512Family(false);</span>
+        }
+<span class="nc" id="L61">        throw new CryptoException(&quot;unsupported hash algorithm: &quot; + algorithm);</span>
+    }
+
+    static String normalise(String algorithm) {
+<span class="fc" id="L65">        StringBuilder b = new StringBuilder(algorithm.length());</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (int i = 0; i &lt; algorithm.length(); i++) {</span>
+<span class="fc" id="L67">            char c = algorithm.charAt(i);</span>
+<span class="pc bpc" id="L68" title="2 of 6 branches missed.">            if (c == '-' || c == '_' || c == ' ') {</span>
+<span class="nc" id="L69">                continue;</span>
+            }
+<span class="pc bpc" id="L71" title="3 of 4 branches missed.">            if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="nc" id="L72">                c = (char) (c - 'a' + 'A');</span>
+            }
+<span class="fc" id="L74">            b.append(c);</span>
+        }
+<span class="fc" id="L76">        return b.toString();</span>
+    }
+
+    // ===============================================================
+    // shared 64-byte (512-bit) block engine used by MD5 and SHA-1/SHA-256
+<span class="fc" id="L81">    abstract static class Block64 extends MessageDigestImpl {</span>
+<span class="fc" id="L82">        final byte[] buffer = new byte[64];</span>
+        int bufferLen;
+        long byteCount;
+
+        abstract void processBlock(byte[] block, int offset);
+        abstract void writeStateBigEndian(byte[] out);
+
+        @Override
+        void update(byte[] data, int offset, int length) {
+<span class="fc" id="L91">            byteCount += length;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (bufferLen &gt; 0) {</span>
+<span class="fc" id="L93">                int copy = 64 - bufferLen;</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                if (copy &gt; length) {</span>
+<span class="fc" id="L95">                    copy = length;</span>
+                }
+<span class="fc" id="L97">                System.arraycopy(data, offset, buffer, bufferLen, copy);</span>
+<span class="fc" id="L98">                bufferLen += copy;</span>
+<span class="fc" id="L99">                offset += copy;</span>
+<span class="fc" id="L100">                length -= copy;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                if (bufferLen == 64) {</span>
+<span class="nc" id="L102">                    processBlock(buffer, 0);</span>
+<span class="nc" id="L103">                    bufferLen = 0;</span>
+                }
+            }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            while (length &gt;= 64) {</span>
+<span class="fc" id="L107">                processBlock(data, offset);</span>
+<span class="fc" id="L108">                offset += 64;</span>
+<span class="fc" id="L109">                length -= 64;</span>
+            }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (length &gt; 0) {</span>
+<span class="fc" id="L112">                System.arraycopy(data, offset, buffer, 0, length);</span>
+<span class="fc" id="L113">                bufferLen = length;</span>
+            }
+<span class="fc" id="L115">        }</span>
+
+        @Override
+        void update(byte b) {
+<span class="fc" id="L119">            byteCount++;</span>
+<span class="fc" id="L120">            buffer[bufferLen++] = b;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (bufferLen == 64) {</span>
+<span class="nc" id="L122">                processBlock(buffer, 0);</span>
+<span class="nc" id="L123">                bufferLen = 0;</span>
+            }
+<span class="fc" id="L125">        }</span>
+
+        final byte[] finishCommon(boolean bigEndianLength) {
+<span class="fc" id="L128">            long bits = byteCount * 8L;</span>
+<span class="fc" id="L129">            buffer[bufferLen++] = (byte) 0x80;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (bufferLen &gt; 56) {</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                while (bufferLen &lt; 64) {</span>
+<span class="nc" id="L132">                    buffer[bufferLen++] = 0;</span>
+                }
+<span class="nc" id="L134">                processBlock(buffer, 0);</span>
+<span class="nc" id="L135">                bufferLen = 0;</span>
+            }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            while (bufferLen &lt; 56) {</span>
+<span class="fc" id="L138">                buffer[bufferLen++] = 0;</span>
+            }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (bigEndianLength) {</span>
+<span class="fc" id="L141">                buffer[56] = (byte) (bits &gt;&gt;&gt; 56);</span>
+<span class="fc" id="L142">                buffer[57] = (byte) (bits &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L143">                buffer[58] = (byte) (bits &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L144">                buffer[59] = (byte) (bits &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L145">                buffer[60] = (byte) (bits &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L146">                buffer[61] = (byte) (bits &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L147">                buffer[62] = (byte) (bits &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L148">                buffer[63] = (byte) bits;</span>
+            } else {
+<span class="fc" id="L150">                buffer[56] = (byte) bits;</span>
+<span class="fc" id="L151">                buffer[57] = (byte) (bits &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L152">                buffer[58] = (byte) (bits &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L153">                buffer[59] = (byte) (bits &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L154">                buffer[60] = (byte) (bits &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L155">                buffer[61] = (byte) (bits &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L156">                buffer[62] = (byte) (bits &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L157">                buffer[63] = (byte) (bits &gt;&gt;&gt; 56);</span>
+            }
+<span class="fc" id="L159">            processBlock(buffer, 0);</span>
+<span class="fc" id="L160">            byte[] out = new byte[digestLength()];</span>
+<span class="fc" id="L161">            writeStateBigEndian(out);</span>
+<span class="fc" id="L162">            reset();</span>
+<span class="fc" id="L163">            return out;</span>
+        }
+    }
+
+    // ===============================================================
+    // MD5 -- RFC 1321 (little-endian length, little-endian word loads)
+    static final class Md5 extends Block64 {
+        int a;
+        int b;
+        int c;
+        int d;
+
+<span class="fc" id="L175">        Md5() {</span>
+<span class="fc" id="L176">            reset();</span>
+<span class="fc" id="L177">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc" id="L181">            a = 0x67452301;</span>
+<span class="fc" id="L182">            b = 0xefcdab89;</span>
+<span class="fc" id="L183">            c = 0x98badcfe;</span>
+<span class="fc" id="L184">            d = 0x10325476;</span>
+<span class="fc" id="L185">            bufferLen = 0;</span>
+<span class="fc" id="L186">            byteCount = 0;</span>
+<span class="fc" id="L187">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc" id="L191">            return 16;</span>
+        }
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L196">            return finishCommon(false);</span>
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+            // MD5 actually writes its state little-endian; we reuse the name
+            // for the shared finish path.
+<span class="fc" id="L203">            writeLE(out, 0, a);</span>
+<span class="fc" id="L204">            writeLE(out, 4, b);</span>
+<span class="fc" id="L205">            writeLE(out, 8, c);</span>
+<span class="fc" id="L206">            writeLE(out, 12, d);</span>
+<span class="fc" id="L207">        }</span>
+
+        private static void writeLE(byte[] out, int o, int v) {
+<span class="fc" id="L210">            out[o] = (byte) v;</span>
+<span class="fc" id="L211">            out[o + 1] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L212">            out[o + 2] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L213">            out[o + 3] = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L214">        }</span>
+
+        private static int readLE(byte[] src, int o) {
+<span class="fc" id="L217">            return  (src[o] &amp; 0xff)</span>
+                  | (src[o + 1] &amp; 0xff) &lt;&lt; 8
+                  | (src[o + 2] &amp; 0xff) &lt;&lt; 16
+                  | (src[o + 3] &amp; 0xff) &lt;&lt; 24;
+        }
+
+        private static int rol(int v, int s) {
+<span class="fc" id="L224">            return (v &lt;&lt; s) | (v &gt;&gt;&gt; (32 - s));</span>
+        }
+
+        @Override
+        void processBlock(byte[] block, int o) {
+<span class="fc" id="L229">            int x0  = readLE(block, o);</span>
+<span class="fc" id="L230">            int x1  = readLE(block, o + 4);</span>
+<span class="fc" id="L231">            int x2  = readLE(block, o + 8);</span>
+<span class="fc" id="L232">            int x3  = readLE(block, o + 12);</span>
+<span class="fc" id="L233">            int x4  = readLE(block, o + 16);</span>
+<span class="fc" id="L234">            int x5  = readLE(block, o + 20);</span>
+<span class="fc" id="L235">            int x6  = readLE(block, o + 24);</span>
+<span class="fc" id="L236">            int x7  = readLE(block, o + 28);</span>
+<span class="fc" id="L237">            int x8  = readLE(block, o + 32);</span>
+<span class="fc" id="L238">            int x9  = readLE(block, o + 36);</span>
+<span class="fc" id="L239">            int x10 = readLE(block, o + 40);</span>
+<span class="fc" id="L240">            int x11 = readLE(block, o + 44);</span>
+<span class="fc" id="L241">            int x12 = readLE(block, o + 48);</span>
+<span class="fc" id="L242">            int x13 = readLE(block, o + 52);</span>
+<span class="fc" id="L243">            int x14 = readLE(block, o + 56);</span>
+<span class="fc" id="L244">            int x15 = readLE(block, o + 60);</span>
+
+<span class="fc" id="L246">            int aa = a;</span>
+<span class="fc" id="L247">            int bb = b;</span>
+<span class="fc" id="L248">            int cc = c;</span>
+<span class="fc" id="L249">            int dd = d;</span>
+
+            // round 1
+<span class="fc" id="L252">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x0  + 0xd76aa478, 7);</span>
+<span class="fc" id="L253">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x1  + 0xe8c7b756, 12);</span>
+<span class="fc" id="L254">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x2  + 0x242070db, 17);</span>
+<span class="fc" id="L255">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x3  + 0xc1bdceee, 22);</span>
+<span class="fc" id="L256">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x4  + 0xf57c0faf, 7);</span>
+<span class="fc" id="L257">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x5  + 0x4787c62a, 12);</span>
+<span class="fc" id="L258">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x6  + 0xa8304613, 17);</span>
+<span class="fc" id="L259">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x7  + 0xfd469501, 22);</span>
+<span class="fc" id="L260">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x8  + 0x698098d8, 7);</span>
+<span class="fc" id="L261">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x9  + 0x8b44f7af, 12);</span>
+<span class="fc" id="L262">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x10 + 0xffff5bb1, 17);</span>
+<span class="fc" id="L263">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x11 + 0x895cd7be, 22);</span>
+<span class="fc" id="L264">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x12 + 0x6b901122, 7);</span>
+<span class="fc" id="L265">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x13 + 0xfd987193, 12);</span>
+<span class="fc" id="L266">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x14 + 0xa679438e, 17);</span>
+<span class="fc" id="L267">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x15 + 0x49b40821, 22);</span>
+
+            // round 2
+<span class="fc" id="L270">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x1  + 0xf61e2562, 5);</span>
+<span class="fc" id="L271">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x6  + 0xc040b340, 9);</span>
+<span class="fc" id="L272">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x11 + 0x265e5a51, 14);</span>
+<span class="fc" id="L273">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x0  + 0xe9b6c7aa, 20);</span>
+<span class="fc" id="L274">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x5  + 0xd62f105d, 5);</span>
+<span class="fc" id="L275">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x10 + 0x02441453, 9);</span>
+<span class="fc" id="L276">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x15 + 0xd8a1e681, 14);</span>
+<span class="fc" id="L277">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x4  + 0xe7d3fbc8, 20);</span>
+<span class="fc" id="L278">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x9  + 0x21e1cde6, 5);</span>
+<span class="fc" id="L279">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x14 + 0xc33707d6, 9);</span>
+<span class="fc" id="L280">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x3  + 0xf4d50d87, 14);</span>
+<span class="fc" id="L281">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x8  + 0x455a14ed, 20);</span>
+<span class="fc" id="L282">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x13 + 0xa9e3e905, 5);</span>
+<span class="fc" id="L283">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x2  + 0xfcefa3f8, 9);</span>
+<span class="fc" id="L284">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x7  + 0x676f02d9, 14);</span>
+<span class="fc" id="L285">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x12 + 0x8d2a4c8a, 20);</span>
+
+            // round 3
+<span class="fc" id="L288">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x5  + 0xfffa3942, 4);</span>
+<span class="fc" id="L289">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x8  + 0x8771f681, 11);</span>
+<span class="fc" id="L290">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x11 + 0x6d9d6122, 16);</span>
+<span class="fc" id="L291">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x14 + 0xfde5380c, 23);</span>
+<span class="fc" id="L292">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x1  + 0xa4beea44, 4);</span>
+<span class="fc" id="L293">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x4  + 0x4bdecfa9, 11);</span>
+<span class="fc" id="L294">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x7  + 0xf6bb4b60, 16);</span>
+<span class="fc" id="L295">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x10 + 0xbebfbc70, 23);</span>
+<span class="fc" id="L296">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x13 + 0x289b7ec6, 4);</span>
+<span class="fc" id="L297">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x0  + 0xeaa127fa, 11);</span>
+<span class="fc" id="L298">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x3  + 0xd4ef3085, 16);</span>
+<span class="fc" id="L299">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x6  + 0x04881d05, 23);</span>
+<span class="fc" id="L300">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x9  + 0xd9d4d039, 4);</span>
+<span class="fc" id="L301">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x12 + 0xe6db99e5, 11);</span>
+<span class="fc" id="L302">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x15 + 0x1fa27cf8, 16);</span>
+<span class="fc" id="L303">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x2  + 0xc4ac5665, 23);</span>
+
+            // round 4
+<span class="fc" id="L306">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x0  + 0xf4292244, 6);</span>
+<span class="fc" id="L307">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x7  + 0x432aff97, 10);</span>
+<span class="fc" id="L308">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x14 + 0xab9423a7, 15);</span>
+<span class="fc" id="L309">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x5  + 0xfc93a039, 21);</span>
+<span class="fc" id="L310">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x12 + 0x655b59c3, 6);</span>
+<span class="fc" id="L311">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x3  + 0x8f0ccc92, 10);</span>
+<span class="fc" id="L312">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x10 + 0xffeff47d, 15);</span>
+<span class="fc" id="L313">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x1  + 0x85845dd1, 21);</span>
+<span class="fc" id="L314">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x8  + 0x6fa87e4f, 6);</span>
+<span class="fc" id="L315">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x15 + 0xfe2ce6e0, 10);</span>
+<span class="fc" id="L316">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x6  + 0xa3014314, 15);</span>
+<span class="fc" id="L317">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x13 + 0x4e0811a1, 21);</span>
+<span class="fc" id="L318">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x4  + 0xf7537e82, 6);</span>
+<span class="fc" id="L319">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x11 + 0xbd3af235, 10);</span>
+<span class="fc" id="L320">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x2  + 0x2ad7d2bb, 15);</span>
+<span class="fc" id="L321">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x9  + 0xeb86d391, 21);</span>
+
+<span class="fc" id="L323">            a += aa;</span>
+<span class="fc" id="L324">            b += bb;</span>
+<span class="fc" id="L325">            c += cc;</span>
+<span class="fc" id="L326">            d += dd;</span>
+<span class="fc" id="L327">        }</span>
+    }
+
+    // ===============================================================
+    // SHA-1 -- RFC 3174
+    static final class Sha1 extends Block64 {
+        int h0;
+        int h1;
+        int h2;
+        int h3;
+        int h4;
+<span class="fc" id="L338">        final int[] w = new int[80];</span>
+
+<span class="fc" id="L340">        Sha1() {</span>
+<span class="fc" id="L341">            reset();</span>
+<span class="fc" id="L342">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc" id="L346">            h0 = 0x67452301;</span>
+<span class="fc" id="L347">            h1 = 0xEFCDAB89;</span>
+<span class="fc" id="L348">            h2 = 0x98BADCFE;</span>
+<span class="fc" id="L349">            h3 = 0x10325476;</span>
+<span class="fc" id="L350">            h4 = 0xC3D2E1F0;</span>
+<span class="fc" id="L351">            bufferLen = 0;</span>
+<span class="fc" id="L352">            byteCount = 0;</span>
+<span class="fc" id="L353">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc" id="L357">            return 20;</span>
+        }
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L362">            return finishCommon(true);</span>
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+<span class="fc" id="L367">            writeBE(out, 0, h0);</span>
+<span class="fc" id="L368">            writeBE(out, 4, h1);</span>
+<span class="fc" id="L369">            writeBE(out, 8, h2);</span>
+<span class="fc" id="L370">            writeBE(out, 12, h3);</span>
+<span class="fc" id="L371">            writeBE(out, 16, h4);</span>
+<span class="fc" id="L372">        }</span>
+
+        @Override
+        void processBlock(byte[] block, int o) {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L377">                w[i] = (block[o + i * 4] &amp; 0xff) &lt;&lt; 24</span>
+                     | (block[o + i * 4 + 1] &amp; 0xff) &lt;&lt; 16
+                     | (block[o + i * 4 + 2] &amp; 0xff) &lt;&lt; 8
+                     | (block[o + i * 4 + 3] &amp; 0xff);
+            }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            for (int i = 16; i &lt; 80; i++) {</span>
+<span class="fc" id="L383">                int t = w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16];</span>
+<span class="fc" id="L384">                w[i] = (t &lt;&lt; 1) | (t &gt;&gt;&gt; 31);</span>
+            }
+<span class="fc" id="L386">            int a = h0;</span>
+<span class="fc" id="L387">            int b = h1;</span>
+<span class="fc" id="L388">            int c = h2;</span>
+<span class="fc" id="L389">            int d = h3;</span>
+<span class="fc" id="L390">            int e = h4;</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">            for (int i = 0; i &lt; 80; i++) {</span>
+                int f;
+                int k;
+<span class="fc bfc" id="L394" title="All 2 branches covered.">                if (i &lt; 20) {</span>
+<span class="fc" id="L395">                    f = (b &amp; c) | (~b &amp; d);</span>
+<span class="fc" id="L396">                    k = 0x5A827999;</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">                } else if (i &lt; 40) {</span>
+<span class="fc" id="L398">                    f = b ^ c ^ d;</span>
+<span class="fc" id="L399">                    k = 0x6ED9EBA1;</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">                } else if (i &lt; 60) {</span>
+<span class="fc" id="L401">                    f = (b &amp; c) | (b &amp; d) | (c &amp; d);</span>
+<span class="fc" id="L402">                    k = 0x8F1BBCDC;</span>
+                } else {
+<span class="fc" id="L404">                    f = b ^ c ^ d;</span>
+<span class="fc" id="L405">                    k = 0xCA62C1D6;</span>
+                }
+<span class="fc" id="L407">                int t = ((a &lt;&lt; 5) | (a &gt;&gt;&gt; 27)) + f + e + k + w[i];</span>
+<span class="fc" id="L408">                e = d;</span>
+<span class="fc" id="L409">                d = c;</span>
+<span class="fc" id="L410">                c = (b &lt;&lt; 30) | (b &gt;&gt;&gt; 2);</span>
+<span class="fc" id="L411">                b = a;</span>
+<span class="fc" id="L412">                a = t;</span>
+            }
+<span class="fc" id="L414">            h0 += a;</span>
+<span class="fc" id="L415">            h1 += b;</span>
+<span class="fc" id="L416">            h2 += c;</span>
+<span class="fc" id="L417">            h3 += d;</span>
+<span class="fc" id="L418">            h4 += e;</span>
+<span class="fc" id="L419">        }</span>
+    }
+
+    // ===============================================================
+    // SHA-224 / SHA-256 -- FIPS 180-4 (32-bit word version)
+    static final class Sha256Family extends Block64 {
+<span class="fc" id="L425">        private static final int[] K = {</span>
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+            0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+            0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+            0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+            0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+            0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+            0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+            0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+            0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        };
+
+        private final boolean truncated; // sha-224 if true
+        private int h0;
+        private int h1;
+        private int h2;
+        private int h3;
+        private int h4;
+        private int h5;
+        private int h6;
+        private int h7;
+<span class="fc" id="L453">        private final int[] w = new int[64];</span>
+
+<span class="fc" id="L455">        Sha256Family(boolean truncated) {</span>
+<span class="fc" id="L456">            this.truncated = truncated;</span>
+<span class="fc" id="L457">            reset();</span>
+<span class="fc" id="L458">        }</span>
+
+        @Override
+        public void reset() {
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">            if (truncated) {</span>
+<span class="nc" id="L463">                h0 = 0xc1059ed8; h1 = 0x367cd507; h2 = 0x3070dd17; h3 = 0xf70e5939;</span>
+<span class="nc" id="L464">                h4 = 0xffc00b31; h5 = 0x68581511; h6 = 0x64f98fa7; h7 = 0xbefa4fa4;</span>
+            } else {
+<span class="fc" id="L466">                h0 = 0x6a09e667; h1 = 0xbb67ae85; h2 = 0x3c6ef372; h3 = 0xa54ff53a;</span>
+<span class="fc" id="L467">                h4 = 0x510e527f; h5 = 0x9b05688c; h6 = 0x1f83d9ab; h7 = 0x5be0cd19;</span>
+            }
+<span class="fc" id="L469">            bufferLen = 0;</span>
+<span class="fc" id="L470">            byteCount = 0;</span>
+<span class="fc" id="L471">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            return truncated ? 28 : 32;</span>
+        }
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L480">            return finishCommon(true);</span>
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+<span class="fc" id="L485">            writeBE(out, 0, h0);</span>
+<span class="fc" id="L486">            writeBE(out, 4, h1);</span>
+<span class="fc" id="L487">            writeBE(out, 8, h2);</span>
+<span class="fc" id="L488">            writeBE(out, 12, h3);</span>
+<span class="fc" id="L489">            writeBE(out, 16, h4);</span>
+<span class="fc" id="L490">            writeBE(out, 20, h5);</span>
+<span class="fc" id="L491">            writeBE(out, 24, h6);</span>
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">            if (!truncated) {</span>
+<span class="fc" id="L493">                writeBE(out, 28, h7);</span>
+            }
+<span class="fc" id="L495">        }</span>
+
+        @Override
+        void processBlock(byte[] block, int o) {
+<span class="fc bfc" id="L499" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L500">                w[i] = (block[o + i * 4] &amp; 0xff) &lt;&lt; 24</span>
+                     | (block[o + i * 4 + 1] &amp; 0xff) &lt;&lt; 16
+                     | (block[o + i * 4 + 2] &amp; 0xff) &lt;&lt; 8
+                     | (block[o + i * 4 + 3] &amp; 0xff);
+            }
+<span class="fc bfc" id="L505" title="All 2 branches covered.">            for (int i = 16; i &lt; 64; i++) {</span>
+<span class="fc" id="L506">                int v15 = w[i - 15];</span>
+<span class="fc" id="L507">                int s0 = ((v15 &gt;&gt;&gt; 7) | (v15 &lt;&lt; 25)) ^ ((v15 &gt;&gt;&gt; 18) | (v15 &lt;&lt; 14)) ^ (v15 &gt;&gt;&gt; 3);</span>
+<span class="fc" id="L508">                int v2 = w[i - 2];</span>
+<span class="fc" id="L509">                int s1 = ((v2 &gt;&gt;&gt; 17) | (v2 &lt;&lt; 15)) ^ ((v2 &gt;&gt;&gt; 19) | (v2 &lt;&lt; 13)) ^ (v2 &gt;&gt;&gt; 10);</span>
+<span class="fc" id="L510">                w[i] = w[i - 16] + s0 + w[i - 7] + s1;</span>
+            }
+<span class="fc" id="L512">            int a = h0;</span>
+<span class="fc" id="L513">            int b = h1;</span>
+<span class="fc" id="L514">            int c = h2;</span>
+<span class="fc" id="L515">            int d = h3;</span>
+<span class="fc" id="L516">            int e = h4;</span>
+<span class="fc" id="L517">            int f = h5;</span>
+<span class="fc" id="L518">            int g = h6;</span>
+<span class="fc" id="L519">            int h = h7;</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            for (int i = 0; i &lt; 64; i++) {</span>
+<span class="fc" id="L521">                int s1 = ((e &gt;&gt;&gt; 6) | (e &lt;&lt; 26)) ^ ((e &gt;&gt;&gt; 11) | (e &lt;&lt; 21)) ^ ((e &gt;&gt;&gt; 25) | (e &lt;&lt; 7));</span>
+<span class="fc" id="L522">                int ch = (e &amp; f) ^ (~e &amp; g);</span>
+<span class="fc" id="L523">                int t1 = h + s1 + ch + K[i] + w[i];</span>
+<span class="fc" id="L524">                int s0 = ((a &gt;&gt;&gt; 2) | (a &lt;&lt; 30)) ^ ((a &gt;&gt;&gt; 13) | (a &lt;&lt; 19)) ^ ((a &gt;&gt;&gt; 22) | (a &lt;&lt; 10));</span>
+<span class="fc" id="L525">                int mj = (a &amp; b) ^ (a &amp; c) ^ (b &amp; c);</span>
+<span class="fc" id="L526">                int t2 = s0 + mj;</span>
+<span class="fc" id="L527">                h = g; g = f; f = e;</span>
+<span class="fc" id="L528">                e = d + t1;</span>
+<span class="fc" id="L529">                d = c; c = b; b = a;</span>
+<span class="fc" id="L530">                a = t1 + t2;</span>
+            }
+<span class="fc" id="L532">            h0 += a; h1 += b; h2 += c; h3 += d;</span>
+<span class="fc" id="L533">            h4 += e; h5 += f; h6 += g; h7 += h;</span>
+<span class="fc" id="L534">        }</span>
+    }
+
+    // ===============================================================
+    // SHA-384 / SHA-512 -- FIPS 180-4 (64-bit word version, 128-byte blocks,
+    // 128-bit length field). Uses a 128-byte block engine.
+    static final class Sha512Family extends MessageDigestImpl {
+<span class="fc" id="L541">        private static final long[] K = {</span>
+            0x428a2f98d728ae22L, 0x7137449123ef65cdL, 0xb5c0fbcfec4d3b2fL, 0xe9b5dba58189dbbcL,
+            0x3956c25bf348b538L, 0x59f111f1b605d019L, 0x923f82a4af194f9bL, 0xab1c5ed5da6d8118L,
+            0xd807aa98a3030242L, 0x12835b0145706fbeL, 0x243185be4ee4b28cL, 0x550c7dc3d5ffb4e2L,
+            0x72be5d74f27b896fL, 0x80deb1fe3b1696b1L, 0x9bdc06a725c71235L, 0xc19bf174cf692694L,
+            0xe49b69c19ef14ad2L, 0xefbe4786384f25e3L, 0x0fc19dc68b8cd5b5L, 0x240ca1cc77ac9c65L,
+            0x2de92c6f592b0275L, 0x4a7484aa6ea6e483L, 0x5cb0a9dcbd41fbd4L, 0x76f988da831153b5L,
+            0x983e5152ee66dfabL, 0xa831c66d2db43210L, 0xb00327c898fb213fL, 0xbf597fc7beef0ee4L,
+            0xc6e00bf33da88fc2L, 0xd5a79147930aa725L, 0x06ca6351e003826fL, 0x142929670a0e6e70L,
+            0x27b70a8546d22ffcL, 0x2e1b21385c26c926L, 0x4d2c6dfc5ac42aedL, 0x53380d139d95b3dfL,
+            0x650a73548baf63deL, 0x766a0abb3c77b2a8L, 0x81c2c92e47edaee6L, 0x92722c851482353bL,
+            0xa2bfe8a14cf10364L, 0xa81a664bbc423001L, 0xc24b8b70d0f89791L, 0xc76c51a30654be30L,
+            0xd192e819d6ef5218L, 0xd69906245565a910L, 0xf40e35855771202aL, 0x106aa07032bbd1b8L,
+            0x19a4c116b8d2d0c8L, 0x1e376c085141ab53L, 0x2748774cdf8eeb99L, 0x34b0bcb5e19b48a8L,
+            0x391c0cb3c5c95a63L, 0x4ed8aa4ae3418acbL, 0x5b9cca4f7763e373L, 0x682e6ff3d6b2b8a3L,
+            0x748f82ee5defb2fcL, 0x78a5636f43172f60L, 0x84c87814a1f0ab72L, 0x8cc702081a6439ecL,
+            0x90befffa23631e28L, 0xa4506cebde82bde9L, 0xbef9a3f7b2c67915L, 0xc67178f2e372532bL,
+            0xca273eceea26619cL, 0xd186b8c721c0c207L, 0xeada7dd6cde0eb1eL, 0xf57d4f7fee6ed178L,
+            0x06f067aa72176fbaL, 0x0a637dc5a2c898a6L, 0x113f9804bef90daeL, 0x1b710b35131c471bL,
+            0x28db77f523047d84L, 0x32caab7b40c72493L, 0x3c9ebe0a15c9bebcL, 0x431d67c49c100d4cL,
+            0x4cc5d4becb3e42b6L, 0x597f299cfc657e2aL, 0x5fcb6fab3ad6faecL, 0x6c44198c4a475817L
+        };
+
+        private final boolean truncated; // sha-384 if true
+        private long h0;
+        private long h1;
+        private long h2;
+        private long h3;
+        private long h4;
+        private long h5;
+        private long h6;
+        private long h7;
+<span class="fc" id="L573">        private final byte[] buffer = new byte[128];</span>
+        private int bufferLen;
+        private long byteCount; // we cap message length at 2^63-1 bytes which is plenty
+<span class="fc" id="L576">        private final long[] w = new long[80];</span>
+
+<span class="fc" id="L578">        Sha512Family(boolean truncated) {</span>
+<span class="fc" id="L579">            this.truncated = truncated;</span>
+<span class="fc" id="L580">            reset();</span>
+<span class="fc" id="L581">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc bfc" id="L585" title="All 2 branches covered.">            if (truncated) {</span>
+<span class="fc" id="L586">                h0 = 0xcbbb9d5dc1059ed8L; h1 = 0x629a292a367cd507L; h2 = 0x9159015a3070dd17L;</span>
+<span class="fc" id="L587">                h3 = 0x152fecd8f70e5939L; h4 = 0x67332667ffc00b31L; h5 = 0x8eb44a8768581511L;</span>
+<span class="fc" id="L588">                h6 = 0xdb0c2e0d64f98fa7L; h7 = 0x47b5481dbefa4fa4L;</span>
+            } else {
+<span class="fc" id="L590">                h0 = 0x6a09e667f3bcc908L; h1 = 0xbb67ae8584caa73bL; h2 = 0x3c6ef372fe94f82bL;</span>
+<span class="fc" id="L591">                h3 = 0xa54ff53a5f1d36f1L; h4 = 0x510e527fade682d1L; h5 = 0x9b05688c2b3e6c1fL;</span>
+<span class="fc" id="L592">                h6 = 0x1f83d9abfb41bd6bL; h7 = 0x5be0cd19137e2179L;</span>
+            }
+<span class="fc" id="L594">            bufferLen = 0;</span>
+<span class="fc" id="L595">            byteCount = 0;</span>
+<span class="fc" id="L596">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc bfc" id="L600" title="All 2 branches covered.">            return truncated ? 48 : 64;</span>
+        }
+
+        @Override
+        void update(byte[] data, int offset, int length) {
+<span class="fc" id="L605">            byteCount += length;</span>
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">            if (bufferLen &gt; 0) {</span>
+<span class="nc" id="L607">                int copy = 128 - bufferLen;</span>
+<span class="nc bnc" id="L608" title="All 2 branches missed.">                if (copy &gt; length) {</span>
+<span class="nc" id="L609">                    copy = length;</span>
+                }
+<span class="nc" id="L611">                System.arraycopy(data, offset, buffer, bufferLen, copy);</span>
+<span class="nc" id="L612">                bufferLen += copy;</span>
+<span class="nc" id="L613">                offset += copy;</span>
+<span class="nc" id="L614">                length -= copy;</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                if (bufferLen == 128) {</span>
+<span class="nc" id="L616">                    processBlock(buffer, 0);</span>
+<span class="nc" id="L617">                    bufferLen = 0;</span>
+                }
+            }
+<span class="fc bfc" id="L620" title="All 2 branches covered.">            while (length &gt;= 128) {</span>
+<span class="fc" id="L621">                processBlock(data, offset);</span>
+<span class="fc" id="L622">                offset += 128;</span>
+<span class="fc" id="L623">                length -= 128;</span>
+            }
+<span class="fc bfc" id="L625" title="All 2 branches covered.">            if (length &gt; 0) {</span>
+<span class="fc" id="L626">                System.arraycopy(data, offset, buffer, 0, length);</span>
+<span class="fc" id="L627">                bufferLen = length;</span>
+            }
+<span class="fc" id="L629">        }</span>
+
+        @Override
+        void update(byte b) {
+<span class="nc" id="L633">            byteCount++;</span>
+<span class="nc" id="L634">            buffer[bufferLen++] = b;</span>
+<span class="nc bnc" id="L635" title="All 2 branches missed.">            if (bufferLen == 128) {</span>
+<span class="nc" id="L636">                processBlock(buffer, 0);</span>
+<span class="nc" id="L637">                bufferLen = 0;</span>
+            }
+<span class="nc" id="L639">        }</span>
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L643">            long bits = byteCount * 8L;</span>
+<span class="fc" id="L644">            buffer[bufferLen++] = (byte) 0x80;</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">            if (bufferLen &gt; 112) {</span>
+<span class="nc bnc" id="L646" title="All 2 branches missed.">                while (bufferLen &lt; 128) {</span>
+<span class="nc" id="L647">                    buffer[bufferLen++] = 0;</span>
+                }
+<span class="nc" id="L649">                processBlock(buffer, 0);</span>
+<span class="nc" id="L650">                bufferLen = 0;</span>
+            }
+<span class="fc bfc" id="L652" title="All 2 branches covered.">            while (bufferLen &lt; 112) {</span>
+<span class="fc" id="L653">                buffer[bufferLen++] = 0;</span>
+            }
+            // high 64 bits of the 128-bit length field are always 0 here since
+            // a Java byte array cannot hold more than 2^31-1 bytes.
+<span class="fc bfc" id="L657" title="All 2 branches covered.">            for (int i = 112; i &lt; 120; i++) {</span>
+<span class="fc" id="L658">                buffer[i] = 0;</span>
+            }
+<span class="fc" id="L660">            buffer[120] = (byte) (bits &gt;&gt;&gt; 56);</span>
+<span class="fc" id="L661">            buffer[121] = (byte) (bits &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L662">            buffer[122] = (byte) (bits &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L663">            buffer[123] = (byte) (bits &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L664">            buffer[124] = (byte) (bits &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L665">            buffer[125] = (byte) (bits &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L666">            buffer[126] = (byte) (bits &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L667">            buffer[127] = (byte) bits;</span>
+<span class="fc" id="L668">            processBlock(buffer, 0);</span>
+
+<span class="fc" id="L670">            byte[] out = new byte[digestLength()];</span>
+<span class="fc" id="L671">            writeBE64(out, 0,  h0);</span>
+<span class="fc" id="L672">            writeBE64(out, 8,  h1);</span>
+<span class="fc" id="L673">            writeBE64(out, 16, h2);</span>
+<span class="fc" id="L674">            writeBE64(out, 24, h3);</span>
+<span class="fc" id="L675">            writeBE64(out, 32, h4);</span>
+<span class="fc" id="L676">            writeBE64(out, 40, h5);</span>
+            // sha-384 omits h6, h7
+<span class="fc bfc" id="L678" title="All 2 branches covered.">            if (!truncated) {</span>
+<span class="fc" id="L679">                writeBE64(out, 48, h6);</span>
+<span class="fc" id="L680">                writeBE64(out, 56, h7);</span>
+            }
+<span class="fc" id="L682">            reset();</span>
+<span class="fc" id="L683">            return out;</span>
+        }
+
+        private void processBlock(byte[] block, int o) {
+<span class="fc bfc" id="L687" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L688">                int p = o + i * 8;</span>
+<span class="fc" id="L689">                w[i] = ((long) (block[p]     &amp; 0xff) &lt;&lt; 56)</span>
+                     | ((long) (block[p + 1] &amp; 0xff) &lt;&lt; 48)
+                     | ((long) (block[p + 2] &amp; 0xff) &lt;&lt; 40)
+                     | ((long) (block[p + 3] &amp; 0xff) &lt;&lt; 32)
+                     | ((long) (block[p + 4] &amp; 0xff) &lt;&lt; 24)
+                     | ((long) (block[p + 5] &amp; 0xff) &lt;&lt; 16)
+                     | ((long) (block[p + 6] &amp; 0xff) &lt;&lt; 8)
+                     | ((long) (block[p + 7] &amp; 0xff));
+            }
+<span class="fc bfc" id="L698" title="All 2 branches covered.">            for (int i = 16; i &lt; 80; i++) {</span>
+<span class="fc" id="L699">                long v15 = w[i - 15];</span>
+<span class="fc" id="L700">                long s0 = ((v15 &gt;&gt;&gt; 1) | (v15 &lt;&lt; 63))</span>
+                        ^ ((v15 &gt;&gt;&gt; 8) | (v15 &lt;&lt; 56))
+                        ^ (v15 &gt;&gt;&gt; 7);
+<span class="fc" id="L703">                long v2 = w[i - 2];</span>
+<span class="fc" id="L704">                long s1 = ((v2 &gt;&gt;&gt; 19) | (v2 &lt;&lt; 45))</span>
+                        ^ ((v2 &gt;&gt;&gt; 61) | (v2 &lt;&lt; 3))
+                        ^ (v2 &gt;&gt;&gt; 6);
+<span class="fc" id="L707">                w[i] = w[i - 16] + s0 + w[i - 7] + s1;</span>
+            }
+<span class="fc" id="L709">            long a = h0;</span>
+<span class="fc" id="L710">            long b = h1;</span>
+<span class="fc" id="L711">            long c = h2;</span>
+<span class="fc" id="L712">            long d = h3;</span>
+<span class="fc" id="L713">            long e = h4;</span>
+<span class="fc" id="L714">            long f = h5;</span>
+<span class="fc" id="L715">            long g = h6;</span>
+<span class="fc" id="L716">            long h = h7;</span>
+<span class="fc bfc" id="L717" title="All 2 branches covered.">            for (int i = 0; i &lt; 80; i++) {</span>
+<span class="fc" id="L718">                long s1 = ((e &gt;&gt;&gt; 14) | (e &lt;&lt; 50))</span>
+                        ^ ((e &gt;&gt;&gt; 18) | (e &lt;&lt; 46))
+                        ^ ((e &gt;&gt;&gt; 41) | (e &lt;&lt; 23));
+<span class="fc" id="L721">                long ch = (e &amp; f) ^ (~e &amp; g);</span>
+<span class="fc" id="L722">                long t1 = h + s1 + ch + K[i] + w[i];</span>
+<span class="fc" id="L723">                long s0 = ((a &gt;&gt;&gt; 28) | (a &lt;&lt; 36))</span>
+                        ^ ((a &gt;&gt;&gt; 34) | (a &lt;&lt; 30))
+                        ^ ((a &gt;&gt;&gt; 39) | (a &lt;&lt; 25));
+<span class="fc" id="L726">                long mj = (a &amp; b) ^ (a &amp; c) ^ (b &amp; c);</span>
+<span class="fc" id="L727">                long t2 = s0 + mj;</span>
+<span class="fc" id="L728">                h = g; g = f; f = e;</span>
+<span class="fc" id="L729">                e = d + t1;</span>
+<span class="fc" id="L730">                d = c; c = b; b = a;</span>
+<span class="fc" id="L731">                a = t1 + t2;</span>
+            }
+<span class="fc" id="L733">            h0 += a; h1 += b; h2 += c; h3 += d;</span>
+<span class="fc" id="L734">            h4 += e; h5 += f; h6 += g; h7 += h;</span>
+<span class="fc" id="L735">        }</span>
+    }
+
+    // ===============================================================
+    // shared little helpers
+    static void writeBE(byte[] out, int o, int v) {
+<span class="fc" id="L741">        out[o]     = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L742">        out[o + 1] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L743">        out[o + 2] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L744">        out[o + 3] = (byte) v;</span>
+<span class="fc" id="L745">    }</span>
+
+    static void writeBE64(byte[] out, int o, long v) {
+<span class="fc" id="L748">        out[o]     = (byte) (v &gt;&gt;&gt; 56);</span>
+<span class="fc" id="L749">        out[o + 1] = (byte) (v &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L750">        out[o + 2] = (byte) (v &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L751">        out[o + 3] = (byte) (v &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L752">        out[o + 4] = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L753">        out[o + 5] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L754">        out[o + 6] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L755">        out[o + 7] = (byte) v;</span>
+<span class="fc" id="L756">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

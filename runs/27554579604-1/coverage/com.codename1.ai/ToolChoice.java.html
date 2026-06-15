@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ToolChoice.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">ToolChoice.java</span></div><h1>ToolChoice.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+/// Controls how aggressively the model will call tools. Use the
+/// constants for the three common modes; use [#named(String)] to force
+/// the model to call a specific tool.
+public final class ToolChoice {
+    /// Model picks freely between calling tools and replying with text.
+<span class="nc" id="L30">    public static final ToolChoice AUTO = new ToolChoice(&quot;auto&quot;, null);</span>
+
+    /// Model must not call any tool -- it must reply with text.
+<span class="nc" id="L33">    public static final ToolChoice NONE = new ToolChoice(&quot;none&quot;, null);</span>
+
+    /// Model must call exactly one tool (any tool). Useful for forcing
+    /// a structured-output path.
+<span class="nc" id="L37">    public static final ToolChoice REQUIRED = new ToolChoice(&quot;required&quot;, null);</span>
+
+    private final String mode;
+    private final String forcedToolName;
+
+<span class="nc" id="L42">    private ToolChoice(String mode, String forcedToolName) {</span>
+<span class="nc" id="L43">        this.mode = mode;</span>
+<span class="nc" id="L44">        this.forcedToolName = forcedToolName;</span>
+<span class="nc" id="L45">    }</span>
+
+    /// Forces the model to call the named tool.
+    public static ToolChoice named(String toolName) {
+<span class="nc bnc" id="L49" title="All 4 branches missed.">        if (toolName == null || toolName.length() == 0) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;toolName is required&quot;);</span>
+        }
+<span class="nc" id="L52">        return new ToolChoice(&quot;named&quot;, toolName);</span>
+    }
+
+    public String getMode() {
+<span class="nc" id="L56">        return mode;</span>
+    }
+
+    public String getForcedToolName() {
+<span class="nc" id="L60">        return forcedToolName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1570 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImageViewer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">ImageViewer.java</span></div><h1>ImageViewer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+/// ImageViewer allows zooming/panning an image and potentially flicking between multiple images
+/// within a list of images.
+///
+/// E.g. the trivial usage works like this:
+///
+/// ```java
+/// Form hi = new Form(&quot;ImageViewer&quot;, new BorderLayout());
+/// Image duke = FontImage.createMaterial(FontImage.MATERIAL_INFO, &quot;Label&quot;, 3.0f);
+/// ImageViewer iv = new ImageViewer(duke);
+/// hi.add(BorderLayout.CENTER, iv);
+/// hi.show();
+/// ```
+///
+/// You can simulate pinch to zoom on the simulator by dragging the right button away from the top left corner to
+/// zoom in and towards the top left corner to zoom out. On Mac touchpads you can drag two fingers to achieve that.
+///
+/// A more elaborate usage includes flicking between multiple images e.g.:
+///
+/// ```java
+/// Form hi = new Form(&quot;ImageViewer&quot;, new BorderLayout());
+///
+/// Image red = Image.createImage(100, 100, 0xffff0000);
+/// Image green = Image.createImage(100, 100, 0xff00ff00);
+/// Image blue = Image.createImage(100, 100, 0xff0000ff);
+/// Image gray = Image.createImage(100, 100, 0xffcccccc);
+///
+/// ImageViewer iv = new ImageViewer(red);
+/// iv.setImageList(new DefaultListModel&lt;&gt;(red, green, blue, gray));
+/// hi.add(BorderLayout.CENTER, iv);
+/// ```
+///
+/// Optional navigation affordances can be enabled when using an image list:
+///
+/// ```java
+/// iv.setNavigationArrowsVisible(true);
+/// iv.setThumbnailsVisible(true);
+/// iv.setThumbnailBarHeight(6f);
+/// ```
+///
+/// These options can also be configured globally using theme constants:
+///
+/// - `imageviewerNavigationArrowsBool`
+/// - `imageviewerThumbnailsBool`
+/// - `imageviewerThumbnailBarHeightMM`
+///
+/// You can even download image URL's dynamically into the `ImageViewer` thanks to the usage of the
+/// `com.codename1.ui.list.ListModel`. E.g. in this model book cover images are downloaded dynamically:
+///
+/// ```java
+/// Form hi = new Form(&quot;ImageViewer&quot;, new BorderLayout());
+/// final EncodedImage placeholder = EncodedImage.createFromImage(
+///         FontImage.createMaterial(FontImage.MATERIAL_SYNC, s).
+///                 scaled(300, 300), false);
+///
+/// class ImageList implements ListModel {
+///     private int selection;
+///     private String[] imageURLs = {
+///         &quot;http://awoiaf.westeros.org/images/thumb/9/93/AGameOfThrones.jpg/300px-AGameOfThrones.jpg&quot;,
+///         &quot;http://awoiaf.westeros.org/images/thumb/3/39/AClashOfKings.jpg/300px-AClashOfKings.jpg&quot;,
+///         &quot;http://awoiaf.westeros.org/images/thumb/2/24/AStormOfSwords.jpg/300px-AStormOfSwords.jpg&quot;,
+///         &quot;http://awoiaf.westeros.org/images/thumb/a/a3/AFeastForCrows.jpg/300px-AFeastForCrows.jpg&quot;,
+///         &quot;http://awoiaf.westeros.org/images/7/79/ADanceWithDragons.jpg&quot;
+///     };
+///     private Image[] images;
+///     private EventDispatcher listeners = new EventDispatcher();
+///
+///     public ImageList() {
+///         this.images = new EncodedImage[imageURLs.length];
+///     }
+///
+///     public Image getItemAt(final int index) {
+///         if(images[index] == null) {
+///             images[index] = placeholder;
+///             Util.downloadUrlToStorageInBackground(imageURLs[index], &quot;list&quot; + index, (e) -&gt; {
+///                     try {
+///                         images[index] = EncodedImage.create(Storage.getInstance().createInputStream(&quot;list&quot; + index));
+///                         listeners.fireDataChangeEvent(index, DataChangedListener.CHANGED);
+///                     } catch(IOException err) {
+///                         err.printStackTrace();
+///                     }
+///             });
+///         }
+///         return images[index];
+///     }
+///
+///     public int getSize() {
+///         return imageURLs.length;
+///     }
+///
+///     public int getSelectedIndex() {
+///         return selection;
+///     }
+///
+///     public void setSelectedIndex(int index) {
+///         selection = index;
+///     }
+///
+///     public void addDataChangedListener(DataChangedListener l) {
+///         listeners.addListener(l);
+///     }
+///
+///     public void removeDataChangedListener(DataChangedListener l) {
+///         listeners.removeListener(l);
+///     }
+///
+///     public void addSelectionListener(SelectionListener l) {
+///     }
+///
+///     public void removeSelectionListener(SelectionListener l) {
+///     }
+///
+///     public void addItem(Image item) {
+///     }
+///
+///     public void removeItem(int index) {
+///     }
+/// };
+///
+/// ImageList imodel = new ImageList();
+///
+/// ImageViewer iv = new ImageViewer(imodel.getItemAt(0));
+/// iv.setImageList(imodel);
+/// hi.add(BorderLayout.CENTER, iv);
+/// ```
+///
+/// @author Shai Almog
+public class ImageViewer extends Component {
+    /// Indicates the initial position of the image in the viewer to FIT to the
+    /// component size
+    public final static int IMAGE_FIT = 0;
+    /// Indicates the initial position of the image in the viewer to FILL the
+    /// component size.
+    /// Notice this type might drop edges of the images in order to stretch the image
+    /// to the full size of the Component.
+    public final static int IMAGE_FILL = 1;
+    private static final int MIN_ZOOM = 1;
+    private static final int MAX_ZOOM = 10;
+    /// The crop box.  This is automatically updated whenever pan/zoom is changed.
+<span class="fc" id="L182">    private final CropBox cropBox = new CropBox();</span>
+<span class="fc" id="L183">    private float zoom = 1;</span>
+<span class="fc" id="L184">    private float currentZoom = 1;</span>
+    private Image image;
+    private int imageX;
+    private int imageY;
+    private int imageDrawWidth;
+    private int imageDrawHeight;
+<span class="fc" id="L190">    private float panPositionX = 0.5f;</span>
+<span class="fc" id="L191">    private float panPositionY = 0.5f;</span>
+    private int pressX;
+    private int pressY;
+    private ListModel&lt;Image&gt; swipeableImages;
+    private DataChangedListener listListener;
+    private Image swipePlaceholder;
+<span class="fc" id="L197">    private float swipeThreshold = 0.4f;</span>
+<span class="fc" id="L198">    private int imageInitialPosition = IMAGE_FIT;</span>
+    private Motion motion;
+<span class="fc" id="L200">    private boolean zooming = false;</span>
+<span class="fc" id="L201">    private boolean animateZoom = true;</span>
+    /// Allows the image to scale down when image initial position is set to fit
+    /// this is off by default since the UX isn't great
+    private boolean allowScaleDown;
+    // return values from image aspect calc
+    private int prefX;
+    private int prefY;
+    private int prefW;
+    private int prefH;
+<span class="fc" id="L210">    private boolean eagerLock = true;</span>
+    private boolean selectLock;
+<span class="fc" id="L212">    private boolean cycleLeft = true;</span>
+<span class="fc" id="L213">    private boolean cycleRight = true;</span>
+    private boolean isPinchZooming;
+    private boolean navigationArrowsVisible;
+    private boolean thumbnailsVisible;
+<span class="fc" id="L217">    private float thumbnailBarHeightMM = 6f;</span>
+    private int pointerPressedAction;
+<span class="fc" id="L219">    private int pointerPressedThumbnailIndex = -1;</span>
+    private boolean delegatingDragToParent;
+
+    /// Default constructor
+<span class="fc" id="L223">    public ImageViewer() {</span>
+<span class="fc" id="L224">        setFocusable(true);</span>
+<span class="fc" id="L225">        setUIIDFinal(&quot;ImageViewer&quot;);</span>
+<span class="fc" id="L226">        getAllStyles().setBgTransparency(0x0);</span>
+<span class="fc" id="L227">        initThemeConstants();</span>
+<span class="fc" id="L228">    }</span>
+
+    private void initThemeConstants() {
+<span class="fc" id="L231">        UIManager manager = getUIManager();</span>
+<span class="fc" id="L232">        String uiidPrefix = getUIID().toLowerCase();</span>
+<span class="fc" id="L233">        navigationArrowsVisible = manager.isThemeConstant(uiidPrefix + &quot;NavigationArrowsBool&quot;, navigationArrowsVisible);</span>
+<span class="fc" id="L234">        thumbnailsVisible = manager.isThemeConstant(uiidPrefix + &quot;ThumbnailsBool&quot;, thumbnailsVisible);</span>
+<span class="fc" id="L235">        thumbnailBarHeightMM = parseFloatThemeConstant(manager.getThemeConstant(uiidPrefix + &quot;ThumbnailBarHeightMM&quot;, Float.toString(thumbnailBarHeightMM)), thumbnailBarHeightMM);</span>
+<span class="fc" id="L236">    }</span>
+
+    private static float parseFloatThemeConstant(String value, float defaultValue) {
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="nc" id="L240">            return defaultValue;</span>
+        }
+        try {
+<span class="fc" id="L243">            return Float.parseFloat(value);</span>
+<span class="nc" id="L244">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L245">            return defaultValue;</span>
+        }
+    }
+
+    /// Initializes the component with an image
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: image to show
+    public ImageViewer(Image i) {
+<span class="fc" id="L255">        this();</span>
+<span class="fc" id="L256">        setImage(i);</span>
+<span class="fc" id="L257">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void resetFocusable() {
+<span class="nc" id="L262">        setFocusable(true);</span>
+<span class="nc" id="L263">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="fc" id="L268">        return new String[]{&quot;eagerLock&quot;, &quot;image&quot;, &quot;imageList&quot;, &quot;swipePlaceholder&quot;, &quot;navigationArrowsVisible&quot;, &quot;thumbnailsVisible&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean shouldBlockSideSwipe() {
+<span class="nc" id="L274">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L280">        return new Class[]{Boolean.class, Image.class,</span>
+<span class="nc" id="L281">                com.codename1.impl.CodenameOneImplementation.getImageArrayClass(), Image.class, Boolean.class, Boolean.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L287">        return new String[]{&quot;Boolean&quot;, &quot;Image&quot;, &quot;Image[]&quot;, &quot;Image&quot;, &quot;Boolean&quot;, &quot;Boolean&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (&quot;eagerLock&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (isEagerLock()) {</span>
+<span class="nc" id="L295">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L297">            return Boolean.FALSE;</span>
+        }
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (&quot;image&quot;.equals(name)) {</span>
+<span class="nc" id="L300">            return getImage();</span>
+        }
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (&quot;imageList&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            if (getImageList() == null) {</span>
+<span class="nc" id="L304">                return null;</span>
+            }
+<span class="nc" id="L306">            Image[] a = new Image[getImageList().getSize()];</span>
+<span class="nc" id="L307">            int alen = a.length;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L309">                a[iter] = getImageList().getItemAt(iter);</span>
+            }
+<span class="nc" id="L311">            return a;</span>
+        }
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (&quot;swipePlaceholder&quot;.equals(name)) {</span>
+<span class="fc" id="L314">            return getSwipePlaceholder();</span>
+        }
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (&quot;navigationArrowsVisible&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            return isNavigationArrowsVisible() ? Boolean.TRUE : Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        if (&quot;thumbnailsVisible&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">            return isThumbnailsVisible() ? Boolean.TRUE : Boolean.FALSE;</span>
+        }
+<span class="nc" id="L322">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        if (&quot;eagerLock&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L329" title="All 4 branches missed.">            setEagerLock(value != null &amp;&amp; ((Boolean) value).booleanValue());</span>
+<span class="nc" id="L330">            return null;</span>
+        }
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (&quot;image&quot;.equals(name)) {</span>
+<span class="nc" id="L333">            setImage((Image) value);</span>
+<span class="nc" id="L334">            return null;</span>
+        }
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (&quot;imageList&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L338">                setImageList(null);</span>
+            } else {
+<span class="nc" id="L340">                setImageList(new DefaultListModel&lt;Image&gt;((Image[]) value));</span>
+            }
+<span class="nc" id="L342">            return null;</span>
+        }
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        if (&quot;swipePlaceholder&quot;.equals(name)) {</span>
+<span class="nc" id="L345">            setSwipePlaceholder((Image) value);</span>
+<span class="nc" id="L346">            return null;</span>
+        }
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (&quot;navigationArrowsVisible&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L349" title="All 4 branches missed.">            setNavigationArrowsVisible(value != null &amp;&amp; ((Boolean) value).booleanValue());</span>
+<span class="nc" id="L350">            return null;</span>
+        }
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (&quot;thumbnailsVisible&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L353" title="All 4 branches missed.">            setThumbnailsVisible(value != null &amp;&amp; ((Boolean) value).booleanValue());</span>
+<span class="nc" id="L354">            return null;</span>
+        }
+<span class="nc" id="L356">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void initComponent() {
+<span class="fc" id="L362">        super.initComponent();</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (image == null) {</span>
+            // gui builder?
+<span class="nc" id="L365">            image = ImageFactory.createImage(this, 50, 50, 0);</span>
+        } else {
+<span class="fc" id="L367">            image.lock();</span>
+        }
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (image.isAnimation()) {</span>
+<span class="nc" id="L370">            getComponentForm().registerAnimated(this);</span>
+        }
+<span class="fc" id="L372">        eagerLock();</span>
+<span class="fc" id="L373">    }</span>
+
+    private void eagerLock() {
+<span class="pc bpc" id="L376" title="2 of 6 branches missed.">        if (eagerLock &amp;&amp; swipeableImages != null &amp;&amp; swipeableImages.getSize() &gt; 1) {</span>
+<span class="fc" id="L377">            Image left = getImageLeft();</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (swipePlaceholder != null) { // PMD Fix: CollapsibleIfStatements consolidate placeholder check</span>
+<span class="nc" id="L379">                left.asyncLock(swipePlaceholder);</span>
+            } else {
+<span class="fc" id="L381">                left.lock();</span>
+            }
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            if (swipeableImages.getSize() &gt; 2) {</span>
+<span class="fc" id="L384">                Image right = getImageRight();</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                if (swipePlaceholder != null) { // PMD Fix: CollapsibleIfStatements consolidate placeholder check</span>
+<span class="nc" id="L386">                    right.asyncLock(swipePlaceholder);</span>
+                } else {
+<span class="fc" id="L388">                    right.lock();</span>
+                }
+            }
+        }
+<span class="fc" id="L392">    }</span>
+
+    private void eagerUnlock() {
+<span class="pc bpc" id="L395" title="2 of 6 branches missed.">        if (eagerLock &amp;&amp; swipeableImages != null &amp;&amp; swipeableImages.getSize() &gt; 1) {</span>
+<span class="fc" id="L396">            getImageLeft().unlock();</span>
+<span class="fc" id="L397">            getImageRight().unlock();</span>
+        }
+<span class="fc" id="L399">    }</span>
+
+    /// Returns the x position of the image viewport which can be useful when it is being panned by the user
+    ///
+    /// #### Returns
+    ///
+    /// x position within the image for the top left corner
+    public int getImageX() {
+<span class="nc" id="L407">        return imageX;</span>
+    }
+
+    /// Returns the y position of the image viewport which can be useful when it is being panned by the user
+    ///
+    /// #### Returns
+    ///
+    /// y position within the image for the top left corner
+    public int getImageY() {
+<span class="nc" id="L416">        return imageY;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void deinitialize() {
+<span class="fc" id="L422">        super.deinitialize();</span>
+<span class="fc" id="L423">        image.unlock();</span>
+<span class="fc" id="L424">        eagerUnlock();</span>
+<span class="fc" id="L425">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int key) {
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        if (swipeableImages != null) {</span>
+<span class="nc" id="L431">            int gk = Display.getInstance().getGameAction(key);</span>
+<span class="nc bnc" id="L432" title="All 8 branches missed.">            if ((gk == Display.GAME_LEFT || gk == Display.GAME_UP) &amp;&amp; (cycleLeft || swipeableImages.getSelectedIndex() &gt; getImageLeftPos())) {</span>
+<span class="nc" id="L433">                new AnimatePanX(-1, getImageLeft(), getImageLeftPos());</span>
+<span class="nc" id="L434">                return;</span>
+            }
+<span class="nc bnc" id="L436" title="All 6 branches missed.">            if (gk == Display.GAME_RIGHT &amp;&amp; (cycleRight || swipeableImages.getSelectedIndex() &lt; getImageRightPos())) {</span>
+<span class="nc" id="L437">                new AnimatePanX(2, getImageRight(), getImageRightPos());</span>
+            }
+        }
+<span class="nc" id="L440">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="fc" id="L445">        pressX = x;</span>
+<span class="fc" id="L446">        pressY = y;</span>
+<span class="fc" id="L447">        pointerPressedAction = getPointerActionAt(x, y);</span>
+<span class="fc" id="L448">        pointerPressedThumbnailIndex = getThumbnailIndexAt(x, y);</span>
+<span class="fc" id="L449">        currentZoom = zoom;</span>
+<span class="fc" id="L450">        delegatingDragToParent = false;</span>
+<span class="fc" id="L451">        getComponentForm().addComponentAwaitingRelease(this);</span>
+<span class="fc" id="L452">    }</span>
+
+    private Container findScrollableYAncestor() {
+<span class="fc" id="L455">        Container p = getParent();</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        while (p != null) {</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">            if (p.isScrollableY()) {</span>
+<span class="fc" id="L458">                return p;</span>
+            }
+<span class="fc" id="L460">            p = p.getParent();</span>
+        }
+<span class="fc" id="L462">        return null;</span>
+    }
+
+    @Override
+    protected void dragFinished(int x, int y) {
+<span class="nc" id="L467">        super.dragFinished(x, y);</span>
+<span class="nc" id="L468">    }</span>
+
+    private Image getImageRight() {
+<span class="fc" id="L471">        return swipeableImages.getItemAt(getImageRightPos());</span>
+    }
+
+    private int getImageRightPos() {
+<span class="fc" id="L475">        return (swipeableImages.getSelectedIndex() + 1) % swipeableImages.getSize();</span>
+    }
+
+    private int getImageLeftPos() {
+<span class="fc" id="L479">        int pos = swipeableImages.getSelectedIndex() - 1;</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (pos &lt; 0) {</span>
+<span class="fc" id="L481">            return swipeableImages.getSize() - 1;</span>
+        }
+<span class="fc" id="L483">        return pos;</span>
+    }
+
+    private Image getImageLeft() {
+<span class="fc" id="L487">        return swipeableImages.getItemAt(getImageLeftPos());</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (delegatingDragToParent) {</span>
+<span class="fc" id="L494">            Container p = findScrollableYAncestor();</span>
+<span class="fc" id="L495">            delegatingDragToParent = false;</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">            if (p != null) {</span>
+<span class="fc" id="L497">                p.pointerReleased(x, y);</span>
+            }
+<span class="fc" id="L499">            pointerPressedAction = ACTION_NONE;</span>
+<span class="fc" id="L500">            return;</span>
+        }
+<span class="fc" id="L502">        super.pointerReleased(x, y);</span>
+<span class="fc" id="L503">        isPinchZooming = false;</span>
+<span class="fc" id="L504">        int releaseAction = getPointerActionAt(x, y);</span>
+<span class="pc bpc" id="L505" title="1 of 4 branches missed.">        if (pointerPressedAction != ACTION_NONE &amp;&amp; pointerPressedAction == releaseAction) {</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">            if (pointerPressedAction == ACTION_LEFT) {</span>
+<span class="nc" id="L507">                navigateToLeft();</span>
+<span class="nc" id="L508">                pointerPressedAction = ACTION_NONE;</span>
+<span class="nc" id="L509">                return;</span>
+            }
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">            if (pointerPressedAction == ACTION_RIGHT) {</span>
+<span class="nc" id="L512">                navigateToRight();</span>
+<span class="nc" id="L513">                pointerPressedAction = ACTION_NONE;</span>
+<span class="nc" id="L514">                return;</span>
+            }
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">            if (pointerPressedAction == ACTION_THUMBNAIL) {</span>
+<span class="fc" id="L517">                int thumbnailIndex = getThumbnailIndexAt(x, y);</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">                if (thumbnailIndex == pointerPressedThumbnailIndex) {</span>
+<span class="fc" id="L519">                    navigateTo(thumbnailIndex);</span>
+                }
+<span class="fc" id="L521">                pointerPressedAction = ACTION_NONE;</span>
+<span class="fc" id="L522">                return;</span>
+            }
+        }
+<span class="fc" id="L525">        pointerPressedAction = ACTION_NONE;</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">        if (panPositionX &gt; 1) {</span>
+<span class="pc bpc" id="L527" title="4 of 6 branches missed.">            if (panPositionX &gt;= 1 + swipeThreshold &amp;&amp; (cycleRight || swipeableImages.getSelectedIndex() &lt; getImageRightPos())) {</span>
+<span class="fc" id="L528">                new AnimatePanX(2, getImageRight(), getImageRightPos());</span>
+            } else {
+                // animate back
+<span class="nc" id="L531">                new AnimatePanX(1, null, 0);</span>
+            }
+<span class="fc" id="L533">            return;</span>
+        }
+<span class="nc bnc" id="L535" title="All 2 branches missed.">        if (panPositionX &lt; 0) {</span>
+<span class="nc bnc" id="L536" title="All 6 branches missed.">            if (panPositionX &lt;= swipeThreshold * -1 &amp;&amp; (cycleLeft || swipeableImages.getSelectedIndex() &gt; getImageLeftPos())) {</span>
+<span class="nc" id="L537">                new AnimatePanX(-1, getImageLeft(), getImageLeftPos());</span>
+            } else {
+                // animate back
+<span class="nc" id="L540">                new AnimatePanX(0, null, 0);</span>
+            }
+        }
+<span class="nc" id="L543">    }</span>
+
+    @Override
+    protected void pinchReleased(int x, int y) {
+<span class="nc" id="L547">        pressX = x;</span>
+<span class="nc" id="L548">        pressY = y;</span>
+<span class="nc" id="L549">        currentZoom = zoom;</span>
+<span class="nc" id="L550">        isPinchZooming = false;</span>
+<span class="nc" id="L551">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">        if (pointerPressedAction != ACTION_NONE) {</span>
+<span class="nc" id="L557">            return;</span>
+        }
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        if (delegatingDragToParent) {</span>
+<span class="fc" id="L560">            Container p = findScrollableYAncestor();</span>
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">            if (p != null) {</span>
+<span class="fc" id="L562">                p.pointerDragged(x, y);</span>
+            }
+<span class="fc" id="L564">            return;</span>
+        }
+<span class="fc" id="L566">        int dxAbs = Math.abs(x - pressX);</span>
+<span class="fc" id="L567">        int dyAbs = Math.abs(y - pressY);</span>
+<span class="pc bpc" id="L568" title="1 of 4 branches missed.">        if (getZoom() &lt;= 1 &amp;&amp; dyAbs &gt; dxAbs) {</span>
+<span class="fc" id="L569">            Container p = findScrollableYAncestor();</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">            if (p != null) {</span>
+<span class="fc" id="L571">                delegatingDragToParent = true;</span>
+<span class="fc" id="L572">                p.pointerPressed(pressX, pressY);</span>
+<span class="fc" id="L573">                p.pointerDragged(x, y);</span>
+<span class="fc" id="L574">                return;</span>
+            }
+        }
+        // could be a pan
+<span class="fc" id="L578">        float distanceX = ((float) pressX - x) / getZoom();</span>
+<span class="fc" id="L579">        float distanceY = ((float) pressY - y) / getZoom();</span>
+
+        // convert to a number between 0 - 1
+<span class="fc" id="L582">        distanceX /= ((float) getWidth());</span>
+<span class="fc" id="L583">        distanceY /= ((float) getHeight());</span>
+
+        // panning or swiping
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">        if (getZoom() &gt; 1) {</span>
+<span class="nc bnc" id="L587" title="All 4 branches missed.">            if (swipeableImages != null &amp;&amp; swipeableImages.getSize() &gt; 1) {</span>
+                // this has the potential of being a pan operation...
+<span class="nc bnc" id="L589" title="All 6 branches missed.">                if (panPositionX &lt; 0 || panPositionX == 0 &amp;&amp; distanceX &lt; 0) {</span>
+<span class="nc" id="L590">                    panPositionX = ((float) pressX - x) / ((float) getWidth());</span>
+<span class="nc" id="L591">                    repaint();</span>
+<span class="nc" id="L592">                    return;</span>
+                } else {
+<span class="nc bnc" id="L594" title="All 6 branches missed.">                    if (panPositionX &gt; 1 || panPositionX == 1 &amp;&amp; distanceX &gt; 0) {</span>
+<span class="nc" id="L595">                        panPositionX = 1 + ((float) pressX - x) / ((float) getWidth());</span>
+<span class="nc" id="L596">                        repaint();</span>
+<span class="nc" id="L597">                        return;</span>
+                    }
+                }
+            }
+<span class="nc" id="L601">            pressX = x;</span>
+<span class="nc" id="L602">            pressY = y;</span>
+<span class="nc" id="L603">            panPositionX = panPositionX + distanceX * getZoom();</span>
+<span class="nc" id="L604">            panPositionX = Math.min(1, Math.max(0, panPositionX));</span>
+<span class="nc" id="L605">            panPositionY = Math.min(1, Math.max(0, panPositionY + distanceY * getZoom()));</span>
+
+<span class="nc" id="L607">            updatePositions();</span>
+<span class="nc" id="L608">            repaint();</span>
+        } else {
+<span class="pc bpc" id="L610" title="1 of 4 branches missed.">            if (swipeableImages != null &amp;&amp; swipeableImages.getSize() &gt; 1) {</span>
+<span class="fc" id="L611">                panPositionX = distanceX;</span>
+
+                // this has the potential of being a pan operation...
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">                if (panPositionX &lt; 0) {</span>
+<span class="nc" id="L615">                    repaint();</span>
+                } else {
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">                    if (panPositionX &gt; 0) {</span>
+<span class="fc" id="L618">                        panPositionX += 1;</span>
+<span class="fc" id="L619">                        repaint();</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L624">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void laidOut() {
+<span class="fc" id="L629">        super.laidOut();</span>
+<span class="fc" id="L630">        updatePositions();</span>
+<span class="fc" id="L631">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean pinch(float scale) {
+<span class="nc" id="L636">        isPinchZooming = true;</span>
+<span class="nc" id="L637">        zoom = currentZoom * scale;</span>
+<span class="nc bnc" id="L638" title="All 2 branches missed.">        if (zoom &lt; MIN_ZOOM) {</span>
+<span class="nc" id="L639">            zoom = MIN_ZOOM;</span>
+        } else {
+<span class="nc bnc" id="L641" title="All 2 branches missed.">            if (zoom &gt; MAX_ZOOM) {</span>
+<span class="nc" id="L642">                zoom = MAX_ZOOM;</span>
+            }
+        }
+<span class="nc" id="L645">        updatePositions();</span>
+<span class="nc" id="L646">        repaint();</span>
+<span class="nc" id="L647">        return true;</span>
+    }
+
+    private void imageAspectCalc(Image img) {
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        if (img == null) {</span>
+<span class="nc" id="L652">            return;</span>
+        }
+<span class="fc" id="L654">        int iW = img.getWidth();</span>
+<span class="fc" id="L655">        int iH = img.getHeight();</span>
+<span class="fc" id="L656">        Style s = getStyle();</span>
+<span class="fc" id="L657">        int width = getWidth() - s.getHorizontalPadding();</span>
+<span class="fc" id="L658">        int height = getHeight() - s.getVerticalPadding();</span>
+        float r2;
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        if (imageInitialPosition == IMAGE_FIT) {</span>
+<span class="fc" id="L661">            r2 = Math.min(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+        } else {
+<span class="fc" id="L663">            r2 = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+        }
+
+        // calculate the image position to fit
+<span class="fc" id="L667">        prefW = (int) (((float) iW) * r2);</span>
+<span class="fc" id="L668">        prefH = (int) (((float) iH) * r2);</span>
+<span class="fc" id="L669">        prefX = s.getPaddingLeftNoRTL() + (width - prefW) / 2;</span>
+<span class="fc" id="L670">        prefY = s.getPaddingTop() + (height - prefH) / 2;</span>
+<span class="fc" id="L671">    }</span>
+
+    private void updatePositions() {
+<span class="fc bfc" id="L674" title="All 2 branches covered.">        if (zoom == 1) {</span>
+<span class="fc" id="L675">            imageAspectCalc(image);</span>
+<span class="fc" id="L676">            imageDrawWidth = prefW;</span>
+<span class="fc" id="L677">            imageDrawHeight = prefH;</span>
+<span class="fc" id="L678">            imageX = prefX;</span>
+<span class="fc" id="L679">            imageY = prefY;</span>
+
+            // Apply the same constraints used in paint() method to ensure cropBox matches what's actually visible
+<span class="fc" id="L682">            int constrainedImageX = imageX;</span>
+<span class="fc" id="L683">            int constrainedImageY = imageY;</span>
+
+<span class="fc bfc" id="L685" title="All 2 branches covered.">            if (imageDrawWidth &gt; getInnerWidth()) {</span>
+<span class="fc" id="L686">                constrainedImageX = Math.max(</span>
+<span class="fc" id="L687">                        Math.min(0, imageX),</span>
+<span class="fc" id="L688">                        -imageDrawWidth + getInnerWidth()</span>
+                );
+            }
+
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">            if (imageDrawHeight &gt; getInnerHeight()) {</span>
+<span class="nc" id="L693">                constrainedImageY = Math.max(</span>
+<span class="nc" id="L694">                        Math.min(0, imageY),</span>
+<span class="nc" id="L695">                        -imageDrawHeight + getInnerHeight()</span>
+                );
+            }
+
+<span class="fc" id="L699">            cropBox.set(-constrainedImageY / (double) imageDrawHeight, (constrainedImageX + imageDrawWidth - getWidth()) / (double) imageDrawWidth, (constrainedImageY + imageDrawHeight - getHeight()) / (double) imageDrawHeight, -constrainedImageX / (double) imageDrawWidth);</span>
+<span class="fc" id="L700">            return;</span>
+        }
+<span class="fc" id="L702">        int iW = image.getWidth();</span>
+<span class="fc" id="L703">        int iH = image.getHeight();</span>
+<span class="fc" id="L704">        Style s = getStyle();</span>
+<span class="fc" id="L705">        int width = getWidth() - s.getHorizontalPadding();</span>
+<span class="fc" id="L706">        int height = getHeight() - s.getVerticalPadding();</span>
+        float r2;
+<span class="pc bpc" id="L708" title="2 of 4 branches missed.">        if (allowScaleDown || imageInitialPosition == IMAGE_FIT) {</span>
+<span class="fc" id="L709">            r2 = Math.min(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+        } else {
+<span class="nc" id="L711">            r2 = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+        }
+<span class="fc" id="L713">        imageDrawWidth = (int) (((float) iW) * r2 * zoom);</span>
+<span class="fc" id="L714">        imageDrawHeight = (int) (((float) iH) * r2 * zoom);</span>
+<span class="fc" id="L715">        imageX = (int) (s.getPaddingLeftNoRTL() + imageDrawWidth * (0.5 - panPositionX));</span>
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">        if (imageDrawWidth &lt; getInnerWidth()) {</span>
+
+<span class="fc" id="L718">            imageX += (getInnerWidth() - imageDrawWidth) / 2;</span>
+        }
+<span class="fc" id="L720">        imageY = (int) (s.getPaddingTop() + imageDrawHeight * (0.5 - panPositionY));</span>
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">        if (imageDrawHeight &lt; getInnerHeight()) {</span>
+
+<span class="fc" id="L723">            imageY += (getInnerHeight() - imageDrawHeight) / 2;</span>
+        }
+
+        // Apply the same constraints used in paint() method to ensure cropBox matches what's actually visible
+<span class="fc" id="L727">        int constrainedImageX = imageX;</span>
+<span class="fc" id="L728">        int constrainedImageY = imageY;</span>
+
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">        if (imageDrawWidth &gt; getInnerWidth()) {</span>
+<span class="nc" id="L731">            constrainedImageX = Math.max(</span>
+<span class="nc" id="L732">                    Math.min(0, imageX),</span>
+<span class="nc" id="L733">                    -imageDrawWidth + getInnerWidth()</span>
+            );
+        }
+
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">        if (imageDrawHeight &gt; getInnerHeight()) {</span>
+<span class="nc" id="L738">            constrainedImageY = Math.max(</span>
+<span class="nc" id="L739">                    Math.min(0, imageY),</span>
+<span class="nc" id="L740">                    -imageDrawHeight + getInnerHeight()</span>
+            );
+        }
+
+<span class="fc" id="L744">        cropBox.set(-constrainedImageY / (double) imageDrawHeight, (constrainedImageX + imageDrawWidth - getWidth()) / (double) imageDrawWidth, (constrainedImageY + imageDrawHeight - getHeight()) / (double) imageDrawHeight, -constrainedImageX / (double) imageDrawWidth);</span>
+<span class="fc" id="L745">    }</span>
+
+    /// Gets the current image cropped using the current pan and zoom state.  The cropped image
+    /// dimensions will be the result of cropping the full-sized image with the current pan/zoom state.  The aspect
+    /// ratio will match the aspect ratio of the ImageViewer - not the source image itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundColor`: The background color, visible for letterboxing.
+    ///
+    /// #### Returns
+    ///
+    /// The cropped image.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public Image getCroppedImage(int backgroundColor) {
+<span class="pc bpc" id="L763" title="1 of 2 branches missed.">        if (image == null) {</span>
+<span class="nc" id="L764">            return null;</span>
+        }
+<span class="fc" id="L766">        updatePositions();</span>
+<span class="fc" id="L767">        int width = (int) Math.round(-image.getWidth() * (cropBox.left + cropBox.right - 1));</span>
+<span class="fc" id="L768">        int height = (int) Math.round(-image.getHeight() * (cropBox.top + cropBox.bottom - 1));</span>
+<span class="fc" id="L769">        return getCroppedImage(width, height, backgroundColor);</span>
+    }
+
+    /// Gets the current image cropped using the current pan and zoom state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: The width of the cropped image.  Use -1 to match aspect ratio of the ImageViewer component.  Either height or width must be positive.
+    ///
+    /// - `height`: The height of the cropped image. Use -1 to match aspect ratio of the ImageViewer component.  Either height or width must be positive.
+    ///
+    /// - `backgroundColor`: Background color to use for letterboxing.
+    ///
+    /// #### Returns
+    ///
+    /// Cropped image in specified dimensions.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public Image getCroppedImage(int width, int height, int backgroundColor) {
+<span class="pc bpc" id="L790" title="1 of 2 branches missed.">        if (image == null) {</span>
+<span class="nc" id="L791">            return null;</span>
+        }
+<span class="fc" id="L793">        updatePositions();</span>
+<span class="pc bpc" id="L794" title="1 of 2 branches missed.">        if (width &lt; 0) {</span>
+<span class="nc" id="L795">            width = (int) Math.round(height * getWidth() / (double) getHeight());</span>
+        }
+<span class="fc bfc" id="L797" title="All 2 branches covered.">        if (height &lt; 0) {</span>
+<span class="fc" id="L798">            height = (int) Math.round(width * getHeight() / (double) getWidth());</span>
+        }
+
+<span class="fc" id="L801">        Image out = ImageFactory.createImage(this, width, height, backgroundColor);</span>
+<span class="fc" id="L802">        Graphics g = out.getGraphics();</span>
+<span class="fc" id="L803">        g.setColor(backgroundColor);</span>
+<span class="fc" id="L804">        g.fillRect(0, 0, width, height);</span>
+<span class="fc" id="L805">        cropBox.paint(g, width, height);</span>
+<span class="fc" id="L806">        return out;</span>
+
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="pc bpc" id="L813" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="fc" id="L814">            return new Dimension(image.getWidth(), image.getHeight());</span>
+        }
+<span class="nc" id="L816">        return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="fc" id="L822">        boolean result = false;</span>
+<span class="pc bpc" id="L823" title="2 of 4 branches missed.">        if (image != null &amp;&amp; image.isAnimation()) {</span>
+<span class="nc" id="L824">            result = image.animate();</span>
+<span class="nc bnc" id="L825" title="All 2 branches missed.">            if (result) {</span>
+<span class="nc" id="L826">                updatePositions();</span>
+            }
+        }
+<span class="pc bpc" id="L829" title="1 of 2 branches missed.">        if (zooming) {</span>
+<span class="nc" id="L830">            float v = motion.getValue();</span>
+<span class="nc" id="L831">            v /= 10000.0f;</span>
+<span class="nc" id="L832">            zoom = v;</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">            if (!result) {</span>
+<span class="nc" id="L834">                updatePositions();</span>
+            }
+<span class="nc bnc" id="L836" title="All 2 branches missed.">            if (motion.isFinished()) {</span>
+<span class="nc" id="L837">                zooming = false;</span>
+<span class="nc bnc" id="L838" title="All 2 branches missed.">                if (!result) {</span>
+<span class="nc" id="L839">                    getComponentForm().deregisterAnimated(this);</span>
+                }
+            }
+<span class="nc" id="L842">            repaint();</span>
+        }
+<span class="pc bpc" id="L844" title="2 of 4 branches missed.">        return super.animate() || result;</span>
+    }
+
+    /// Allows the image to scale down when image initial position is set to fit
+    /// this is off by default since the UX isn't great
+    ///
+    /// #### Returns
+    ///
+    /// the allowScaleDown
+    public boolean isAllowScaleDown() {
+<span class="fc" id="L854">        return allowScaleDown;</span>
+    }
+
+    /// Allows the image to scale down when image initial position is set to fit
+    /// this is off by default since the UX isn't great
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowScaleDown`: the allowScaleDown to set
+    public void setAllowScaleDown(boolean allowScaleDown) {
+<span class="fc" id="L864">        this.allowScaleDown = allowScaleDown;</span>
+<span class="fc" id="L865">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">        if (panPositionX &lt; 0) {</span>
+<span class="nc" id="L871">            Style s = getStyle();</span>
+<span class="nc" id="L872">            int width = getWidth() - s.getHorizontalPadding();</span>
+<span class="nc" id="L873">            float ratio = ((float) width) * (panPositionX * -1);</span>
+<span class="nc bnc" id="L874" title="All 2 branches missed.">            if (isPinchZooming) {</span>
+<span class="nc" id="L875">                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);</span>
+            }
+<span class="nc" id="L877">            g.drawImage(image, ((int) ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);</span>
+<span class="nc" id="L878">            g.setRenderingHints(0);</span>
+<span class="nc bnc" id="L879" title="All 4 branches missed.">            if (cycleLeft || swipeableImages.getSelectedIndex() &gt; getImageLeftPos()) {</span>
+<span class="nc" id="L880">                Image left = getImageLeft();</span>
+<span class="nc bnc" id="L881" title="All 2 branches missed.">                if (swipePlaceholder != null) {</span>
+<span class="nc" id="L882">                    left.asyncLock(swipePlaceholder);</span>
+                } else {
+<span class="nc" id="L884">                    left.lock();</span>
+                }
+<span class="nc" id="L886">                ratio = ratio - width;</span>
+<span class="nc" id="L887">                imageAspectCalc(left);</span>
+<span class="nc bnc" id="L888" title="All 2 branches missed.">                if (isPinchZooming) {</span>
+<span class="nc" id="L889">                    g.setRenderingHints(Graphics.RENDERING_HINT_FAST);</span>
+                }
+<span class="nc" id="L891">                g.drawImage(left, ((int) ratio) + getX() + prefX, getY() + prefY, prefW, prefH);</span>
+<span class="nc" id="L892">                g.setRenderingHints(0);</span>
+            }
+<span class="nc" id="L894">            drawNavigationChrome(g);</span>
+<span class="nc" id="L895">            return;</span>
+        }
+<span class="fc bfc" id="L897" title="All 2 branches covered.">        if (panPositionX &gt; 1) {</span>
+<span class="fc" id="L898">            Style s = getStyle();</span>
+<span class="fc" id="L899">            int width = getWidth() - s.getHorizontalPadding();</span>
+<span class="fc" id="L900">            float ratio = ((float) width) * (1 - panPositionX);</span>
+<span class="pc bpc" id="L901" title="1 of 2 branches missed.">            if (isPinchZooming) {</span>
+<span class="nc" id="L902">                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);</span>
+            }
+<span class="fc" id="L904">            g.drawImage(image, ((int) ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);</span>
+<span class="fc" id="L905">            g.setRenderingHints(0);</span>
+<span class="pc bpc" id="L906" title="3 of 4 branches missed.">            if (cycleRight || swipeableImages.getSelectedIndex() &lt; getImageRightPos()) {</span>
+<span class="fc" id="L907">                Image right = getImageRight();</span>
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">                if (swipePlaceholder != null) {</span>
+<span class="nc" id="L909">                    right.asyncLock(swipePlaceholder);</span>
+                } else {
+<span class="fc" id="L911">                    right.lock();</span>
+                }
+<span class="fc" id="L913">                ratio = ratio + width;</span>
+<span class="fc" id="L914">                imageAspectCalc(right);</span>
+<span class="pc bpc" id="L915" title="1 of 2 branches missed.">                if (isPinchZooming) {</span>
+<span class="nc" id="L916">                    g.setRenderingHints(Graphics.RENDERING_HINT_FAST);</span>
+                }
+<span class="fc" id="L918">                g.drawImage(right, ((int) ratio) + getX() + prefX, getY() + prefY, prefW, prefH);</span>
+<span class="fc" id="L919">                g.setRenderingHints(0);</span>
+            }
+<span class="fc" id="L921">            drawNavigationChrome(g);</span>
+<span class="fc" id="L922">            return;</span>
+        }
+        // can happen in the GUI builder
+<span class="pc bpc" id="L925" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="pc bpc" id="L926" title="1 of 2 branches missed.">            if (isPinchZooming) {</span>
+<span class="nc" id="L927">                g.setRenderingHints(Graphics.RENDERING_HINT_FAST);</span>
+            }
+
+<span class="fc" id="L930">            g.drawImage(image,</span>
+<span class="fc bfc" id="L931" title="All 2 branches covered.">                    (imageDrawWidth &lt;= getInnerWidth()) ? getX() + imageX : Math.max(</span>
+<span class="fc" id="L932">                            Math.min( //</span>
+<span class="fc" id="L933">                                    getX(),</span>
+<span class="fc" id="L934">                                    getX() + imageX</span>
+                            ),
+<span class="fc" id="L936">                            getX() - imageDrawWidth + getInnerWidth()),</span>
+<span class="pc bpc" id="L937" title="1 of 2 branches missed.">                    (imageDrawHeight &lt;= getInnerHeight()) ? getY() + imageY : Math.max(</span>
+<span class="nc" id="L938">                            Math.min(</span>
+<span class="nc" id="L939">                                    getY(), getY() + imageY</span>
+<span class="nc" id="L940">                            ), getY() - imageDrawHeight + getInnerHeight()</span>
+                    ),
+                    imageDrawWidth, imageDrawHeight);
+
+
+<span class="fc" id="L945">            g.setRenderingHints(0);</span>
+        }
+<span class="fc" id="L947">        drawNavigationChrome(g);</span>
+<span class="fc" id="L948">    }</span>
+
+    private static final int ACTION_NONE = 0;
+    private static final int ACTION_LEFT = 1;
+    private static final int ACTION_RIGHT = 2;
+    private static final int ACTION_THUMBNAIL = 3;
+
+    private boolean canNavigate() {
+<span class="pc bpc" id="L956" title="1 of 4 branches missed.">        return swipeableImages != null &amp;&amp; swipeableImages.getSize() &gt; 1;</span>
+    }
+
+    private void navigateToLeft() {
+<span class="nc bnc" id="L960" title="All 2 branches missed.">        if (!canNavigate()) {</span>
+<span class="nc" id="L961">            return;</span>
+        }
+<span class="nc bnc" id="L963" title="All 4 branches missed.">        if (cycleLeft || swipeableImages.getSelectedIndex() &gt; getImageLeftPos()) {</span>
+<span class="nc" id="L964">            new AnimatePanX(-1, getImageLeft(), getImageLeftPos());</span>
+        }
+<span class="nc" id="L966">    }</span>
+
+    private void navigateToRight() {
+<span class="nc bnc" id="L969" title="All 2 branches missed.">        if (!canNavigate()) {</span>
+<span class="nc" id="L970">            return;</span>
+        }
+<span class="nc bnc" id="L972" title="All 4 branches missed.">        if (cycleRight || swipeableImages.getSelectedIndex() &lt; getImageRightPos()) {</span>
+<span class="nc" id="L973">            new AnimatePanX(2, getImageRight(), getImageRightPos());</span>
+        }
+<span class="nc" id="L975">    }</span>
+
+    private void navigateTo(int index) {
+<span class="pc bpc" id="L978" title="3 of 6 branches missed.">        if (!canNavigate() || index &lt; 0 || index &gt;= swipeableImages.getSize()) {</span>
+<span class="nc" id="L979">            return;</span>
+        }
+<span class="pc bpc" id="L981" title="1 of 2 branches missed.">        if (index != swipeableImages.getSelectedIndex()) {</span>
+<span class="fc" id="L982">            swipeableImages.setSelectedIndex(index);</span>
+        }
+<span class="fc" id="L984">    }</span>
+
+    private int getPointerActionAt(int x, int y) {
+<span class="fc bfc" id="L987" title="All 2 branches covered.">        if (!canNavigate()) {</span>
+<span class="fc" id="L988">            return ACTION_NONE;</span>
+        }
+<span class="pc bpc" id="L990" title="1 of 4 branches missed.">        if (thumbnailsVisible &amp;&amp; getThumbnailIndexAt(x, y) &gt; -1) {</span>
+<span class="fc" id="L991">            return ACTION_THUMBNAIL;</span>
+        }
+<span class="pc bpc" id="L993" title="1 of 2 branches missed.">        if (navigationArrowsVisible) {</span>
+<span class="nc" id="L994">            int leftBound = getX() + Math.max(24, getWidth() / 8);</span>
+<span class="nc" id="L995">            int rightBound = getX() + getWidth() - Math.max(24, getWidth() / 8);</span>
+<span class="nc bnc" id="L996" title="All 2 branches missed.">            if (x &lt;= leftBound) {</span>
+<span class="nc" id="L997">                return ACTION_LEFT;</span>
+            }
+<span class="nc bnc" id="L999" title="All 2 branches missed.">            if (x &gt;= rightBound) {</span>
+<span class="nc" id="L1000">                return ACTION_RIGHT;</span>
+            }
+        }
+<span class="fc" id="L1003">        return ACTION_NONE;</span>
+    }
+
+    private int getThumbnailIndexAt(int x, int y) {
+<span class="pc bpc" id="L1007" title="1 of 4 branches missed.">        if (!thumbnailsVisible || !canNavigate()) {</span>
+<span class="fc" id="L1008">            return -1;</span>
+        }
+<span class="fc" id="L1010">        int barHeight = Math.max(24, Display.getInstance().convertToPixels(thumbnailBarHeightMM));</span>
+<span class="fc" id="L1011">        int barTop = getY() + getHeight() - barHeight;</span>
+<span class="pc bpc" id="L1012" title="2 of 4 branches missed.">        if (y &lt; barTop || y &gt; getY() + getHeight()) {</span>
+<span class="nc" id="L1013">            return -1;</span>
+        }
+<span class="fc" id="L1015">        int size = swipeableImages.getSize();</span>
+<span class="fc" id="L1016">        int availableWidth = getWidth() - 8;</span>
+<span class="fc" id="L1017">        int perThumbWidth = Math.max(14, availableWidth / size);</span>
+<span class="fc" id="L1018">        int startX = getX() + (getWidth() - (perThumbWidth * size)) / 2;</span>
+<span class="pc bpc" id="L1019" title="2 of 4 branches missed.">        if (x &lt; startX || x &gt; startX + perThumbWidth * size) {</span>
+<span class="nc" id="L1020">            return -1;</span>
+        }
+<span class="fc" id="L1022">        int index = (x - startX) / perThumbWidth;</span>
+<span class="pc bpc" id="L1023" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= size) {</span>
+<span class="nc" id="L1024">            return -1;</span>
+        }
+<span class="fc" id="L1026">        return index;</span>
+    }
+
+    private void drawNavigationChrome(Graphics g) {
+<span class="fc bfc" id="L1030" title="All 2 branches covered.">        if (!canNavigate()) {</span>
+<span class="fc" id="L1031">            return;</span>
+        }
+<span class="pc bpc" id="L1033" title="1 of 2 branches missed.">        if (navigationArrowsVisible) {</span>
+<span class="nc" id="L1034">            drawArrow(g, true);</span>
+<span class="nc" id="L1035">            drawArrow(g, false);</span>
+        }
+<span class="fc bfc" id="L1037" title="All 2 branches covered.">        if (thumbnailsVisible) {</span>
+<span class="fc" id="L1038">            drawThumbnails(g);</span>
+        }
+<span class="fc" id="L1040">    }</span>
+
+    private void drawArrow(Graphics g, boolean left) {
+<span class="nc" id="L1043">        int diameter = 28;</span>
+<span class="nc" id="L1044">        int radius = diameter / 2;</span>
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">        int centerX = left ? getX() + 16 : getX() + getWidth() - 16;</span>
+<span class="nc" id="L1046">        int centerY = getY() + getHeight() / 2;</span>
+<span class="nc" id="L1047">        g.setColor(0x66000000);</span>
+<span class="nc" id="L1048">        g.fillArc(centerX - radius, centerY - radius, diameter, diameter, 0, 360);</span>
+<span class="nc" id="L1049">        g.setColor(0xffffff);</span>
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">        char icon = left ? FontImage.MATERIAL_CHEVRON_LEFT : FontImage.MATERIAL_CHEVRON_RIGHT;</span>
+<span class="nc" id="L1051">        String iconText = String.valueOf(icon);</span>
+<span class="nc" id="L1052">        Font oldFont = g.getFont();</span>
+<span class="nc" id="L1053">        g.setFont(FontImage.getMaterialDesignFont());</span>
+<span class="nc" id="L1054">        Font iconFont = g.getFont();</span>
+<span class="nc" id="L1055">        int iconX = centerX - iconFont.stringWidth(iconText) / 2;</span>
+<span class="nc" id="L1056">        int iconY = centerY - iconFont.getHeight() / 2;</span>
+<span class="nc" id="L1057">        g.drawString(iconText, iconX, iconY);</span>
+<span class="nc" id="L1058">        g.setFont(oldFont);</span>
+<span class="nc" id="L1059">    }</span>
+
+    private void drawThumbnails(Graphics g) {
+<span class="fc" id="L1062">        int size = swipeableImages.getSize();</span>
+<span class="fc" id="L1063">        int barHeight = Math.max(24, Display.getInstance().convertToPixels(thumbnailBarHeightMM));</span>
+<span class="fc" id="L1064">        int y = getY() + getHeight() - barHeight;</span>
+<span class="fc" id="L1065">        g.setColor(0x66000000);</span>
+<span class="fc" id="L1066">        g.fillRect(getX(), y, getWidth(), barHeight);</span>
+<span class="fc" id="L1067">        int availableWidth = getWidth() - 8;</span>
+<span class="fc" id="L1068">        int perThumbWidth = Math.max(14, availableWidth / size);</span>
+<span class="fc" id="L1069">        int thumbMargin = 2;</span>
+<span class="fc" id="L1070">        int startX = getX() + (getWidth() - (perThumbWidth * size)) / 2;</span>
+<span class="fc" id="L1071">        int thumbHeight = barHeight - 6;</span>
+<span class="fc bfc" id="L1072" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L1073">            int tx = startX + i * perThumbWidth;</span>
+<span class="fc" id="L1074">            Image thumb = swipeableImages.getItemAt(i);</span>
+<span class="fc" id="L1075">            g.drawImage(thumb, tx + thumbMargin, y + 3, perThumbWidth - thumbMargin * 2, thumbHeight);</span>
+<span class="fc bfc" id="L1076" title="All 2 branches covered.">            g.setColor(i == swipeableImages.getSelectedIndex() ? 0xffffff : 0x99ffffff);</span>
+<span class="fc" id="L1077">            g.drawRect(tx + thumbMargin, y + 3, perThumbWidth - thumbMargin * 2, thumbHeight);</span>
+        }
+<span class="fc" id="L1079">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void paintBackground(Graphics g) {
+        // disable background painting for performance when zooming
+<span class="pc bpc" id="L1085" title="1 of 4 branches missed.">        if (imageDrawWidth &lt; getWidth() || imageDrawHeight &lt; getHeight()) {</span>
+<span class="fc" id="L1086">            super.paintBackground(g);</span>
+        }
+<span class="fc" id="L1088">    }</span>
+
+    /// Returns the currently showing image
+    ///
+    /// #### Returns
+    ///
+    /// the image
+    public Image getImage() {
+<span class="fc" id="L1096">        return image;</span>
+    }
+
+    /// Sets the currently showing image
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image to set
+    public final void setImage(Image image) {
+<span class="pc bpc" id="L1105" title="1 of 2 branches missed.">        if (this.image != image) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L1106">            panPositionX = 0.5f;</span>
+<span class="fc" id="L1107">            panPositionY = 0.5f;</span>
+<span class="fc" id="L1108">            zoom = MIN_ZOOM;</span>
+<span class="fc" id="L1109">            this.image = image;</span>
+<span class="fc" id="L1110">            updatePositions();</span>
+<span class="fc" id="L1111">            repaint();</span>
+<span class="pc bpc" id="L1112" title="1 of 2 branches missed.">            if (image.isAnimation()) {</span>
+<span class="nc" id="L1113">                Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1114" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1115">                    f.registerAnimated(this);</span>
+                }
+            }
+        }
+<span class="fc" id="L1119">    }</span>
+
+    /// Sets the current image without any changes to the panning/scaling
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: new image instance
+    public void setImageNoReposition(Image image) {
+<span class="fc" id="L1127">        this.image = image;</span>
+<span class="fc" id="L1128">        repaint();</span>
+<span class="fc" id="L1129">    }</span>
+
+    /// Returns the list model containing the images in the we can swipe through
+    ///
+    /// #### Returns
+    ///
+    /// the list model
+    public ListModel&lt;Image&gt; getImageList() {
+<span class="fc" id="L1137">        return swipeableImages;</span>
+    }
+
+    /// By providing this optional list of images you can allows swiping between multiple images
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: a list of images
+    public void setImageList(ListModel&lt;Image&gt; model) {
+<span class="pc bpc" id="L1146" title="2 of 4 branches missed.">        if (model == null || model.getSize() == 0) {</span>
+<span class="nc" id="L1147">            return;</span>
+        }
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">        if (image == null) {</span>
+<span class="fc" id="L1150">            image = model.getItemAt(0);</span>
+        }
+<span class="pc bpc" id="L1152" title="1 of 2 branches missed.">        if (swipeableImages != null) {</span>
+<span class="nc" id="L1153">            swipeableImages.removeDataChangedListener(listListener);</span>
+<span class="nc" id="L1154">            swipeableImages.removeSelectionListener((SelectionListener) listListener);</span>
+<span class="nc" id="L1155">            model.addDataChangedListener(listListener);</span>
+<span class="nc" id="L1156">            model.addSelectionListener((SelectionListener) listListener);</span>
+        } else {
+<span class="fc" id="L1158">            class Listener implements SelectionListener, DataChangedListener {</span>
+                @Override
+                public void selectionChanged(int oldSelected, int newSelected) {
+<span class="fc bfc" id="L1161" title="All 2 branches covered.">                    if (selectLock) {</span>
+<span class="fc" id="L1162">                        return;</span>
+                    }
+<span class="pc bpc" id="L1164" title="3 of 6 branches missed.">                    if (swipeableImages.getSize() &gt; 0 &amp;&amp; newSelected &gt; -1 &amp;&amp; newSelected &lt; swipeableImages.getSize()) {</span>
+<span class="fc" id="L1165">                        setImage(swipeableImages.getItemAt(newSelected));</span>
+                    }
+<span class="fc" id="L1167">                }</span>
+
+                @Override
+                public void dataChanged(int type, int index) {
+<span class="nc bnc" id="L1171" title="All 6 branches missed.">                    if (swipeableImages.getSize() &gt; 0 &amp;&amp; swipeableImages.getSelectedIndex() &gt; -1 &amp;&amp; swipeableImages.getSelectedIndex() &lt; swipeableImages.getSize()) {</span>
+<span class="nc" id="L1172">                        setImage(swipeableImages.getItemAt(swipeableImages.getSelectedIndex()));</span>
+                    }
+<span class="nc" id="L1174">                }</span>
+            }
+<span class="fc" id="L1176">            listListener = new Listener();</span>
+<span class="fc" id="L1177">            model.addDataChangedListener(listListener);</span>
+<span class="fc" id="L1178">            model.addSelectionListener((SelectionListener) listListener);</span>
+        }
+<span class="fc" id="L1180">        this.swipeableImages = model;</span>
+<span class="fc" id="L1181">    }</span>
+
+    /// Indicates if the zoom should bee animated. It's true by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `animateZoom`: true if zoom is animated
+    public void setAnimateZoom(boolean animateZoom) {
+<span class="fc" id="L1189">        this.animateZoom = animateZoom;</span>
+<span class="fc" id="L1190">    }</span>
+
+    /// Indicates if the zoom should bee animated. It's true by default
+    ///
+    /// #### Returns
+    ///
+    /// true if zoom is animated
+    public boolean isAnimatedZoom() {
+<span class="nc" id="L1198">        return animateZoom;</span>
+    }
+
+    /// Indicates if side navigation arrows should be painted for moving between images.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if side navigation arrows are visible.
+    public boolean isNavigationArrowsVisible() {
+<span class="fc" id="L1207">        return navigationArrowsVisible;</span>
+    }
+
+    /// Enables side navigation arrows (material font icons) for moving between images.
+    ///
+    /// #### Parameters
+    ///
+    /// - `navigationArrowsVisible`: `true` to show side navigation arrows.
+    public void setNavigationArrowsVisible(boolean navigationArrowsVisible) {
+<span class="fc" id="L1216">        this.navigationArrowsVisible = navigationArrowsVisible;</span>
+<span class="fc" id="L1217">        repaint();</span>
+<span class="fc" id="L1218">    }</span>
+
+    /// Indicates if thumbnails should be painted in a strip at the bottom for direct image selection.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the thumbnail strip is visible.
+    public boolean isThumbnailsVisible() {
+<span class="fc" id="L1226">        return thumbnailsVisible;</span>
+    }
+
+    /// Enables a bottom thumbnail strip for direct image selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbnailsVisible`: `true` to show thumbnails.
+    public void setThumbnailsVisible(boolean thumbnailsVisible) {
+<span class="fc" id="L1235">        this.thumbnailsVisible = thumbnailsVisible;</span>
+<span class="fc" id="L1236">        repaint();</span>
+<span class="fc" id="L1237">    }</span>
+
+    /// Gets the thumbnail strip height in millimeters.
+    ///
+    /// #### Returns
+    ///
+    /// Height of the thumbnail strip in millimeters.
+    public float getThumbnailBarHeight() {
+<span class="fc" id="L1245">        return thumbnailBarHeightMM;</span>
+    }
+
+    /// Sets the thumbnail strip height in millimeters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbnailBarHeight`: Height of the thumbnail strip in millimeters.
+    public void setThumbnailBarHeight(float thumbnailBarHeight) {
+<span class="fc" id="L1254">        this.thumbnailBarHeightMM = Math.max(1f, thumbnailBarHeight);</span>
+<span class="fc" id="L1255">        repaint();</span>
+<span class="fc" id="L1256">    }</span>
+
+    /// Manipulate the zoom level of the application
+    ///
+    /// #### Returns
+    ///
+    /// the zoom
+    public float getZoom() {
+<span class="fc" id="L1264">        return zoom;</span>
+    }
+
+    /// Manipulate the zoom level of the application
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoom`: the zoom to set
+    public void setZoom(float zoom) {
+<span class="nc bnc" id="L1273" title="All 2 branches missed.">        if (animateZoom) {</span>
+<span class="nc" id="L1274">            zooming = true;</span>
+<span class="nc" id="L1275">            float initZoom = this.zoom;</span>
+<span class="nc" id="L1276">            motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);</span>
+<span class="nc" id="L1277">            motion.start();</span>
+<span class="nc" id="L1278">            getComponentForm().registerAnimated(this);</span>
+<span class="nc" id="L1279">        } else {</span>
+<span class="nc" id="L1280">            this.zoom = zoom;</span>
+<span class="nc" id="L1281">            updatePositions();</span>
+<span class="nc" id="L1282">            repaint();</span>
+        }
+<span class="nc" id="L1284">    }</span>
+
+    /// Manipulate the zoom level of the application
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoom`: the zoom to set
+    ///
+    /// - `panPositionX`: A float value between 0 and 1 to set the image x position
+    ///
+    /// - `panPositionY`: A float value between 0 and 1 to set the image y position
+    public void setZoom(float zoom, float panPositionX, float panPositionY) {
+<span class="fc bfc" id="L1296" title="All 2 branches covered.">        if (panPositionX &gt; 1) {</span>
+<span class="fc" id="L1297">            panPositionX = 1;</span>
+        }
+<span class="pc bpc" id="L1299" title="1 of 2 branches missed.">        if (panPositionX &lt; 0) {</span>
+<span class="nc" id="L1300">            panPositionX = 0;</span>
+        }
+<span class="pc bpc" id="L1302" title="1 of 2 branches missed.">        if (panPositionY &gt; 1) {</span>
+<span class="nc" id="L1303">            panPositionY = 1;</span>
+        }
+<span class="fc bfc" id="L1305" title="All 2 branches covered.">        if (panPositionY &lt; 0) {</span>
+<span class="fc" id="L1306">            panPositionY = 0;</span>
+        }
+<span class="fc" id="L1308">        this.panPositionX = panPositionX;</span>
+<span class="fc" id="L1309">        this.panPositionY = panPositionY;</span>
+<span class="pc bpc" id="L1310" title="1 of 2 branches missed.">        if (animateZoom) {</span>
+<span class="nc" id="L1311">            zooming = true;</span>
+<span class="nc" id="L1312">            float initZoom = this.zoom;</span>
+<span class="nc" id="L1313">            motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);</span>
+<span class="nc" id="L1314">            motion.start();</span>
+<span class="nc" id="L1315">            getComponentForm().registerAnimated(this);</span>
+<span class="nc" id="L1316">        } else {</span>
+<span class="fc" id="L1317">            this.zoom = zoom;</span>
+<span class="fc" id="L1318">            updatePositions();</span>
+<span class="fc" id="L1319">            repaint();</span>
+        }
+<span class="fc" id="L1321">    }</span>
+
+    /// This image is shown briefly during swiping while the full size image is loaded
+    ///
+    /// #### Returns
+    ///
+    /// the swipePlaceholder
+    public Image getSwipePlaceholder() {
+<span class="fc" id="L1329">        return swipePlaceholder;</span>
+    }
+
+    /// This image is shown briefly during swiping while the full size image is loaded
+    ///
+    /// #### Parameters
+    ///
+    /// - `swipePlaceholder`: the swipePlaceholder to set
+    public void setSwipePlaceholder(Image swipePlaceholder) {
+<span class="fc" id="L1338">        this.swipePlaceholder = swipePlaceholder;</span>
+<span class="fc" id="L1339">    }</span>
+
+    /// Eager locking effectively locks the right/left images as well as the main image, as a result
+    /// more heap is taken
+    ///
+    /// #### Returns
+    ///
+    /// the eagerLock
+    public boolean isEagerLock() {
+<span class="fc" id="L1348">        return eagerLock;</span>
+    }
+
+    /// Eager locking effectively locks the right/left images as well as the main image, as a result
+    /// more heap is taken
+    ///
+    /// #### Parameters
+    ///
+    /// - `eagerLock`: the eagerLock to set
+    public void setEagerLock(boolean eagerLock) {
+<span class="fc" id="L1358">        this.eagerLock = eagerLock;</span>
+<span class="fc" id="L1359">    }</span>
+
+    /// By default the ImageViewer cycles from the beginning to the end of the list
+    /// when going to the left, setting this to false prevents this behaviour
+    ///
+    /// #### Returns
+    ///
+    /// true if it should cycle left from beginning
+    public boolean isCycleLeft() {
+<span class="fc" id="L1368">        return cycleLeft;</span>
+    }
+
+    /// By default the ImageViewer cycles from the beginning to the end of the list
+    /// when going to the left, setting this to false prevents this behaviour
+    ///
+    /// #### Parameters
+    ///
+    /// - `cycleLeft`: the cycle left to set
+    public void setCycleLeft(boolean cycleLeft) {
+<span class="fc" id="L1378">        this.cycleLeft = cycleLeft;</span>
+<span class="fc" id="L1379">    }</span>
+
+    /// By default the ImageViewer cycles from the end to the beginning of the list
+    /// when going to the right, setting this to false prevents this behaviour
+    ///
+    /// #### Returns
+    ///
+    /// true if it should cycle right from the end
+    public boolean isCycleRight() {
+<span class="fc" id="L1388">        return cycleRight;</span>
+    }
+
+    /// By default the ImageViewer cycles from the end to the beginning of the list
+    /// when going to the right, setting this to false prevents this behaviour
+    ///
+    /// #### Parameters
+    ///
+    /// - `cycleRight`: the cycle right to set
+    public void setCycleRight(boolean cycleRight) {
+<span class="fc" id="L1398">        this.cycleRight = cycleRight;</span>
+<span class="fc" id="L1399">    }</span>
+
+    /// The swipe threshold is a number between 0 and 1 that indicates the threshold
+    /// after which the swiped image moves to the next image. Below that number the image
+    /// will bounce back
+    ///
+    /// #### Returns
+    ///
+    /// the threshold
+    public float getSwipeThreshold() {
+<span class="fc" id="L1409">        return swipeThreshold;</span>
+    }
+
+    /// The swipe threshold is a number between 0 and 1 that indicates the threshold
+    /// after which the swiped image moves to the next image. Below that number the image
+    /// will bounce back
+    ///
+    /// #### Parameters
+    ///
+    /// - `swipeThreshold`: the swipeThreshold to set
+    public void setSwipeThreshold(float swipeThreshold) {
+<span class="fc" id="L1420">        this.swipeThreshold = swipeThreshold;</span>
+<span class="fc" id="L1421">    }</span>
+
+    /// Sets the viewer initial image position to fill or to fit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageInitialPosition`: values can be IMAGE_FILL or IMAGE_FIT
+    public void setImageInitialPosition(int imageInitialPosition) {
+<span class="fc" id="L1429">        this.imageInitialPosition = imageInitialPosition;</span>
+<span class="fc" id="L1430">    }</span>
+
+    private class CropBox {
+        /// The top, left, right, bottom crop positions expressed as
+        /// ratios of corresponding axis length.  E.g. top/bottom are
+        /// ratio of crop position to the height.  Left/right are ratio of crop
+        /// position to width.  Positive values move inward toward image center
+        /// Negative values move box out.
+        private double top;
+        private double left;
+        private double right;
+        private double bottom;
+
+<span class="fc" id="L1443">        CropBox() {</span>
+
+<span class="fc" id="L1445">        }</span>
+
+<span class="nc" id="L1447">        CropBox(double top, double right, double bottom, double left) {</span>
+<span class="nc" id="L1448">            this.top = top;</span>
+<span class="nc" id="L1449">            this.left = left;</span>
+<span class="nc" id="L1450">            this.right = right;</span>
+<span class="nc" id="L1451">            this.bottom = bottom;</span>
+<span class="nc" id="L1452">        }</span>
+
+        void set(double top, double right, double bottom, double left) {
+<span class="fc" id="L1455">            this.top = top;</span>
+<span class="fc" id="L1456">            this.left = left;</span>
+<span class="fc" id="L1457">            this.right = right;</span>
+<span class="fc" id="L1458">            this.bottom = bottom;</span>
+<span class="fc" id="L1459">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L1463">            return &quot;CropBox{&quot; + top + &quot;, &quot; + right + &quot;, &quot; + bottom + &quot;, &quot; + left + &quot;}&quot;;</span>
+        }
+
+        /// Given a cropped image width, this returns the source image width necessary
+        /// to produce the cropped image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `croppedWidth`
+        private int imageWidthForCroppedWidth(int croppedWidth) {
+<span class="fc" id="L1473">            return (int) Math.round(-croppedWidth / (left + right - 1));</span>
+        }
+
+        /// Given a cropped image height, this returns the source image height necessary to
+        /// produce the cropped image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `croppedHeight`
+        private int imageHeightForCroppedHeight(int croppedHeight) {
+<span class="fc" id="L1483">            return (int) (Math.round(-croppedHeight / (top + bottom - 1)));</span>
+        }
+
+        /// Paints the source image onto a Graphics context for a cropped image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `g`: The graphics context
+        ///
+        /// - `imageWidth`: The cropped image width.
+        ///
+        /// - `imageHeight`: The cropped image height.
+        private void paint(Graphics g, int imageWidth, int imageHeight) {
+<span class="fc" id="L1496">            int ih = imageHeightForCroppedHeight(imageHeight);</span>
+<span class="fc" id="L1497">            int iw = imageWidthForCroppedWidth(imageWidth);</span>
+<span class="fc" id="L1498">            g.drawImage(image, (int) Math.round(-left * iw), (int) Math.round(-top * ih), iw, ih);</span>
+<span class="fc" id="L1499">        }</span>
+
+
+    }
+
+    class AnimatePanX implements Animation {
+        private final Motion motion;
+        private final Image replaceImage;
+        private final int updatePos;
+
+<span class="fc" id="L1509">        public AnimatePanX(float destPan, Image replaceImage, int updatePos) {</span>
+<span class="fc" id="L1510">            motion = Motion.createEaseInOutMotion((int) (panPositionX * 10000), (int) (destPan * 10000), 200);</span>
+<span class="fc" id="L1511">            motion.start();</span>
+<span class="fc" id="L1512">            this.replaceImage = replaceImage;</span>
+<span class="fc" id="L1513">            this.updatePos = updatePos;</span>
+<span class="fc" id="L1514">            Display.getInstance().getCurrent().registerAnimated(this);</span>
+<span class="fc" id="L1515">        }</span>
+
+        @Override
+        public boolean animate() {
+<span class="fc" id="L1519">            float v = motion.getValue();</span>
+<span class="fc" id="L1520">            v /= 10000.0f;</span>
+<span class="fc" id="L1521">            panPositionX = v;</span>
+<span class="fc bfc" id="L1522" title="All 2 branches covered.">            if (motion.isFinished()) {</span>
+<span class="pc bpc" id="L1523" title="1 of 2 branches missed.">                if (replaceImage != null) {</span>
+<span class="pc bpc" id="L1524" title="1 of 2 branches missed.">                    if (!eagerLock) {</span>
+<span class="nc" id="L1525">                        getImage().unlock();</span>
+<span class="nc" id="L1526">                        setImage(replaceImage);</span>
+                    } else {
+<span class="fc" id="L1528">                        setImage(replaceImage);</span>
+<span class="fc" id="L1529">                        Image left = getImageLeft();</span>
+<span class="fc" id="L1530">                        Image right = getImageRight();</span>
+<span class="pc bpc" id="L1531" title="1 of 2 branches missed.">                        if (left != replaceImage) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1532">                            left.unlock();</span>
+                        }
+<span class="pc bpc" id="L1534" title="1 of 2 branches missed.">                        if (right != replaceImage) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1535">                            right.unlock();</span>
+                        }
+<span class="fc" id="L1537">                        selectLock = true;</span>
+<span class="fc" id="L1538">                        swipeableImages.setSelectedIndex(updatePos);</span>
+<span class="fc" id="L1539">                        selectLock = false;</span>
+<span class="fc" id="L1540">                        replaceImage.lock();</span>
+<span class="fc" id="L1541">                        eagerLock();</span>
+                    }
+<span class="fc" id="L1543">                    selectLock = true;</span>
+<span class="fc" id="L1544">                    swipeableImages.setSelectedIndex(updatePos);</span>
+<span class="fc" id="L1545">                    selectLock = false;</span>
+<span class="fc" id="L1546">                    panPositionX = 0.5f;</span>
+<span class="fc" id="L1547">                    panPositionY = 0.5f;</span>
+<span class="fc" id="L1548">                    zoom = MIN_ZOOM;</span>
+                } else {
+                    // free cached memory
+<span class="nc bnc" id="L1551" title="All 4 branches missed.">                    if (swipeableImages != null &amp;&amp; swipeableImages.getSize() &gt; 1) {</span>
+<span class="nc" id="L1552">                        getImageLeft().unlock();</span>
+<span class="nc" id="L1553">                        getImageRight().unlock();</span>
+                    }
+                }
+<span class="fc" id="L1556">                Display.getInstance().getCurrent().deregisterAnimated(this);</span>
+            }
+<span class="fc" id="L1558">            repaint();</span>
+<span class="fc" id="L1559">            return false;</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="nc" id="L1564">        }</span>
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

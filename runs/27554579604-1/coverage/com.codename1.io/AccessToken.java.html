@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessToken.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">AccessToken.java</span></div><h1>AccessToken.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.io;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.util.DateUtil;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Date;
+
+/// This class represent an access token.
+///
+/// @author Chen
+public class AccessToken implements Externalizable {
+
+
+    private String token;
+
+    /// When the token expires.  Generally this is a numeric string obtained
+    /// from the &quot;expires&quot; token of an oauth2 request, signifying the number of seconds
+    /// from the time of issue that the token is valid for.
+    private String expires;
+
+    /// The expiry date of the token.  Prefer this value over the `#expires` value
+    /// since the expires value may just be the number of seconds that the access token is good
+    /// for since it was generated - and we may not have that information stored.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    private Date expiryDate;
+
+    private String refreshToken;
+
+    private String identityToken;
+
+    /// Constructor with parameters
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the token string
+    ///
+    /// - `expires`: the access token expires date
+    public AccessToken(String token, String expires) {
+<span class="fc" id="L68">        this(token, expires, null);</span>
+<span class="fc" id="L69">    }</span>
+
+    /// Constructor with parameters
+    ///
+    /// @since 7.0
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the token string
+    ///
+    /// - `expires`: the access token expires date
+    ///
+    /// - `refreshToken`: The refresh token.
+    public AccessToken(String token, String expires, String refreshToken) {
+<span class="fc" id="L83">        this(token, expires, refreshToken, null);</span>
+<span class="fc" id="L84">    }</span>
+
+    /// Constructor with parameters
+    ///
+    /// @since 7.0
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the token string
+    ///
+    /// - `expires`: the access token expires date
+    ///
+    /// - `refreshToken`: The refresh token.
+    ///
+    /// - `identityToken`: The identity token
+<span class="fc" id="L99">    public AccessToken(String token, String expires, String refreshToken, String identityToken) {</span>
+<span class="fc" id="L100">        this.token = token;</span>
+<span class="fc" id="L101">        this.expires = expires;</span>
+<span class="fc" id="L102">        this.expiryDate = parseDate(expires);</span>
+<span class="fc" id="L103">        this.refreshToken = refreshToken;</span>
+<span class="fc" id="L104">        this.identityToken = identityToken;</span>
+<span class="fc" id="L105">    }</span>
+
+    /// #### Since
+    ///
+    /// 7.0
+<span class="fc" id="L110">    public AccessToken() {</span>
+
+<span class="fc" id="L112">    }</span>
+
+    /// #### Parameters
+    ///
+    /// - `Token`: The token.
+    ///
+    /// - `expiryDate`: The expiry date.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public static AccessToken createWithExpiryDate(String token, Date expiryDate) {
+<span class="fc" id="L124">        AccessToken out = new AccessToken(token, null);</span>
+
+<span class="fc" id="L126">        out.expiryDate = expiryDate;</span>
+<span class="fc" id="L127">        return out;</span>
+    }
+
+    /// Parses an integer value as a string.  Automatically truncates at first
+    /// decimal place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: A numeric string
+    ///
+    /// #### Returns
+    ///
+    /// The Long value of the string, or null if it couldn't be parsed.
+    private static Long parseLong(String str) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (str == null) {</span>
+<span class="fc" id="L142">            return null;</span>
+        }
+<span class="fc" id="L144">        int decimalPos = str.indexOf('.');</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (decimalPos &gt;= 0) {</span>
+<span class="fc" id="L146">            str = str.substring(0, decimalPos);</span>
+        }
+
+<span class="fc" id="L149">        char[] chars = str.toCharArray();</span>
+<span class="fc" id="L150">        int len = chars.length;</span>
+
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L153">            char c = chars[i];</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (!Character.isDigit(c)) {</span>
+<span class="fc" id="L155">                return null;</span>
+            }
+        }
+<span class="fc" id="L158">        return Long.valueOf(Long.parseLong(str));</span>
+    }
+
+    /// A utility function that can parse date values received as a string.
+    /// Most often these dates are just numbers of seconds as received from
+    /// &quot;expires&quot; oauth2 tokens, which indicate the number of seconds an access
+    /// token is valid for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dateStr`: The date string.  Value inputs include &quot;3600&quot;, &quot;3600.0&quot;, &quot;7200.12345&quot;, etc..
+    ///
+    /// #### Returns
+    ///
+    /// A Date, or null if the input can't be parsed.
+    private static Date parseDate(String dateStr) {
+<span class="fc" id="L174">        Long longExpires = parseLong(dateStr);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (longExpires != null) {</span>
+            // There was an expiry date, but it might have been from an expires_in
+            // header, which would only hold the number of seconds since
+<span class="fc" id="L178">            long l = longExpires.longValue();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (l == 0L) {</span>
+<span class="fc" id="L180">                return null;</span>
+            }
+<span class="fc" id="L182">            return new Date(System.currentTimeMillis() + l * 1000L);</span>
+        }
+<span class="fc" id="L184">        return null;</span>
+
+    }
+
+    /// Simple getter
+    ///
+    /// #### Returns
+    ///
+    /// the token string
+    public String getToken() {
+<span class="fc" id="L194">        return token;</span>
+    }
+
+    /// Simple getter
+    ///
+    /// #### Returns
+    ///
+    /// the expires date
+    public String getExpires() {
+<span class="fc" id="L203">        return expires;</span>
+    }
+
+    @Override
+    public int getVersion() {
+<span class="fc" id="L208">        return 4;</span>
+    }
+
+    @Override
+    public void externalize(DataOutputStream out) throws IOException {
+<span class="fc" id="L213">        Util.writeUTF(token, out);</span>
+<span class="fc" id="L214">        Util.writeUTF(expires, out);</span>
+<span class="fc" id="L215">        Util.writeObject(expiryDate, out);</span>
+<span class="fc" id="L216">        Util.writeUTF(refreshToken, out);</span>
+<span class="fc" id="L217">        Util.writeUTF(identityToken, out);</span>
+<span class="fc" id="L218">    }</span>
+
+    @Override
+    public void internalize(int version, DataInputStream in) throws IOException {
+<span class="fc" id="L222">        token = Util.readUTF(in);</span>
+<span class="fc" id="L223">        expires = Util.readUTF(in);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (version &gt;= 2) {</span>
+<span class="fc" id="L225">            expiryDate = (Date) Util.readObject(in);</span>
+        }
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (version &gt;= 3) {</span>
+<span class="fc" id="L228">            refreshToken = Util.readUTF(in);</span>
+        }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (version &gt;= 4) {</span>
+<span class="fc" id="L231">            identityToken = Util.readUTF(in);</span>
+        }
+<span class="fc" id="L233">    }</span>
+
+    /// Gets refresh token.
+    ///
+    /// #### Returns
+    ///
+    /// Refresh token.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public String getRefreshToken() {
+<span class="fc" id="L245">        return refreshToken;</span>
+    }
+
+    /// Sets refresh token.
+    ///
+    /// #### Parameters
+    ///
+    /// - `refreshToken`: The refresh token.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public void setRefreshToken(String refreshToken) {
+<span class="fc" id="L258">        this.refreshToken = refreshToken;</span>
+<span class="fc" id="L259">    }</span>
+
+    @Override
+    public String getObjectId() {
+<span class="fc" id="L263">        return &quot;AccessToken&quot;;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (obj instanceof AccessToken) {</span>
+<span class="fc" id="L269">            AccessToken tok = (AccessToken) obj;</span>
+<span class="fc bfc" id="L270" title="All 4 branches covered.">            return Objects.equals(token, tok.token) &amp;&amp; Objects.equals(expiryDate, tok.expiryDate);</span>
+        }
+<span class="fc" id="L272">        return super.equals(obj);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L277">        int hash = 3;</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        hash = 53 * hash + (this.token != null ? this.token.hashCode() : 0);</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        hash = 53 * hash + (this.expiryDate != null ? this.expiryDate.hashCode() : 0);</span>
+<span class="fc" id="L280">        return hash;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L285">        return &quot;AccessToken {&quot; + token + &quot;, expires=&quot; + expiryDate + &quot;}&quot;;</span>
+    }
+
+    /// Gets the expiry date of this token.
+    ///
+    /// #### Returns
+    ///
+    /// The expiry date of this token or null.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public Date getExpiryDate() {
+<span class="fc" id="L298">        return expiryDate;</span>
+    }
+
+    /// Sets the expiry date of this token.
+    ///
+    /// #### Parameters
+    ///
+    /// - `date`: The expiry date of this token.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public void setExpiryDate(Date date) {
+<span class="fc" id="L311">        this.expiryDate = date;</span>
+<span class="fc" id="L312">    }</span>
+
+    /// Checks to see if this token is expired.
+    ///
+    /// #### Returns
+    ///
+    /// False if no expiry date is set or the expiryDate is before the current time.
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public boolean isExpired() {
+<span class="fc bfc" id="L324" title="All 4 branches covered.">        return expiryDate != null &amp;&amp; DateUtil.compare(expiryDate, new Date()) &lt; 0;</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the identityToken
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public String getIdentityToken() {
+<span class="fc" id="L335">        return identityToken;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `identityToken`: the identityToken to set
+    ///
+    /// #### Since
+    ///
+    /// 7.0
+    public void setIdentityToken(String identityToken) {
+<span class="fc" id="L346">        this.identityToken = identityToken;</span>
+<span class="fc" id="L347">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

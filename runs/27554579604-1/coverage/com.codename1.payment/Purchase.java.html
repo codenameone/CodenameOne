@@ -1,0 +1,1116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Purchase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">Purchase.java</span></div><h1>Purchase.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment;
+
+import com.codename1.io.Log;
+import com.codename1.io.Storage;
+import com.codename1.io.Util;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+
+/// Represents the status of in-app-purchase goods, this class provides information
+/// about products purchased by a user as well as the ability to purchase additional
+/// products. There are generally two types of payment systems: Manual and managed.
+/// In manual payments we pay a specific amount in a specific currency  while with managed
+/// payment systems we work against a product catalog defined in the server.
+///
+/// In-app-purchase API's rely on managed server based products, other payment systems
+/// use the manual approach. An application dealing with virtual goods must support both
+/// since not all devices feature in-app-purchase API's. An application dealing with physical
+/// goods &amp; services must use the latter according to the TOS of current in-app-purchase
+/// solutions.
+///
+/// @author Shai Almog
+<span class="fc" id="L51">public abstract class Purchase {</span>
+    private static final String RECEIPTS_KEY = &quot;CN1SubscriptionsData.dat&quot;;
+    private static final String RECEIPTS_REFRESH_TIME_KEY = &quot;CN1SubscriptionsDataRefreshTime.dat&quot;;
+    private static final String PENDING_PURCHASE_KEY = &quot;PendingPurchases.dat&quot;;
+    private static final String PROCESSED_PURCHASE_KEY = &quot;ProcessedPurchases.dat&quot;;
+    /// All purchase state mutations and Storage I/O happen on the CN1
+    /// EDT.  Methods that may be invoked from off-EDT threads (notably
+    /// the static `#postReceipt(java.lang.String,java.lang.String,java.lang.String,long,java.lang.String)`
+    /// entry point called by native iOS StoreKit callbacks on the main
+    /// UI thread) auto-dispatch their work via
+    /// `Display#callSerially(java.lang.Runnable)`.  This replaces an
+    /// earlier lock-based design whose contention on the iOS main
+    /// thread froze keyboard input on iOS 26.x (issue #5010).  Public
+    /// read accessors that historically supported off-EDT invocation
+    /// continue to do so via `Display#callSeriallyAndWait`.
+    private static boolean syncInProgress;
+    private static boolean loadInProgress;
+    /// Eagerly initialized (rather than lazy) so that SpotBugs doesn't
+    /// flag the now-unlocked update path as `LI_LAZY_INIT_STATIC`.
+    /// Access is EDT-only by construction, so neither the lazy-init
+    /// race nor the field assignment need synchronization.
+<span class="fc" id="L72">    private static final List&lt;SuccessCallback&lt;Boolean&gt;&gt; synchronizeReceiptsCallbacks =</span>
+            new ArrayList&lt;SuccessCallback&lt;Boolean&gt;&gt;();
+    /// Static (shared across all `Purchase` instances) because
+    /// `Display#getInAppPurchase()` returns a fresh `Purchase` on every
+    /// call on every port (iOS `ZoozPurchase`, Android `ZoozPurchase`,
+    /// the JavaSE anonymous subclass).  A per-instance store would be
+    /// invisible to the native receipt path: StoreKit's
+    /// `paymentQueue:updatedTransactions:` enters via the static
+    /// `#postReceipt(...)` which calls `getInAppPurchase().postReceipt(r)`
+    /// on a brand-new instance whose store would be null, so the app's
+    /// `ReceiptStore` would never be invoked for auto-submitted receipts.
+    /// There is logically one IAP store per app, so a static field is the
+    /// correct scope.  Access is EDT-only by construction.
+    private static ReceiptStore receiptStore;
+    private List&lt;Receipt&gt; receipts;
+    private Date receiptsRefreshTime;
+
+    /// Posts a receipt to be added to the receipt store.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: The sku of the product
+    ///
+    /// - `transactionId`: The transaction ID
+    ///
+    /// - `datePurchased`: The date of the purchase.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal implementation use only.
+    public static void postReceipt(String storeCode, String sku, String transactionId, long datePurchased, String orderData) {
+
+<span class="fc" id="L104">        Receipt r = new Receipt();</span>
+<span class="fc" id="L105">        r.setSku(sku);</span>
+<span class="fc" id="L106">        r.setTransactionId(transactionId);</span>
+<span class="fc" id="L107">        r.setOrderData(orderData);</span>
+<span class="fc" id="L108">        r.setStoreCode(storeCode);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (datePurchased &gt; 0) {</span>
+<span class="fc" id="L110">            r.setPurchaseDate(new Date(datePurchased));</span>
+        } else {
+<span class="nc" id="L112">            r.setPurchaseDate(new Date());</span>
+        }
+<span class="fc" id="L114">        Purchase.getInAppPurchase().postReceipt(r);</span>
+
+<span class="fc" id="L116">    }</span>
+
+    /// Returns the native OS purchase implementation if applicable, if unavailable this
+    /// method will try to fallback to a custom purchase implementation and failing that
+    /// will return null
+    ///
+    /// #### Returns
+    ///
+    /// instance of the purchase class or null
+    public static Purchase getInAppPurchase() {
+<span class="fc" id="L126">        return Display.getInstance().getInAppPurchase();</span>
+    }
+
+    /// #### Deprecated
+    ///
+    /// use the version that takes no arguments
+    public static Purchase getInAppPurchase(boolean d) {
+<span class="nc" id="L133">        return Display.getInstance().getInAppPurchase();</span>
+    }
+
+    protected final ReceiptStore getReceiptStore() {
+<span class="nc" id="L137">        return receiptStore;</span>
+    }
+
+    /// Installs a given receipt store to handle receipt management
+    ///
+    /// #### Parameters
+    ///
+    /// - `store`
+    public final void setReceiptStore(ReceiptStore store) {
+<span class="fc" id="L146">        receiptStore = store;</span>
+<span class="fc" id="L147">    }</span>
+
+    /// Gets all of the receipts for this app.  Note:  You should periodically
+    /// reload the receipts from the server to make sure that the user
+    /// hasn't canceled a receipt or renewed one.
+    ///
+    /// #### Returns
+    ///
+    /// List of receipts for purchases this app.
+    public final List&lt;Receipt&gt; getReceipts() {
+<span class="fc" id="L157">        Display d = Display.getInstance();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (!d.isEdt()) {</span>
+<span class="fc" id="L159">            final List&lt;Receipt&gt;[] out = new List[]{null};</span>
+<span class="fc" id="L160">            d.callSeriallyAndWait(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L163">                    out[0] = getReceipts();</span>
+<span class="fc" id="L164">                }</span>
+            });
+<span class="fc" id="L166">            return out[0];</span>
+        }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (receipts == null) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (Storage.getInstance().exists(RECEIPTS_KEY)) {</span>
+<span class="nc" id="L170">                Receipt.registerExternalizable();</span>
+                try {
+<span class="nc" id="L172">                    receipts = (List&lt;Receipt&gt;) Storage.getInstance().readObject(RECEIPTS_KEY);</span>
+<span class="nc" id="L173">                } catch (Exception ex) {</span>
+<span class="nc" id="L174">                    Log.p(&quot;Failed to load receipts from &quot; + RECEIPTS_KEY);</span>
+<span class="nc" id="L175">                    Log.e(ex);</span>
+<span class="nc" id="L176">                    receipts = new ArrayList&lt;Receipt&gt;();</span>
+<span class="nc" id="L177">                }</span>
+            } else {
+<span class="nc" id="L179">                receipts = new ArrayList&lt;Receipt&gt;();</span>
+            }
+        }
+<span class="fc" id="L182">        return receipts;</span>
+    }
+
+    /// Sets the list of receipts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`
+    private void setReceipts(List&lt;Receipt&gt; data) {
+<span class="fc" id="L191">        receipts = new ArrayList&lt;Receipt&gt;();</span>
+<span class="fc" id="L192">        receipts.addAll(data);</span>
+<span class="fc" id="L193">        Storage.getInstance().writeObject(RECEIPTS_KEY, receipts);</span>
+<span class="fc" id="L194">    }</span>
+
+    /// Gets all of the receipts for the specified skus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: The skus for which to get receipts.
+    ///
+    /// #### Returns
+    ///
+    /// All receipts for the given skus.
+    public final Receipt[] getReceipts(String... skus) {
+<span class="fc" id="L206">        List&lt;Receipt&gt; out = new ArrayList&lt;Receipt&gt;();</span>
+<span class="fc" id="L207">        List&lt;String&gt; lSkus = Arrays.asList(skus);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (Receipt r : getReceipts()) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (lSkus.contains(r.getSku())) {</span>
+<span class="fc" id="L210">                out.add(r);</span>
+            }
+<span class="fc" id="L212">        }</span>
+<span class="fc" id="L213">        return out.toArray(new Receipt[out.size()]);</span>
+    }
+
+    /// Gets the time that receipts were last refreshed.
+    private Date getReceiptsRefreshTime() {
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (receiptsRefreshTime == null) {</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (Storage.getInstance().exists(RECEIPTS_REFRESH_TIME_KEY)) {</span>
+<span class="fc" id="L220">                receiptsRefreshTime = (Date) Storage.getInstance().readObject(RECEIPTS_REFRESH_TIME_KEY);</span>
+            } else {
+<span class="fc" id="L222">                return new Date(-1L);</span>
+            }
+        }
+<span class="fc" id="L225">        return receiptsRefreshTime;</span>
+    }
+
+    /// Updates the last refresh time for receipts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`
+    private void setReceiptsRefreshTime(Date time) {
+<span class="fc" id="L234">        receiptsRefreshTime = time;</span>
+<span class="fc" id="L235">        Storage.getInstance().writeObject(RECEIPTS_REFRESH_TIME_KEY, receiptsRefreshTime);</span>
+<span class="fc" id="L236">    }</span>
+
+    /// Indicates whether the purchasing platform supports manual payments which
+    /// are just payments of a specific amount of money.
+    ///
+    /// #### Returns
+    ///
+    /// true if manual payments are supported
+    public boolean isManualPaymentSupported() {
+<span class="nc" id="L245">        return false;</span>
+    }
+
+    /// Indicates whether the purchasing platform supports managed payments which
+    /// work by picking products that are handled by the servers/OS of the platform vendor.
+    ///
+    /// #### Returns
+    ///
+    /// true if managed payments are supported
+    public boolean isManagedPaymentSupported() {
+<span class="nc" id="L255">        return false;</span>
+    }
+
+    /// Performs payment of a specific amount based on the manual payment API, notice that
+    /// this doesn't use the in-app-purchase functionality of the device!
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the amount to pay
+    ///
+    /// - `currency`: the three letter currency type
+    ///
+    /// #### Returns
+    ///
+    /// @return a token representing the pending transaction which will be matched
+    /// when receiving a callback from the platform or a null if the payment has
+    /// failed or was canceled
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the manual payments API and will fail if
+    /// isManualPaymentSupported() returns false
+    public String pay(double amount, String currency) {
+<span class="nc" id="L278">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Performs payment of a specific amount based on the manual payment API, notice that
+    /// this doesn't use the in-app-purchase functionality of the device!
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the amount to pay
+    ///
+    /// - `currency`: the three letter currency type
+    ///
+    /// - `invoiceNumber`: application specific invoice number
+    ///
+    /// #### Returns
+    ///
+    /// @return a token representing the pending transaction which will be matched
+    /// when receiving a callback from the platform or a null if the payment has
+    /// failed or was canceled
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the manual payments API and will fail if
+    /// isManualPaymentSupported() returns false
+    public String pay(double amount, String currency, String invoiceNumber) {
+<span class="nc" id="L303">        return pay(amount, currency);</span>
+    }
+
+    /// Indicates whether the payment platform supports things such as &quot;item listing&quot; or
+    /// requires that items be coded into the system. iOS provides listing and pricing
+    /// where Android expects developers to redirect into the Play application for
+    /// application details.
+    ///
+    /// #### Returns
+    ///
+    /// true if the OS supports this behavior
+    public boolean isItemListingSupported() {
+<span class="nc" id="L315">        return false;</span>
+    }
+
+    /// Returns the product list for the given SKU array
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: the ids for the specific products
+    ///
+    /// #### Returns
+    ///
+    /// the product instances
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    /// isManagedPaymentSupported() returns false
+    ///
+    /// - `RuntimeException`: This method works only if isItemListingSupported() returns true
+    public Product[] getProducts(String[] skus) {
+<span class="nc" id="L335">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Returns true if the given SKU was purchased in the past, notice this method might not
+    /// work as expected for Unmanaged/consumable products which can be purchased multiple
+    /// times.  In addition, this will only return true if the product was purchased (or
+    /// has been restored) on the current device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the id of the product
+    ///
+    /// #### Returns
+    ///
+    /// true if the product was purchased
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    /// isManagedPaymentSupported() returns false
+    public boolean wasPurchased(String sku) {
+<span class="nc" id="L356">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Begins the purchase process for the given SKU
+    ///
+    /// On Android you *must* use `#subscribe(java.lang.String)` for play store subscription products instead of this method.  You cannot use `#purchase(java.lang.String)`.  On iOS
+    /// there is no difference between `#subscribe(java.lang.String)` and `#purchase(java.lang.String)`, so if you are simulating subscriptions
+    /// on iOS using auto-renewables, you are better to use `#subscribe(java.lang.String)` as this will work correctly on both Android
+    /// and iOS.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    /// isManagedPaymentSupported() returns false
+    public void purchase(String sku) {
+<span class="nc" id="L375">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Begins the purchase process for the given SKU using a provided promotional offer.
+    ///
+    /// Promotional offers are currently only supported on iOS.  See [Apple's documentation](https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc)
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// - `promotionalOffer`: The promotional offer.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    /// isManagedPaymentSupported() returns false
+    ///
+    /// #### See also
+    ///
+    /// - ApplePromotionalOffer
+    public void purchase(String sku, PromotionalOffer promotionalOffer) {
+<span class="nc" id="L397">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Begins subscribe process for the given subscription SKU
+    ///
+    /// On Android you *must* use this method for play store subscription products.  You cannot use `#purchase(java.lang.String)`.  On iOS
+    /// there is no difference between `#subscribe(java.lang.String)` and `#purchase(java.lang.String)`, so if you are simulating subscriptions
+    /// on iOS using auto-renewables, you are better to use `#subscribe(java.lang.String)` as this will work correctly on both Android
+    /// and iOS.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    /// isManagedPaymentSupported() returns false
+    public void subscribe(String sku) {
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (receiptStore != null) {</span>
+<span class="fc" id="L417">            purchase(sku);</span>
+<span class="fc" id="L418">            return;</span>
+        }
+<span class="fc" id="L420">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Begins subscribe process for the given subscription SKU using a provided promotional offer.
+    ///
+    /// Promotional offers are currently only supported on iOS.  See [Apple's documentation](https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc)
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// - `promotionalOffer`: The promotional offer.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    /// isManagedPaymentSupported() returns false
+    ///
+    /// #### See also
+    ///
+    /// - ApplePromotionalOffer
+    public void subscribe(String sku, PromotionalOffer promotionalOffer) {
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">        if (receiptStore != null) {</span>
+<span class="fc" id="L443">            purchase(sku, promotionalOffer);</span>
+<span class="fc" id="L444">            return;</span>
+        }
+<span class="nc" id="L446">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Cancels the subscription to a given SKU
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
+    /// isManagedPaymentSupported() returns false
+    public void unsubscribe(String sku) {
+<span class="nc" id="L460">        throw new RuntimeException(&quot;Unsupported&quot;);</span>
+    }
+
+    /// Gets a list of purchases that haven't yet been sent to the server.  You can
+    /// use this for diagnostic and debugging purposes periodically in the app to
+    /// make sure there aren't a queue of purchases that aren't getting submitted
+    /// to the server.
+    ///
+    /// #### Returns
+    ///
+    /// List of receipts that haven't been sent to the server.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public List&lt;Receipt&gt; getPendingPurchases() {
+<span class="fc" id="L473">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">        if (!d.isEdt()) {</span>
+<span class="nc" id="L475">            final List&lt;Receipt&gt;[] out = new List[]{null};</span>
+<span class="nc" id="L476">            d.callSeriallyAndWait(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L479">                    out[0] = getPendingPurchases();</span>
+<span class="nc" id="L480">                }</span>
+            });
+<span class="nc" id="L482">            return out[0];</span>
+        }
+<span class="fc" id="L484">        Storage s = Storage.getInstance();</span>
+<span class="fc" id="L485">        Util.register(new Receipt());</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (s.exists(PENDING_PURCHASE_KEY)) {</span>
+<span class="fc" id="L487">            return (List&lt;Receipt&gt;) s.readObject(PENDING_PURCHASE_KEY);</span>
+        } else {
+<span class="fc" id="L489">            return new ArrayList&lt;Receipt&gt;();</span>
+        }
+    }
+
+    /// Adds a receipt to be pushed to the server.  Receipts whose
+    /// `transactionId` has already been successfully submitted to the
+    /// `ReceiptStore` (recorded in the persistent processed set) or is
+    /// already sitting in the pending queue are silently dropped.  This
+    /// closes the abstraction so the user's `ReceiptStore.submitReceipt`
+    /// is invoked at most once per `transactionId` across the lifetime of
+    /// the install, regardless of platform-level redelivery quirks
+    /// (e.g. iOS StoreKit redelivering an unfinished transaction across
+    /// app sessions, or sandbox subscription renewals).
+    ///
+    /// #### Parameters
+    ///
+    /// - `receipt`: the receipt
+    private void addPendingPurchase(final Receipt receipt) {
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L508">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L511">                    addPendingPurchase(receipt);</span>
+<span class="nc" id="L512">                }</span>
+            });
+<span class="nc" id="L514">            return;</span>
+        }
+<span class="fc" id="L516">        Storage s = Storage.getInstance();</span>
+<span class="fc" id="L517">        String txId = receipt.getTransactionId();</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">        if (txId != null) {</span>
+<span class="fc bfc" id="L519" title="All 2 branches covered.">            if (getProcessedTransactionIds().contains(txId)) {</span>
+<span class="fc" id="L520">                return;</span>
+            }
+<span class="fc" id="L522">            List&lt;Receipt&gt; pendingPurchases = getPendingPurchases();</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">            for (Receipt r : pendingPurchases) {</span>
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">                if (txId.equals(r.getTransactionId())) {</span>
+<span class="fc" id="L525">                    return;</span>
+                }
+<span class="nc" id="L527">            }</span>
+<span class="fc" id="L528">            pendingPurchases.add(receipt);</span>
+<span class="fc" id="L529">            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);</span>
+<span class="fc" id="L530">        } else {</span>
+            // Receipts without a transactionId can't be tracked in the
+            // processed set; fall back to enqueueing and let the
+            // synchronize path drain them.  receiptsMatch handles
+            // removal correctly when transactionId is null on both
+            // sides.
+<span class="nc" id="L536">            List&lt;Receipt&gt; pendingPurchases = getPendingPurchases();</span>
+<span class="nc" id="L537">            pendingPurchases.add(receipt);</span>
+<span class="nc" id="L538">            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);</span>
+        }
+<span class="fc" id="L540">    }</span>
+
+    /// Returns the persistent list of transactionIds that have already
+    /// been successfully submitted to the `ReceiptStore`.  Called only
+    /// from the EDT.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private List&lt;String&gt; getProcessedTransactionIds() {
+<span class="fc" id="L547">        Storage s = Storage.getInstance();</span>
+<span class="fc bfc" id="L548" title="All 2 branches covered.">        if (s.exists(PROCESSED_PURCHASE_KEY)) {</span>
+<span class="fc" id="L549">            return (List&lt;String&gt;) s.readObject(PROCESSED_PURCHASE_KEY);</span>
+        }
+<span class="fc" id="L551">        return new ArrayList&lt;String&gt;();</span>
+    }
+
+    /// Records that the receipt with the given transactionId has been
+    /// successfully submitted to the `ReceiptStore`, so future
+    /// `addPendingPurchase` calls with the same transactionId skip the
+    /// enqueue.
+    private void recordProcessedTransactionId(final String txId) {
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        if (txId == null) {</span>
+<span class="fc" id="L560">            return;</span>
+        }
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L563">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L566">                    recordProcessedTransactionId(txId);</span>
+<span class="nc" id="L567">                }</span>
+            });
+<span class="nc" id="L569">            return;</span>
+        }
+<span class="fc" id="L571">        List&lt;String&gt; processed = getProcessedTransactionIds();</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">        if (!processed.contains(txId)) {</span>
+<span class="fc" id="L573">            processed.add(txId);</span>
+<span class="fc" id="L574">            Storage.getInstance().writeObject(PROCESSED_PURCHASE_KEY, processed);</span>
+        }
+<span class="fc" id="L576">    }</span>
+
+    /// Removes a receipt from pending purchases.  Receipts with a non-null
+    /// `transactionId` are matched on `transactionId`; receipts whose
+    /// `transactionId` is null fall back to matching on `sku`, `storeCode`,
+    /// `purchaseDate` and `orderData` so that the receipt is still removed
+    /// from the queue and `synchronizeReceipts` doesn't re-submit it forever.
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: the receipt to remove
+    ///
+    /// #### Returns
+    ///
+    /// the removed receipt, or null if no matching receipt was found
+    private Receipt removePendingPurchase(Receipt target) {
+        // Caller is always on the EDT (only invoked from the
+        // synchronizeReceipts success path, which re-dispatches its
+        // callback to the EDT).
+<span class="fc" id="L595">        Storage s = Storage.getInstance();</span>
+<span class="fc" id="L596">        List&lt;Receipt&gt; pendingPurchases = getPendingPurchases();</span>
+<span class="fc" id="L597">        Receipt found = null;</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">        for (Receipt r : pendingPurchases) {</span>
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">            if (receiptsMatch(r, target)) {</span>
+<span class="fc" id="L600">                found = r;</span>
+<span class="fc" id="L601">                break;</span>
+            }
+<span class="nc" id="L603">        }</span>
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">        if (found != null) {</span>
+<span class="fc" id="L605">            pendingPurchases.remove(found);</span>
+<span class="fc" id="L606">            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);</span>
+<span class="fc" id="L607">            return found;</span>
+        } else {
+<span class="nc" id="L609">            return null;</span>
+        }
+    }
+
+    private static boolean receiptsMatch(Receipt a, Receipt b) {
+<span class="fc" id="L614">        String aTx = a.getTransactionId();</span>
+<span class="fc" id="L615">        String bTx = b.getTransactionId();</span>
+<span class="pc bpc" id="L616" title="1 of 4 branches missed.">        if (aTx != null &amp;&amp; bTx != null) {</span>
+<span class="fc" id="L617">            return aTx.equals(bTx);</span>
+        }
+<span class="pc bpc" id="L619" title="2 of 4 branches missed.">        if (aTx != null || bTx != null) {</span>
+<span class="nc" id="L620">            return false;</span>
+        }
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">        return nullSafeEquals(a.getSku(), b.getSku())</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">                &amp;&amp; nullSafeEquals(a.getStoreCode(), b.getStoreCode())</span>
+<span class="pc bpc" id="L624" title="1 of 2 branches missed.">                &amp;&amp; nullSafeEquals(a.getPurchaseDate(), b.getPurchaseDate())</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">                &amp;&amp; nullSafeEquals(a.getOrderData(), b.getOrderData());</span>
+    }
+
+    private static boolean nullSafeEquals(Object a, Object b) {
+<span class="pc bpc" id="L629" title="3 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    public final void synchronizeReceipts() {
+<span class="fc" id="L633">        synchronizeReceipts(0, null);</span>
+<span class="fc" id="L634">    }</span>
+
+    private void fireSynchronizeReceiptsCallbacks(boolean result) {
+        // Caller is always on the EDT.
+<span class="fc bfc" id="L638" title="All 2 branches covered.">        for (SuccessCallback&lt;Boolean&gt; cb : synchronizeReceiptsCallbacks) {</span>
+<span class="fc" id="L639">            cb.onSucess(result);</span>
+<span class="fc" id="L640">        }</span>
+<span class="fc" id="L641">        synchronizeReceiptsCallbacks.clear();</span>
+<span class="fc" id="L642">    }</span>
+
+    /// Synchronize with receipt store.  This will try to submit any pending purchases
+    /// to the receipt store, and then reload receipts from the receipt store
+    ///
+    /// #### Parameters
+    ///
+    /// - `ifOlderThanMs`: Only fetch receipts if they haven't been fetched in `ifOlderThanMs` milliseconds.
+    ///
+    /// - `callback`: @param callback      Callback called when sync is done.  Will be passed true if all pending purchases were successfully
+    /// submitted to the receipt store AND receipts were successfully loaded.
+    public final void synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback&lt;Boolean&gt; callback) {
+<span class="fc bfc" id="L654" title="All 2 branches covered.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L655">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L658">                    synchronizeReceipts(ifOlderThanMs, callback);</span>
+<span class="fc" id="L659">                }</span>
+            });
+<span class="fc" id="L661">            return;</span>
+        }
+
+<span class="fc bfc" id="L664" title="All 2 branches covered.">        if (callback != null) {</span>
+<span class="fc" id="L665">            synchronizeReceiptsCallbacks.add(callback);</span>
+        }
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">        if (syncInProgress) {</span>
+<span class="nc" id="L668">            return;</span>
+        }
+<span class="fc" id="L670">        syncInProgress = true;</span>
+
+<span class="fc" id="L672">        List&lt;Receipt&gt; pending = getPendingPurchases();</span>
+<span class="fc bfc" id="L673" title="All 4 branches covered.">        if (!pending.isEmpty() &amp;&amp; receiptStore != null) {</span>
+<span class="fc" id="L674">            final Receipt receipt = pending.get(0);</span>
+<span class="fc" id="L675">            receiptStore.submitReceipt(receipt, new SuccessCallback&lt;Boolean&gt;() {</span>
+                @Override
+                public void onSucess(Boolean submitSucceeded) {
+                    // The receipt store may invoke this callback on any
+                    // thread; re-dispatch to the EDT before touching
+                    // purchase state.
+<span class="fc" id="L681">                    onSubmitReceiptComplete(receipt, submitSucceeded);</span>
+<span class="fc" id="L682">                }</span>
+            });
+<span class="fc" id="L684">        } else {</span>
+<span class="fc" id="L685">            loadReceipts(ifOlderThanMs, new SuccessCallback&lt;Boolean&gt;() {</span>
+                @Override
+                public void onSucess(Boolean fetchSucceeded) {
+<span class="fc" id="L688">                    onLoadReceiptsComplete(fetchSucceeded);</span>
+<span class="fc" id="L689">                }</span>
+            });
+        }
+<span class="fc" id="L692">    }</span>
+
+    /// Called from the `ReceiptStore#submitReceipt` callback to apply
+    /// the result on the EDT.  May be invoked on any thread; the body
+    /// always runs on the EDT.
+    private void onSubmitReceiptComplete(final Receipt receipt, final Boolean submitSucceeded) {
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L699">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L702">                    onSubmitReceiptComplete(receipt, submitSucceeded);</span>
+<span class="nc" id="L703">                }</span>
+            });
+<span class="nc" id="L705">            return;</span>
+        }
+        // Reset syncInProgress before doing any work that can throw so
+        // that a failure here doesn't permanently wedge
+        // synchronizeReceipts in the &quot;in progress&quot; state for the rest
+        // of the app's lifetime.
+<span class="fc" id="L711">        syncInProgress = false;</span>
+<span class="fc bfc" id="L712" title="All 2 branches covered.">        if (Boolean.TRUE.equals(submitSucceeded)) {</span>
+            // Record the transactionId before removing the receipt
+            // from pending so a parallel postReceipt re-enqueue
+            // (e.g. iOS redelivery) is dropped by addPendingPurchase
+            // rather than sneaking back into the queue.
+<span class="fc" id="L717">            recordProcessedTransactionId(receipt.getTransactionId());</span>
+<span class="fc" id="L718">            removePendingPurchase(receipt);</span>
+            // Continue draining the queue.  The original callback is
+            // already registered in synchronizeReceiptsCallbacks;
+            // passing null here avoids registering it again and firing
+            // it once per drained receipt.
+<span class="fc" id="L723">            synchronizeReceipts(0, null);</span>
+        } else {
+<span class="fc" id="L725">            fireSynchronizeReceiptsCallbacks(false);</span>
+        }
+<span class="fc" id="L727">    }</span>
+
+    /// Called from the `ReceiptStore#fetchReceipts` callback (via
+    /// `#loadReceipts`) to apply the result on the EDT.  May be invoked
+    /// on any thread; the body always runs on the EDT.
+    private void onLoadReceiptsComplete(final Boolean fetchSucceeded) {
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L734">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L737">                    onLoadReceiptsComplete(fetchSucceeded);</span>
+<span class="nc" id="L738">                }</span>
+            });
+<span class="nc" id="L740">            return;</span>
+        }
+<span class="fc" id="L742">        syncInProgress = false;</span>
+<span class="fc" id="L743">        fireSynchronizeReceiptsCallbacks(Boolean.TRUE.equals(fetchSucceeded));</span>
+<span class="fc" id="L744">    }</span>
+
+    /// Posts a receipt to be added to the receipt store.  The Storage
+    /// I/O and lock-free state mutations all execute on the EDT, so
+    /// calling this from the iOS main thread (the typical
+    /// `paymentQueue:updatedTransactions:` entry path) returns
+    /// immediately without blocking the UI thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: The receipt to post.
+    private void postReceipt(final Receipt r) {
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L757">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L760">                    postReceipt(r);</span>
+<span class="nc" id="L761">                }</span>
+            });
+<span class="nc" id="L763">            return;</span>
+        }
+<span class="fc" id="L765">        addPendingPurchase(r);</span>
+<span class="fc" id="L766">        synchronizeReceipts();</span>
+<span class="fc" id="L767">    }</span>
+
+    /// Synchronize receipts and wait for the sync to complete before proceeding.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ifOlderThanMs`: Only re-fetch if it hasn't been reloaded in this number of milliseconds.
+    ///
+    /// #### Returns
+    ///
+    /// True if the synchronization succeeds.  False otherwise.
+    public final boolean synchronizeReceiptsSync(long ifOlderThanMs) {
+<span class="fc" id="L779">        final boolean[] complete = new boolean[1];</span>
+<span class="fc" id="L780">        final boolean[] success = new boolean[1];</span>
+<span class="fc" id="L781">        synchronizeReceipts(ifOlderThanMs, new SynchronizeReceiptsSyncSuccessCallback(complete, success));</span>
+
+<span class="fc bfc" id="L783" title="All 2 branches covered.">        if (!complete[0]) {</span>
+<span class="fc" id="L784">            Display.getInstance().invokeAndBlock(new SynchronizeReceiptsSyncRunnable(complete));</span>
+        }
+<span class="fc" id="L786">        return success[0];</span>
+    }
+
+    /// Fetches receipts from the IAP service so that we know we are dealing
+    /// with current data.  This method should be called before checking a
+    /// subscription expiry date so that any changes the user has made in the
+    /// store is reflected here (e.g. cancelling or renewing subscription).
+    ///
+    /// #### Parameters
+    ///
+    /// - `ifOlderThanMs`: @param ifOlderThanMs Update is only performed if more than `ifOlderThanMs` milliseconds has elapsed
+    /// since the last successful fetch.
+    ///
+    /// - `callback`: @param callback      Callback called when request is complete.  Passed `true` if
+    /// the data was successfully fetched.  `false` otherwise.
+    private void loadReceipts(long ifOlderThanMs, final SuccessCallback&lt;Boolean&gt; callback) {
+        // Caller is always on the EDT.
+<span class="pc bpc" id="L803" title="1 of 2 branches missed.">        if (loadInProgress) {</span>
+<span class="nc" id="L804">            Log.p(&quot;Did not load receipts because another load is in progress&quot;);</span>
+<span class="nc" id="L805">            callback.onSucess(false);</span>
+<span class="nc" id="L806">            return;</span>
+        }
+<span class="fc" id="L808">        loadInProgress = true;</span>
+<span class="fc" id="L809">        Date lastRefreshTime = getReceiptsRefreshTime();</span>
+<span class="fc" id="L810">        Date now = new Date();</span>
+<span class="pc bpc" id="L811" title="1 of 2 branches missed.">        if (lastRefreshTime.getTime() + ifOlderThanMs &gt; now.getTime()) {</span>
+<span class="nc" id="L812">            Log.p(&quot;Receipts were last refreshed at &quot; + lastRefreshTime + &quot; so we won't refetch.&quot;);</span>
+<span class="nc" id="L813">            loadInProgress = false;</span>
+<span class="nc" id="L814">            callback.onSucess(true);</span>
+<span class="nc" id="L815">            return;</span>
+        }
+
+<span class="fc" id="L818">        SuccessCallback&lt;Receipt[]&gt; onSuccess = new SuccessCallback&lt;Receipt[]&gt;() {</span>
+            @Override
+            public void onSucess(final Receipt[] value) {
+                // The receipt store may invoke this on any thread;
+                // re-dispatch state mutations to the EDT.
+<span class="fc bfc" id="L823" title="All 2 branches covered.">                if (!Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L824">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L827">                            onSucess(value);</span>
+<span class="fc" id="L828">                        }</span>
+                    });
+<span class="fc" id="L830">                    return;</span>
+                }
+<span class="pc bpc" id="L832" title="1 of 2 branches missed.">                if (value != null) {</span>
+<span class="fc" id="L833">                    setReceipts(Arrays.asList(value));</span>
+<span class="fc" id="L834">                    setReceiptsRefreshTime(new Date());</span>
+<span class="fc" id="L835">                    loadInProgress = false;</span>
+<span class="fc" id="L836">                    callback.onSucess(Boolean.TRUE);</span>
+                } else {
+<span class="nc" id="L838">                    loadInProgress = false;</span>
+<span class="nc" id="L839">                    callback.onSucess(Boolean.FALSE);</span>
+                }
+<span class="fc" id="L841">            }</span>
+        };
+<span class="fc bfc" id="L843" title="All 2 branches covered.">        if (receiptStore != null) {</span>
+<span class="fc" id="L844">            receiptStore.fetchReceipts(onSuccess);</span>
+        } else {
+<span class="fc" id="L846">            Log.p(&quot;No receipt store is currently registered so no receipts were fetched&quot;);</span>
+<span class="fc" id="L847">            loadInProgress = false;</span>
+<span class="fc" id="L848">            callback.onSucess(Boolean.FALSE);</span>
+        }
+<span class="fc" id="L850">    }</span>
+
+    /// Gets the latest expiry date for a set of SKUs as reflected by a set of receipts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `receipts`: Receipts to check against.
+    ///
+    /// - `skus`: The set of skus we are checking for.
+    ///
+    /// #### Returns
+    ///
+    /// The expiry date for a set of skus
+    private Date getExpiryDate(Receipt[] receipts, String... skus) {
+<span class="fc" id="L864">        Date expiryDate = new Date(0L);</span>
+<span class="fc" id="L865">        List&lt;String&gt; lSkus = Arrays.asList(skus);</span>
+
+<span class="fc bfc" id="L867" title="All 2 branches covered.">        for (Receipt r : receipts) {</span>
+<span class="pc bpc" id="L868" title="1 of 2 branches missed.">            if (!lSkus.contains(r.getSku())) {</span>
+<span class="nc" id="L869">                continue;</span>
+            }
+<span class="pc bpc" id="L871" title="1 of 2 branches missed.">            if (r.getExpiryDate() == null) {</span>
+<span class="nc" id="L872">                continue;</span>
+            }
+<span class="pc bpc" id="L874" title="2 of 4 branches missed.">            if (r.getExpiryDate().getTime() &gt; expiryDate.getTime() &amp;&amp; r.getCancellationDate() == null) {</span>
+<span class="fc" id="L875">                expiryDate = r.getExpiryDate();</span>
+            }
+        }
+<span class="fc" id="L878">        return expiryDate;</span>
+    }
+
+    /// Gets the expiry date for a set of skus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: The skus to check.  The latest expiry date of the set will be used.
+    ///
+    /// #### Returns
+    ///
+    /// The expiry date for a set of skus.
+    public final Date getExpiryDate(String... skus) {
+<span class="fc" id="L891">        return getExpiryDate(getReceipts(skus), skus);</span>
+    }
+
+    /// Checks to see if the user is currently subscribed to any of the given skus.  A user
+    /// is deemed to be subscribed if `#getExpiryDate(java.lang.String...)` returns a date
+    /// later than now.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skus`: Set of skus to check.
+    public final boolean isSubscribed(String... skus) {
+<span class="fc" id="L902">        Date exp = getExpiryDate(skus);</span>
+<span class="pc bpc" id="L903" title="1 of 4 branches missed.">        return exp != null &amp;&amp; exp.getTime() &gt;= System.currentTimeMillis();</span>
+    }
+
+    /// Given the `publishDate` for an item, this returns the effective receipt that
+    /// relates to that item.  This will either be a receipt with `purchaseDate &lt;= publishDate &lt;= expiryDate` or
+    /// the earliest receipt with `publishDate &lt; purchaseDate`,  or null if no receipts
+    ///
+    /// #### Parameters
+    ///
+    /// - `receipts`
+    ///
+    /// - `publishDate`
+    ///
+    /// - `skus`
+    private Receipt getFirstReceiptExpiringAfter(Receipt[] receipts, Date publishDate, String... skus) {
+<span class="fc" id="L918">        List&lt;String&gt; lSkus = Arrays.asList(skus);</span>
+<span class="fc" id="L919">        Receipt effectiveReceipt = null;</span>
+<span class="fc bfc" id="L920" title="All 2 branches covered.">        for (Receipt r : receipts) {</span>
+<span class="pc bpc" id="L921" title="1 of 2 branches missed.">            if (!lSkus.contains(r.getSku())) {</span>
+<span class="nc" id="L922">                continue;</span>
+            }
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">            if (r.getExpiryDate() == null) {</span>
+<span class="nc" id="L925">                continue;</span>
+            }
+<span class="pc bpc" id="L927" title="1 of 2 branches missed.">            if (r.getPurchaseDate() != null</span>
+<span class="fc bfc" id="L928" title="All 2 branches covered.">                    &amp;&amp; r.getPurchaseDate().getTime() &lt;= publishDate.getTime()</span>
+<span class="pc bpc" id="L929" title="1 of 2 branches missed.">                    &amp;&amp; r.getExpiryDate().getTime() &gt;= publishDate.getTime()</span>
+<span class="pc bpc" id="L930" title="1 of 2 branches missed.">                    &amp;&amp; (r.getCancellationDate() == null</span>
+<span class="nc bnc" id="L931" title="All 2 branches missed.">                    || r.getCancellationDate().getTime() &gt;= publishDate.getTime())) {</span>
+                // Exact match in range.
+<span class="fc" id="L933">                return r;</span>
+            }
+
+<span class="pc bpc" id="L936" title="2 of 4 branches missed.">            if (r.getPurchaseDate() != null &amp;&amp; r.getPurchaseDate().getTime() &lt;= publishDate.getTime()) {</span>
+                // The previous check would see if we had an exact match.
+                // If we are here and the purchase date is before the issue date,
+                // then the receipt had expired by the time this issue came out
+<span class="nc" id="L940">                continue;</span>
+            }
+
+            // At this point we know that the issue date is before the purchase date
+<span class="pc bpc" id="L944" title="1 of 4 branches missed.">            if (effectiveReceipt == null || effectiveReceipt.getPurchaseDate().getTime() &gt; r.getPurchaseDate().getTime()) {</span>
+<span class="fc" id="L945">                effectiveReceipt = r;</span>
+            }
+        }
+<span class="fc" id="L948">        return effectiveReceipt;</span>
+    }
+
+    /// Gets the first receipt that expires after the specified date for the provided
+    /// skus.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dt`
+    ///
+    /// - `skus`
+    public Receipt getFirstReceiptExpiringAfter(Date dt, String... skus) {
+<span class="fc" id="L960">        return getFirstReceiptExpiringAfter(getReceipts(skus), dt, skus);</span>
+    }
+
+    /// Indicates whether refunding is possible when the SKU is purchased
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the sku
+    ///
+    /// #### Returns
+    ///
+    /// true if the SKU can be refunded
+    public boolean isRefundable(String sku) {
+<span class="nc" id="L973">        return false;</span>
+    }
+
+    /// Tries to refund the given SKU if applicable in the current market/product
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the id for the product
+    public void refund(String sku) {
+<span class="nc" id="L982">    }</span>
+
+    /// Returns true if the subscription API is supported in this platform
+    ///
+    /// #### Returns
+    ///
+    /// true if the subscription API is supported in this platform
+    public boolean isSubscriptionSupported() {
+<span class="nc" id="L990">        return false;</span>
+    }
+
+    /// Some platforms support subscribing but don't support unsubscribe
+    ///
+    /// #### Returns
+    ///
+    /// true if the subscription API allows for unsubscribe
+    ///
+    /// #### Deprecated
+    ///
+    /// use `#isManageSubscriptionsSupported()` instead
+    public boolean isUnsubscribeSupported() {
+<span class="nc" id="L1003">        return isSubscriptionSupported();</span>
+    }
+
+    /// Indicates whether a purchase restore button is supported by the OS
+    ///
+    /// #### Returns
+    ///
+    /// true if you can invoke the restore method
+    public boolean isRestoreSupported() {
+<span class="nc" id="L1012">        return false;</span>
+    }
+
+    /// Restores purchases if applicable, this will only work if isRestoreSupported() returns true
+    public void restore() {
+<span class="nc" id="L1017">    }</span>
+
+    /// Checks to see if this platform supports the `#manageSubscriptions(java.lang.String)` method.
+    ///
+    /// #### Returns
+    ///
+    /// True if the platform supports the `#manageSubscriptions(java.lang.String)` method.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    public boolean isManageSubscriptionsSupported() {
+<span class="nc" id="L1029">        return false;</span>
+    }
+
+    /// Open the platform's UI for managing subscriptions.  Currently iOS and Android
+    /// are the only platforms that support this.  Other platforms will simply display a dialog stating that
+    /// it doesn't support this feature.  Use the `#isManageSubscriptionsSupported()` method to check
+    /// if the platform supports this feature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: @param sku Optional sku of product whose subscription you wish to manage.  If left null, then
+    /// the general subscription management UI will be opened.  iOS doesn't support &quot;deep-linking&quot; directly to the
+    /// management for a particular sku, so this parameter is ignored there.  If included on Android, howerver,
+    /// it will open the UI for managing the specified sku.
+    ///
+    /// #### Since
+    ///
+    /// 6.0
+    public void manageSubscriptions(String sku) {
+<span class="nc" id="L1048">        Dialog.show(&quot;Not Supported&quot;, &quot;This platform doesn't support in-app subscription management. &quot;, &quot;OK&quot;, null);</span>
+<span class="nc" id="L1049">    }</span>
+
+    /// Returns the store code associated with this in-app purchase object.
+    ///
+    /// #### Returns
+    ///
+    /// @return The store code.  One of `Receipt#STORE_CODE_ITUNES`, `Receipt#STORE_CODE_PLAY`, `Receipt#STORE_CODE_SIMULATOR`, or
+    /// `Receipt#STORE_CODE_WINDOWS`.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public String getStoreCode() {
+<span class="nc" id="L1062">        return null;</span>
+    }
+
+    private static class SynchronizeReceiptsSyncRunnable implements Runnable {
+
+        private final boolean[] complete;
+
+<span class="fc" id="L1069">        public SynchronizeReceiptsSyncRunnable(boolean[] complete) {</span>
+<span class="fc" id="L1070">            this.complete = complete;</span>
+<span class="fc" id="L1071">        }</span>
+
+        @Override
+        public void run() {
+
+<span class="fc bfc" id="L1076" title="All 2 branches covered.">            while (!complete[0]) {</span>
+<span class="fc" id="L1077">                synchronized (complete) {</span>
+                    try {
+                        // need to recheck condition within the synchronized block
+<span class="pc bpc" id="L1080" title="1 of 2 branches missed.">                        if (!complete[0]) {</span>
+<span class="fc" id="L1081">                            complete.wait();</span>
+                        }
+<span class="nc" id="L1083">                    } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1084">                        Thread.currentThread().interrupt();</span>
+<span class="nc" id="L1085">                        return;</span>
+<span class="fc" id="L1086">                    }</span>
+<span class="fc" id="L1087">                }</span>
+            }
+<span class="fc" id="L1089">        }</span>
+
+    }
+
+    private static class SynchronizeReceiptsSyncSuccessCallback implements SuccessCallback&lt;Boolean&gt; {
+
+        private final boolean[] complete;
+        private final boolean[] success;
+
+<span class="fc" id="L1098">        public SynchronizeReceiptsSyncSuccessCallback(boolean[] complete, boolean[] success) {</span>
+<span class="fc" id="L1099">            this.complete = complete;</span>
+<span class="fc" id="L1100">            this.success = success;</span>
+<span class="fc" id="L1101">        }</span>
+
+        @Override
+        public void onSucess(Boolean value) {
+<span class="fc" id="L1105">            complete[0] = true;</span>
+<span class="fc" id="L1106">            success[0] = value;</span>
+
+<span class="fc" id="L1108">            synchronized (complete) {</span>
+<span class="fc" id="L1109">                complete.notifyAll();</span>
+<span class="fc" id="L1110">            }</span>
+
+<span class="fc" id="L1112">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

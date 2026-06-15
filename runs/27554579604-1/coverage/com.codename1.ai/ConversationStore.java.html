@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConversationStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">ConversationStore.java</span></div><h1>ConversationStore.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.Storage;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// JSON-backed persistent conversation history.
+///
+/// Stores [ChatMessage] lists in [Storage] under a caller-chosen key
+/// so apps can rehydrate a `ChatView` after process restart.
+/// Multimodal parts ([ImagePart], [ToolResultPart]) are serialized
+/// to a lossy text fallback -- image data is not round-tripped (apps
+/// that need full multimodal persistence should encode the bytes
+/// themselves and keep them in [com.codename1.io.FileSystemStorage]).
+public final class ConversationStore {
+    private static final String KIND_TEXT = &quot;t&quot;;
+    private static final String KIND_TOOL_RESULT = &quot;tr&quot;;
+
+    private final String storageKey;
+
+<span class="fc" id="L48">    public ConversationStore(String storageKey) {</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        if (storageKey == null || storageKey.length() == 0) {</span>
+<span class="fc" id="L50">            throw new IllegalArgumentException(&quot;storageKey is required&quot;);</span>
+        }
+<span class="fc" id="L52">        this.storageKey = storageKey;</span>
+<span class="fc" id="L53">    }</span>
+
+    public void save(List&lt;ChatMessage&gt; messages) throws IOException {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        List&lt;Object&gt; serialized = new ArrayList&lt;Object&gt;(messages == null ? 0 : messages.size());</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (messages != null) {</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            for (ChatMessage m : messages) {</span>
+<span class="fc" id="L59">                Map&lt;String, Object&gt; jm = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L60">                jm.put(&quot;role&quot;, m.getRole().name());</span>
+<span class="fc" id="L61">                List&lt;Object&gt; parts = new ArrayList&lt;Object&gt;(m.getParts().size());</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                for (MessagePart p : m.getParts()) {</span>
+<span class="fc" id="L63">                    Map&lt;String, Object&gt; jp = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                    if (p instanceof TextPart) {</span>
+<span class="fc" id="L65">                        jp.put(&quot;kind&quot;, KIND_TEXT);</span>
+<span class="fc" id="L66">                        jp.put(&quot;text&quot;, ((TextPart) p).getText());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                    } else if (p instanceof ToolResultPart) {</span>
+<span class="fc" id="L68">                        ToolResultPart trp = (ToolResultPart) p;</span>
+<span class="fc" id="L69">                        jp.put(&quot;kind&quot;, KIND_TOOL_RESULT);</span>
+<span class="fc" id="L70">                        jp.put(&quot;toolCallId&quot;, trp.getToolCallId());</span>
+<span class="fc" id="L71">                        jp.put(&quot;resultJson&quot;, trp.getResultJson());</span>
+<span class="fc" id="L72">                    } else {</span>
+                        // ImagePart: lossy. Save a placeholder so
+                        // the message order is preserved.
+<span class="fc" id="L75">                        jp.put(&quot;kind&quot;, KIND_TEXT);</span>
+<span class="fc" id="L76">                        jp.put(&quot;text&quot;, &quot;[image]&quot;);</span>
+                    }
+<span class="fc" id="L78">                    parts.add(jp);</span>
+<span class="fc" id="L79">                }</span>
+<span class="fc" id="L80">                jm.put(&quot;parts&quot;, parts);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                if (m.getToolCallId() != null) {</span>
+<span class="fc" id="L82">                    jm.put(&quot;toolCallId&quot;, m.getToolCallId());</span>
+                }
+<span class="fc" id="L84">                serialized.add(jm);</span>
+<span class="fc" id="L85">            }</span>
+        }
+<span class="fc" id="L87">        Map&lt;String, Object&gt; root = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L88">        root.put(&quot;messages&quot;, serialized);</span>
+<span class="fc" id="L89">        byte[] payload = JSONParser.toJson(root).getBytes(&quot;UTF-8&quot;);</span>
+<span class="fc" id="L90">        Storage.getInstance().writeObject(storageKey, payload);</span>
+<span class="fc" id="L91">    }</span>
+
+    public List&lt;ChatMessage&gt; load() throws IOException {
+<span class="fc" id="L94">        Object raw = Storage.getInstance().readObject(storageKey);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc" id="L96">            return new ArrayList&lt;ChatMessage&gt;();</span>
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!(raw instanceof byte[])) {</span>
+            // Old-format / accidental overwrite. Treat as empty
+            // rather than crashing.
+<span class="fc" id="L101">            return new ArrayList&lt;ChatMessage&gt;();</span>
+        }
+<span class="fc" id="L103">        Map root = JSONParser.parseJSON((byte[]) raw);</span>
+<span class="fc" id="L104">        List&lt;Object&gt; serialized = JSONParser.asList(root.get(&quot;messages&quot;));</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (serialized == null) {</span>
+<span class="nc" id="L106">            return new ArrayList&lt;ChatMessage&gt;();</span>
+        }
+<span class="fc" id="L108">        List&lt;ChatMessage&gt; out = new ArrayList&lt;ChatMessage&gt;(serialized.size());</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (Object rawJm : serialized) {</span>
+<span class="fc" id="L110">            Map jm = JSONParser.asMap(rawJm);</span>
+<span class="fc" id="L111">            Role role = parseRole(JSONParser.getString(jm, &quot;role&quot;));</span>
+<span class="fc" id="L112">            List&lt;MessagePart&gt; parts = new ArrayList&lt;MessagePart&gt;();</span>
+<span class="fc" id="L113">            List&lt;Object&gt; jparts = JSONParser.asList(jm.get(&quot;parts&quot;));</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (jparts != null) {</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                for (Object rawJp : jparts) {</span>
+<span class="fc" id="L116">                    Map jp = JSONParser.asMap(rawJp);</span>
+<span class="fc" id="L117">                    String kind = JSONParser.getString(jp, &quot;kind&quot;);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                    if (KIND_TOOL_RESULT.equals(kind)) {</span>
+<span class="fc" id="L119">                        parts.add(new ToolResultPart(</span>
+<span class="fc" id="L120">                                JSONParser.getString(jp, &quot;toolCallId&quot;),</span>
+<span class="fc" id="L121">                                JSONParser.getString(jp, &quot;resultJson&quot;)));</span>
+                    } else {
+<span class="fc" id="L123">                        parts.add(new TextPart(JSONParser.getString(jp, &quot;text&quot;)));</span>
+                    }
+<span class="fc" id="L125">                }</span>
+            }
+<span class="fc" id="L127">            out.add(new ChatMessage(role, parts,</span>
+<span class="fc" id="L128">                    null, null, JSONParser.getString(jm, &quot;toolCallId&quot;)));</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">        return out;</span>
+    }
+
+    public void clear() {
+<span class="fc" id="L134">        Storage.getInstance().deleteStorageFile(storageKey);</span>
+<span class="fc" id="L135">    }</span>
+
+    public String getStorageKey() {
+<span class="fc" id="L138">        return storageKey;</span>
+    }
+
+    private static Role parseRole(String name) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L143">            return Role.USER;</span>
+        }
+        try {
+<span class="fc" id="L146">            return Role.valueOf(name);</span>
+<span class="fc" id="L147">        } catch (IllegalArgumentException iae) {</span>
+<span class="fc" id="L148">            return Role.USER;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XYSeriesRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.renderers</a> &gt; <span class="el_source">XYSeriesRenderer.java</span></div><h1>XYSeriesRenderer.java</h1><pre class="source lang-java linenums">/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+package com.codename1.charts.renderers;
+
+import com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.charts.views.PointStyle;
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+/// A renderer for the XY type series.
+<span class="fc" id="L27">public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: UnnecessarySemicolon cleaned extra delimiter</span>
+    /// If the chart should be filled outside its line.
+<span class="fc" id="L29">    private final List&lt;FillOutsideLine&gt; mFillBelowLine = new ArrayList&lt;FillOutsideLine&gt;();</span>
+    /// If the chart points should be filled.
+<span class="fc" id="L31">    private boolean mFillPoints = false;</span>
+    /// The point style.
+<span class="fc" id="L33">    private PointStyle mPointStyle = PointStyle.POINT;</span>
+    /// The point stroke width
+<span class="fc" id="L35">    private float mPointStrokeWidth = 1;</span>
+    /// The chart line width.
+<span class="fc" id="L37">    private float mLineWidth = 1;</span>
+    /// If the values should be displayed above the chart points.
+    private boolean mDisplayChartValues;
+    /// The minimum distance between displaying chart values.
+<span class="fc" id="L41">    private int mDisplayChartValuesDistance = 100;</span>
+    /// The chart values text size.
+<span class="fc" id="L43">    private float mChartValuesTextSize = 10;</span>
+    /// The chart values text alignment.
+<span class="fc" id="L45">    private int mChartValuesTextAlign = Component.CENTER;</span>
+    /// The chart values spacing from the data point.
+<span class="fc" id="L47">    private float mChartValuesSpacing = 5f;</span>
+    /// The annotations text size.
+<span class="fc" id="L49">    private float mAnnotationsTextSize = 10;</span>
+    /// The annotations text alignment.
+<span class="fc" id="L51">    private int mAnnotationsTextAlign = Component.CENTER;</span>
+    /// The annotations color.
+<span class="fc" id="L53">    private int mAnnotationsColor = DefaultRenderer.TEXT_COLOR;</span>
+
+    /// Returns if the chart should be filled below the line.
+    ///
+    /// #### Returns
+    ///
+    /// the fill below line status
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#getFillOutsideLine()` instead.
+    @Deprecated
+    public boolean isFillBelowLine() {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        return !mFillBelowLine.isEmpty();</span>
+    }
+
+    /// Sets if the line chart should be filled below its line. Filling below the
+    /// line transforms a line chart into an area chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fill`: the fill below line flag value
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `#addFillOutsideLine(FillOutsideLine)` instead.
+    @Deprecated
+    public void setFillBelowLine(boolean fill) {
+<span class="nc" id="L81">        mFillBelowLine.clear();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (fill) {</span>
+<span class="nc" id="L83">            mFillBelowLine.add(new FillOutsideLine(Type.BOUNDS_ALL));</span>
+        } else {
+<span class="nc" id="L85">            mFillBelowLine.add(new FillOutsideLine(Type.NONE));</span>
+        }
+<span class="nc" id="L87">    }</span>
+
+    /// Returns the type of the outside fill of the line.
+    ///
+    /// #### Returns
+    ///
+    /// the type of the outside fill of the line.
+    public FillOutsideLine[] getFillOutsideLine() {
+<span class="fc" id="L95">        FillOutsideLine[] out = new FillOutsideLine[mFillBelowLine.size()];</span>
+<span class="fc" id="L96">        return mFillBelowLine.toArray(out);</span>
+    }
+
+    /// Sets if the line chart should be filled outside its line. Filling outside
+    /// with FillOutsideLine.INTEGRAL the line transforms a line chart into an area
+    /// chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fill`: the type of the filling
+    public void addFillOutsideLine(FillOutsideLine fill) {
+<span class="nc" id="L107">        mFillBelowLine.add(fill);</span>
+<span class="nc" id="L108">    }</span>
+
+    /// Returns if the chart points should be filled.
+    ///
+    /// #### Returns
+    ///
+    /// the points fill status
+    public boolean isFillPoints() {
+<span class="nc" id="L116">        return mFillPoints;</span>
+    }
+
+    /// Sets if the chart points should be filled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fill`: the points fill flag value
+    public void setFillPoints(boolean fill) {
+<span class="nc" id="L125">        mFillPoints = fill;</span>
+<span class="nc" id="L126">    }</span>
+
+    /// Sets the fill below the line color.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: the fill below line color
+    ///
+    /// #### Deprecated
+    ///
+    /// Use FillOutsideLine.setColor instead
+    @Deprecated
+    public void setFillBelowLineColor(int color) {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (!mFillBelowLine.isEmpty()) {</span>
+<span class="nc" id="L140">            mFillBelowLine.get(0).setColor(color);</span>
+        }
+<span class="nc" id="L142">    }</span>
+
+    /// Returns the point style.
+    ///
+    /// #### Returns
+    ///
+    /// the point style
+    public PointStyle getPointStyle() {
+<span class="fc" id="L150">        return mPointStyle;</span>
+    }
+
+    /// Sets the point style.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: the point style
+    public void setPointStyle(PointStyle style) {
+<span class="nc" id="L159">        mPointStyle = style;</span>
+<span class="nc" id="L160">    }</span>
+
+    /// Returns the point stroke width in pixels.
+    ///
+    /// #### Returns
+    ///
+    /// the point stroke width in pixels
+    public float getPointStrokeWidth() {
+<span class="nc" id="L168">        return mPointStrokeWidth;</span>
+    }
+
+    /// Sets the point stroke width in pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeWidth`: the point stroke width in pixels
+    public void setPointStrokeWidth(float strokeWidth) {
+<span class="nc" id="L177">        mPointStrokeWidth = strokeWidth;</span>
+<span class="nc" id="L178">    }</span>
+
+    /// Returns the chart line width.
+    ///
+    /// #### Returns
+    ///
+    /// the line width
+    public float getLineWidth() {
+<span class="fc" id="L186">        return mLineWidth;</span>
+    }
+
+    /// Sets the chart line width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lineWidth`: the line width
+    public void setLineWidth(float lineWidth) {
+<span class="nc" id="L195">        mLineWidth = lineWidth;</span>
+<span class="nc" id="L196">    }</span>
+
+    /// Returns if the chart point values should be displayed as text.
+    ///
+    /// #### Returns
+    ///
+    /// if the chart point values should be displayed as text
+    public boolean isDisplayChartValues() {
+<span class="fc" id="L204">        return mDisplayChartValues;</span>
+    }
+
+    /// Sets if the chart point values should be displayed as text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `display`: if the chart point values should be displayed as text
+    public void setDisplayChartValues(boolean display) {
+<span class="nc" id="L213">        mDisplayChartValues = display;</span>
+<span class="nc" id="L214">    }</span>
+
+    /// Returns the chart values minimum distance.
+    ///
+    /// #### Returns
+    ///
+    /// the chart values minimum distance
+    public int getDisplayChartValuesDistance() {
+<span class="nc" id="L222">        return mDisplayChartValuesDistance;</span>
+    }
+
+    /// Sets chart values minimum distance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `distance`: the chart values minimum distance
+    public void setDisplayChartValuesDistance(int distance) {
+<span class="nc" id="L231">        mDisplayChartValuesDistance = distance;</span>
+<span class="nc" id="L232">    }</span>
+
+    /// Returns the chart values text size.
+    ///
+    /// #### Returns
+    ///
+    /// the chart values text size
+    public float getChartValuesTextSize() {
+<span class="fc" id="L240">        return mChartValuesTextSize;</span>
+    }
+
+    /// Sets the chart values text size. Consider using  `#setChartValuesTextFont(com.codename1.ui.Font)`
+    /// instead to allow the font size to to be adjusted appropriately for the display
+    /// resolution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textSize`: the chart values text size
+    public void setChartValuesTextSize(float textSize) {
+<span class="nc" id="L251">        mChartValuesTextSize = textSize;</span>
+<span class="nc" id="L252">    }</span>
+
+    /// Sets the chart values title text font size using a Font object instead of a point size.
+    /// This method is the preferred way to set font size because it allows you to
+    /// more easily have fonts appear in an appropriate size for the target device.
+    ///
+    /// Alternatively check out `#setChartValuesTextSize(float)` to set the text
+    /// size in pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`
+    public void setChartValuesTextFont(Font font) {
+<span class="nc" id="L265">        setChartValuesTextSize(font.getHeight());</span>
+<span class="nc" id="L266">    }</span>
+
+    /// Returns the chart values text align.
+    ///
+    /// #### Returns
+    ///
+    /// the chart values text align
+    public int getChartValuesTextAlign() {
+<span class="nc" id="L274">        return mChartValuesTextAlign;</span>
+    }
+
+    /// Sets the chart values text align.
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: the chart values text align
+    public void setChartValuesTextAlign(int align) {
+<span class="nc" id="L283">        mChartValuesTextAlign = align;</span>
+<span class="nc" id="L284">    }</span>
+
+    /// Returns the chart values spacing from the data point.
+    ///
+    /// #### Returns
+    ///
+    /// the chart values spacing
+    public float getChartValuesSpacing() {
+<span class="nc" id="L292">        return mChartValuesSpacing;</span>
+    }
+
+    /// Sets the chart values spacing from the data point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `spacing`: @param spacing the chart values spacing (in pixels) from the chart data
+    /// point
+    public void setChartValuesSpacing(float spacing) {
+<span class="nc" id="L302">        mChartValuesSpacing = spacing;</span>
+<span class="nc" id="L303">    }</span>
+
+    /// Returns the annotations text size.
+    ///
+    /// #### Returns
+    ///
+    /// the annotations text size
+    public float getAnnotationsTextSize() {
+<span class="nc" id="L311">        return mAnnotationsTextSize;</span>
+    }
+
+    /// Sets the annotations text size. Consider using  `#setAnnotationsTextFont(com.codename1.ui.Font)`
+    /// instead to allow the font size to to be adjusted appropriately for the display
+    /// resolution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textSize`: the annotations text size
+    public void setAnnotationsTextSize(float textSize) {
+<span class="nc" id="L322">        mAnnotationsTextSize = textSize;</span>
+<span class="nc" id="L323">    }</span>
+
+    /// Sets the annotations text font size using a Font object instead of a point size.
+    /// This method is the preferred way to set font size because it allows you to
+    /// more easily have fonts appear in an appropriate size for the target device.
+    ///
+    /// Alternatively check out `#setAnnotationsTextSize(float)` to set the text
+    /// size in pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`
+    public void setAnnotationsTextFont(Font font) {
+<span class="nc" id="L336">        setAnnotationsTextSize(font.getHeight());</span>
+<span class="nc" id="L337">    }</span>
+
+    /// Returns the annotations text align.
+    ///
+    /// #### Returns
+    ///
+    /// the annotations text align
+    public int getAnnotationsTextAlign() {
+<span class="nc" id="L345">        return mAnnotationsTextAlign;</span>
+    }
+
+    /// Sets the annotations text align.
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: the chart values text align
+    public void setAnnotationsTextAlign(int align) {
+<span class="nc" id="L354">        mAnnotationsTextAlign = align;</span>
+<span class="nc" id="L355">    }</span>
+
+    /// Returns the annotations color.
+    ///
+    /// #### Returns
+    ///
+    /// the annotations color
+    public int getAnnotationsColor() {
+<span class="nc" id="L363">        return mAnnotationsColor;</span>
+    }
+
+    /// Sets the annotations color.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: the annotations color
+    public void setAnnotationsColor(int color) {
+<span class="nc" id="L372">        mAnnotationsColor = color;</span>
+<span class="nc" id="L373">    }</span>
+
+    /// A descriptor for the line fill behavior.
+    public static class FillOutsideLine {
+        /// The fill type.
+        private final Type mType;
+        /// The fill color.
+<span class="fc" id="L380">        private int mColor = ColorUtil.argb(125, 0, 0, 200);</span>
+        /// The fill points index range.
+        private int[] mFillRange;
+
+        /// The line fill behavior.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: the fill type
+<span class="fc" id="L389">        public FillOutsideLine(Type type) {</span>
+<span class="fc" id="L390">            this.mType = type;</span>
+<span class="fc" id="L391">        }</span>
+
+        /// Returns the fill color.
+        ///
+        /// #### Returns
+        ///
+        /// the fill color
+        public int getColor() {
+<span class="fc" id="L399">            return mColor;</span>
+        }
+
+        /// Sets the fill color
+        ///
+        /// #### Parameters
+        ///
+        /// - `color`: the fill color
+        public void setColor(int color) {
+<span class="fc" id="L408">            mColor = color;</span>
+<span class="fc" id="L409">        }</span>
+
+        /// Returns the fill type.
+        ///
+        /// #### Returns
+        ///
+        /// the fill type
+        public Type getType() {
+<span class="fc" id="L417">            return mType;</span>
+        }
+
+        /// Returns the fill range which is the minimum and maximum data index values
+        /// for the fill.
+        ///
+        /// #### Returns
+        ///
+        /// the fill range
+        public int[] getFillRange() {
+<span class="fc" id="L427">            return mFillRange;</span>
+        }
+
+        /// Sets the fill range which is the minimum and maximum data index values
+        /// for the fill.
+        ///
+        /// #### Parameters
+        ///
+        /// - `range`: the fill range
+        public void setFillRange(int[] range) {
+<span class="fc" id="L437">            mFillRange = range;</span>
+<span class="fc" id="L438">        }</span>
+
+<span class="fc" id="L440">        public enum Type {</span>
+<span class="fc" id="L441">            NONE, BOUNDS_ALL, BOUNDS_BELOW, BOUNDS_ABOVE, BELOW, ABOVE</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
