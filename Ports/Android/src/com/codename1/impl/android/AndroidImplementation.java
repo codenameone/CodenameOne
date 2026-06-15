@@ -234,6 +234,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 com.codename1.io.Log.e(e);
                 com.codename1.io.Log.sendLog();
             }
+            try {
+                com.codename1.crash.CrashProtection.capture(e);
+            } catch (Throwable ignore) {
+            }
         }
     };
 

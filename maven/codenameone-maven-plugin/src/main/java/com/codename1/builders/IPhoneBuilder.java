@@ -4543,6 +4543,13 @@ public class IPhoneBuilder extends Executor {
             }
 
         }
+        // Crash protection symbol upload hook: the cloud build executor
+        // runs xcodebuild AFTER this method returns and the resulting
+        // dSYM bundle is emitted under the xcarchive. The executor
+        // should zip <archive>/dSYMs/<app>.app.dSYM, extract the UUID
+        // with `dwarfdump --uuid`, and call
+        // CrashSymbolUploader.uploadIosDsym (only for release builds).
+        // Doing it here is wrong because the dSYM doesn't exist yet.
         return true;
     }
 
