@@ -634,9 +634,12 @@ final class JavascriptMethodGenerator {
      * a runtime-only field), preserving prior behaviour.
      */
     private static String resolveStaticFieldOwner(String owner, String fieldName) {
+        if (owner == null) {
+            return null;
+        }
         Map<String, ByteCodeClass> idx = classIndex;
         String start = JavascriptNameUtil.sanitizeClassName(owner);
-        if (idx == null || owner == null || fieldName == null) {
+        if (idx == null || fieldName == null) {
             return start;
         }
         java.util.Set<String> seen = new java.util.HashSet<String>();
