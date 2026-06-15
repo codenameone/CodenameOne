@@ -61,6 +61,7 @@ class LinuxBrowserComponent extends PeerComponent {
     protected void initComponent() {
         super.initComponent();
         LinuxNative.browserSetBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+        LinuxNative.browserSetVisible(peer, true);
         if (poller == null && getComponentForm() != null) {
             poller = UITimer.timer(60, true, getComponentForm(), new Runnable() {
                 public void run() {
@@ -76,6 +77,9 @@ class LinuxBrowserComponent extends PeerComponent {
             poller.cancel();
             poller = null;
         }
+        // Hide the native WebKit widget so it does not stay floating in the window
+        // overlay over the next form once this BrowserComponent's form is gone.
+        LinuxNative.browserSetVisible(peer, false);
         super.deinitialize();
     }
 

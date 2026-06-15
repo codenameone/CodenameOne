@@ -150,6 +150,15 @@ typedef struct {
     char* tempPath;
 } CN1Media;
 
+/* Blocks until the pipeline finishes prerolling (reaches PAUSED with data buffered)
+ * or the timeout elapses. Without it a duration/has-video query issued right after
+ * createMedia/play returns 0/unknown because the async PAUSED transition has not
+ * completed yet -- which is why "duration 0ms" showed for a finite asset. */
+static void cn1MediaPreroll(GstElement* playbin) {
+    GstState st = GST_STATE_NULL;
+    p_gst_element_get_state(playbin, &st, 0, 5 * GST_SECOND);
+}
+
 JAVA_LONG com_codename1_impl_linux_LinuxNative_mediaCreate___byte_1ARRAY_int_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data, JAVA_INT length, JAVA_OBJECT mimeType) {
     CN1Media* m;
     char tmpl[] = "/tmp/cn1mediaXXXXXX";
@@ -187,6 +196,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_mediaCreate___byte_1ARRAY_int_jav
     g_object_set(m->playbin, "uri", uri, NULL);
     g_free(uri);
     p_gst_element_set_state(m->playbin, GST_STATE_PAUSED);
+    cn1MediaPreroll(m->playbin);
     return (JAVA_LONG) (intptr_t) m;
 }
 
@@ -214,6 +224,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_mediaCreateUri___java_lang_String
     }
     g_object_set(m->playbin, "uri", u, NULL);
     p_gst_element_set_state(m->playbin, GST_STATE_PAUSED);
+    cn1MediaPreroll(m->playbin);
     return (JAVA_LONG) (intptr_t) m;
 }
 
@@ -408,7 +419,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraCaptureFrame___int_1ARRAY
     }
     cn1GstInit();
     pipe = p_gst_parse_launch(
-            "v4l2src num-buffers=1 ! videoconvert ! video/x-raw,format=BGRA ! appsink name=s max-buffers=1 drop=true sync=false",
+            "v4l2src ! videoconvert ! video/x-raw,format=BGRA ! appsink name=s max-buffers=2 drop=true sync=false",
             &err);
     if (!pipe) {
         if (err) g_error_free(err);
@@ -416,7 +427,24 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraCaptureFrame___int_1ARRAY
     }
     sink = p_gst_bin_get_by_name(GST_BIN(pipe), "s");
     p_gst_element_set_state(pipe, GST_STATE_PLAYING);
-    sample = p_gst_app_sink_try_pull_sample(GST_APP_SINK(sink), 5 * GST_SECOND);
+    /* Webcams hand back the first frames black while auto-exposure / white-balance
+     * settle (the old num-buffers=1 grabbed exactly that black first frame). Pull
+     * and discard up to ~20 frames (~0.7s @30fps), keeping the most recent, so the
+     * saved photo is a real exposed image. The first pull waits up to 2s for the
+     * camera to start; a timeout there means no device, so we bail with no frame. */
+    {
+        int i;
+        for (i = 0; i < 20; i++) {
+            GstSample* s = p_gst_app_sink_try_pull_sample(GST_APP_SINK(sink), 2 * GST_SECOND);
+            if (!s) {
+                break;
+            }
+            if (sample) {
+                p_gst_sample_unref(sample);
+            }
+            sample = s;
+        }
+    }
     if (sample) {
         result = cn1CameraSampleToArgb(threadStateData, sample, dims);
         p_gst_sample_unref(sample);

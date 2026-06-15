@@ -2348,7 +2348,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public char getFileSystemSeparator() {
-        return '\\';
+        return '/';
     }
 
     /* ------------------------------------------------------------ platform */

@@ -192,6 +192,15 @@ static void cn1BrowserBoundsOnMain(void* p) {
     cn1LinuxOverlayMove(op->b->view, op->x, op->y, op->w, op->h);
 }
 
+static void cn1BrowserSetVisibleOnMain(void* p) {
+    CN1BrowserOp* op = (CN1BrowserOp*) p;
+    if (op->x) {
+        gtk_widget_show(op->b->view);
+    } else {
+        gtk_widget_hide(op->b->view);
+    }
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_browserSetHtml___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_OBJECT html) {
     CN1Browser* b = (CN1Browser*) (intptr_t) peer;
     CN1BrowserOp op;
@@ -230,6 +239,15 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_browserSetBounds___long_int_int_i
     op.b = b;
     op.x = x; op.y = y; op.w = w; op.h = h;
     cn1LinuxRunOnMainAndWait(cn1BrowserBoundsOnMain, &op);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_browserSetVisible___long_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_BOOLEAN visible) {
+    CN1Browser* b = (CN1Browser*) (intptr_t) peer;
+    CN1BrowserOp op;
+    if (!b) { return; }
+    op.b = b;
+    op.x = visible ? 1 : 0;
+    cn1LinuxRunOnMainAndWait(cn1BrowserSetVisibleOnMain, &op);
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_browserPollEvent___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {

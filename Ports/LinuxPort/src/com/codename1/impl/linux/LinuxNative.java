@@ -66,6 +66,10 @@ public final class LinuxNative {
 
     public static native void browserSetBounds(long peer, int x, int y, int w, int h);
 
+    /** Shows/hides the native WebKit widget. Hidden when the BrowserComponent's form
+     *  is not on screen so the peer does not float over the next form. */
+    public static native void browserSetVisible(long peer, boolean visible);
+
     /** Next queued browser event ("LOAD" or "NAV|<url>"), or null when none. */
     public static native String browserPollEvent(long peer);
 
