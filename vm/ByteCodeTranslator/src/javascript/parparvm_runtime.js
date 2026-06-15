@@ -682,6 +682,15 @@ function threadDebugLabel(threadObject) {
 //                                    -> outbound RPC to the main thread;
 //                                       resumed when host posts a
 //                                       host-callback message back.
+//   { op: "await", promise }
+//                                    -> suspend on a WORKER-LOCAL promise (no
+//                                       host round-trip). Resumed via the
+//                                       promise's own .then -> enqueue; reject
+//                                       resumes with null. Used to block a
+//                                       green thread until a worker-side async
+//                                       resource (e.g. a FontFace in
+//                                       self.fonts) is loaded before a getter
+//                                       reads it.
 //
 // Acquire/release lifecycle for synchronized:
 //   monitorEnter(thread, obj):
@@ -3174,6 +3183,24 @@ const jvm = {
       // promotes it. No timer, no setTimeout -- waking is purely
       // event-driven on the holder's release.
       thread.waiting = { op: "monitor_enter", entrant: yielded.entrant };
+      return;
+    }
+    if (yielded.op === "await") {
+      // Suspend the green thread on a WORKER-LOCAL promise -- the worker-side
+      // analog of HOST_CALL (which suspends on a host round-trip). Used to park
+      // a thread until an async resource loaded INSIDE the worker is ready
+      // (e.g. a FontFace added to self.fonts, so OffscreenCanvas text
+      // measurement reads real metrics instead of a fallback). The unpark path
+      // is the promise's own settlement -> enqueue, mirroring how the image
+      // decode barrier (__cn1_decode_image_from_url__) resumes its caller. The
+      // thread resumes with the resolved value; a rejection resumes with null
+      // so the caller degrades gracefully (never parks forever on a 404).
+      thread.waiting = { op: "await" };
+      const scheduler = this;
+      Promise.resolve(yielded.promise).then(
+        function (v) { scheduler.enqueue(thread, v === undefined ? null : v); },
+        function () { scheduler.enqueue(thread, null); }
+      );
       return;
     }
     throw new Error("Unsupported yield op " + yielded.op);

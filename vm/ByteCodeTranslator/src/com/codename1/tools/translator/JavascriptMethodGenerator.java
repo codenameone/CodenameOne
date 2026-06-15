@@ -3619,7 +3619,7 @@ final class JavascriptMethodGenerator {
                 int comma = swKeep.indexOf(',');
                 int k = Integer.parseInt(swKeep.substring(0, comma));
                 int mm = Integer.parseInt(swKeep.substring(comma + 1));
-                int hh = Math.abs((method.getMethodName() + method.getSignature()).hashCode());
+                int hh = (method.getMethodName() + method.getSignature()).hashCode() & 0x7fffffff;
                 if (hh % mm != k) {
                     return _sb(method, instructions, "L2993");
                 }
@@ -3636,7 +3636,7 @@ final class JavascriptMethodGenerator {
             int comma = keepSpec.indexOf(',');
             int k = Integer.parseInt(keepSpec.substring(0, comma));
             int mm = Integer.parseInt(keepSpec.substring(comma + 1));
-            int hh = Math.abs((method.getMethodName() + method.getSignature()).hashCode());
+            int hh = (method.getMethodName() + method.getSignature()).hashCode() & 0x7fffffff;
             if (hh % mm != k) {
                 return _sb(method, instructions, "L3010");
             }
@@ -3691,9 +3691,9 @@ final class JavascriptMethodGenerator {
             Integer sI = tc.getStart() == null ? null : labelToIndex.get(tc.getStart());
             Integer eI = tc.getEnd() == null ? null : labelToIndex.get(tc.getEnd());
             Integer hI = tc.getHandler() == null ? null : labelToIndex.get(tc.getHandler());
-            Integer sB = sI == null ? null : startToBlock.get((int) sI);
-            Integer eB = eI == null ? null : startToBlock.get((int) eI);
-            Integer hB = hI == null ? null : startToBlock.get((int) hI);
+            Integer sB = sI == null ? null : startToBlock.get(sI);
+            Integer eB = eI == null ? null : startToBlock.get(eI);
+            Integer hB = hI == null ? null : startToBlock.get(hI);
             if (sB != null && hB != null && eB != null && sB.equals(hB) && eB == sB + 1
                     && tc.getType() == null
                     && !"0".equals(System.getProperty("parparvm.js.structured.selfentry"))) {
@@ -3730,9 +3730,9 @@ final class JavascriptMethodGenerator {
         }
         // Catch dispatch is a forward branch too: register pre-labels for
         // handlers that are loop headers or try starts.
-        for (Long key : tryRanges.keySet()) {
-            int eIncl = (int) (key & 0xffffffffL) - 1;
-            for (int[] h : tryRanges.get(key)) {
+        for (java.util.Map.Entry<Long, java.util.List<int[]>> tr : tryRanges.entrySet()) {
+            int eIncl = (int) (tr.getKey() & 0xffffffffL) - 1;
+            for (int[] h : tr.getValue()) {
                 if (h[0] > eIncl && (loopEnd.containsKey(h[0]) || tryStarts.contains(h[0]))) {
                     preHeaderTargets.add(h[0]);
                 }
@@ -3754,9 +3754,9 @@ final class JavascriptMethodGenerator {
             }
         }
         java.util.TreeSet<Integer> targets = new java.util.TreeSet<Integer>();
-        for (Long key : tryRanges.keySet()) {
-            int eIncl = (int) (key & 0xffffffffL) - 1;
-            for (int[] h : tryRanges.get(key)) {
+        for (java.util.Map.Entry<Long, java.util.List<int[]>> tr : tryRanges.entrySet()) {
+            int eIncl = (int) (tr.getKey() & 0xffffffffL) - 1;
+            for (int[] h : tr.getValue()) {
                 // Handlers are goto targets for the catch dispatch -- except
                 // ones routed through a pre-try P label (forward dispatch to
                 // another try's start): those must NOT get a B label, or the
@@ -5832,8 +5832,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             boolean addFallThrough = true;
             if (last instanceof Jump) {
                 Integer t = labelToIndex.get(((Jump) last).getLabel());
-                if (t != null && startToBlock.containsKey((int) t)) {
-                    b.succs.add(startToBlock.get((int) t));
+                if (t != null && startToBlock.containsKey(t)) {
+                    b.succs.add(startToBlock.get(t));
                 }
                 if (last.getOpcode() == Opcodes.GOTO) {
                     addFallThrough = false;

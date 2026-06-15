@@ -2171,19 +2171,93 @@ bindCiFallback("NetworkManager.addErrorListener", [
   return null;
 });
 
-// Worker-safe implementation of HTML5Implementation.loadTrueTypeFont_: the
-// @JSBody version expands to document.createElement + WebFont.load, which has
-// no hope of running in the worker-only runtime. Route to the host via the
-// __cn1_load_truetype_font__ bridge so the returned promise suspends the
-// generator until the host actually has the font available to CSS. The
-// worker passes the bare resource name (e.g. material-design-font.ttf); the
-// host mirrors HTML5Implementation.getResourceAsStream and resolves it to
-// assets/<name> before handing it to FontFace. We avoid the previous
-// arrayBuffer->base64 dataURL route because Window.current().arrayBufferToBase64
-// is not wired up in the worker and silently returned an empty string.
+// Load a TTF into the WORKER's own FontFaceSet (self.fonts) and return a promise
+// that resolves once it is added. The worker-side OffscreenCanvas that
+// HTML5Graphics.stringWidthOffscreen() measures against has its OWN font set,
+// separate from the host's document.fonts where __cn1_load_truetype_font__
+// installs the paint font. Until a custom font (the Initializr "Inter" family,
+// "Material Icons") is in self.fonts the worker measures it against the default
+// sans-serif fallback, which is narrower -- so stringWidth under-reports, the
+// label box is sized too tight, and the host paints the real (wider) glyphs
+// clipped ("Essentials" -> "Essential"). TeaVM never hit this because it
+// measures and paints on the same main thread. The returned promise lets the
+// font loader SUSPEND the green thread until the metrics are real (see the
+// loadTrueTypeFont binding below) -- the same suspend-until-ready barrier the
+// image path uses via __cn1_decode_image_from_url__. Mirrors the host's
+// assets/<name> path resolution (browser_bridge.js __cn1_load_truetype_font__).
+function cn1WorkerFontFacePromise(fontName, rawPath, fontFormat) {
+  try {
+    if (typeof FontFace === "undefined"
+        || typeof self === "undefined"
+        || typeof self.fonts === "undefined"
+        || typeof self.fonts.add !== "function"
+        || !fontName || !rawPath) {
+      return Promise.resolve(false); // FontFaceSet unavailable: nothing to wait on
+    }
+    let url = String(rawPath);
+    if (!/^(?:data:|https?:|\/)/i.test(url)) {
+      const lastSlash = url.lastIndexOf("/");
+      if (lastSlash >= 0) {
+        url = url.substring(lastSlash + 1);
+      }
+      if (url !== "icon.png" && url.indexOf("assets/") !== 0) {
+        url = "assets/" + url;
+      }
+    }
+    // Cache the in-flight/settled load per (family,url) so repeated
+    // createTrueTypeFont calls for the same font share one fetch and the
+    // suspend on the 2nd+ call resolves immediately ("fetch it right away").
+    const cache = self.__cn1WorkerFontPromises || (self.__cn1WorkerFontPromises = {});
+    const key = fontName + "|" + url;
+    if (cache[key]) {
+      return cache[key];
+    }
+    let p;
+    try {
+      const ff = new FontFace(fontName, "url('" + url + "') format('" + (fontFormat || "truetype") + "')");
+      p = ff.load().then(function (loaded) {
+        try { self.fonts.add(loaded); } catch (e) { /* already added */ }
+        return true;
+      }, function () {
+        // 404 / decode error: resume the waiter anyway (degrade to fallback
+        // metrics) instead of parking it forever. Drop the cache entry so a
+        // later attempt can retry.
+        delete cache[key];
+        return false;
+      });
+    } catch (e) {
+      p = Promise.resolve(false);
+    }
+    cache[key] = p;
+    return p;
+  } catch (e) {
+    return Promise.resolve(false);
+  }
+}
+
+// Pre-warm the material icon font in the worker so icon-glyph widths (FontImage,
+// Toolbar/Tabs/Picker) measure against the same TTF the host @font-face
+// (index.html) paints. Kicked off at boot; no green thread to suspend here.
+cn1WorkerFontFacePromise("Material Icons", "assets/material-design-font.ttf", "truetype");
+
+// Worker-safe implementation of HTML5Implementation.loadTrueTypeFont_. SUSPENDS
+// the calling green thread until the font is cached in the worker's self.fonts,
+// so that by the time any stringWidth() runs the OffscreenCanvas can measure the
+// real font (fast synchronous fetch) instead of returning fallback metrics and
+// patching them later. This is the same suspend-until-ready model the image
+// decode barrier uses (__cn1_decode_image_from_url__): the bridge getter blocks,
+// the scheduler runs other green threads meanwhile, and we resume the instant
+// the resource is ready. Blocking here (at load) rather than inside stringWidth
+// keeps the hot layout path off the suspending/generator code path.
+//
+// The host load (document.fonts, for PAINTING) stays fire-and-forget: it is a
+// separate FontFaceSet, the host resolves 'font-family' at paint time, and the
+// old worker->host round-trip caused a 21s boot stall when the reply was lost.
+// The worker-LOCAL FontFace.load() promise we await instead cannot be "lost"
+// (no cross-thread message) and is bounded by a local fetch.
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_loadTrueTypeFont__java_lang_String_java_lang_String_java_lang_String"
-], function(fontName, fontFile, fontFormat) {
+], function*(fontName, fontFile, fontFormat) {
   const toStr = function(v) {
     if (v == null) return "";
     return typeof v === "string" ? v : (jvm.toNativeString ? jvm.toNativeString(v) : String(v));
@@ -2193,15 +2267,11 @@ bindNative([
     fontUrl: toStr(fontFile),
     fontFormat: toStr(fontFormat) || "truetype"
   };
-  // FIRE-AND-FORGET: the worker never uses the load result (it returned null
-  // regardless), and the host resolves 'font-family' at paint time, so there is
-  // no reason to PARK the green thread on the host's FontFace.load() promise.
-  // The old round-trip was a 21s full-worker boot stall (host font-load reply
-  // slow/lost while the worker sat parked) -- a textbook "API that doesn't need
-  // a response". Post it and keep running; text painted before the font lands
-  // re-renders (normal FOUT), and the screenshot settle-wait covers the
-  // transient. Same __cn1_no_response path the surface ops use.
+  // Host load for PAINTING (fire-and-forget; FOUT on the host is cosmetic).
   cn1SurfacePost("__cn1_load_truetype_font__", payload);
+  // Worker load for MEASURING: suspend until the FontFace is in self.fonts.
+  const fontReady = cn1WorkerFontFacePromise(payload.fontName, payload.fontUrl, payload.fontFormat);
+  yield { op: "await", promise: fontReady };
   return null;
 });
 
