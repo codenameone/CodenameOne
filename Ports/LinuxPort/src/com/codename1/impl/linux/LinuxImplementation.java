@@ -2291,6 +2291,29 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return LinuxNative.fileRoots();
     }
 
+    /**
+     * Anchors the app home at the per-user storage directory.
+     *
+     * The base getAppHomePath() builds {@code listFilesystemRoots()[0] + AppName},
+     * which here is the real filesystem root "/" + the app name -- unwritable, and
+     * literally "/null/" when neither an AppName property nor a packageName is set.
+     * That made {@code new File("x").getAbsolutePath()} resolve to "/null/x" (which
+     * is exactly why a recorded "tmpaudio.wav" came back as file:///null/tmpaudio.wav
+     * and would not play). Use the same writable per-user directory that Storage and
+     * capturePhoto already rely on.
+     */
+    @Override
+    public String getAppHomePath() {
+        String dir = LinuxNative.storageDir();
+        if (dir == null || dir.length() == 0) {
+            dir = "/tmp";
+        }
+        if (!dir.endsWith("/")) {
+            dir += "/";
+        }
+        return dir;
+    }
+
     @Override
     public String[] listFiles(String directory) throws IOException {
         return LinuxNative.fileList(stripFileUrl(directory));
