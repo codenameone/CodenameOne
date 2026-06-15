@@ -373,6 +373,18 @@
         "url": "https://medium.com/p/12ca68b71c6e/edit",
         "syndicated_at": "2026-06-14T18:18:47+00:00"
       }
+    },
+    "modern-advertising-api": {
+      "hashnode": {
+        "url": "https://hashnode.com/draft/6a301385a7aa7f6b9fbf63d9",
+        "published": false,
+        "draft_url": "https://hashnode.com/draft/6a301385a7aa7f6b9fbf63d9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": false,
+        "canonical_set": false,
+        "syndicated_at": "2026-06-15T15:01:50+00:00"
+      }
     }
   }
 }
