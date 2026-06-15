@@ -117,17 +117,18 @@ developing. Optimizations stay on in either case.
 The full cross-platform build-hints reference is in the
 link:#_sending_arguments_to_the_build_server[Advanced topics chapter].
 
-=== Optimized and stripped by default
+=== Optimized, with debug info in a separate file
 
-The shipping build is optimized (`/O2`) and stripped: no debug information is
-embedded, and the linker removes unused functions and folds identical ones, which
-keeps the single self-contained executable as small as the translated code allows.
-As a concrete data point, the Codename One Initializr sample builds to a ~13 MB
-stripped `.exe` with no `.pdb`. Setting `windows.debug=true` keeps the
-symbols: the same app produces a ~14 MB exe *plus a ~97 MB `.pdb`* -- the
-debug data dwarfs the binary, which is exactly why it's not in the default. The
-build stays optimized either way; with the `.pdb` present a faulting address can be
-turned back into a function name and source line with `llvm-symbolizer`.
+The shipping build is optimized (`/O2`): the linker removes unused functions and
+folds identical ones (`/OPT:REF` and `/OPT:ICF`), and the debug information isn't
+embedded in the executable -- it's written to a separate `.pdb` companion. The
+`.exe` therefore stays as small as the translated code allows, while a faulting
+address can still be turned back into a function name and source line with
+`llvm-symbolizer` against the `.pdb`. As a concrete data point, the Codename One
+Initializr sample builds to an ~8 MB `.exe`; the matching `.pdb` is several times
+larger but ships beside the binary rather than inside it, and is only needed to
+symbolize a crash. Setting `windows.debug=true` switches to an unoptimized debug
+build with full symbols.
 
 === Code signing
 
@@ -204,8 +205,9 @@ packaged as a Windows installer.
 |Yes -- a compatible JDK (11–25) must be installed on the machine.
 
 |Artifact size
-|One `.exe`, on the order of 10–15 MB (everything -- VM, GC, your code,
-resources -- is inside; ~13 MB for the Initializr sample).
+|One `.exe`, on the order of 5–10 MB (everything -- VM, GC, your code,
+resources -- is inside; ~8 MB for the Initializr sample), plus a separate `.pdb`
+for crash symbolication.
 |Largest: app + a bundled JRE (the JRE alone is ~40–70 MB).
 |Smallest: a few MB (just bytecode); the JVM lives outside it.
 

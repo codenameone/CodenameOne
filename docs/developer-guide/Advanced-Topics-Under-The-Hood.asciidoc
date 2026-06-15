@@ -237,6 +237,24 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 +
 Only supported for App Store builds. See https://www.codenameone.com/developer-guide.html#_mac_os_desktop_build_options[macOS Desktop Build Options] for more information.
 
+| windows.arch
+| Native Windows (`windows-device`) target CPU: `x64` (default), `arm64`, or `both`. An x64 binary also runs on Windows-on-ARM via the OS's x64 emulation. See <<Working with the native Windows port>>.
+
+| windows.debug
+| Native Windows target: `true`/`false` (default `false`). When `false` the `.exe` is optimized and stripped (with the `.pdb` in its own file); `true` keeps symbols (a single x64 build) for crash symbolication. Optimizations stay on either way.
+
+| windows.signing.pkcs12 / windows.signing.password / windows.signing.timestampUrl / windows.signing.digest / windows.signing.name / windows.signing.url
+| Native Windows Authenticode signing of the produced `.exe` (via `osslsigncode`). A certificate is taken from `windows.signing.pkcs12` or the build's uploaded certificate; set `windows.signing=false` to skip. Unsigned binaries run but trip SmartScreen / "Unknown publisher."
+
+| linux.arch
+| Native Linux (`linux-device`) target CPU: `x64` (default), `arm64`, or `both`. See <<Working with the native Linux port>>.
+
+| linux.debug
+| Native Linux target: `true`/`false` (default `false`). When `false` the ELF is optimized and stripped (debug info is split into a separate `.debug`); `true` keeps symbols (`RelWithDebInfo`) for crash symbolication. Optimizations stay on either way.
+
+| linux.libc
+| Native Linux target: `glibc` (default) or `musl`. The default compiles against an old glibc so the ELF runs on essentially any mainstream distro; `musl` targets Alpine (where the GTK stack is itself musl-built). A glibc binary and a musl binary aren't interchangeable.
+
 |ios.associatedDomains
 |Comma-delimited list of domains associated with this app. Since 6.0.  Note that each domain should be prefixed by a supported prefix. For example, "applinks:" or "webcredentials:." See https://developer.apple.com/documentation/security/password_autofill/setting_up_an_app_s_associated_domains?language=objc[Apple's documentation on Associated domains] for more information.
 
@@ -920,7 +938,21 @@ For Android native interfaces you can implement the generated `...Impl` class in
 | `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.h` +
 `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m` +
 `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.swift`
+
+| Native Windows (win32, C)
+| `win/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
+
+| Native Linux (C)
+| `linux/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
+
+| JavaScript
+| `javascript/src/main/javascript/com_mycompany_myapp_MyNative.js`
 |===
+
+NOTE: The native Windows and native Linux ports compile your app to C (no JVM), so
+their native interface implementations are plain C, generated alongside the others
+by the "Generate Native Sources" tool. The native Mac target reuses the iOS
+Objective-C/Swift implementation, since it rides the same build.
 
 ===== Use the Android main thread (native EDT)
 
@@ -1045,6 +1077,54 @@ Cocoapods are the iOS equivalent of Gradle dependencies.
 CocoaPods allow you to add a native library dependency to iOS far more than Gradle. By default you target iOS 7.0 or newer which is supported by Intercom for older versions of the library. Annoyingly CocoaPods might seem to work but some specific APIs won't work since it fell back to an older version... To solve this you've to explicitly define the build hint `ios.pods.platform=8.0` to force iOS 8 or newer. You might need to force it to even newer versions as some libraries force an iOS 9 least etc.
 
 Including intercom itself required a single build hint: `ios.pods=Intercom` which you can obviously extend by using commas to include many libraries. You can search the https://cocoapods.org/[CocoaPods website] for supported 3rd party libraries which includes everything you would expect. One important advantage when working with CocoaPods is the faster build time as the upload to the Codename One website is smaller and the bandwidth you've to CocoaPods is faster. Another advantage is the ability to keep up with the latest developments from the library providers.
+
+==== C (native Windows and native Linux)
+
+The native Windows (win32) and native Linux ports have no JVM: the "clean" ParparVM
+target compiles your whole app to C and then to a native binary. A native interface
+on these ports is therefore implemented in plain *C* rather than C#/Objective-C/Java.
+The "Generate Native Sources" tool emits one C file per interface:
+
+* `win/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c` (native Windows)
+* `linux/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c` (native Linux)
+
+The two files are identical, so a native interface written once works on both ports;
+only the directory differs. (The native Mac target reuses the iOS Objective-C/Swift
+implementation, because it rides the iOS build.)
+
+The translator emits one C function per interface method. Unlike the Objective-C
+stub, the function name is the fully qualified, mangled C symbol the translated app
+links against, so *don't rename the functions or change their signatures*; just fill
+in the bodies. Each function takes the thread state as its first argument and
+`JAVA_*` typed parameters. For example, the interface:
+
+[source,java]
+----
+public interface MyNative extends NativeInterface {
+    String hello(String name);
+}
+----
+
+This generates the C stub below (returning `JAVA_NULL` until you implement it):
+
+[source,c]
+----
+#include "cn1_globals.h"
+
+JAVA_OBJECT com_mycompany_myapp_MyNativeImplCodenameOne_hello___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT param1) {
+    return JAVA_NULL;
+}
+----
+
+Type mapping: the primitives (`int`, `long`, `boolean`, `byte`, `short`, `char`,
+`float`, `double`) become their `JAVA_INT`/`JAVA_LONG`/`JAVA_BOOLEAN` equivalents;
+`String`, arrays and other objects become `JAVA_OBJECT`; a `void` method returns
+`JAVA_VOID` and omits the `_R_` suffix in its name; and a
+`com.codename1.ui.PeerComponent` is passed and returned as a `JAVA_LONG` native peer
+handle. Use the core helpers declared in `cn1_globals.h` (for example
+`newStringFromCString` / `stringToUTF8`) to convert between C and Java values. As
+with the other ports, you can drop additional `.c`/`.h` sources and prebuilt
+libraries into the same `src/main/c` directory and they're compiled into the binary.
 
 ==== JavaScript
 

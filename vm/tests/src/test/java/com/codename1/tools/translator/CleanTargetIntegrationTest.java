@@ -702,6 +702,15 @@ class CleanTargetIntegrationTest {
             if (dest.getParent() != null) { Files.createDirectories(dest.getParent()); }
             Files.copy(exe, dest, StandardCopyOption.REPLACE_EXISTING);
             System.out.println("Cross-built suite exe copied to " + dest.toAbsolutePath());
+            // Ship the separate .pdb beside it (the shipping build now emits one via
+            // /Zi + /DEBUG) so a crash address symbolizes to a function/line.
+            Path pdb = exe.resolveSibling("WinHelloMain.pdb");
+            if (Files.exists(pdb)) {
+                Path pdbDest = dest.resolveSibling("WinHelloMain.pdb");
+                Files.copy(pdb, pdbDest, StandardCopyOption.REPLACE_EXISTING);
+                System.out.println("Cross-built suite pdb copied to " + pdbDest.toAbsolutePath()
+                        + " (" + (Files.size(pdbDest) / 1024) + "KB)");
+            }
         }
     }
 
@@ -1214,7 +1223,7 @@ class CleanTargetIntegrationTest {
         }
     }
 
-    private static int countPngFiles(Path dir) throws IOException {
+    static int countPngFiles(Path dir) throws IOException {
         int n = 0;
         try (java.util.stream.Stream<Path> s = Files.list(dir)) {
             for (Path p : (Iterable<Path>) s::iterator) {

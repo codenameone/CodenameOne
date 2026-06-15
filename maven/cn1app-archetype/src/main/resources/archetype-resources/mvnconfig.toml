@@ -33,6 +33,11 @@ command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dco
 label="Mac Desktop Build"
 group="Cloud"
 
+[mac_native]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=mac-os-x-native", "-U", "-e"]
+label="Mac Native Build"
+group="Cloud"
+
 [windows_desktop]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=windows-desktop", "-U", "-e"]
 label="Windows Desktop Build"
@@ -41,6 +46,11 @@ group="Cloud"
 [windows_device]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=win", "-Dcodename1.buildTarget=windows-device", "-U", "-e"]
 label="Windows Device Build (UWP)"
+group="Cloud"
+
+[linux_device]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=linux", "-Dcodename1.buildTarget=linux-device", "-U", "-e"]
+label="Linux Device Build"
 group="Cloud"
 
 

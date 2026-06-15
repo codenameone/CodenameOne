@@ -27,6 +27,14 @@ Without this configuration present, some functionality in the IDE may be limited
                 <property name="codename1.buildTarget">mac-os-x-desktop</property>
                 <property name="codename1.platform">javase</property>
             </configuration>
+            <configuration id="Mac Native App" profiles="">
+                <property name="codename1.buildTarget">mac-os-x-native</property>
+                <property name="codename1.platform">ios</property>
+            </configuration>
+            <configuration id="Linux Device App" profiles="">
+                <property name="codename1.buildTarget">linux-device</property>
+                <property name="codename1.platform">linux</property>
+            </configuration>
             <configuration id="Simulator" profiles="">
                 <property name="codename1.platform">javase</property>
             </configuration>

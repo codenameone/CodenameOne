@@ -20,8 +20,12 @@ if [ -n "$JAVA17_HOME" ]; then
 fi
 
 function mac_desktop {
-  
+
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javase" "-Dcodename1.buildTarget=mac-os-x-desktop" "-U" "-e"
+}
+function mac_native {
+
+  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=ios" "-Dcodename1.buildTarget=mac-os-x-native" "-U" "-e"
 }
 function windows_desktop {
   
@@ -32,8 +36,12 @@ function windows_device {
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=win" "-Dcodename1.buildTarget=windows-device" "-U" "-e"
 }
 function uwp {
-  
-  "windows_device" 
+
+  "windows_device"
+}
+function linux_device {
+
+  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=linux" "-Dcodename1.buildTarget=linux-device" "-U" "-e"
 }
 function javascript {
   
@@ -101,11 +109,15 @@ function help {
   "echo" "-e" "  mac_desktop"
   "echo" "-e" "    Builds Mac OS desktop app."
   "echo" "-e" "    *Mac OS Desktop builds are a Pro user feature."
+  "echo" "-e" "  mac_native"
+  "echo" "-e" "    Builds a native Mac app (no JVM)."
   "echo" "-e" "  windows_desktop"
   "echo" "-e" "    Builds Windows desktop app."
   "echo" "-e" "    *Windows Desktop builds are a Pro user feature."
   "echo" "-e" "  windows_device"
   "echo" "-e" "    Builds UWP Windows app."
+  "echo" "-e" "  linux_device"
+  "echo" "-e" "    Builds a native Linux app (ELF, no JVM)."
   "echo" "-e" "  javascript"
   "echo" "-e" "    Builds as a web app."
   "echo" "-e" "    *Javascript builds are an Enterprise user feature"

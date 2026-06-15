@@ -139,6 +139,10 @@ public class CompilerHelper {
         return System.getProperty("os.name").toLowerCase().contains("win");
     }
 
+    public static boolean isLinux() {
+        return System.getProperty("os.name").toLowerCase().contains("linux");
+    }
+
     public static String executableName(String base) {
         if (isWindows()) {
             return base + ".exe";

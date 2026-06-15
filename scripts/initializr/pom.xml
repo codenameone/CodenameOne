@@ -152,6 +152,30 @@
       </modules>
     </profile>
     <profile>
+      <id>win</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>win</value>
+        </property>
+      </activation>
+      <modules>
+        <module>win</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>linux</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>linux</value>
+        </property>
+      </activation>
+      <modules>
+        <module>linux</module>
+      </modules>
+    </profile>
+    <profile>
       <id>android</id>
       <activation>
         <property>
