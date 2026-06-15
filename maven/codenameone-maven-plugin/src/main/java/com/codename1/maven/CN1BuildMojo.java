@@ -389,6 +389,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = Executor.BUILD_TARGET_MAC_NATIVE_PROJECT;
+    public static final String BUILD_TARGET_MAC_NATIVE = Executor.BUILD_TARGET_MAC_NATIVE;
+    public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
     private boolean isLocalBuildTarget(String buildTarget) {
         return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
@@ -705,9 +707,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             } else {
                 // Cloud-builds route through a remote build server; for the Mac
-                // native target we set the same macNative.enabled hint here so
-                // the server-side IPhoneBuilder takes the Mac branch.
-                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                // native targets we set the same macNative.enabled hint here so the
+                // server-side IPhoneBuilder takes the Mac branch. Both the source
+                // project (mac-source) and the device build (mac-os-x-native) need it
+                // -- previously only mac-source did, so the cloud mac-os-x-native
+                // target rode the plain iOS pipeline instead of emitting a Mac app.
+                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                        || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)) {
                     cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
                 }
                 if (automated) {

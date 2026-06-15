@@ -82,6 +82,13 @@ public abstract class Executor {
     // "windows-desktop" (javase) target.
     public static final String BUILD_TARGET_WINDOWS_NATIVE = "windows-device";
     public static final String BUILD_TARGET_WINDOWS_NATIVE_PROJECT = "windows-source";
+    // Native Linux (ParparVM -> CMake/Ninja, GTK3/Cairo) target; distinct from a
+    // JVM/JavaSE executable jar. The cloud target submits to the "linux" queue; the
+    // local "local-linux-device" target builds on the developer's own machine.
+    public static final String BUILD_TARGET_LINUX_NATIVE = "linux-device";
+    // Native Mac (ParparVM Catalyst slice, rides the iOS pipeline with
+    // macNative.enabled). The cloud target name; "mac-source" is the local project.
+    public static final String BUILD_TARGET_MAC_NATIVE = "mac-os-x-native";
     private String buildTarget;
 
     private static boolean disableDelete;
