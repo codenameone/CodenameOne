@@ -241,7 +241,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 | Native Windows (`windows-device`) target CPU: `x64` (default), `arm64`, or `both`. An x64 binary also runs on Windows-on-ARM via the OS's x64 emulation. See <<Working with the native Windows port>>.
 
 | windows.debug
-| Native Windows target: `true`/`false` (default `false`). When `false` the `.exe` is optimized and stripped (the `.pdb` is emitted separately); `true` keeps symbols (a single x64 build) for crash symbolication. Optimizations stay on either way.
+| Native Windows target: `true`/`false` (default `false`). When `false` the `.exe` is optimized and stripped (with the `.pdb` in its own file); `true` keeps symbols (a single x64 build) for crash symbolication. Optimizations stay on either way.
 
 | windows.signing.pkcs12 / windows.signing.password / windows.signing.timestampUrl / windows.signing.digest / windows.signing.name / windows.signing.url
 | Native Windows Authenticode signing of the produced `.exe` (via `osslsigncode`). A certificate is taken from `windows.signing.pkcs12` or the build's uploaded certificate; set `windows.signing=false` to skip. Unsigned binaries run but trip SmartScreen / "Unknown publisher."
@@ -253,7 +253,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 | Native Linux target: `true`/`false` (default `false`). When `false` the ELF is optimized and stripped (debug info is split into a separate `.debug`); `true` keeps symbols (`RelWithDebInfo`) for crash symbolication. Optimizations stay on either way.
 
 | linux.libc
-| Native Linux target: `glibc` (default) or `musl`. The default compiles against an old glibc so the ELF runs on essentially any mainstream distro; `musl` targets Alpine (where the GTK stack is itself musl-built). A glibc binary and a musl binary are not interchangeable.
+| Native Linux target: `glibc` (default) or `musl`. The default compiles against an old glibc so the ELF runs on essentially any mainstream distro; `musl` targets Alpine (where the GTK stack is itself musl-built). A glibc binary and a musl binary aren't interchangeable.
 
 |ios.associatedDomains
 |Comma-delimited list of domains associated with this app. Since 6.0.  Note that each domain should be prefixed by a supported prefix. For example, "applinks:" or "webcredentials:." See https://developer.apple.com/documentation/security/password_autofill/setting_up_an_app_s_associated_domains?language=objc[Apple's documentation on Associated domains] for more information.
@@ -1093,9 +1093,9 @@ only the directory differs. (The native Mac target reuses the iOS Objective-C/Sw
 implementation, because it rides the iOS build.)
 
 The translator emits one C function per interface method. Unlike the Objective-C
-stub, the function name is the fully-qualified, mangled C symbol the translated app
-links against, so *do not rename the functions or change their signatures* -- only
-fill in the bodies. Each function takes the thread state as its first argument and
+stub, the function name is the fully qualified, mangled C symbol the translated app
+links against, so *don't rename the functions or change their signatures*; just fill
+in the bodies. Each function takes the thread state as its first argument and
 `JAVA_*` typed parameters. For example, the interface:
 
 [source,java]
@@ -1105,7 +1105,7 @@ public interface MyNative extends NativeInterface {
 }
 ----
 
-generates this C stub (returning `JAVA_NULL` until you implement it):
+This generates the C stub below (returning `JAVA_NULL` until you implement it):
 
 [source,c]
 ----
@@ -1116,14 +1116,15 @@ JAVA_OBJECT com_mycompany_myapp_MyNativeImplCodenameOne_hello___java_lang_String
 }
 ----
 
-Type mapping: `int`/`long`/`boolean`/`byte`/`short`/`char`/`float`/`double` become
-`JAVA_INT`/`JAVA_LONG`/`JAVA_BOOLEAN`/… ; `String`, arrays and other objects become
-`JAVA_OBJECT`; a `void` method returns `JAVA_VOID` and omits the `_R_` suffix in its
-name; and a `com.codename1.ui.PeerComponent` is passed and returned as a `JAVA_LONG`
-native peer handle. Use the core helpers declared in `cn1_globals.h` (for example
+Type mapping: the primitives (`int`, `long`, `boolean`, `byte`, `short`, `char`,
+`float`, `double`) become their `JAVA_INT`/`JAVA_LONG`/`JAVA_BOOLEAN` equivalents;
+`String`, arrays and other objects become `JAVA_OBJECT`; a `void` method returns
+`JAVA_VOID` and omits the `_R_` suffix in its name; and a
+`com.codename1.ui.PeerComponent` is passed and returned as a `JAVA_LONG` native peer
+handle. Use the core helpers declared in `cn1_globals.h` (for example
 `newStringFromCString` / `stringToUTF8`) to convert between C and Java values. As
 with the other ports, you can drop additional `.c`/`.h` sources and prebuilt
-libraries into the same `src/main/c` directory and they are compiled into the binary.
+libraries into the same `src/main/c` directory and they're compiled into the binary.
 
 ==== JavaScript
 
