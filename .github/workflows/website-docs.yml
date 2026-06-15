@@ -57,6 +57,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Cap the whole job well below GitHub's 6h default. The site apps build
+    # their JavaScript bundles via the local ParparVM target plus a full
+    # reactor bootstrap, so a healthy run is well under an hour; anything past
+    # this is a hang (e.g. a JS build blocked on an external dependency) and
+    # should fail fast instead of holding a runner for hours.
+    timeout-minutes: 90
     env:
       CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
@@ -136,6 +142,10 @@ jobs:
           java-version: '25'
 
       - name: Build website
+        # Bounds the heaviest step (javadocs + dev guide + three local ParparVM
+        # JavaScript builds). A healthy run finishes well within this; a hang
+        # here (e.g. a JS build blocked on an external dependency) fails fast.
+        timeout-minutes: 60
         run: |
           set -euo pipefail
           scripts/website/build.sh
