@@ -281,6 +281,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new CryptoApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),
+            new BridgeBulkTransferGuardTest(),
             new VPNDetectionAPITest(),
             new CallDetectionAPITest(),
             new LocalNotificationOverrideTest(),

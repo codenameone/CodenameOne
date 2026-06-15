@@ -12,7 +12,7 @@ function windows_desktop {
 }
 function javascript {
   
-  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
+  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=local-javascript" "-U" "-e"
 }
 function android {
   

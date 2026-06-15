@@ -117,8 +117,14 @@
           <value>true</value>
         </property>
       </activation>
+      <!-- Build against the locally-built (repo HEAD) Codename One artifacts
+           instead of the pinned release, so the local ParparVM JavaScript
+           build reflects repo source. The website CI bootstraps these
+           8.0-SNAPSHOT artifacts via bootstrap_local_cn1_snapshots before
+           building the initializr with -Dcn1.localWorkspace=true. -->
       <properties>
-        <cn1.version>7.0.251</cn1.version>
+        <cn1.version>8.0-SNAPSHOT</cn1.version>
+        <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
       </properties>
     </profile>
     <profile>

@@ -37,14 +37,38 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
     private static boolean synchronizedMethod;
     private static boolean staticMethod;
     private static String className;
-    
+
+    // Resolved operand-stack-ENTRY form for the DUP family, computed by ASM
+    // frame analysis at parse time (Parser.resolveDupForms). The JVM dup
+    // opcodes are defined in SLOTS (long/double take two), but the JS backend
+    // models a long/double as ONE operand-stack entry, so the correct shuffle
+    // depends on whether the operands are category-2. dupNDup = how many top
+    // entries to duplicate, dupNSkip = how many entries below them to insert
+    // beneath. -1 means "not analyzed" -> the emitter falls back to the legacy
+    // (category-1-assuming) form. See JavascriptMethodGenerator dup handling.
+    private int dupNDup = -1;
+    private int dupNSkip = -1;
+
     public BasicInstruction(int opcode, int value) {
         super(opcode);
         this.value = value;
     }
-    
+
     public int getValue() {
         return value;
+    }
+
+    public void setDupForm(int nDup, int nSkip) {
+        this.dupNDup = nDup;
+        this.dupNSkip = nSkip;
+    }
+
+    public int getDupNDup() {
+        return dupNDup;
+    }
+
+    public int getDupNSkip() {
+        return dupNSkip;
     }
     
     public static void setSynchronizedMethod(boolean b, boolean stat, String cls) {

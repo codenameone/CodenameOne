@@ -18,7 +18,7 @@
     <maven.compiler.target>1.8</maven.compiler.target>
     <codename1.platform>javascript</codename1.platform>
       <codename1.projectPlatform>javascript</codename1.projectPlatform>
-      <codename1.defaultBuildTarget>javascript</codename1.defaultBuildTarget>
+      <codename1.defaultBuildTarget>local-javascript</codename1.defaultBuildTarget>
   </properties>
     <build>
         <resources>

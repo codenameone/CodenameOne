@@ -59,7 +59,7 @@ mvn -DskipTests install
 [source,bash]
 ----
 cd ../scripts/initializr
-./mvnw package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript -Dcn1.localWorkspace=true
+./mvnw package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript -Dcn1.localWorkspace=true
 ----
 
 This switches Initializr to `8.0-SNAPSHOT` so JavaScript builds use your local Codename One code.

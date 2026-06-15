@@ -38,6 +38,14 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.BasicInterpreter;
+import org.objectweb.asm.tree.analysis.BasicValue;
+import org.objectweb.asm.tree.analysis.Frame;
+import com.codename1.tools.translator.bytecodes.BasicInstruction;
+import com.codename1.tools.translator.bytecodes.Instruction;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
 
@@ -926,7 +934,115 @@ public class Parser extends ClassVisitor {
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
         BytecodeMethod mtd = new BytecodeMethod(clsName, access, name, desc, signature, exceptions);
         cls.addMethod(mtd);
-        return new JSRInlinerAdapter(new MethodVisitorWrapper(super.visitMethod(access, name, desc, signature, exceptions), mtd), access, name, desc, signature, exceptions);
+        // Tee the (post-JSR-inlined) bytecode into a MethodNode so visitEnd can run
+        // ASM frame analysis to resolve category-2-aware DUP/POP2 forms. The wrapper
+        // sits INSIDE the JSRInlinerAdapter, so the MethodNode it feeds matches the
+        // instruction stream BytecodeMethod is built from. Parser's own ClassVisitor
+        // has no delegate writer (super.visitMethod returns null), so routing the
+        // MethodNode as the wrapper's delegate loses nothing.
+        MethodNode analysisNode = new MethodNode(Opcodes.ASM9, access, name, desc, signature, exceptions);
+        MethodVisitorWrapper wrapper = new MethodVisitorWrapper(analysisNode, mtd);
+        wrapper.dupAnalysisOwner = clsName;
+        wrapper.dupAnalysisNode = analysisNode;
+        return new JSRInlinerAdapter(wrapper, access, name, desc, signature, exceptions);
+    }
+
+    // Category-sensitive stack opcodes: their correct operand-stack-ENTRY shuffle
+    // depends on whether the operands are category-2 (long/double), because the JS
+    // backend models a long/double as ONE entry while the JVM defines these in slots.
+    private static boolean isCategorySensitiveStackOp(int op) {
+        return op == Opcodes.DUP2 || op == Opcodes.DUP2_X1 || op == Opcodes.DUP2_X2
+                || op == Opcodes.DUP_X2 || op == Opcodes.POP2;
+    }
+
+    /**
+     * Runs ASM frame analysis over the parsed MethodNode and stamps each
+     * category-sensitive DUP/POP2 ``BasicInstruction`` with its resolved
+     * entry-form (see {@link BasicInstruction#setDupForm}). On any analysis
+     * failure the forms are left unset and the emitter uses its legacy
+     * (category-1-assuming) path -- i.e. no worse than before.
+     */
+    private static void resolveDupForms(String owner, MethodNode mn, BytecodeMethod mtd) {
+        if (owner == null || mn == null || mn.instructions == null || mn.instructions.size() == 0) {
+            return;
+        }
+        Frame<BasicValue>[] frames;
+        try {
+            frames = new Analyzer<BasicValue>(new BasicInterpreter()).analyze(owner, mn);
+        } catch (Throwable t) {
+            return;
+        }
+        // Decisions for category-sensitive ops, in linear (parse) order.
+        List<int[]> decisions = new ArrayList<int[]>();
+        AbstractInsnNode[] insns = mn.instructions.toArray();
+        for (int i = 0; i < insns.length; i++) {
+            int op = insns[i].getOpcode();
+            if (!isCategorySensitiveStackOp(op)) {
+                continue;
+            }
+            decisions.add(dupForm(op, frames[i]));
+        }
+        // Stamp the matching ParparVM BasicInstructions, in the same linear order.
+        // The dup/pop2 sequence is identical between the ASM node and the
+        // BytecodeMethod (both built from the same post-JSR stream), so they zip
+        // 1:1. Stamping the instruction object (not a positional queue) keeps the
+        // form correct even though the structured emitter later reorders blocks.
+        int di = 0;
+        for (Instruction instr : mtd.getInstructions()) {
+            if (!(instr instanceof BasicInstruction) || !isCategorySensitiveStackOp(instr.getOpcode())) {
+                continue;
+            }
+            if (di >= decisions.size()) {
+                break;
+            }
+            int[] form = decisions.get(di++);
+            if (form != null) {
+                ((BasicInstruction) instr).setDupForm(form[0], form[1]);
+            }
+        }
+    }
+
+    /**
+     * Resolves a category-sensitive stack opcode into entry terms given the frame
+     * BEFORE it. Returns {nDup, nSkip} for the DUP family (duplicate the top nDup
+     * entries, reinsert beneath the next nSkip), or {entriesToPop, -1} for POP2.
+     * Returns null when the frame is unavailable (unreachable code).
+     * ASM analysis frames model a long/double as ONE stack entry with size 2.
+     */
+    private static int[] dupForm(int op, Frame<BasicValue> f) {
+        if (f == null) {
+            return null;
+        }
+        int sp = f.getStackSize();
+        if (sp < 1) {
+            return null;
+        }
+        boolean topWide = f.getStack(sp - 1).getSize() == 2;
+        switch (op) {
+            case Opcodes.POP2:
+                return new int[]{ topWide ? 1 : 2, -1 };
+            case Opcodes.DUP2:
+                return topWide ? new int[]{1, 0} : new int[]{2, 0};
+            case Opcodes.DUP2_X1:
+                return topWide ? new int[]{1, 1} : new int[]{2, 1};
+            case Opcodes.DUP_X2: {
+                // Top is category-1; skip one entry if the value below is category-2.
+                boolean belowWide = sp >= 2 && f.getStack(sp - 2).getSize() == 2;
+                return belowWide ? new int[]{1, 1} : new int[]{1, 2};
+            }
+            case Opcodes.DUP2_X2:
+                if (topWide) {
+                    boolean belowWide = sp >= 2 && f.getStack(sp - 2).getSize() == 2;
+                    return belowWide ? new int[]{1, 1} : new int[]{1, 2};
+                } else {
+                    // Top two entries are category-1; skip one entry if the value
+                    // beneath them is category-2.
+                    boolean belowWide = sp >= 3 && f.getStack(sp - 3).getSize() == 2;
+                    return belowWide ? new int[]{2, 1} : new int[]{2, 2};
+                }
+            default:
+                return null;
+        }
     }
 
     @Override
@@ -1034,6 +1150,8 @@ public class Parser extends ClassVisitor {
     
     class MethodVisitorWrapper extends MethodVisitor {
         private final BytecodeMethod mtd;
+        String dupAnalysisOwner;
+        MethodNode dupAnalysisNode;
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
             super(Opcodes.ASM9, mv);
             this.mtd = mtd;
@@ -1041,7 +1159,8 @@ public class Parser extends ClassVisitor {
 
         @Override
         public void visitEnd() {
-            super.visitEnd(); 
+            super.visitEnd();
+            resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd);
         }
 
         @Override

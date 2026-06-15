@@ -379,6 +379,7 @@ function aliasGlobalToImpl(symbol) {
     return false;
   }
   global[symbol] = impl;
+  cn1RefreshAlias(symbol, impl);
   emitDiagLine("PARPAR:DIAG:INIT:aliasGlobalToImpl=" + symbol);
   return true;
 }
@@ -630,6 +631,7 @@ function wrapGlobalGeneratorWithDiag(symbol, marker) {
   };
   wrapped.__cn1DiagWrapped = true;
   global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
   return true;
 }
 
@@ -730,6 +732,19 @@ function ensureKotlinUnitShim() {
 }
 ensureKotlinUnitShim();
 
+
+// Bundle call-site aliasing: hot cn1_* call sites go through short $J*
+// aliases (see JavascriptBundleWriter.aliasHotCn1Identifiers). Whenever
+// port.js reassigns a cn1_* global, refresh the alias too or aliased
+// call sites keep invoking the replaced function.
+function cn1RefreshAlias(symbol, fn) {
+  if (typeof global.__cn1RefreshAlias === "function") {
+    global.__cn1RefreshAlias(symbol, fn);
+  } else if (global.__cn1Al && global.__cn1Al[symbol]) {
+    global[global.__cn1Al[symbol]] = fn;
+  }
+}
+
 function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
   if (typeof global[symbol] === "function") {
     return false;
@@ -742,6 +757,7 @@ function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
     }
     return null;
   };
+  cn1RefreshAlias(symbol, global[symbol]);
   emitCiFallbackMarker(marker, "ENABLED");
   emitDiagLine("PARPAR:DIAG:INIT:missingGlobalDelegate:" + symbol + "->" + delegateSymbol);
   return true;
@@ -971,7 +987,7 @@ bindNative([
   "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int",
   "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_void",
   "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_int"
-], function*(src, srcOff, dst, dstOff, length) {
+], function(src, srcOff, dst, dstOff, length) {
   if (!src || length <= 0) {
     return null;
   }
@@ -1002,7 +1018,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int",
   "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int_R_void"
-], function*(src, dst, offset) {
+], function(src, dst, offset) {
   if (!src || !dst) {
     return null;
   }
@@ -1031,7 +1047,7 @@ bindNative([
 // even multi-MiB byte[] inputs cost a single ``yield*`` boundary.
 bindNative([
   "cn1_com_codename1_teavm_io_BlobUtil_byteArrayToUint8Array_byte_1ARRAY_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(bytes) {
+], function(bytes) {
   if (!bytes) {
     return jvm.wrapJsObject(new Uint8Array(0), "com_codename1_html5_js_typedarrays_Uint8Array");
   }
@@ -1043,12 +1059,12 @@ bindNative([
   return jvm.wrapJsObject(u8, "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
-bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function() {
   const arr = [];
   return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
 });
 
-bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___int_R_com_codename1_html5_js_core_JSArray"], function*(length) {
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___int_R_com_codename1_html5_js_core_JSArray"], function(length) {
   const size = Math.max(0, length | 0);
   const arr = new Array(size);
   for (let i = 0; i < size; i++) {
@@ -1278,7 +1294,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create_R_com_codename1_html5_js_ajax_XMLHttpRequest",
   "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create___R_com_codename1_html5_js_ajax_XMLHttpRequest"
-], function*() {
+], function() {
   if (typeof global.XMLHttpRequest !== "function") {
     throw new Error("XMLHttpRequest is not available in this javascript runtime");
   }
@@ -1288,14 +1304,14 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create_int_R_com_codename1_html5_js_typedarrays_ArrayBuffer",
   "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create___int_R_com_codename1_html5_js_typedarrays_ArrayBuffer"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.ArrayBuffer(size | 0), "com_codename1_html5_js_typedarrays_ArrayBuffer");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.Uint8Array(size | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
@@ -1307,28 +1323,28 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_int_R_com_codename1_html5_js_typedarrays_Float64Array",
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___int_R_com_codename1_html5_js_typedarrays_Float64Array"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.Float64Array(size | 0), "com_codename1_html5_js_typedarrays_Float64Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array",
   "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array"
-], function*(buffer) {
+], function(buffer) {
   return jvm.wrapJsObject(new global.Float64Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Float64Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer) {
+], function(buffer) {
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(bufferView) {
+], function(bufferView) {
   const nativeView = jvm.unwrapJsValue(bufferView);
   return jvm.wrapJsObject(new global.Uint8Array(nativeView.buffer, nativeView.byteOffset || 0, nativeView.byteLength || undefined), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
@@ -1336,14 +1352,14 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer, offset) {
+], function(buffer, offset) {
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer, offset, length) {
+], function(buffer, offset, length) {
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
@@ -1352,28 +1368,28 @@ bindNative([
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(size) {
+], function(size) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(size | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(buffer) {
+], function(buffer) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(buffer, offset) {
+], function(buffer, offset) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
   "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
-], function*(buffer, offset, length) {
+], function(buffer, offset, length) {
   return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
 });
 
@@ -1414,12 +1430,12 @@ bindNative([
   return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function*(name) {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function(name) {
   const value = getQueryParameter(jvm.toNativeString(name));
   return value == null ? null : jvm.createStringLiteral(value);
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function() {
   // Default to 1: Codename One's JS port works end-to-end in CSS
   // ("real") pixels and skips HiDPI auto-scaling of the canvas /
   // pointer events. Use ``?pixelRatio=2`` to opt back in.
@@ -1448,7 +1464,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRati
   return Number(win.overridePixelRatio || win.devicePixelRatio || 1.0);
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize___R_int"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize___R_int"], function() {
   const value = getQueryParameter("baseFont");
   if (value == null || value === "") {
     return 0;
@@ -1457,7 +1473,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_
   return isNaN(parsed) ? 0 : parsed |0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride___R_int"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride___R_int"], function() {
   const value = getQueryParameter("density");
   if (value == null || value === "") {
     return 0;
@@ -1466,27 +1482,27 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride
   return isNaN(parsed) ? 0 : parsed |0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhone___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhone___R_boolean"], function() {
   return isPhoneUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function() {
   return isPhoneOrTabletUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIOS_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIOS___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIOS_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIOS___R_boolean"], function() {
   return isIOSUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isMac_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isMac___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isMac_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isMac___R_boolean"], function() {
   return isMacUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIPad_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIPad___R_boolean"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIPad_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIPad___R_boolean"], function() {
   return isIPadUserAgent() ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function() {
   const nav = global.navigator || {};
   const value = nav.language || nav.browserLanguage || "";
   return jvm.createStringLiteral(String(value));
@@ -1495,7 +1511,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported_R_boolean",
   "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported___R_boolean"
-], function*() {
+], function() {
   return typeof WeakMap === "function" ? 1 : 0;
 });
 
@@ -1553,7 +1569,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int"
-], function*(id, w, h) {
+], function(id, w, h) {
   cn1SurfacePost("__cn1_surface_create__", { id: id | 0, w: w | 0, h: h | 0 });
   return null;
 });
@@ -1563,7 +1579,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush_int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int"
-], function*(id, w, h, ops, opCount, nums, numCount, objs, objCount) {
+], function(id, w, h, ops, opCount, nums, numCount, objs, objCount) {
   const oc = opCount | 0;
   if (oc <= 0) {
     return null;
@@ -1643,7 +1659,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int"
-], function*(id) {
+], function(id) {
   cn1SurfacePost("__cn1_surface_dispose__", { id: id | 0 });
   return null;
 });
@@ -1653,7 +1669,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels_int_int_1ARRAY_int_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int"
-], function*(id, argb, w, h) {
+], function(id, argb, w, h) {
   const n = (w | 0) * (h | 0);
   cn1SurfacePost("__cn1_surface_write__", {
     id: id | 0, w: w | 0, h: h | 0, argb: argb.slice(0, n)
@@ -1684,7 +1700,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur_int_com_codename1_html5_js_JSObject_int_int_int_float",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float"
-], function*(dstId, srcImage, srcSurfaceId, w, h, radius) {
+], function(dstId, srcImage, srcSurfaceId, w, h, radius) {
   cn1SurfacePost("__cn1_surface_blur__", {
     dstId: dstId | 0, srcImage: cn1CleanRef(srcImage), srcSurfaceId: srcSurfaceId | 0,
     w: w | 0, h: h | 0, radius: +radius
@@ -1697,7 +1713,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement_int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String"
-], function*(id, element, cssWidth, cssHeight) {
+], function(id, element, cssWidth, cssHeight) {
   cn1SurfacePost("__cn1_attach_surface_to_element__", {
     id: id | 0, element: cn1CleanRef(element),
     cssWidth: cssWidth == null ? null : jvm.toNativeString(cssWidth),
@@ -1729,7 +1745,7 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal_java_lang_Object_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int"
-], function*(owner, surfaceId) {
+], function(owner, surfaceId) {
   if (__cn1SurfaceFinalizers && owner && typeof owner === "object") {
     try { __cn1SurfaceFinalizers.register(owner, surfaceId | 0); } catch (_e) {}
   }
@@ -1739,7 +1755,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
-], function*(objectRef) {
+], function(objectRef) {
   if (typeof WeakMap !== "function") {
     return null;
   }
@@ -1755,7 +1771,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
-], function*(keyRef) {
+], function(keyRef) {
   if (typeof WeakMap !== "function") {
     return null;
   }
@@ -1772,7 +1788,7 @@ bindNative([
   return value == null ? null : jvm.wrapJsObject(value, jvm.inferJsObjectClass(value, null));
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function*(name) {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function(name) {
   const win = global.window || global;
   const flags = win.cn1_debug_flags;
   if (!flags) {
@@ -1781,7 +1797,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
   return flags[jvm.toNativeString(name)] ? 1 : 0;
 });
 
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function*() {
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
   const win = global.window || global;
   const normalizeWheel = win.cn1NormalizeWheel;
   let value = "wheel";
@@ -1796,7 +1812,7 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded___java_lang_String"
-], function*(resource) {
+], function(resource) {
   const win = global.window || global;
   const handler = win.cn1LoadedFile;
   if (typeof handler === "function") {
@@ -1810,7 +1826,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload",
   "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload__"
-], function*() {
+], function() {
   const win = global.window || global;
   win.onbeforeunload = function() {
     return "Leaving or refreshing the page may cause you to lose unsaved data.";
@@ -1821,7 +1837,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler___R_com_codename1_html5_js_JSObject"
-], function*() {
+], function() {
   const win = global.window || global;
   const handler = win.onbeforeunload;
   return handler == null ? null : jvm.wrapJsObject(handler, "com_codename1_html5_js_JSObject");
@@ -1830,7 +1846,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler___com_codename1_html5_js_JSObject"
-], function*(handler) {
+], function(handler) {
   const win = global.window || global;
   win.onbeforeunload = handler == null ? null : jvm.unwrapJsValue(handler);
   return null;
@@ -1848,7 +1864,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource_java_lang_Object_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource___java_lang_Object_com_codename1_html5_js_JSObject"
-], function*(owner, resource) {
+], function(owner, resource) {
   if (owner != null && resource != null && jvm && typeof jvm.registerNativeResource === "function") {
     jvm.registerNativeResource(owner, resource);
   }
@@ -1858,7 +1874,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage___java_lang_String"
-], function*(msg) {
+], function(msg) {
   const win = global.window || global;
   const value = msg == null ? "" : jvm.toNativeString(msg);
   win.onbeforeunload = function() {
@@ -1870,7 +1886,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload",
   "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload__"
-], function*() {
+], function() {
   const win = global.window || global;
   win.onbeforeunload = function() {};
   return null;
@@ -1879,7 +1895,7 @@ bindNative([
 bindNative([
   "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter_com_codename1_teavm_io_BlobUtil_BlobToFileFunc",
   "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter___com_codename1_teavm_io_BlobUtil_BlobToFileFunc"
-], function*(_func) {
+], function(_func) {
   const win = global.window || global;
   win.saveBlobToFile = function(_blob, _fileName, callback) {
     if (callback && typeof callback.error === "function") {
@@ -1962,7 +1978,7 @@ bindCiFallback("BlobUtil.toUint8ArrayDirect", [
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative___com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int"
-], function*(handler) {
+], function(handler) {
   const win = global.window || global;
   return (win.requestAnimationFrame || function(cb) { return win.setTimeout(function() { cb(Date.now()); }, 16); })(function(time) {
     try {
@@ -2155,16 +2171,90 @@ bindCiFallback("NetworkManager.addErrorListener", [
   return null;
 });
 
-// Worker-safe implementation of HTML5Implementation.loadTrueTypeFont_: the
-// @JSBody version expands to document.createElement + WebFont.load, which has
-// no hope of running in the worker-only runtime. Route to the host via the
-// __cn1_load_truetype_font__ bridge so the returned promise suspends the
-// generator until the host actually has the font available to CSS. The
-// worker passes the bare resource name (e.g. material-design-font.ttf); the
-// host mirrors HTML5Implementation.getResourceAsStream and resolves it to
-// assets/<name> before handing it to FontFace. We avoid the previous
-// arrayBuffer->base64 dataURL route because Window.current().arrayBufferToBase64
-// is not wired up in the worker and silently returned an empty string.
+// Load a TTF into the WORKER's own FontFaceSet (self.fonts) and return a promise
+// that resolves once it is added. The worker-side OffscreenCanvas that
+// HTML5Graphics.stringWidthOffscreen() measures against has its OWN font set,
+// separate from the host's document.fonts where __cn1_load_truetype_font__
+// installs the paint font. Until a custom font (the Initializr "Inter" family,
+// "Material Icons") is in self.fonts the worker measures it against the default
+// sans-serif fallback, which is narrower -- so stringWidth under-reports, the
+// label box is sized too tight, and the host paints the real (wider) glyphs
+// clipped ("Essentials" -> "Essential"). TeaVM never hit this because it
+// measures and paints on the same main thread. The returned promise lets the
+// font loader SUSPEND the green thread until the metrics are real (see the
+// loadTrueTypeFont binding below) -- the same suspend-until-ready barrier the
+// image path uses via __cn1_decode_image_from_url__. Mirrors the host's
+// assets/<name> path resolution (browser_bridge.js __cn1_load_truetype_font__).
+function cn1WorkerFontFacePromise(fontName, rawPath, fontFormat) {
+  try {
+    if (typeof FontFace === "undefined"
+        || typeof self === "undefined"
+        || typeof self.fonts === "undefined"
+        || typeof self.fonts.add !== "function"
+        || !fontName || !rawPath) {
+      return Promise.resolve(false); // FontFaceSet unavailable: nothing to wait on
+    }
+    let url = String(rawPath);
+    if (!/^(?:data:|https?:|\/)/i.test(url)) {
+      const lastSlash = url.lastIndexOf("/");
+      if (lastSlash >= 0) {
+        url = url.substring(lastSlash + 1);
+      }
+      if (url !== "icon.png" && url.indexOf("assets/") !== 0) {
+        url = "assets/" + url;
+      }
+    }
+    // Cache the in-flight/settled load per (family,url) so repeated
+    // createTrueTypeFont calls for the same font share one fetch and the
+    // suspend on the 2nd+ call resolves immediately ("fetch it right away").
+    const cache = self.__cn1WorkerFontPromises || (self.__cn1WorkerFontPromises = {});
+    const key = fontName + "|" + url;
+    if (cache[key]) {
+      return cache[key];
+    }
+    let p;
+    try {
+      const ff = new FontFace(fontName, "url('" + url + "') format('" + (fontFormat || "truetype") + "')");
+      p = ff.load().then(function (loaded) {
+        try { self.fonts.add(loaded); } catch (e) { /* already added */ }
+        return true;
+      }, function () {
+        // 404 / decode error: resume the waiter anyway (degrade to fallback
+        // metrics) instead of parking it forever. Drop the cache entry so a
+        // later attempt can retry.
+        delete cache[key];
+        return false;
+      });
+    } catch (e) {
+      p = Promise.resolve(false);
+    }
+    cache[key] = p;
+    return p;
+  } catch (e) {
+    return Promise.resolve(false);
+  }
+}
+
+// Pre-warm the material icon font in the worker so icon-glyph widths (FontImage,
+// Toolbar/Tabs/Picker) measure against the same TTF the host @font-face
+// (index.html) paints. Kicked off at boot; no green thread to suspend here.
+cn1WorkerFontFacePromise("Material Icons", "assets/material-design-font.ttf", "truetype");
+
+// Worker-safe implementation of HTML5Implementation.loadTrueTypeFont_. SUSPENDS
+// the calling green thread until the font is cached in the worker's self.fonts,
+// so that by the time any stringWidth() runs the OffscreenCanvas can measure the
+// real font (fast synchronous fetch) instead of returning fallback metrics and
+// patching them later. This is the same suspend-until-ready model the image
+// decode barrier uses (__cn1_decode_image_from_url__): the bridge getter blocks,
+// the scheduler runs other green threads meanwhile, and we resume the instant
+// the resource is ready. Blocking here (at load) rather than inside stringWidth
+// keeps the hot layout path off the suspending/generator code path.
+//
+// The host load (document.fonts, for PAINTING) stays fire-and-forget: it is a
+// separate FontFaceSet, the host resolves 'font-family' at paint time, and the
+// old worker->host round-trip caused a 21s boot stall when the reply was lost.
+// The worker-LOCAL FontFace.load() promise we await instead cannot be "lost"
+// (no cross-thread message) and is bounded by a local fetch.
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_loadTrueTypeFont__java_lang_String_java_lang_String_java_lang_String"
 ], function*(fontName, fontFile, fontFormat) {
@@ -2177,15 +2267,11 @@ bindNative([
     fontUrl: toStr(fontFile),
     fontFormat: toStr(fontFormat) || "truetype"
   };
-  // FIRE-AND-FORGET: the worker never uses the load result (it returned null
-  // regardless), and the host resolves 'font-family' at paint time, so there is
-  // no reason to PARK the green thread on the host's FontFace.load() promise.
-  // The old round-trip was a 21s full-worker boot stall (host font-load reply
-  // slow/lost while the worker sat parked) -- a textbook "API that doesn't need
-  // a response". Post it and keep running; text painted before the font lands
-  // re-renders (normal FOUT), and the screenshot settle-wait covers the
-  // transient. Same __cn1_no_response path the surface ops use.
+  // Host load for PAINTING (fire-and-forget; FOUT on the host is cosmetic).
   cn1SurfacePost("__cn1_load_truetype_font__", payload);
+  // Worker load for MEASURING: suspend until the FontFace is in self.fonts.
+  const fontReady = cn1WorkerFontFacePromise(payload.fontName, payload.fontUrl, payload.fontFormat);
+  yield { op: "await", promise: fontReady };
   return null;
 });
 
@@ -2453,6 +2539,7 @@ function installGlobalArrayReturnCoerce(symbol, className, marker) {
   };
   wrapped.__cn1ArrayReturnCoerceWrapped = true;
   global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
   if (jvm && jvm.classes && jvm.classes[className] && jvm.classes[className].methods && typeof jvm.classes[className].methods[symbol] === "function") {
     jvm.classes[className].methods[symbol] = wrapped;
   }
@@ -3254,6 +3341,7 @@ function installGlobalIllegalStateBypass(symbol, marker) {
   };
   wrapped.__cn1IllegalStateBypassWrapped = true;
   global[symbol] = wrapped;
+  cn1RefreshAlias(symbol, wrapped);
   if (jvm && jvm.classes && jvm.classes["com_codename1_ui_Form"] && jvm.classes["com_codename1_ui_Form"].methods && typeof jvm.classes["com_codename1_ui_Form"].methods[symbol] === "function") {
     jvm.classes["com_codename1_ui_Form"].methods[symbol] = wrapped;
   }
@@ -3413,6 +3501,7 @@ bindCiFallbackWithMethodId("Form.addComponentNullContentPaneGuard", formAddCompo
 
 const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
 const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
+const cn1ssBridgeCountsMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_jsBridgeCallCounts_R_java_lang_String";
 const baseTestCreateFormMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_createForm_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String_R_com_codename1_ui_Form";
 const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
 const baseTestFormSubclassClassId = "com_codenameone_examples_hellocodenameone_tests_BaseTest_1";
@@ -3743,6 +3832,7 @@ const html5HideSplashWorkerSymbol = "cn1_com_codename1_impl_html5_HTML5Implement
     return null;
   };
   global[html5HideSplashWorkerSymbol] = replacement;
+  cn1RefreshAlias(html5HideSplashWorkerSymbol, replacement);
   if (jvm && jvm.nativeMethods) {
     jvm.nativeMethods["cn1_s_hideSplash"] = replacement;
     jvm.nativeMethods[html5HideSplashWorkerSymbol] = replacement;
@@ -4740,6 +4830,8 @@ const cn1ssWs = {
   queue: [],      // {test, bytes} buffered while the socket is still connecting
   pending: 0      // sent-but-unacked frames, for an optional flush at suite end
 };
+cn1RefreshAlias(hashMapComputeHashCodeMethodId, global[hashMapComputeHashCodeMethodId]);
+cn1RefreshAlias(hashMapComputeHashCodeImplMethodId, global[hashMapComputeHashCodeImplMethodId]);
 
 function cn1ssWsHost() {
   try {
@@ -5126,6 +5218,19 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     }
   }
   return null;
+});
+
+// Bridge-call counters for BridgeBulkTransferGuardTest: large-volume
+// transfers must cost bridge calls proportional to operations, not bytes.
+bindCiFallback("Cn1ssDeviceRunnerHelper.jsBridgeCallCounts", [
+  cn1ssBridgeCountsMethodId,
+  cn1ssBridgeCountsMethodId + "__impl"
+], function*() {
+  // _L is the runtime's exported string-literal constructor (the same one
+  // every translated call site uses), so the return value is a real
+  // java.lang.String object.
+  return _L("jso=" + (jvm.__cn1JsoDispatchCount | 0)
+    + ":host=" + (jvm.__cn1HostCallCount | 0));
 });
 
 bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [

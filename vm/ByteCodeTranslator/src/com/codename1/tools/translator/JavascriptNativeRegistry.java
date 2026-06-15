@@ -117,7 +117,23 @@ final class JavascriptNativeRegistry {
             "cn1_java_util_TimeZone_getTimezoneRawOffset_java_lang_String_R_int",
             "cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean",
             "cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode_R_int",
-            "cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int"
+            "cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
+            // NativeInterface bridge: runtime-implemented in parparvm_runtime.js
+            // (bindNative). Each forwards to the main thread via the
+            // __cn1_native_interface_call__ host hook and coerces the result to
+            // the declared Java type (createJavaString / _LfromNumber / newArray).
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callBoolean_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_boolean",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callByte_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_byte",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callShort_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_short",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callInt_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_int",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callChar_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_char",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callLong_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_long",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callFloat_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_float",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callDouble_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_double",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callString_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callObject_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_Object",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callArray_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_java_lang_String_R_java_lang_Object",
+            "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_callVoid_java_lang_String_java_lang_String_java_lang_Object_1ARRAY"
     ));
 
     private static final Set<String> HOST_HOOK_PREFIXES = new HashSet<String>(Arrays.asList(
