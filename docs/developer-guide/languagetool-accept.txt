@@ -588,3 +588,24 @@ billboarded
 Bezier
 subpath
 subpaths
+
+# Native Linux port chapter (Working-With-Linux). The standard names of the
+# GTK3/Cairo native stack and the libc/toolchain terms: "Pango" is the text
+# layout engine, "musl" and "glibc" are the two C libraries, "libc" is the C
+# library itself, "libcurl"/"libsecret"/"libnotify" are the HTTP/keyring/
+# notification libraries, "sonames" are ELF shared-object version names, and a
+# "syscall" is a system call.
+Pango
+musl
+glibc
+libc
+libcurl
+libsecret
+libnotify
+sonames
+syscall
+
+# The POSIX dynamic-loader call used by the Linux port to load optional libs.
+dlopen
+# The zig toolchain (zig cc), used to pin an old glibc for the Linux port.
+zig

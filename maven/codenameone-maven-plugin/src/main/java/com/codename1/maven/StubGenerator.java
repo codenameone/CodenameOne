@@ -47,6 +47,8 @@ public class StubGenerator {
     private File androidFile;
     private File javaseFile;
     private File csFile;
+    private File winCFile;
+    private File linuxCFile;
     private File iosHFile;
     private File iosMFile;
     private File iosSwiftFile;
@@ -150,6 +152,17 @@ public class StubGenerator {
         csFile = new File(path(destination.getAbsolutePath(), "win", "src", "main", "csharp", nativeInterface.getName().replace('.', File.separatorChar) + "Impl.cs"));
         csFile.getParentFile().mkdirs();
 
+        // Native C (ParparVM "clean" target) implementation stubs for the no-JVM
+        // desktop ports: native Windows (win32 -> win/src/main/c) and native Linux
+        // (linux/src/main/c). Unlike the UWP C# stub above, these are plain C: the
+        // translator emits a C function per native method (the mangled name the
+        // generated XxxImplCodenameOne produces) which the developer defines here.
+        String cFileName = nativeInterface.getName().replace('.', File.separatorChar) + "ImplCodenameOne.c";
+        winCFile = new File(path(destination.getAbsolutePath(), "win", "src", "main", "c", cFileName));
+        winCFile.getParentFile().mkdirs();
+        linuxCFile = new File(path(destination.getAbsolutePath(), "linux", "src", "main", "c", cFileName));
+        linuxCFile.getParentFile().mkdirs();
+
         String iosFilename = nativeInterface.getName().replace('.', '_') + "Impl.";
         iosHFile = new File(path(destination.getAbsolutePath(), "ios", "src", "main", "objectivec", iosFilename+"h"));
         iosMFile = new File(path(destination.getAbsolutePath(), "ios", "src", "main", "objectivec", iosFilename+"m"));
@@ -191,6 +204,12 @@ public class StubGenerator {
         }
         if (csFile.exists()) {
             out.add(csFile);
+        }
+        if (winCFile.exists()) {
+            out.add(winCFile);
+        }
+        if (linuxCFile.exists()) {
+            out.add(linuxCFile);
         }
         if (javaseFile.exists()) {
             out.add(javaseFile);
@@ -239,6 +258,23 @@ public class StubGenerator {
         } else {
             log.debug("No win/ module under destination — skipping C# stub for "+nativeInterface.getName());
         }
+
+        // Native C stubs for the no-JVM desktop ports (native Windows / native Linux).
+        // Both compile the app to C with ParparVM's "clean" target, so the developer
+        // implements the same C functions; only the directory differs.
+        if(overwrite || !winCFile.exists()) {
+            log.info("Writing "+winCFile);
+            generateCleanCFile(winCFile);
+        } else {
+            log.debug(winCFile+" already exists. Skipping");
+        }
+        if(overwrite || !linuxCFile.exists()) {
+            log.info("Writing "+linuxCFile);
+            generateCleanCFile(linuxCFile);
+        } else {
+            log.debug(linuxCFile+" already exists. Skipping");
+        }
+
         if(overwrite || !(iosHFile.exists() || iosMFile.exists())) {
             log.info("Writing "+iosHFile);
             log.info("Writing "+iosMFile);
@@ -690,6 +726,94 @@ public class StubGenerator {
         FileOutputStream fo = new FileOutputStream(dest);
         fo.write(t.getBytes(StandardCharsets.UTF_8));
         fo.close();
+    }
+
+    /**
+     * Generates the native C implementation stub for the ParparVM "clean" target
+     * (native Windows / native Linux). The translator emits one C function per
+     * native-interface method, named with the standard ParparVM mangling of the
+     * generated {@code <Interface>ImplCodenameOne} class, taking a thread-state first
+     * argument and {@code JAVA_*} typed parameters. The developer fills in each body;
+     * the names and signatures must stay exactly as generated so the translated app
+     * links against them. A {@link com.codename1.ui.PeerComponent} is bridged as a
+     * {@code JAVA_LONG} native handle, mirroring the build's {@code XxxImplCodenameOne}.
+     */
+    private void generateCleanCFile(File dest) throws IOException {
+        String classMangled = nativeInterface.getName().replace('.', '_') + "ImplCodenameOne";
+        StringBuilder t = new StringBuilder();
+        t.append("// Native C implementation stub for ").append(nativeInterface.getName())
+                .append(" on the native desktop ports (no JVM): native Windows (win32) and\n")
+                .append("// native Linux, both compiled to C by ParparVM. Implement each function body.\n")
+                .append("// Keep the function names and signatures exactly as generated -- the translated\n")
+                .append("// app links against them. A PeerComponent is passed/returned as a JAVA_LONG\n")
+                .append("// native peer handle.\n\n");
+        t.append("#include \"cn1_globals.h\"\n\n");
+        for (Method m : nativeInterface.getMethods()) {
+            Class returnType = m.getReturnType();
+            Class[] params = m.getParameterTypes();
+            t.append(javaTypeToCType(returnType)).append(' ')
+                    .append(classMangled).append('_').append(m.getName()).append("__");
+            for (Class p : params) {
+                t.append('_').append(cMangledType(p));
+            }
+            // Void methods omit the _R_<ret> suffix; every other return type appends it.
+            if (returnType != Void.TYPE && returnType != Void.class) {
+                t.append("_R_").append(cMangledType(returnType));
+            }
+            t.append("(CODENAME_ONE_THREAD_STATE");
+            for (int i = 0; i < params.length; i++) {
+                t.append(", ").append(javaTypeToCType(params[i])).append(" param").append(i + 1);
+            }
+            t.append(") {\n");
+            if (returnType != Void.TYPE && returnType != Void.class) {
+                t.append("    return ").append(defaultCReturn(returnType)).append(";\n");
+            }
+            t.append("}\n\n");
+        }
+        dest.getParentFile().mkdirs();
+        try (FileOutputStream fo = new FileOutputStream(dest)) {
+            fo.write(t.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /** The ParparVM {@code JAVA_*} C type for a native-interface method type. */
+    private String javaTypeToCType(Class t) {
+        if (t.getName().equals("com.codename1.ui.PeerComponent")) {
+            return "JAVA_LONG";
+        }
+        if (t == Void.TYPE || t == Void.class) return "JAVA_VOID";
+        if (t == Boolean.class || t == Boolean.TYPE) return "JAVA_BOOLEAN";
+        if (t == Byte.class || t == Byte.TYPE) return "JAVA_BYTE";
+        if (t == Character.class || t == Character.TYPE) return "JAVA_CHAR";
+        if (t == Short.class || t == Short.TYPE) return "JAVA_SHORT";
+        if (t == Integer.class || t == Integer.TYPE) return "JAVA_INT";
+        if (t == Long.class || t == Long.TYPE) return "JAVA_LONG";
+        if (t == Float.class || t == Float.TYPE) return "JAVA_FLOAT";
+        if (t == Double.class || t == Double.TYPE) return "JAVA_DOUBLE";
+        // String, arrays and any other object reference.
+        return "JAVA_OBJECT";
+    }
+
+    /** The mangled type token used in the generated C function name. */
+    private String cMangledType(Class t) {
+        if (t.getName().equals("com.codename1.ui.PeerComponent")) {
+            return "long";
+        }
+        return typeToXMLVMJavaName(t);
+    }
+
+    /** Default return value for the generated C stub body. */
+    private String defaultCReturn(Class t) {
+        if (t.getName().equals("com.codename1.ui.PeerComponent")) {
+            return "0";
+        }
+        if (t == String.class || t.isArray()) {
+            return "JAVA_NULL";
+        }
+        if (t == Boolean.class || t == Boolean.TYPE) {
+            return "JAVA_FALSE";
+        }
+        return "0";
     }
 
     private boolean isValidType(Class cls) {

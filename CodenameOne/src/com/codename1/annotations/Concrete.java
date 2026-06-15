@@ -49,4 +49,12 @@ public @interface Concrete {
     /// Windows specialization (e.g. a SIMD helper) translates to its software
     /// base instead of pulling in the absent iOS class.
     String win() default "";
+
+    /// The fully-qualified class name of the concrete implementation to prefer
+    /// when translating for the native Linux (GTK/Cairo) port. When empty (the
+    /// default), the native Linux build falls back to the annotated (portable)
+    /// base class rather than the iOS {@link #name()} target -- mirroring
+    /// {@link #win()} so a type with no Linux specialization translates to its
+    /// software base instead of pulling in the absent iOS class.
+    String linux() default "";
 }

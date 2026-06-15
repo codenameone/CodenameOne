@@ -1,0 +1,196 @@
+== Working with the native Linux port
+
+The native Linux port compiles a Codename One app to a real, standalone Linux
+executable -- a single ELF binary that runs with *no JVM*. It's the Linux analog
+of the iOS and native Windows ports: the same ParparVM pipeline that turns your
+Java/Kotlin bytecode into C and then into a native binary, here targeting Linux
+and rendering through GTK3 / Cairo / Pango.
+
+This is distinct from packaging the app as an executable jar that runs on a Java
+Virtual Machine on Linux (see <<_native_linux_vs_the_executable_jar>> for a
+practical comparison). The native port needs no JVM on the target machine.
+
+=== How it works (the technology stack)
+
+The port reuses Codename One's portable architecture and swaps in a GTK3 / Cairo
+implementation layer:
+
+- *ParparVM "clean" C target.* The same VM that powers iOS and Windows translates
+  your app + the Codename One core + the minimal Java runtime to C. A CMake project
+  is generated and compiled with `cc`/Clang + *Ninja* into a native ELF. There is
+  no bytecode interpreter and no JNI -- your code *is* the native binary.
+- *Cairo + Pango + GdkPixbuf.* All 2D graphics (primitives, gradients, clipping,
+  affine transforms, images) go through Cairo; glyph layout, measurement and
+  rasterization use Pango (with FontConfig/FreeType, so bundled fonts -- including
+  the material icon font -- register and render); image decode/encode uses
+  GdkPixbuf. Windowing and native peers (text editing, browser, video) are GTK3
+  widgets layered over the Cairo drawing surface.
+- *OpenGL ES (EGL)* backs the portable 3D API (`com.codename1.gpu`); *GStreamer*
+  backs `Media` playback, audio recording and the camera; *WebKitGTK* backs
+  `BrowserComponent`; *libsecret* backs secure storage; *libnotify* backs local
+  notifications; *GeoClue* backs location; *libcurl* and POSIX sockets back
+  networking.
+- *Single self-contained executable.* There is no `.app`-style bundle directory,
+  so the app's classpath resources -- the theme `.res`, images, localization, the
+  material icon font -- are embedded directly into the ELF and read back at
+  runtime through `getResourceAsStream`. The result is one file you copy and run.
+
+=== Runs on essentially any Linux desktop
+
+Two choices keep the binary portable, so in practice it just runs:
+
+- *GTK3, dynamically linked.* GTK3 has shipped on every Linux desktop since 2011,
+  so its runtime is already present on virtually any machine with a graphical
+  session, and the binary resolves `libgtk-3`, Cairo and Pango from the system at
+  startup. (GTK4 is newer and not yet universal, so a GTK4 build would be a separate
+  future target.)
+- *An old glibc.* The build compiles your app against an old glibc (via `zig cc`),
+  so the resulting ELF needs only an ancient, universally present glibc -- in
+  practice around `GLIBC_2.17` (2013) -- and starts on essentially any glibc desktop
+  from the last decade, no matter how new the build machine is.
+
+The result is one small ELF that runs out of the box across mainstream distros.
+Alpine, which uses musl instead of glibc, is an opt-in target -- see the
+`linux.libc` build hint below.
+
+=== Building a native Linux app
+
+A native Linux build runs through the `codenameone-maven-plugin` like every other
+target. Build it with:
+
+[source,bash]
+----
+mvn -pl common package -Dcodename1.platform=linux -Dcodename1.buildTarget=local-linux-device cn1:build
+----
+
+The builder translates the app to C with ParparVM's `linux` app type, generates a
+CMake project that links the GTK stack via `pkg-config`, builds it with CMake +
+Ninja, and produces the ELF.
+
+==== Build-host dependencies
+
+The native compile needs the GTK development stack and the capability libraries
+the port links. On Debian/Ubuntu:
+
+[source,bash]
+----
+sudo apt-get install -y \
+  cmake ninja-build pkg-config \
+  libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \
+  libfontconfig1-dev libfreetype-dev libcurl4-openssl-dev \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
+  libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev
+----
+
+The `*-dev` packages are needed on the *build* host. The machine that *runs* the
+binary only needs the corresponding runtime libraries, which any standard desktop
+already has.
+
+==== Architecture and cross-compiling
+
+Both *x64* and *arm64* are supported; pick the target with the `linux.arch` build
+hint. The build is a *native* compile -- it produces a binary for the host
+architecture by default, so the straightforward way to get both is to build on a
+machine of each.
+
+You can also *cross-compile* -- and you may well want to, for example producing an
+arm64 binary from a build host that itself runs x64. The translated C is architecture-independent,
+and the default toolchain (`zig cc`) is itself a cross-compiler, so it can emit a
+binary for a different CPU from the one it runs on. Point `linux.cc` at a cross
+`zig cc` wrapper for the target triple (or set `linux.arch` and let the builder
+generate one) to cross-build.
+
+=== Build hints
+
+The native Linux port adds the build hints below (all use the `linux.` prefix).
+
+.Native Linux port build hints
+|===
+|Name |Description
+
+|linux.arch
+|Target CPU architecture for the ELF: `x64` (default) or `arm64`. The synonyms
+`x86_64`/`amd64` and `aarch64` are accepted.
+
+|linux.debug
+|`true`/`false` (default `false`). When `false`, the ELF is optimized and
+*stripped* (no debug info). Set `true` to keep symbols (`RelWithDebInfo`) so a
+native crash address can be turned back into a function name and source line while
+developing. Optimizations stay on either way.
+
+|linux.libc
+|`glibc` (default) or `musl`. The default builds with `zig cc` against an old
+glibc (`*-linux-gnu.2.28`), so the binary runs on essentially any mainstream
+distro. `musl` targets `*-linux-musl` for *Alpine* (where the GTK stack is itself
+musl-built); a musl binary doesn't run on glibc distros and vice versa.
+
+|linux.toolchain
+|Set to `zig` to force the `zig cc` toolchain (the default already uses it for the
+glibc target). zig is a self-contained cross-compiler, so a single host can build
+for either `linux.arch` and either `linux.libc`.
+
+|linux.cc
+|Override the C compiler CMake uses (for example a `zig cc` wrapper for a specific
+target triple, a `musl-gcc`, or a cross `cc`). Takes precedence over
+`linux.libc`/`linux.toolchain`; also settable through the `CN1_CC` environment
+variable.
+|===
+
+The full cross-platform build-hints reference is in the
+link:#_sending_arguments_to_the_build_server[Advanced topics chapter].
+
+=== Optimized and stripped by default
+
+The shipping build is optimized and stripped: no debug information is embedded, so
+the single self-contained executable stays as small as the translated code allows.
+Setting `linux.debug=true` keeps the symbols so a faulting address can be
+symbolized during development; the build stays optimized either way.
+
+=== Native Linux vs. the executable jar
+
+Before the native port, the way to run a Codename One app on Linux was to package
+it as an executable jar that runs on a JVM. The two differ in what ships and how it
+runs:
+
+[cols="1,1,1",options="header"]
+|===
+| |Native Linux port |Executable jar
+
+|Needs a JVM on the target?
+|*No* -- a native ELF
+|Yes (any installed JRE)
+
+|What ships
+|One small ELF + the system GTK libraries
+|A single `.jar`
+
+|Rendering
+|GTK3 / Cairo / Pango (native)
+|Java2D on the JVM
+
+|Startup / footprint
+|Native, small
+|JVM startup
+
+|How it's built
+|ParparVM -> C -> ELF (CMake/Ninja)
+|`javase` packaging
+|===
+
+The native port is the right choice when you want a true native Linux binary with
+no JVM dependency; the executable jar remains the convenient path for development
+and for environments where a JVM is acceptable.
+
+=== Blocking native calls and the concurrent GC
+
+ParparVM's garbage collector is concurrent: before it can traverse a lightweight
+(CN1-created) thread's stack it sets that thread's `threadBlockedByGC` flag and
+spins until the thread parks itself (clears `threadActive`). A native that parks a
+CN1 thread in a long blocking syscall -- a socket `read`/`write`/`connect`, an
+`curl_easy_perform`, a `sleep` -- *must* drop `threadActive` across the call
+(`CN1_YIELD_THREAD` / `CN1_RESUME_THREAD`), exactly as every other port does.
+Forget it on even one path (for example the cn1ss screenshot reader parked in
+`read()` waiting on the server) and a GC that happens to fire during that window
+never completes, deadlocking every thread waiting on it. The Linux port wraps all
+of its blocking I/O this way; keep that invariant when adding new native calls.
