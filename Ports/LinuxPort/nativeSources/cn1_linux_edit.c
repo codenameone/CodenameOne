@@ -128,6 +128,7 @@ static void cn1EditCreateOnMain(void* p) {
     if (req->singleLine) {
         e->entry = gtk_entry_new();
         e->container = e->entry;
+        gtk_widget_set_can_focus(e->entry, TRUE);
         if (req->maxSize > 0) {
             gtk_entry_set_max_length(GTK_ENTRY(e->entry), req->maxSize);
         }
@@ -139,18 +140,27 @@ static void cn1EditCreateOnMain(void* p) {
         g_signal_connect(e->entry, "activate", G_CALLBACK(cn1EditActivate), e);
         g_signal_connect(e->entry, "focus-out-event", G_CALLBACK(cn1EditFocusOut), e);
     } else {
+        /* Use the GtkTextView directly as the overlay widget rather than wrapping it
+         * in a GtkScrolledWindow. The wrapper meant the focus grab had to reach the
+         * view via gtk_bin_get_child and the view could end up unfocused, so the
+         * multi-line editor received no keystrokes and never committed (the text was
+         * "lost" and the field could not be re-edited). The view scrolls its own
+         * content to follow the caret, which is all the overlay editor needs. */
         GtkWidget* tv = gtk_text_view_new();
+        e->container = tv;
+        gtk_widget_set_can_focus(tv, TRUE);
+        gtk_text_view_set_editable(GTK_TEXT_VIEW(tv), TRUE);
+        gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(tv), TRUE);
+        gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR);
         e->buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(tv));
         gtk_text_buffer_set_text(e->buffer, req->text ? req->text : "", -1);
         cn1EditApplyStyle(tv, req->font, req->fg, req->bg);
-        e->container = gtk_scrolled_window_new(0, 0);
-        gtk_container_add(GTK_CONTAINER(e->container), tv);
         g_signal_connect(e->buffer, "changed", G_CALLBACK(cn1EditChanged), e);
         g_signal_connect(tv, "focus-out-event", G_CALLBACK(cn1EditFocusOut), e);
     }
 
     cn1LinuxOverlayAdd(e->container, req->x, req->y, req->w, req->h);
-    gtk_widget_grab_focus(e->singleLine ? e->entry : gtk_bin_get_child(GTK_BIN(e->container)));
+    gtk_widget_grab_focus(e->container);
     req->result = e;
 }
 

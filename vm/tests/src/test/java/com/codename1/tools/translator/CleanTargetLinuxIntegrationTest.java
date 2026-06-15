@@ -145,8 +145,13 @@ class CleanTargetLinuxIntegrationTest {
                 "    home.add(play);\n" +
                 "    Button rec = new Button(\"Record audio (GStreamer)\");\n" +
                 "    rec.addActionListener(new ActionListener(){ public void actionPerformed(ActionEvent e){\n" +
-                "      try { String p = Capture.captureAudio(); toast(p == null ? \"Recording cancelled\" : (\"Recorded to: \" + p)); }\n" +
-                "      catch(Throwable t){ toast(\"Audio recording unavailable: \" + t); }\n" +
+                "      try {\n" +
+                "        String p = Capture.captureAudio();\n" +
+                "        if (p == null) { toast(\"Recording cancelled\"); return; }\n" +
+                "        Media pb = MediaManager.createMedia(p, false);\n" +
+                "        if (pb != null) { pb.play(); toast(\"Recorded + playing back (\" + pb.getDuration() + \"ms): \" + p); }\n" +
+                "        else { toast(\"Recorded to: \" + p); }\n" +
+                "      } catch(Throwable t){ toast(\"Audio recording unavailable: \" + t); }\n" +
                 "    } });\n" +
                 "    home.add(rec);\n" +
                 "    Button cam = new Button(\"Capture photo (camera)\");\n" +

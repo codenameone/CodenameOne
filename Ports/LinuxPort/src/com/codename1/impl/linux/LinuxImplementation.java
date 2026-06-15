@@ -2397,6 +2397,89 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return new LinuxMedia(peer, onCompletion);
     }
 
+    /**
+     * Self-contained audio capture UI. The shared {@code AudioRecorderComponent}
+     * (LayeredLayout + icon buttons) renders blank in this port's Sheet, so the
+     * Linux port provides its own minimal Record/Done/Cancel sheet driven directly
+     * by the GStreamer-backed {@link LinuxAudioRecorder}. The result path (or null
+     * when cancelled/closed) is delivered exactly once via {@code response} so the
+     * blocking {@code Capture.captureAudio()} wrapper always returns.
+     */
+    @Override
+    public void captureAudio(final com.codename1.media.MediaRecorderBuilder recordingOptions,
+            final com.codename1.ui.events.ActionListener response) {
+        final com.codename1.media.MediaRecorderBuilder builder =
+                recordingOptions == null ? new com.codename1.media.MediaRecorderBuilder() : recordingOptions;
+        if (builder.getPath() == null) {
+            builder.path(LinuxNative.storageDir() + getFileSystemSeparator()
+                    + "cn1rec" + System.currentTimeMillis() + ".wav");
+        }
+        if (builder.getMimeType() == null) {
+            builder.mimeType("audio/wav");
+        }
+        final Media[] rec = new Media[1];
+        final String[] result = new String[1];        // null => cancelled
+        final boolean[] delivered = new boolean[1];
+        final com.codename1.ui.Sheet sheet = new com.codename1.ui.Sheet(null, "Record Audio");
+        sheet.getContentPane().setLayout(com.codename1.ui.layouts.BoxLayout.y());
+        final com.codename1.ui.Label status = new com.codename1.ui.Label("Press Record to start");
+        final com.codename1.ui.Button recordBtn = new com.codename1.ui.Button("Record");
+        final com.codename1.ui.Button cancelBtn = new com.codename1.ui.Button("Cancel");
+        sheet.getContentPane().add(status).add(recordBtn).add(cancelBtn);
+
+        recordBtn.addActionListener(new com.codename1.ui.events.ActionListener() {
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                try {
+                    if (rec[0] == null) {
+                        rec[0] = createMediaRecorder(builder);
+                        if (rec[0] == null) {
+                            status.setText("Recorder unavailable (GStreamer not installed?)");
+                            sheet.getContentPane().revalidate();
+                            return;
+                        }
+                        rec[0].play();
+                        status.setText("Recording... press Done to finish");
+                        recordBtn.setText("Done");
+                        sheet.getContentPane().revalidate();
+                    } else {
+                        // Finish: the close listener finalizes the file and delivers.
+                        result[0] = "file://" + builder.getPath();
+                        sheet.back();
+                    }
+                } catch (Throwable t) {
+                    status.setText("Error: " + t);
+                    sheet.getContentPane().revalidate();
+                }
+            }
+        });
+        cancelBtn.addActionListener(new com.codename1.ui.events.ActionListener() {
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                result[0] = null;
+                sheet.back();
+            }
+        });
+        // Single delivery point: covers Done, Cancel, and the sheet's own close (X).
+        sheet.addCloseListener(new com.codename1.ui.events.ActionListener() {
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                if (delivered[0]) {
+                    return;
+                }
+                delivered[0] = true;
+                if (rec[0] != null) {
+                    try {
+                        rec[0].pause();
+                        rec[0].cleanup();   // sends EOS so wavenc finalizes the header
+                    } catch (Throwable t) {
+                        // ignore -- still deliver whatever we have
+                    }
+                }
+                response.actionPerformed(result[0] != null
+                        ? new com.codename1.ui.events.ActionEvent(result[0]) : null);
+            }
+        });
+        sheet.show();
+    }
+
     /* ---------------------------------------------------- audio recording
      * waveIn-backed PCM WAV recorder (cn1_linux_audiorec.c). createMediaRecorder
      * returns a Media whose play() starts capturing from the default microphone
