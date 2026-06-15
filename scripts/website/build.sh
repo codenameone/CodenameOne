@@ -717,9 +717,29 @@ build_playground_for_site() {
   mkdir -p "${output_dir}"
   unzip -q -o "${result_zip}" -d "${output_dir}"
 
+  # The cloud result.zip is flat (index.html at the root), but the local
+  # ParparVM build (codename1.buildTarget=local-javascript) wraps the bundle in
+  # a single top-level directory (e.g. CN1Playground-js/). Flatten that wrapper
+  # so the served layout is identical regardless of which builder produced it.
+  if [ ! -f "${output_dir}/index.html" ]; then
+    local inner_dir
+    inner_dir="$(find "${output_dir}" -mindepth 1 -maxdepth 1 -type d | head -n1 || true)"
+    if [ -n "${inner_dir}" ] && [ -f "${inner_dir}/index.html" ]; then
+      ( cd "${inner_dir}" && tar cf - . ) | ( cd "${output_dir}" && tar xf - )
+      rm -rf "${inner_dir}"
+    fi
+  fi
+
   if [ ! -f "${output_dir}/index.html" ]; then
     echo "Playground website bundle is missing index.html after extraction." >&2
     exit 1
+  fi
+
+  # The Playground page (layouts/_default/playground.html) shows the app icon
+  # from /playground-app/icon.png. The cloud bundle shipped one; the local
+  # ParparVM bundle does not, so copy the project icon in when it is absent.
+  if [ ! -f "${output_dir}/icon.png" ] && [ -f "${REPO_ROOT}/scripts/cn1playground/common/icon.png" ]; then
+    cp "${REPO_ROOT}/scripts/cn1playground/common/icon.png" "${output_dir}/icon.png"
   fi
 }
 
@@ -783,6 +803,19 @@ build_skindesigner_for_site() {
   rm -rf "${output_dir}"
   mkdir -p "${output_dir}"
   unzip -q -o "${result_zip}" -d "${output_dir}"
+
+  # The cloud result.zip is flat (index.html at the root), but the local
+  # ParparVM build (codename1.buildTarget=local-javascript) wraps the bundle in
+  # a single top-level directory (e.g. SkinDesigner-js/). Flatten that wrapper
+  # so the served layout is identical regardless of which builder produced it.
+  if [ ! -f "${output_dir}/index.html" ]; then
+    local inner_dir
+    inner_dir="$(find "${output_dir}" -mindepth 1 -maxdepth 1 -type d | head -n1 || true)"
+    if [ -n "${inner_dir}" ] && [ -f "${inner_dir}/index.html" ]; then
+      ( cd "${inner_dir}" && tar cf - . ) | ( cd "${output_dir}" && tar xf - )
+      rm -rf "${inner_dir}"
+    fi
+  fi
 
   if [ ! -f "${output_dir}/index.html" ]; then
     echo "Skin Designer website bundle is missing index.html after extraction." >&2

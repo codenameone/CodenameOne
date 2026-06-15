@@ -28,10 +28,13 @@ function linux_device {
 }
 function javascript {
   
-  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
+  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=local-javascript" "-U" "-e"
 }
 function javascript_compare {
-  "javascript"
+  # Build the legacy cloud JavaScript bundle explicitly: the default `javascript`
+  # function now targets local-javascript (ParparVM), so override back to the
+  # cloud `javascript` target to keep this a cloud-vs-ParparVM comparison.
+  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
   local legacy_zip=""
   legacy_zip="$(ls -1 javascript/target/result.zip javascript/target/cn1playground-javascript-*.zip 2>/dev/null | head -n1 || true)"
   if [ -z "$legacy_zip" ] || [ ! -f "$legacy_zip" ]; then

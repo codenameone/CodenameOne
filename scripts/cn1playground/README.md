@@ -189,9 +189,16 @@ Changes made in the property editor are immediately reflected in the preview. Th
 
 ## JavaScript Port Tracking
 
-The current `javascript` module still represents the legacy JavaScript build
-path. While the new ParparVM-backed JavaScript port is being integrated, you
-can compare bundle size against a ParparVM artifact with:
+The `javascript` module now builds through the ParparVM-backed JavaScript port
+by default: `build.sh javascript` (and `build.bat javascript`) pass
+`-Dcodename1.buildTarget=local-javascript`, which routes through the local
+ParparVM bytecode → JavaScript translator instead of the cloud `javascript`
+build target. The website pipeline picks the same target up via the module's
+`codename1.defaultBuildTarget` property. The cloud `javascript` target remains
+available as a fallback by overriding `-Dcodename1.buildTarget=javascript`.
+
+To compare the ParparVM bundle size against a reference (e.g. a cloud-built
+artifact), use:
 
 ```bash
 PLAYGROUND_PARPARVM_BUNDLE=/path/to/parparvm/dist ./build.sh javascript_compare
@@ -199,9 +206,7 @@ PLAYGROUND_PARPARVM_BUNDLE=/path/to/parparvm/dist ./build.sh javascript_compare
 
 This uses
 [`compare-javascript-bundles.sh`](/Users/shai/dev/cn1/scripts/cn1playground/tools/compare-javascript-bundles.sh)
-to report total and JavaScript payload sizes. The long-term goal is to replace
-the legacy `javascript` module build itself with the ParparVM-backed port once
-the runtime and browser harness are complete.
+to report total and JavaScript payload sizes.
 
 ## BeanShell Interpreter Tradeoffs
 
