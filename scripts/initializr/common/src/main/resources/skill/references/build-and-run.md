@@ -13,7 +13,7 @@ A Codename One project can produce four kinds of artifacts. Some build entirely 
 | iOS app | Cloud, **or** locally as an Xcode project via `ios-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (cloud) or `…-Dcodename1.buildTarget=ios-source` (local Xcode project) |
 | Mac Native app (AOT-compiled, same pipeline as iOS) | Cloud, **or** locally as an Xcode project via `mac-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` (cloud) or `…-Dcodename1.buildTarget=mac-source` (local Xcode project) |
 | Native Windows `.exe` (`win32`, ParparVM → clang-cl, no JVM) | Cloud (Linux build server cross-compiles); **also** locally on Windows, or as a project via `windows-source` | `mvn -pl common package -Dcodename1.platform=windows -Dcodename1.buildTarget=windows-device` (cloud) or `…-Dcodename1.buildTarget=local-windows-device` (local). A regular build returns x64 + arm64 release exes; add the `windows.debug` build hint for a single x64 debug exe. |
-| JavaScript / web bundle | Cloud | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript` |
+| JavaScript / web bundle | Local (ParparVM → JavaScript translator; Enterprise-gated). Cloud still available via `…-Dcodename1.buildTarget=javascript`. | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` |
 
 The two big "local-only" outputs are the **simulator** and **tests** — those are everything you need for ordinary development and CI feedback loops. You only invoke the cloud builds when you want a deployable native artifact.
 
@@ -102,8 +102,9 @@ mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source
 # Native Android APK/AAB. Cloud-built by default.
 mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
 
-# JavaScript / web bundle. Cloud-built.
-mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript
+# JavaScript / web bundle. Built locally via the ParparVM → JavaScript translator (Enterprise-gated).
+# Append -Dcodename1.buildTarget=javascript instead to use the cloud builder.
+mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
 
 # Standalone Mac / Windows / Linux desktop app. Cloud-built.
 mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop

@@ -4511,6 +4511,22 @@ public abstract class CodenameOneImplementation {
         execute(url);
     }
 
+    /// Offers the given in-memory bytes to the user as a downloadable file,
+    /// bypassing local storage. Implemented by platforms (currently the
+    /// JavaScript port) where the storage-backed `execute(file:// URL)`
+    /// download path is unavailable. Returns `true` if the platform handled
+    /// the download (so callers can skip the storage fallback), `false` if
+    /// unsupported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the suggested file name for the download
+    ///
+    /// - `bytes`: the file contents
+    public boolean downloadBytesAsFile(String fileName, byte[] bytes) {
+        return false;
+    }
+
     /// Returns one of the density variables appropriate for this device, notice that
     /// density doesn't always correspond to resolution and an implementation might
     /// decide to change the density based on DPI constraints.

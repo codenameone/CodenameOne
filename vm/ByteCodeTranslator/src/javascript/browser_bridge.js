@@ -164,6 +164,74 @@
     }
   };
 
+  // ---- Native interface dispatch -------------------------------------------------
+  // Codename One NativeInterface calls arrive here (on the MAIN thread) from the
+  // worker via the generated <Iface>Impl -> NativeInterfaceBridge.call* host-hooks.
+  // We look up the developer's JS implementation in cn1_native_interfaces (the
+  // registry the stub self-registers into, populated on the main thread by the
+  // <script>-loaded stub) and invoke it with the trailing callback, returning a
+  // Promise so the worker resumes with the result once callback.complete fires.
+  function cn1InvokeNativeInterface(iface, method, args) {
+    var registry = global.cn1_native_interfaces
+            || (global.window && global.window.cn1_native_interfaces);
+    var impl = registry ? registry[iface] : null;
+    if (!impl) {
+      return Promise.reject(new Error('No native interface implementation registered for ' + iface));
+    }
+    var fn = impl[method];
+    if (typeof fn !== 'function') {
+      return Promise.reject(new Error('Native interface ' + iface + ' has no implementation for ' + method));
+    }
+    var callArgs = [];
+    if (args != null) {
+      for (var i = 0; i < args.length; i++) {
+        callArgs.push(args[i]);
+      }
+    }
+    return new Promise(function(resolve, reject) {
+      var settled = false;
+      var callback = {
+        complete: function(value) {
+          if (settled) return;
+          settled = true;
+          if (value === undefined) {
+            value = null;
+          }
+          // A returned host object (e.g. a DOM element backing a PeerComponent)
+          // is not structured-cloneable; hand the worker a host-ref handle it can
+          // use as a JSO receiver. Primitives, strings and plain arrays
+          // (String[]/primitive[]) pass through untouched for worker-side coercion.
+          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            value = hostResult(value);
+          }
+          resolve(value);
+        },
+        error: function(err) {
+          if (settled) return;
+          settled = true;
+          reject(err instanceof Error ? err : new Error(err == null ? 'native interface error' : String(err)));
+        }
+      };
+      callArgs.push(callback);
+      try {
+        fn.apply(impl, callArgs);
+      } catch (e) {
+        if (!settled) {
+          settled = true;
+          reject(e);
+        }
+      }
+    });
+  }
+
+  // Single host hook for every NativeInterfaceBridge.call* native. The worker-side
+  // bindNative wrappers (parparvm_runtime.js) funnel here with (iface, method, args)
+  // and coerce the resolved value to the declared Java return type, so dispatch is
+  // uniform on this side.
+  hostBridge.register('__cn1_native_interface_call__', function(iface, method, args) {
+    return cn1InvokeNativeInterface(iface, method, args);
+  });
+
   var hostRefNextId = 1;
   var hostRefById = {};
   var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
@@ -1341,22 +1409,39 @@
     var payload = request || {};
     var dataUrl = String(payload.dataUrl == null ? '' : payload.dataUrl);
     var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:register-dataurl fileName=' + fileName + ' len=' + dataUrl.length); } catch (_le) {}
+    }
     if (!dataUrl) {
       __cn1PendingSaveBlobHandler = null;
       return null;
     }
-    __cn1PendingSaveBlobHandler = function() {
-      var doc = (global.window || global).document || global.document;
-      if (!doc) {
-        return;
-      }
-      var a = doc.createElement('a');
-      a.href = dataUrl;
-      a.download = fileName;
-      doc.body.appendChild(a);
-      a.click();
-      doc.body.removeChild(a);
+    var makeHandler = function() {
+      return function() {
+        var doc = (global.window || global).document || global.document;
+        if (!doc) {
+          return;
+        }
+        var a = doc.createElement('a');
+        a.href = dataUrl;
+        a.download = fileName;
+        doc.body.appendChild(a);
+        a.click();
+        doc.body.removeChild(a);
+      };
     };
+    // Fire immediately -- same rationale as __cn1_register_save_blob__: the
+    // Generate flow is a clear user-intent path, so most browsers allow the
+    // programmatic a.click() even though the original click was seconds ago
+    // while the cooperative scheduler built the zip. Backside-hook timing
+    // becomes irrelevant. Also stash for the backside-hook fire path in case
+    // the immediate click was blocked by user-gesture policy.
+    try { makeHandler()(); } catch (e) {
+      if (global.console && typeof global.console.warn === 'function') {
+        try { global.console.warn('PARPAR:save-blob-dataurl-immediate-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+      }
+    }
+    __cn1PendingSaveBlobHandler = makeHandler();
     return null;
   });
 
@@ -1479,6 +1564,10 @@
             return;
           }
           advanced = true;
+          var idx = pendingFrameTicks.indexOf(tick);
+          if (idx >= 0) {
+            pendingFrameTicks.splice(idx, 1);
+          }
           remaining--;
           if (remaining <= 0) {
             resolve();
@@ -1486,12 +1575,25 @@
           }
           step();
         }
+        // Hidden/headless pages throttle BOTH rAF (stops entirely) and the
+        // setTimeout fallback (intensive wake-up batching), so register the
+        // tick for the external __cn1NudgeVm driver too -- a CDP-driven
+        // nudge resolves pending frame waits within its interval instead of
+        // stalling each settle for seconds.
+        pendingFrameTicks.push(tick);
         raf(tick);
         setTimeout(tick, 32);
       }
       step();
     });
   }
+  var pendingFrameTicks = [];
+  global.__cn1FlushFrameTicks = function() {
+    var ticks = pendingFrameTicks.splice(0, pendingFrameTicks.length);
+    for (var i = 0; i < ticks.length; i++) {
+      try { ticks[i](); } catch (_e) { /* tick is self-guarding */ }
+    }
+  };
 
   function shortSignatureFromImageData(img) {
     if (!img || !img.data || !img.data.length) {
@@ -2222,20 +2324,39 @@
             && typeof document !== 'undefined'
             && document.fonts
             && typeof document.fonts.add === 'function') {
-          var descriptor = "url('" + cssStringEscape(fontUrl) + "') format('"
-            + cssStringEscape(fontFormat) + "')";
-          var ff = new FontFace(fontName, descriptor);
-          ff.load().then(function(loaded) {
-            try { document.fonts.add(loaded); } catch (_err) {}
-            resolve({ loaded: true, path: 'FontFace' });
-          }, function(err) {
-            if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-              console.warn('PARPAR:DIAG:HOST:loadTrueTypeFont:FontFace:fail:fontName=' + fontName
-                + ':url=' + fontUrl
-                + ':error=' + String(err && err.message ? err.message : err));
+          // App-resource fonts (theme .ttf files) land at the bundle ROOT
+          // (the translator copies app resources top-level), while the
+          // port's own webapp fonts live under assets/. Try assets/ first
+          // (the historical layout), then fall back to the bare basename so
+          // root-level app fonts don't 404 (observed: Initializr's
+          // Inter-*.ttf 404ing under assets/ and the UI falling back to
+          // system fonts).
+          var candidates = [fontUrl];
+          if (fontUrl.indexOf('assets/') === 0) {
+            candidates.push(fontUrl.substring('assets/'.length));
+          }
+          var tryLoad = function(idx) {
+            if (idx >= candidates.length) {
+              resolve({ loaded: false, path: 'FontFace', error: 'all candidate paths failed' });
+              return;
             }
-            resolve({ loaded: false, path: 'FontFace', error: String(err && err.message ? err.message : err) });
-          });
+            var candidate = candidates[idx];
+            var descriptor = "url('" + cssStringEscape(candidate) + "') format('"
+              + cssStringEscape(fontFormat) + "')";
+            var ff = new FontFace(fontName, descriptor);
+            ff.load().then(function(loaded) {
+              try { document.fonts.add(loaded); } catch (_err) {}
+              resolve({ loaded: true, path: 'FontFace' });
+            }, function(err) {
+              if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                console.warn('PARPAR:DIAG:HOST:loadTrueTypeFont:FontFace:fail:fontName=' + fontName
+                  + ':url=' + candidate
+                  + ':error=' + String(err && err.message ? err.message : err));
+              }
+              tryLoad(idx + 1);
+            });
+          };
+          tryLoad(0);
           return;
         }
         if (typeof document !== 'undefined' && document.head) {
@@ -2638,6 +2759,25 @@
     }
     var worker = new Worker(workerUrl);
     global.__parparWorker = worker;
+    // External liveness nudge. Hidden/headless Chromium throttles BOTH the
+    // page's and the worker's timers (intensive wake-up throttling batches
+    // re-armed chains to ~1/min), which starves the VM scheduler's
+    // sleep/wait wakeups -- observed as every green thread parked 12-60s
+    // past its deadline while the worker idles. postMessage delivery is
+    // never throttled, and a 'timer-wake' makes the worker drain(), which
+    // opportunistically fires any due timed wakeups. Test harnesses (or
+    // embedders that detect background stalls) call this from an
+    // un-throttled context, e.g. CDP Runtime.evaluate.
+    global.__cn1NudgeVm = function() {
+      try {
+        worker.postMessage({ type: 'timer-wake' });
+      } catch (e) { /* worker torn down */ }
+      try {
+        if (typeof global.__cn1FlushFrameTicks === 'function') {
+          global.__cn1FlushFrameTicks();
+        }
+      } catch (e) { /* frame ticks are self-guarding */ }
+    };
     worker.onmessage = function(event) {
       handleVmMessage(event.data, worker);
     };

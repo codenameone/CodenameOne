@@ -223,6 +223,20 @@ interface Cn1ssDeviceRunnerHelper {
         return "HTML5".equals(Display.getInstance().getPlatformName());
     }
 
+    /// Returns the JS port's cumulative bridge-call counters as
+    /// "jso=N:host=M", or null on platforms without a JS bridge. On HTML5
+    /// the translated body below is replaced at runtime by a port.js
+    /// bindCiFallback override reading jvm.__cn1JsoDispatchCount /
+    /// jvm.__cn1HostCallCount. Consumed by BridgeBulkTransferGuardTest to
+    /// assert that large-volume transfers (resource streams, pixel
+    /// buffers, storage) cost bridge calls proportional to OPERATIONS,
+    /// not BYTES -- the per-element regression class that has now bitten
+    /// three separate times (single-byte ArrayBufferInputStream.read,
+    /// pre-bulk readBulkImpl, surface-encode/getRGB).
+    static String jsBridgeCallCounts() {
+        return null;
+    }
+
     /// Computes a 64-bit FNV-1a hash of the given bytes. FNV-1a is fast and
     /// has no platform dependencies (no java.security, no java.util.zip
     /// CRC32 wrapping subtleties). 64 bits is enough to make accidental

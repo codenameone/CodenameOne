@@ -38,12 +38,13 @@ import org.objectweb.asm.Opcodes;
  * <li>It is declared {@code synchronized} — monitor acquisition can block.</li>
  * <li>Its bytecode contains {@code monitorenter} or {@code monitorexit}
  *     (synchronized block) — same reason.</li>
- * <li>It contains any {@code invokevirtual} / {@code invokeinterface}
- *     instruction — the dispatch goes through {@code cn1_iv*} which is
- *     a generator, so the caller must be ready to {@code yield*}. We
- *     treat ALL virtuals as suspending rather than doing
- *     override-set CHA, which keeps the analysis portable and safe
- *     against future-inherited suspending overrides.</li>
+ * <li>It contains an {@code invokevirtual} / {@code invokeinterface}
+ *     whose dispatched signature has AT LEAST ONE suspending impl in
+ *     the class hierarchy (override-set CHA). Such sites are emitted as
+ *     {@code yield* cn1_iv*}; sites whose every impl is synchronous use
+ *     the {@code cn1_ivs*} sync dispatcher and do NOT make their caller
+ *     suspending. The suspending-sig set is computed by fixed-point in
+ *     {@link #propagate} and exported via {@link #exportedSuspendingSigs}.</li>
  * <li>It contains any {@code invokestatic} / {@code invokespecial} whose
  *     resolved target is itself suspending (recursive closure via
  *     fixed-point iteration).</li>
@@ -58,6 +59,19 @@ import org.objectweb.asm.Opcodes;
 final class JavascriptSuspensionAnalysis {
     private final Map<String, ByteCodeClass> byName = new HashMap<String, ByteCodeClass>();
     private final Set<BytecodeMethod> suspending = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
+    // Sigs whose runtime impl can be a bindNative-installed generator the
+    // static concrete-impl scan cannot see: declared (possibly abstractly)
+    // on JSO-bridge classes, or string-referenced by the bridge JS (see
+    // seedBridgeReferenced). Unconditionally suspending.
+    private final Set<String> jsoDeclaredSigs = new java.util.HashSet<String>();
+
+    // Native bridge bindings whose wrapper is a plain ``function`` (not
+    // ``function*``): SYNCHRONOUS natives that never yield. They must NOT be
+    // seeded suspending (neither by the native seed nor the bridge-referenced
+    // seed), so callers can invoke them directly instead of ``yield*``-ing.
+    // These are all declared ``native`` (no Java body), so propagate() never
+    // re-introduces them.
+    private final Set<String> syncNativeTokens = JavascriptBundleWriter.collectSyncNativeTokens();
 
     // Sigs (name + descriptor) whose concrete impl set contains AT
     // LEAST ONE suspending method. Populated during ``propagate``
@@ -73,6 +87,7 @@ final class JavascriptSuspensionAnalysis {
         JavascriptSuspensionAnalysis a = new JavascriptSuspensionAnalysis();
         a.index(classes);
         a.seedDirectlySuspending(classes);
+        a.seedBridgeReferenced(classes);
         a.propagate(classes);
         return a.applyResults(classes);
     }
@@ -105,6 +120,18 @@ final class JavascriptSuspensionAnalysis {
         for (ByteCodeClass cls : classes) {
             boolean clsIsJso = jsoBridgeClasses.contains(cls.getClsName());
             for (BytecodeMethod m : cls.getMethods()) {
+                // JSO-declared SIGNATURES must be suspending even when the
+                // declaration is abstract (interface methods like
+                // ``Window.getDocument()`` have NO translated impl at all --
+                // the only "impl" is the ``function*`` override bindNative
+                // installs at runtime, which the concrete-impl scan in
+                // ``propagate`` can never see). Record the sig here so
+                // ``propagate`` folds it into ``suspendingSigs`` and every
+                // dispatching call site keeps its ``yield*``.
+                if (clsIsJso && !m.isEliminated() && !m.isStatic() && !m.isConstructor()
+                        && !isSyncNativeBinding(cls, m)) {
+                    jsoDeclaredSigs.add(m.getMethodName() + m.getSignature());
+                }
                 if (m.isEliminated() || m.isAbstract()) {
                     continue;
                 }
@@ -119,25 +146,74 @@ final class JavascriptSuspensionAnalysis {
                 // with ``cn1_ivAdapt`` wrappers at every hand-written
                 // ``yield* translatedFn(args)`` call site.
                 //
-                // ``hasVirtualDispatch`` is required in the seed
-                // because the emitter hardcodes ``yield* cn1_iv*`` at
-                // every INVOKEVIRTUAL / INVOKEINTERFACE call site (see
-                // ``JavascriptMethodGenerator.appendVirtualDispatch``
-                // -- there is no ``cn1_ivs*`` synchronous virtual
-                // dispatcher, and 3 prior attempts to add one all hit
-                // runtime errors per
-                // ``project_jsport_suspension_tightening_failure``
-                // memory). A method emitted as plain ``function``
-                // cannot contain ``yield*``, so any method with even
-                // ONE virtual call must be a generator. Tightening
-                // the sync set further requires landing the sync
-                // virtual dispatcher first.
-                if (m.isNative()
+                // Virtual dispatch is NO LONGER an unconditional seed.
+                // The emitter now has a synchronous virtual-dispatch
+                // family (``cn1_ivs0..N`` in parparvm_runtime.js) that
+                // it selects (via ``isInvokeSuspending`` consulting
+                // ``exportedSuspendingSigs``) for any INVOKEVIRTUAL /
+                // INVOKEINTERFACE whose CHA impl set is entirely
+                // synchronous. So a method whose only virtual calls
+                // target non-suspending sigs can itself be a plain
+                // ``function``. Suspension still propagates through
+                // virtual dispatch in ``propagate``: if ANY impl of a
+                // called sig is suspending, that sig is suspending and
+                // every caller of it is marked suspending there. The
+                // earlier sync-dispatcher attempts failed by letting a
+                // generator leak as a value; ``cn1_ivs*`` drives a
+                // one-shot and throws a named error on a true gap
+                // instead (see the runtime helper).
+                if ((m.isNative() && !isSyncNativeBinding(cls, m))
                         || m.isSynchronizedMethod()
                         || hasMonitorOps(m)
-                        || clsIsJso
-                        || hasVirtualDispatch(m)) {
+                        || (clsIsJso && !isSyncNativeBinding(cls, m))) {
                     suspending.add(m);
+                }
+            }
+        }
+    }
+
+    /**
+     * Any method whose emitted identifier (or its {@code __impl} body, or
+     * its class-free dispatch id) appears as a string literal in the
+     * hand-written bridge JS must be suspending. Those strings are how
+     * {@code bindNative} / {@code bindCiFallback} (port.js,
+     * parparvm_runtime.js, browser_bridge.js) locate translated methods
+     * to REPLACE with {@code function*} overrides at runtime. The static
+     * body may look trivially synchronous, but the override that actually
+     * runs is a generator -- a caller that skipped {@code yield*} would
+     * receive the raw generator object as its "result" and the override
+     * would never execute (observed as the screenshot runner's
+     * done-callback silently never firing). Over-protecting names the
+     * bridge merely CALLS (it wraps those in {@code cn1_ivAdapt}, which
+     * tolerates sync) costs a handful of generators; under-protecting
+     * breaks the bridge contract silently, so blanket-protect every
+     * string-referenced name.
+     */
+    private void seedBridgeReferenced(List<ByteCodeClass> classes) {
+        Set<String> tokens = JavascriptBundleWriter.collectBridgeReferencedCn1Tokens();
+        if (tokens.isEmpty()) {
+            return;
+        }
+        for (ByteCodeClass cls : classes) {
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated() || m.isAbstract()) {
+                    continue;
+                }
+                String full = JavascriptNameUtil.methodIdentifier(cls.getClsName(), m.getMethodName(), m.getSignature());
+                boolean referenced = tokens.contains(full) || tokens.contains(full + "__impl");
+                boolean dispatchable = !m.isStatic() && !m.isConstructor();
+                if (!referenced && dispatchable
+                        && tokens.contains(JavascriptNameUtil.dispatchMethodIdentifier(m.getMethodName(), m.getSignature()))) {
+                    referenced = true;
+                }
+                if (referenced && !isSyncNativeBinding(cls, m)) {
+                    suspending.add(m);
+                    if (dispatchable) {
+                        // Virtual dispatch can land on the runtime-installed
+                        // override too -- protect the whole signature, same
+                        // as the JSO-declared sigs.
+                        jsoDeclaredSigs.add(m.getMethodName() + m.getSignature());
+                    }
                 }
             }
         }
@@ -174,6 +250,25 @@ final class JavascriptSuspensionAnalysis {
         return false;
     }
 
+    /**
+     * True when this method is implemented by a synchronous native bridge
+     * binding (a plain {@code function} wrapper, see
+     * {@link JavascriptBundleWriter#collectSyncNativeTokens}). Such a method
+     * never yields, so it must stay synchronous regardless of the {@code
+     * native} / bridge-referenced seeds.
+     */
+    private boolean isSyncNativeBinding(ByteCodeClass cls, BytecodeMethod m) {
+        if (syncNativeTokens.isEmpty() || m.isAbstract()) {
+            return false;
+        }
+        String full = JavascriptNameUtil.methodIdentifier(cls.getClsName(), m.getMethodName(), m.getSignature());
+        if (syncNativeTokens.contains(full) || syncNativeTokens.contains(full + "__impl")) {
+            return true;
+        }
+        return !m.isStatic() && !m.isConstructor()
+                && syncNativeTokens.contains(JavascriptNameUtil.dispatchMethodIdentifier(m.getMethodName(), m.getSignature()));
+    }
+
     private static boolean hasMonitorOps(BytecodeMethod m) {
         List<Instruction> instructions = m.getInstructions();
         if (instructions == null) {
@@ -185,23 +280,6 @@ final class JavascriptSuspensionAnalysis {
                 if (op == Opcodes.MONITORENTER || op == Opcodes.MONITOREXIT) {
                     return true;
                 }
-            }
-        }
-        return false;
-    }
-
-    private static boolean hasVirtualDispatch(BytecodeMethod m) {
-        List<Instruction> instructions = m.getInstructions();
-        if (instructions == null) {
-            return false;
-        }
-        for (Instruction instr : instructions) {
-            if (!(instr instanceof Invoke)) {
-                continue;
-            }
-            int op = instr.getOpcode();
-            if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
-                return true;
             }
         }
         return false;
@@ -243,6 +321,11 @@ final class JavascriptSuspensionAnalysis {
                 }
             }
         }
+        // JSO-bridge declared sigs are suspending regardless of their (often
+        // absent / abstract) translated impls -- see seedDirectlySuspending.
+        // Must be folded in BEFORE the caller scan below so dispatching
+        // callers get escalated.
+        suspendingSigs.addAll(jsoDeclaredSigs);
         for (ByteCodeClass cls : classes) {
             for (BytecodeMethod caller : cls.getMethods()) {
                 if (caller.isEliminated() || caller.isAbstract()) {

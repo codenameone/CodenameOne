@@ -496,10 +496,33 @@ class JavascriptTargetIntegrationTest {
         // The bytecode-level INVOKEVIRTUAL emission simply calls the
         // ``cn1_iv*`` helper, which consults the runtime cache. Assert
         // that virtual dispatch still runs through that helper family.
+        // The structured emitter spells the helpers through their short
+        // runtime aliases (``_v*`` generator / ``_w*`` sync); the
+        // interpreter path keeps the long ``cn1_iv*`` names. Which one a
+        // fixture method gets depends on the bytecode shape the compiling
+        // JDK produced, so accept the whole family.
         assertTrue(methodBody.contains("cn1_iv0(") || methodBody.contains("cn1_iv1(")
                         || methodBody.contains("cn1_iv2(") || methodBody.contains("cn1_iv3(")
-                        || methodBody.contains("cn1_iv4(") || methodBody.contains("cn1_ivN("),
-                "Interpreter-mode virtual dispatch should route through the cn1_iv* helper family");
+                        || methodBody.contains("cn1_iv4(") || methodBody.contains("cn1_ivN(")
+                        || methodBody.contains("_v0(") || methodBody.contains("_v1(")
+                        || methodBody.contains("_v2(") || methodBody.contains("_v3(")
+                        || methodBody.contains("_v4(") || methodBody.contains("_vN(")
+                        || methodBody.contains("_w0(") || methodBody.contains("_w1(")
+                        || methodBody.contains("_w2(") || methodBody.contains("_w3(")
+                        || methodBody.contains("_w4(") || methodBody.contains("_wN(")
+                        || methodBody.contains("_dv0(")
+                        || methodBody.contains("_dv1(")
+                        || methodBody.contains("_dv2(")
+                        || methodBody.contains("_dv3(")
+                        || methodBody.contains("_dv4(")
+                        || methodBody.contains("_dvN(")
+                        || methodBody.contains("_dw0(")
+                        || methodBody.contains("_dw1(")
+                        || methodBody.contains("_dw2(")
+                        || methodBody.contains("_dw3(")
+                        || methodBody.contains("_dw4(")
+                        || methodBody.contains("_dwN("),
+                "Virtual dispatch should route through the cn1_iv*/_v*/_w*/_dv*/_dw* helper family");
     }
 
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {
@@ -537,6 +560,16 @@ class JavascriptTargetIntegrationTest {
 
     static void runJavascriptTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         Class<?> translatorClass = ByteCodeTranslator.class;
+        // The fixtures assert on canonical ``cn1_*`` / Java method names in
+        // the emitted bundle; the whole-bundle identifier renamer and the
+        // call-site alias pass legitimately erase those names in production
+        // output. Translate the fixtures with both passes off so the
+        // name-based assertions keep testing what they were written for
+        // (that each construct TRANSLATES) rather than the minifier.
+        String prevMinify = System.getProperty("parparvm.js.minify.idents.off");
+        String prevAlias = System.getProperty("parparvm.js.alias.off");
+        System.setProperty("parparvm.js.minify.idents.off", "1");
+        System.setProperty("parparvm.js.alias.off", "1");
         try {
             java.lang.reflect.Field verboseField = translatorClass.getField("verbose");
             boolean originalVerbose = verboseField.getBoolean(null);
@@ -565,6 +598,16 @@ class JavascriptTargetIntegrationTest {
                 verboseField.setBoolean(null, originalVerbose);
             }
         } finally {
+            if (prevMinify == null) {
+                System.clearProperty("parparvm.js.minify.idents.off");
+            } else {
+                System.setProperty("parparvm.js.minify.idents.off", prevMinify);
+            }
+            if (prevAlias == null) {
+                System.clearProperty("parparvm.js.alias.off");
+            } else {
+                System.setProperty("parparvm.js.alias.off", prevAlias);
+            }
             Parser.cleanup();
         }
     }

@@ -682,6 +682,15 @@ function threadDebugLabel(threadObject) {
 //                                    -> outbound RPC to the main thread;
 //                                       resumed when host posts a
 //                                       host-callback message back.
+//   { op: "await", promise }
+//                                    -> suspend on a WORKER-LOCAL promise (no
+//                                       host round-trip). Resumed via the
+//                                       promise's own .then -> enqueue; reject
+//                                       resumes with null. Used to block a
+//                                       green thread until a worker-side async
+//                                       resource (e.g. a FontFace in
+//                                       self.fonts) is loaded before a getter
+//                                       reads it.
 //
 // Acquire/release lifecycle for synchronized:
 //   monitorEnter(thread, obj):
@@ -1012,13 +1021,20 @@ const jvm = {
       throw new Error("Unknown class " + className);
     }
     if (cls.initialized || cls.initializing) {
+      if (VM_DIAG_ENABLED && !cls.initialized && className === "com_codename1_ui_Display") {
+        try { vmTrace("DIAG:CLINIT_REENTRY:" + className + ":stack=" + String(new Error().stack).split("\n").slice(1, 14).join("<")); } catch (_e) {}
+      }
       return;
     }
     cls.initializing = true;
     if (cls.baseClass) {
       this.ensureClassInitialized(cls.baseClass);
     }
-    cls.initialized = true;
+    // NOTE: ``initialized`` is only set after the clinit completes
+    // successfully (see end of this function). Re-entrant reads from
+    // within the clinit early-return on ``initializing`` above. If the
+    // clinit throws, the class stays uninitialized and the next _I
+    // retries instead of silently running with half-written statics.
     const clinitMethodId = "cn1_" + className + "___CLINIT__";
     const clinit = this.nativeMethods[clinitMethodId] || cls.clinit;
     if (clinit) {
@@ -1037,6 +1053,9 @@ const jvm = {
       } catch (e) {
         jvm.__cn1ClinitDepth--;
         cls.initializing = false;
+        if (VM_DIAG_ENABLED) {
+          try { vmTrace("DIAG:CLINIT_THREW:" + className + ":err=" + String(e && e.message || e).slice(0, 120) + ":stack=" + String(e && e.stack || new Error().stack).split("\n").slice(0, 12).join("<")); } catch (_e2) {}
+        }
         throw e;
       }
       // A clinit declared synchronous by the translator returns a
@@ -1066,6 +1085,12 @@ const jvm = {
             }
             step = result.next();
           }
+        } catch (e) {
+          cls.initializing = false;
+          if (VM_DIAG_ENABLED) {
+            try { vmTrace("DIAG:CLINIT_THREW:" + className + ":err=" + String(e && e.message || e).slice(0, 120)); } catch (_e2) {}
+          }
+          throw e;
         } finally {
           jvm.__cn1ClinitDepth--;
         }
@@ -1074,6 +1099,7 @@ const jvm = {
       }
     }
     cls.initializing = false;
+    cls.initialized = true;
   },
   newObject(className) {
     this.ensureClassInitialized(className);
@@ -1464,6 +1490,10 @@ const jvm = {
     };
   },
   invokeJsoBridge(__cn1ThisObject, className, methodId, args) {
+    // Diagnostic counter consumed by the bridge-bulk-transfer guard test:
+    // per-element JSO dispatch in a data loop (e.g. a per-byte stream read)
+    // multiplies this by the payload SIZE and must be caught in CI.
+    this.__cn1JsoDispatchCount = (this.__cn1JsoDispatchCount | 0) + 1;
     const self = this;
     return (function*() {
       const receiver = self.unwrapJsValue(__cn1ThisObject);
@@ -2298,6 +2328,7 @@ const jvm = {
     });
   },
   invokeHostNative(symbol, args) {
+    this.__cn1HostCallCount = (this.__cn1HostCallCount | 0) + 1;
     return { op: this.protocol.messages.HOST_CALL, id: this.nextHostCallId++, symbol: symbol, args: args || [] };
   },
   // Arm the owning-object finalizer so the host releases ``hostResource``'s id
@@ -2404,6 +2435,30 @@ const jvm = {
         out[i] = this.toHostTransferArg(value[i], _depth + 1, _seen);
       }
       return out;
+    }
+    // A Java String is a VM object, not a JS primitive. Host code (e.g. the
+    // native-interface bridge, which passes the interface/method names) expects
+    // the actual text, so marshal it to a plain JS string rather than letting it
+    // fall through to the opaque object-iteration path below.
+    if (value.__class === "java_lang_String") {
+      return this.toNativeString(value);
+    }
+    // 64-bit long ({__l:1,l,h}) -> JS number for the host.
+    if (value.__l === 1) {
+      return _LtoNumber(value);
+    }
+    // Boxed primitives -> their JS value. NativeInterface args arrive boxed in an
+    // Object[] (Integer.valueOf(...) etc.); the host wants the plain value.
+    switch (value.__class) {
+      case "java_lang_Integer": return value.cn1_java_lang_Integer_value | 0;
+      case "java_lang_Short": return value.cn1_java_lang_Short_value | 0;
+      case "java_lang_Byte": return value.cn1_java_lang_Byte_value | 0;
+      case "java_lang_Character": return value.cn1_java_lang_Character_value | 0;
+      case "java_lang_Boolean": return !!value.cn1_java_lang_Boolean_value;
+      case "java_lang_Double": return Number(value.cn1_java_lang_Double_value);
+      case "java_lang_Float": return Number(value.cn1_java_lang_Float_value);
+      case "java_lang_Long": return _LtoNum(value.cn1_java_lang_Long_value);
+      default: break;
     }
     if (value.__cn1HostRef != null) {
       return value.__cn1HostClass
@@ -2634,6 +2689,15 @@ const jvm = {
     if (this.draining) {
       return;
     }
+    // Opportunistic wakeup delivery on every outermost drain (i.e. every host
+    // event that wakes the worker): when the one-shot wakeup timeout is being
+    // throttled by the host (see _ensureWakeupPump), due sleeps/waits still
+    // fire with near-zero latency here instead of waiting for the 1s pump.
+    // O(pending) once per burst; no-op when nothing is due.
+    if (this.timedWakeups.length && !this._processingWakeups
+            && this._earliestWakeAt() <= this.schedulerNow() + 1) {
+      this._processExpiredTimedWakeups();
+    }
     this.draining = true;
     const deadline = this.schedulerNow() + 8;
     let steps = 0;
@@ -2727,6 +2791,11 @@ const jvm = {
             continue;
           }
           this.handleYield(thread, result.value);
+        if (this.__cn1BreakBurst) {
+          this.__cn1BreakBurst = false;
+          this.scheduleDrain();
+          break;
+        }
         } catch (threadErr) {
           // An uncaught exception in a green thread TERMINATES THAT THREAD
           // (Java semantics: Thread.run() unwinds, other threads keep running)
@@ -2794,6 +2863,47 @@ const jvm = {
   _scheduleTimedWakeup(entry) {
     this.timedWakeups.push(entry);
     this._refreshTimedWakeupTimer();
+    this._ensureWakeupPump();
+  },
+  // Permanent low-frequency backstop for the one-shot wakeup timer.
+  //
+  // Headless/hidden Chromium intensively throttles rapidly re-armed
+  // setTimeout CHAINS (nesting depth >= 5, short delays) down to ~one
+  // firing per minute, while >=1s intervals keep firing normally --
+  // observed on the screenshot suite as the heartbeat interval beating
+  // every 1.5s while the armed wakeup timeout sat 12-48s past its target
+  // (sinceStepMs == wakeFiredAgo == 12771 with every thread parked), so
+  // every Thread.sleep / Object.wait(timeout) in the VM stalled in
+  // batches. The pump bounds that worst case at ~1s: a cheap length +
+  // earliest-deadline check, processing only when something is actually
+  // due. The one-shot timer remains the precision path; drain() also
+  // opportunistically processes due wakeups on every host event.
+  _ensureWakeupPump() {
+    if (this._wakeupPump != null || typeof setInterval !== "function") {
+      return;
+    }
+    const self = this;
+    this._wakeupPump = setInterval(function() {
+      try {
+        if (self.timedWakeups.length && self._earliestWakeAt() <= self.schedulerNow() + 1) {
+          self._processExpiredTimedWakeups();
+        }
+      } catch (_e) {
+        // Never let the backstop kill itself.
+      }
+    }, 1000);
+    // Node harnesses: don't hold the process open for the pump.
+    if (this._wakeupPump && typeof this._wakeupPump.unref === "function") {
+      this._wakeupPump.unref();
+    }
+  },
+  _earliestWakeAt() {
+    let earliest = Infinity;
+    for (let i = 0; i < this.timedWakeups.length; i++) {
+      const w = this.timedWakeups[i];
+      if (!w.cancelled && w.wakeAt < earliest) earliest = w.wakeAt;
+    }
+    return earliest;
   },
   _removeTimedWakeup(entry) {
     if (!entry || entry.cancelled) return;
@@ -2816,15 +2926,37 @@ const jvm = {
       }
       return;
     }
-    if (this._wakeupTimer != null && this._wakeupAt <= earliest) {
-      // Existing timer fires sooner or at the same moment; keep it.
+    if (this._wakeupTimer != null && this._wakeupAt <= earliest
+            && this._wakeupAt > this.schedulerNow() - 100) {
+      // Existing timer fires sooner or at the same moment; keep it. The
+      // third clause guards against a ZOMBIE: a timer whose target time is
+      // already well past yet whose callback never ran (its first statement
+      // nulls _wakeupTimer, so non-null + past-due means the host lost the
+      // timeout -- observed on the screenshot suite as every sleeping thread
+      // stranded 30s+ past its deadline with the queue intact, because a
+      // past-due _wakeupAt satisfies ``<= earliest`` for EVERY later wakeup
+      // and this branch then never re-arms). Distrust it and re-arm; if the
+      // old timer does still fire, the callback's _wakeupTimer-null reset +
+      // re-entrant processing are idempotent, so the duplicate is harmless.
       return;
     }
-    if (this._wakeupTimer != null) clearTimeout(this._wakeupTimer);
+    if (this._wakeupTimer != null) {
+      if (VM_DIAG_ENABLED && this._wakeupAt !== Infinity
+              && this._wakeupAt <= this.schedulerNow() - 100) {
+        try {
+          vmTrace("DIAG:WAKEUP_TIMER_ZOMBIE:rearmed:staleMs="
+            + Math.round(this.schedulerNow() - this._wakeupAt));
+        } catch (_e) {}
+      }
+      clearTimeout(this._wakeupTimer);
+    }
     const delay = Math.max(0, earliest - this.schedulerNow());
     this._wakeupAt = earliest;
     const self = this;
+    this._wakeupArmCount = (this._wakeupArmCount | 0) + 1;
     this._wakeupTimer = setTimeout(function() {
+      self._wakeupFireCount = (self._wakeupFireCount | 0) + 1;
+      self._wakeupLastFiredAt = self.schedulerNow();
       self._wakeupTimer = null;
       self._wakeupAt = Infinity;
       // ALWAYS reschedule remaining wakeups, even if processing one throws --
@@ -2837,6 +2969,20 @@ const jvm = {
     }, delay);
   },
   _processExpiredTimedWakeups() {
+    if (this._processingWakeups) {
+      // Re-entrancy guard: the resume loop below runs green threads via
+      // enqueue -> drain, and drain's opportunistic due-check (or the pump /
+      // a late one-shot) could otherwise re-enter while a batch is mid-resume.
+      return;
+    }
+    this._processingWakeups = true;
+    try {
+      this._processExpiredTimedWakeupsInner();
+    } finally {
+      this._processingWakeups = false;
+    }
+  },
+  _processExpiredTimedWakeupsInner() {
     const now = this.schedulerNow();
     const expired = [];
     for (let i = this.timedWakeups.length - 1; i >= 0; i--) {
@@ -2850,6 +2996,17 @@ const jvm = {
       if (w.wakeAt <= now + 1) {
         expired.push(w);
         this.timedWakeups.splice(i, 1);
+      } else if (VM_DIAG_ENABLED && !(w.wakeAt > now - 2000)) {
+        // An entry that is neither due (<= now+1) nor sane-future fails BOTH
+        // comparisons only when wakeAt isn't an ordinary number (NaN / boxed
+        // long / string). Print its raw shape -- this is the only way a
+        // queued, uncancelled, overdue entry can survive processing.
+        try {
+          vmTrace("DIAG:WAKEUP_BAD_ENTRY:kind=" + String(w.kind)
+            + ":typeof=" + (typeof w.wakeAt)
+            + ":val=" + String(w.wakeAt).slice(0, 30)
+            + ":thread=" + (w.thread ? w.thread.id : "-"));
+        } catch (_e) {}
       }
     }
     expired.reverse();  // restore registration order for FIFO fairness
@@ -2867,6 +3024,7 @@ const jvm = {
       if (w.cancelled) {
         continue;
       }
+      try {
       if (w.kind === "sleep") {
         this.enqueue(w.thread);
       } else if (w.kind === "wait") {
@@ -2883,6 +3041,16 @@ const jvm = {
           }
           this.resolveHostCall(w.id, false, null, "host call timed out (jso bridge)");
         }
+      }
+      } catch (resumeErr) {
+        // Per-entry guard: every entry in this batch is ALREADY spliced out of
+        // timedWakeups, so an exception escaping one resume would strand every
+        // remaining entry's thread in a sleep/wait that can never fire again.
+        // Contain the failure to the one entry and keep resuming the rest.
+        try {
+          vmTrace("DIAG:WAKEUP_RESUME_THREW:kind=" + String(w.kind)
+            + ":err=" + String(resumeErr && resumeErr.message || resumeErr).slice(0, 120));
+        } catch (_e) {}
       }
     }
     this._refreshTimedWakeupTimer();
@@ -2935,6 +3103,11 @@ const jvm = {
       this.enqueue(thread, yielded);
       return;
     }
+    if (yielded.op === "byield") {
+      this.runnable.unshift(thread);
+      this.__cn1BreakBurst = true;
+      return;
+    }
     if (yielded.op === "sleep") {
       // millis originates from Thread.sleep(long) -> BigInt; coerce to a Number
       // before the scheduler's Number-domain timer arithmetic (avoids BigInt mix).
@@ -2944,6 +3117,9 @@ const jvm = {
         // to the next runnable green thread; no real-time delay needed.
         this.enqueue(thread);
         return;
+      }
+      if (VM_DIAG_ENABLED && millis > 5000) {
+        try { vmTrace("DIAG:LONG_SLEEP:millis=" + millis + ":stack=" + String(new Error().stack).split("\n").slice(1, 10).join("<")); } catch (_e) {}
       }
       const entry = { kind: "sleep", thread: thread, wakeAt: this.schedulerNow() + millis, cancelled: false };
       thread.waiting = { op: "sleep", entry: entry };
@@ -3007,6 +3183,24 @@ const jvm = {
       // promotes it. No timer, no setTimeout -- waking is purely
       // event-driven on the holder's release.
       thread.waiting = { op: "monitor_enter", entrant: yielded.entrant };
+      return;
+    }
+    if (yielded.op === "await") {
+      // Suspend the green thread on a WORKER-LOCAL promise -- the worker-side
+      // analog of HOST_CALL (which suspends on a host round-trip). Used to park
+      // a thread until an async resource loaded INSIDE the worker is ready
+      // (e.g. a FontFace added to self.fonts, so OffscreenCanvas text
+      // measurement reads real metrics instead of a fallback). The unpark path
+      // is the promise's own settlement -> enqueue, mirroring how the image
+      // decode barrier (__cn1_decode_image_from_url__) resumes its caller. The
+      // thread resumes with the resolved value; a rejection resumes with null
+      // so the caller degrades gracefully (never parks forever on a 404).
+      thread.waiting = { op: "await" };
+      const scheduler = this;
+      Promise.resolve(yielded.promise).then(
+        function (v) { scheduler.enqueue(thread, v === undefined ? null : v); },
+        function () { scheduler.enqueue(thread, null); }
+      );
       return;
     }
     throw new Error("Unsupported yield op " + yielded.op);
@@ -3443,7 +3637,15 @@ global.__cn1TickReset = __cn1TickReset;
 // the wall clock and resets/yields if the budget has elapsed. The
 // counter is reset to zero when drain() restarts a generator step,
 // so fresh steps start fast again.
-const _Yv = { op: "sleep", millis: 0 };
+// Budget yield is a DISTINCT op from sleep(0): it must give the HOST event
+// loop a turn (timers, postMessage, rendering) but resume the SAME green
+// thread before any sibling, preserving the port's historical cooperative
+// atomicity. CN1 code written for the never-preempting JS/TeaVM ports
+// shares unsynchronised static state (StyleParser/CSSBorder caches etc.)
+// across call stretches; interleaving siblings at arbitrary dispatch
+// points surfaced those latent races as nondeterministic boot failures
+// (the flaky "Failed to load CSS border" -> downstream NPE).
+const _Yv = { op: "byield" };
 const __cn1TickStride = 256;
 let __cn1TickCounter = 0;
 function _Yc() {
@@ -3753,6 +3955,14 @@ function wrapRawJsErrorAsRuntimeException(err) {
     return err;
   }
 }
+// Structured-emitter catch dispatch: returns the WRAPPED throwable when
+// ``err`` is assignable to ``type`` (null = catch-all), else null. Same
+// matching rules as findExceptionHandler, expressed per-handler so a real
+// JS try/catch can chain handler tests without a pc table.
+global._Ex = function(err, type) {
+  const w = wrapRawJsErrorAsRuntimeException(err);
+  return jvm.findExceptionHandler([{ s: 0, e: 1, t: type == null ? undefined : type }], 0, w) ? w : null;
+};
 global._E = function(table, pc, err, stack) {
   const h = jvm.findExceptionHandler(table, pc, err);
   if (!h) throw err;
@@ -3992,43 +4202,219 @@ function* adaptVirtualResult(result) {
 // it was a generator) or return the value directly. Inlining halves
 // per-call allocator pressure on the hot virtual-dispatch path. Sync /
 // async resolution semantics are unchanged.
+// Budget check at every generator virtual dispatch: the per-method entry
+// check (emitted ``if(_Yc())yield _Yv``) cannot slice a loop that stays
+// INSIDE one method and only calls runtime functions -- e.g. the
+// Initializr's boot loop dispatching JSO-bridge methods via cn1_iv*,
+// which blocked the worker's event loop for 90s+ (no events, no timers,
+// no heartbeat, pointer input dead). _Yc is counter-amortised (clock
+// check every 256th call) so the hot-path cost is one increment+compare.
 function* cn1_iv0(target, mid) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv1(target, mid, a0) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv2(target, mid, a0, a1) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0, a1);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv3(target, mid, a0, a1, a2) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0, a1, a2);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_iv4(target, mid, a0, a1, a2, a3) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const r = cn1_ivResolve(target, mid)(target, a0, a1, a2, a3);
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
 function* cn1_ivN(target, mid, args) {
+  if (_Yc()) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
   const method = cn1_ivResolve(target, mid);
   const r = method.apply(null, [target].concat(args));
   if (r && typeof r.next === "function") { return yield* r; }
   return r;
 }
+// Synchronous virtual dispatch family (cn1_ivs0..4 / cn1_ivsN). Emitted
+// at INVOKEVIRTUAL / INVOKEINTERFACE call sites whose signature the
+// suspension analysis (exportedSuspendingSigs) proved has NO suspending
+// impl -- so the resolved override is a plain ``function`` returning a
+// value, and the caller need not be a generator. This is what lets a
+// method that only makes non-suspending virtual calls be emitted as a
+// plain ``function`` instead of ``function*`` (no ``yield*`` ceremony),
+// removing per-call generator allocation and shrinking the bundle while
+// keeping the green-thread model intact for genuinely-blocking paths.
+//
+// Defensive drive-once: if a target unexpectedly returns a generator (a
+// CHA-soundness gap -- e.g. a runtime-installed override the static
+// analysis didn't see, or the ``{}`` broken-receiver canvas no-op stubs
+// in cn1_ivResolve which are ``function*``), step it ONCE. A body that
+// never actually yields completes on the first next() so we return its
+// value safely; one that genuinely suspends in this sync context throws
+// a NAMED error rather than letting a raw generator object leak
+// downstream as the "result" (the silent-corruption failure mode of the
+// three earlier sync-dispatcher attempts).
+function cn1_ivsDrive(r, mid) {
+  if (r && typeof r.next === "function") {
+    const step = r.next();
+    if (!step.done) {
+      throw new Error("cn1_ivs: sync virtual dispatch reached a yielding method (CHA unsound): " + mid);
+    }
+    return step.value;
+  }
+  return r;
+}
+function cn1_ivsNpe() {
+  const ex = jvm.createException("java_lang_NullPointerException");
+  if (typeof ex.ctor === "function") {
+    const cr = ex.ctor(ex.object);
+    if (cr && typeof cr.next === "function") {
+      const s = cr.next();
+      if (!s.done) { throw new Error("cn1_ivs: NPE constructor yielded in sync dispatch"); }
+    }
+  }
+  throw ex.object;
+}
+function cn1_ivs0(target, mid) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target), mid);
+}
+function cn1_ivs1(target, mid, a0) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0), mid);
+}
+function cn1_ivs2(target, mid, a0, a1) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0, a1), mid);
+}
+function cn1_ivs3(target, mid, a0, a1, a2) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0, a1, a2), mid);
+}
+function cn1_ivs4(target, mid, a0, a1, a2, a3) {
+  if (target == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(cn1_ivResolve(target, mid)(target, a0, a1, a2, a3), mid);
+}
+function cn1_ivsN(target, mid, args) {
+  if (target == null) { cn1_ivsNpe(); }
+  const method = cn1_ivResolve(target, mid);
+  return cn1_ivsDrive(method.apply(null, [target].concat(args)), mid);
+}
+// Monomorphic-devirtualization dispatch family (_dv0.._dv4/_dvN
+// suspending, _dw0.._dw4/_dwN sync). The translator emits these at
+// INVOKEVIRTUAL / INVOKEINTERFACE call sites whose dispatch id has
+// exactly one concrete implementation program-wide: the resolved
+// override can only ever be that one body, so instead of the
+// dispatch-id-string + resolveVirtual lookup the translator passes the
+// impl FUNCTION directly. Semantics are identical to _v* / _w* minus
+// the lookup: the null-receiver NPE and the drive-once contract are
+// preserved. This lets the dispatch-id string drop from the _q table
+// and the method's m: entry be pruned (it no longer participates in
+// runtime virtual dispatch). The ``fn`` argument is a bareword
+// function reference (minified/aliased in lockstep with its def), not
+// a string.
+function* _dv0(t, fn) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv1(t, fn, a0) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv2(t, fn, a0, a1) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0, a1);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv3(t, fn, a0, a1, a2) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0, a1, a2);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dv4(t, fn, a0, a1, a2, a3) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn(t, a0, a1, a2, a3);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function* _dvN(t, fn, args) {
+  if (_Yc()) yield _Yv;
+  if (t == null) { yield* throwNullPointerException(); }
+  const r = fn.apply(null, [t].concat(args));
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
+}
+function _dw0(t, fn) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t), "");
+}
+function _dw1(t, fn, a0) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0), "");
+}
+function _dw2(t, fn, a0, a1) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0, a1), "");
+}
+function _dw3(t, fn, a0, a1, a2) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0, a1, a2), "");
+}
+function _dw4(t, fn, a0, a1, a2, a3) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn(t, a0, a1, a2, a3), "");
+}
+function _dwN(t, fn, args) {
+  if (t == null) { cn1_ivsNpe(); }
+  return cn1_ivsDrive(fn.apply(null, [t].concat(args)), "");
+}
+global._dv0 = _dv0; global._dv1 = _dv1; global._dv2 = _dv2;
+global._dv3 = _dv3; global._dv4 = _dv4; global._dvN = _dvN;
+global._dw0 = _dw0; global._dw1 = _dw1; global._dw2 = _dw2;
+global._dw3 = _dw3; global._dw4 = _dw4; global._dwN = _dwN;
+
+// Two/three-char aliases for the dispatch family: the helper name appears
+// at every INVOKEVIRTUAL / INVOKEINTERFACE call site (~42k in a real app),
+// so cn1_iv0 -> _v0 / cn1_ivs0 -> _w0 saves ~5 bytes per site (~200KB raw).
+// The long names stay exported for port.js / diagnostics.
+global._v0 = cn1_iv0; global._v1 = cn1_iv1; global._v2 = cn1_iv2;
+global._v3 = cn1_iv3; global._v4 = cn1_iv4; global._vN = cn1_ivN;
+global._w0 = cn1_ivs0; global._w1 = cn1_ivs1; global._w2 = cn1_ivs2;
+global._w3 = cn1_ivs3; global._w4 = cn1_ivs4; global._wN = cn1_ivsN;
+global.cn1_ivs0 = cn1_ivs0;
+global.cn1_ivs1 = cn1_ivs1;
+global.cn1_ivs2 = cn1_ivs2;
+global.cn1_ivs3 = cn1_ivs3;
+global.cn1_ivs4 = cn1_ivs4;
+global.cn1_ivsN = cn1_ivsN;
 global.cn1_iv0 = cn1_iv0;
 global.cn1_iv1 = cn1_iv1;
 global.cn1_iv2 = cn1_iv2;
@@ -4380,6 +4766,15 @@ function* throwInterruptedException() {
   throw ex.object;
 }
 function* throwNullPointerException() {
+  if (VM_DIAG_ENABLED) {
+    try {
+      const dc = jvm.classes["com_codename1_ui_Display"];
+      vmTrace("DIAG:NPE_THROWN:displayInit=" + (dc ? (dc.initialized ? 1 : 0) : -1)
+        + ":displayIniting=" + (dc ? (dc.initializing ? 1 : 0) : -1)
+        + ":instanceSet=" + ((jvm.staticFieldsFor && 0) || (typeof _S !== "undefined" && _S["com_codename1_ui_Display"] && _S["com_codename1_ui_Display"]["INSTANCE"] != null ? 1 : 0))
+        + ":stack=" + String(new Error().stack).split("\n").slice(1, 16).join("<"));
+    } catch (_e) {}
+  }
   const ex = jvm.createException("java_lang_NullPointerException");
   if (typeof ex.ctor === "function") {
     yield* adaptVirtualResult(ex.ctor(ex.object));
@@ -4463,6 +4858,7 @@ function bindNative(names, fn) {
     jvm.nativeMethods[name] = fn;
     global[name] = fn;
     jvm[name] = fn;
+    refreshCn1Alias(name, fn);
     installVirtualOverride(name);
   }
   for (let i = 0; i < names.length; i++) {
@@ -4563,6 +4959,7 @@ function installNativeBindings() {
     }
     global[name] = nativeFn;
     jvm[name] = nativeFn;
+    refreshCn1Alias(name, nativeFn);
     overrideMethodMaps(name, nativeFn);
     if (!name.endsWith("__impl")) {
       const implName = name + "__impl";
@@ -4574,9 +4971,25 @@ function installNativeBindings() {
       }
       global[name + "__impl"] = nativeFn;
       jvm[name + "__impl"] = nativeFn;
+      refreshCn1Alias(implName, nativeFn);
     }
   }
 }
+// Call-site aliasing support: the bundle writer rewrites hot ``cn1_*``
+// call sites to short ``$J*`` aliases and emits an ``__cn1Al`` registry
+// (canonical name -> alias). Any code path that reassigns a ``cn1_*``
+// global MUST refresh the alias through here or aliased call sites keep
+// invoking the stale original.
+function refreshCn1Alias(name, fn) {
+  const al = global.__cn1Al;
+  if (al) {
+    const alias = al[name];
+    if (alias) {
+      global[alias] = fn;
+    }
+  }
+}
+global.__cn1RefreshAlias = refreshCn1Alias;
 installCompatibilityClasses();
 function getQueryParameter(name) {
   const loc = (global.window || global).location;
@@ -4643,7 +5056,7 @@ function isIPadUserAgent() {
   const maxTouchPoints = Number(nav.maxTouchPoints || 0);
   return /iPad/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
 }
-bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function*() {
+bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function() {
   return 0;
 });
 bindNative([
@@ -4679,9 +5092,9 @@ bindNative([
   }
   return null;
 });
-bindNative(["cn1_java_lang_Object_notify", "cn1_java_lang_Object_notify__"], function*(__cn1ThisObject) { jvm.notifyOne(__cn1ThisObject); return null; });
-bindNative(["cn1_java_lang_Object_notifyAll", "cn1_java_lang_Object_notifyAll__"], function*(__cn1ThisObject) { jvm.notifyAll(__cn1ThisObject); return null; });
-bindNative(["cn1_java_lang_Object_hashCode_R_int", "cn1_java_lang_Object_hashCode___R_int"], function*(__cn1ThisObject) { return __cn1ThisObject == null ? 0 : (__cn1ThisObject.__id | 0); });
+bindNative(["cn1_java_lang_Object_notify", "cn1_java_lang_Object_notify__"], function(__cn1ThisObject) { jvm.notifyOne(__cn1ThisObject); return null; });
+bindNative(["cn1_java_lang_Object_notifyAll", "cn1_java_lang_Object_notifyAll__"], function(__cn1ThisObject) { jvm.notifyAll(__cn1ThisObject); return null; });
+bindNative(["cn1_java_lang_Object_hashCode_R_int", "cn1_java_lang_Object_hashCode___R_int"], function(__cn1ThisObject) { return __cn1ThisObject == null ? 0 : (__cn1ThisObject.__id | 0); });
 bindNative([
   "cn1_java_lang_Object_getClass_R_java_lang_Class",
   "cn1_java_lang_Object_getClass___R_java_lang_Class",
@@ -4696,29 +5109,29 @@ bindNative([
   }
   return jvm.getClassObject(__cn1ThisObject.__class);
 });
-bindNative(["cn1_java_io_PrintStream_print_java_lang_String"], function*(__cn1ThisObject, value) {
+bindNative(["cn1_java_io_PrintStream_print_java_lang_String"], function(__cn1ThisObject, value) {
   printToConsole(printStreamValue(value));
   return null;
 });
-bindNative(["cn1_java_io_PrintStream_println_java_lang_String"], function*(__cn1ThisObject, value) {
+bindNative(["cn1_java_io_PrintStream_println_java_lang_String"], function(__cn1ThisObject, value) {
   printToConsole(printStreamValue(value));
   return null;
 });
-bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function*(__cn1ThisObject, value) {
+bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function(__cn1ThisObject, value) {
   printToConsole(printStreamValue(value));
   return null;
 });
-bindNative(["cn1_java_lang_System___CLINIT__"], function*() {
+bindNative(["cn1_java_lang_System___CLINIT__"], function() {
   ensureSystemPrintStreams();
   return null;
 });
-bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function(__cn1ThisObject) {
   if (__cn1ThisObject == null) {
     return createJavaString("null");
   }
   return createJavaString(javaClassName(__cn1ThisObject.__class) + "@" + ((__cn1ThisObject.__id | 0).toString(16)));
 });
-bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_lang_Thread_currentThread___R_java_lang_Thread"], function*() {
+bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_lang_Thread_currentThread___R_java_lang_Thread"], function() {
   if (jvm.currentThread && jvm.currentThread.object) {
     return jvm.currentThread.object;
   }
@@ -4731,11 +5144,11 @@ bindNative(["cn1_java_lang_Thread_sleep_long", "cn1_java_lang_Thread_sleep___lon
   }
   return null;
 });
-bindNative(["cn1_java_lang_Thread_setPriorityImpl_int", "cn1_java_lang_Thread_setPriorityImpl___int"], function*() { return null; });
-bindNative(["cn1_java_lang_Thread_interrupt0", "cn1_java_lang_Thread_interrupt0__"], function*(__cn1ThisObject) { jvm.interruptThread(__cn1ThisObject); return null; });
-bindNative(["cn1_java_lang_Thread_isInterrupted_boolean_R_boolean", "cn1_java_lang_Thread_isInterrupted___boolean_R_boolean"], function*(__cn1ThisObject, clearInterrupted) { const value = __cn1ThisObject && __cn1ThisObject.__interrupted ? 1 : 0; if (clearInterrupted && __cn1ThisObject) __cn1ThisObject.__interrupted = 0; return value; });
-bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function*() { return _LfromInt(jvm.currentThread ? jvm.currentThread.id : 0); });
-bindNative(["cn1_java_lang_Thread_releaseThreadNativeResources_long", "cn1_java_lang_Thread_releaseThreadNativeResources___long"], function*() { return null; });
+bindNative(["cn1_java_lang_Thread_setPriorityImpl_int", "cn1_java_lang_Thread_setPriorityImpl___int"], function() { return null; });
+bindNative(["cn1_java_lang_Thread_interrupt0", "cn1_java_lang_Thread_interrupt0__"], function(__cn1ThisObject) { jvm.interruptThread(__cn1ThisObject); return null; });
+bindNative(["cn1_java_lang_Thread_isInterrupted_boolean_R_boolean", "cn1_java_lang_Thread_isInterrupted___boolean_R_boolean"], function(__cn1ThisObject, clearInterrupted) { const value = __cn1ThisObject && __cn1ThisObject.__interrupted ? 1 : 0; if (clearInterrupted && __cn1ThisObject) __cn1ThisObject.__interrupted = 0; return value; });
+bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function() { return _LfromInt(jvm.currentThread ? jvm.currentThread.id : 0); });
+bindNative(["cn1_java_lang_Thread_releaseThreadNativeResources_long", "cn1_java_lang_Thread_releaseThreadNativeResources___long"], function() { return null; });
 bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], function*(__cn1ThisObject) {
   const tid = jvm.nextThreadId;
   __cn1ThisObject[CN1_THREAD_ALIVE] = 1;
@@ -4761,8 +5174,8 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   jvm.spawn(__cn1ThisObject, generator);
   return null;
 });
-bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return _LfromNumber(Date.now()); });
-bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTime___R_long"], function*() {
+bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function() { return _LfromNumber(Date.now()); });
+bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTime___R_long"], function() {
   // performance.now() is a high-resolution monotonic clock (sub-millisecond,
   // in fractional milliseconds) and is available in both window and worker
   // scopes. Fall back to the wall clock if it is somehow absent. This branch's
@@ -4773,64 +5186,64 @@ bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTi
   }
   return _LfromNumber(Date.now() * 1e6);
 });
-bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return identityHash(obj); });
-bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function*(src, srcOffset, dst, dstOffset, length) {
+bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function(obj) { return identityHash(obj); });
+bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function(src, srcOffset, dst, dstOffset, length) {
   for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
   return null;
 });
-bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function*() { return null; });
-bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function*() { return null; });
-bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function*(status) { jvm.finish(status); return null; });
-bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function*() { return _LfromNumber(67108864); });
-bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function*() { return _LfromNumber(33554432); });
-bindNative(["cn1_java_lang_Throwable_fillInStack"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function() { return null; });
+bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function() { return null; });
+bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
+bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
+bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function() { return _LfromNumber(33554432); });
+bindNative(["cn1_java_lang_Throwable_fillInStack"], function(__cn1ThisObject) {
   const prevLimit = Error.stackTraceLimit;
   try { Error.stackTraceLimit = 200; } catch (_l) {}
   __cn1ThisObject[CN1_THROWABLE_STACK] = createJavaString(new Error().stack || "");
   try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
   return null;
 });
-bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function*(__cn1ThisObject) { return __cn1ThisObject[CN1_THROWABLE_STACK] || createJavaString(""); });
-bindNative(["cn1_java_lang_Math_abs_double_R_double"], function*(v) { return Math.abs(v); });
-bindNative(["cn1_java_lang_Math_abs_float_R_float"], function*(v) { return Math.abs(v); });
-bindNative(["cn1_java_lang_Math_abs_int_R_int"], function*(v) { return Math.abs(v | 0); });
-bindNative(["cn1_java_lang_Math_abs_long_R_long"], function*(v) { const x = _Lc(v); return x.h < 0 ? _Lneg(x) : x; });
-bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function*(v) { return Math.ceil(v); });
-bindNative(["cn1_java_lang_Math_floor_double_R_double"], function*(v) { return Math.floor(v); });
-bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function*(a, b) { return Math.max(a, b); });
-bindNative(["cn1_java_lang_Math_max_float_float_R_float"], function*(a, b) { return Math.max(a, b); });
-bindNative(["cn1_java_lang_Math_max_int_int_R_int"], function*(a, b) { return Math.max(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function*(a, b) { return _Lcmp(a, b) >= 0 ? _Lc(a) : _Lc(b); });
-bindNative(["cn1_java_lang_Math_min_double_double_R_double"], function*(a, b) { return Math.min(a, b); });
-bindNative(["cn1_java_lang_Math_min_float_float_R_float"], function*(a, b) { return Math.min(a, b); });
-bindNative(["cn1_java_lang_Math_min_int_int_R_int"], function*(a, b) { return Math.min(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function*(a, b) { return _Lcmp(a, b) <= 0 ? _Lc(a) : _Lc(b); });
-bindNative(["cn1_java_lang_Math_pow_double_double_R_double"], function*(a, b) { return Math.pow(a, b); });
-bindNative(["cn1_java_lang_Math_cos_double_R_double"], function*(v) { return Math.cos(v); });
-bindNative(["cn1_java_lang_Math_sin_double_R_double"], function*(v) { return Math.sin(v); });
-bindNative(["cn1_java_lang_Math_sqrt_double_R_double"], function*(v) { return Math.sqrt(v); });
-bindNative(["cn1_java_lang_Math_tan_double_R_double"], function*(v) { return Math.tan(v); });
-bindNative(["cn1_java_lang_Math_atan_double_R_double"], function*(v) { return Math.atan(v); });
-bindNative(["cn1_java_lang_Integer_toString_int_R_java_lang_String"], function*(v) { return createJavaString(String(v | 0)); });
-bindNative(["cn1_java_lang_Integer_toString_int_int_R_java_lang_String"], function*(v, radix) { return createJavaString((v | 0).toString((radix | 0) || 10)); });
-bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function*(v, radix) { return createJavaString(_LtoStr(v, (radix | 0) || 10)); });
-bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
-bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
-bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function*(v) { return intBitsFromFloat(v); });
-bindNative(["cn1_java_lang_Float_intBitsToFloat_int_R_float"], function*(bits) { return floatFromIntBits(bits); });
-bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function*(v) { return createJavaString(String(v)); });
-bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function*(v) { return longBitsFromDouble(v); });
-bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function*(bits) { return doubleFromLongBits(bits); });
-bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function*(v) { return createJavaString(String(v)); });
-bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function*(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
-bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
-bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
-bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function*(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
-bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function*(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
-bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function*(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
-bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function*(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
-bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function(__cn1ThisObject) { return __cn1ThisObject[CN1_THROWABLE_STACK] || createJavaString(""); });
+bindNative(["cn1_java_lang_Math_abs_double_R_double"], function(v) { return Math.abs(v); });
+bindNative(["cn1_java_lang_Math_abs_float_R_float"], function(v) { return Math.abs(v); });
+bindNative(["cn1_java_lang_Math_abs_int_R_int"], function(v) { return Math.abs(v | 0); });
+bindNative(["cn1_java_lang_Math_abs_long_R_long"], function(v) { const x = _Lc(v); return x.h < 0 ? _Lneg(x) : x; });
+bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function(v) { return Math.ceil(v); });
+bindNative(["cn1_java_lang_Math_floor_double_R_double"], function(v) { return Math.floor(v); });
+bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function(a, b) { return Math.max(a, b); });
+bindNative(["cn1_java_lang_Math_max_float_float_R_float"], function(a, b) { return Math.max(a, b); });
+bindNative(["cn1_java_lang_Math_max_int_int_R_int"], function(a, b) { return Math.max(a | 0, b | 0); });
+bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function(a, b) { return _Lcmp(a, b) >= 0 ? _Lc(a) : _Lc(b); });
+bindNative(["cn1_java_lang_Math_min_double_double_R_double"], function(a, b) { return Math.min(a, b); });
+bindNative(["cn1_java_lang_Math_min_float_float_R_float"], function(a, b) { return Math.min(a, b); });
+bindNative(["cn1_java_lang_Math_min_int_int_R_int"], function(a, b) { return Math.min(a | 0, b | 0); });
+bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function(a, b) { return _Lcmp(a, b) <= 0 ? _Lc(a) : _Lc(b); });
+bindNative(["cn1_java_lang_Math_pow_double_double_R_double"], function(a, b) { return Math.pow(a, b); });
+bindNative(["cn1_java_lang_Math_cos_double_R_double"], function(v) { return Math.cos(v); });
+bindNative(["cn1_java_lang_Math_sin_double_R_double"], function(v) { return Math.sin(v); });
+bindNative(["cn1_java_lang_Math_sqrt_double_R_double"], function(v) { return Math.sqrt(v); });
+bindNative(["cn1_java_lang_Math_tan_double_R_double"], function(v) { return Math.tan(v); });
+bindNative(["cn1_java_lang_Math_atan_double_R_double"], function(v) { return Math.atan(v); });
+bindNative(["cn1_java_lang_Integer_toString_int_R_java_lang_String"], function(v) { return createJavaString(String(v | 0)); });
+bindNative(["cn1_java_lang_Integer_toString_int_int_R_java_lang_String"], function(v, radix) { return createJavaString((v | 0).toString((radix | 0) || 10)); });
+bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function(v, radix) { return createJavaString(_LtoStr(v, (radix | 0) || 10)); });
+bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
+bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
+bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function(v) { return intBitsFromFloat(v); });
+bindNative(["cn1_java_lang_Float_intBitsToFloat_int_R_float"], function(bits) { return floatFromIntBits(bits); });
+bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function(v) { return createJavaString(String(v)); });
+bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function(v) { return longBitsFromDouble(v); });
+bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function(bits) { return doubleFromLongBits(bits); });
+bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function(v) { return createJavaString(String(v)); });
+bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
+bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
+bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
+bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
+bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
+bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
+bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
+bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function(__cn1ThisObject) {
   const count = __cn1ThisObject[CN1_SB_COUNT] | 0;
   const data = __cn1ThisObject[CN1_SB_VALUE];
   let out = "";
@@ -4839,28 +5252,28 @@ bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function
   }
   return createJavaString(out);
 });
-bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], function*(__cn1ThisObject, start, end, dst, dstStart) {
+bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], function(__cn1ThisObject, start, end, dst, dstStart) {
   const value = __cn1ThisObject[CN1_SB_VALUE];
   for (let i = start | 0; i < (end | 0); i++) {
     dst[(dstStart | 0) + i - (start | 0)] = value[i] | 0;
   }
   return null;
 });
-bindNative(["cn1_java_lang_String_charAt_int_R_char"], function*(__cn1ThisObject, index) { return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0; });
-bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function*(__cn1ThisObject, obj) {
+bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject, index) { return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0; });
+bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
 });
-bindNative(["cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean"], function*(__cn1ThisObject, other) {
+bindNative(["cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean"], function(__cn1ThisObject, other) {
   return (other != null && jvm.toNativeString(__cn1ThisObject).toLowerCase() === jvm.toNativeString(other).toLowerCase()) ? 1 : 0;
 });
-bindNative(["cn1_java_lang_String_getChars_int_int_char_1ARRAY_int"], function*(__cn1ThisObject, start, end, dst, dstStart) {
+bindNative(["cn1_java_lang_String_getChars_int_int_char_1ARRAY_int"], function(__cn1ThisObject, start, end, dst, dstStart) {
   const value = jvm.toNativeString(__cn1ThisObject);
   for (let i = start | 0; i < (end | 0); i++) {
     dst[(dstStart | 0) + i - (start | 0)] = value.charCodeAt(i) | 0;
   }
   return null;
 });
-bindNative(["cn1_java_lang_String_hashCode_R_int"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_String_hashCode_R_int"], function(__cn1ThisObject) {
   let hash = __cn1ThisObject[CN1_STRING_HASH] | 0;
   if (hash !== 0) {
     return hash;
@@ -4872,12 +5285,12 @@ bindNative(["cn1_java_lang_String_hashCode_R_int"], function*(__cn1ThisObject) {
   __cn1ThisObject[CN1_STRING_HASH] = hash;
   return hash;
 });
-bindNative(["cn1_java_lang_String_indexOf_int_int_R_int"], function*(__cn1ThisObject, ch, fromIndex) { return jvm.toNativeString(__cn1ThisObject).indexOf(String.fromCharCode(ch | 0), fromIndex | 0); });
-bindNative(["cn1_java_lang_String_toLowerCase_R_java_lang_String"], function*(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toLowerCase()); });
-bindNative(["cn1_java_lang_String_toString_R_java_lang_String"], function*(__cn1ThisObject) { return __cn1ThisObject; });
-bindNative(["cn1_java_lang_String_toUpperCase_R_java_lang_String"], function*(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toUpperCase()); });
-bindNative(["cn1_java_lang_String_releaseNSString_long"], function*() { return null; });
-bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function*(bytes, off, len, encoding) {
+bindNative(["cn1_java_lang_String_indexOf_int_int_R_int"], function(__cn1ThisObject, ch, fromIndex) { return jvm.toNativeString(__cn1ThisObject).indexOf(String.fromCharCode(ch | 0), fromIndex | 0); });
+bindNative(["cn1_java_lang_String_toLowerCase_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toLowerCase()); });
+bindNative(["cn1_java_lang_String_toString_R_java_lang_String"], function(__cn1ThisObject) { return __cn1ThisObject; });
+bindNative(["cn1_java_lang_String_toUpperCase_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toUpperCase()); });
+bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return null; });
+bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function(bytes, off, len, encoding) {
   const slice = bytes.slice(off | 0, (off | 0) + (len | 0));
   const array = Uint8Array.from(slice, function(v) { return v & 0xff; });
   let text = "";
@@ -4900,7 +5313,7 @@ bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java
   // ``not iterable`` TypeError.
   return yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding));
 });
-bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY"], function*(chars) {
+bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY"], function(chars) {
   // The original ``text += String.fromCharCode(chars[i] | 0)`` loop
   // is O(N) of additive string concatenation, which most JS engines
   // optimise to a rope but still costs noticeably more than the
@@ -4986,7 +5399,7 @@ bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRA
 
   return createJavaString(out);
 });
-bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function*(value, exponentIndex) {
+bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function(value, exponentIndex) {
   // Contract (per Apache Harmony StringToReal.parseDblImpl): the input string
   // is the pre-processed digits with no decimal point, and exponentIndex is
   // the power of 10 to multiply by. StringToReal.parseDouble("1.4") strips
@@ -5000,7 +5413,7 @@ bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_doub
   const exp = exponentIndex | 0;
   return exp === 0 ? parsed : parsed * Math.pow(10, exp);
 });
-bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum"], function*(enumType, name) {
+bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum"], function(enumType, name) {
   if (!enumType || !enumType.__classDef) {
     return null;
   }
@@ -5028,19 +5441,19 @@ bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_
   }
   return null;
 });
-bindNative(["cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class"], function*(className) {
+bindNative(["cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class"], function(className) {
   const runtimeName = runtimeTypeFromJavaName(jvm.toNativeString(className));
   const cls = jvm.classes[runtimeName];
   return cls ? cls.classObject : null;
 });
-bindNative(["cn1_java_lang_Class_getNameImpl_R_java_lang_String"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Class_getNameImpl_R_java_lang_String"], function(__cn1ThisObject) {
   return createJavaString(javaClassName(__cn1ThisObject.__classDef.name));
 });
-bindNative(["cn1_java_lang_Class_getName_R_java_lang_String"], function*(__cn1ThisObject) { return createJavaString(descriptorClassName(__cn1ThisObject.__classDef.name)); });
-bindNative(["cn1_java_lang_Class_isArray_R_boolean"], function*(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.name.indexOf("[]") > -1 ? 1 : 0; });
-bindNative(["cn1_java_lang_Class_isAssignableFrom_java_lang_Class_R_boolean"], function*(__cn1ThisObject, cls) { return cls && cls.__classDef && cls.__classDef.assignableTo[__cn1ThisObject.__classDef.name] ? 1 : 0; });
-bindNative(["cn1_java_lang_Class_isInstance_java_lang_Object_R_boolean"], function*(__cn1ThisObject, obj) { return jvm.instanceOf(obj, __cn1ThisObject.__classDef.name) ? 1 : 0; });
-bindNative(["cn1_java_lang_Class_isInterface_R_boolean"], function*(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isInterface ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_getName_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(descriptorClassName(__cn1ThisObject.__classDef.name)); });
+bindNative(["cn1_java_lang_Class_isArray_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.name.indexOf("[]") > -1 ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_isAssignableFrom_java_lang_Class_R_boolean"], function(__cn1ThisObject, cls) { return cls && cls.__classDef && cls.__classDef.assignableTo[__cn1ThisObject.__classDef.name] ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_isInstance_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) { return jvm.instanceOf(obj, __cn1ThisObject.__classDef.name) ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_isInterface_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isInterface ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*(__cn1ThisObject) {
   const def = __cn1ThisObject.__classDef;
   if (!def || def.isInterface || def.isAbstract || def.isPrimitive || def.name.indexOf("[]") > -1) {
@@ -5060,26 +5473,26 @@ bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*
   }
   return obj;
 });
-bindNative(["cn1_java_lang_Class_isAnnotation_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_isEnum_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_isAnonymousClass_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_isSynthetic_R_boolean"], function*() { return 0; });
-bindNative(["cn1_java_lang_Class_hashCode_R_int"], function*(__cn1ThisObject) { return __cn1ThisObject && __cn1ThisObject.__classDef ? (__cn1ThisObject.__classDef.name.length | 0) : 0; });
-bindNative(["cn1_java_lang_Class_getComponentType_R_java_lang_Class"], function*(__cn1ThisObject) {
+bindNative(["cn1_java_lang_Class_isAnnotation_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_isEnum_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_isAnonymousClass_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_isSynthetic_R_boolean"], function() { return 0; });
+bindNative(["cn1_java_lang_Class_hashCode_R_int"], function(__cn1ThisObject) { return __cn1ThisObject && __cn1ThisObject.__classDef ? (__cn1ThisObject.__classDef.name.length | 0) : 0; });
+bindNative(["cn1_java_lang_Class_getComponentType_R_java_lang_Class"], function(__cn1ThisObject) {
   const def = __cn1ThisObject.__classDef;
   if (!def || def.name.indexOf("[]") < 0) {
     return null;
   }
   return classObjectForName(def.componentClass);
 });
-bindNative(["cn1_java_lang_Class_isPrimitive_R_boolean"], function*(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isPrimitive ? 1 : 0; });
-bindNative(["cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object"], function*(componentClass, length) {
+bindNative(["cn1_java_lang_Class_isPrimitive_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isPrimitive ? 1 : 0; });
+bindNative(["cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object"], function(componentClass, length) {
   if (!componentClass || !componentClass.__classDef) {
     return null;
   }
   return jvm.newArray(length | 0, componentClass.__classDef.name, 1);
 });
-bindNative(["cn1_java_util_Locale_getOSLanguage_R_java_lang_String"], function*() {
+bindNative(["cn1_java_util_Locale_getOSLanguage_R_java_lang_String"], function() {
   let locale = null;
   if (typeof navigator !== "undefined" && navigator.language) {
     locale = navigator.language;
@@ -5088,22 +5501,22 @@ bindNative(["cn1_java_util_Locale_getOSLanguage_R_java_lang_String"], function*(
   }
   return createJavaString(locale || "en-US");
 });
-bindNative(["cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String"], function*() {
+bindNative(["cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String"], function() {
   return createJavaString(defaultTimeZoneId());
 });
-bindNative(["cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int"], function*(name, year, month, day, timeOfDayMillis) {
+bindNative(["cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int"], function(name, year, month, day, timeOfDayMillis) {
   const tz = normalizeTimeZoneId(name);
   const millis = Date.UTC((year | 0), ((month | 0) - 1), day | 0, 0, 0, 0, 0) + (timeOfDayMillis | 0);
   return timezoneOffsetMillis(tz, millis);
 });
-bindNative(["cn1_java_util_TimeZone_getTimezoneRawOffset_java_lang_String_R_int"], function*(name) {
+bindNative(["cn1_java_util_TimeZone_getTimezoneRawOffset_java_lang_String_R_int"], function(name) {
   return timezoneRawOffsetMillis(normalizeTimeZoneId(name));
 });
-bindNative(["cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean"], function*(name, millis) {
+bindNative(["cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean"], function(name, millis) {
   const tz = normalizeTimeZoneId(name);
   return timezoneOffsetMillis(tz, millis) !== timezoneRawOffsetMillis(tz) ? 1 : 0;
 });
-bindNative(["cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String"], function*(__cn1ThisObject, date, toAppendTo) {
+bindNative(["cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String"], function(__cn1ThisObject, date, toAppendTo) {
   const formatted = createJavaString(formatJavaDate(__cn1ThisObject, date));
   if (toAppendTo != null && toAppendTo[CN1_STRINGBUFFER_INTERNAL] != null) {
     sbAppendNativeString(toAppendTo[CN1_STRINGBUFFER_INTERNAL], jvm.toNativeString(formatted));
@@ -5149,19 +5562,96 @@ bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function
   return null;
 });
 bindNative(["cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode_R_int",
-            "cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode___R_int"], function*() {
+            "cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode___R_int"], function() {
   if (!jvm.lastEvent || jvm.lastEvent.code == null) {
     return -1;
   }
   return jvm.lastEvent.code | 0;
 });
 bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
-            "cn1_com_codename1_impl_platform_js_VMHost_pollEventCode___R_int"], function*() {
+            "cn1_com_codename1_impl_platform_js_VMHost_pollEventCode___R_int"], function() {
   if (!jvm.eventQueue.length) {
     return -1;
   }
   const event = jvm.eventQueue.shift();
   return event && event.code != null ? (event.code | 0) : -1;
+});
+
+// ---- NativeInterface bridge -----------------------------------------------------
+// The generated <Iface>Impl methods call these NativeInterfaceBridge.call*
+// natives. Each forwards the (iface, method, args) tuple to the MAIN thread via
+// the shared __cn1_native_interface_call__ host hook (browser_bridge.js runs the
+// developer's JS stub with DOM access and resolves through its callback), then
+// coerces the JS result to the declared Java return type. Args were already
+// unboxed by toHostTransferArg (boxed primitives / Java String / long).
+const __NI_PREFIX = "cn1_com_codename1_impl_platform_js_NativeInterfaceBridge_";
+const __NI_SIG = "java_lang_String_java_lang_String_java_lang_Object_1ARRAY";
+function* __cn1NativeInterfaceCall(iface, method, args) {
+  return yield jvm.invokeHostNative("__cn1_native_interface_call__", [iface, method, args]);
+}
+function __cn1NativeInterfaceArray(v, token) {
+  if (v == null) {
+    return null;
+  }
+  const len = v.length | 0;
+  const arr = jvm.newArray(len, token, 1);
+  for (let i = 0; i < len; i++) {
+    const e = v[i];
+    switch (token) {
+      case "java_lang_String": arr[i] = (e == null ? null : createJavaString(e)); break;
+      case "JAVA_LONG": arr[i] = _LfromNumber(Number(e || 0)); break;
+      case "JAVA_BOOLEAN": arr[i] = !!e; break;
+      case "JAVA_CHAR": arr[i] = (e | 0) & 0xffff; break;
+      case "JAVA_BYTE": arr[i] = ((e | 0) << 24) >> 24; break;
+      case "JAVA_SHORT": arr[i] = ((e | 0) << 16) >> 16; break;
+      case "JAVA_INT": arr[i] = e | 0; break;
+      case "JAVA_FLOAT": arr[i] = Math.fround(Number(e || 0)); break;
+      case "JAVA_DOUBLE": arr[i] = Number(e || 0); break;
+      default: arr[i] = e;
+    }
+  }
+  return arr;
+}
+bindNative([__NI_PREFIX + "callBoolean_" + __NI_SIG + "_R_boolean"], function*(iface, method, args) {
+  return !!(yield* __cn1NativeInterfaceCall(iface, method, args));
+});
+bindNative([__NI_PREFIX + "callByte_" + __NI_SIG + "_R_byte"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args); return ((v | 0) << 24) >> 24;
+});
+bindNative([__NI_PREFIX + "callShort_" + __NI_SIG + "_R_short"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args); return ((v | 0) << 16) >> 16;
+});
+bindNative([__NI_PREFIX + "callInt_" + __NI_SIG + "_R_int"], function*(iface, method, args) {
+  return (yield* __cn1NativeInterfaceCall(iface, method, args)) | 0;
+});
+bindNative([__NI_PREFIX + "callChar_" + __NI_SIG + "_R_char"], function*(iface, method, args) {
+  return ((yield* __cn1NativeInterfaceCall(iface, method, args)) | 0) & 0xffff;
+});
+bindNative([__NI_PREFIX + "callLong_" + __NI_SIG + "_R_long"], function*(iface, method, args) {
+  return _LfromNumber(Number((yield* __cn1NativeInterfaceCall(iface, method, args)) || 0));
+});
+bindNative([__NI_PREFIX + "callFloat_" + __NI_SIG + "_R_float"], function*(iface, method, args) {
+  return Math.fround(Number((yield* __cn1NativeInterfaceCall(iface, method, args)) || 0));
+});
+bindNative([__NI_PREFIX + "callDouble_" + __NI_SIG + "_R_double"], function*(iface, method, args) {
+  return Number((yield* __cn1NativeInterfaceCall(iface, method, args)) || 0);
+});
+bindNative([__NI_PREFIX + "callString_" + __NI_SIG + "_R_java_lang_String"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args);
+  return v == null ? null : createJavaString(v);
+});
+bindNative([__NI_PREFIX + "callObject_" + __NI_SIG + "_R_java_lang_Object"], function*(iface, method, args) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args);
+  return (typeof v === "string") ? createJavaString(v) : (v == null ? null : v);
+});
+bindNative([__NI_PREFIX + "callVoid_" + __NI_SIG], function*(iface, method, args) {
+  yield* __cn1NativeInterfaceCall(iface, method, args);
+  return null;
+});
+bindNative([__NI_PREFIX + "callArray_java_lang_String_java_lang_String_java_lang_Object_1ARRAY_java_lang_String_R_java_lang_Object"],
+        function*(iface, method, args, token) {
+  const v = yield* __cn1NativeInterfaceCall(iface, method, args);
+  return __cn1NativeInterfaceArray(v, jvm.toNativeString(token));
 });
 
 // Worker liveness heartbeat (diag-only). If the worker wedges in a synchronous
@@ -5173,12 +5663,46 @@ bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
 if (VM_DIAG_ENABLED && typeof setInterval === "function") {
   let __cn1HbLastResumes = -1;
   let __cn1HbFrozenStreak = 0;
+  let __cn1HbTick = 0;
   setInterval(function() {
     try {
       const rc = jvm.__cn1ResumeCount | 0;
       const frozen = rc === __cn1HbLastResumes;
       __cn1HbLastResumes = rc;
       __cn1HbFrozenStreak = frozen ? (__cn1HbFrozenStreak + 1) : 0;
+      // Periodic full thread dump (every ~20 beats ~= 30s). The FROZEN dump
+      // below only covers total wedges (resume count stalled); a single
+      // parked thread with the EDT still ticking -- e.g. a runner waiting on
+      // a notify that never comes -- never trips it. The periodic dump shows
+      // every thread's wait target during such partial stalls.
+      __cn1HbTick++;
+      if (__cn1HbTick % 20 === 0) {
+        vmTrace("DIAG:WORKER_HB_THREADS:" + jvm.dumpThreadStates());
+      }
+      // Stranded-sleep detector: a thread parked in sleep PAST its deadline is
+      // in one of three states, each implicating a different bug:
+      //   queued=1   -- entry still in timedWakeups; the single host timer is
+      //                 not firing / mis-armed (_refreshTimedWakeupTimer).
+      //   cancelled=1 -- something _removeTimedWakeup'd it without resuming
+      //                 the thread.
+      //   gone       -- spliced out of timedWakeups while not cancelled:
+      //                 _processExpiredTimedWakeups collected it but the
+      //                 enqueue never landed.
+      var __ths = jvm.threads || [];
+      for (var __i = 0; __i < __ths.length; __i++) {
+        var __t = __ths[__i];
+        if (__t.done || !__t.waiting || __t.waiting.op !== "sleep" || !__t.waiting.entry) continue;
+        var __e = __t.waiting.entry;
+        var __due = __e.wakeAt - jvm.schedulerNow();
+        if (__due > -2000) continue;
+        vmTrace("DIAG:STRANDED_SLEEP:t" + __t.id
+          + ":dueIn=" + Math.round(__due)
+          + ":queued=" + (jvm.timedWakeups.indexOf(__e) >= 0 ? 1 : 0)
+          + ":cancelled=" + (__e.cancelled ? 1 : 0)
+          + ":wakeupTimerArmed=" + (jvm._wakeupTimer != null ? 1 : 0)
+          + ":wakeupAt=" + (jvm._wakeupAt === Infinity ? "inf" : Math.round(jvm._wakeupAt - jvm.schedulerNow()))
+          + ":pendingWakeups=" + jvm.timedWakeups.length);
+      }
       vmTrace("DIAG:WORKER_HB:resumes=" + rc
         + ":runnable=" + (jvm.runnable ? jvm.runnable.length : -1)
         + ":draining=" + (jvm.draining ? 1 : 0)
@@ -5186,7 +5710,10 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
         + ":frozen=" + (frozen ? 1 : 0)
         + ":captureGate=" + (jvm.captureGateOwner ? 1 : 0)
         + ":sinceStepMs=" + (jvm.__cn1LastResumeTs != null ? Math.round(jvm.schedulerNow() - jvm.__cn1LastResumeTs) : -1)
-        + ":lastThread=" + String(jvm.__cn1LastResumeLabel));
+        + ":lastThread=" + String(jvm.__cn1LastResumeLabel)
+        + ":wakeArm=" + (jvm._wakeupArmCount | 0)
+        + ":wakeFire=" + (jvm._wakeupFireCount | 0)
+        + ":wakeFiredAgo=" + (jvm._wakeupLastFiredAt != null ? Math.round(jvm.schedulerNow() - jvm._wakeupLastFiredAt) : -1));
       // When the worker is wedged (frozen with nothing runnable) every green
       // thread is parked. Dump WHAT they are parked on so the lost-response /
       // deadlock can be isolated without worker-internal tracing (which

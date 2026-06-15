@@ -24,10 +24,27 @@ public class ArrayBufferInputStream extends InputStream {
     int pos = 0;
     int len;
     String src;
+    // Worker-local copy of the backing buffer, materialised lazily on the
+    // FIRST single-byte read. ``buf.get(pos++)`` is a JSO-bridge virtual
+    // dispatch (string-parsed method id + wrapper unwrap per call);
+    // ``Resources.load(theme.res)`` issues hundreds of thousands of
+    // single-byte reads through DataInputStream, which made the
+    // Initializr's boot crawl for minutes. One bulk copy turns every
+    // subsequent read into a plain Java array access. Callers that only
+    // bulk-read (media) or grab the blob/buffer never pay the copy.
+    private byte[] local;
+
     public ArrayBufferInputStream(Uint8Array buf, String type) {
         this.buf = buf;
         this.type=type;
         this.len = buf.getByteLength();
+    }
+
+    private void ensureLocal() {
+        if (local == null) {
+            local = new byte[len];
+            readBulkImpl(buf, 0, local, 0, len);
+        }
     }
 
     @Override
@@ -35,7 +52,8 @@ public class ArrayBufferInputStream extends InputStream {
         if ( pos >= len ){
             return -1;
         }
-        return buf.get(pos++);
+        ensureLocal();
+        return local[pos++] & 0xFF;
     }
 
     @Override
@@ -50,6 +68,11 @@ public class ArrayBufferInputStream extends InputStream {
         int avail = len - pos;
         if (n > avail) {
             n = avail;
+        }
+        if (local != null) {
+            System.arraycopy(local, pos, b, off, n);
+            pos += n;
+            return n;
         }
         // Native intrinsic: one JS-side loop copies n bytes from the
         // backing Uint8Array into the Java byte[] without per-byte
@@ -99,6 +122,7 @@ public class ArrayBufferInputStream extends InputStream {
     @Override
     public void close() throws IOException {
         buf = null;
+        local = null;
         len = 0;
     }
 
