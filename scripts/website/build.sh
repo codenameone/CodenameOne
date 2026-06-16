@@ -108,11 +108,32 @@ set_cn1_user_token() {
   local project_dir="$1"
 
   if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+    # CN1_TOKEN holds the account *password*, not a build token. The build
+    # sends whatever is stored in the prefs "token" slot as an
+    # "Authorization: Bearer" header; the cloud server parses that as a JWT,
+    # so seeding the raw password makes every cloud call 401 and the build
+    # falls back to an interactive browser login that hangs in CI
+    # ("Waiting for login..."). Exchange the password for a short-lived
+    # Keycloak access token (OAuth2 direct grant on the public cn1cloudapp
+    # client) and seed THAT instead.
+    local cn1_access_token=""
+    cn1_access_token="$(curl -fsS -m 20 \
+      -d 'grant_type=password' \
+      -d 'client_id=cn1cloudapp' \
+      --data-urlencode "username=${CN1_USER}" \
+      --data-urlencode "password=${CN1_TOKEN}" \
+      'https://auth.codenameone.com/auth/realms/Realm/protocol/openid-connect/token' \
+      | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')" || true
+    if [ -z "${cn1_access_token}" ]; then
+      echo "Failed to obtain a Codename One access token from CN1_USER/CN1_TOKEN — check the credentials (the secret must be the account password)." >&2
+      return 1
+    fi
+
     if ! sh ./mvnw -q -U -pl javascript -am \
       cn1:set-user-token \
       -Dcodename1.platform=javascript \
       -Duser="${CN1_USER}" \
-      -Dtoken="${CN1_TOKEN}"; then
+      -Dtoken="${cn1_access_token}"; then
       echo "cn1:set-user-token is unavailable in this plugin version for ${project_dir}; writing CN1 credentials directly to Java preferences." >&2
       local tmp_dir
       tmp_dir="$(mktemp -d)"
@@ -131,7 +152,7 @@ public class SetCn1Prefs {
 }
 JAVA
       javac "${tmp_dir}/SetCn1Prefs.java"
-      java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${CN1_TOKEN}"
+      java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${cn1_access_token}"
       rm -rf "${tmp_dir}"
     fi
   else
