@@ -27,6 +27,9 @@ public final class GeneratedAccess_java_util_function {
         if ("BiConsumer".equals(simpleName)) {
             return java.util.function.BiConsumer.class;
         }
+        if ("BiFunction".equals(simpleName)) {
+            return java.util.function.BiFunction.class;
+        }
         if ("BinaryOperator".equals(simpleName)) {
             return java.util.function.BinaryOperator.class;
         }
@@ -67,30 +70,37 @@ public final class GeneratedAccess_java_util_function {
                 unsupported = ex;
             }
         }
+        if (target instanceof java.util.function.BiFunction) {
+            try {
+                return invoke1((java.util.function.BiFunction) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof java.util.function.Consumer) {
             try {
-                return invoke1((java.util.function.Consumer) target, name, safeArgs);
+                return invoke2((java.util.function.Consumer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.function.Function) {
             try {
-                return invoke2((java.util.function.Function) target, name, safeArgs);
+                return invoke3((java.util.function.Function) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.function.Predicate) {
             try {
-                return invoke3((java.util.function.Predicate) target, name, safeArgs);
+                return invoke4((java.util.function.Predicate) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.function.Supplier) {
             try {
-                return invoke4((java.util.function.Supplier) target, name, safeArgs);
+                return invoke5((java.util.function.Supplier) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -111,7 +121,17 @@ public final class GeneratedAccess_java_util_function {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke1(java.util.function.Consumer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke1(java.util.function.BiFunction typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("apply".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
+                return typedTarget.apply((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(java.util.function.Consumer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accept".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -121,7 +141,7 @@ public final class GeneratedAccess_java_util_function {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(java.util.function.Function typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(java.util.function.Function typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("apply".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -131,7 +151,7 @@ public final class GeneratedAccess_java_util_function {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(java.util.function.Predicate typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(java.util.function.Predicate typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("test".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -141,7 +161,7 @@ public final class GeneratedAccess_java_util_function {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(java.util.function.Supplier typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(java.util.function.Supplier typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("get".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.get();

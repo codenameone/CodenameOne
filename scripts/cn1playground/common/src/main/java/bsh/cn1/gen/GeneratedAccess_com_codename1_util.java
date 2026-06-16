@@ -254,6 +254,30 @@ public final class GeneratedAccess_com_codename1_util {
                 return com.codename1.util.Base64.decode((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), (byte[]) adaptedArgs[2]);
             }
         }
+        if ("decodeNoWhitespaceSimd".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, byte[].class}, false);
+                return com.codename1.util.Base64.decodeNoWhitespaceSimd((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), (byte[]) adaptedArgs[2]);
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, byte[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, byte[].class, int[].class}, false);
+                return com.codename1.util.Base64.decodeNoWhitespaceSimd((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), (byte[]) adaptedArgs[2], (int[]) adaptedArgs[3]);
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class}, false);
+                return com.codename1.util.Base64.decodeNoWhitespaceSimd((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), (byte[]) adaptedArgs[3], toIntValue(adaptedArgs[4]));
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class, int[].class}, false);
+                return com.codename1.util.Base64.decodeNoWhitespaceSimd((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), (byte[]) adaptedArgs[3], toIntValue(adaptedArgs[4]), (int[]) adaptedArgs[5]);
+            }
+        }
+        if ("decodeUrlSafe".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.util.Base64.decodeUrlSafe((java.lang.String) adaptedArgs[0]);
+            }
+        }
         if ("encode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
@@ -268,6 +292,30 @@ public final class GeneratedAccess_com_codename1_util {
             if (matches(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false);
                 return com.codename1.util.Base64.encodeNoNewline((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1]);
+            }
+        }
+        if ("encodeNoNewlineSimd".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false);
+                return com.codename1.util.Base64.encodeNoNewlineSimd((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class, byte[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class, int[].class}, false);
+                return com.codename1.util.Base64.encodeNoNewlineSimd((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1], (int[]) adaptedArgs[2]);
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class}, false);
+                return com.codename1.util.Base64.encodeNoNewlineSimd((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), (byte[]) adaptedArgs[3], toIntValue(adaptedArgs[4]));
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, byte[].class, java.lang.Integer.class, int[].class}, false);
+                return com.codename1.util.Base64.encodeNoNewlineSimd((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), (byte[]) adaptedArgs[3], toIntValue(adaptedArgs[4]), (int[]) adaptedArgs[5]);
+            }
+        }
+        if ("encodeUrlSafe".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return com.codename1.util.Base64.encodeUrlSafe((byte[]) adaptedArgs[0]);
             }
         }
         throw unsupportedStatic(com.codename1.util.Base64.class, name, safeArgs);

@@ -21,14 +21,16 @@
   <properties>
     <cn1.plugin.version>${cn1.version}</cn1.plugin.version>
     <cn1.version>7.0.251</cn1.version>
-    <!-- cn1.registry.version pins the bean-shell access registry one
-         release behind cn1.version. The registry is consumed by the
-         deployed JavaScript cloud build, which lags the release
-         channel, so generating against the current cn1.version
-         references APIs (zoomFonts, isSimdOptimizationsEnabled, ...)
-         that fail at shell-eval time with NoSuchMethod on JS. Bump
-         this deliberately as the JS port catches up. -->
-    <cn1.registry.version>7.0.234</cn1.registry.version>
+    <!-- The bean-shell access registry is generated against the same
+         Codename One sources the playground ships. The deployed
+         JavaScript bundle now builds with the local ParparVM
+         `local-javascript` target (no longer the lagging cloud TeaVM
+         build), so the registry tracks the current API directly and the
+         old one-release `cn1.registry.version` pin is gone. When building
+         against the local workspace (cn1.localWorkspace=true) the registry
+         is generated from the repo's own sources; see
+         cn1.accessRegistry.useLocalSources below. -->
+    <cn1.accessRegistry.useLocalSources>false</cn1.accessRegistry.useLocalSources>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java.version>1.8</java.version>
     <java-tests.version>11</java-tests.version>
@@ -127,6 +129,10 @@
       </activation>
       <properties>
         <cn1.version>8.0-SNAPSHOT</cn1.version>
+        <!-- The local 8.0-SNAPSHOT has no source jars on Maven Central, so
+             generate the bean-shell registry from the repo's own CN1 sources
+             (which are what the local-javascript ParparVM build compiles). -->
+        <cn1.accessRegistry.useLocalSources>true</cn1.accessRegistry.useLocalSources>
       </properties>
     </profile>
     <profile>

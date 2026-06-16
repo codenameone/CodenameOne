@@ -48,75 +48,43 @@ public final class GenerateCN1AccessRegistry {
     private static final int FIND_CLASS_CHUNK_SIZE = 64;
     private static final char MEMBER_SEPARATOR = '\u001f';
     private static final Map<String, Boolean> RUNTIME_PUBLIC_TYPE_CACHE = new HashMap<String, Boolean>();
+    // Types that must never appear in the bean-shell registry.
+    //
+    // The earlier one-release exclusions for the security/nfc APIs are gone:
+    // they were workarounds for the legacy JavaScript cloud build (TeaVM)
+    // lagging the release channel. The playground now builds with the local
+    // ParparVM `local-javascript` target against the current sources, so those
+    // APIs are available again.
+    //
+    // The remaining entries are structural, not version-driven:
+    //  - Accessor / IOAccessor are package-private accessor shims that exist
+    //    only so sibling packages can reach internal state; they are not part
+    //    of the public API.
+    //  - Simd's allocaByte/allocaInt/allocaFloat (+ the *Zeroed/*Filled
+    //    variants) return method-local scratch arrays that ParparVM may place
+    //    on the C stack. The bytecode-compliance check (enforced by the
+    //    local-javascript target too, not just iOS) forbids letting such an
+    //    array escape its allocating method, and the generated reflection
+    //    bridge inherently escapes it by returning it from invokeN. Simd is a
+    //    low-level SIMD primitives API that playground scripts are extremely
+    //    unlikely to need, so exclude the whole class.
     private static final Set<String> INTERNAL_CN1_TYPES = new HashSet<String>(Arrays.asList(
             "com.codename1.ui.Accessor",
             "com.codename1.io.IOAccessor",
-            // Simd's allocaByte/allocaInt/allocaFloat (+ the *Zeroed/*Filled
-            // variants) return method-local scratch arrays that the ParparVM
-            // lowering may place on the C stack. CN1's compliance check
-            // forbids letting such an array escape the method that allocated
-            // it, and the generated reflection bridge inherently does escape
-            // it by returning it from invokeN. Exclude the whole class from
-            // the bean-shell registry - Simd is a low-level SIMD primitives
-            // API that playground scripts are extremely unlikely to need.
-            "com.codename1.util.Simd",
-            // com.codename1.security.* is a newly-introduced API
-            // (Biometrics, SecureStorage and friends). Until the cloud build
-            // server / TeaVM backend that compiles the playground catches up
-            // with the new classes the bridge generation trips the TeaVM
-            // RMI daemon. Exclude the new types from the registry for one
-            // release; the API is still usable in real apps, just not in the
-            // playground sandbox.
-            "com.codename1.security.Biometrics",
-            "com.codename1.security.SecureStorage",
-            "com.codename1.security.AuthenticationOptions",
-            "com.codename1.security.BiometricType",
-            "com.codename1.security.BiometricError",
-            "com.codename1.security.BiometricException",
-            // Crypto primitives (Hash, Hmac, Cipher, ...) ride the same
-            // one-release exclusion: the playground's TeaVM bridge needs to
-            // catch up with the new package before these can be reflected
-            // from beanshell.
-            "com.codename1.security.Hash",
-            "com.codename1.security.Hmac",
-            "com.codename1.security.Cipher",
-            "com.codename1.security.Signature",
-            "com.codename1.security.SecureRandom",
-            "com.codename1.security.KeyGenerator",
-            "com.codename1.security.KeyPair",
-            "com.codename1.security.SecretKey",
-            "com.codename1.security.PublicKey",
-            "com.codename1.security.PrivateKey",
-            "com.codename1.security.Jwt",
-            "com.codename1.security.Otp",
-            "com.codename1.security.Base32",
-            "com.codename1.security.Base64Url",
-            "com.codename1.security.CryptoException",
-            // com.codename1.nfc.* is a newly-introduced API (Nfc, NdefMessage,
-            // tag-technology classes, HostCardEmulationService). Same TeaVM
-            // backend cloud-build limitation as the security package above --
-            // exclude until the playground server is updated. Real apps still
-            // use the API, just not playground scripts.
-            "com.codename1.nfc.Nfc",
-            "com.codename1.nfc.NfcException",
-            "com.codename1.nfc.NfcError",
-            "com.codename1.nfc.NfcReadOptions",
-            "com.codename1.nfc.NfcListener",
-            "com.codename1.nfc.NdefMessage",
-            "com.codename1.nfc.NdefRecord",
-            "com.codename1.nfc.Tag",
-            "com.codename1.nfc.TagType",
-            "com.codename1.nfc.TagTechnology",
-            "com.codename1.nfc.IsoDep",
-            "com.codename1.nfc.MifareClassic",
-            "com.codename1.nfc.MifareUltralight",
-            "com.codename1.nfc.NfcA",
-            "com.codename1.nfc.NfcB",
-            "com.codename1.nfc.NfcF",
-            "com.codename1.nfc.NfcV",
-            "com.codename1.nfc.HostCardEmulationService",
-            "com.codename1.nfc.ApduResponse"
+            "com.codename1.util.Simd"
     ));
+
+    // Package prefixes excluded wholesale from the registry.
+    //  - com.codename1.testing.junit is the JavaSE-port JUnit 5 test-extension
+    //    API (CodenameOneExtension, @Theme, @DarkMode, @RTL, ...). It is desktop
+    //    test tooling, not a runtime API a playground bean-shell script can use,
+    //    and it is not on the playground-common compile classpath in every
+    //    release (it lives in the JavaSE port, not the core). Including it broke
+    //    the registry compile ("package com.codename1.testing.junit does not
+    //    exist") once the cn1.registry.version pin was removed.
+    private static final String[] INTERNAL_CN1_PACKAGE_PREFIXES = new String[]{
+            "com.codename1.testing.junit."
+    };
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
             "com.codename1.",
@@ -1240,6 +1208,11 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static boolean isPublicRuntimeType(String className) {
         if (INTERNAL_CN1_TYPES.contains(className)) {
             return false;
+        }
+        for (String prefix : INTERNAL_CN1_PACKAGE_PREFIXES) {
+            if (className.startsWith(prefix)) {
+                return false;
+            }
         }
         Boolean cached = RUNTIME_PUBLIC_TYPE_CACHE.get(className);
         if (cached != null) {
@@ -2546,8 +2519,17 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             throws IOException {
         int fixedCount = paramTypes.size() - 1;
         ApiType componentType = paramTypes.get(paramTypes.size() - 1).componentType();
-        writer.write(indent + componentType.canonicalName() + "[] varArgs = new " + componentType.canonicalName()
-                + "[adaptedArgs.length - " + fixedCount + "];\n");
+        // The allocated array's first dimension carries the element count. When
+        // the varargs element type is itself an array (e.g. byte[]... -> the
+        // component type is byte[]), the size must sit in the leading bracket
+        // and the element's own array dimensions trail it: "new byte[N][]", not
+        // the malformed "new byte[][N]".
+        StringBuilder trailingDims = new StringBuilder();
+        for (int i = 0; i < componentType.arrayDepth; i++) {
+            trailingDims.append("[]");
+        }
+        writer.write(indent + componentType.canonicalName() + "[] varArgs = new " + componentType.baseName
+                + "[adaptedArgs.length - " + fixedCount + "]" + trailingDims + ";\n");
         writer.write(indent + "for (int i = " + fixedCount + "; i < adaptedArgs.length; i++) {\n");
         writer.write(indent + "    varArgs[i - " + fixedCount + "] = " + castValue("adaptedArgs[i]", componentType) + ";\n");
         writer.write(indent + "}\n");

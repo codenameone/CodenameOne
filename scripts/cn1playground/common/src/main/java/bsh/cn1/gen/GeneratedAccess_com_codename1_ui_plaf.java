@@ -30,6 +30,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("CSSBorder".equals(simpleName)) {
             return com.codename1.ui.plaf.CSSBorder.class;
         }
+        if ("CSSFilterParser".equals(simpleName)) {
+            return com.codename1.ui.plaf.CSSFilterParser.class;
+        }
+        if ("FilterChain".equals(simpleName)) {
+            return com.codename1.ui.plaf.CSSFilterParser.FilterChain.class;
+        }
         if ("DefaultLookAndFeel".equals(simpleName)) {
             return com.codename1.ui.plaf.DefaultLookAndFeel.class;
         }
@@ -183,12 +189,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.plaf.Border.class) return invokeStatic0(name, safeArgs);
-        if (type == com.codename1.ui.plaf.DefaultLookAndFeel.class) return invokeStatic1(name, safeArgs);
-        if (type == com.codename1.ui.plaf.RoundBorder.class) return invokeStatic2(name, safeArgs);
-        if (type == com.codename1.ui.plaf.RoundRectBorder.class) return invokeStatic3(name, safeArgs);
-        if (type == com.codename1.ui.plaf.Style.class) return invokeStatic4(name, safeArgs);
-        if (type == com.codename1.ui.plaf.StyleParser.class) return invokeStatic5(name, safeArgs);
-        if (type == com.codename1.ui.plaf.UIManager.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.ui.plaf.CSSFilterParser.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.ui.plaf.DefaultLookAndFeel.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.ui.plaf.RoundBorder.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.ui.plaf.RoundRectBorder.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.ui.plaf.Style.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.ui.plaf.StyleParser.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.ui.plaf.UIManager.class) return invokeStatic7(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -436,6 +443,16 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("parse".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.ui.plaf.CSSFilterParser.parse((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.ui.plaf.CSSFilterParser.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("reverseAlignForBidi".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class}, false);
@@ -445,7 +462,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.DefaultLookAndFeel.class, name, safeArgs);
     }
 
-    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.RoundBorder.create();
@@ -454,7 +471,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.RoundBorder.class, name, safeArgs);
     }
 
-    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.RoundRectBorder.create();
@@ -463,7 +480,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.RoundRectBorder.class, name, safeArgs);
     }
 
-    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("createProxyStyle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style[].class}, true);
@@ -477,7 +494,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.Style.class, name, safeArgs);
     }
 
-    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
         if ("getBackgroundTypes".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.StyleParser.getBackgroundTypes();
@@ -503,7 +520,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.StyleParser.class, name, safeArgs);
     }
 
-    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
         if ("createInstance".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.UIManager.createInstance();
@@ -992,6 +1009,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 typedTarget.drawList((com.codename1.ui.Graphics) adaptedArgs[0], (com.codename1.ui.List) adaptedArgs[1]); return null;
             }
         }
+        if ("drawModernPullToRefresh".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.Component.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.Component.class, java.lang.Boolean.class}, false);
+                typedTarget.drawModernPullToRefresh((com.codename1.ui.Graphics) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue()); return null;
+            }
+        }
         if ("drawPullToRefresh".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.Component.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.Component.class, java.lang.Boolean.class}, false);
@@ -1256,6 +1279,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("isFocusScrolling".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isFocusScrolling();
+            }
+        }
+        if ("isInteractiveScroll".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isInteractiveScroll();
             }
         }
         if ("isRTL".equals(name)) {
@@ -2796,6 +2824,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.isFocusScrolling();
             }
         }
+        if ("isInteractiveScroll".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isInteractiveScroll();
+            }
+        }
         if ("isRTL".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isRTL();
@@ -3045,6 +3078,16 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.getAlignment();
             }
         }
+        if ("getBackdropFilterBlurRadius".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBackdropFilterBlurRadius();
+            }
+        }
+        if ("getBackdropFilterColorMatrix".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBackdropFilterColorMatrix();
+            }
+        }
         if ("getBackgroundGradientEndColor".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getBackgroundGradientEndColor();
@@ -3115,9 +3158,24 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.getFgColor();
             }
         }
+        if ("getFilterBlurRadius".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFilterBlurRadius();
+            }
+        }
+        if ("getFilterColorMatrix".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFilterColorMatrix();
+            }
+        }
         if ("getFont".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getFont();
+            }
+        }
+        if ("getGradient".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getGradient();
             }
         }
         if ("getHorizontalMargins".equals(name)) {
@@ -3288,6 +3346,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.is3DTextNorth();
             }
         }
+        if ("isExtendedGradientBackground".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isExtendedGradientBackground();
+            }
+        }
         if ("isLowered3DText".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isLowered3DText();
@@ -3380,6 +3443,26 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setAlignment(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("setBackdropFilterBlurRadius".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setBackdropFilterBlurRadius(((Number) adaptedArgs[0]).floatValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
+                typedTarget.setBackdropFilterBlurRadius(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("setBackdropFilterColorMatrix".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
+                typedTarget.setBackdropFilterColorMatrix((float[]) adaptedArgs[0]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Boolean.class}, false);
+                typedTarget.setBackdropFilterColorMatrix((float[]) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setBackgroundGradientEndColor".equals(name)) {
@@ -3522,6 +3605,26 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 typedTarget.setFgColor(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
+        if ("setFilterBlurRadius".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setFilterBlurRadius(((Number) adaptedArgs[0]).floatValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
+                typedTarget.setFilterBlurRadius(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("setFilterColorMatrix".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
+                typedTarget.setFilterColorMatrix((float[]) adaptedArgs[0]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Boolean.class}, false);
+                typedTarget.setFilterColorMatrix((float[]) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
         if ("setFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false);
@@ -3530,6 +3633,16 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class, java.lang.Boolean.class}, false);
                 typedTarget.setFont((com.codename1.ui.Font) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("setGradient".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Gradient.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Gradient.class}, false);
+                typedTarget.setGradient((com.codename1.ui.Gradient) adaptedArgs[0]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Gradient.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Gradient.class, java.lang.Boolean.class}, false);
+                typedTarget.setGradient((com.codename1.ui.Gradient) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setIconGap".equals(name)) {
@@ -4590,6 +4703,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.parseComponentStyle((com.codename1.ui.util.Resources) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], varArgs);
             }
         }
+        if ("refreshTheme".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.refreshTheme(); return null;
+            }
+        }
         if ("removeThemeRefreshListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -4647,6 +4765,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.wasThemeInstalled();
             }
         }
+        if ("zoomFonts".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.zoomFonts(((Number) adaptedArgs[0]).floatValue()); return null;
+            }
+        }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
@@ -4688,11 +4812,18 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     private static Object getStaticField1(String name) throws Exception {
         if ("ALIGNMENT".equals(name)) return com.codename1.ui.plaf.Style.ALIGNMENT;
+        if ("BACKDROP_FILTER_BLUR".equals(name)) return com.codename1.ui.plaf.Style.BACKDROP_FILTER_BLUR;
+        if ("BACKDROP_FILTER_COLOR_MATRIX".equals(name)) return com.codename1.ui.plaf.Style.BACKDROP_FILTER_COLOR_MATRIX;
         if ("BACKGROUND_ALIGNMENT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_ALIGNMENT;
         if ("BACKGROUND_GRADIENT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT;
+        if ("BACKGROUND_GRADIENT_CONIC".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_CONIC;
+        if ("BACKGROUND_GRADIENT_LINEAR".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR;
         if ("BACKGROUND_GRADIENT_LINEAR_HORIZONTAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL;
         if ("BACKGROUND_GRADIENT_LINEAR_VERTICAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL;
         if ("BACKGROUND_GRADIENT_RADIAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_RADIAL;
+        if ("BACKGROUND_GRADIENT_RADIAL_FULL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_RADIAL_FULL;
+        if ("BACKGROUND_GRADIENT_REPEATING_LINEAR".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_REPEATING_LINEAR;
+        if ("BACKGROUND_GRADIENT_REPEATING_RADIAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_REPEATING_RADIAL;
         if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM;
         if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT;
         if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT;
@@ -4722,7 +4853,10 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("ELEVATION".equals(name)) return com.codename1.ui.plaf.Style.ELEVATION;
         if ("FG_ALPHA".equals(name)) return com.codename1.ui.plaf.Style.FG_ALPHA;
         if ("FG_COLOR".equals(name)) return com.codename1.ui.plaf.Style.FG_COLOR;
+        if ("FILTER_BLUR".equals(name)) return com.codename1.ui.plaf.Style.FILTER_BLUR;
+        if ("FILTER_COLOR_MATRIX".equals(name)) return com.codename1.ui.plaf.Style.FILTER_COLOR_MATRIX;
         if ("FONT".equals(name)) return com.codename1.ui.plaf.Style.FONT;
+        if ("GRADIENT".equals(name)) return com.codename1.ui.plaf.Style.GRADIENT;
         if ("ICON_GAP".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP;
         if ("ICON_GAP_UNIT".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP_UNIT;
         if ("MARGIN".equals(name)) return com.codename1.ui.plaf.Style.MARGIN;
@@ -4758,6 +4892,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     public static Object getField(Object target, String name) throws Exception {
+        if (target instanceof com.codename1.ui.plaf.CSSFilterParser.FilterChain) {
+            com.codename1.ui.plaf.CSSFilterParser.FilterChain typedTarget = (com.codename1.ui.plaf.CSSFilterParser.FilterChain) target;
+            if ("blurRadius".equals(name)) return typedTarget.blurRadius;
+            if ("colorMatrix".equals(name)) return typedTarget.colorMatrix;
+        }
         throw unsupportedField(target, name);
     }
 

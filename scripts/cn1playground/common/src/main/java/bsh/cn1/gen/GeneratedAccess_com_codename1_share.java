@@ -33,8 +33,23 @@ public final class GeneratedAccess_com_codename1_share {
         if ("SMSShare".equals(simpleName)) {
             return com.codename1.share.SMSShare.class;
         }
+        if ("ShareResult".equals(simpleName)) {
+            return com.codename1.share.ShareResult.class;
+        }
+        if ("ShareResultListener".equals(simpleName)) {
+            return com.codename1.share.ShareResultListener.class;
+        }
         if ("ShareService".equals(simpleName)) {
             return com.codename1.share.ShareService.class;
+        }
+        if ("SharedContent".equals(simpleName)) {
+            return com.codename1.share.SharedContent.class;
+        }
+        if ("Builder".equals(simpleName)) {
+            return com.codename1.share.SharedContent.Builder.class;
+        }
+        if ("Item".equals(simpleName)) {
+            return com.codename1.share.SharedContent.Item.class;
         }
         return null;
     }
@@ -63,7 +78,39 @@ public final class GeneratedAccess_com_codename1_share {
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.share.ShareResult.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.share.SharedContent.class) return invokeStatic1(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
+    }
+
+    private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("dismissed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.share.ShareResult.dismissed();
+            }
+        }
+        if ("failed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.share.ShareResult.failed((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("sharedTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.share.ShareResult.sharedTo((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.share.ShareResult.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("builder".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.share.SharedContent.builder();
+            }
+        }
+        throw unsupportedStatic(com.codename1.share.SharedContent.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
@@ -90,9 +137,44 @@ public final class GeneratedAccess_com_codename1_share {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.share.ShareResult) {
+            try {
+                return invoke3((com.codename1.share.ShareResult) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.share.ShareService) {
             try {
-                return invoke3((com.codename1.share.ShareService) target, name, safeArgs);
+                return invoke4((com.codename1.share.ShareService) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.share.SharedContent) {
+            try {
+                return invoke5((com.codename1.share.SharedContent) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.share.SharedContent.Builder) {
+            try {
+                return invoke6((com.codename1.share.SharedContent.Builder) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.share.SharedContent.Item) {
+            try {
+                return invoke7((com.codename1.share.SharedContent.Item) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.share.ShareResultListener) {
+            try {
+                return invoke8((com.codename1.share.ShareResultListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -135,6 +217,21 @@ public final class GeneratedAccess_com_codename1_share {
         if ("getCommandName".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getCommandName();
+            }
+        }
+        if ("getDesktopMenu".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopMenu();
+            }
+        }
+        if ("getDesktopShortcutKeyChar".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutKeyChar();
+            }
+        }
+        if ("getDesktopShortcutModifiers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutModifiers();
             }
         }
         if ("getDisabledIcon".equals(name)) {
@@ -187,6 +284,11 @@ public final class GeneratedAccess_com_codename1_share {
                 return typedTarget.getRolloverIcon();
             }
         }
+        if ("getShareResultListener".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getShareResultListener();
+            }
+        }
         if ("hashCode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
@@ -212,6 +314,22 @@ public final class GeneratedAccess_com_codename1_share {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setDesktopMenu".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setDesktopMenu((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setDesktopShortcut".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("setDisabledIcon".equals(name)) {
@@ -290,6 +408,12 @@ public final class GeneratedAccess_com_codename1_share {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
                 typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setShareResultListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false);
+                typedTarget.setShareResultListener((com.codename1.share.ShareResultListener) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
@@ -344,6 +468,21 @@ public final class GeneratedAccess_com_codename1_share {
                 return typedTarget.getCommandName();
             }
         }
+        if ("getDesktopMenu".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopMenu();
+            }
+        }
+        if ("getDesktopShortcutKeyChar".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutKeyChar();
+            }
+        }
+        if ("getDesktopShortcutModifiers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutModifiers();
+            }
+        }
         if ("getDisabledIcon".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDisabledIcon();
@@ -394,6 +533,11 @@ public final class GeneratedAccess_com_codename1_share {
                 return typedTarget.getRolloverIcon();
             }
         }
+        if ("getShareResultListener".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getShareResultListener();
+            }
+        }
         if ("hashCode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
@@ -419,6 +563,22 @@ public final class GeneratedAccess_com_codename1_share {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setDesktopMenu".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setDesktopMenu((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setDesktopShortcut".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("setDisabledIcon".equals(name)) {
@@ -497,6 +657,12 @@ public final class GeneratedAccess_com_codename1_share {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
                 typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setShareResultListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false);
+                typedTarget.setShareResultListener((com.codename1.share.ShareResultListener) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
@@ -551,6 +717,21 @@ public final class GeneratedAccess_com_codename1_share {
                 return typedTarget.getCommandName();
             }
         }
+        if ("getDesktopMenu".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopMenu();
+            }
+        }
+        if ("getDesktopShortcutKeyChar".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutKeyChar();
+            }
+        }
+        if ("getDesktopShortcutModifiers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutModifiers();
+            }
+        }
         if ("getDisabledIcon".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDisabledIcon();
@@ -601,6 +782,11 @@ public final class GeneratedAccess_com_codename1_share {
                 return typedTarget.getRolloverIcon();
             }
         }
+        if ("getShareResultListener".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getShareResultListener();
+            }
+        }
         if ("hashCode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
@@ -626,6 +812,22 @@ public final class GeneratedAccess_com_codename1_share {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setDesktopMenu".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setDesktopMenu((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setDesktopShortcut".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("setDisabledIcon".equals(name)) {
@@ -706,6 +908,12 @@ public final class GeneratedAccess_com_codename1_share {
                 typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
+        if ("setShareResultListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false);
+                typedTarget.setShareResultListener((com.codename1.share.ShareResultListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -724,7 +932,46 @@ public final class GeneratedAccess_com_codename1_share {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.share.ShareService typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(com.codename1.share.ShareResult typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getError".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getError();
+            }
+        }
+        if ("getPackageName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPackageName();
+            }
+        }
+        if ("getStatus".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStatus();
+            }
+        }
+        if ("isDismissed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDismissed();
+            }
+        }
+        if ("isFailed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isFailed();
+            }
+        }
+        if ("isSharedTo".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSharedTo();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codename1.share.ShareService typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
@@ -758,6 +1005,21 @@ public final class GeneratedAccess_com_codename1_share {
                 return typedTarget.getCommandName();
             }
         }
+        if ("getDesktopMenu".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopMenu();
+            }
+        }
+        if ("getDesktopShortcutKeyChar".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutKeyChar();
+            }
+        }
+        if ("getDesktopShortcutModifiers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopShortcutModifiers();
+            }
+        }
         if ("getDisabledIcon".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDisabledIcon();
@@ -808,6 +1070,11 @@ public final class GeneratedAccess_com_codename1_share {
                 return typedTarget.getRolloverIcon();
             }
         }
+        if ("getShareResultListener".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getShareResultListener();
+            }
+        }
         if ("hashCode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
@@ -833,6 +1100,22 @@ public final class GeneratedAccess_com_codename1_share {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setDesktopMenu".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setDesktopMenu((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setDesktopShortcut".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Integer.class}, false);
+                return typedTarget.setDesktopShortcut(((Character) adaptedArgs[0]).charValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("setDisabledIcon".equals(name)) {
@@ -913,6 +1196,12 @@ public final class GeneratedAccess_com_codename1_share {
                 typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
+        if ("setShareResultListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.share.ShareResultListener.class}, false);
+                typedTarget.setShareResultListener((com.codename1.share.ShareResultListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -931,8 +1220,212 @@ public final class GeneratedAccess_com_codename1_share {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
+    private static Object invoke5(com.codename1.share.SharedContent typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getFirstItem".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFirstItem();
+            }
+        }
+        if ("getItems".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getItems();
+            }
+        }
+        if ("getSubject".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSubject();
+            }
+        }
+        if ("hasFiles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasFiles();
+            }
+        }
+        if ("hasText".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasText();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.share.SharedContent.Builder typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addFile".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.addFile((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]);
+            }
+        }
+        if ("addImage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.addImage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]);
+            }
+        }
+        if ("addText".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.addText((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("addUrl".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.addUrl((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("build".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.build();
+            }
+        }
+        if ("subject".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.subject((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke7(com.codename1.share.SharedContent.Item typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getFilePath".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFilePath();
+            }
+        }
+        if ("getMimeType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMimeType();
+            }
+        }
+        if ("getText".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getText();
+            }
+        }
+        if ("getTitle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTitle();
+            }
+        }
+        if ("getType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getType();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.share.ShareResultListener typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("onResult".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.share.ShareResult.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.share.ShareResult.class}, false);
+                typedTarget.onResult((com.codename1.share.ShareResult) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.share.EmailShare.class) return getStaticField0(name);
+        if (type == com.codename1.share.FacebookShare.class) return getStaticField1(name);
+        if (type == com.codename1.share.SMSShare.class) return getStaticField2(name);
+        if (type == com.codename1.share.ShareResult.class) return getStaticField3(name);
+        if (type == com.codename1.share.ShareService.class) return getStaticField4(name);
+        if (type == com.codename1.share.SharedContent.class) return getStaticField5(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DESKTOP_MENU".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU;
+        if ("DESKTOP_MENU_ABOUT".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_ABOUT;
+        if ("DESKTOP_MENU_APP".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_APP;
+        if ("DESKTOP_MENU_EDIT".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_EDIT;
+        if ("DESKTOP_MENU_FILE".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_FILE;
+        if ("DESKTOP_MENU_HELP".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_HELP;
+        if ("DESKTOP_MENU_PREFERENCES".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_PREFERENCES;
+        if ("DESKTOP_MENU_QUIT".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_QUIT;
+        if ("DESKTOP_MENU_VIEW".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_VIEW;
+        if ("DESKTOP_MENU_WINDOW".equals(name)) return com.codename1.share.EmailShare.DESKTOP_MENU_WINDOW;
+        if ("DESKTOP_SHORTCUT_KEY".equals(name)) return com.codename1.share.EmailShare.DESKTOP_SHORTCUT_KEY;
+        if ("DESKTOP_SHORTCUT_MODIFIERS".equals(name)) return com.codename1.share.EmailShare.DESKTOP_SHORTCUT_MODIFIERS;
+        if ("DESKTOP_SHORTCUT_MODIFIER_ALT".equals(name)) return com.codename1.share.EmailShare.DESKTOP_SHORTCUT_MODIFIER_ALT;
+        if ("DESKTOP_SHORTCUT_MODIFIER_PRIMARY".equals(name)) return com.codename1.share.EmailShare.DESKTOP_SHORTCUT_MODIFIER_PRIMARY;
+        if ("DESKTOP_SHORTCUT_MODIFIER_SHIFT".equals(name)) return com.codename1.share.EmailShare.DESKTOP_SHORTCUT_MODIFIER_SHIFT;
+        throw unsupportedStaticField(com.codename1.share.EmailShare.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("DESKTOP_MENU".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU;
+        if ("DESKTOP_MENU_ABOUT".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_ABOUT;
+        if ("DESKTOP_MENU_APP".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_APP;
+        if ("DESKTOP_MENU_EDIT".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_EDIT;
+        if ("DESKTOP_MENU_FILE".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_FILE;
+        if ("DESKTOP_MENU_HELP".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_HELP;
+        if ("DESKTOP_MENU_PREFERENCES".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_PREFERENCES;
+        if ("DESKTOP_MENU_QUIT".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_QUIT;
+        if ("DESKTOP_MENU_VIEW".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_VIEW;
+        if ("DESKTOP_MENU_WINDOW".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_MENU_WINDOW;
+        if ("DESKTOP_SHORTCUT_KEY".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_SHORTCUT_KEY;
+        if ("DESKTOP_SHORTCUT_MODIFIERS".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_SHORTCUT_MODIFIERS;
+        if ("DESKTOP_SHORTCUT_MODIFIER_ALT".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_SHORTCUT_MODIFIER_ALT;
+        if ("DESKTOP_SHORTCUT_MODIFIER_PRIMARY".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_SHORTCUT_MODIFIER_PRIMARY;
+        if ("DESKTOP_SHORTCUT_MODIFIER_SHIFT".equals(name)) return com.codename1.share.FacebookShare.DESKTOP_SHORTCUT_MODIFIER_SHIFT;
+        throw unsupportedStaticField(com.codename1.share.FacebookShare.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("DESKTOP_MENU".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU;
+        if ("DESKTOP_MENU_ABOUT".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_ABOUT;
+        if ("DESKTOP_MENU_APP".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_APP;
+        if ("DESKTOP_MENU_EDIT".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_EDIT;
+        if ("DESKTOP_MENU_FILE".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_FILE;
+        if ("DESKTOP_MENU_HELP".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_HELP;
+        if ("DESKTOP_MENU_PREFERENCES".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_PREFERENCES;
+        if ("DESKTOP_MENU_QUIT".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_QUIT;
+        if ("DESKTOP_MENU_VIEW".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_VIEW;
+        if ("DESKTOP_MENU_WINDOW".equals(name)) return com.codename1.share.SMSShare.DESKTOP_MENU_WINDOW;
+        if ("DESKTOP_SHORTCUT_KEY".equals(name)) return com.codename1.share.SMSShare.DESKTOP_SHORTCUT_KEY;
+        if ("DESKTOP_SHORTCUT_MODIFIERS".equals(name)) return com.codename1.share.SMSShare.DESKTOP_SHORTCUT_MODIFIERS;
+        if ("DESKTOP_SHORTCUT_MODIFIER_ALT".equals(name)) return com.codename1.share.SMSShare.DESKTOP_SHORTCUT_MODIFIER_ALT;
+        if ("DESKTOP_SHORTCUT_MODIFIER_PRIMARY".equals(name)) return com.codename1.share.SMSShare.DESKTOP_SHORTCUT_MODIFIER_PRIMARY;
+        if ("DESKTOP_SHORTCUT_MODIFIER_SHIFT".equals(name)) return com.codename1.share.SMSShare.DESKTOP_SHORTCUT_MODIFIER_SHIFT;
+        throw unsupportedStaticField(com.codename1.share.SMSShare.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("STATUS_DISMISSED".equals(name)) return com.codename1.share.ShareResult.STATUS_DISMISSED;
+        if ("STATUS_FAILED".equals(name)) return com.codename1.share.ShareResult.STATUS_FAILED;
+        if ("STATUS_SHARED_TO".equals(name)) return com.codename1.share.ShareResult.STATUS_SHARED_TO;
+        throw unsupportedStaticField(com.codename1.share.ShareResult.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("DESKTOP_MENU".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU;
+        if ("DESKTOP_MENU_ABOUT".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_ABOUT;
+        if ("DESKTOP_MENU_APP".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_APP;
+        if ("DESKTOP_MENU_EDIT".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_EDIT;
+        if ("DESKTOP_MENU_FILE".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_FILE;
+        if ("DESKTOP_MENU_HELP".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_HELP;
+        if ("DESKTOP_MENU_PREFERENCES".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_PREFERENCES;
+        if ("DESKTOP_MENU_QUIT".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_QUIT;
+        if ("DESKTOP_MENU_VIEW".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_VIEW;
+        if ("DESKTOP_MENU_WINDOW".equals(name)) return com.codename1.share.ShareService.DESKTOP_MENU_WINDOW;
+        if ("DESKTOP_SHORTCUT_KEY".equals(name)) return com.codename1.share.ShareService.DESKTOP_SHORTCUT_KEY;
+        if ("DESKTOP_SHORTCUT_MODIFIERS".equals(name)) return com.codename1.share.ShareService.DESKTOP_SHORTCUT_MODIFIERS;
+        if ("DESKTOP_SHORTCUT_MODIFIER_ALT".equals(name)) return com.codename1.share.ShareService.DESKTOP_SHORTCUT_MODIFIER_ALT;
+        if ("DESKTOP_SHORTCUT_MODIFIER_PRIMARY".equals(name)) return com.codename1.share.ShareService.DESKTOP_SHORTCUT_MODIFIER_PRIMARY;
+        if ("DESKTOP_SHORTCUT_MODIFIER_SHIFT".equals(name)) return com.codename1.share.ShareService.DESKTOP_SHORTCUT_MODIFIER_SHIFT;
+        throw unsupportedStaticField(com.codename1.share.ShareService.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("TYPE_FILE".equals(name)) return com.codename1.share.SharedContent.TYPE_FILE;
+        if ("TYPE_IMAGE".equals(name)) return com.codename1.share.SharedContent.TYPE_IMAGE;
+        if ("TYPE_TEXT".equals(name)) return com.codename1.share.SharedContent.TYPE_TEXT;
+        if ("TYPE_URL".equals(name)) return com.codename1.share.SharedContent.TYPE_URL;
+        throw unsupportedStaticField(com.codename1.share.SharedContent.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

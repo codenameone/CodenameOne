@@ -170,6 +170,12 @@ public final class GeneratedAccess_com_codenameone_playground {
                 typedTarget.init((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
+        if ("onReceivedSharedContent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.share.SharedContent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.share.SharedContent.class}, false);
+                typedTarget.onReceivedSharedContent((com.codename1.share.SharedContent) adaptedArgs[0]); return null;
+            }
+        }
         if ("runApp".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.runApp(); return null;

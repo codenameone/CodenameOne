@@ -30,6 +30,9 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("AnimationObject".equals(simpleName)) {
             return com.codename1.ui.animations.AnimationObject.class;
         }
+        if ("AnimationTime".equals(simpleName)) {
+            return com.codename1.ui.animations.AnimationTime.class;
+        }
         if ("BubbleTransition".equals(simpleName)) {
             return com.codename1.ui.animations.BubbleTransition.class;
         }
@@ -101,11 +104,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.animations.AnimationObject.class) return invokeStatic0(name, safeArgs);
-        if (type == com.codename1.ui.animations.CommonTransitions.class) return invokeStatic1(name, safeArgs);
-        if (type == com.codename1.ui.animations.ComponentAnimation.class) return invokeStatic2(name, safeArgs);
-        if (type == com.codename1.ui.animations.MorphTransition.class) return invokeStatic3(name, safeArgs);
-        if (type == com.codename1.ui.animations.Motion.class) return invokeStatic4(name, safeArgs);
-        if (type == com.codename1.ui.animations.Timeline.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.ui.animations.AnimationTime.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.ui.animations.CommonTransitions.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.ui.animations.ComponentAnimation.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.ui.animations.MorphTransition.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.ui.animations.Motion.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.ui.animations.Timeline.class) return invokeStatic6(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -124,6 +128,31 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     }
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("isOverridden".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ui.animations.AnimationTime.isOverridden();
+            }
+        }
+        if ("now".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ui.animations.AnimationTime.now();
+            }
+        }
+        if ("reset".equals(name)) {
+            if (safeArgs.length == 0) {
+                com.codename1.ui.animations.AnimationTime.reset(); return null;
+            }
+        }
+        if ("setTime".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                com.codename1.ui.animations.AnimationTime.setTime(((Number) adaptedArgs[0]).longValue()); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.ui.animations.AnimationTime.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("createCover".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
@@ -198,7 +227,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedStatic(com.codename1.ui.animations.CommonTransitions.class, name, safeArgs);
     }
 
-    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("compoundAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation[].class}, true);
@@ -222,7 +251,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedStatic(com.codename1.ui.animations.ComponentAnimation.class, name, safeArgs);
     }
 
-    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -232,7 +261,13 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedStatic(com.codename1.ui.animations.MorphTransition.class, name, safeArgs);
     }
 
-    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+        if ("createCriticalDampedSpringMotion".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createCriticalDampedSpringMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
+            }
+        }
         if ("createCubicBezierMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
@@ -319,7 +354,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedStatic(com.codename1.ui.animations.Motion.class, name, safeArgs);
     }
 
-    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
         if ("createTimeline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false);
@@ -695,6 +730,11 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 typedTarget.initTransition(); return null;
             }
         }
+        if ("isSnapshotMode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSnapshotMode();
+            }
+        }
         if ("morph".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -709,6 +749,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
                 typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
+            }
+        }
+        if ("snapshotMode".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.snapshotMode(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);

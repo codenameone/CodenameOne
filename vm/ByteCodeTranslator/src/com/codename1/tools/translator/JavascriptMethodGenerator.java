@@ -4782,8 +4782,56 @@ final class JavascriptMethodGenerator {
                 out.append("  ").append(ctx.push("jvm.getClassObject(\"" + JavascriptNameUtil.sanitizeClassName(type.getInternalName()) + "\")")).append(";\n");
                 return true;
             }
+            if (type.getSort() == Type.ARRAY) {
+                out.append("  ").append(ctx.push(arrayClassObjectExpression(type))).append(";\n");
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * Expression yielding the {@code java.lang.Class} object for an array
+     * class literal (e.g. {@code byte[].class}, {@code String[].class}). The
+     * bytecode is {@code ldc} of an {@code ARRAY}-sort {@link Type}, which the
+     * OBJECT-only path above does not cover. {@code jvm.getArrayClass} lazily
+     * creates and caches the array class under the same name array instances
+     * use ({@code JAVA_BYTE[]}, {@code java_lang_String[]}), so the literal and
+     * {@code someArray.getClass()} resolve to the identical class object.
+     */
+    private static String arrayClassObjectExpression(Type type) {
+        Type element = type.getElementType();
+        String componentToken;
+        if (element.getSort() == Type.OBJECT) {
+            componentToken = JavascriptNameUtil.sanitizeClassName(element.getInternalName());
+        } else {
+            componentToken = primitiveComponentToken(element);
+        }
+        return "jvm.getArrayClass(\"" + componentToken + "\", " + type.getDimensions() + ").classObject";
+    }
+
+    /** Maps a primitive array element {@link Type} to its runtime {@code JAVA_*} token. */
+    private static String primitiveComponentToken(Type element) {
+        switch (element.getSort()) {
+            case Type.BOOLEAN:
+                return "JAVA_BOOLEAN";
+            case Type.CHAR:
+                return "JAVA_CHAR";
+            case Type.BYTE:
+                return "JAVA_BYTE";
+            case Type.SHORT:
+                return "JAVA_SHORT";
+            case Type.INT:
+                return "JAVA_INT";
+            case Type.LONG:
+                return "JAVA_LONG";
+            case Type.FLOAT:
+                return "JAVA_FLOAT";
+            case Type.DOUBLE:
+                return "JAVA_DOUBLE";
+            default:
+                throw new IllegalArgumentException("Unsupported primitive array element type " + element);
+        }
     }
 
     private static boolean appendStraightLineTypeInstruction(StringBuilder out, TypeInstruction instruction, StraightLineContext ctx) {
@@ -6579,6 +6627,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (type.getSort() == Type.OBJECT) {
                 out.append("        stack.p(jvm.getClassObject(\"").append(JavascriptNameUtil.sanitizeClassName(type.getInternalName()))
                         .append("\")); pc = ").append(index + 1).append("; break;\n");
+                return;
+            }
+            if (type.getSort() == Type.ARRAY) {
+                out.append("        stack.p(").append(arrayClassObjectExpression(type))
+                        .append("); pc = ").append(index + 1).append("; break;\n");
                 return;
             }
         }

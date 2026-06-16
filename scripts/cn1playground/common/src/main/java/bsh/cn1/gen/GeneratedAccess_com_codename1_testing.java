@@ -2169,6 +2169,16 @@ public final class GeneratedAccess_com_codename1_testing {
                 return typedTarget.isGrabsPointerEvents();
             }
         }
+        if ("isHScrollThumbGrabbed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHScrollThumbGrabbed();
+            }
+        }
+        if ("isHScrollThumbHover".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHScrollThumbHover();
+            }
+        }
         if ("isHidden".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isHidden();
@@ -2272,6 +2282,16 @@ public final class GeneratedAccess_com_codename1_testing {
         if ("isTraversable".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isTraversable();
+            }
+        }
+        if ("isVScrollThumbGrabbed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isVScrollThumbGrabbed();
+            }
+        }
+        if ("isVScrollThumbHover".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isVScrollThumbHover();
             }
         }
         if ("isVisible".equals(name)) {
@@ -2754,6 +2774,12 @@ public final class GeneratedAccess_com_codename1_testing {
                 typedTarget.setHideInPortrait(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
+        if ("setHorizontalScrollBounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.setHorizontalScrollBounds(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), toIntValue(adaptedArgs[5]), toIntValue(adaptedArgs[6]), toIntValue(adaptedArgs[7])); return null;
+            }
+        }
         if ("setIgnorePointerEvents".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -2908,6 +2934,12 @@ public final class GeneratedAccess_com_codename1_testing {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
                 return typedTarget.setPropertyValue((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        if ("setPullToRefresh".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
+                typedTarget.setPullToRefresh((java.lang.Runnable) adaptedArgs[0]); return null;
             }
         }
         if ("setRTL".equals(name)) {
@@ -3074,6 +3106,12 @@ public final class GeneratedAccess_com_codename1_testing {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false);
                 typedTarget.setUnselectedStyle((com.codename1.ui.plaf.Style) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setVerticalScrollBounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.setVerticalScrollBounds(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), toIntValue(adaptedArgs[5]), toIntValue(adaptedArgs[6]), toIntValue(adaptedArgs[7])); return null;
             }
         }
         if ("setVisible".equals(name)) {

@@ -187,21 +187,30 @@ The playground includes an **Inspector** tab that displays the component hierarc
 
 Changes made in the property editor are immediately reflected in the preview. The component tree updates automatically when your script re-runs.
 
-## JavaScript Port Tracking
+## JavaScript Port
 
-The current `javascript` module still represents the legacy JavaScript build
-path. While the new ParparVM-backed JavaScript port is being integrated, you
-can compare bundle size against a ParparVM artifact with:
+The `javascript` module builds with the local ParparVM JavaScript target
+(`codename1.buildTarget=local-javascript`), the same path the initializr uses.
+The build translates the app's ParparVM bytecode to JavaScript locally instead
+of routing through the legacy `javascript` cloud build target, so it tracks the
+current Codename One sources directly — there is no longer an old-version pin or
+a class-exclusion list working around the cloud TeaVM backend lagging the
+release channel. The cloud `javascript` target remains available as a fallback.
+
+The bean-shell access registry (`GeneratedCN1Access`) is generated against the
+same sources the bundle is built from. When building against the local
+workspace (`-Dcn1.localWorkspace=true`) it is generated from the repo's own CN1
+sources; see [`tools/README.md`](tools/README.md).
+
+To compare a bundle's size against another ParparVM artifact:
 
 ```bash
 PLAYGROUND_PARPARVM_BUNDLE=/path/to/parparvm/dist ./build.sh javascript_compare
 ```
 
 This uses
-[`compare-javascript-bundles.sh`](/Users/shai/dev/cn1/scripts/cn1playground/tools/compare-javascript-bundles.sh)
-to report total and JavaScript payload sizes. The long-term goal is to replace
-the legacy `javascript` module build itself with the ParparVM-backed port once
-the runtime and browser harness are complete.
+[`compare-javascript-bundles.sh`](tools/compare-javascript-bundles.sh)
+to report total and JavaScript payload sizes.
 
 ## BeanShell Interpreter Tradeoffs
 

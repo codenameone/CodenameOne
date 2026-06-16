@@ -153,6 +153,18 @@ public final class GeneratedAccess_com_codename1_push {
                 com.codename1.push.Push.sendPushMessageAsync((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], (java.lang.String) adaptedArgs[6], (java.lang.String) adaptedArgs[7], (java.lang.String) adaptedArgs[8], (java.lang.String) adaptedArgs[9], (java.lang.String) adaptedArgs[10]); return null;
             }
         }
+        if ("subscribeToTopic".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.push.Push.subscribeToTopic((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("unsubscribeFromTopic".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.push.Push.unsubscribeFromTopic((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
         throw unsupportedStatic(com.codename1.push.Push.class, name, safeArgs);
     }
 
@@ -190,6 +202,12 @@ public final class GeneratedAccess_com_codename1_push {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.push.PushContent.setActionId((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setActionTitle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.push.PushContent.setActionTitle((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setBody".equals(name)) {
@@ -441,6 +459,11 @@ public final class GeneratedAccess_com_codename1_push {
         if ("getActionId".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getActionId();
+            }
+        }
+        if ("getActionTitle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getActionTitle();
             }
         }
         if ("getBody".equals(name)) {

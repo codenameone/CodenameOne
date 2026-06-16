@@ -720,20 +720,31 @@ public class JavaScriptBuilder extends Executor {
         log("Running ByteCodeTranslator (javascript target) for " + mainClass);
         java.util.List<String> cmd = new java.util.ArrayList<String>();
         cmd.add("java");
-        cmd.add("-Xmx512m");
         // Pass through extra translator JVM options (e.g. -Dparparvm.js.*
-        // size/diagnostic knobs and kill switches) from the
+        // size/diagnostic knobs and kill switches, or a larger -Xmx) from the
         // CN1_TRANSLATOR_OPTS environment variable. The forked JVM does
         // not inherit the Maven process's -D properties, so this is the
         // only way to reach the translator for bisection / tuning.
         String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
+        boolean heapOverridden = false;
+        java.util.List<String> extraOpts = new java.util.ArrayList<String>();
         if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
             for (String opt : translatorOpts.trim().split("\\s+")) {
                 if (!opt.isEmpty()) {
-                    cmd.add(opt);
+                    extraOpts.add(opt);
+                    if (opt.startsWith("-Xmx")) {
+                        heapOverridden = true;
+                    }
                 }
             }
         }
+        // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence (apps
+        // that disable tree-shaking, e.g. the Playground, emit a much larger
+        // bundle and need a bigger heap to avoid OutOfMemoryError mid-emit).
+        if (!heapOverridden) {
+            cmd.add("-Xmx512m");
+        }
+        cmd.addAll(extraOpts);
         cmd.add("-cp");
         cmd.add(compilerJar.getAbsolutePath());
         cmd.add("com.codename1.tools.translator.ByteCodeTranslator");
