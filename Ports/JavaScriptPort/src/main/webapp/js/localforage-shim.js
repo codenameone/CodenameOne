@@ -23,9 +23,18 @@
   if (typeof window.createConfigOptions !== "function") {
     window.createConfigOptions = function() { return {}; };
   }
-  // If a real ``localforage`` library is loaded ahead of us, leave it
-  // alone. Otherwise install a localStorage-backed shim.
-  if (window.localforage && typeof window.localforage.setItem === "function") {
+  // This synchronous-callback shim MUST own ``window.localforage`` on the
+  // ParparVM port. The CN1 worker can't pump the async microtask/Promise loop
+  // a real localForage relies on, so its callbacks must fire inline (see the
+  // setItem note below). The catch: ``fontmetrics.js`` bundles a real
+  // localForage 1.7.3 and globally exposes it, and it loads BEFORE us -- left
+  // in place, CN1 Storage hits its Promise-based callback path and the
+  // worker-bridged callback blows up with "b is not a function". So install
+  // unconditionally, overriding any real localForage on the window. The only
+  // thing we skip is re-installing over OURSELVES (idempotent). fontmetrics
+  // keeps its own bundled instance for internal font-metric caching; it
+  // references that through its module closure, not ``window.localforage``.
+  if (window.localforage && window.localforage.__cn1ShimInstalled) {
     return;
   }
   var STORE_PREFIX = "cn1lf:";
@@ -122,6 +131,9 @@
   // callback fired. The empty-result case looked indistinguishable from
   // a non-existent key.)
   window.localforage = {
+    // Marker so a second load of this shim (or a re-check) doesn't reinstall
+    // over itself, while still letting us override a real localForage.
+    __cn1ShimInstalled: true,
     INDEXEDDB: "indexeddb",
     WEBSQL: "websql",
     LOCALSTORAGE: "localstorage",
