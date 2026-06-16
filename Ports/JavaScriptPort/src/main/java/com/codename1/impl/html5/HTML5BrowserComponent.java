@@ -252,8 +252,29 @@ public class HTML5BrowserComponent extends HTML5Peer {
     private static native boolean supportsSrcdocAttribute();
     private boolean supportsSrcdocAttribute;
     
-    @JSBody(params={"iframe"}, script="try{if(iframe.contentWindow.document){return false} else {return true}}catch(e){return true}")
-    private native static boolean isCORSRestricted(HTMLIFrameElement iframe);
+    // NOTE: this must NOT be an @JSBody. On the ParparVM worker model an
+    // @JSBody script runs in the worker, where the ``iframe`` argument is a
+    // host-ref proxy with no live DOM -- ``iframe.contentWindow`` is undefined,
+    // so the old inline probe always threw and reported EVERY BrowserComponent
+    // (even a same-origin one like the Playground editor) as CORS-restricted,
+    // which made execute()/executeAndReturnString() throw and the editor never
+    // bootstrapped. Probe through the JSO bridge instead so contentWindow /
+    // document access runs on the MAIN thread where it is meaningful: a
+    // same-origin iframe yields a non-null document; a genuinely cross-origin
+    // one throws on access (caught here) and is correctly reported restricted.
+    // (TeaVM ran everything on the main thread, so its @JSBody worked -- this
+    // only bit the worker-based ParparVM port.)
+    private static boolean isCORSRestricted(HTMLIFrameElement iframe) {
+        try {
+            Window cw = iframe.getContentWindow();
+            if (cw == null) {
+                return true;
+            }
+            return cw.getDocument() == null;
+        } catch (Throwable t) {
+            return true;
+        }
+    }
     
     private boolean listenersInstalled;
     private List<EventListener> frameListeners;

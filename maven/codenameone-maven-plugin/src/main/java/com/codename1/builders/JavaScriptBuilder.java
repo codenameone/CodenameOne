@@ -823,6 +823,55 @@ public class JavaScriptBuilder extends Executor {
                 }
             }
         }
+        // BrowserComponent.setURLHierarchy(path) loads the app's bundled HTML
+        // hierarchy from ``assets/cn1html/<path>`` (HTML5Implementation
+        // .setBrowserPageInHierarchy). Those files ship packed in html.tar; the
+        // CN1 runtime only ever unpacks it into the in-app FileSystemStorage
+        // (installTar), which the browser can't fetch over HTTP for an iframe
+        // src. Unpack html.tar into assets/cn1html/ so the iframe URL resolves
+        // to a real served file (same-origin) -- without this the editor iframe
+        // 404s. (Leave html.tar at the root too; installTar still reads it.)
+        File htmlTar = new File(distDir, "html.tar");
+        if (htmlTar.isFile()) {
+            extractHtmlHierarchy(htmlTar, new File(assetsDir, "cn1html"));
+        }
+    }
+
+    /** Unpack html.tar into {@code destDir} (used to HTTP-serve setURLHierarchy content). */
+    private void extractHtmlHierarchy(File htmlTar, File destDir) throws IOException {
+        destDir.mkdirs();
+        org.xeustechnologies.jtar.TarInputStream tis =
+                new org.xeustechnologies.jtar.TarInputStream(new java.io.BufferedInputStream(new FileInputStream(htmlTar)));
+        try {
+            org.xeustechnologies.jtar.TarEntry entry;
+            byte[] buf = new byte[8192];
+            while ((entry = tis.getNextEntry()) != null) {
+                String name = entry.getName();
+                if (name == null || name.length() == 0 || name.contains("..")) {
+                    continue;
+                }
+                File out = new File(destDir, name);
+                if (entry.isDirectory()) {
+                    out.mkdirs();
+                    continue;
+                }
+                File parent = out.getParentFile();
+                if (parent != null) {
+                    parent.mkdirs();
+                }
+                FileOutputStream fos = new FileOutputStream(out);
+                try {
+                    int n;
+                    while ((n = tis.read(buf)) != -1) {
+                        fos.write(buf, 0, n);
+                    }
+                } finally {
+                    fos.close();
+                }
+            }
+        } finally {
+            tis.close();
+        }
     }
 
     private static void copyTree(File src, File dst) throws IOException {

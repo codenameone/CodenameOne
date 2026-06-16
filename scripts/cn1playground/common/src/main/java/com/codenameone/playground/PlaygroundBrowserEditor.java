@@ -162,14 +162,24 @@ final class PlaygroundBrowserEditor {
         if (browser == null) {
             return;
         }
-        browser.execute("window.PlaygroundEditor && window.PlaygroundEditor.bootstrap("
-                + asJsString(metadataJson) + ", "
+        // The BrowserComponent fires ready as soon as the iframe document loads,
+        // which can be BEFORE editor.js has run and defined window.PlaygroundEditor
+        // (loader.js + editor.js load asynchronously). A plain
+        // "PlaygroundEditor && PlaygroundEditor.bootstrap(...)" then silently
+        // no-ops and the editor never initialises -- and the iframe->host message
+        // channel is one-way here, so we can't rely on the editor signalling back.
+        // Inject a self-retrying bootstrap that waits inside the iframe until
+        // PlaygroundEditor exists, so bootstrap runs regardless of load ordering.
+        String bootstrapArgs = asJsString(metadataJson) + ", "
                 + asJsString(pendingSource) + ", "
                 + asJsString(mode.monacoLanguage()) + ", "
                 + (pendingDarkMode ? "true" : "false") + ", "
                 + pendingMarkersJson + ", "
                 + pendingMessagesJson + ", "
-                + pendingUiidsJson + ");");
+                + pendingUiidsJson;
+        browser.execute("(function(){var n=0;function go(){"
+                + "if(window.PlaygroundEditor){window.PlaygroundEditor.bootstrap(" + bootstrapArgs + ");}"
+                + "else if(n++<200){setTimeout(go,25);}}go();})();");
     }
 
     private boolean shouldUseBrowserEditor() {
