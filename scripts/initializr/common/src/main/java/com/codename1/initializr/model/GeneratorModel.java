@@ -4,6 +4,7 @@ import com.codename1.components.ToastBar;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.util.StringUtil;
+import net.sf.zipme.CRC32;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
 import net.sf.zipme.ZipOutputStream;
@@ -112,33 +113,70 @@ public class GeneratorModel {
     }
 
     public void generate() {
-        // The JavaScript port backs openFileOutputStream with IndexedDB. The Blob handed to
-        // execute() retains the bytes, but the IndexedDB entry sticks around forever, so each
-        // generation accumulates a multi-MB record until the browser quota is exhausted.
         cleanupGeneratedZips();
-        String filePath = getAppHomePath() + appName.toLowerCase() + ".zip";
+        String fileName = appName.toLowerCase() + ".zip";
+
+        // Collect the project's entries (read source/template/cn1lib bytes).
+        Map<String, byte[]> entries;
         try {
-            writeProjectZipToStorage(filePath);
+            entries = collectProjectEntries();
+        } catch (IOException ex) {
+            Log.e(ex);
+            ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
+            return;
+        }
+
+        // Build the project zip in memory. This runs on every platform,
+        // including the JavaScript port: the in-Java zip is fast there now that
+        // the translator no longer wraps synchronous natives (arraycopy/CRC) in
+        // cooperative generators and resolves inherited interface static fields
+        // correctly. Then hand the bytes to the platform downloader; falls
+        // through to the storage + execute() path when unsupported.
+        byte[] bytes;
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            writeEntriesToZip(bos, entries);
+            bytes = bos.toByteArray();
+        } catch (IOException ex) {
+            Log.e(ex);
+            ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
+            return;
+        }
+        if (downloadBytesAsFile(fileName, bytes)) {
+            return;
+        }
+
+        // Fallback (non-JS platforms): write the bytes to storage and hand the
+        // file path to execute(). The IndexedDB entry sticks around, so a prior
+        // cleanupGeneratedZips() keeps generations from accumulating multi-MB
+        // records. Retry once after a fresh cleanup before giving up.
+        String filePath = getAppHomePath() + fileName;
+        try {
+            writeBytesToStorage(filePath, bytes);
         } catch (IOException firstErr) {
-            // Almost always quota-exhaustion. Clean up once more (covers orphan entries the
-            // first sweep missed, e.g. a half-written file from this attempt) and retry.
             cleanupGeneratedZips();
             try {
-                writeProjectZipToStorage(filePath);
+                writeBytesToStorage(filePath, bytes);
             } catch (IOException retryErr) {
                 Log.e(retryErr);
                 ToastBar.showErrorMessage(
-                        "Browser storage is full. Open your browser settings, clear site "
-                                + "data for this page, then try again.");
+                        "Couldn't generate the project: " + describeError(retryErr)
+                                + ". If your browser storage is full, clear site data for "
+                                + "this page and try again.");
                 return;
             }
         }
         execute(filePath);
     }
 
-    private void writeProjectZipToStorage(String filePath) throws IOException {
+    private static String describeError(Throwable ex) {
+        String detail = ex.getMessage();
+        return (detail == null || detail.length() == 0) ? ex.getClass().getName() : detail;
+    }
+
+    private void writeBytesToStorage(String filePath, byte[] bytes) throws IOException {
         try (OutputStream fos = openFileOutputStream(filePath)) {
-            writeProjectZip(fos);
+            fos.write(bytes);
         }
     }
 
@@ -162,6 +200,13 @@ public class GeneratorModel {
     }
 
     void writeProjectZip(OutputStream outputStream) throws IOException {
+        writeEntriesToZip(outputStream, collectProjectEntries());
+    }
+
+    /// Reads every entry (IDE scaffold, common files, template sources, cn1libs,
+    /// localization, generated README/.gitignore/skills) into an ordered map of
+    /// path -> bytes. This is the I/O phase, kept separate from the zip assembly.
+    Map<String, byte[]> collectProjectEntries() throws IOException {
         Map<String, byte[]> mergedEntries = new LinkedHashMap<String, byte[]>();
 
         copyZipEntriesToMap(ide.ZIP, mergedEntries, ZipEntryType.IDE);
@@ -178,12 +223,29 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
+        return mergedEntries;
+    }
 
+    /// Writes the collected entries as a STORED (uncompressed) zip. STORED rather
+    /// than DEFLATED keeps the byte work minimal (CRC + copy, no compression
+    /// engine); the size cost is irrelevant for a one-off scaffold download.
+    /// Used on every platform including the JavaScript port, where it is fast now
+    /// that the translator no longer wraps synchronous natives in generators and
+    /// resolves inherited interface static fields correctly.
+    void writeEntriesToZip(OutputStream outputStream, Map<String, byte[]> mergedEntries) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
+            zos.setMethod(ZipOutputStream.STORED);
             for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
+                byte[] data = fileEntry.getValue();
                 ZipEntry zipEntry = new ZipEntry(fileEntry.getKey());
+                zipEntry.setMethod(ZipOutputStream.STORED);
+                zipEntry.setSize(data.length);
+                zipEntry.setCompressedSize(data.length);
+                CRC32 crc = new CRC32();
+                crc.update(data);
+                zipEntry.setCrc(crc.getValue());
                 zos.putNextEntry(zipEntry);
-                zos.write(fileEntry.getValue());
+                zos.write(data);
                 zos.closeEntry();
             }
         }

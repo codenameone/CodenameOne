@@ -28,6 +28,13 @@ body::-webkit-scrollbar { width: 0 !important }
     bottom: 0;
     margin: 0;
     padding: 0;
+    /* Deliver touch gestures to the app instead of letting the browser
+       claim them for native pan/zoom. Without this the canvas's touchmove
+       handler is treated as passive and the browser swallows drag gestures,
+       so touch/drag scrolling never reaches Codename One (mouse-wheel scroll
+       still works because it is a separate event). */
+    touch-action: none;
+    -ms-touch-action: none;
 }
 
 .cn1-edit-string, .cn1-string-picker {

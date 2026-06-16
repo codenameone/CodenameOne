@@ -130,7 +130,7 @@ import java.util.Vector;
 /// Display specifically for key, pointer events and screen resolution.
 ///
 /// @author Shai Almog
-@Concrete(name = "com.codename1.impl.ios.IOSImplementation", win = "com.codename1.impl.windows.WindowsImplementation")
+@Concrete(name = "com.codename1.impl.ios.IOSImplementation", win = "com.codename1.impl.windows.WindowsImplementation", linux = "com.codename1.impl.linux.LinuxImplementation")
 public abstract class CodenameOneImplementation {
     /// Indicates the range of "hard" RTL bidi characters in unicode
     private static final int RTL_RANGE_BEGIN = 0x590;
@@ -4509,6 +4509,22 @@ public abstract class CodenameOneImplementation {
     /// to the application
     public void execute(String url, ActionListener response) {
         execute(url);
+    }
+
+    /// Offers the given in-memory bytes to the user as a downloadable file,
+    /// bypassing local storage. Implemented by platforms (currently the
+    /// JavaScript port) where the storage-backed `execute(file:// URL)`
+    /// download path is unavailable. Returns `true` if the platform handled
+    /// the download (so callers can skip the storage fallback), `false` if
+    /// unsupported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the suggested file name for the download
+    ///
+    /// - `bytes`: the file contents
+    public boolean downloadBytesAsFile(String fileName, byte[] bytes) {
+        return false;
     }
 
     /// Returns one of the density variables appropriate for this device, notice that

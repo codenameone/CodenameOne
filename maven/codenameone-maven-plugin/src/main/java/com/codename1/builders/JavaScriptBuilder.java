@@ -29,6 +29,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -123,9 +127,17 @@ public class JavaScriptBuilder extends Executor {
             File portSources = locateJavaScriptPortSources(request);
             File portClassesStaged = stageJavaScriptPort(request, portSources, stageClasses, portClasses);
 
+            // For every NativeInterface in the app, generate a <Interface>Impl whose
+            // methods bridge to the developer's JS stub on the MAIN thread (via
+            // NativeInterfaceBridge -> browser_bridge.js -> cn1_native_interfaces). The
+            // launcher registers each impl with NativeLookup so create() resolves and the
+            // optimizer keeps the impl (it is otherwise only reached reflectively).
+            List<Class<?>> nativeInterfaces = findNativeInterfaces(stageClasses);
+            List<File> generatedImpls = generateNativeInterfaceImpls(buildDir, nativeInterfaces);
+
             String translatorAppName = sanitizeIdentifier(request.getMainClass()) + "JavaScriptMain";
-            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass(), stageClasses);
-            compileLauncher(launcherJava, stageClasses, portClassesStaged);
+            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass(), stageClasses, nativeInterfaces);
+            compileLauncher(launcherJava, generatedImpls, stageClasses, portClassesStaged);
 
             File parparvmCompilerJar = extractParparVMCompiler();
 
@@ -166,6 +178,17 @@ public class JavaScriptBuilder extends Executor {
     }
 
     private boolean checkUserLevel(BuildRequest request) {
+        // A logged-in Codename One account is the authorization for the local JS
+        // build, the same way it authorizes the cloud build. The credentials are
+        // written to the /com/codename1/ui preferences node by `cn1:set-user-token`
+        // (SetUserTokenMojo) -- e.g. set_cn1_user_token in the website build. Honor
+        // that login directly so the local target "just works" once you're logged in.
+        if (hasCodenameOneLogin()) {
+            log("Local JavaScript builder: authorized via logged-in Codename One account.");
+            return true;
+        }
+        // Fallback for direct CLI invocations that aren't logged in: an explicit
+        // Enterprise-or-higher user level still unlocks the build.
         String raw = firstNonEmpty(
                 request.getArg("javascript.userLevel", null),
                 request.getArg("userLevel", null),
@@ -179,10 +202,24 @@ public class JavaScriptBuilder extends Executor {
             return true;
         }
         log("ERROR: The local JavaScript build is licensed only to Enterprise and higher tier users. "
-                + "Set codename1.arg.javascript.userLevel=Enterprise (or a higher tier) in codenameone_settings.properties, "
+                + "Log in with `cn1:set-user-token -Duser=<email> -Dtoken=<token>`, "
+                + "set codename1.arg.javascript.userLevel=Enterprise (or a higher tier) in codenameone_settings.properties, "
                 + "or define the CN1_USER_LEVEL environment variable, to enable this preview. "
                 + "See https://www.codenameone.com/pricing.html for tier details.");
         return false;
+    }
+
+    private boolean hasCodenameOneLogin() {
+        try {
+            java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userRoot().node("/com/codename1/ui");
+            String user = prefs.get("user", null);
+            String token = prefs.get("token", null);
+            return user != null && user.trim().length() > 0
+                    && token != null && token.trim().length() > 0;
+        } catch (Exception ex) {
+            // Preferences backing store unavailable -- fall through to the userLevel path.
+            return false;
+        }
     }
 
     private static int parseUserRank(String raw) {
@@ -346,7 +383,8 @@ public class JavaScriptBuilder extends Executor {
         return "javac";
     }
 
-    private File writeLauncher(File workDir, String launcherName, String packageName, String mainClass, File stageClasses) throws IOException {
+    private File writeLauncher(File workDir, String launcherName, String packageName, String mainClass, File stageClasses,
+                               List<Class<?>> nativeInterfaces) throws IOException {
         // If the build-time SVG transcoder generated com.codename1.generated.svg.SVGRegistry
         // for this app, register the transcoded SVGs at startup -- the JS-port analogue of
         // JavaSEPort.init's reflective installGlobal(). A DIRECT call (not reflection) is
@@ -365,6 +403,16 @@ public class JavaScriptBuilder extends Executor {
             if (hasGeneratedSvg) {
                 pw.println("        com.codename1.generated.svg.SVGRegistry.installGlobal();");
             }
+            // Register the generated native interface implementations. The DIRECT
+            // class references (not reflection) also keep the optimizer from culling
+            // the *Impl classes, which are otherwise reached only via NativeLookup.
+            if (nativeInterfaces != null) {
+                for (Class<?> iface : nativeInterfaces) {
+                    String ifaceName = iface.getName();
+                    pw.println("        com.codename1.system.NativeLookup.register("
+                            + ifaceName + ".class, " + ifaceName + "Impl.class);");
+                }
+            }
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "());");
             pw.println("    }");
             pw.println("}");
@@ -374,15 +422,287 @@ public class JavaScriptBuilder extends Executor {
         return f;
     }
 
-    private void compileLauncher(File launcherJava, File stageClasses, File portClasses) throws Exception {
+    private void compileLauncher(File launcherJava, List<File> generatedImpls, File stageClasses, File portClasses) throws Exception {
         String javac = resolveJavac();
-        boolean ok = exec(tmpDir, -1, javac, "-source", "8", "-target", "8",
-                "-cp", stageClasses.getAbsolutePath() + File.pathSeparator + portClasses.getAbsolutePath(),
-                "-d", stageClasses.getAbsolutePath(),
-                launcherJava.getAbsolutePath());
-        if (!ok) {
-            throw new BuildException("Failed to compile JavaScript launcher class");
+        List<String> cmd = new ArrayList<String>();
+        cmd.add(javac);
+        cmd.add("-source"); cmd.add("8");
+        cmd.add("-target"); cmd.add("8");
+        cmd.add("-cp"); cmd.add(stageClasses.getAbsolutePath() + File.pathSeparator + portClasses.getAbsolutePath());
+        cmd.add("-d"); cmd.add(stageClasses.getAbsolutePath());
+        cmd.add(launcherJava.getAbsolutePath());
+        if (generatedImpls != null) {
+            for (File impl : generatedImpls) {
+                cmd.add(impl.getAbsolutePath());
+            }
         }
+        boolean ok = exec(tmpDir, -1, cmd.toArray(new String[cmd.size()]));
+        if (!ok) {
+            throw new BuildException("Failed to compile JavaScript launcher / native interface impl classes");
+        }
+    }
+
+    // ----- Native interface binding --------------------------------------------------
+    // Scans the staged app classes for com.codename1.system.NativeInterface subtypes and
+    // generates, per interface, a <Interface>Impl whose methods delegate to
+    // NativeInterfaceBridge.call* (a HOST_HOOK native). At runtime those calls suspend the
+    // worker and run the developer's JS stub (cn1_native_interfaces[...][method_]) on the
+    // MAIN thread, then resume the worker with the result. Mirrors the cloud builder's
+    // JSStubGenerator + NativeLookup.register flow, adapted to the worker/host-call model.
+
+    private List<Class<?>> findNativeInterfaces(File stageClasses) {
+        List<Class<?>> result = new ArrayList<Class<?>>();
+        URLClassLoader loader = null;
+        try {
+            loader = new URLClassLoader(new URL[]{ stageClasses.toURI().toURL() },
+                    JavaScriptBuilder.class.getClassLoader());
+            Class<?> niClass;
+            try {
+                niClass = loader.loadClass("com.codename1.system.NativeInterface");
+            } catch (Throwable t) {
+                log("com.codename1.system.NativeInterface not on the classpath; no native interfaces to bind");
+                return result;
+            }
+            List<File> classFiles = new ArrayList<File>();
+            collectClassFiles(stageClasses, classFiles);
+            for (File cf : classFiles) {
+                // Cheap pre-filter: only classes whose bytes mention the marker interface
+                // are candidates (native interfaces extend it directly). Avoids loading the
+                // thousands of unrelated core/runtime classes.
+                byte[] bytes;
+                try {
+                    bytes = java.nio.file.Files.readAllBytes(cf.toPath());
+                } catch (Throwable t) {
+                    continue;
+                }
+                if (!new String(bytes, StandardCharsets.ISO_8859_1).contains("com/codename1/system/NativeInterface")) {
+                    continue;
+                }
+                String cn = classNameFor(stageClasses, cf);
+                if (cn == null) {
+                    continue;
+                }
+                try {
+                    Class<?> c = loader.loadClass(cn);
+                    if (c.isInterface() && !c.equals(niClass) && niClass.isAssignableFrom(c)) {
+                        result.add(c);
+                        log("Found native interface: " + c.getName());
+                    }
+                } catch (Throwable ignore) {
+                    // class not loadable in isolation (missing deps) -- not a native interface we can bind
+                }
+            }
+        } catch (Throwable t) {
+            log("Failed scanning for native interfaces: " + t);
+        } finally {
+            if (loader != null) {
+                try {
+                    loader.close();
+                } catch (Throwable ignore) {
+                }
+            }
+        }
+        return result;
+    }
+
+    private static void collectClassFiles(File dir, List<File> out) {
+        File[] children = dir.listFiles();
+        if (children == null) return;
+        for (File f : children) {
+            if (f.isDirectory()) {
+                collectClassFiles(f, out);
+            } else if (f.getName().endsWith(".class") && f.getName().indexOf('$') < 0) {
+                out.add(f);
+            }
+        }
+    }
+
+    private static String classNameFor(File root, File classFile) {
+        String rootPath = root.getAbsolutePath();
+        String filePath = classFile.getAbsolutePath();
+        if (!filePath.startsWith(rootPath)) {
+            return null;
+        }
+        String rel = filePath.substring(rootPath.length());
+        if (rel.startsWith(File.separator)) {
+            rel = rel.substring(1);
+        }
+        if (!rel.endsWith(".class")) {
+            return null;
+        }
+        rel = rel.substring(0, rel.length() - ".class".length());
+        return rel.replace(File.separatorChar, '.').replace('/', '.');
+    }
+
+    private List<File> generateNativeInterfaceImpls(File buildDir, List<Class<?>> nativeInterfaces) throws IOException {
+        List<File> generated = new ArrayList<File>();
+        if (nativeInterfaces == null || nativeInterfaces.isEmpty()) {
+            return generated;
+        }
+        File genDir = new File(buildDir, "generated-native-impls");
+        genDir.mkdirs();
+        for (Class<?> iface : nativeInterfaces) {
+            File jf = writeNativeInterfaceImpl(genDir, iface);
+            if (jf != null) {
+                generated.add(jf);
+            }
+        }
+        return generated;
+    }
+
+    private File writeNativeInterfaceImpl(File genDir, Class<?> iface) throws IOException {
+        String pkg = iface.getPackage() != null ? iface.getPackage().getName() : "";
+        String simpleImpl = iface.getSimpleName() + "Impl";
+        String registryKey = iface.getName().replace('.', '_');
+
+        File pkgDir = pkg.isEmpty() ? genDir : new File(genDir, pkg.replace('.', File.separatorChar));
+        pkgDir.mkdirs();
+        File out = new File(pkgDir, simpleImpl + ".java");
+
+        StringBuilder sb = new StringBuilder();
+        if (!pkg.isEmpty()) {
+            sb.append("package ").append(pkg).append(";\n\n");
+        }
+        sb.append("public class ").append(simpleImpl)
+                .append(" implements ").append(iface.getName()).append(" {\n");
+        sb.append("    private static final String __NI = \"").append(registryKey).append("\";\n\n");
+
+        for (Method m : iface.getMethods()) {
+            if (Modifier.isStatic(m.getModifiers())) {
+                continue;
+            }
+            appendNativeInterfaceImplMethod(sb, m);
+        }
+        sb.append("}\n");
+
+        PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(out), StandardCharsets.UTF_8));
+        try {
+            pw.print(sb.toString());
+        } finally {
+            pw.close();
+        }
+        return out;
+    }
+
+    private void appendNativeInterfaceImplMethod(StringBuilder sb, Method m) {
+        Class<?>[] params = m.getParameterTypes();
+        Class<?> ret = m.getReturnType();
+        String methodKey = nativeInterfaceMethodKey(m);
+
+        sb.append("    public ").append(ret.getCanonicalName()).append(" ").append(m.getName()).append("(");
+        for (int i = 0; i < params.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(params[i].getCanonicalName()).append(" p").append(i);
+        }
+        sb.append(") {\n");
+
+        // Build the boxed argument array.
+        StringBuilder args = new StringBuilder();
+        if (params.length == 0) {
+            args.append("new Object[0]");
+        } else {
+            args.append("new Object[]{ ");
+            for (int i = 0; i < params.length; i++) {
+                if (i > 0) args.append(", ");
+                args.append(boxArgExpression(params[i], "p" + i));
+            }
+            args.append(" }");
+        }
+
+        String call = "com.codename1.impl.platform.js.NativeInterfaceBridge.";
+        String invokeArgs = "__NI, \"" + methodKey + "\", " + args.toString();
+
+        if (ret == void.class) {
+            sb.append("        ").append(call).append("callVoid(").append(invokeArgs).append(");\n");
+        } else if (ret == boolean.class) {
+            sb.append("        return ").append(call).append("callBoolean(").append(invokeArgs).append(");\n");
+        } else if (ret == int.class) {
+            sb.append("        return ").append(call).append("callInt(").append(invokeArgs).append(");\n");
+        } else if (ret == long.class) {
+            sb.append("        return ").append(call).append("callLong(").append(invokeArgs).append(");\n");
+        } else if (ret == double.class) {
+            sb.append("        return ").append(call).append("callDouble(").append(invokeArgs).append(");\n");
+        } else if (ret == float.class) {
+            sb.append("        return ").append(call).append("callFloat(").append(invokeArgs).append(");\n");
+        } else if (ret == byte.class) {
+            sb.append("        return ").append(call).append("callByte(").append(invokeArgs).append(");\n");
+        } else if (ret == short.class) {
+            sb.append("        return ").append(call).append("callShort(").append(invokeArgs).append(");\n");
+        } else if (ret == char.class) {
+            sb.append("        return ").append(call).append("callChar(").append(invokeArgs).append(");\n");
+        } else if (ret == String.class) {
+            sb.append("        return ").append(call).append("callString(").append(invokeArgs).append(");\n");
+        } else if (ret.isArray()) {
+            // Primitive arrays + String[]: callArray builds the correctly-typed
+            // Java array from the JS array the host returns (componentToken picks
+            // the element type).
+            sb.append("        return (").append(ret.getCanonicalName()).append(") ")
+                    .append(call).append("callArray(").append(invokeArgs)
+                    .append(", \"").append(arrayComponentToken(ret.getComponentType())).append("\");\n");
+        } else if ("com.codename1.ui.PeerComponent".equals(ret.getName())) {
+            // The stub returns a native element (delivered to the worker as a
+            // host-ref); wrap it as a Codename One peer component.
+            sb.append("        return com.codename1.ui.PeerComponent.create(")
+                    .append(call).append("callObject(").append(invokeArgs).append("));\n");
+        } else {
+            sb.append("        return (").append(ret.getCanonicalName()).append(") ")
+                    .append(call).append("callObject(").append(invokeArgs).append(");\n");
+        }
+        sb.append("    }\n\n");
+    }
+
+    private static String boxArgExpression(Class<?> type, String var) {
+        // Pass a PeerComponent's underlying native element (a host-ref) to the
+        // stub, not the Java peer wrapper.
+        if ("com.codename1.ui.PeerComponent".equals(type.getName())) {
+            return var + ".getNativePeer()";
+        }
+        if (type == int.class) return "Integer.valueOf(" + var + ")";
+        if (type == long.class) return "Long.valueOf(" + var + ")";
+        if (type == double.class) return "Double.valueOf(" + var + ")";
+        if (type == float.class) return "Float.valueOf(" + var + ")";
+        if (type == boolean.class) return "Boolean.valueOf(" + var + ")";
+        if (type == byte.class) return "Byte.valueOf(" + var + ")";
+        if (type == short.class) return "Short.valueOf(" + var + ")";
+        if (type == char.class) return "Character.valueOf(" + var + ")";
+        return var;
+    }
+
+    // Mirrors StubGenerator's JS stub key: methodName + "_" + ("_" + xmlvmType) per param.
+    private static String nativeInterfaceMethodKey(Method m) {
+        StringBuilder key = new StringBuilder(m.getName()).append("_");
+        for (Class<?> p : m.getParameterTypes()) {
+            if ("com.codename1.ui.PeerComponent".equals(p.getName())) {
+                key.append("_com_codename1_ui_PeerComponent");
+            } else {
+                key.append("_").append(xmlvmTypeName(p));
+            }
+        }
+        return key.toString();
+    }
+
+    // Runtime newArray() component-class token for an array's element type.
+    private static String arrayComponentToken(Class<?> component) {
+        if (component == int.class) return "JAVA_INT";
+        if (component == long.class) return "JAVA_LONG";
+        if (component == double.class) return "JAVA_DOUBLE";
+        if (component == float.class) return "JAVA_FLOAT";
+        if (component == boolean.class) return "JAVA_BOOLEAN";
+        if (component == byte.class) return "JAVA_BYTE";
+        if (component == short.class) return "JAVA_SHORT";
+        if (component == char.class) return "JAVA_CHAR";
+        if (component == String.class) return "java_lang_String";
+        return component.getName().replace('.', '_');
+    }
+
+    private static String xmlvmTypeName(Class<?> type) {
+        if (type.isArray()) {
+            return xmlvmTypeName(type.getComponentType()) + "_1ARRAY";
+        }
+        if (type.isPrimitive()) {
+            return type.getName();
+        }
+        return type.getName().replace('.', '_');
     }
 
     private File extractParparVMCompiler() throws BuildException {
@@ -398,18 +718,35 @@ public class JavaScriptBuilder extends Executor {
                                           String version) throws Exception {
         Map<String, String> env = new HashMap<String, String>();
         log("Running ByteCodeTranslator (javascript target) for " + mainClass);
-        return exec(tmpDir, env, -1,
-                "java", "-Xmx512m", "-cp", compilerJar.getAbsolutePath(),
-                "com.codename1.tools.translator.ByteCodeTranslator",
-                "javascript",
-                stageClasses.getAbsolutePath(),
-                translatorOut.getAbsolutePath(),
-                translatorAppName,
-                packageName,
-                mainClass,
-                version == null ? "1.0" : version,
-                "ios",
-                "none");
+        java.util.List<String> cmd = new java.util.ArrayList<String>();
+        cmd.add("java");
+        cmd.add("-Xmx512m");
+        // Pass through extra translator JVM options (e.g. -Dparparvm.js.*
+        // size/diagnostic knobs and kill switches) from the
+        // CN1_TRANSLATOR_OPTS environment variable. The forked JVM does
+        // not inherit the Maven process's -D properties, so this is the
+        // only way to reach the translator for bisection / tuning.
+        String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
+        if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
+            for (String opt : translatorOpts.trim().split("\\s+")) {
+                if (!opt.isEmpty()) {
+                    cmd.add(opt);
+                }
+            }
+        }
+        cmd.add("-cp");
+        cmd.add(compilerJar.getAbsolutePath());
+        cmd.add("com.codename1.tools.translator.ByteCodeTranslator");
+        cmd.add("javascript");
+        cmd.add(stageClasses.getAbsolutePath());
+        cmd.add(translatorOut.getAbsolutePath());
+        cmd.add(translatorAppName);
+        cmd.add(packageName);
+        cmd.add(mainClass);
+        cmd.add(version == null ? "1.0" : version);
+        cmd.add("ios");
+        cmd.add("none");
+        return exec(tmpDir, env, -1, cmd.toArray(new String[0]));
     }
 
     private File locateDistDir(File translatorOut, String translatorAppName) {
@@ -439,11 +776,41 @@ public class JavaScriptBuilder extends Executor {
                 Files.copy(c.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         }
+        // getResourceAsStream resources are fetched by the host from
+        // ``assets/<name>`` FIRST (port.js mirrors getResourceAsStream's
+        // assets/ rewrite), falling back to the dist root only if that
+        // 404s. The translator emits these bundled resources at the dist
+        // ROOT, so locally the root fallback hides the problem -- but the
+        // deployed website serves the app from a path where only assets/
+        // is reliably present, so the root fallback also 404s and the
+        // resource read fails. Relocate the resources the app fetches at
+        // runtime into assets/ so the FIRST fetch succeeds everywhere:
+        //   * TrueType fonts (material-design icon font + CSS-merged theme
+        //     fonts such as Initializr's Inter-*.ttf),
+        //   * the Initializr generator's template archives (*.zip) and
+        //     pom templates (*-pom.xml), e.g. common.zip, idea.zip,
+        //     eclipse.zip, barebones-*.zip / barebones-pom.xml -- without
+        //     these, clicking "Generate Project" 404s the templates and
+        //     fails (previously misreported as "Browser storage is full").
+        // index.html, *.js, manifest.json, *.res and the generic pom.xml
+        // (maven artifact metadata, not a template) are left at the root.
         File assetsDir = new File(distDir, "assets");
         assetsDir.mkdirs();
-        File md = new File(distDir, "material-design-font.ttf");
-        if (md.isFile() && !new File(assetsDir, md.getName()).isFile()) {
-            Files.move(md.toPath(), new File(assetsDir, md.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        File[] rootFiles = distDir.listFiles();
+        if (rootFiles != null) {
+            for (File rf : rootFiles) {
+                if (!rf.isFile()) {
+                    continue;
+                }
+                String lower = rf.getName().toLowerCase();
+                boolean relocate = lower.endsWith(".ttf")
+                        || lower.endsWith(".zip")
+                        || lower.endsWith("-pom.xml");
+                if (relocate) {
+                    File dest = new File(assetsDir, rf.getName());
+                    Files.move(rf.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
         }
     }
 

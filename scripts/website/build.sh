@@ -48,11 +48,18 @@ bootstrap_local_cn1_snapshots() {
     return
   fi
 
+  # Each site app (initializr/playground/skindesigner) calls this; the full
+  # reactor build is expensive, so run setup-workspace.sh only once per build.
+  if [ "${__CN1_SNAPSHOTS_BOOTSTRAPPED:-}" = "true" ]; then
+    return
+  fi
+
   echo "Bootstrapping local Codename One snapshot Maven artifacts..." >&2
   (
     cd "${REPO_ROOT}"
     SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
   )
+  __CN1_SNAPSHOTS_BOOTSTRAPPED="true"
 }
 
 activate_bootstrapped_java17() {
@@ -101,11 +108,32 @@ set_cn1_user_token() {
   local project_dir="$1"
 
   if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+    # CN1_TOKEN holds the account *password*, not a build token. The build
+    # sends whatever is stored in the prefs "token" slot as an
+    # "Authorization: Bearer" header; the cloud server parses that as a JWT,
+    # so seeding the raw password makes every cloud call 401 and the build
+    # falls back to an interactive browser login that hangs in CI
+    # ("Waiting for login..."). Exchange the password for a short-lived
+    # Keycloak access token (OAuth2 direct grant on the public cn1cloudapp
+    # client) and seed THAT instead.
+    local cn1_access_token=""
+    cn1_access_token="$(curl -fsS -m 20 \
+      -d 'grant_type=password' \
+      -d 'client_id=cn1cloudapp' \
+      --data-urlencode "username=${CN1_USER}" \
+      --data-urlencode "password=${CN1_TOKEN}" \
+      'https://auth.codenameone.com/auth/realms/Realm/protocol/openid-connect/token' \
+      | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')" || true
+    if [ -z "${cn1_access_token}" ]; then
+      echo "Failed to obtain a Codename One access token from CN1_USER/CN1_TOKEN — check the credentials (the secret must be the account password)." >&2
+      return 1
+    fi
+
     if ! sh ./mvnw -q -U -pl javascript -am \
       cn1:set-user-token \
       -Dcodename1.platform=javascript \
       -Duser="${CN1_USER}" \
-      -Dtoken="${CN1_TOKEN}"; then
+      -Dtoken="${cn1_access_token}"; then
       echo "cn1:set-user-token is unavailable in this plugin version for ${project_dir}; writing CN1 credentials directly to Java preferences." >&2
       local tmp_dir
       tmp_dir="$(mktemp -d)"
@@ -124,7 +152,7 @@ public class SetCn1Prefs {
 }
 JAVA
       javac "${tmp_dir}/SetCn1Prefs.java"
-      java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${CN1_TOKEN}"
+      java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${cn1_access_token}"
       rm -rf "${tmp_dir}"
     fi
   else
@@ -569,6 +597,13 @@ build_initializr_for_site() {
     return
   fi
 
+  # The initializr builds the JavaScript app with the local ParparVM target
+  # (codename1.buildTarget=local-javascript). That builder lives in the repo's
+  # 8.0-SNAPSHOT plugin, not the pinned release, so bootstrap the local
+  # snapshots and build with -Dcn1.localWorkspace=true (the cn1-local-workspace
+  # profile then overrides cn1.version/cn1.plugin.version to the repo build).
+  bootstrap_local_cn1_snapshots
+
   echo "Building Initializr JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/initializr"
@@ -581,7 +616,13 @@ build_initializr_for_site() {
       fi
     }
 
-    if [ -n "${JAVA_HOME_8_X64:-}" ]; then
+    local initializr_workspace_args=()
+    if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
+      # Local ParparVM JS build runs the translator + javac; use the
+      # bootstrapped JDK 17 (matching the Playground/Skin Designer path).
+      activate_bootstrapped_java17
+      initializr_workspace_args+=(-Dcn1.localWorkspace=true)
+    elif [ -n "${JAVA_HOME_8_X64:-}" ]; then
       export JAVA_HOME="${JAVA_HOME_8_X64}"
       export PATH="${JAVA_HOME}/bin:${PATH}"
     fi
@@ -589,6 +630,7 @@ build_initializr_for_site() {
     # Ensure attached classifier artifact initializr-ZipSupport:jar:common is present
     # in the local Maven repo before building modules that depend on it (e.g. initializr-common).
     run_initializr_mvn -q -U -pl cn1libs/ZipSupport -am \
+      "${initializr_workspace_args[@]}" \
       -DskipTests \
       -Dcodename1.platform=javascript \
       install
@@ -596,6 +638,7 @@ build_initializr_for_site() {
     set_cn1_user_token "Initializr"
 
     run_initializr_mvn -q -U -pl javascript -am \
+      "${initializr_workspace_args[@]}" \
       -DskipTests \
       -Dautomated=true \
       -Dcodename1.platform=javascript \
@@ -617,9 +660,29 @@ build_initializr_for_site() {
   mkdir -p "${output_dir}"
   unzip -q -o "${result_zip}" -d "${output_dir}"
 
+  # The cloud result.zip is flat (index.html at the root), but the local
+  # ParparVM build (codename1.buildTarget=local-javascript) wraps the bundle in
+  # a single top-level directory (e.g. Initializr-js/). Flatten that wrapper so
+  # the served layout is identical regardless of which builder produced the zip.
+  if [ ! -f "${output_dir}/index.html" ]; then
+    local inner_dir
+    inner_dir="$(find "${output_dir}" -mindepth 1 -maxdepth 1 -type d | head -n1 || true)"
+    if [ -n "${inner_dir}" ] && [ -f "${inner_dir}/index.html" ]; then
+      ( cd "${inner_dir}" && tar cf - . ) | ( cd "${output_dir}" && tar xf - )
+      rm -rf "${inner_dir}"
+    fi
+  fi
+
   if [ ! -f "${output_dir}/index.html" ]; then
     echo "Initializr website bundle is missing index.html after extraction." >&2
     exit 1
+  fi
+
+  # The Initializr page (layouts/_default/initializr.html) shows the app icon
+  # from /initializr-app/icon.png. The cloud bundle shipped one; the local
+  # ParparVM bundle does not, so copy the project icon in when it is absent.
+  if [ ! -f "${output_dir}/icon.png" ] && [ -f "${REPO_ROOT}/scripts/initializr/common/icon.png" ]; then
+    cp "${REPO_ROOT}/scripts/initializr/common/icon.png" "${output_dir}/icon.png"
   fi
 }
 

@@ -144,6 +144,11 @@ jobs:
           WEBSITE_INCLUDE_DEVGUIDE: "true"
           WEBSITE_INCLUDE_INITIALIZR: "auto"
           WEBSITE_INCLUDE_PLAYGROUND: "auto"
+          # The Initializr's JavaScript app is built with the local ParparVM
+          # target, whose builder lives in the repo (8.0-SNAPSHOT) plugin rather
+          # than the pinned release. Bootstrap the local snapshot artifacts so
+          # the initializr (and the other site apps) build against repo HEAD.
+          WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS: "true"
           # PR previews build with future-dated posts visible so reviewers
           # can read posts staged for later in the week. Production deploys
           # (push to master) keep the default so future posts only appear

@@ -42,9 +42,41 @@ class StubGeneratorTest {
             generator.generateCode(tempDir, false);
 
             StubGenerator checker = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, true, true);
+            // android(.java + .kt) + ios(.h + .m + .swift) + win(.cs C# UWP + .c native
+            // win32) + linux(.c native) + javase(.java) + javascript(.js) = 10.
             List<File> existing = checker.getExistingFiles(tempDir);
-            assertEquals(8, existing.size());
+            assertEquals(10, existing.size());
             assertTrue(checker.isFilesExist(tempDir));
+        } finally {
+            deleteTree(tempDir);
+        }
+    }
+
+    @Test
+    void nativeCStubsAreGeneratedForWin32AndLinux() throws Exception {
+        File tempDir = Files.createTempDirectory("cn1-stubgen-c").toFile();
+        try {
+            StubGenerator generator = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class);
+            generator.generateCode(tempDir, false);
+
+            File winC = new File(tempDir,
+                    "win/src/main/c/com/codename1/maven/stubgen/TestNativeInterfaceImplCodenameOne.c");
+            File linuxC = new File(tempDir,
+                    "linux/src/main/c/com/codename1/maven/stubgen/TestNativeInterfaceImplCodenameOne.c");
+            assertTrue(winC.exists(), "win32 native C stub not generated");
+            assertTrue(linuxC.exists(), "linux native C stub not generated");
+
+            String c = new String(Files.readAllBytes(linuxC.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(c.contains("#include \"cn1_globals.h\""), c);
+            // The ParparVM-mangled function name, thread-state first arg and JAVA_*
+            // types the translated app links against for String hello(String).
+            assertTrue(c.contains(
+                    "JAVA_OBJECT com_codename1_maven_stubgen_TestNativeInterfaceImplCodenameOne_hello___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT param1)"),
+                    "unexpected generated C stub:\n" + c);
+            assertTrue(c.contains("return JAVA_NULL;"), c);
+            // win32 and linux are the same clean-C target, so the stub is identical;
+            // only the module directory differs.
+            assertEquals(c, new String(Files.readAllBytes(winC.toPath()), java.nio.charset.StandardCharsets.UTF_8));
         } finally {
             deleteTree(tempDir);
         }

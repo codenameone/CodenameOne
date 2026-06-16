@@ -1235,7 +1235,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         document = window.getDocument();
         canvas = (HTMLCanvasElement)document.createElement("canvas");
         outputCanvas = (HTMLCanvasElement)document.getElementById("codenameone-canvas");
-        outputCanvas.getStyle().setProperty("pointer-events", "none");
+        // The canvas must be hit-testable from the start: it boots with no
+        // active peers, and the per-event listeners installed later only
+        // flip pointer-events to "none" when the point is over a native
+        // peer. Booting with "none" relied on the window-level restore
+        // listener flipping it back on the first event -- but that restore
+        // round-trips through the worker bridge, so the initial pointer
+        // DOWN is always lost and the first gesture after load is silently
+        // swallowed (observed on the Initializr as scroll/drag doing
+        // nothing).
+        outputCanvas.getStyle().setProperty("pointer-events", "auto");
         peersContainer = (HTMLElement)document.createElement("div");
         peersContainer.setAttribute("id", "cn1-peers-container");
         outputCanvas.getParentNode().insertBefore(peersContainer, outputCanvas);
@@ -1538,15 +1547,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         || (evt.getTarget() == textField || evt.getTarget() == textArea);
                 if (ignore) {
                     debugLog("[mouseDown] touchIsDown");
-                    if (pointerState.isTouchDown()) {
-                        pointerState.setMouseDown(false);
-                    }
+                    // Ignored press (touch already down, or the target is a native
+                    // text field): clear mouseDown so the permanent mousemove
+                    // listener's press gate does not dispatch drags for it.
+                    pointerState.setMouseDown(false);
                     completePressInFlight();
                     return;
                 }
-                onMouseMoveHandle = EventUtil.addEventListener(peersContainer, "mousemove", onMouseMove, true);
-                onPointerMoveHandle = EventUtil.addEventListener(peersContainer, "pointermove", onMouseMove, true);
-
                 pointerState.setLastMousePosition(x, y);
                 // ``mouseDown=true`` already set at handler entry — see comment
                 // at top. Don't unset/re-set here; doing so opens the same
@@ -1614,9 +1621,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     return;
                 }
                 pointerState.setMouseDown(false);
-
-                EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
-                EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
 
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
@@ -1702,17 +1706,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (touchDecision.shouldCancelMouseTracking()) {
                     debugLog("[touchStart] mouseIsDown");
                     pointerState.setMouseDown(false);
-                    EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
-                    EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
                     pointerState.setTouchDown(false);
                 }
                 pointerState.setTouchDown(true);
                 
                 
                 pointerState.setTouches(x, y);
-                
-                onTouchMoveHandle = EventUtil.addEventListener(peersContainer, "touchmove", onTouchMove, true);
-                
+
                 callSerially(new Runnable() {
 
                     @Override
@@ -1782,7 +1782,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 pointerState.setGrabbedDrag(false);
                 
                 TouchEvent me = (TouchEvent)evt;
-                EventUtil.removeEventListener(peersContainer, "touchmove", onTouchMoveHandle, true); 
                 installBacksideHooksInUserInteraction();
                 nativeCallSerially(new Runnable() {
                     @Override
@@ -1813,6 +1812,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             @Override
             public void handleEvent(Event evt) {
+                // touchmove is registered permanently on the canvas (see init) so a
+                // drag's events are never lost to the late-attach race that used to
+                // add it inside the suspending onTouchStart. Only act while a touch
+                // is actually down. Keep this gate FIRST and cheap: the listener is
+                // permanent, so it fires on every touchmove -- debugLog (a native
+                // debugFlag bridge call) must stay BELOW the gate, else it taxes
+                // every move app-wide even when no drag is in progress.
+                if (!pointerState.isTouchDown()) {
+                    return;
+                }
                 debugLog("in TouchMove");
                 TouchEvent me = (TouchEvent)evt;
                 JSArray<MouseEvent> touches = me.getTargetTouches();
@@ -1835,7 +1844,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 if (JavaScriptInputCoordinator.shouldCancelTouchMove(pointerState.isMouseDown())) {
                     pointerState.setTouchDown(false);
-                    EventUtil.removeEventListener(peersContainer, "touchmove", onTouchMoveHandle, true);
                     return;
                 }
                 
@@ -1854,6 +1862,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             @Override
             public void handleEvent(Event evt) {
+                // mousemove/pointermove are registered permanently on the canvas
+                // (see init) so a drag's events are never lost to the late-attach
+                // race that used to add them inside the suspending onMouseDown
+                // (which the cooperative scheduler can take a while to complete).
+                // Only act while a pointer is actually pressed. Keep this gate
+                // FIRST and cheap: the listener is permanent AND bound to both
+                // mousemove and pointermove, so it fires (twice) on every mouse
+                // move -- debugLog (a native debugFlag bridge call) must stay BELOW
+                // the gate, else it taxes every hover app-wide.
+                if (!pointerState.isMouseDown()) {
+                    return;
+                }
                 debugLog("In mouseMove");
                 MouseEvent me = (MouseEvent)evt;
                 final int x = getClientX(me);
@@ -1865,8 +1885,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 if (JavaScriptInputCoordinator.shouldCancelMouseMove(pointerState.isTouchDown())) {
                     pointerState.setMouseDown(false);
-                    EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
-                    EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
                     return;
                 }
                 
@@ -2045,15 +2063,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
 
             };
+        // Bind pointer/touch/wheel input to the CANVAS, not ``peersContainer``.
+        // The canvas is the top, full-screen render surface; ``peersContainer``
+        // is a full-screen overlay deliberately parked BEHIND it (style.css
+        // ``#cn1-peers-container { z-index: -1000 }``) so native peers can show
+        // through transparent regions of the canvas (see ``hitTest`` /
+        // ``copyEventsToNativePeers``). A listener on the buried peers container
+        // never receives a click that lands on the canvas, so binding input
+        // there froze ALL pointer input on desktop. The canvas is the element
+        // the browser actually delivers these events to.
         JavaScriptEventWiring.registerPeerPointerEvents(new JavaScriptEventWiring.ElementRegistrar() {
             @Override
             public void add(String eventName, Object listener, boolean capture) {
-                peersContainer.addEventListener(eventName, (EventListener) listener, capture);
+                outputCanvas.addEventListener(eventName, (EventListener) listener, capture);
             }
         }, !debugFlag("disableMousedown"), !debugFlag("disableMouseup"), !debugFlag("disableTouchstart"),
                 !debugFlag("disableTouchend"), !debugFlag("disableWheel"), getWheelEventType(),
                 onMouseDown, hitTest, onMouseUp, onTouchStart, onTouchEnd, wheelListener);
-        
+
+        // Register the drag-move listeners PERMANENTLY on the canvas instead of
+        // adding them inside onMouseDown/onTouchStart. ParparVM's cooperative
+        // scheduler can take a while to complete the press handler, so adding the
+        // move listener there lost the early part of a drag -- touch/drag
+        // scrolling barely registered (a full drag scrolled <1%). onMouseMove /
+        // onTouchMove gate on pointerState.isMouseDown()/isTouchDown(), so they
+        // are no-ops outside an active press (e.g. plain hover).
+        onMouseMoveHandle = EventUtil.addEventListener(outputCanvas, "mousemove", onMouseMove, true);
+        onPointerMoveHandle = EventUtil.addEventListener(outputCanvas, "pointermove", onMouseMove, true);
+        onTouchMoveHandle = EventUtil.addEventListener(outputCanvas, "touchmove", onTouchMove, true);
+
         /**
          *  The installbacksidehooks event is an event that can be triggered from native javascript to install
          *  backside hooks.   This may be necessary if the user is interacting with the page outside of the app, or
@@ -5568,8 +5606,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return false;
         }
         try {
-            Blob blob = BlobUtil.createBlob(bytes, "application/octet-stream");
-            registerSaveBlobHandler(fileName, blob);
+            // Deliver as a base64 ``data:`` URL rather than a worker-side Blob.
+            // A worker Blob does not survive the worker->main host-bridge
+            // serialization (toHostTransferArg has no Blob case), so
+            // __cn1_register_save_blob__ never reaches the host. A plain string
+            // data: URL marshals cleanly through invokeHostNative.
+            String dataUrl = "data:application/octet-stream;base64,"
+                    + com.codename1.util.Base64.encodeNoNewline(bytes);
+            registerSaveBlobHandlerDataUrl(fileName, dataUrl);
         } catch (Throwable t) {
             return false;
         }

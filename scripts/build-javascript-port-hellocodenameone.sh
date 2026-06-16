@@ -260,7 +260,18 @@ bj_log "Compiling JavaScript-port runtime sources"
 cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
 
 bj_log "Running ByteCodeTranslator for HelloCodenameOne"
-"$JAVA_BIN" -cp "$PARPARVM_COMPILER" com.codename1.tools.translator.ByteCodeTranslator \
+# The webapp property matters for correctness, not just assets: the translator
+# scans port.js for string-referenced cn1_* names to (a) keep them suspending
+# in the CHA (bindNative/bindCiFallback replace those bodies with generators
+# at runtime) and (b) exclude them from identifier minification.
+# locateJavaScriptPortWebApp() walks UP from the CWD, which under WORK_DIR
+# staging may never reach the repo -- pass the location explicitly or the
+# bridge-name protections silently degrade (observed as
+# lambda2RunBridge:missingDispatch under minified builds).
+"$JAVA_BIN" -cp "$PARPARVM_COMPILER" \
+  -Dcodename1.javascriptport.webapp="$PORT_ROOT/src/main/webapp" \
+  ${CN1_TRANSLATOR_OPTS:-} \
+  com.codename1.tools.translator.ByteCodeTranslator \
   javascript \
   "$STAGE_CLASSES" \
   "$TRANSLATOR_OUT" \

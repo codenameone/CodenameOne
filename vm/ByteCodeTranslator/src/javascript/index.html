@@ -52,6 +52,10 @@ window.cn1LoadedFile = window.cn1LoadedFile || function(filename) {
 <script src="js/fontmetrics.js"></script>
 <script src="js/bootstrap.min.js"></script>
 <script src="js/localforage-shim.js"></script>
+<!-- Native-interface implementations run on the MAIN thread (DOM access). They
+     register into cn1_native_interfaces (defined by fontmetrics.js above) before
+     browser_bridge.js wires the worker, so host-call dispatch can find them. -->
+<!--__NATIVE_INTERFACE_STUBS__-->
 <script src="browser_bridge.js"></script>
 </body>
 </html>

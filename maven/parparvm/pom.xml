@@ -35,6 +35,15 @@
             <version>9.2</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-analysis -->
+        <!-- Used for category-aware DUP/POP2 resolution (long/double take two
+             JVM stack slots but one JS operand-stack entry). -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-analysis</artifactId>
+            <version>9.2</version>
+        </dependency>
+
     </dependencies>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

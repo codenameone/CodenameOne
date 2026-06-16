@@ -75,6 +75,16 @@ class MacNativeBuilder {
     private String signingIdentityAppStore;
     private String signingIdentityDeveloperID;
     private String fixedWindowSize;            // "<W>x<H>" or empty for native default
+    // Distribution notarization (opt-in; default off so existing builds are
+    // unchanged). When macNative.notarize=true the built Mac .app is Developer
+    // ID signed (hardened runtime + entitlements), notarized + stapled so a
+    // pre-compiled/downloaded build clears Gatekeeper instead of relying on the
+    // ad-hoc/linker signature (which a quarantined download cannot use).
+    private boolean notarize;
+    private String notaryKeychainProfile;
+    private String notaryAppleId;
+    private String notaryTeamId;
+    private String notaryPassword;
 
     MacNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;
@@ -119,6 +129,122 @@ class MacNativeBuilder {
         // Format "WxH", e.g., "1024x685". Empty/unset preserves the
         // default user-resizable Catalyst window.
         fixedWindowSize = request.getArg("macNative.fixedWindowSize", "").trim();
+        notarize = "true".equals(request.getArg("macNative.notarize", "false"));
+        notaryKeychainProfile = request.getArg("macNative.notarize.keychainProfile", "");
+        notaryAppleId = request.getArg("macNative.notarize.appleId", "");
+        notaryTeamId = request.getArg("macNative.notarize.teamId", teamId);
+        notaryPassword = request.getArg("macNative.notarize.password", "");
+    }
+
+    boolean isNotarizeEnabled() {
+        return enabled && notarize;
+    }
+
+    /**
+     * Sign (Developer ID + hardened runtime + the DeveloperID entitlements) and
+     * notarize + staple a built Mac {@code .app} so a pre-compiled/downloaded
+     * build clears Gatekeeper, instead of relying on the ad-hoc/linker signature
+     * that a quarantined download cannot use. No-op unless
+     * {@code macNative.notarize=true}.
+     *
+     * <p>Called AFTER xcodebuild has produced the bundle -- by the local build
+     * step (build-mac-native-app.sh) or the BuildDaemon Mac export. The
+     * Developer ID cert is supplied as the build's {@code certificate} (.p12) +
+     * {@code certificatePassword} -- the same "supply a cert" model as the iOS
+     * build -- and imported into a throwaway keychain so the host needs nothing
+     * pre-installed. Notary credentials come from {@code macNative.notarize.*}
+     * (a stored notarytool keychain profile, or appleId/teamId/password).
+     *
+     * @param request the build request (carries the Developer ID .p12 + password)
+     * @param appBundle the built {@code *.app} bundle
+     * @param developerIdEntitlements the {@code *-DeveloperID.entitlements} that
+     *        {@link #writeEntitlements} already produced
+     */
+    void signAndNotarizeMacApp(BuildRequest request, File appBundle,
+            File developerIdEntitlements) throws Exception {
+        if (!isNotarizeEnabled()) {
+            return;
+        }
+        if (appBundle == null || !appBundle.isDirectory()) {
+            owner.log("[macNative] notarize requested but no .app at " + appBundle
+                    + "; skipping");
+            return;
+        }
+        File dir = appBundle.getParentFile();
+        String identity = signingIdentityDeveloperID;
+
+        // 1) Import the supplied Developer ID cert into a throwaway keychain so
+        //    the build host needs nothing pre-installed (the iOS "supply a cert"
+        //    model). Skipped if no cert was provided (codesign then uses a
+        //    matching identity already in the login keychain).
+        String keychain = null;
+        byte[] cert = request.getCertificate();
+        if (cert != null && cert.length > 0) {
+            keychain = new File(dir, "cn1-macsign.keychain-db").getAbsolutePath();
+            String kcPass = "cn1sign" + System.nanoTime();
+            File p12 = File.createTempFile("cn1-macsign", ".p12", dir);
+            Files.write(p12.toPath(), cert);
+            String certPass = request.getCertificatePassword() == null
+                    ? "" : request.getCertificatePassword();
+            owner.exec(dir, "security", "create-keychain", "-p", kcPass, keychain);
+            owner.exec(dir, "security", "unlock-keychain", "-p", kcPass, keychain);
+            owner.exec(dir, "security", "import", p12.getAbsolutePath(),
+                    "-k", keychain, "-P", certPass, "-T", "/usr/bin/codesign");
+            owner.exec(dir, "security", "set-key-partition-list", "-S",
+                    "apple-tool:,apple:,codesign:", "-s", "-k", kcPass, keychain);
+            owner.exec(dir, "security", "list-keychains", "-d", "user", "-s", keychain,
+                    System.getProperty("user.home") + "/Library/Keychains/login.keychain-db");
+            p12.delete();
+        }
+
+        // 2) Sign inside-out: nested Mach-O (frameworks/dylibs) first, then the
+        //    bundle with the hardened runtime + DeveloperID entitlements.
+        owner.log("[macNative] codesigning " + appBundle.getName()
+                + " with identity \"" + identity + "\"");
+        File contents = new File(appBundle, "Contents");
+        if (contents.isDirectory()) {
+            try (java.util.stream.Stream<java.nio.file.Path> walk =
+                    Files.walk(contents.toPath())) {
+                for (java.nio.file.Path p : walk.collect(
+                        java.util.stream.Collectors.toList())) {
+                    String n = p.toString();
+                    boolean nested = (n.endsWith(".dylib") || n.endsWith(".framework"))
+                            && !n.contains(File.separator + "MacOS" + File.separator);
+                    if (nested) {
+                        owner.exec(dir, "codesign", "--force", "--timestamp",
+                                "--options", "runtime", "--sign", identity, n);
+                    }
+                }
+            }
+        }
+        owner.exec(dir, "codesign", "--force", "--timestamp", "--options", "runtime",
+                "--entitlements", developerIdEntitlements.getAbsolutePath(),
+                "--sign", identity, appBundle.getAbsolutePath());
+        owner.exec(dir, "codesign", "--verify", "--deep", "--strict",
+                "--verbose=2", appBundle.getAbsolutePath());
+
+        // 3) Notarize (notarytool needs a zip) + staple the ticket into the app
+        //    so it validates offline at launch. exec() uses timeout -1 = wait.
+        File zip = new File(dir, appBundle.getName().replaceFirst("\\.app$", "")
+                + "-notarize.zip");
+        owner.exec(dir, "ditto", "-c", "-k", "--keepParent",
+                appBundle.getAbsolutePath(), zip.getAbsolutePath());
+        if (notaryKeychainProfile != null && !notaryKeychainProfile.isEmpty()) {
+            owner.exec(dir, "xcrun", "notarytool", "submit", zip.getAbsolutePath(),
+                    "--keychain-profile", notaryKeychainProfile, "--wait");
+        } else {
+            owner.exec(dir, "xcrun", "notarytool", "submit", zip.getAbsolutePath(),
+                    "--apple-id", notaryAppleId, "--team-id", notaryTeamId,
+                    "--password", notaryPassword, "--wait");
+        }
+        owner.exec(dir, "xcrun", "stapler", "staple", appBundle.getAbsolutePath());
+        zip.delete();
+
+        if (keychain != null) {
+            owner.exec(dir, "security", "delete-keychain", keychain);
+        }
+        owner.log("[macNative] " + appBundle.getName()
+                + " is Developer ID signed, hardened, notarized + stapled.");
     }
 
     /**

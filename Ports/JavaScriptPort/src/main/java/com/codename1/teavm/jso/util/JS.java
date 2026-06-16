@@ -73,6 +73,17 @@ public class JS {
     
     
     public static String[] unwrapStringArray(JSArray<JSString> input) {
+        // A null / undefined input arrives when the underlying JS call
+        // resolved to no value -- most notably LocalForage.keys() on an
+        // empty IndexedDB store, which resolves to an empty (or absent)
+        // array. Treat it as the empty array rather than dereferencing
+        // null: input.getLength() on a null receiver threw an uncaught
+        // NullPointerException out of the keys() callback, killing the
+        // storage-init thread and leaving the app unresponsive on first
+        // load.
+        if (input == null || JS.isUndefined(input)) {
+            return new String[0];
+        }
         int len = input.getLength();
         String[] out = new String[len];
         for (int i=0; i<len; i++) {

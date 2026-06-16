@@ -29,6 +29,14 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 final class JavascriptMethodGenerator {
+    /**
+     * Mangled identifiers (and their {@code __impl} variants) of every native
+     * method emitted this translation run. The JS<->worker bridge overrides
+     * natives by their exact global name, so {@link JavascriptBundleWriter}'s
+     * identifier minifier must never rename these. Populated during emission.
+     */
+    static final java.util.Set<String> NATIVE_METHOD_IDENTIFIERS = new java.util.HashSet<String>();
+
     // Global class-name to ByteCodeClass index, used by appendFieldInstruction
     // to resolve a getfield/putfield instruction's class reference (the
     // "current receiver type" from the bytecode's Fieldref) to the actual
@@ -67,6 +75,22 @@ final class JavascriptMethodGenerator {
     // class-specific function identifier at the call site, not
     // the class's ``methods`` table.
     private static volatile java.util.Set<String> referencedDispatchIds = null;
+    // Monomorphic-devirtualization map: dispatch id (class-free
+    // name+desc) -> the single concrete implementation's JS function
+    // identifier, for dispatch ids that have EXACTLY ONE concrete
+    // surviving implementation across the whole program. A virtual call
+    // to such an id can only ever resolve to that one body (an override
+    // would be a second concrete impl -> not monomorphic), so the
+    // emitter calls the impl directly via the ``_dv*`` / ``_dw*`` helper
+    // family (which preserves the null-receiver NPE and the
+    // drive-once semantics of ``_v*`` / ``_w*`` but skips the
+    // dispatch-id string lookup). Because a fully-devirtualized id is
+    // no longer counted in ``referencedDispatchIds``, its ``m:``
+    // methods-map entry is pruned and its now-unreferenced dispatch-id
+    // string drops out of the ``_q`` hoist table -- the bulk of the
+    // win. JSO-bridge types are excluded (they dispatch host-side via
+    // the m: map). Kill switch: ``-Dparparvm.js.devirt.off``.
+    private static volatile java.util.Map<String, String> monomorphicDispatch = null;
     // The class whose method is currently being emitted. Used by
     // ``appendInterpreterEnsureClassInitialized`` to elide
     // ``_I("X")`` when ``X`` is the containing class or one of
@@ -89,7 +113,12 @@ final class JavascriptMethodGenerator {
     private JavascriptMethodGenerator() {
     }
 
+    // Memoises classNeedsInitialization(); keyed on the sanitized class name.
+    // Cleared whenever classIndex changes so a stale run can't leak.
+    private static final Map<String, Boolean> classNeedsInitCache = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
+
     static void setClassIndex(List<ByteCodeClass> allClasses) {
+        classNeedsInitCache.clear();
         if (allClasses == null) {
             classIndex = null;
             referencedStaticFields = null;
@@ -120,6 +149,12 @@ final class JavascriptMethodGenerator {
         // the set with the raw declared owner AND every ancestor
         // that has a field by the same name. Over-approximation is
         // safe: we never accidentally drop a referenced field.
+        // Monomorphic-devirtualization map must be computed BEFORE the
+        // dispatch-reference scan so that scan can skip ids that will be
+        // devirtualized (and thus need no m: entry / dispatch-id string).
+        java.util.Map<String, String> monoDispatch = computeMonomorphicDispatch(allClasses, index);
+        monomorphicDispatch = monoDispatch;
+
         java.util.Set<String> fieldRefs = new java.util.HashSet<String>();
         java.util.Set<String> instanceRefs = new java.util.HashSet<String>();
         java.util.Set<String> dispatchRefs = new java.util.HashSet<String>();
@@ -135,7 +170,16 @@ final class JavascriptMethodGenerator {
                         if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
                             com.codename1.tools.translator.bytecodes.Invoke inv =
                                     (com.codename1.tools.translator.bytecodes.Invoke) instr;
-                            dispatchRefs.add(JavascriptNameUtil.dispatchMethodIdentifier(inv.getName(), inv.getDesc()));
+                            String did = JavascriptNameUtil.dispatchMethodIdentifier(inv.getName(), inv.getDesc());
+                            // A monomorphic id is devirtualized at every call
+                            // site (direct ``_dv*`` / ``_dw*`` call), so it
+                            // never participates in runtime virtual dispatch
+                            // and needs no m: entry. Leaving it out of
+                            // dispatchRefs is what prunes the entry + drops
+                            // the dispatch-id string.
+                            if (!monoDispatch.containsKey(did)) {
+                                dispatchRefs.add(did);
+                            }
                         }
                     }
                     if (instr instanceof com.codename1.tools.translator.bytecodes.Field) {
@@ -193,6 +237,225 @@ final class JavascriptMethodGenerator {
         referencedStaticFields = fieldRefs;
         referencedInstanceFields = instanceRefs;
         referencedDispatchIds = dispatchRefs;
+        if (System.getProperty("parparvm.js.devirtdiag") != null) {
+            emitDevirtDiagnostics(allClasses, index);
+        }
+    }
+
+    /**
+     * Build the dispatch-id -> single-impl-function map (see
+     * {@link #monomorphicDispatch}). A dispatch id qualifies iff it has
+     * exactly one concrete (non-abstract, non-native, non-eliminated)
+     * instance-method body across all surviving classes, and that body
+     * is not on a JSO-bridge type. Native / JSO impls force the id
+     * out (host-bound / host-dispatched). Returns an empty map when the
+     * kill switch ``-Dparparvm.js.devirt.off`` is set.
+     */
+    private static java.util.Map<String, String> computeMonomorphicDispatch(
+            List<ByteCodeClass> allClasses, Map<String, ByteCodeClass> index) {
+        java.util.Map<String, String> result = new java.util.HashMap<String, String>();
+        if (System.getProperty("parparvm.js.devirt.off") != null) {
+            return result;
+        }
+        // Soundness requires the "declared exactly once program-wide"
+        // rule, NOT merely "one surviving concrete body". A subclass
+        // override that RTA pruned (because it judged the override
+        // unreachable) leaves a single concrete body behind, but an
+        // instance of that subclass still dispatches the inherited /
+        // base body at runtime -- so counting only non-eliminated
+        // concrete methods can wrongly call the base impl on a subtype
+        // receiver (observed: a devirtualized hasFocus()/predicate
+        // returning the wrong value steered Component.getStyle() down a
+        // null-returning branch -> NPE in getInnerHeight). So count
+        // EVERY declaration of a name+desc across ALL classes
+        // (concrete, abstract, native, eliminated, interface); a
+        // dispatch id is devirtualizable only when its signature is
+        // declared in exactly one class, and that one declaration is a
+        // concrete non-native non-JSO instance method.
+        java.util.Map<String, Integer> declCount = new java.util.HashMap<String, Integer>();
+        for (ByteCodeClass c : allClasses) {
+            if (c == null) continue;
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isStatic() || m.isConstructor()) continue;
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) continue;
+                if ("__INIT__".equals(name) || "__CLINIT__".equals(name)) continue;
+                String did = JavascriptNameUtil.dispatchMethodIdentifier(name, desc);
+                Integer cur = declCount.get(did);
+                declCount.put(did, cur == null ? 1 : cur + 1);
+            }
+        }
+        for (ByteCodeClass c : allClasses) {
+            if (c == null) continue;
+            boolean jso = isJsoBridgeType(c, index);
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isEliminated() || m.isStatic() || m.isAbstract()
+                        || m.isConstructor() || m.isNative()) {
+                    continue;
+                }
+                if (jso) continue;
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) continue;
+                if ("__INIT__".equals(name) || "__CLINIT__".equals(name)) continue;
+                String did = JavascriptNameUtil.dispatchMethodIdentifier(name, desc);
+                Integer total = declCount.get(did);
+                if (total != null && total == 1) {
+                    result.put(did, jsMethodIdentifier(c, m));
+                }
+            }
+        }
+        // Host-dispatched methods must keep their m: entry: the JS bridge
+        // (port.js / runtime) resolves them via
+        // ``jvm.resolveVirtual(recv.__class, dispatchId)`` or
+        // ``classDef.methods[id]`` -- NOT by an in-bundle INVOKEVIRTUAL --
+        // so pruning the entry breaks host dispatch ("Missing virtual
+        // method ... on ..."). Exclude every dispatch id the bridge
+        // references, either as a literal ``cn1_s_*`` string or derived
+        // from a referenced full ``cn1_<class>_<method>_<sig>`` id (strip
+        // the longest matching class prefix, mirroring the runtime's
+        // overrideMethodMaps). The screenshot-runner callbacks
+        // (Cn1ssDeviceRunner.awaitTestCompletion / finalizeTest), event
+        // handlers, toString/getMessage etc. all flow through here.
+        java.util.Set<String> bridge = JavascriptBundleWriter.collectBridgeReferencedCn1Tokens();
+        for (String t : bridge) {
+            if (t == null) continue;
+            if (t.startsWith("cn1_s_")) {
+                result.remove(t);
+            } else if (t.startsWith("cn1_")) {
+                String stripped = t.endsWith("__impl") ? t.substring(0, t.length() - 6) : t;
+                String best = null;
+                for (String clsName : index.keySet()) {
+                    String prefix = "cn1_" + clsName + "_";
+                    if (stripped.startsWith(prefix)
+                            && (best == null || clsName.length() > best.length())) {
+                        best = clsName;
+                    }
+                }
+                if (best != null) {
+                    result.remove("cn1_s_" + stripped.substring(("cn1_" + best + "_").length()));
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * One-shot sizing diagnostic (``-Dparparvm.js.devirtdiag``) for the
+     * two architecture-preserving density levers. Prints, to stderr:
+     * (1) virtual call sites whose dispatch-id has exactly one concrete
+     * surviving implementation across the whole program -- the
+     * monomorphic-devirtualization-eligible sites, which could drop the
+     * runtime ``_v*(t,"id")`` resolution and (when no polymorphic use
+     * remains) the dispatch-id string from the table; (2) trivial
+     * synchronous method bodies (field getter / setter / const return)
+     * -- inline candidates that would remove the whole function def plus
+     * its call ceremony. Cost: a tally pass; emits nothing unless the
+     * property is set.
+     */
+    private static void emitDevirtDiagnostics(List<ByteCodeClass> allClasses, Map<String, ByteCodeClass> index) {
+        // concrete-impl count per dispatch-id (name+desc), and virtual
+        // call-site count per dispatch-id.
+        java.util.Map<String, Integer> implCount = new java.util.HashMap<String, Integer>();
+        java.util.Map<String, Integer> callSites = new java.util.HashMap<String, Integer>();
+        int virtualCallSites = 0;
+        int trivialGetters = 0, trivialSetters = 0, trivialConst = 0;
+        long trivialBytesEst = 0;
+        for (ByteCodeClass c : allClasses) {
+            if (c == null) continue;
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isEliminated()) continue;
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name != null && desc != null
+                        && !"__INIT__".equals(name) && !"__CLINIT__".equals(name)
+                        && !m.isStatic()) {
+                    String did = JavascriptNameUtil.dispatchMethodIdentifier(name, desc);
+                    Integer cur = implCount.get(did);
+                    implCount.put(did, cur == null ? 1 : cur + 1);
+                }
+                List<Instruction> insns = m.getInstructions();
+                if (insns == null) continue;
+                int kind = trivialBodyKind(insns);
+                if (kind == 1) { trivialGetters++; trivialBytesEst += 40; }
+                else if (kind == 2) { trivialSetters++; trivialBytesEst += 45; }
+                else if (kind == 3) { trivialConst++; trivialBytesEst += 30; }
+                for (Instruction instr : insns) {
+                    if (instr instanceof com.codename1.tools.translator.bytecodes.Invoke) {
+                        int op = instr.getOpcode();
+                        if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
+                            com.codename1.tools.translator.bytecodes.Invoke inv =
+                                    (com.codename1.tools.translator.bytecodes.Invoke) instr;
+                            String did = JavascriptNameUtil.dispatchMethodIdentifier(inv.getName(), inv.getDesc());
+                            Integer cur = callSites.get(did);
+                            callSites.put(did, cur == null ? 1 : cur + 1);
+                            virtualCallSites++;
+                        }
+                    }
+                }
+            }
+        }
+        int monoSites = 0, monoDispatchIds = 0;
+        for (java.util.Map.Entry<String, Integer> e : callSites.entrySet()) {
+            Integer impls = implCount.get(e.getKey());
+            if (impls != null && impls == 1) {
+                monoSites += e.getValue();
+                monoDispatchIds++;
+            }
+        }
+        System.err.println("[devirtdiag] virtual call sites total=" + virtualCallSites
+                + " monomorphic-eligible=" + monoSites
+                + " (over " + monoDispatchIds + " single-impl dispatch-ids)");
+        System.err.println("[devirtdiag] inline candidates: getters=" + trivialGetters
+                + " setters=" + trivialSetters + " const=" + trivialConst
+                + " ~" + (trivialBytesEst / 1024) + "KB of trivial bodies");
+    }
+
+    /** 0=not trivial, 1=getter (ALOAD0;GETFIELD;xRETURN), 2=setter, 3=const return. */
+    private static int trivialBodyKind(List<Instruction> insns) {
+        java.util.List<Instruction> ops = new java.util.ArrayList<Instruction>();
+        for (Instruction i : insns) {
+            if (i instanceof com.codename1.tools.translator.bytecodes.LabelInstruction
+                    || i instanceof com.codename1.tools.translator.bytecodes.LineNumber
+                    || i instanceof com.codename1.tools.translator.bytecodes.LocalVariable) {
+                continue;
+            }
+            ops.add(i);
+        }
+        if (ops.size() == 3
+                && isVarOp(ops.get(0), Opcodes.ALOAD)
+                && ops.get(1) instanceof com.codename1.tools.translator.bytecodes.Field
+                && ops.get(1).getOpcode() == Opcodes.GETFIELD
+                && isReturn(ops.get(2))) {
+            return 1;
+        }
+        if (ops.size() == 4
+                && isVarOp(ops.get(0), Opcodes.ALOAD)
+                && (ops.get(1) instanceof com.codename1.tools.translator.bytecodes.VarOp)
+                && ops.get(2) instanceof com.codename1.tools.translator.bytecodes.Field
+                && ops.get(2).getOpcode() == Opcodes.PUTFIELD
+                && ops.get(3).getOpcode() == Opcodes.RETURN) {
+            return 2;
+        }
+        if (ops.size() == 2 && isReturn(ops.get(1))) {
+            int op0 = ops.get(0).getOpcode();
+            if (op0 == Opcodes.ACONST_NULL || (op0 >= Opcodes.ICONST_M1 && op0 <= Opcodes.DCONST_1)
+                    || ops.get(0) instanceof com.codename1.tools.translator.bytecodes.Ldc) {
+                return 3;
+            }
+        }
+        return 0;
+    }
+
+    private static boolean isVarOp(Instruction i, int opcode) {
+        return i instanceof com.codename1.tools.translator.bytecodes.VarOp && i.getOpcode() == opcode;
+    }
+
+    private static boolean isReturn(Instruction i) {
+        int op = i.getOpcode();
+        return op == Opcodes.IRETURN || op == Opcodes.LRETURN || op == Opcodes.FRETURN
+                || op == Opcodes.DRETURN || op == Opcodes.ARETURN;
     }
 
     /**
@@ -285,6 +548,23 @@ final class JavascriptMethodGenerator {
     }
 
     /**
+     * True when a {@code synchronized} method must emit its (yielding)
+     * monitor enter/exit. A synchronized method only needs the monitor
+     * when it is actually classified suspending: the JS suspension
+     * analysis seeds {@code synchronized} as suspending by default, but
+     * may clear a method to synchronous when its monitor is provably
+     * uncontended (single-threaded green-thread model: the body never
+     * yields while holding the monitor, so it runs atomically and no
+     * other thread can be holding the lock). A cleared method is emitted
+     * as a plain {@code function} that runs straight through, so its
+     * monitor is redundant -- skip it rather than emit a {@code yield*}
+     * that a non-generator cannot perform.
+     */
+    private static boolean emitsMonitor(BytecodeMethod method) {
+        return method.isSynchronizedMethod() && method.isJavascriptSuspending();
+    }
+
+    /**
      * True when the given invoke's callee is (or must be conservatively
      * treated as) suspending. Virtual / interface dispatches go through
      * {@code cn1_iv*} which is a generator, so they are always
@@ -340,6 +620,114 @@ final class JavascriptMethodGenerator {
         return JavascriptNameUtil.sanitizeClassName(owner);
     }
 
+    /**
+     * Resolves the bytecode Fieldref owner of a STATIC field to the
+     * class/interface that actually DECLARES it, mirroring JVM field
+     * resolution (JVMS 5.4.3.2): search the named class, then its
+     * superinterfaces, then its superclass, recursively. Required because
+     * static fields are stored in {@code _S[<declaringClass>]} and their
+     * {@code <clinit>} is keyed on the declaring class, while javac is free to
+     * name any subtype through which the field is accessed as the Fieldref
+     * owner (e.g. {@code DeflaterEngine.COMPR_FUNC} for {@code COMPR_FUNC}
+     * declared on the interface {@code DeflaterConstants}). Falls back to the
+     * sanitized raw owner when the field can't be located (unknown class, or
+     * a runtime-only field), preserving prior behaviour.
+     */
+    private static String resolveStaticFieldOwner(String owner, String fieldName) {
+        if (owner == null) {
+            return null;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        String start = JavascriptNameUtil.sanitizeClassName(owner);
+        if (idx == null || fieldName == null) {
+            return start;
+        }
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String current = stack.pop();
+            if (current == null || !seen.add(current)) {
+                continue;
+            }
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                continue;
+            }
+            for (ByteCodeField f : cls.getFields()) {
+                if (f.isStaticField() && fieldName.equals(f.getFieldName())) {
+                    return current;
+                }
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(JavascriptNameUtil.sanitizeClassName(base));
+            }
+        }
+        return start;
+    }
+
+    /**
+     * True when {@code _I(className)} (ensureClassInitialized) can have any
+     * observable effect: the class or one of its supertypes (superclass or a
+     * transitive superinterface) has an explicit {@code <clinit>} or deferred
+     * static-field initialization. When false the guard is pure overhead — the
+     * runtime helper walks the hierarchy, finds no clinit, and returns — so the
+     * emitter can omit it entirely. This mirrors TeaVM, which only guards
+     * init-bearing classes (a hellocodenameone build emits ~90 guards; ParparVM
+     * emitted ~8900 because it guarded unconditionally). Over-approximates
+     * (returns {@code true}) for unknown classes / hierarchy cycles so a needed
+     * guard is never dropped; static fields themselves are default-initialised
+     * at {@code defineClass} time, so a clinit-less class is safe to read
+     * without a guard.
+     */
+    private static boolean classNeedsInitialization(String className) {
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (className == null || idx == null) {
+            return true;
+        }
+        String start = JavascriptNameUtil.sanitizeClassName(className);
+        Boolean cached = classNeedsInitCache.get(start);
+        if (cached != null) {
+            return cached;
+        }
+        boolean needs = false;
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String cur = stack.pop();
+            if (cur == null || !seen.add(cur)) {
+                continue;
+            }
+            ByteCodeClass cls = idx.get(cur);
+            if (cls == null) {
+                needs = true;            // unknown class -> keep the guard
+                break;
+            }
+            if (hasExplicitClinit(cls) || hasDeferredStaticInitialization(cls)) {
+                needs = true;
+                break;
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(JavascriptNameUtil.sanitizeClassName(base));
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+        }
+        classNeedsInitCache.put(start, needs);
+        return needs;
+    }
+
     static String generateClassJavascript(ByteCodeClass cls, List<ByteCodeClass> allClasses) {
         // Populate the resolution index lazily on first call and keep it
         // alive for the rest of the generation pass. The size check is
@@ -385,6 +773,15 @@ final class JavascriptMethodGenerator {
             if (!method.isNative() || method.isEliminated()) {
                 continue;
             }
+            // Record native method identifiers so the bundle-writer's identifier
+            // minifier never renames them: the JS<->worker bridge overrides natives
+            // by reassigning the global of their exact name (and the constructed
+            // name+"__impl" static body) at runtime -- a renamed native stub would
+            // bypass its override. The translator's own isNative() knowledge is the
+            // authoritative source (more reliable than scanning runtime JS text).
+            String nativeId = jsMethodIdentifier(cls, method);
+            NATIVE_METHOD_IDENTIFIERS.add(nativeId);
+            NATIVE_METHOD_IDENTIFIERS.add(nativeId + "__impl");
             appendNativeStubIfNeeded(methodsOut, cls, method);
             if (!method.isStatic() && !method.isConstructor()) {
                 String jsMethodName = jsMethodIdentifier(cls, method);
@@ -853,6 +1250,51 @@ final class JavascriptMethodGenerator {
      * collapsed form can itself chain with a subsequent getfield
      * (``.p(X.$F),.p(.q().$G)`` → ``.p(X.$F.$G)``).
      */
+    /**
+     * Applies a virtual-dispatch collapse rule in BOTH spellings: the
+     * generator form ({@code yield* cn1_iv<N>(...)}) and the synchronous
+     * form ({@code cn1_ivs<N>(...)}) that the emitter selects when the
+     * CHA proved the signature non-suspending. The sync variant is derived
+     * textually -- {@code yield\* cn1_iv} → {@code cn1_ivs} in the pattern
+     * and {@code yield* cn1_iv} → {@code cn1_ivs} in the replacement --
+     * which introduces no capture groups, so group numbering is identical
+     * across both applications.
+     */
+    private static String applyVirtualRule(String s, String pattern, String replacement) {
+        // (1) suspending + (2) sync, quoted dispatch-id forms (_v* / _w*).
+        s = s.replaceAll(pattern, replacement);
+        s = s.replaceAll(
+                pattern.replace("yield\\* _v", "_w"),
+                replacement.replace("yield* _v", "_w"));
+        // (3) suspending + (4) sync, MONOMORPHIC-DEVIRT forms (_dv* / _dw*).
+        // Devirtualized call sites pass the impl FUNCTION (a bareword) as
+        // the 2nd argument instead of a quoted dispatch-id, so they don't
+        // match the _v*/_w* peephole shapes above and would otherwise stay
+        // uncollapsed (the operand-push fold is lost -> ~90KB on a real
+        // app). Derive the devirt rule from the suspending rule by (a)
+        // swapping the helper prefix ``_v`` -> ``_dv`` and (b) swapping the
+        // quoted dispatch-id capture ``"([^"]+)"`` for a bareword capture
+        // ``([\w$]+)`` in the pattern, and un-quoting the corresponding
+        // ``"$N"`` emit in the replacement. Group numbering is preserved
+        // (the bareword swap keeps exactly one capture in the same spot),
+        // so ``$N`` back-references still resolve. Only rules that actually
+        // contain a quoted dispatch-id capture get a meaningful variant;
+        // others produce a pattern that simply never matches.
+        if (pattern.contains("\"([^\"]+)\"")) {
+            String dvPattern = pattern
+                    .replace("yield\\* _v", "yield\\* _dv")
+                    .replace("\"([^\"]+)\"", "([\\w$]+)");
+            String dvReplacement = replacement
+                    .replace("yield* _v", "yield* _dv")
+                    .replaceAll("\"(\\$\\d+)\"", "$1");
+            s = s.replaceAll(dvPattern, dvReplacement);
+            s = s.replaceAll(
+                    dvPattern.replace("yield\\* _dv", "_dw"),
+                    dvReplacement.replace("yield* _dv", "_dw"));
+        }
+        return s;
+    }
+
     private static String applyMethodPeephole(CharSequence body) {
         String s = body.toString();
         // Safe-strip has already elided pc advances between adjacent
@@ -942,20 +1384,20 @@ final class JavascriptMethodGenerator {
                     "stack.p($1); stack.p($1);");
             // Rule 7: inline 0-arg virtual dispatch when the target
             // was just pushed.
-            //   stack.p(T); stack.p(yield* cn1_iv0(stack.q(), "mid"));
-            //     → stack.p(yield* cn1_iv0(T, "mid"));
+            //   stack.p(T); stack.p(yield* _v0(stack.q(), "mid"));
+            //     → stack.p(yield* _v0(T, "mid"));
             // T restricted to simple identifier+index shape.
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(yield\\* cn1_iv0\\(stack\\.q\\(\\), \"([^\"]+)\"\\)\\);",
-                    "stack.p(yield* cn1_iv0($1, \"$2\"));");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(yield\\* _v0\\(stack\\.q\\(\\), \"([^\"]+)\"\\)\\);",
+                    "stack.p(yield* _v0($1, \"$2\"));");
             // Rule 8: inline 1-arg virtual dispatch when target+arg
             // were just pushed.
             //   stack.p(T); stack.p(A);
-            //   { let __arg0 = stack.q(); stack.p(yield* cn1_iv1(stack.q(), "mid", __arg0)); pc = N; break; }
-            //     → stack.p(yield* cn1_iv1(T, "mid", A)); pc = N; break;
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv1($1, \"$3\", $2)); $4");
+            //   { let __arg0 = stack.q(); stack.p(yield* _v1(stack.q(), "mid", __arg0)); pc = N; break; }
+            //     → stack.p(yield* _v1(T, "mid", A)); pc = N; break;
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v1($1, \"$3\", $2)); $4");
             // Rule 8b: extended arg pattern allowing ONE level of
             // balanced parens inside the arg push — captures common
             // shapes like ``_L("...")``, ``_O("...")``, ``_F(N)``,
@@ -973,30 +1415,30 @@ final class JavascriptMethodGenerator {
             // and arg in swapped slots. (Reproduced as
             // setBgTransparency((int) f) → "Missing virtual method on
             // float" in Toolbar.show*SidemenuImpl.)
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv1($1, \"$3\", $2)); $4");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v1($1, \"$3\", $2)); $4");
             // Rule 9: same as Rule 8 but for void return.
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv1($1, \"$3\", $2); $4");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
+                    "yield* _v1($1, \"$3\", $2); $4");
             // Rule 9b: extended arg — balanced-parens variant of Rule 9.
             // See Rule 8b for the ``(?!stack\.q\()`` lookahead rationale.
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv1($1, \"$3\", $2); $4");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* _v1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
+                    "yield* _v1($1, \"$3\", $2); $4");
             // Rule 10: 2-arg virtual with target + two args all pushed.
             //   stack.p(T); stack.p(A0); stack.p(A1);
-            //   { let __arg1 = stack.q(); let __arg0 = stack.q(); stack.p(yield* cn1_iv2(stack.q(), "mid", __arg0, __arg1)); pc = N; break; }
-            //     → stack.p(yield* cn1_iv2(T, "mid", A0, A1)); pc = N; break;
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
+            //   { let __arg1 = stack.q(); let __arg0 = stack.q(); stack.p(yield* _v2(stack.q(), "mid", __arg0, __arg1)); pc = N; break; }
+            //     → stack.p(yield* _v2(T, "mid", A0, A1)); pc = N; break;
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v2($1, \"$4\", $2, $3)); $5");
             // Rule 10c: 2-arg virtual with balanced-parens args.
             // See Rule 8b for the ``(?!stack\.q\()`` lookahead rationale.
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v2($1, \"$4\", $2, $3)); $5");
             // Rule 11: 0-arg INVOKESPECIAL with inline target.
             //   stack.p(T); stack.p(yield* $ctor(stack.q())); pc = N; break;
             //     → stack.p(yield* $ctor(T)); pc = N; break;
@@ -1015,8 +1457,17 @@ final class JavascriptMethodGenerator {
             // Chains further through iteration (sN=X; sN=sN.a; sN=sN.b
             // → sN=X.a.b). Matches only simple slot-to-slot flow where
             // the next statement reads and writes the SAME slot.
+            // ``yield*`` binds the whole postfix expression, so fusing a
+            // subscript onto a ``yield* f(...)`` result MUST parenthesise:
+            // ``s0 = yield* f()["p"]`` subscripts the GENERATOR OBJECT
+            // (undefined) and throws "yield* undefined is not iterable" at
+            // runtime -- this killed the invokeAndBlock thread-pool loop
+            // (RunnableWrapper.run case 4) and wedged every waiter.
             s = s.replaceAll(
-                    "(\\s+s(\\d+) = )([^;]+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
+                    "(\\s+s(\\d+) = )(yield\\*? [^;]+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
+                    "$1($3)$4;");
+            s = s.replaceAll(
+                    "(\\s+s(\\d+) = )((?:(?!yield)[^;])+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
                     "$1$3$4;");
             // Rule 14: straight-line slot-to-return chain.
             //   sN = EXPR; return sN;
@@ -1052,27 +1503,46 @@ final class JavascriptMethodGenerator {
             // where the slot is overwritten.
             // Rule 15: 3-arg virtual with target + three args all pushed.
             //   stack.p(T); stack.p(A0); stack.p(A1); stack.p(A2);
-            //   { let __arg2=q; let __arg1=q; let __arg0=q; stack.p(yield* cn1_iv3(q, "mid", __arg0, __arg1, __arg2)); pc=N; break; }
-            //     → stack.p(yield* cn1_iv3(T, "mid", A0, A1, A2)); pc=N; break;
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv3($1, \"$5\", $2, $3, $4)); $6");
+            //   { let __arg2=q; let __arg1=q; let __arg0=q; stack.p(yield* _v3(q, "mid", __arg0, __arg1, __arg2)); pc=N; break; }
+            //     → stack.p(yield* _v3(T, "mid", A0, A1, A2)); pc=N; break;
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v3($1, \"$5\", $2, $3, $4)); $6");
             // Rule 15b: void-return variant of Rule 15.
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv3($1, \"$5\", $2, $3, $4); $6");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* _v3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\); (pc = \\d+; break;) \\}",
+                    "yield* _v3($1, \"$5\", $2, $3, $4); $6");
             // Rule 16: 4-arg virtual with target + four args all pushed.
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\)\\); (pc = \\d+; break;) \\}",
-                    "stack.p(yield* cn1_iv4($1, \"$6\", $2, $3, $4, $5)); $7");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* _v4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* _v4($1, \"$6\", $2, $3, $4, $5)); $7");
             // Rule 16b: void-return variant of Rule 16.
-            s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv4($1, \"$6\", $2, $3, $4, $5); $7");
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* _v4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\); (pc = \\d+; break;) \\}",
+                    "yield* _v4($1, \"$6\", $2, $3, $4, $5); $7");
             // Rule 10b: void-return variant of Rule 10 (2-arg virtual).
+            s = applyVirtualRule(s,
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* _v2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\); (pc = \\d+; break;) \\}",
+                    "yield* _v2($1, \"$4\", $2, $3); $5");
+            // Rule 18: collapse the straight-line call-result temp.
+            //   { let __result = <call-expr>; X = __result; }
+            //     → X = <call-expr>;
+            // The temp is created and consumed in the same block with
+            // exactly one use, and a JS assignment fully evaluates its
+            // RHS before the store, so the rewrite cannot change
+            // semantics even when X also appears inside the call
+            // expression (``b = yield* _v0(b, ...)``). This is the
+            // single largest scaffolding pattern in the straight-line
+            // emitter's output (one per non-void invocation).
             s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\); (pc = \\d+; break;) \\}",
-                    "yield* cn1_iv2($1, \"$4\", $2, $3); $5");
+                    "\\{\\s*let __result = ((?:yield\\* )?[^;]+);\\s*([\\w\\$]+(?:\\[\\d+\\])?) = __result;\\s*\\}",
+                    "$2 = $1;");
+            // Rule 18b: identity copy-pair.
+            //   X = Y;  Y = X;     →  X = Y;
+            // The second statement re-stores Y's own value.
+            s = s.replaceAll(
+                    "(\\s)([\\w\\$]+) = ([\\w\\$]+);\\s+\\3 = \\2;",
+                    "$1$2 = $3;");
             // Rule 17: array load (AALOAD/IALOAD/BALOAD/CALOAD/SALOAD)
             // with inlined array + index pushes.
             //   stack.p(A); stack.p(I);
@@ -2071,13 +2541,14 @@ final class JavascriptMethodGenerator {
             out.append("__cn1Arg").append(i + 1);
         }
         out.append("){\n");
-        if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
+        if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())
+                && classNeedsInitialization(cls.getClsName())) {
             out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
         }
         if ("__CLINIT__".equals(method.getMethodName())) {
             appendDeferredStaticFieldInitialization(out, cls);
         }
-        if (appendStraightLineMethodBody(out, regs, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName)) {
+        if (appendStraightLineMethodBody(out, regs, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName, labelToIndex)) {
             if (wrappedStaticMethod && shouldEmitStaticWrapper(method)) {
                 appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
             }
@@ -2158,23 +2629,27 @@ final class JavascriptMethodGenerator {
         if (hasTryCatch) {
             appendTryCatchTable(out, instructions, labelToIndex);
         }
-        // Cooperative budget yield. Opt-in via the system property
-        // ``parparvm.js.preemptYield=1``. When enabled, every
-        // generator-method invocation checks ``_Yc()`` (counter-amortised
-        // wall-clock test against ``__cn1TickStartedAt``) and yields
-        // ``_Yv = {op:"sleep",millis:0}`` when the budget is exceeded.
-        // Disabled by default while we tune the overhead; the runtime
-        // half of the machinery (``_Yc``/``_Yv``/``__cn1TickReset`` +
-        // the clinit-depth gate in ``ensureClassInitialized``) ships
-        // unconditionally so the gate can be flipped without a
-        // translator rebuild.
+        // Cooperative budget yield. ON by default; opt out with
+        // ``parparvm.js.preemptYield=0``. Every generator-method invocation
+        // checks ``_Yc()`` (counter-amortised wall-clock test against
+        // ``__cn1TickStartedAt``) and yields ``_Yv = {op:"sleep",millis:0}``
+        // when the budget is exceeded.
+        //
+        // Without it, a long synchronous stretch (the Initializr's boot-time
+        // layout/JSO work on worker-local wrappers) runs as ONE drain step:
+        // the worker's event loop starves for tens of seconds, host events
+        // queue, the heartbeat stops, and the canvas pointer-events restore
+        // handler never runs -- observed as "loads really slowly and ignores
+        // drags". The historical overhead concern is largely mooted by the
+        // sync-dispatch CHA: hot leaf methods are now plain functions that
+        // never reach this check.
         //
         // Sync (non-generator) methods skip this -- they cannot yield.
         if (methodSuspending && !"__CLINIT__".equals(method.getMethodName())
-                && Boolean.getBoolean("parparvm.js.preemptYield")) {
+                && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))) {
             out.append("  if(_Yc())yield _Yv;\n");
         }
-        if (method.isSynchronizedMethod()) {
+        if (emitsMonitor(method)) {
             out.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
             // ``yield* _me(...)`` lets the calling green thread park if
             // the monitor is contended; the non-contended case is a
@@ -2345,7 +2820,7 @@ final class JavascriptMethodGenerator {
             out.append("    } catch (__cn1Error) { pc = _E(__cn1TryCatch, pc, __cn1Error, stack); }\n");
         }
         out.append("  }\n");
-        if (method.isSynchronizedMethod()) {
+        if (emitsMonitor(method)) {
             out.append("  } finally {\n");
             out.append("    _mx(__cn1Monitor);\n");
             out.append("  }\n");
@@ -2409,7 +2884,9 @@ final class JavascriptMethodGenerator {
         out.append(suspending ? "function* " : "function ").append(wrapperName).append("(");
         appendMethodParameters(out, method);
         out.append("){\n");
-        out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
+        if (classNeedsInitialization(cls.getClsName())) {
+            out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
+        }
         out.append("  return ").append(suspending ? "yield* " : "").append(bodyName).append("(");
         appendMethodParameterArguments(out, method);
         out.append(");\n");
@@ -2723,10 +3200,8 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineMethodBody(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method,
-            List<Instruction> instructions, String jsMethodName) {
-        if (!isStraightLineEligible(method, instructions)) {
-            return false;
-        }
+            List<Instruction> instructions, String jsMethodName, Map<Label, Integer> labelToIndex) {
+        boolean plain = isStraightLineEligible(method, instructions);
         try {
             StringBuilder setup = new StringBuilder();
             StringBuilder instructionBody = new StringBuilder();
@@ -2745,6 +3220,7 @@ final class JavascriptMethodGenerator {
                 ctx.initializedClasses.add(walk.getClsName());
                 walk = walk.getBaseClassObject();
             }
+            ctx.captureInitializedClassesSeed();
             if (!method.isStatic()) {
                 setup.append("  let l0 = __cn1ThisObject;\n");
                 ctx.localsInitialized[0] = true;
@@ -2761,10 +3237,45 @@ final class JavascriptMethodGenerator {
                     localIndex++;
                 }
             }
-            for (int i = 0; i < instructions.size(); i++) {
-                Instruction instruction = instructions.get(i);
-                if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
-                    return false;
+            if (plain) {
+                for (int i = 0; i < instructions.size(); i++) {
+                    Instruction instruction = instructions.get(i);
+                    if (!appendStraightLineInstruction(instructionBody, method, instructions, i, ctx)) {
+                        return false;
+                    }
+                }
+            } else if (!appendStructuredInstructionBody(instructionBody, method, instructions, labelToIndex, ctx)) {
+                return false;
+            } else if (!structuredBodyIsWellFormed(instructionBody.toString())) {
+                // The region machinery produced structurally invalid JS
+                // (mispaired braces / severed try) -- fall back to the
+                // interpreter rather than ship a file esbuild can't parse.
+                if (System.getProperty("parparvm.js.trydiag") != null) {
+                    System.err.println("[trydiag] MALFORMED " + cls.getClsName() + "." + method.getMethodName()
+                            + method.getSignature());
+                    try {
+                        java.nio.file.Files.write(
+                                java.nio.file.Paths.get("/tmp/cn1-malformed-" + cls.getClsName() + "." + method.getMethodName() + ".js"),
+                                instructionBody.toString().getBytes("UTF-8"));
+                    } catch (java.io.IOException | RuntimeException dumpFailure) {
+                        // diagnostics only -- report and continue
+                        System.err.println("[trydiag] dump failed: " + dumpFailure);
+                    }
+                }
+                return false;
+            } else {
+                String dump = System.getProperty("parparvm.js.structured.dump");
+                if (dump != null && !dump.isEmpty()
+                        && (cls.getClsName() + "." + method.getMethodName()).contains(dump)) {
+                    try {
+                        java.nio.file.Files.write(
+                                java.nio.file.Paths.get("/tmp/cn1-dump-" + cls.getClsName() + "." + method.getMethodName()
+                                        + "_" + Integer.toHexString(method.getSignature().hashCode()) + ".js"),
+                                instructionBody.toString().getBytes("UTF-8"));
+                    } catch (java.io.IOException | RuntimeException dumpFailure) {
+                        // diagnostics only -- report and continue
+                        System.err.println("[trydiag] dump failed: " + dumpFailure);
+                    }
                 }
             }
             body.append(setup);
@@ -2782,19 +3293,34 @@ final class JavascriptMethodGenerator {
             for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
                 body.append("  let s").append(i).append(";\n");
             }
-            // Cooperative budget yield -- straight-line variant. Opt-in
-            // via ``parparvm.js.preemptYield``. See appendMethodImpl.
+            // Cooperative budget yield -- straight-line / structured
+            // variant. The preamble lets the scheduler preempt
+            // long-running cooperative code so the worker event loop
+            // breathes (the boot-loop 90s-freeze fix). A method whose CFG
+            // has NO back-edge does bounded work and returns promptly --
+            // it cannot itself starve the loop, and if it's hot its
+            // caller's loop carries the preemption -- so the preamble is
+            // emitted ONLY for methods that contain a loop (back-edge).
+            // The known starvation bug was a spinning LOOP, not recursion
+            // (infinite recursion stack-overflows rather than hangs), so
+            // this is safe against it. Plain straight-line bodies (no
+            // jumps) never have a back-edge. Kill switch
+            // ``parparvm.js.preemptYield=0`` disables entirely;
+            // ``parparvm.js.preemptYield.allmethods=1`` restores the
+            // emit-everywhere behaviour for comparison.
             if (method.isJavascriptSuspending() && !"__CLINIT__".equals(method.getMethodName())
-                    && Boolean.getBoolean("parparvm.js.preemptYield")) {
+                    && !"0".equals(System.getProperty("parparvm.js.preemptYield", "1"))
+                    && (methodHasBackEdge(instructions, labelToIndex)
+                        || "1".equals(System.getProperty("parparvm.js.preemptYield.allmethods")))) {
                 body.append("  if(_Yc())yield _Yv;\n");
             }
-            if (method.isSynchronizedMethod()) {
+            if (emitsMonitor(method)) {
                 body.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
                 body.append("  yield* _me(__cn1Monitor);\n");
                 body.append("  try {\n");
             }
             body.append(instructionBody);
-            if (method.isSynchronizedMethod()) {
+            if (emitsMonitor(method)) {
                 body.append("  } finally {\n");
                 body.append("    _mx(__cn1Monitor);\n");
                 body.append("  }\n");
@@ -2840,8 +3366,868 @@ final class JavascriptMethodGenerator {
         return false;
     }
 
+    /**
+     * Structured body generation for methods whose CFG is acyclic-forward
+     * (if/else diamonds, early returns -- no loops, switches or exception
+     * tables): forward jumps become ``break B<n>;`` out of labeled blocks,
+     * eliminating the ``for(;;)switch(pc)`` state machine, its ``case``
+     * labels and ``pc = N; break;`` transitions, and letting these bodies
+     * share the straight-line deferred-expression lowering. Writes only the
+     * instruction body (the caller owns setup/declarations/wrapper) and
+     * returns false to fall back to the interpreter on anything unsupported,
+     * on a stack-depth mismatch at a merge point, or past the block budget.
+     */
+    private static int structuredSwitchOrdinal = 0;
+
+    /**
+     * Structured-emission bail helper: returns false, and when the
+     * ``parparvm.js.trydiag`` property is set prints WHY a method
+     * containing an exception table fell back to the interpreter
+     * (tagged with the bail site's source line). Temporary tuning
+     * aid for the try/catch structuring rollout; zero cost unless
+     * the property is set.
+     */
+    private static boolean _sb(BytecodeMethod method, List<Instruction> instructions, String why) {
+        if (System.getProperty("parparvm.js.trydiag") != null) {
+            boolean hasTry = false;
+            for (int i = 0; i < instructions.size(); i++) {
+                if (instructions.get(i) instanceof TryCatch) {
+                    hasTry = true;
+                    break;
+                }
+            }
+            if (hasTry) {
+                System.err.println("[trydiag] " + why + " "
+                        + (currentEmissionClass != null ? currentEmissionClass.getClsName() : "?")
+                        + "." + method.getMethodName());
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Emission-time structural validation of a generated method body:
+     * simulates the JS block structure ({@code {}} nesting plus
+     * {@code try}/{@code catch}/{@code finally} pairing) the same way a
+     * parser would, skipping string literals. The structured emitter's
+     * region machinery has had label-ownership/close-ordering defects
+     * that produced syntactically invalid JS; because the build's
+     * esbuild pass reports such breakage only as a WARNING and ships
+     * the file unminified, an invalid method must never leave the
+     * translator. A method whose body fails this check falls back to
+     * the interpreter (and is reported under {@code parparvm.js.trydiag}).
+     */
+    static boolean structuredBodyIsWellFormed(String body) {
+        // 'T' = open try block, 'C' = open catch/finally block, 'B' = any other block
+        java.util.ArrayDeque<Character> stack = new java.util.ArrayDeque<Character>();
+        int n = body.length();
+        int i = 0;
+        while (i < n) {
+            char c = body.charAt(i);
+            if (c == '"' || c == '\'') {
+                char quote = c;
+                i++;
+                while (i < n) {
+                    char d = body.charAt(i);
+                    if (d == '\\') {
+                        i += 2;
+                        continue;
+                    }
+                    if (d == quote) {
+                        break;
+                    }
+                    i++;
+                }
+                i++;
+                continue;
+            }
+            if (c == '{') {
+                // look back for the keyword introducing this block
+                int j = i - 1;
+                while (j >= 0 && Character.isWhitespace(body.charAt(j))) {
+                    j--;
+                }
+                char kind = 'B';
+                if (j >= 2 && body.charAt(j) == 'y' && body.charAt(j - 1) == 'r' && body.charAt(j - 2) == 't'
+                        && (j < 3 || !Character.isLetterOrDigit(body.charAt(j - 3)))) {
+                    kind = 'T';
+                } else if (j >= 0 && body.charAt(j) == ')') {
+                    // could be catch(...) { -- check the word before the parens
+                    int k = j;
+                    int depth = 0;
+                    while (k >= 0) {
+                        char d = body.charAt(k);
+                        if (d == ')') depth++;
+                        else if (d == '(') { depth--; if (depth == 0) break; }
+                        k--;
+                    }
+                    k--;
+                    while (k >= 0 && Character.isWhitespace(body.charAt(k))) k--;
+                    if (k >= 4 && body.regionMatches(k - 4, "catch", 0, 5)) {
+                        kind = 'C';
+                    }
+                } else if (j >= 6 && body.regionMatches(j - 6, "finally", 0, 7)) {
+                    kind = 'C';
+                }
+                stack.push(kind);
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                if (stack.isEmpty()) {
+                    return false;
+                }
+                char kind = stack.pop();
+                // a try block's close must be followed by catch or finally
+                int j = i + 1;
+                while (j < n && Character.isWhitespace(body.charAt(j))) {
+                    j++;
+                }
+                boolean catchNext = j + 5 <= n && body.regionMatches(j, "catch", 0, 5);
+                boolean finallyNext = j + 7 <= n && body.regionMatches(j, "finally", 0, 7);
+                if (kind == 'T' && !catchNext && !finallyNext) {
+                    return false;
+                }
+                if (kind != 'T' && (catchNext || finallyNext)) {
+                    return false;
+                }
+                i++;
+                continue;
+            }
+            i++;
+        }
+        return stack.isEmpty();
+    }
+
+    /**
+     * True when a branch from {@code fromBlock} to {@code toBlock} crosses
+     * INTO some try region's span {@code [start, endExcl)} from outside it.
+     * Such a branch cannot be expressed with the structured emission's
+     * label placement (the target label sits inside the ``try {`` block,
+     * out of scope at the source), so the method must fall back to the
+     * interpreter.
+     */
+    private static boolean branchEntersTryRegion(java.util.List<long[]> trySpans, int fromBlock, int toBlock) {
+        for (long[] s : trySpans) {
+            // strictly INSIDE: a branch to the region's START block is
+            // ordinary try entry and is routed through a pre-try P label
+            // (mirroring loop pre-headers), so it is allowed here.
+            boolean toIn = "0".equals(System.getProperty("parparvm.js.structured.pretry"))
+                    ? (toBlock >= s[0] && toBlock < s[1])
+                    : (toBlock > s[0] && toBlock < s[1]);
+            boolean fromIn = fromBlock >= s[0] && fromBlock < s[1];
+            if (toIn && !fromIn) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean appendStructuredInstructionBody(StringBuilder bodyOut, BytecodeMethod method,
+            List<Instruction> instructions, Map<Label, Integer> labelToIndex, StraightLineContext ctx) {
+        if (emitsMonitor(method) || labelToIndex == null) {
+            return _sb(method, instructions, "L2919");
+        }
+        // Bisection knob: comma-separated substrings matched against
+        // ``<class>.<method>``; matches fall back to the interpreter.
+        String skip = System.getProperty("parparvm.js.structured.skip");
+        if (skip != null && !skip.isEmpty()) {
+            String id = (currentEmissionClass != null ? currentEmissionClass.getClsName() : "?")
+                    + "." + method.getMethodName();
+            for (String part : skip.split(",")) {
+                if (!part.isEmpty() && id.contains(part)) {
+                    return _sb(method, instructions, "SKIP_KNOB");
+                }
+            }
+        }
+        boolean hasJump = false;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (instruction instanceof MultiArray) {
+                return _sb(method, instructions, "L2925");
+            }
+            if (instruction instanceof Jump || instruction instanceof SwitchInstruction
+                    || instruction instanceof TryCatch) {
+                hasJump = true;
+            }
+            if (instruction instanceof BasicInstruction) {
+                int opcode = ((BasicInstruction) instruction).getOpcode();
+                if (opcode == Opcodes.MONITORENTER || opcode == Opcodes.MONITOREXIT) {
+                    // ``_me`` can yield the cooperative scheduler, so a
+                    // monitor in a sync-classified body has nowhere to
+                    // suspend -- that combination stays interpreted
+                    // (the interpreter has the same constraint, so it
+                    // should never occur; bail defensively).
+                    // Kill switch: parparvm.js.structured.monitors=0.
+                    if (!method.isJavascriptSuspending()
+                            || "0".equals(System.getProperty("parparvm.js.structured.monitors"))) {
+                        return _sb(method, instructions, "L2934");
+                    }
+                }
+            }
+        }
+        if (!hasJump) {
+            return _sb(method, instructions, "L2939");
+        }
+        java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
+        // 256 covers the try/catch-heavy long tail (the largest
+        // CN1 methods sit around ~200 blocks); beyond that the
+        // emission-time nesting checks get quadratic-ish and the
+        // interpreter fallback is fine for the rare giant.
+        int structuredBudget = Integer.getInteger("parparvm.js.structured.maxblocks", 256);
+        if (structuredBudget <= 0 || blocks.size() > structuredBudget) {
+            return _sb(method, instructions, "L2948");
+        }
+        // Natural-loop regions: every back-edge must target a single header h,
+        // with the region [h, lastBackSource] properly nested against every
+        // other region, and no forward jump may enter a region anywhere but
+        // its header (irreducible flow bails to the interpreter).
+        java.util.TreeMap<Integer, Integer> loopEnd = new java.util.TreeMap<Integer, Integer>();
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x <= i) {
+                    Integer cur = loopEnd.get(x);
+                    if (cur == null || cur < i) {
+                        loopEnd.put(x, i);
+                    }
+                }
+            }
+        }
+        // Debug bisection: parparvm.js.structured.loopskip=K,M structures a
+        // loop-containing method only when hash(name)%M != K.
+        boolean hasSwitchInstr = false;
+        for (int i = 0; i < instructions.size(); i++) {
+            if (instructions.get(i) instanceof SwitchInstruction) {
+                hasSwitchInstr = true;
+                break;
+            }
+        }
+        String swKeep = System.getProperty("parparvm.js.structured.switchkeep");
+        if (hasSwitchInstr) {
+            Integer swMax = Integer.getInteger("parparvm.js.structured.switchmax");
+            if (swMax != null) {
+                int ord = ++structuredSwitchOrdinal;
+                if (ord > swMax) {
+                    return _sb(method, instructions, "L2980");
+                }
+                System.err.println("[structured-switch-ordinal] " + ord + " " + method.getMethodName() + method.getSignature());
+            }
+            if ("0".equals(System.getProperty("parparvm.js.structured.switch", "1"))) {
+                return _sb(method, instructions, "L2985");
+            }
+            if (swKeep != null) {
+                int comma = swKeep.indexOf(',');
+                int k = Integer.parseInt(swKeep.substring(0, comma));
+                int mm = Integer.parseInt(swKeep.substring(comma + 1));
+                int hh = (method.getMethodName() + method.getSignature()).hashCode() & 0x7fffffff;
+                if (hh % mm != k) {
+                    return _sb(method, instructions, "L2993");
+                }
+                System.err.println("[structured-switchkeep] " + method.getMethodName() + method.getSignature());
+            }
+        }
+        String onlySpec = System.getProperty("parparvm.js.structured.looponly");
+        if (onlySpec != null && !loopEndProbeEmpty(instructions, labelToIndex)
+                && !(method.getMethodName() + method.getSignature()).contains(onlySpec)) {
+            return _sb(method, instructions, "L3001");
+        }
+        String keepSpec = System.getProperty("parparvm.js.structured.loopkeep");
+        if (keepSpec != null && !loopEndProbeEmpty(instructions, labelToIndex)) {
+            int comma = keepSpec.indexOf(',');
+            int k = Integer.parseInt(keepSpec.substring(0, comma));
+            int mm = Integer.parseInt(keepSpec.substring(comma + 1));
+            int hh = (method.getMethodName() + method.getSignature()).hashCode() & 0x7fffffff;
+            if (hh % mm != k) {
+                return _sb(method, instructions, "L3010");
+            }
+            System.err.println("[structured-loopkeep] " + method.getMethodName() + method.getSignature());
+        }
+        int loopSpanBudget = Integer.getInteger("parparvm.js.structured.maxloopspan", 256);
+        for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+            if (r.getValue() - r.getKey() + 1 > loopSpanBudget) {
+                return _sb(method, instructions, "L3017");
+            }
+        }
+        for (java.util.Map.Entry<Integer, Integer> a : loopEnd.entrySet()) {
+            for (java.util.Map.Entry<Integer, Integer> c : loopEnd.entrySet()) {
+                int h1 = a.getKey(), e1 = a.getValue(), h2 = c.getKey(), e2 = c.getValue();
+                if (h1 < h2 && h2 <= e1 && e2 > e1) {
+                    return _sb(method, instructions, "L3024"); // partial overlap
+                }
+            }
+        }
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x > i) {
+                    for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+                        if (x > r.getKey() && x <= r.getValue() && (i < r.getKey() || i > r.getValue())) {
+                            return _sb(method, instructions, "L3033"); // jump into a loop body from outside
+                        }
+                    }
+                }
+            }
+        }
+        java.util.Map<Integer, Integer> startToBlock = new java.util.HashMap<Integer, Integer>();
+        for (int b = 0; b < blocks.size(); b++) {
+            startToBlock.put(blocks.get(b).start, b);
+        }
+        // Exception ranges: group handlers per (startBlock, endBlock) range in
+        // table order (JVM semantics: first matching entry wins). Structured
+        // form requires block-aligned ranges that nest properly with each
+        // other and with loop regions, handlers outside their own range.
+        java.util.LinkedHashMap<Long, java.util.List<int[]>> tryRanges = new java.util.LinkedHashMap<Long, java.util.List<int[]>>();
+        java.util.List<String> tryTypes = new java.util.ArrayList<String>();
+        // Loop headers reached by a FORWARD branch (jump, switch case, or
+        // catch dispatch) need a pre-header label P<h> closing right
+        // before the for(;;) opens -- structuredGoto emits ``break P<h>``
+        // for those.
+        java.util.TreeSet<Integer> preHeaderTargets = new java.util.TreeSet<Integer>();
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (!(instruction instanceof TryCatch)) {
+                continue;
+            }
+            TryCatch tc = (TryCatch) instruction;
+            Integer sI = tc.getStart() == null ? null : labelToIndex.get(tc.getStart());
+            Integer eI = tc.getEnd() == null ? null : labelToIndex.get(tc.getEnd());
+            Integer hI = tc.getHandler() == null ? null : labelToIndex.get(tc.getHandler());
+            Integer sB = sI == null ? null : startToBlock.get(sI);
+            Integer eB = eI == null ? null : startToBlock.get(eI);
+            Integer hB = hI == null ? null : startToBlock.get(hI);
+            if (sB != null && hB != null && eB != null && sB.equals(hB) && eB == sB + 1
+                    && tc.getType() == null
+                    && !"0".equals(System.getProperty("parparvm.js.structured.selfentry"))) {
+                // javac's self-protecting cleanup entry ([h, x) -> h, type
+                // any): it guards the synchronized handler's own
+                // ``monitorexit; athrow`` against a throwing monitorexit by
+                // re-dispatching to itself -- which would loop forever if it
+                // ever fired. Our ``_mx`` only throws for unowned monitors
+                // (impossible for compiler-balanced blocks), so the entry is
+                // unreachable; skip it instead of bailing the whole method.
+                continue;
+            }
+            if (sB == null || eB == null || hB == null || eB <= sB || (hB >= sB && hB < eB)) {
+                return _sb(method, instructions, "L3062"
+                        + ":s" + (sB == null ? "?" : sB) + ":e" + (eB == null ? "?" : eB)
+                        + ":h" + (hB == null ? "?" : hB)
+                        + ":t" + (tc.getType() == null ? "any" : "typed")); // not block aligned / handler inside its range
+            }
+            long key = ((long) sB << 32) | (eB & 0xffffffffL);
+            java.util.List<int[]> hs = tryRanges.get(key);
+            if (hs == null) {
+                hs = new java.util.ArrayList<int[]>();
+                tryRanges.put(key, hs);
+            }
+            hs.add(new int[]{ hB, tryTypes.size() });
+            tryTypes.add(tc.getType() == null ? null : JavascriptNameUtil.runtimeTypeName(tc.getType()));
+        }
+        // Start blocks of every try region: forward branches to one are
+        // ordinary try entry, expressed as ``break P<start>`` against a
+        // pre-try label closing right before the ``try {`` opens.
+        java.util.TreeSet<Integer> tryStarts = new java.util.TreeSet<Integer>();
+        for (Long key : tryRanges.keySet()) {
+            tryStarts.add((int) (key >> 32));
+        }
+        // Catch dispatch is a forward branch too: register pre-labels for
+        // handlers that are loop headers or try starts.
+        for (java.util.Map.Entry<Long, java.util.List<int[]>> tr : tryRanges.entrySet()) {
+            int eIncl = (int) (tr.getKey() & 0xffffffffL) - 1;
+            for (int[] h : tr.getValue()) {
+                if (h[0] > eIncl && (loopEnd.containsKey(h[0]) || tryStarts.contains(h[0]))) {
+                    preHeaderTargets.add(h[0]);
+                }
+            }
+        }
+        // nesting: try-vs-try and try-vs-loop must not partially overlap
+        java.util.List<int[]> regionList = new java.util.ArrayList<int[]>();
+        for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+            regionList.add(new int[]{ r.getKey(), r.getValue() });
+        }
+        for (Long key : tryRanges.keySet()) {
+            regionList.add(new int[]{ (int) (key >> 32), (int) (key & 0xffffffffL) - 1 });
+        }
+        for (int[] r1 : regionList) {
+            for (int[] r2 : regionList) {
+                if (r1[0] < r2[0] && r2[0] <= r1[1] && r2[1] > r1[1]) {
+                    return _sb(method, instructions, "L3084");
+                }
+            }
+        }
+        java.util.TreeSet<Integer> targets = new java.util.TreeSet<Integer>();
+        for (java.util.Map.Entry<Long, java.util.List<int[]>> tr : tryRanges.entrySet()) {
+            int eIncl = (int) (tr.getKey() & 0xffffffffL) - 1;
+            for (int[] h : tr.getValue()) {
+                // Handlers are goto targets for the catch dispatch -- except
+                // ones routed through a pre-try P label (forward dispatch to
+                // another try's start): those must NOT get a B label, or the
+                // target close at the handler block severs the try it opens.
+                if (h[0] > eIncl && tryStarts.contains(h[0]) && !loopEnd.containsKey(h[0])) {
+                    continue;
+                }
+                targets.add(h[0]);
+            }
+        }
+        // Jump/switch targets, with try-boundary validation: a target's
+        // label lives lexically INSIDE the ``try {`` of any region that
+        // contains it, so a branch whose source is OUTSIDE that region
+        // cannot reach the label (JS label scoping) -- the emitted
+        // ``break B<t>`` would be a SyntaxError. This includes branches
+        // to the region's start block (its label opens after ``try {``,
+        // unlike loop headers which get a pre-header P label). Bail to
+        // the interpreter on any outside->inside branch.
+        java.util.List<long[]> trySpans = new java.util.ArrayList<long[]>();
+        for (Long key : tryRanges.keySet()) {
+            trySpans.add(new long[]{ (int) (key >> 32), (int) (key & 0xffffffffL) });
+        }
+        // Catch dispatch is emitted at the region's close (lexically at
+        // its last block): it too must not branch INTO a different try.
+        for (int ti = 0; ti < trySpans.size(); ti++) {
+            for (int[] h : tryRanges.get((((long) trySpans.get(ti)[0]) << 32) | (trySpans.get(ti)[1] & 0xffffffffL))) {
+                if (branchEntersTryRegion(trySpans, (int) trySpans.get(ti)[1] - 1, h[0])) {
+                    return _sb(method, instructions, "TRY_ENTER_H");
+                }
+            }
+        }
+        int srcBlock = 0;
+        for (int i = 0; i < instructions.size(); i++) {
+            while (srcBlock + 1 < blocks.size() && i >= blocks.get(srcBlock).end) {
+                srcBlock++;
+            }
+            Instruction instruction = instructions.get(i);
+            if (instruction instanceof Jump) {
+                Integer t = labelToIndex.get(((Jump) instruction).getLabel());
+                Integer tb = t == null ? null : startToBlock.get((int) t);
+                if (tb == null) {
+                    return _sb(method, instructions, "L3100");
+                }
+                if (branchEntersTryRegion(trySpans, srcBlock, tb)) {
+                    return _sb(method, instructions, "TRY_ENTER");
+                }
+                if (tryStarts.contains(tb) && !loopEnd.containsKey(tb) && tb > srcBlock) {
+                    // pre-try entry: P label only, no B label (a target close
+                    // at the try start would sever the enclosing block)
+                    preHeaderTargets.add(tb);
+                } else {
+                    targets.add(tb);
+                    if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                        preHeaderTargets.add(tb);
+                    }
+                }
+            } else if (instruction instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) instruction;
+                java.util.List<Label> swLabels = new java.util.ArrayList<Label>();
+                if (sw.getDefaultLabel() != null) {
+                    swLabels.add(sw.getDefaultLabel());
+                }
+                if (sw.getLabels() != null) {
+                    swLabels.addAll(java.util.Arrays.asList(sw.getLabels()));
+                }
+                for (Label l : swLabels) {
+                    Integer t = l == null ? null : labelToIndex.get(l);
+                    Integer tb = t == null ? null : startToBlock.get((int) t);
+                    if (tb == null) {
+                        return _sb(method, instructions, "L3116");
+                    }
+                    if (branchEntersTryRegion(trySpans, srcBlock, tb)) {
+                        return _sb(method, instructions, "TRY_ENTER_SW");
+                    }
+                    if (tryStarts.contains(tb) && !loopEnd.containsKey(tb) && tb > srcBlock) {
+                        preHeaderTargets.add(tb);
+                    } else {
+                        targets.add(tb);
+                        if (tb > srcBlock && loopEnd.containsKey(tb)) {
+                            preHeaderTargets.add(tb);
+                        }
+                    }
+                }
+            }
+        }
+        // (preHeaderTargets is populated above from actual forward
+        // branches; plain fall-through into a loop header needs no
+        // pre-header label, and creating one anyway broke close/open
+        // pairing when a try region opened at the header itself.)
+        // Labeled blocks must nest WITH the loop structure: a target inside a
+        // loop region opens its label right after that loop's for(;;) brace,
+        // not at the function top (otherwise the target's close brace would
+        // sever the for). ownerOf(t) = innermost loop region containing t
+        // (header excluded -- the header IS the loop), or -1 for the root.
+        // Region model spanning loops AND try-ranges for label ownership and
+        // open/close ordering. Key = start*100000+endIncl (unique per region;
+        // a loop and a try sharing exact bounds is impossible since the try
+        // end is exclusive-aligned to a leader after the loop's back edge).
+        java.util.List<long[]> openByStart = new java.util.ArrayList<long[]>(); // {start, endIncl, isTry, tryKeyIdx}
+        java.util.List<Long> tryKeys = new java.util.ArrayList<Long>(tryRanges.keySet());
+        for (java.util.Map.Entry<Integer, Integer> r : loopEnd.entrySet()) {
+            openByStart.add(new long[]{ r.getKey(), r.getValue(), 0, -1 });
+        }
+        for (int ti = 0; ti < tryKeys.size(); ti++) {
+            long key = tryKeys.get(ti);
+            openByStart.add(new long[]{ (int) (key >> 32), (int) (key & 0xffffffffL) - 1, 1, ti });
+        }
+        java.util.Map<Integer, java.util.List<Integer>> ownedLabels = new java.util.HashMap<Integer, java.util.List<Integer>>();
+        for (int t : targets) {
+            if (loopEnd.containsKey(t)) {
+                continue; // headers use the loop's own label / pre-header label
+            }
+            // innermost region containing t = smallest span; -1 = function root.
+            int owner = -1;
+            long bestSpan = Long.MAX_VALUE;
+            for (long[] r : openByStart) {
+                long lo = r[0], hi = r[1];
+                boolean inside = r[2] == 1 ? (t >= lo && t <= hi) : (t > lo && t <= hi);
+                // strict < keeps the first match on ties, so equal-span
+                // tries must win explicitly (the try nests INSIDE the loop
+                // on an exact-span tie -- see the opens sort).
+                if (inside && ((hi - lo) < bestSpan || ((hi - lo) == bestSpan && r[2] == 1))) {
+                    bestSpan = hi - lo;
+                    owner = (int) (r[2] == 1 ? -2 - r[3] : lo); // tries encode as -2-tryIdx
+                }
+            }
+            java.util.List<Integer> list = ownedLabels.get(owner);
+            if (list == null) {
+                list = new java.util.ArrayList<Integer>();
+                ownedLabels.put(owner, list);
+            }
+            list.add(t);
+        }
+        // Pre-header labels belong to the header's OWN owner region --
+        // the innermost LOOP OR TRY containing the header. Considering
+        // only loops here put a P label at function top when the loop
+        // sat inside a try: the P's close (fired at loop-header entry)
+        // then paired with the ``try {`` brace instead, severing it
+        // (observed as esbuild ``Expected "finally"``).
+        java.util.Map<Integer, java.util.List<Integer>> ownedPre = new java.util.HashMap<Integer, java.util.List<Integer>>();
+        for (int t : preHeaderTargets) {
+            int owner = -1;
+            long bestSpan = Long.MAX_VALUE;
+            for (long[] r : openByStart) {
+                long lo = r[0], hi = r[1];
+                // strictly t > lo for BOTH kinds: a pre-label wraps code
+                // BEFORE its block, so a region starting AT t cannot own it.
+                boolean inside = t > lo && t <= hi;
+                if (inside && (hi - lo) < bestSpan) {
+                    bestSpan = hi - lo;
+                    owner = (int) (r[2] == 1 ? -2 - r[3] : lo);
+                }
+            }
+            java.util.List<Integer> list = ownedPre.get(owner);
+            if (list == null) {
+                list = new java.util.ArrayList<Integer>();
+                ownedPre.put(owner, list);
+            }
+            list.add(t);
+        }
+        appendRegionLabels(bodyOut, ownedLabels.get(-1), ownedPre.get(-1));
+        int[] entrySp = new int[blocks.size()];
+        java.util.Arrays.fill(entrySp, -1);
+        boolean reachable = true;
+        for (int b = 0; b < blocks.size(); b++) {
+            BasicBlock block = blocks.get(b);
+            boolean emitDeadBlock = false;
+            if (preHeaderTargets.contains(b)) {
+                bodyOut.append("  }\n");
+                // try-start pre-targets are NOT in ``targets`` (no B label),
+                // so the stack-depth phi check happens here. Loop headers
+                // re-validate in the loopOpensHere branch; idempotent.
+                if (entrySp[b] >= 0) {
+                    if (reachable && ctx.sp != entrySp[b]) {
+                        return _sb(method, instructions, "PRE_SP");
+                    }
+                    if (!reachable) {
+                        ctx.sp = entrySp[b];
+                        ctx.clearPendings();
+                        ctx.resetInitializedClasses();
+                        reachable = true;
+                    }
+                }
+            }
+            // Open every region starting at this block, outermost (largest
+            // endIncl) first; each open is followed by the labels it owns so
+            // the brace structure nests with breaks/continues.
+            java.util.List<long[]> opens = new java.util.ArrayList<long[]>();
+            for (long[] r : openByStart) {
+                if (r[0] == b) {
+                    opens.add(r);
+                }
+            }
+            // Outermost (largest endIncl) first. A try CAN share both
+            // bounds with a loop (try/finally wrapping exactly the loop
+            // body, e.g. GeneralPath.toString) -- on that tie the try is
+            // consistently the INNER region: loop opens first here, try
+            // closes first below, and label ownership prefers the try.
+            java.util.Collections.sort(opens, (x, y) -> {
+                int c = Long.compare(y[1], x[1]);
+                return c != 0 ? c : Long.compare(x[2], y[2]);
+            });
+            boolean loopOpensHere = loopEnd.containsKey(b);
+            if (loopOpensHere) {
+                if (targets.contains(b) && entrySp[b] >= 0) {
+                    if (reachable && ctx.sp != entrySp[b]) {
+                        return _sb(method, instructions, "L3213");
+                    }
+                    ctx.sp = entrySp[b];
+                } else if (!reachable) {
+                    return _sb(method, instructions, "L3217");
+                }
+                ctx.clearPendings();
+                ctx.resetInitializedClasses();
+                reachable = true;
+                if (entrySp[b] < 0) {
+                    entrySp[b] = ctx.sp;
+                }
+            } else if (targets.contains(b)) {
+                // Close this target's labeled block BEFORE any region opening
+                // here, so a try{ opening at a merge point nests inside the
+                // newly entered scope rather than being severed by the close.
+                bodyOut.append("  }\n");
+                if (entrySp[b] >= 0) {
+                    if (reachable && ctx.sp != entrySp[b]) {
+                        return _sb(method, instructions, "L3232");
+                    }
+                    ctx.sp = entrySp[b];
+                } else if (!reachable) {
+                    return _sb(method, instructions, "L3236");
+                }
+                ctx.clearPendings();
+                ctx.resetInitializedClasses();
+                reachable = true;
+            } else if (!reachable && opens.isEmpty()) {
+                // Dead straight-line block: emit nothing for its
+                // instructions, but DO fall through to the region-close
+                // scan below -- a try/loop region whose last block is
+                // unreachable still needs its ``} catch``/``}`` emitted,
+                // or the brace structure is severed (observed as
+                // ``Expected "finally" but found "B6"`` from esbuild).
+                emitDeadBlock = true;
+            } else if (!reachable) {
+                return _sb(method, instructions, "L3244"); // region opens at an unreachable block -- bail
+            }
+            for (long[] r : opens) {
+                if (r[2] == 1) {
+                    bodyOut.append("  try {\n");
+                    appendRegionLabels(bodyOut, ownedLabels.get((int) (-2 - r[3])), ownedPre.get((int) (-2 - r[3])));
+                } else {
+                    bodyOut.append("  B").append(b).append(": for(;;) {\n");
+                    appendRegionLabels(bodyOut, ownedLabels.get(b), ownedPre.get(b));
+                }
+            }
+            for (int i = block.start; !emitDeadBlock && i < block.end; i++) {
+                Instruction instruction = instructions.get(i);
+                if (instruction instanceof Jump) {
+                    Jump jump = (Jump) instruction;
+                    Integer t = labelToIndex.get(jump.getLabel());
+                    int tb = startToBlock.get((int) t);
+                    String cond = structuredJumpCondition(jump.getOpcode(), ctx);
+                    if (cond == null && jump.getOpcode() != Opcodes.GOTO) {
+                        return _sb(method, instructions, "L3263");
+                    }
+                    bodyOut.append(ctx.flushAllPending());
+                    if (entrySp[tb] < 0) {
+                        entrySp[tb] = ctx.sp;
+                    } else if (entrySp[tb] != ctx.sp) {
+                        return _sb(method, instructions, "L3269");
+                    }
+                    String go = structuredGoto(tb, b, loopEnd, tryStarts);
+                    if (jump.getOpcode() == Opcodes.GOTO) {
+                        if (tb != b + 1) {
+                            bodyOut.append("  ").append(go).append(";\n");
+                        }
+                        if (i == block.end - 1) {
+                            reachable = (tb == b + 1);
+                        }
+                    } else {
+                        bodyOut.append("  if (").append(cond).append(") ").append(go).append(";\n");
+                    }
+                    continue;
+                }
+                if (instruction instanceof SwitchInstruction) {
+                    SwitchInstruction sw = (SwitchInstruction) instruction;
+                    String sel = ctx.pop();
+                    bodyOut.append(ctx.flushAllPending());
+                    bodyOut.append("  switch ((").append(sel).append(")|0) {\n");
+                    int[] keys = sw.getKeys();
+                    Label[] swl = sw.getLabels();
+                    for (int ki = 0; swl != null && ki < swl.length; ki++) {
+                        Integer t = swl[ki] == null ? null : labelToIndex.get(swl[ki]);
+                        int tb = startToBlock.get((int) t);
+                        if (entrySp[tb] < 0) {
+                            entrySp[tb] = ctx.sp;
+                        } else if (entrySp[tb] != ctx.sp) {
+                            return _sb(method, instructions, "L3297");
+                        }
+                        int key = (keys != null && ki < keys.length) ? keys[ki] : ki;
+                        bodyOut.append("  case ").append(key).append(": ")
+                               .append(structuredGoto(tb, b, loopEnd, tryStarts)).append(";\n");
+                    }
+                    Integer dT = sw.getDefaultLabel() == null ? null : labelToIndex.get(sw.getDefaultLabel());
+                    int db = startToBlock.get((int) dT);
+                    if (entrySp[db] < 0) {
+                        entrySp[db] = ctx.sp;
+                    } else if (entrySp[db] != ctx.sp) {
+                        return _sb(method, instructions, "L3308");
+                    }
+                    bodyOut.append("  default: ").append(structuredGoto(db, b, loopEnd, tryStarts)).append(";\n  }\n");
+                    if (i == block.end - 1) {
+                        reachable = false;
+                    }
+                    continue;
+                }
+                if (!appendStraightLineInstruction(bodyOut, method, instructions, i, ctx)) {
+                    return _sb(method, instructions, "L3317");
+                }
+                if (isTerminatingInstruction(instruction) && i == block.end - 1) {
+                    reachable = false;
+                }
+            }
+            // Close every region ending at this block, innermost (largest
+            // start) first; loop closes synthesize the bottom break, try
+            // closes emit the catch dispatch chain.
+            java.util.List<long[]> closing = new java.util.ArrayList<long[]>();
+            for (long[] r : openByStart) {
+                if (r[1] == b) {
+                    closing.add(r);
+                }
+            }
+            // Innermost (largest start) first; on an exact-span tie the
+            // try closes before the loop (mirror of the open order above).
+            java.util.Collections.sort(closing, (x, y) -> {
+                int c = Long.compare(y[0], x[0]);
+                return c != 0 ? c : Long.compare(y[2], x[2]);
+            });
+            for (long[] reg : closing) {
+                if (reg[2] == 1) {
+                    if (reachable) {
+                        bodyOut.append(ctx.flushAllPending());
+                    }
+                    long key = tryKeys.get((int) reg[3]);
+                    // the catch writes the exception into s0 -- make sure the
+                    // slot is declared even if normal flow never uses it
+                    if (ctx.maxObservedStack < 1) {
+                        ctx.maxObservedStack = 1;
+                    }
+                    bodyOut.append("  } catch(__e) {\n");
+                    for (int[] hdl : tryRanges.get(key)) {
+                        int hB = hdl[0];
+                        String type = tryTypes.get(hdl[1]);
+                        if (entrySp[hB] < 0) {
+                            entrySp[hB] = 1;
+                        } else if (entrySp[hB] != 1) {
+                            return _sb(method, instructions, "L3351");
+                        }
+                        bodyOut.append("  { const __t = _Ex(__e, ")
+                               .append(type == null ? "null" : "\"" + type + "\"")
+                               .append("); if (__t !== null) { s0 = __t; ")
+                               .append(structuredGoto(hB, b, loopEnd, tryStarts)).append("; } }\n");
+                    }
+                    bodyOut.append("  throw __e;\n  }\n");
+                    // control continues after the catch only via try-body
+                    // fallthrough; reachable is unchanged.
+                    ctx.clearPendings();
+                    ctx.resetInitializedClasses();
+                    continue;
+                }
+                int h = (int) reg[0];
+                boolean bottomBreak = reachable;
+                if (bottomBreak) {
+                    // Falling off the bottom of for(;;) would loop; exit instead.
+                    bodyOut.append(ctx.flushAllPending());
+                    bodyOut.append("  break B").append(h).append(";\n");
+                }
+                bodyOut.append("  }\n");
+                // Right after the for(;;) close, control arrives ONLY via the
+                // synthesized bottom break (jumps from inside the loop to
+                // later blocks use those blocks' own labels). Without one,
+                // this point is unreachable until the next labeled target.
+                reachable = bottomBreak;
+                ctx.clearPendings();
+                ctx.resetInitializedClasses();
+            }
+            if (reachable && b + 1 < blocks.size() && targets.contains(b + 1) && !loopEnd.containsKey(b + 1)) {
+                bodyOut.append(ctx.flushAllPending());
+                if (entrySp[b + 1] < 0) {
+                    entrySp[b + 1] = ctx.sp;
+                } else if (entrySp[b + 1] != ctx.sp) {
+                    return _sb(method, instructions, "L3386");
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean loopEndProbeEmpty(List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x <= i) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** break/continue statement reaching block tb from block b. */
+    private static String structuredGoto(int tb, int b, java.util.TreeMap<Integer, Integer> loopEnd,
+            java.util.TreeSet<Integer> tryStarts) {
+        if (loopEnd.containsKey(tb) && tb <= b) {
+            return "continue B" + tb;   // back edge to enclosing loop header
+        }
+        if (loopEnd.containsKey(tb)) {
+            return "break P" + tb;      // forward entry to a loop's top
+        }
+        if (tryStarts.contains(tb) && tb > b) {
+            return "break P" + tb;      // forward entry at a try region's start
+        }
+        return "break B" + tb;
+    }
+
+    /** Open the labeled blocks owned by one region, deepest target first
+     * (B-labels for plain forward targets, P-labels for pre-header entries),
+     * interleaved in descending block order so closes pop in block order. */
+    private static void appendRegionLabels(StringBuilder bodyOut,
+            java.util.List<Integer> labels, java.util.List<Integer> preLabels) {
+        java.util.TreeMap<Integer, String> merged = new java.util.TreeMap<Integer, String>();
+        if (labels != null) {
+            for (int t : labels) {
+                merged.put(t, "B");
+            }
+        }
+        if (preLabels != null) {
+            for (int t : preLabels) {
+                merged.put(t, "P");
+            }
+        }
+        for (java.util.Map.Entry<Integer, String> e : merged.descendingMap().entrySet()) {
+            bodyOut.append("  ").append(e.getValue()).append(e.getKey()).append(": {\n");
+        }
+    }
+
+    /** JS condition for a conditional jump opcode, popping its operands. */
+    private static String structuredJumpCondition(int opcode, StraightLineContext ctx) {
+        switch (opcode) {
+            case Opcodes.GOTO: return null;
+            case Opcodes.IFEQ: return "(" + ctx.pop() + "|0) == 0";
+            case Opcodes.IFNE: return "(" + ctx.pop() + "|0) != 0";
+            case Opcodes.IFLT: return "(" + ctx.pop() + "|0) < 0";
+            case Opcodes.IFLE: return "(" + ctx.pop() + "|0) <= 0";
+            case Opcodes.IFGT: return "(" + ctx.pop() + "|0) > 0";
+            case Opcodes.IFGE: return "(" + ctx.pop() + "|0) >= 0";
+            case Opcodes.IFNULL: return ctx.pop() + " == null";
+            case Opcodes.IFNONNULL: return ctx.pop() + " != null";
+            case Opcodes.IF_ICMPEQ: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) == (" + b + "|0)"; }
+            case Opcodes.IF_ICMPNE: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) != (" + b + "|0)"; }
+            case Opcodes.IF_ICMPLT: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) < (" + b + "|0)"; }
+            case Opcodes.IF_ICMPLE: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) <= (" + b + "|0)"; }
+            case Opcodes.IF_ICMPGT: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) > (" + b + "|0)"; }
+            case Opcodes.IF_ICMPGE: { String b = ctx.pop(), a = ctx.pop(); return "(" + a + "|0) >= (" + b + "|0)"; }
+            case Opcodes.IF_ACMPEQ: { String b = ctx.pop(), a = ctx.pop(); return a + " === " + b; }
+            case Opcodes.IF_ACMPNE: { String b = ctx.pop(), a = ctx.pop(); return a + " !== " + b; }
+            default: return null;
+        }
+    }
+
     private static boolean isStraightLineEligible(BytecodeMethod method, List<Instruction> instructions) {
-        if (method.isSynchronizedMethod()) {
+        if (emitsMonitor(method)) {
             return false;
         }
         // ATHROW is straight-line-friendly: we just emit ``throw
@@ -2874,9 +4260,18 @@ final class JavascriptMethodGenerator {
         return true;
     }
 
-    private static boolean appendStraightLineInstruction(StringBuilder out, BytecodeMethod method, Instruction instruction,
-            StraightLineContext ctx) {
+    private static boolean appendStraightLineInstruction(StringBuilder out, BytecodeMethod method,
+            List<Instruction> instructions, int index, StraightLineContext ctx) {
+        Instruction instruction = instructions.get(index);
         if (instruction instanceof LabelInstruction || instruction instanceof LineNumber || instruction instanceof LocalVariable) {
+            return true;
+        }
+        if (instruction instanceof TryCatch) {
+            // Exception-table marker, not executable code. The structured
+            // emitter consumed the whole table up front (tryRanges) and
+            // bails before reaching here when any entry is unsupported;
+            // plain straight-line bodies can't contain one (the eligibility
+            // scan rejects methods with exception tables).
             return true;
         }
         if (instruction instanceof BasicInstruction) {
@@ -2888,6 +4283,12 @@ final class JavascriptMethodGenerator {
         if (instruction instanceof IInc) {
             IInc iinc = (IInc) instruction;
             ctx.localsUsed[iinc.getVar()] = true;
+            // IINC writes the local exactly like the store opcodes do: any
+            // deferred pending read of lN (or a field path based on it) must
+            // materialise BEFORE the increment, or expressions like
+            // ``data[off + i++]`` read the post-increment value (observed as
+            // the UTF-8 decoder skipping byte 0 and wedging boot).
+            out.append(ctx.flushPendingLocal(iinc.getVar()));
             out.append("  l").append(iinc.getVar()).append(" = (l").append(iinc.getVar()).append(" || 0) + ")
                     .append(iinc.getAmount()).append(";\n");
             return true;
@@ -2902,9 +4303,43 @@ final class JavascriptMethodGenerator {
             return appendStraightLineFieldInstruction(out, (Field) instruction, ctx);
         }
         if (instruction instanceof Invoke) {
-            return appendStraightLineInvokeInstruction(out, (Invoke) instruction, ctx);
+            return appendStraightLineInvokeInstruction(out, (Invoke) instruction, instructions, index, ctx);
         }
         return false;
+    }
+
+    // Category-aware DUP emission. The JVM dup opcodes are defined over operand
+    // stack SLOTS (a long/double occupies two), but the JS backend models a
+    // long/double as a SINGLE stack entry. ASM frame analysis (Parser) resolves
+    // each dup into ENTRY terms: duplicate the top ``nDup`` entries and reinsert
+    // the copy beneath the next ``nSkip`` entries. This covers all category-1
+    // and category-2 forms of DUP2/DUP2_X1/DUP2_X2/DUP_X2 uniformly.
+    //
+    // Without this, e.g. ``totalIn = totalOut = 0L`` (a dup2_x1 of a long over a
+    // ref) was emitted with the category-1 three-value shuffle, swapping object
+    // and value on the second store -- so the field never got written.
+    private static void emitDup(StringBuilder out, StraightLineContext ctx, int nDup, int nSkip) {
+        int total = nDup + nSkip;
+        String[] temps = new String[total];
+        // temps[0] = topmost value (first popped).
+        for (int i = 0; i < total; i++) {
+            String v = ctx.pop();
+            String t = ctx.nextTemp("__dup");
+            out.append("  let ").append(t).append(" = ").append(v).append(";\n");
+            temps[i] = t;
+        }
+        // Bottom copy of the duplicated entries (restore original bottom->top order).
+        for (int i = nDup - 1; i >= 0; i--) {
+            out.append("  ").append(ctx.push(temps[i])).append(";\n");
+        }
+        // The skipped entries, in original order.
+        for (int i = total - 1; i >= nDup; i--) {
+            out.append("  ").append(ctx.push(temps[i])).append(";\n");
+        }
+        // Top copy of the duplicated entries.
+        for (int i = nDup - 1; i >= 0; i--) {
+            out.append("  ").append(ctx.push(temps[i])).append(";\n");
+        }
     }
 
     private static boolean appendStraightLineBasicInstruction(StringBuilder out, BytecodeMethod method, BasicInstruction instruction,
@@ -2961,12 +4396,24 @@ final class JavascriptMethodGenerator {
             case Opcodes.DSTORE:
             case Opcodes.ASTORE:
                 ctx.localsUsed[instruction.getValue()] = true;
+                out.append(ctx.flushPendingLocal(instruction.getValue()));
                 out.append("  l").append(instruction.getValue()).append(" = ").append(ctx.pop()).append(";\n");
                 return true;
             case Opcodes.POP:
                 ctx.pop();
                 return true;
             case Opcodes.POP2:
+                // POP2 pops two SLOTS: one category-2 value (long/double) or two
+                // category-1 values. The JS backend models a long/double as ONE
+                // entry, so popping a fixed two entries discards an extra value
+                // when the top is category-2. getDupNDup() carries the resolved
+                // entry count (1 or 2) from ASM frame analysis; -1 = legacy.
+                if (instruction.getDupNDup() >= 0) {
+                    for (int i = 0; i < instruction.getDupNDup(); i++) {
+                        ctx.pop();
+                    }
+                    return true;
+                }
                 ctx.pop();
                 ctx.pop();
                 return true;
@@ -2990,6 +4437,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP_X2: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
@@ -3006,6 +4457,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP2: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String t1 = ctx.nextTemp("__dup");
@@ -3019,6 +4474,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP2_X1: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
@@ -3036,6 +4495,10 @@ final class JavascriptMethodGenerator {
                 return true;
             }
             case Opcodes.DUP2_X2: {
+                if (instruction.getDupNDup() >= 0) {
+                    emitDup(out, ctx, instruction.getDupNDup(), instruction.getDupNSkip());
+                    return true;
+                }
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
@@ -3174,6 +4637,24 @@ final class JavascriptMethodGenerator {
             case Opcodes.ATHROW:
                 out.append("  throw ").append(ctx.pop()).append(";\n");
                 return true;
+            case Opcodes.MONITORENTER: {
+                // ``_me`` may yield (contended monitor / cooperative
+                // hand-off), so this opcode only reaches here in
+                // suspending bodies (the eligibility scan bails sync
+                // ones). Pending field reads materialise first: the
+                // enter is a synchronization point and another green
+                // thread may have run since they were deferred.
+                String target = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
+                out.append("  yield* _me(").append(target).append(");\n");
+                return true;
+            }
+            case Opcodes.MONITOREXIT: {
+                String target = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
+                out.append("  _mx(").append(target).append(");\n");
+                return true;
+            }
             case Opcodes.ARRAYLENGTH:
                 return emitUnary(out, ctx, "%s.length");
             case Opcodes.AALOAD:
@@ -3214,20 +4695,35 @@ final class JavascriptMethodGenerator {
 
     private static boolean emitBinary(StringBuilder out, StraightLineContext ctx, String format, boolean repeatedArgs) {
         String b = ctx.pop();
+        boolean bPending = ctx.lastPopWasPending;
+        boolean bField = ctx.lastPopHadField;
         String a = ctx.pop();
+        boolean aPending = ctx.lastPopWasPending;
+        boolean aField = ctx.lastPopHadField;
         String expr;
         if (repeatedArgs) {
             expr = String.format(format, a, b, a, b, a, b);
         } else {
             expr = String.format(format, a, b);
         }
-        out.append("  ").append(ctx.push(expr)).append(";\n");
+        if (aPending && bPending && !repeatedArgs) {
+            out.append("  ").append(ctx.pushComposite(expr, aField || bField)).append(";\n");
+        } else {
+            out.append("  ").append(ctx.push(expr)).append(";\n");
+        }
         return true;
     }
 
     private static boolean emitUnary(StringBuilder out, StraightLineContext ctx, String format) {
         String value = ctx.pop();
-        out.append("  ").append(ctx.push(String.format(format, value))).append(";\n");
+        boolean vPending = ctx.lastPopWasPending;
+        boolean vField = ctx.lastPopHadField;
+        String expr = String.format(format, value);
+        if (vPending) {
+            out.append("  ").append(ctx.pushComposite(expr, vField)).append(";\n");
+        } else {
+            out.append("  ").append(ctx.push(expr)).append(";\n");
+        }
         return true;
     }
 
@@ -3256,6 +4752,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.DSTORE:
             case Opcodes.ASTORE:
                 ctx.localsUsed[instruction.getIndex()] = true;
+                out.append(ctx.flushPendingLocal(instruction.getIndex()));
                 out.append("  l").append(instruction.getIndex()).append(" = ").append(ctx.pop()).append(";\n");
                 return true;
             default:
@@ -3319,18 +4816,29 @@ final class JavascriptMethodGenerator {
         String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
         String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
-        String owner = JavascriptNameUtil.sanitizeClassName(rawOwner);
+        // Static fields live in ``_S[<declaringClass>]`` and their clinit is
+        // keyed on the declaring class, so the bytecode's Fieldref owner must be
+        // resolved to the class/interface that actually DECLARES the static field
+        // (javac may name any accessible subtype as the owner -- e.g.
+        // ``DeflaterEngine.COMPR_FUNC`` for a field declared on the interface
+        // ``DeflaterConstants``). The JVM resolves this; we must too, walking
+        // superclasses AND superinterfaces, else GETSTATIC reads the wrong ``_S``
+        // slot (undefined) and ``_I`` initializes the wrong class.
+        String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 out.append("  ").append(ctx.push("_S[\"" + owner + "\"][\"" + fieldName + "\"]")).append(";\n");
                 return true;
-            case Opcodes.PUTSTATIC:
+            case Opcodes.PUTSTATIC: {
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
+                String value = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
                 out.append("  _S[\"").append(owner).append("\"][\"").append(fieldName).append("\"] = ")
-                        .append(ctx.pop()).append(";\n");
+                        .append(value).append(";\n");
                 return true;
+            }
             case Opcodes.GETFIELD: {
                 String target = ctx.pop();
                 out.append("  ").append(ctx.push(target + "[\"" + propertyName + "\"]")).append(";\n");
@@ -3339,6 +4847,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.PUTFIELD: {
                 String value = ctx.pop();
                 String target = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
                 out.append("  ").append(target).append("[\"").append(propertyName).append("\"] = ").append(value).append(";\n");
                 return true;
             }
@@ -3348,12 +4857,92 @@ final class JavascriptMethodGenerator {
     }
 
     private static void appendStraightLineEnsureClassInitialized(StringBuilder out, StraightLineContext ctx, String owner) {
+        if (!classNeedsInitialization(owner)) {
+            return;
+        }
         if (ctx.initializedClasses.add(owner)) {
             out.append("  _I(\"").append(owner).append("\");\n");
         }
     }
 
-    private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
+    /**
+     * True when the value-returning invoke at {@code index} may be DEFERRED
+     * as an expression (executed at its consumption site) instead of
+     * materialised into a slot. Sound iff every instruction between the call
+     * and the consumption of its value is pure and reorder-safe relative to
+     * the call: local loads, constants (incl. interned-string LDC -- the
+     * intern-table touch is unobservable), and pure arithmetic / compare /
+     * convert ops. Field/static/array reads are excluded (the deferred call
+     * may write them), as are other invokes, monitors, jumps into the window
+     * and stack-shuffling DUP/POP forms. The scan tracks the virtual stack
+     * depth of the call's value; consumption by a store / return / putfield
+     * / array-store / jump-condition / further composition ends the window.
+     */
+    private static boolean canDeferInvokeResult(List<Instruction> instructions, int index) {
+        int depth = 0; // our value sits at relative depth 0 from the top
+        for (int i = index + 1; i < instructions.size() && i < index + 10; i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof LabelInstruction || in instanceof LineNumber || in instanceof LocalVariable) {
+                continue;
+            }
+            int op = in.getOpcode();
+            if (in instanceof VarOp || in instanceof Ldc) {
+                if (op >= Opcodes.ILOAD && op <= Opcodes.ALOAD || op == Opcodes.BIPUSH || op == Opcodes.SIPUSH
+                        || in instanceof Ldc) {
+                    depth++;
+                    continue;
+                }
+                if (op >= Opcodes.ISTORE && op <= Opcodes.ASTORE) {
+                    return depth == 0; // consumed by the store (or bail)
+                }
+                return false;
+            }
+            if (in instanceof BasicInstruction) {
+                // pure const pushes
+                if (op >= Opcodes.ACONST_NULL && op <= Opcodes.DCONST_1) {
+                    depth++;
+                    continue;
+                }
+                // pure binary arithmetic / shifts / compares: pop 2 push 1
+                if (op >= Opcodes.IADD && op <= Opcodes.DREM
+                        || op >= Opcodes.ISHL && op <= Opcodes.LXOR
+                        || op >= Opcodes.LCMP && op <= Opcodes.DCMPG) {
+                    if (depth == 0) {
+                        depth = 0; // our value folds into the composite; result is the new top
+                        continue;
+                    }
+                    if (depth == 1) {
+                        depth = 0; // we are the deeper operand of the fold
+                        continue;
+                    }
+                    depth -= 1;
+                    continue;
+                }
+                // pure unary / conversions: pop 1 push 1
+                if (op >= Opcodes.INEG && op <= Opcodes.DNEG
+                        || op >= Opcodes.I2L && op <= Opcodes.I2S) {
+                    continue;
+                }
+                if (op >= Opcodes.IRETURN && op <= Opcodes.ARETURN) {
+                    return depth == 0;
+                }
+                return false;
+            }
+            if (in instanceof Jump) {
+                // consumed inside the branch condition only if on top
+                int jop = in.getOpcode();
+                if (jop != Opcodes.GOTO && depth <= 1) {
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke,
+            List<Instruction> instructions, int index, StraightLineContext ctx) {
         String declaredOwner = invoke.getOwner();
         String directOwner = resolveDirectInvokeOwner(invoke);
         String owner = JavascriptNameUtil.sanitizeClassName(directOwner);
@@ -3380,6 +4969,11 @@ final class JavascriptMethodGenerator {
             default:
                 return false;
         }
+        // Field-read barrier: pendings consumed as args of THIS call
+        // evaluate inside the call statement (correct order); any other
+        // pending field read must materialise BEFORE the call, which may
+        // mutate the field it reads.
+        out.append(ctx.flushPendingFieldReads());
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
             // Straight-line INVOKEVIRTUAL / INVOKEINTERFACE: emit one cn1_iv*
             // helper call instead of __classDef/resolveVirtual boilerplate.
@@ -3388,13 +4982,40 @@ final class JavascriptMethodGenerator {
             // ``resolveVirtual`` handles inheritance without per-class alias
             // entries.
             String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(invoke.getName(), invoke.getDesc());
+            boolean suspending = isInvokeSuspending(invoke);
             if (hasReturn) {
-                out.append("  {\n");
-                appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues);
-                out.append("    ").append(ctx.push("__result")).append(";\n");
-                out.append("  }\n");
+                if (canDeferInvokeResult(instructions, index)) {
+                    // Monomorphic devirtualization (see appendCompactVirtualDispatch):
+                    // direct ``_dv*`` / ``_dw*`` call to the single impl when known.
+                    String monoImpl = monomorphicDispatch == null ? null : monomorphicDispatch.get(dispatchId);
+                    String devBase = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+                    String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
+                    StringBuilder callExpr = new StringBuilder();
+                    callExpr.append(suspending ? "(yield* " : "(").append(devBase)
+                            .append(argValues.length <= 4 ? String.valueOf(argValues.length) : "N")
+                            .append("(").append(target).append(", ").append(devSecond);
+                    if (argValues.length > 4) {
+                        callExpr.append(", [");
+                        for (int ai = 0; ai < argValues.length; ai++) {
+                            if (ai > 0) callExpr.append(", ");
+                            callExpr.append(argValues[ai]);
+                        }
+                        callExpr.append("]");
+                    } else {
+                        for (int ai = 0; ai < argValues.length; ai++) {
+                            callExpr.append(", ").append(argValues[ai]);
+                        }
+                    }
+                    callExpr.append("))");
+                    out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
+                } else {
+                    out.append("  {\n");
+                    appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending);
+                    out.append("    ").append(ctx.push("__result")).append(";\n");
+                    out.append("  }\n");
+                }
             } else {
-                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues);
+                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues, suspending);
             }
             return true;
         }
@@ -3418,6 +5039,25 @@ final class JavascriptMethodGenerator {
         // ``yield*`` ceremony so the cooperative scheduler can interleave
         // them with other threads.
         String yieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
+        if (hasReturn && canDeferInvokeResult(instructions, index)) {
+            StringBuilder callExpr = new StringBuilder();
+            callExpr.append("(").append(yieldPrefix).append(invokedName).append("(");
+            boolean firstArg = true;
+            if (target != null) {
+                callExpr.append(target);
+                firstArg = false;
+            }
+            for (int ai = 0; ai < argValues.length; ai++) {
+                if (!firstArg) {
+                    callExpr.append(", ");
+                }
+                firstArg = false;
+                callExpr.append(argValues[ai]);
+            }
+            callExpr.append("))");
+            out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
+            return true;
+        }
         if (hasReturn) {
             out.append("  { let __result = ").append(yieldPrefix).append(invokedName).append("(");
         } else {
@@ -3451,6 +5091,16 @@ final class JavascriptMethodGenerator {
         private final boolean[] localsInitialized;
         private final boolean[] localsUsed;
         private final Set<String> initializedClasses;
+        // Snapshot of ``initializedClasses`` taken after the
+        // always-sound seeding (containing class + ancestors).
+        // ``_I`` elision via ``initializedClasses`` is only sound
+        // while the earlier emission DOMINATES the later site, which
+        // holds inside one basic block but not across merge points --
+        // an ``_I`` emitted in one conditional arm must not elide the
+        // ``_I`` in a sibling arm. The structured walk calls
+        // ``resetInitializedClasses()`` at every block entry where it
+        // already clears pendings, restoring this seed.
+        private final Set<String> initializedClassesSeed;
         private int sp;
         private int maxObservedStack;
         private int nextTempId;
@@ -3459,12 +5109,82 @@ final class JavascriptMethodGenerator {
             this.localsInitialized = new boolean[Math.max(1, maxLocals)];
             this.localsUsed = new boolean[Math.max(1, maxLocals)];
             this.initializedClasses = new HashSet<String>();
+            this.initializedClassesSeed = new HashSet<String>();
             this.sp = 0;
             this.maxObservedStack = 0;
             this.nextTempId = 0;
         }
 
+        // Deferred-expression lowering: pushes of PURE, re-readable
+        // expressions (numeric/null constants and bare local reads) do
+        // not materialise an ``sN = expr;`` statement -- the expression
+        // itself is recorded and substituted at the consuming site. This
+        // is the stack-to-expression collapse the regex peepholes cannot
+        // do safely (they lack liveness): ``sN = l3; l4 = sN;`` becomes
+        // ``l4 = l3;`` at EMISSION time. Locals are only mutable via
+        // ISTORE/IINC inside a straight-line block (JS calls cannot touch
+        // caller locals), so the single invalidation hook is
+        // flushPendingLocal() called before those writes.
+        private String[] pendingExpr = new String[8];
+        private boolean[] pendingIsField = new boolean[8];
+        // True when the most recent pop() returned a deferred (pure) pending
+        // rather than a slot name -- consumed by the composite-expression
+        // builder in emitBinary/emitUnary.
+        private boolean lastPopWasPending;
+        private boolean lastPopHadField;
+
+        private static boolean isDeferrable(String expression) {
+            if (expression == null || expression.isEmpty()) {
+                return false;
+            }
+            if ("null".equals(expression) || "true".equals(expression) || "false".equals(expression)) {
+                return true;
+            }
+            char c0 = expression.charAt(0);
+            if (c0 == 'l') {
+                for (int i = 1; i < expression.length(); i++) {
+                    if (!Character.isDigit(expression.charAt(i))) {
+                        return false;
+                    }
+                }
+                return expression.length() > 1;
+            }
+            // numeric literal (int/float, optional sign / n-suffix for longs)
+            int start = (c0 == '-') ? 1 : 0;
+            if (start >= expression.length()) {
+                return false;
+            }
+            for (int i = start; i < expression.length(); i++) {
+                char c = expression.charAt(i);
+                if (!Character.isDigit(c) && c != '.' && c != 'n' && c != 'e' && c != 'E' && c != '-' && c != '+') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private String push(String expression) {
+            if (sp >= pendingExpr.length) {
+                String[] grown = new String[pendingExpr.length * 2 + sp];
+                System.arraycopy(pendingExpr, 0, grown, 0, pendingExpr.length);
+                pendingExpr = grown;
+            }
+            boolean fieldRead = isDeferrableFieldRead(expression);
+            if (isDeferrable(expression) || fieldRead) {
+                if (sp >= pendingIsField.length) {
+                    boolean[] grown = new boolean[pendingExpr.length];
+                    System.arraycopy(pendingIsField, 0, grown, 0, pendingIsField.length);
+                    pendingIsField = grown;
+                }
+                pendingIsField[sp] = fieldRead;
+                pendingExpr[sp++] = expression;
+                if (sp > maxObservedStack) {
+                    maxObservedStack = sp;
+                }
+                // Caller appends ";" -- an empty statement esbuild drops.
+                return "";
+            }
+            pendingExpr[sp] = null;
             String slot = "s" + sp++;
             if (sp > maxObservedStack) {
                 maxObservedStack = sp;
@@ -3477,7 +5197,47 @@ final class JavascriptMethodGenerator {
             if (sp < 0) {
                 throw new IllegalStateException("Straight-line JS lowering stack underflow");
             }
+            if (pendingExpr[sp] != null) {
+                String expr = pendingExpr[sp];
+                lastPopWasPending = true;
+                lastPopHadField = pendingIsField[sp];
+                pendingExpr[sp] = null;
+                pendingIsField[sp] = false;
+                return expr;
+            }
+            lastPopWasPending = false;
+            lastPopHadField = false;
             return "s" + sp;
+        }
+
+        /// SSA-lite composite building: defer a PURE expression composed from
+        /// two popped pendings instead of materialising a slot, so chains
+        /// like ``s0=l1[f]; s1=s0+l2; l3=s1*4`` collapse to
+        /// ``l3=((l1[f]+l2)*4)``. Only pending operands compose (a slot-name
+        /// operand at index >= our position could be overwritten by a later
+        /// push before consumption); the field flag propagates so the call /
+        /// field-write barriers still flush; a length cap bounds re-evaluation
+        /// cost from DUP-family re-reads and pathological nesting.
+        private String pushComposite(String expr, boolean hasField) {
+            if (expr.length() > 120) {
+                return push(expr);
+            }
+            if (sp >= pendingExpr.length) {
+                String[] grown = new String[pendingExpr.length * 2 + sp];
+                System.arraycopy(pendingExpr, 0, grown, 0, pendingExpr.length);
+                pendingExpr = grown;
+            }
+            if (sp >= pendingIsField.length) {
+                boolean[] grown = new boolean[pendingExpr.length];
+                System.arraycopy(pendingIsField, 0, grown, 0, pendingIsField.length);
+                pendingIsField = grown;
+            }
+            pendingIsField[sp] = hasField;
+            pendingExpr[sp++] = expr;
+            if (sp > maxObservedStack) {
+                maxObservedStack = sp;
+            }
+            return "";
         }
 
         private String peek(int depth) {
@@ -3485,7 +5245,147 @@ final class JavascriptMethodGenerator {
             if (index < 0) {
                 throw new IllegalStateException("Straight-line JS lowering stack underflow");
             }
+            // Constants / local reads are pure, so a peek (DUP family)
+            // can re-evaluate them at every use site.
+            if (pendingExpr[index] != null) {
+                return pendingExpr[index];
+            }
             return "s" + index;
+        }
+
+        /// Instance/static field reads off a simple base are deferrable
+        /// BETWEEN mutation barriers: every invoke, PUTFIELD and PUTSTATIC
+        /// in the straight-line emitter calls flushPendingFieldReads()
+        /// first, so a deferred read can never float across a write that
+        /// could change its value. One hop only -- re-evaluation stays a
+        /// single property access.
+        private static boolean isDeferrableFieldRead(String expression) {
+            if (expression == null || expression.length() < 6 || expression.charAt(expression.length() - 1) != ']') {
+                return false;
+            }
+            int br = expression.indexOf("[\"");
+            if (br < 0 || expression.indexOf(']') != expression.length() - 1
+                    || expression.indexOf("[\"", br + 1) >= 0) {
+                return false;
+            }
+            String base = expression.substring(0, br);
+            if (base.charAt(0) != 'l' || base.length() < 2) {
+                return false;
+            }
+            for (int i = 1; i < base.length(); i++) {
+                if (!Character.isDigit(base.charAt(i))) {
+                    return false;
+                }
+            }
+            // body must be a quoted identifier: ["name"]
+            for (int i = br + 2; i < expression.length() - 2; i++) {
+                char c = expression.charAt(i);
+                if (!Character.isLetterOrDigit(c) && c != '_' && c != '$') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// Materialise every pending FIELD read into its slot. Called
+        /// before any statement that could mutate a field (calls, field
+        /// writes). Returns prelude statements to emit.
+        private String flushPendingFieldReads() {
+            StringBuilder prelude = new StringBuilder();
+            for (int i = 0; i < sp; i++) {
+                if (pendingExpr[i] != null && pendingIsField[i]) {
+                    prelude.append("  s").append(i).append(" = ").append(pendingExpr[i]).append(";\n");
+                    pendingExpr[i] = null;
+                    pendingIsField[i] = false;
+                }
+            }
+            return prelude.toString();
+        }
+
+        /// True when ``word`` appears in ``expr`` NOT followed/preceded by an
+        /// identifier character (so l1 does not match l12 or al1).
+        private static boolean containsWord(String expr, String word) {
+            int from = 0;
+            int wl = word.length();
+            while (true) {
+                int at = expr.indexOf(word, from);
+                if (at < 0) {
+                    return false;
+                }
+                boolean leftOk = at == 0 || !isIdentCharCtx(expr.charAt(at - 1));
+                int end = at + wl;
+                boolean rightOk = end >= expr.length() || !isIdentCharCtx(expr.charAt(end));
+                if (leftOk && rightOk) {
+                    return true;
+                }
+                from = at + 1;
+            }
+        }
+
+        private static boolean isIdentCharCtx(char c) {
+            return Character.isLetterOrDigit(c) || c == '_' || c == '$';
+        }
+
+        /// Materialise EVERY pending expression into its slot. Required at
+        /// control-flow boundaries in the structured emitter: a value
+        /// deferred on one path must exist in its slot when paths merge.
+        /// Drop every pending expression WITHOUT materialising. Used when
+        /// entering a jump-target block: all inbound paths flushed their
+        /// pendings into slots before jumping/falling through, but a path
+        /// that ended in a return/throw may have left stale pendings below
+        /// sp that would otherwise shadow the real slot values at the merge.
+        private void clearPendings() {
+            for (int i = 0; i < pendingExpr.length; i++) {
+                pendingExpr[i] = null;
+                if (i < pendingIsField.length) {
+                    pendingIsField[i] = false;
+                }
+            }
+        }
+
+        /// Capture the always-sound ``_I`` elision seed (containing
+        /// class + ancestors). Called once after seeding, before any
+        /// instruction is emitted.
+        private void captureInitializedClassesSeed() {
+            initializedClassesSeed.clear();
+            initializedClassesSeed.addAll(initializedClasses);
+        }
+
+        /// Drop every ``_I`` elision entry that doesn't hold by the
+        /// JVM-spec guarantee. Called at merge-point / handler /
+        /// loop-header entry, where an entry added on one incoming
+        /// path no longer dominates the code that follows.
+        private void resetInitializedClasses() {
+            initializedClasses.clear();
+            initializedClasses.addAll(initializedClassesSeed);
+        }
+
+        private String flushAllPending() {
+            StringBuilder prelude = new StringBuilder();
+            for (int i = 0; i < sp; i++) {
+                if (pendingExpr[i] != null) {
+                    prelude.append("  s").append(i).append(" = ").append(pendingExpr[i]).append(";\n");
+                    pendingExpr[i] = null;
+                    pendingIsField[i] = false;
+                }
+            }
+            return prelude.toString();
+        }
+
+        /// Materialise any pending reads of local ``lN`` into their real
+        /// slots BEFORE a write to that local. Returns the prelude
+        /// statements to emit (empty when nothing was pending).
+        private String flushPendingLocal(int localIndex) {
+            String name = "l" + localIndex;
+            StringBuilder prelude = new StringBuilder();
+            for (int i = 0; i < sp; i++) {
+                if (pendingExpr[i] != null && containsWord(pendingExpr[i], name)) {
+                    prelude.append("  s").append(i).append(" = ").append(pendingExpr[i]).append(";\n");
+                    pendingExpr[i] = null;
+                    pendingIsField[i] = false;
+                }
+            }
+            return prelude.toString();
         }
 
         private int getMaxObservedStack() {
@@ -3860,6 +5760,148 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // benefit from a pc pin anyway.
         }
         return false;
+    }
+
+    /**
+     * A basic block: a maximal straight-line instruction range [start, end)
+     * with successor block indices. Consumed by the structured
+     * (labeled-break) emitter that replaces the switch(pc) state machine for
+     * acyclic-forward CFGs.
+     */
+    static final class BasicBlock {
+        final int start;
+        int end;
+        final java.util.List<Integer> succs = new java.util.ArrayList<Integer>();
+        BasicBlock(int start) { this.start = start; }
+    }
+
+    /** Partition into basic blocks and wire successor edges. */
+    static java.util.List<BasicBlock> buildBasicBlocks(List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        int n = instructions.size();
+        boolean[] leader = new boolean[n + 1];
+        if (n > 0) {
+            leader[0] = true;
+        }
+        for (int i = 0; i < n; i++) {
+            Instruction instr = instructions.get(i);
+            if (instr instanceof Jump) {
+                Integer t = labelToIndex.get(((Jump) instr).getLabel());
+                if (t != null && t < n) {
+                    leader[t] = true;
+                }
+                if (i + 1 < n) {
+                    leader[i + 1] = true;
+                }
+            } else if (instr instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) instr;
+                if (sw.getDefaultLabel() != null) {
+                    Integer d = labelToIndex.get(sw.getDefaultLabel());
+                    if (d != null && d < n) { leader[d] = true; }
+                }
+                if (sw.getLabels() != null) {
+                    for (Label l : sw.getLabels()) {
+                        Integer d = l == null ? null : labelToIndex.get(l);
+                        if (d != null && d < n) { leader[d] = true; }
+                    }
+                }
+                if (i + 1 < n) { leader[i + 1] = true; }
+            } else if (instr instanceof TryCatch) {
+                TryCatch tc = (TryCatch) instr;
+                for (Label l : new Label[]{ tc.getStart(), tc.getEnd(), tc.getHandler() }) {
+                    Integer d = l == null ? null : labelToIndex.get(l);
+                    if (d != null && d < n) { leader[d] = true; }
+                }
+            } else if (isTerminatingInstruction(instr) && i + 1 < n) {
+                leader[i + 1] = true;
+            }
+        }
+        java.util.List<BasicBlock> blocks = new java.util.ArrayList<BasicBlock>();
+        java.util.Map<Integer, Integer> startToBlock = new java.util.HashMap<Integer, Integer>();
+        BasicBlock cur = null;
+        for (int i = 0; i < n; i++) {
+            if (leader[i] || cur == null) {
+                if (cur != null) { cur.end = i; }
+                cur = new BasicBlock(i);
+                startToBlock.put(i, blocks.size());
+                blocks.add(cur);
+            }
+        }
+        if (cur != null) { cur.end = n; }
+        for (BasicBlock b : blocks) {
+            Instruction last = b.end > b.start ? instructions.get(b.end - 1) : null;
+            boolean addFallThrough = true;
+            if (last instanceof Jump) {
+                Integer t = labelToIndex.get(((Jump) last).getLabel());
+                if (t != null && startToBlock.containsKey(t)) {
+                    b.succs.add(startToBlock.get(t));
+                }
+                if (last.getOpcode() == Opcodes.GOTO) {
+                    addFallThrough = false;
+                }
+            } else if (last instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) last;
+                if (sw.getDefaultLabel() != null) {
+                    Integer d = labelToIndex.get(sw.getDefaultLabel());
+                    if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                }
+                if (sw.getLabels() != null) {
+                    for (Label l : sw.getLabels()) {
+                        Integer d = l == null ? null : labelToIndex.get(l);
+                        if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                    }
+                }
+                addFallThrough = false;
+            } else if (last != null && isTerminatingInstruction(last)) {
+                addFallThrough = false;
+            }
+            if (addFallThrough && startToBlock.containsKey(b.end)) {
+                b.succs.add(startToBlock.get(b.end));
+            }
+        }
+        return blocks;
+    }
+
+    /**
+     * True when the method's control-flow graph contains a back-edge
+     * (a loop). Used to decide whether the cooperative-preemption
+     * preamble is needed: only loop-bearing methods can spin long
+     * enough to starve the worker event loop. Returns false for plain
+     * straight-line bodies (no jumps) and acyclic-forward structured
+     * bodies. Conservative on parse failure (returns true) so a method
+     * we can't analyse keeps its preamble.
+     */
+    private static boolean methodHasBackEdge(List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        if (labelToIndex == null) {
+            return true;
+        }
+        boolean anyJump = false;
+        for (Instruction instr : instructions) {
+            if (instr instanceof Jump || instr instanceof SwitchInstruction) {
+                anyJump = true;
+                break;
+            }
+        }
+        if (!anyJump) {
+            return false; // no branches -> straight line -> no loop
+        }
+        try {
+            java.util.List<BasicBlock> blocks = buildBasicBlocks(instructions, labelToIndex);
+            return !isAcyclicForward(blocks);
+        } catch (RuntimeException analysisFailed) {
+            return true;
+        }
+    }
+
+    /** True when every edge goes to a strictly later block (no loops). */
+    static boolean isAcyclicForward(java.util.List<BasicBlock> blocks) {
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int x : blocks.get(i).succs) {
+                if (x <= i) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean isTerminatingInstruction(Instruction instruction) {
@@ -4609,7 +6651,15 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         // up the alias under the verbose ``cn1_<subclass>_...`` key,
         // which mangling rewrites inconsistently).
         String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
-        String owner = JavascriptNameUtil.sanitizeClassName(rawOwner);
+        // Static fields live in ``_S[<declaringClass>]`` and their clinit is
+        // keyed on the declaring class, so the bytecode's Fieldref owner must be
+        // resolved to the class/interface that actually DECLARES the static field
+        // (javac may name any accessible subtype as the owner -- e.g.
+        // ``DeflaterEngine.COMPR_FUNC`` for a field declared on the interface
+        // ``DeflaterConstants``). The JVM resolves this; we must too, walking
+        // superclasses AND superinterfaces, else GETSTATIC reads the wrong ``_S``
+        // slot (undefined) and ``_I`` initializes the wrong class.
+        String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
@@ -4655,6 +6705,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         // any of its methods can run, so both are already live by the
         // time this method body executes. ~30% of the 7.7k ``jvm.eI``
         // sites resolve to the containing class or its ancestors.
+        if (!classNeedsInitialization(owner)) {
+            return;
+        }
         if (isClassAlreadyInitializedForCurrentEmission(owner)) {
             return;
         }
@@ -4799,6 +6852,24 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
 
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
+            // CHA verdict for this call site: a sync signature uses the
+            // non-generator ``cn1_ivs*`` family with no ``yield*`` (so a
+            // method whose every virtual call is sync can itself be a plain
+            // ``function``); a suspending signature keeps ``yield* cn1_iv*``.
+            boolean susp = isInvokeSuspending(invoke);
+            // Monomorphic devirtualization (interpreter inline arity 0-4
+            // path). Mirrors appendCompactVirtualDispatch: a single-impl
+            // dispatch id calls the impl directly via ``_dv*`` / ``_dw*``
+            // (impl fn bareword as 2nd arg) instead of the string lookup.
+            // CRITICAL: this path MUST devirtualize whenever the id was
+            // pruned from the virtual-dispatch table (m: entry dropped by
+            // referencedDispatchIds), or the string-based _v*/_w* call
+            // would resolve to a now-missing m: entry ("Missing virtual
+            // method ...").
+            String monoImpl = monomorphicDispatch == null ? null : monomorphicDispatch.get(dispatchId);
+            String iv = monoImpl != null ? (susp ? "_dv" : "_dw") : (susp ? "_v" : "_w");
+            String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
+            String yk = susp ? "yield* " : "";
             // Fast path for 0-arg virtual dispatch: inline the
             // target pop into the iv0 call. Pops TOS inside the
             // invoke's arg list, so the full block collapses to a
@@ -4806,9 +6877,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // call sites.
             if (argCount == 0) {
                 if (hasReturn) {
-                    out.append("        stack.p(yield* cn1_iv0(stack.q(), \"").append(dispatchId).append("\"));\n");
+                    out.append("        stack.p(").append(yk).append(iv).append("0(stack.q(), ").append(ivSecond).append("));\n");
                 } else {
-                    out.append("        yield* cn1_iv0(stack.q(), \"").append(dispatchId).append("\");\n");
+                    out.append("        ").append(yk).append(iv).append("0(stack.q(), ").append(ivSecond).append(");\n");
                 }
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
@@ -4816,9 +6887,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 1) {
                 out.append("        { let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv1(stack.q(), \"").append(dispatchId).append("\", __arg0));");
+                    out.append("stack.p(").append(yk).append(iv).append("1(stack.q(), ").append(ivSecond).append(", __arg0));");
                 } else {
-                    out.append("yield* cn1_iv1(stack.q(), \"").append(dispatchId).append("\", __arg0);");
+                    out.append(yk).append(iv).append("1(stack.q(), ").append(ivSecond).append(", __arg0);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4826,9 +6897,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 2) {
                 out.append("        { let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1));");
+                    out.append("stack.p(").append(yk).append(iv).append("2(stack.q(), ").append(ivSecond).append(", __arg0, __arg1));");
                 } else {
-                    out.append("yield* cn1_iv2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1);");
+                    out.append(yk).append(iv).append("2(stack.q(), ").append(ivSecond).append(", __arg0, __arg1);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4836,9 +6907,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 3) {
                 out.append("        { let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2));");
+                    out.append("stack.p(").append(yk).append(iv).append("3(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2));");
                 } else {
-                    out.append("yield* cn1_iv3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2);");
+                    out.append(yk).append(iv).append("3(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4846,9 +6917,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (argCount == 4) {
                 out.append("        { let __arg3 = stack.q(); let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
                 if (hasReturn) {
-                    out.append("stack.p(yield* cn1_iv4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3));");
+                    out.append("stack.p(").append(yk).append(iv).append("4(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2, __arg3));");
                 } else {
-                    out.append("yield* cn1_iv4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3);");
+                    out.append(yk).append(iv).append("4(stack.q(), ").append(ivSecond).append(", __arg0, __arg1, __arg2, __arg3);");
                 }
                 out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
@@ -4863,7 +6934,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             out.append("        {\n");
             appendInvocationArgumentBindings(out, argCount, "          ", "stack.q()");
             out.append("          let __target = stack.q();\n");
-            appendCompactVirtualDispatch(out, "          ", dispatchId, argCount, hasReturn, "__target", true);
+            appendCompactVirtualDispatch(out, "          ", dispatchId, argCount, hasReturn, "__target", true, isInvokeSuspending(invoke));
             out.append("          pc = ").append(index + 1).append("; break;\n");
             out.append("        }\n");
             return;
@@ -5015,32 +7086,58 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
      *                        the arg expressions directly (straight-line path).
      */
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
-            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack) {
-        appendCompactVirtualDispatch(out, indent, methodId, argCount, hasReturn, targetExpr, argsFromStack, null);
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, boolean suspending) {
+        appendCompactVirtualDispatch(out, indent, methodId, argCount, hasReturn, targetExpr, argsFromStack, null, suspending);
     }
 
+    /**
+     * @param suspending  CHA verdict for the dispatched signature. When true the
+     *                    call goes through the generator family
+     *                    ({@code yield* cn1_iv*}) so a blocking override can
+     *                    suspend the cooperative scheduler. When false the
+     *                    analysis proved every impl is synchronous, so we emit
+     *                    the synchronous family ({@code cn1_ivs*}, no
+     *                    {@code yield*}) -- this is what allows a caller that
+     *                    makes only non-suspending virtual calls to itself be a
+     *                    plain {@code function}.
+     */
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
-            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions) {
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
+            boolean suspending) {
+        // Monomorphic devirtualization: a dispatch id with exactly one
+        // concrete impl resolves to that body for any receiver, so call
+        // it directly through the ``_dv*`` / ``_dw*`` family (impl
+        // function passed by reference instead of the dispatch-id
+        // string looked up at runtime). Preserves the null-receiver NPE
+        // and drive-once semantics; the second argument becomes the
+        // (bareword) impl function id, not a quoted dispatch id.
+        java.util.Map<String, String> mono = monomorphicDispatch;
+        String monoImpl = mono == null ? null : mono.get(methodId);
+        String base = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+        // The second helper argument: bareword impl fn for devirt, else
+        // the quoted dispatch-id string.
+        String secondArg = monoImpl != null ? monoImpl : ("\"" + methodId + "\"");
+        String yieldKw = suspending ? "yield* " : "";
         String helper;
         boolean variadic = false;
         switch (argCount) {
-            case 0: helper = "cn1_iv0"; break;
-            case 1: helper = "cn1_iv1"; break;
-            case 2: helper = "cn1_iv2"; break;
-            case 3: helper = "cn1_iv3"; break;
-            case 4: helper = "cn1_iv4"; break;
+            case 0: helper = base + "0"; break;
+            case 1: helper = base + "1"; break;
+            case 2: helper = base + "2"; break;
+            case 3: helper = base + "3"; break;
+            case 4: helper = base + "4"; break;
             default:
-                helper = "cn1_ivN";
+                helper = base + "N";
                 variadic = true;
                 break;
         }
         out.append(indent);
         if (hasReturn && argsFromStack) {
-            out.append("stack.p(yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("stack.p(").append(yieldKw).append(helper).append("(").append(targetExpr).append(", ").append(secondArg);
         } else if (hasReturn) {
-            out.append("let __result = yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("let __result = ").append(yieldKw).append(helper).append("(").append(targetExpr).append(", ").append(secondArg);
         } else {
-            out.append("yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append(yieldKw).append(helper).append("(").append(targetExpr).append(", ").append(secondArg);
         }
         if (variadic) {
             out.append(", [");

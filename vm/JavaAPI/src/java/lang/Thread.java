@@ -54,6 +54,7 @@ public class Thread implements java.lang.Runnable{
     private String name;
     private int priority = NORM_PRIORITY;
     private long nativeThreadId;
+    private boolean daemon;
     private static int activeThreads = 0;
     
     /**
@@ -95,6 +96,21 @@ public class Thread implements java.lang.Runnable{
      */
     public static int activeCount() {
         return activeThreads;
+    }
+
+    /**
+     * Marks this thread as either a daemon thread or a user thread. Stored for
+     * API compatibility; the concurrent GC tracks lightweight threads regardless.
+     */
+    public final void setDaemon(boolean on) {
+        this.daemon = on;
+    }
+
+    /**
+     * Tests whether this thread is a daemon thread.
+     */
+    public final boolean isDaemon() {
+        return daemon;
     }
 
     /**

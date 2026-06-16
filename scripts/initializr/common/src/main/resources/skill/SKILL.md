@@ -256,10 +256,13 @@ mvn -pl common cn1:debug
 # Execute the CN1 test runner
 mvn -pl common cn1:test
 
-# Cloud build for Android/iOS/JS (requires CN1 build server creds)
+# Cloud build for Android/iOS (requires CN1 build server creds)
 mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
 mvn -pl ios     package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios-device
-mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript
+
+# JavaScript / web bundle, built locally via the ParparVM → JS translator (Enterprise-gated).
+# Use -Dcodename1.buildTarget=javascript instead for the cloud builder.
+mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
 ```
 
 See `references/build-and-run.md` for the local-vs-cloud matrix, automated-build mode (Enterprise), iOS local-build prerequisites, and the complete goal list. The full `codename1.arg.*` index lives in `references/build-hints.md`.
