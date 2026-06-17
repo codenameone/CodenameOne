@@ -9,16 +9,14 @@ import com.codename1.ui.CN
  *
  * It is a distinct lifecycle class - not the phone main - so the watch slice has
  * its own tree-shaking root even though it reuses the same screenshot suite. The
- * suite's individual tests adapt to the form factor at runtime via
- * [CN.isWatch] / [com.codename1.ui.Display.getFormFactor] (e.g.
- * AbstractGraphicsScreenshotTest emits four separate full-screen captures on a
- * watch instead of a cramped 2x2 grid), so a single application services both
- * form factors from two entry points.
+ * suite's individual tests adapt to the form factor at runtime via [CN.isWatch]
+ * (e.g. AbstractGraphicsScreenshotTest emits four separate full-screen captures
+ * on a watch instead of a cramped 2x2 grid), so a single application services
+ * both form factors from two entry points.
  */
 class HelloCodenameOneWatch : HelloCodenameOne() {
     override fun runApp() {
-        System.out.println("CN1SS:INFO:watch entry HelloCodenameOneWatch isWatch=" + CN.isWatch()
-                + " formFactor=" + com.codename1.ui.Display.getInstance().formFactor)
+        System.out.println("CN1SS:INFO:watch entry HelloCodenameOneWatch isWatch=" + CN.isWatch())
         super.runApp()
     }
 }

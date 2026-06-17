@@ -130,8 +130,8 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
     public boolean runTest() {
         if (CN.isWatch()) {
             // Watch form factor: four separate full-screen captures instead of a
-            // cramped 2x2 grid. This exercises Display.isWatch()/getFormFactor()
-            // and demonstrates a form-factor-appropriate test layout.
+            // cramped 2x2 grid. This exercises CN.isWatch() and demonstrates a
+            // form-factor-appropriate test layout.
             showWatchVariant(0);
             return true;
         }
