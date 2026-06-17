@@ -23,7 +23,7 @@ mvn cn1:create-game-scene -DclassName=com.example.game.CoinRun -Dmode=2d
 mvn cn1:gamebuilder
 ```
 
-The editor opens bound to your project; **Build** writes `src/main/resources/games/<Scene>.game` and (once) the companion `<Scene>.java`. The three concepts you'll use throughout: **Layers** (tile grids vs. freely-placed entity layers), **Assets** (pick a pack, click an asset, click/drag onto the stage), and the **Inspector** (an object's *Object* transform and *Behavior* metadata).
+The editor opens bound to your project; **Build** writes `src/main/resources/games/<Scene>.game` and (once) the companion `<Scene>.java`. The three concepts you'll use throughout: **Layers** (tile grids vs. freely placed entity layers), **Assets** (pick a pack, click an asset, click/drag onto the stage), and the **Inspector** (an object's *Object* transform and *Behavior* metadata).
 
 ## Step 1 — New 2D scene
 

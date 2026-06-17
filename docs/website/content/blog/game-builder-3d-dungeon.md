@@ -31,7 +31,7 @@ Choose **New scene → 3D Map**. The editor shows the board (placement defaults 
 
 ## Step 2 — Pick the play style
 
-With nothing selected, set the Inspector's **3D play style** to **dungeon**. The options are *open* (a free arena), *flight* (an aerial fly-over), *race* (a road racer) and *dungeon* (first-person walls).
+With nothing selected, set the Inspector's **3D play style** to **dungeon**. The options are *open* (a free arena), *flight* (an aerial flyover), *race* (a road racer) and *dungeon* (first-person walls).
 
 ![Choose the dungeon play style](/blog/gamebuilder/dungeon-2-style.png)
 
@@ -49,7 +49,7 @@ Place a **Spawn** and tick **This is the player** in its Behavior section. Its *
 
 ## Step 5 — Walk it
 
-Press **Live**: in *dungeon* style you walk in **first person** — **Left/Right turn, Up/Down walk** — and the pillars act as walls you can't pass through. A radar in the corner shows where everything is. Switch the play style to *open* for a free arena or *flight* for an aerial fly-over of the same layout.
+Press **Live**: in *dungeon* style you walk in **first person** — **Left/Right turn, Up/Down walk** — and the pillars act as walls you can't pass through. A radar in the corner shows where everything is. Switch the play style to *open* for a free arena or *flight* for an aerial flyover of the same layout.
 
 ![Walk the dungeon in first person](/blog/gamebuilder/dungeon-5-walk.png)
 

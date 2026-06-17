@@ -4,7 +4,7 @@ The *Game Builder* is a visual level / map editor for the
 <<Game Development,`com.codename1.gaming`>> API. You lay out a game world -- tiles,
 characters, items, the camera -- set per-object behavior values, preview it live, and
 *Build* it into your project as a data file plus a small Java companion that the runtime
-plays. It is to games what the GUI builder is to forms.
+plays. It's to games what the GUI builder is to forms.
 
 This chapter covers the whole feature: the underlying model, the editor UI, building a
 level, _defining game rules_, the supported _game types_, and the Maven workflow.
@@ -15,7 +15,7 @@ A game built with this tool has three layers:
 
 [cols="1,3,2", options="header"]
 |===
-| Layer | What it is | Who authors it
+| Layer | Role | Who authors it
 | Level data (`+*.game+`)
 | A JSON description of the scene: grid, layers, placed elements + their properties,
 camera, lights.
@@ -43,7 +43,7 @@ and your `onUpdate` logic is preserved across regeneration.
 `layers()`, `elements()`, camera, `lights()`, `getTerrain()`. `load(json)` / `toJson()`.
 | `GameElement`
 | A placed thing: `id`, `name`, `assetId`, `layer`, a transform and a typed _property
-bag_ (`getInt`/`getDouble`/`getString`/`getBoolean`). It is not a `Sprite`, so the same
+bag_ (`getInt`/`getDouble`/`getString`/`getBoolean`). It's not a `Sprite`, so the same
 model works in 2D and 3D.
 | `Layer`
 | A named band: `KIND_TILE` (an `assetId`-per-cell grid), `KIND_ENTITY`, `KIND_MODEL`;
@@ -121,12 +121,12 @@ brings in your own artwork as a new asset.
 * *Inspector* (right) -- scene settings when nothing is selected, or the selected
 object's properties.
 
-Because it is a desktop application, *every command is also available from the native
+Because it's a desktop application, *every command is also available from the native
 menu bar* (drawn by the OS), grouped by convention: *File* (New 2D / 3D / Board, Open
 Scene, Save), *Edit* (Undo, Redo, Delete Selection), *View* (Toggle Grid / Snap, Zoom
 In / Out, Show Generated Code), *Tools* (Select / Move / Brush / Fill / Erase / Pan),
 *Layer* (Add Layer) and *Game* (Play / Stop). The standard accelerators work too --
-*Cmd/Ctrl+Z* undo, *Cmd/Ctrl+S* save, *Cmd/Ctrl+R* play, *Cmd/Ctrl+=* / *Cmd/Ctrl+-*
+`Cmd/Ctrl+Z` undo, `Cmd/Ctrl+S` save, `Cmd/Ctrl+R` play, `Cmd/Ctrl+=` / `Cmd/Ctrl+-`
 zoom. Every on-screen control also has a tooltip.
 
 === Building a level
@@ -171,14 +171,14 @@ Select an object to edit its *Transform* (name, position, *Layer* dropdown) and 
 
 These defaults come from the *asset* -- the Inspector's read-only *Asset* section shows
 the id, kind, size and `unique` flag, and *Edit asset defaults…* lets you change an
-asset's default size and properties (e.g. tune `ground`/`coin`). Use *Add property…* to
+asset's default size and properties (for example, tune `ground`/`coin`). Use *Add property…* to
 attach your own game metadata (`hitPoints`, `value`, …) to a single object, readable at
-runtime via `el.getInt(...)` / `el.getDouble(...)`. The *This is the player* toggle marks
+runtime via `el.getInt(...)` / `el.getDouble(...)`. *This is the player* marks
 which element the preview and arrow keys drive (otherwise a `player`/`hero`/`spawn` asset
 is used).
 
 Scene-wide rules are set in the Inspector when nothing is selected: *gravity*,
-*background* theme, grid *Cols / Rows / Tile size* and the *Mode*. All of these are saved
+*background* theme, grid *Cols / Rows / Tile size* and the *Mode*. These are saved
 into the `.game` file and are available at runtime on each `GameElement`.
 
 ==== Logic -- written in the companion
@@ -233,10 +233,10 @@ Switch type from the scene dropdown's _New scene_ buttons or scaffold with
 terrain; placed elements become meshes (import your own glTF via `GltfLoader` from the
 companion's `buildModels` hook).
 
-image::img/gamebuilder-3d.png[Editing a 3D map -- the board auto-fits the canvas and zooms,800]
+image::img/gamebuilder-3d.png[Editing a 3D map -- the board autofits the canvas and zooms,800]
 
 In *3D mode* the board is edited top-down (placement, terrain and lighting), and the
-grid auto-fits the canvas so it stays usable at any size and zoom. Each placed element
+grid autofits the canvas so it stays usable at any size and zoom. Each placed element
 reads as a single object on the grid rather than a flat sprite filling the board.
 
 === Live preview

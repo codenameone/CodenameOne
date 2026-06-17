@@ -11,7 +11,7 @@ more art.
 The classes live in `com.codename1.gaming.level`: `AssetDef`, `AssetPack` and
 `AssetCatalog`.
 
-=== What is an asset?
+=== What an asset is
 
 An asset is a *reusable template* -- an `AssetDef` -- not a thing in your level. It says
 "this is what a _coin_ looks like and what default values a coin has," and any number of
@@ -23,30 +23,30 @@ An `AssetDef` carries:
 |===
 | Field | Meaning
 | `getId()`
-| The stable string key (e.g. `coin`, `player`, `ground`). A placed element references
+| The stable string key (for example, `coin`, `player`, `ground`). A placed element references
 this id, the catalog indexes by it, and imported art is filed under it.
 | `getName()`
-| The human-readable display name shown in the editor palette (e.g. `Coin`). Defaults to
+| The human-readable display name shown in the editor palette (for example, `Coin`). Defaults to
 the id.
 | `getKind()`
 | `AssetDef.KIND_TILE` (painted into a cell of a tile layer's grid) or
-`AssetDef.KIND_ACTOR` (a freely positioned entity / model). `isTile()` is a convenience.
+`AssetDef.KIND_ACTOR` (a free-form entity / model). `isTile()` is a convenience.
 | `getWidth()` / `getHeight()`
-| The natural pixel size of the art (default 32x32).
+| The natural pixel size of the art (default 32×32).
 | `getColor()`
 | A base ARGB colour used to render a flat placeholder until real artwork is available
 (default `0xff888888`).
 | `isUnique()`
-| Whether a level should hold at most one of these (e.g. the player / spawn point).
+| Whether a level should hold at most one of these (for example, the player / spawn point).
 | `getSource()`
 | An optional reference to the source art (a resource path, an SVG/Lottie key, or the
 `assets/<id>.png` path written for an imported image).
 | `defaultProperties()`
 | The default authoring property values copied onto a freshly placed element -- a coin's
-`value`, a player's `lives` and `jumpHeight`, and so on.
+`value`, a player's `lives` and `jumpHeight`, and more.
 |===
 
-==== Asset (template) vs. placed element (instance)
+==== Asset (template) versus placed element (instance)
 
 Keep this distinction clear:
 
@@ -60,7 +60,7 @@ When you drop a coin into a level, the editor creates a `GameElement` whose `ass
 (see `StarterPacks.addActor`, which does exactly this with `el.properties().putAll(def.defaultProperties())`).
 You can then tweak _that one_ coin's `value` without affecting the template or any other
 coin. Changing the asset's size or art, conversely, affects how every instance that
-references it is drawn.
+references it's drawn.
 
 === How assets are structured
 
@@ -132,7 +132,7 @@ gems, the player/hero figure, slime, brick, crate, grass, ladder, spike, water, 
 chest, door, flag, torch, card, token, dice, barrel -- with a generic "chip" fallback for
 anything unrecognized.
 
-The big advantage: because it is plain `Graphics` drawing, it runs *identically on every
+The big advantage: because it's plain `Graphics` drawing, it runs *identically on every
 platform with no SVG/Lottie transcode dependency*. The trade-off is that the art is
 simple/stylized and authored in Java rather than in an art tool. `AssetArt.install`
 requires a live `Display`, so call it from the UI, not from headless code.
@@ -160,7 +160,7 @@ each imported PNG from `<gamesDir>/assets/`, restoring your custom pack into the
 
 ==== The SVG / Lottie build-time transcode path
 
-More generally, an `AssetDef`'s `getSource()` can point at vector or animated source art
+Beyond raster art, an `AssetDef`'s `getSource()` can point at vector or animated source art
 (an SVG or Lottie key). This is the standard Codename One pipeline: the build-time step
 transcodes the vector/animated source into a real `Image`, which is wired into the catalog
 with `setImage`. This gives the crispest, resolution-independent art, but unlike
@@ -175,7 +175,7 @@ un-renderable.
 
 There are two practical paths.
 
-==== Path 1: author a pack JSON entry
+==== Path 1: Author a pack JSON entry
 
 Add an entry to a pack's `assets` array using the same format as the built-ins. For
 example, a collectible key:
@@ -198,7 +198,7 @@ Field by field:
 
 * `id` -- unique string key your placed elements and any art will reference. Required.
 * `name` -- display name in the palette. Optional; defaults to the id.
-* `kind` -- `"tile"` to paint into grid cells, `"actor"` for a freely placed entity.
+* `kind` -- `"tile"` to paint into grid cells, `"actor"` for a free-form entity.
 Anything other than `"tile"` is treated as an actor.
 * `w` / `h` -- natural pixel size. Optional; default 32.
 * `color` -- `#rrggbb` placeholder colour used until real art is supplied. Optional.
@@ -212,13 +212,13 @@ You can add this to a copy of `gamebuilder-packs.json`, or build a pack in code 
 `catalog.setImage("key", image)` or add a drawing case for the id in the art-as-code
 layer.
 
-==== Path 2: import an image in the editor
+==== Path 2: Import an image in the editor
 
 The no-code path: open your level in the Game Builder, select the layer you want the
 asset to belong to (a tile layer for tiles, an entity/actor layer otherwise), and use the
 *Import* action ("Import your own image as a new asset"). Pick a PNG (or other supported
-image), and the editor creates the `AssetDef`, files it under the *Custom* pack, and -- if
-the project is bound -- saves the PNG and pack JSON under the project's `games/assets/`
+image), and the editor creates the `AssetDef` and files it under the *Custom* pack. When the
+project is bound, it also writes the PNG and pack JSON under the project's `games/assets/`
 directory as described above. The new asset appears in the palette and is immediately
 placeable.
 
@@ -226,7 +226,7 @@ placeable.
 
 3D terrain surfaces use a different, pluggable concept: *materials*, not sprite assets. A
 `Material` (`com.codename1.gaming.level.Material`) describes a surface -- a base colour,
-whether it is `solid` (blocks movement), a `friction` multiplier, and an optional
+whether it's `solid` (blocks movement), a `friction` multiplier, and an optional
 `artId` for textured rendering -- and is referenced everywhere by its string id.
 
 Materials are resolved through `MaterialRegistry`, a process-wide registry that ships six
@@ -236,10 +236,10 @@ is registered as solid. Applications add their own without changing the level fo
 [source,java]
 ----
 MaterialRegistry.register(new Material("lava", "Lava", 0xc0392b).setSolid(true));
-Material m = MaterialRegistry.get("lava");   // never null; unknown ids return grey
+Material m = MaterialRegistry.get("lava");   // never null; unknown ids return gray
 ----
 
-Unknown ids resolve to a neutral grey placeholder, so a level that references a
+Unknown ids resolve to a neutral gray placeholder, so a level that references a
 not-yet-registered material still loads. Materials cover terrain cells and
 `TerrainFeature`s; the sprite/model assets covered above are a separate system.
 
@@ -254,5 +254,5 @@ Authoring at the asset's natural pixel size keeps it crisp.
 entries alongside the built-ins so the whole pack loads through `AssetCatalog.load`.
 * *Use external game-art sources.* Plenty of open game-art libraries and your own design
 tools (vector editors, pixel-art tools) can produce sprite sheets and tiles. Whichever
-source you use, *you are responsible for honouring its licence* -- check the terms for
-attribution and commercial-use requirements before shipping art you did not create.
+source you use, *you are responsible for honoring its license* -- check the terms for
+attribution and commercial-use requirements before shipping art you didn't create.

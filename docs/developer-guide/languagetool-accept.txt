@@ -609,3 +609,4 @@ syscall
 dlopen
 # The zig toolchain (zig cc), used to pin an old glibc for the Linux port.
 zig
+transcoder
