@@ -1171,6 +1171,30 @@ public class AndroidGradleBuilder extends Executor {
         String googleAdUnitId = request.getArg("android.googleAdUnitId", request.getArg("google.adUnitId", null));
         String googlePlayAdViewCode = "";
         String userXapplication = request.getArg("android.xapplication", "");
+
+        // Wear OS support. android.wear=true marks this as an Android Wear
+        // (Wear OS) app. A Wear app is a regular Android app that declares the
+        // watch hardware feature; the Codename One UI renders through the same
+        // Android pipeline (no separate render backend is needed, unlike the
+        // Apple Watch port), and CN.isWatch() returns true at runtime via
+        // PackageManager.FEATURE_WATCH. Standalone Wear apps (the default since
+        // Wear OS 2.0) install and run directly on the watch without a paired
+        // phone app. With the hint off the manifest is unchanged.
+        String wearApplicationMetaData = "";
+        if ("true".equals(request.getArg("android.wear", "false"))) {
+            // Wear OS 2.0 (the standalone-app baseline) is API 23.
+            minSDK = maxInt("23", minSDK);
+            if (!xPermissions.contains("android.hardware.type.watch")) {
+                xPermissions += "    <uses-feature android:name=\"android.hardware.type.watch\" android:required=\"true\" />\n";
+            }
+            // Declare the app standalone (runs without a companion phone app)
+            // unless the developer opts out or already declared the meta-data.
+            if (!"false".equals(request.getArg("android.wear.standalone", "true"))
+                    && !userXapplication.contains("com.google.android.wearable.standalone")) {
+                wearApplicationMetaData = "        <meta-data android:name=\"com.google.android.wearable.standalone\" android:value=\"true\" />\n";
+            }
+        }
+
         if (playServicesAds) {
             minSDK = maxInt("21", minSDK);
         }
@@ -2871,6 +2895,7 @@ public class AndroidGradleBuilder extends Executor {
                 + googlePlayAdsActivity
                 + pushManifestEntries
                 + billingServiceData
+                + wearApplicationMetaData
                 + "  " + request.getArg("android.xapplication", "")
                 + mopubActivities
                 + alarmRecevier
