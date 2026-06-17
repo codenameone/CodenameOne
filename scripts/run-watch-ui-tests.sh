@@ -118,18 +118,37 @@ xcrun simctl install "$WATCH_UDID" "$APP_PATH"
 xcrun simctl launch "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
 rw_log "Launched watch app; waiting for the suite to stream screenshots..."
 
-# Poll until the streamed count is stable (suite idle) or we hit the cap.
+# Wait until every expected screenshot has streamed (preferred), or the streamed
+# count goes idle, capped by MAX_WAIT. The watch streams in bursts with multi-
+# second GC/render pauses between phases (the theme tests in particular arrive in
+# a late burst), so a short "count stable" window settles prematurely and the
+# comparison snapshots the partial set -- the late screenshots are received by
+# the WS sink (logged status=ok) but land on disk after we already compared,
+# showing up as false "missing". We therefore wait for the full golden count when
+# we can, and only fall back to an idle plateau (with a generous window) when
+# fewer screenshots are produced than the golden set.
 MAX_WAIT="${CN1SS_WATCH_TIMEOUT:-1200}"
+WATCH_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-watch}"
+EXPECTED="$(/usr/bin/find "$WATCH_REF_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+rw_log "Expecting $EXPECTED screenshots (golden set)"
 prev=-1; stable=0; waited=0
 while [ "$waited" -lt "$MAX_WAIT" ]; do
   sleep 8; waited=$((waited+8))
   cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+  # Preferred exit: the full golden set has arrived. Confirm once more so the
+  # final PNG writes flush to disk before we snapshot.
+  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ]; then
+    stable=$((stable+1)); [ "$stable" -ge 2 ] && break
+    continue
+  fi
+  # Fallback: the streamed count has gone idle. Use a generous window (~80s) so a
+  # pause between bursts is not mistaken for completion.
   if [ "$cur" = "$prev" ] && [ "$cur" -gt 0 ]; then
-    stable=$((stable+1)); [ "$stable" -ge 3 ] && break
+    stable=$((stable+1)); [ "$stable" -ge 10 ] && break
   else stable=0; fi
   prev="$cur"
 done
-rw_log "Capture settled: $prev screenshots after ${waited}s"
+rw_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
 
 # --- Compare against the watch golden set + emit report ---------------------
 REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-watch}"
