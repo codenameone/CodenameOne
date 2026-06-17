@@ -902,17 +902,6 @@ public class CN extends CN1Constants {
         return Display.impl.isWatch();
     }
 
-    /// Returns the coarse form factor of the current device as one of the
-    /// `Display.FORM_FACTOR_*` constants.
-    ///
-    /// #### Returns
-    ///
-    /// one of Display.FORM_FACTOR_WATCH, FORM_FACTOR_TABLET, FORM_FACTOR_DESKTOP
-    /// or FORM_FACTOR_PHONE
-    public static String getFormFactor() {
-        return Display.getInstance().getFormFactor();
-    }
-
     /// Returns the size of the desktop hosting the application window when running on a desktop platform.
     ///
     /// #### Returns

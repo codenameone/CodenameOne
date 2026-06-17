@@ -106,15 +106,6 @@ import java.util.TimerTask;
 ///
 /// @author Chen Fishbein, Shai Almog
 public final class Display extends CN1Constants {
-    /// Form factor returned by #getFormFactor() for a standard handset
-    public static final String FORM_FACTOR_PHONE = "phone";
-    /// Form factor returned by #getFormFactor() for a tablet device
-    public static final String FORM_FACTOR_TABLET = "tablet";
-    /// Form factor returned by #getFormFactor() for a desktop application
-    public static final String FORM_FACTOR_DESKTOP = "desktop";
-    /// Form factor returned by #getFormFactor() for a smartwatch (Apple Watch / Wear OS)
-    public static final String FORM_FACTOR_WATCH = "watch";
-
     /// A common sound type that can be used with playBuiltinSound
     public static final String SOUND_TYPE_ALARM = "alarm";
     /// A common sound type that can be used with playBuiltinSound
@@ -4361,28 +4352,6 @@ public final class Display extends CN1Constants {
     /// true if the device is assumed to be a smartwatch
     public boolean isWatch() {
         return impl.isWatch();
-    }
-
-    /// Returns the coarse form factor of the current device as one of the
-    /// `FORM_FACTOR_*` constants. This is a convenience derived from
-    /// #isWatch(), #isTablet() and #isDesktop(); watch takes precedence over
-    /// tablet, which takes precedence over desktop, defaulting to phone.
-    ///
-    /// #### Returns
-    ///
-    /// one of FORM_FACTOR_WATCH, FORM_FACTOR_TABLET, FORM_FACTOR_DESKTOP or
-    /// FORM_FACTOR_PHONE
-    public String getFormFactor() {
-        if(isWatch()) {
-            return FORM_FACTOR_WATCH;
-        }
-        if(isDesktop()) {
-            return FORM_FACTOR_DESKTOP;
-        }
-        if(isTablet()) {
-            return FORM_FACTOR_TABLET;
-        }
-        return FORM_FACTOR_PHONE;
     }
 
     /// Returns true if the device has dialing capabilities

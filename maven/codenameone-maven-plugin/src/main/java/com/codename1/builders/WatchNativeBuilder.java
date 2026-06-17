@@ -566,6 +566,18 @@ class WatchNativeBuilder {
                     .append("end\n");
         }
 
+        // The generated watch entry point CN1WatchApp.swift (@main, imports
+        // WatchKit) lives in <mainClass>-src/ and is globbed into the iOS app
+        // target too. WatchKit doesn't exist for iOS, so the iOS target must not
+        // compile it -- add it to the iOS app target's EXCLUDED_SOURCE_FILE_NAMES
+        // (preserving any existing exclusions, e.g. the Mac Catalyst slice).
+        s.append("app_target.build_configurations.each do |config|\n")
+                .append("  cur = config.build_settings['EXCLUDED_SOURCE_FILE_NAMES']\n")
+                .append("  list = cur.is_a?(Array) ? cur.dup : (cur.is_a?(String) && !cur.empty? ? cur.split(/\\s+/) : [])\n")
+                .append("  list << 'CN1WatchApp.swift' unless list.include?('CN1WatchApp.swift')\n")
+                .append("  config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = list\n")
+                .append("end\n");
+
         s.append("xcproj.save\n");
 
         try {
