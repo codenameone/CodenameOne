@@ -258,16 +258,33 @@ class WatchNativeBuilder {
         //    runtime (see WATCHOS_PORT.md); declared here so the watch target
         //    links against them.
         String m = mangle(watchMain);
+        // The screenshot/test build runs the regular main class (it drives
+        // Cn1ssDeviceRunner from start()), so the watch bootstrap enters through
+        // the regular main class's generated Stub.main. cn1_watch_app_main is the
+        // app-specific hook invoked by cn1_watch_runtime_start (CN1WatchRuntime.m)
+        // on a dedicated thread; Stub.main sets the main class and calls
+        // Display.init, which starts the EDT and blocks the thread inside initVM
+        // (mirroring iOS main() + UIApplicationMain).
+        String mainStub = mangle(mainClass) + "Stub";
         StringBuilder bs = new StringBuilder();
         bs.append("#include \"TargetConditionals.h\"\n")
           .append("#if TARGET_OS_WATCH\n")
-          .append("#import \"CN1WatchHost.h\"\n\n")
-          .append("// Implemented by the CN1 runtime / generated watch Stub.\n")
+          .append("#import \"CN1WatchHost.h\"\n")
+          .append("#include \"cn1_globals.h\"\n\n")
+          .append("// Implemented by CN1WatchRuntime.m (app-agnostic watch runtime glue).\n")
           .append("extern void cn1_watch_runtime_start(const char *watchMainClass);\n")
           .append("extern void cn1_watch_runtime_paint(void);\n")
           .append("extern void cn1_watch_runtime_pointerPressed(int x, int y);\n")
           .append("extern void cn1_watch_runtime_pointerDragged(int x, int y);\n")
           .append("extern void cn1_watch_runtime_pointerReleased(int x, int y);\n\n")
+          .append("// App-specific entry: register natives + set the main class, init\n")
+          .append("// Display (starts the EDT) and block this thread inside initVM.\n")
+          .append("extern void ").append(mainStub)
+          .append("_main___java_lang_String_1ARRAY(struct ThreadLocalData* threadStateData, JAVA_OBJECT arg);\n")
+          .append("void cn1_watch_app_main(void) {\n")
+          .append("    ").append(mainStub)
+          .append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n")
+          .append("}\n\n")
           .append("// Watch lifecycle entry class (mangled FQN): ").append(m).append("\n")
           .append("void cn1_watch_bootstrap(void) { cn1_watch_runtime_start(\"")
           .append(IPhoneBuilder.escapeRubyStr(watchMain)).append("\"); }\n")
@@ -420,16 +437,10 @@ class WatchNativeBuilder {
             }
             excluded.append(f);
         }
-        // The watch app is SwiftUI-rooted (CN1WatchApp.swift @main), so the
-        // shared ParparVM translation's C `int main()` (the phone entry) must be
-        // excluded from the watch target to avoid a duplicate-main link error.
-        // The translated file holding it is the class with a Java main() - the
-        // generated phone Stub. Its source name is project-specific, so it is
-        // supplied via watchNative.phoneMainSource (documented in WATCHOS_PORT.md).
-        String phoneMainSource = request.getArg("watchNative.phoneMainSource", "").trim();
-        if (phoneMainSource.length() > 0) {
-            excluded.append(' ').append(phoneMainSource);
-        }
+        // The generated phone Stub is NOT excluded from the watch target -- it
+        // carries the app's translated classes and the Stub.main the watch
+        // bootstrap invokes. Its duplicate C `int main()` is neutralised with a
+        // per-file -Dmain rename below (see "stub_name"), not by exclusion.
 
         StringBuilder s = new StringBuilder();
         s.append("#!/usr/bin/env ruby\n")
@@ -512,6 +523,20 @@ class WatchNativeBuilder {
             s.append("  bs['DEVELOPMENT_TEAM'] = '").append(resolvedTeamId).append("'\n");
         }
         s.append("end\n");
+
+        // The generated phone Stub (translated <MainClass>) defines the C
+        // `int main()` (the iOS entry). The watch app is SwiftUI-rooted
+        // (CN1WatchApp.swift @main), so both would define `_main` -> duplicate
+        // symbol. We keep the Stub compiled on the watch (it carries the app's
+        // translated classes + the Stub.main the bootstrap calls) and instead
+        // rename its C main away with a per-file -Dmain. -Wno-error=return-type
+        // covers the original main()'s implicit fallthrough once renamed.
+        s.append("stub_name = '").append(mangle(mainClass)).append("Stub.m'\n")
+                .append("watch_target.source_build_phase.files.to_a.each do |bf|\n")
+                .append("  ref = bf.file_ref\n")
+                .append("  next unless ref && ref.path && File.basename(ref.path) == stub_name\n")
+                .append("  bf.settings = { 'COMPILER_FLAGS' => '-Dmain=cn1_watch_phone_main_unused -Wno-error=return-type -Wno-return-type' }\n")
+                .append("end\n");
 
         // watchOS frameworks auto-link via modules; remove GL/Metal framework
         // refs that the template added for iOS so the watch target doesn't try
