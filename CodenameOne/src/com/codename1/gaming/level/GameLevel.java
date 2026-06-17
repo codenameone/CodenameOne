@@ -479,14 +479,14 @@ public class GameLevel {
             }
             List<Object> ws = Json.asList(ter.get("walls"));
             float[] walls = grid.walls();
-            if (ws != null && walls != null) {
+            if (ws != null) {
                 for (int i = 0; i < ws.size() && i < walls.length; i++) {
                     walls[i] = (float) Json.num(ws.get(i), 0);
                 }
             }
             List<Object> ms = Json.asList(ter.get("materials"));
             int[] mats = grid.materials();
-            if (ms != null && mats != null) {
+            if (ms != null) {
                 for (int i = 0; i < ms.size() && i < mats.length; i++) {
                     mats[i] = Json.intval(ms.get(i), 0);
                 }
@@ -672,23 +672,19 @@ public class GameLevel {
                 }
                 sb.append("],\"walls\":[");
                 float[] w = terrain.walls();
-                if (w != null) {
-                    for (int i = 0; i < w.length; i++) {
-                        if (i > 0) {
-                            sb.append(',');
-                        }
-                        Json.writeNumber(sb, w[i]);
+                for (int i = 0; i < w.length; i++) {
+                    if (i > 0) {
+                        sb.append(',');
                     }
+                    Json.writeNumber(sb, w[i]);
                 }
                 sb.append("],\"materials\":[");
                 int[] mm = terrain.materials();
-                if (mm != null) {
-                    for (int i = 0; i < mm.length; i++) {
-                        if (i > 0) {
-                            sb.append(',');
-                        }
-                        Json.writeNumber(sb, mm[i]);
+                for (int i = 0; i < mm.length; i++) {
+                    if (i > 0) {
+                        sb.append(',');
                     }
+                    Json.writeNumber(sb, mm[i]);
                 }
                 sb.append("]}");
             }
