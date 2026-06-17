@@ -1540,6 +1540,18 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnMac__(CN1_THREAD_STATE_
     return JAVA_FALSE;
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnWatch__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+    // Resolved entirely at compile time: the watchOS slice returns true, every
+    // other slice (iOS, Mac Catalyst, simulator) returns false so behaviour is
+    // byte-for-byte identical on iOS.
+#if TARGET_OS_WATCH
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_setMacWindowDarkAppearance___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN dark) {
 #if TARGET_OS_MACCATALYST
     if (@available(iOS 13.0, *)) {
@@ -10534,6 +10546,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7___R_boolean(CN1_THREAD_STAT
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnMac___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_isRunningOnMac__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnWatch___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_isRunningOnWatch__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {

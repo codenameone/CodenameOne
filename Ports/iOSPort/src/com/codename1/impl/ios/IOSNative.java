@@ -152,6 +152,11 @@ public final class IOSNative {
     native boolean isIOS7();
     native boolean isRunningOnMac();
 
+    // Returns true when the binary is running on the watchOS slice. Implemented
+    // natively via the TARGET_OS_WATCH compile-time check so the iOS slice keeps
+    // returning false with zero runtime cost.
+    native boolean isRunningOnWatch();
+
     // Mac native (Catalyst): set the host window title bar text from the current form title.
     native void setWindowTitle(String title);
 

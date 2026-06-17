@@ -596,7 +596,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static File baseResourceDir;
     private static final String DEFAULT_SKIN = "/iPhoneX.skin";
-    private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
+    /// Watch-form-factor skins bundled on the classpath alongside the default.
+    /// Listed in DEFAULT_SKINS and recognized by classifySkin() as built-ins.
+    private static final String[] BUNDLED_WATCH_SKINS = {
+        "/AppleWatch45mm.skin", "/AppleWatch41mm.skin"
+    };
+    private static final String DEFAULT_SKINS = DEFAULT_SKIN + ";"
+            + "/AppleWatch45mm.skin;/AppleWatch41mm.skin;";
     private static String appHomeDir = ".cn1";
     
     /**
@@ -812,6 +818,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static String currentSimulatorNativeTheme;
     private static int softkeyCount = 1;
     private static boolean tablet;
+    private static boolean watch;
     private static String DEFAULT_FONT = "Arial-plain-11";
     private static EventDispatcher formChangeListener;
     private static boolean autoAdjustFontSize = true;
@@ -3830,6 +3837,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
+            // A watch skin advertises watch=true so CN.isWatch() and the
+            // "watch" resource-override layer light up in the simulator.
+            watch = props.getProperty("watch", "false").equalsIgnoreCase("true");
 
             // Native theme override: the simulator ships all shipped-with-
             // framework themes (iOSModernTheme.res, AndroidMaterialTheme.res,
@@ -6537,10 +6547,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "user";
         }
         // Doesn't resolve on the filesystem: treat as a classpath
-        // resource. Only the current default is kept; old bundled
-        // skins were removed and would error out at load time.
+        // resource. Only the current default and the bundled watch skins
+        // are kept; old bundled skins were removed and would error out at
+        // load time.
         if (DEFAULT_SKIN.equals(pathOrURI)) {
             return "default";
+        }
+        for (String w : BUNDLED_WATCH_SKINS) {
+            if (w.equals(pathOrURI)) {
+                return "default";
+            }
         }
         return null;
     }
@@ -12663,6 +12679,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isDesktop() {
         return portraitSkin == null;
     }
+
+    @Override
+    public boolean isWatch() {
+        return watch && !isDesktop();
+    }
     
     public static void setTablet(boolean b) {
         tablet = b;
@@ -13537,6 +13558,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     public String[] getPlatformOverrides() {
         if(isDesktop()) {
             return new String[] {"desktop", "tablet"};
+        }
+        if(isWatch()) {
+            // Guarantee the "watch" override layer is present even if the skin's
+            // overrideNames omits it; preserve any additional skin-declared names.
+            for(String o : platformOverrides) {
+                if("watch".equals(o)) {
+                    return platformOverrides;
+                }
+            }
+            String[] withWatch = new String[platformOverrides.length + 1];
+            withWatch[0] = "watch";
+            System.arraycopy(platformOverrides, 0, withWatch, 1, platformOverrides.length);
+            return withWatch;
         }
         return platformOverrides;
     }

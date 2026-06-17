@@ -94,6 +94,61 @@ final class BuildHintSchemaDefaults {
                 + "hololight = Android Holo Light (API 14+). legacy = pre-Holo "
                 + "Android theme. (Deprecated alias: cn1.androidTheme; "
                 + "and.hololight=true is also accepted for back-compat.)");
+
+        // watchOS native build (Apple Watch). Adds a watchOS app target to the
+        // iOS Xcode project, rendering the CN1 UI via the Core Graphics backend.
+        set("{{@watchNative}}.label", "Apple Watch (watchOS)");
+        set("{{@watchNative}}.description",
+                "Builds an Apple Watch app from the same project, rendering the "
+                + "Codename One UI on watchOS via the Core Graphics backend. The "
+                + "watch app is a separate arm64_32 target; in the default "
+                + "companion mode it is embedded in the iOS .ipa and installs "
+                + "with the phone app.");
+
+        set("{{#watchNative#watchNative.enabled}}.label", "Enable watchOS target");
+        set("{{#watchNative#watchNative.enabled}}.type", "Select");
+        set("{{#watchNative#watchNative.enabled}}.values", "false,true");
+        set("{{#watchNative#watchNative.enabled}}.description",
+                "When true, adds an Apple Watch app target to the generated "
+                + "Xcode project. Also auto-enabled whenever codename1.watchMain "
+                + "is declared next to codename1.mainName in "
+                + "codenameone_settings.properties, so the double app is produced "
+                + "as part of the regular iPhone build. Requires the Ruby "
+                + "xcodeproj gem (bundled with CocoaPods).");
+
+        set("{{#watchNative#watchNative.mainClass}}.label", "Watch lifecycle class");
+        set("{{#watchNative#watchNative.mainClass}}.type", "String");
+        set("{{#watchNative#watchNative.mainClass}}.description",
+                "Fully-qualified watch entry/lifecycle class. Normally set via "
+                + "codename1.watchMain; this hint is an override. May equal the "
+                + "phone main class - a distinct class lets the watch slice "
+                + "tree-shake from its own root. Defaults to the phone main class "
+                + "when watchNative.enabled=true without a watch entry.");
+
+        set("{{#watchNative#watchNative.distribution}}.label", "Distribution");
+        set("{{#watchNative#watchNative.distribution}}.type", "Select");
+        set("{{#watchNative#watchNative.distribution}}.values", "companion,standalone");
+        set("{{#watchNative#watchNative.distribution}}.description",
+                "companion = the watch app is embedded in the iOS app and "
+                + "installs with it (WKCompanionAppBundleIdentifier pinned to "
+                + "the iOS bundle). standalone = an independent watch-only app.");
+
+        set("{{#watchNative#watchNative.bundleId}}.label", "Watch bundle identifier");
+        set("{{#watchNative#watchNative.bundleId}}.type", "String");
+        set("{{#watchNative#watchNative.bundleId}}.description",
+                "Bundle id of the watch app. Defaults to <package>.watchkitapp.");
+
+        set("{{#watchNative#watchNative.minDeploymentTarget}}.label", "Minimum watchOS version");
+        set("{{#watchNative#watchNative.minDeploymentTarget}}.type", "String");
+        set("{{#watchNative#watchNative.minDeploymentTarget}}.description",
+                "WATCHOS_DEPLOYMENT_TARGET for the watch target. Defaults to 9.0 "
+                + "(single-target WKApplication apps + WidgetKit complications).");
+
+        set("{{#watchNative#watchNative.teamId}}.label", "Apple team id");
+        set("{{#watchNative#watchNative.teamId}}.type", "String");
+        set("{{#watchNative#watchNative.teamId}}.description",
+                "Development team for signing the watch target. Defaults to the "
+                + "iOS team id (ios.teamId / ios.release.teamId).");
     }
 
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */

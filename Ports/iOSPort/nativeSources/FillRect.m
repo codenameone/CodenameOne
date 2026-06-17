@@ -27,6 +27,9 @@
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 
 #ifdef USE_ES2
 #ifndef CN1_USE_METAL
@@ -110,7 +113,11 @@ static GLuint getOGLProgram(){
     height = h;
     return self;
 }
-#ifdef USE_ES2
+#if TARGET_OS_WATCH
+-(void)execute {
+    CN1CGFillRect(color, alpha, x, y, width, height);
+}
+#elif defined(USE_ES2)
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalFillRect(color, alpha, x, y, width, height);
