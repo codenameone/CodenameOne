@@ -82,6 +82,9 @@ class WatchNativeBuilder {
         // on the watch slice by CN1WatchViewController.m (NSObject render-driver)
         // + the SwiftUI @main shell (CN1WatchApp.swift) / CN1WatchHost.
         "CodenameOne_GLViewController.m", "CodenameOne_GLAppDelegate.m",
+        // UIWebView-based legacy browser peer (UIWebView + UIApplication
+        // networkActivityIndicator are unavailable on watchOS).
+        "UIWebViewEventDelegate.m",
         "CodenameOne_GLViewController.xib", "MainWindow.xib",
         "CodenameOne_METALViewController.xib", "MainWindowMETAL.xib"
     };

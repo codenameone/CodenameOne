@@ -53,7 +53,9 @@ int connections = 0;
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout {
     dispatch_async(dispatch_get_main_queue(), ^{
+#if !TARGET_OS_WATCH
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+#endif
     });
     connections++;
     float time = ((float)timeout) / 1000.0;
@@ -231,7 +233,9 @@ extern void connectionError(void* peer, NSString* message);
     connectionError((BRIDGE_CAST void*)self, [error localizedDescription]);
     connections--;
     if(connections < 1) {
+#if !TARGET_OS_WATCH
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+#endif
     }
 }
 
@@ -243,7 +247,9 @@ extern void connectionError(void* peer, NSString* message);
     connectionComplete((BRIDGE_CAST void*)self);
     connections--;
     if(connections < 1) {
+#if !TARGET_OS_WATCH
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+#endif
     }
 }
 

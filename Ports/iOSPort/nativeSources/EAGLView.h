@@ -20,6 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+#include "TargetConditionals.h"
+// EAGLView is a CAEAGLLayer-backed UIView (OpenGL ES). Both UIView and OpenGL ES
+// are unavailable on watchOS; the watch slice renders via CN1WatchRenderingView
+// instead, so this header is empty there.
+#if !TARGET_OS_WATCH
 #import <UIKit/UIKit.h>
 
 #import <OpenGLES/ES1/gl.h>
@@ -58,3 +63,4 @@
 -(void) keyboardNextClicked;
 -(void) addPeerComponent:(UIView*) view;
 @end
+#endif // !TARGET_OS_WATCH

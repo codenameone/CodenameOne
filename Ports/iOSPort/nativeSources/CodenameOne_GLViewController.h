@@ -206,9 +206,12 @@
 #define EAGLVIEW [[CodenameOne_GLViewController instance] eaglView]
 
 // Launch placeholder shown over the GL/Metal view between makeKeyAndVisible
-// and the first EDT-painted frame; see CodenameOne_GLViewController.m
+// and the first EDT-painted frame; see CodenameOne_GLViewController.m. UIWindow
+// is unavailable on watchOS and the launch placeholder is iOS-only.
+#if !TARGET_OS_WATCH
 void CN1ShowLaunchPlaceholder(UIWindow *window);
 void CN1DismissLaunchPlaceholder(void);
+#endif
 
 //ADD_INCLUDE
 
@@ -219,7 +222,6 @@ void CN1DismissLaunchPlaceholder(void);
 // same ExecutableOp queue and drives drawFrame into the Core Graphics surface
 // (CN1WatchRenderingView). Same class name so the ~10 callers + the translated
 // runtime resolve unchanged.
-@class EAGLView;
 @interface CodenameOne_GLViewController : NSObject {
 @private
     GLUIImage* currentMutableImage;
@@ -230,7 +232,7 @@ void CN1DismissLaunchPlaceholder(void);
 @property (nonatomic) NSInteger animationFrameInterval;
 @property (readwrite, assign) GLUIImage* currentMutableImage;
 +(CodenameOne_GLViewController*)instance;
--(EAGLView*)eaglView;
+-(id)eaglView;
 -(id)view;
 -(void)startAnimation;
 -(void)stopAnimation;

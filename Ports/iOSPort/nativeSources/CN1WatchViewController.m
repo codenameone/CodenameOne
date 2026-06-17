@@ -69,8 +69,8 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     return [CN1WatchHost sharedHost].renderingView;
 }
 
-- (EAGLView *)eaglView {
-    return (EAGLView *)[CN1WatchHost sharedHost].renderingView;
+- (id)eaglView {
+    return [CN1WatchHost sharedHost].renderingView;
 }
 
 + (void)upcoming:(ExecutableOp *)op {
