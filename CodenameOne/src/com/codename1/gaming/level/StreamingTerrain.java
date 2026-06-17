@@ -183,7 +183,7 @@ public class StreamingTerrain implements Terrain {
         return loaded.size();
     }
 
-    /// The currently-resident chunks (snapshot) — used to persist a small region inline.
+    /// The currently-resident chunks (snapshot) -- used to persist a small region inline.
     public List<TerrainChunk> residentChunks() {
         return new ArrayList<TerrainChunk>(loaded.values());
     }

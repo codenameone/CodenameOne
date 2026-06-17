@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/// A `#SIZE`x`#SIZE` square block of terrain — the unit of streaming. Identified by its chunk
+/// A `#SIZE`x`#SIZE` square block of terrain -- the unit of streaming. Identified by its chunk
 /// coordinates (`#getChunkX()`, `#getChunkZ()`), it is self-describing: a height per cell, a
 /// material per cell (stored compactly as an index into the chunk's own material palette), and
 /// the `TerrainFeature`s anchored within it. `StreamingTerrain` loads/saves chunks on demand so

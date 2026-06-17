@@ -217,9 +217,8 @@ layer.
 The no-code path: open your level in the Game Builder, select the layer you want the
 asset to belong to (a tile layer for tiles, an entity/actor layer otherwise), and use the
 *Import* action ("Import your own image as a new asset"). Pick a PNG (or other supported
-image), and the editor creates the `AssetDef` and files it under the *Custom* pack. When the
-project is bound, it also writes the PNG and pack JSON under the project's `games/assets/`
-directory as described above. The new asset appears in the palette and is immediately
+image), and the editor creates the `AssetDef` and files it under the *Custom* pack. Once bound to a project, the editor also saves the PNG and a pack-JSON entry
+under the project's `games/assets/` directory as described above. The new asset appears in the palette and is immediately
 placeable.
 
 === Terrain materials
