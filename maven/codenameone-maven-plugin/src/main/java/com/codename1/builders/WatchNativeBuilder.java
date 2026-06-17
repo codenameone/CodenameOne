@@ -545,7 +545,10 @@ class WatchNativeBuilder {
         // The generated phone Stub source is named from the FQN-mangled class
         // (com_<pkg>_<Main>Stub.m), not the simple name -- match that so the
         // per-file -Dmain rename actually lands (else duplicate _main vs @main).
-        s.append("stub_name = '").append(mainStub).append(".m'\n")
+        String stubFqn = (request.getPackageName() == null || request.getPackageName().isEmpty())
+                ? mainClass : (request.getPackageName() + "." + mainClass);
+        String phoneStubName = mangle(stubFqn) + "Stub";
+        s.append("stub_name = '").append(phoneStubName).append(".m'\n")
                 .append("watch_target.source_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path && File.basename(ref.path) == stub_name\n")
