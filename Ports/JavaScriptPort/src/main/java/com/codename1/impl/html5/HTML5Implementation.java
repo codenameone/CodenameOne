@@ -8225,9 +8225,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
         if (url.length() > 0 && url.charAt(0) != '/') {
             url = "/" + url;
-                   
+
         }
-        setBrowserURL(browserPeer, "assets/cn1html"+url);
+        // Build an ABSOLUTE iframe URL rather than the relative "assets/cn1html/..".
+        // A relative iframe src is resolved by the browser against the host
+        // document's base URL at the moment it is set; the Playground mutates its
+        // own location (share links, history.pushState), so a relative src
+        // intermittently resolved against the wrong base and the editor iframe
+        // 404'd ("Nothing matches the given URI"). Anchoring it to origin +
+        // current directory makes the load deterministic.
+        String pathName = window.getLocation().getPathname();
+        String dirPath = pathName == null ? "" : pathName;
+        int lastSlash = dirPath.lastIndexOf("/");
+        if (lastSlash >= 0) {
+            dirPath = dirPath.substring(0, lastSlash);
+        }
+        String absolute = ((WindowLocation) window.getLocation()).getOrigin() + dirPath + "/assets/cn1html" + url;
+        setBrowserURL(browserPeer, absolute);
     }
 
     
