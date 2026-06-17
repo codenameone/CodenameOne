@@ -37,7 +37,34 @@
 #import "CN1WatchHost.h"
 #import "CodenameOne_GLViewController.h"
 #include "cn1_globals.h"
+#include "java_lang_NullPointerException.h"
+#include "java_lang_RuntimeException.h"
 #include <pthread.h>
+#include <signal.h>
+
+// Mirror CodenameOne_GLAppDelegate's installSignalHandlers (that file is the
+// UIApplication delegate, excluded on watchOS). The ParparVM runtime relies on
+// converting a BAD_ACCESS (SIGSEGV) into a Java NullPointerException rather than
+// crashing, so a stray null/dangling deref in a peer/native path is recoverable
+// (the EDT unwinds to its run loop) instead of taking the whole app down.
+extern void throwException(struct ThreadLocalData* threadStateData, JAVA_OBJECT exception);
+
+static void cn1WatchSignalHandler(int sig) {
+    if (sig == SIGSEGV || sig == SIGBUS) {
+        throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));
+    } else {
+        throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_RuntimeException(getThreadLocalData()));
+    }
+}
+
+static void cn1WatchInstallSignalHandlers(void) {
+    signal(SIGABRT, cn1WatchSignalHandler);
+    signal(SIGILL, cn1WatchSignalHandler);
+    signal(SIGSEGV, cn1WatchSignalHandler);
+    signal(SIGFPE, cn1WatchSignalHandler);
+    signal(SIGBUS, cn1WatchSignalHandler);
+    signal(SIGPIPE, cn1WatchSignalHandler);
+}
 
 extern void initConstantPool(void);
 // Emitted per-app into CN1WatchBootstrap.m: runs <Main>Stub.main, which inits
@@ -67,6 +94,7 @@ void cn1_watch_runtime_start(const char *watchMainClass) {
         return;
     }
     cn1WatchRuntimeStarted = YES;
+    cn1WatchInstallSignalHandlers();
     initConstantPool();
     pthread_t vmThread;
     if (pthread_create(&vmThread, NULL, cn1WatchVMThread, NULL) == 0) {
