@@ -124,8 +124,8 @@ public final class ProjectIO {
             mkdirs(fs, dir);
             String javaPath = join(dir, scene + ".java");
             if (!fs.exists(javaPath)) {
-                String res = "/games/" + scene + ".game";
-                writeString(fs, javaPath, CompanionCodeGen.companionJava(packageName, scene, res));
+                String res = "/" + scene + ".game";
+                writeString(fs, javaPath, CompanionCodeGen.companionJava(packageName, scene, res, model.level()));
             }
         }
     }

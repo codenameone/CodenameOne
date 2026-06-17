@@ -50,18 +50,36 @@ class CompanionCodeGenTest {
 
     @Test
     void companionJavaHasWiring() {
-        String src = CompanionCodeGen.companionJava("com.example.game", "Level1", "/games/Level1.game");
+        String src = CompanionCodeGen.companionJava("com.example.game", "Level1", "/Level1.game");
         assertTrue(src.startsWith("package com.example.game;"), "has package");
         assertTrue(src.contains("class Level1 extends GameSceneView"), "extends GameSceneView");
-        assertTrue(src.contains("/games/Level1.game"), "references resource path");
+        assertTrue(src.contains("/Level1.game"), "references flat resource path");
+        assertFalse(src.contains("/games/Level1.game"), "no nested resource path");
         assertTrue(src.contains(CompanionCodeGen.GEN_BEGIN), "has gen-begin marker");
         assertTrue(src.contains(CompanionCodeGen.GEN_END), "has gen-end marker");
         assertTrue(src.contains("protected void onUpdate("), "has behavior hook");
     }
 
     @Test
+    void companionJavaGeneratesFieldsForNamedElements() {
+        GameLevel level = StarterPacks.newLevel(GameLevel.MODE_2D);
+        level.addElement(new GameElement("e1", "player").setName("player").setProperty("lives", 3));
+        level.addElement(new GameElement("e2", "slime").setName("slime"));
+        level.addElement(new GameElement("e3", "coin")); // unnamed -> no field
+
+        String src = CompanionCodeGen.companionJava("com.example.game", "Level1", "/Level1.game", level);
+        assertTrue(src.contains("import com.codename1.gaming.Sprite;"), "imports Sprite for fields");
+        assertTrue(src.contains("protected Sprite player;"), "field for named player");
+        assertTrue(src.contains("protected Sprite slime;"), "field for named slime");
+        assertTrue(src.contains("player = findByName(\"player\");"), "wires player field");
+        assertTrue(src.contains("setLives(elementOf(player).getInt(\"lives\", 3));"), "seeds lives");
+        // unnamed element gets no field
+        assertFalse(src.contains("Sprite coin;"), "no field for unnamed element");
+    }
+
+    @Test
     void companionJavaNoPackage() {
-        String src = CompanionCodeGen.companionJava("", "Boss", "/games/Boss.game");
+        String src = CompanionCodeGen.companionJava("", "Boss", "/Boss.game");
         assertFalse(src.contains("package "), "default package omits the statement");
         assertTrue(src.contains("class Boss extends GameSceneView"));
     }

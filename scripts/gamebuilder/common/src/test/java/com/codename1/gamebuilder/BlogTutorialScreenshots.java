@@ -41,14 +41,20 @@ import com.codename1.ui.util.Resources;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 /// Drives the editor through the exact steps of the three blog tutorials (2D platformer, board
 /// game, 3D dungeon) and writes a screenshot after each step into the website's blog image
 /// folder, so the published tutorials are illustrated by real, regenerated screenshots. The
 /// same steps are asserted runnable by `TutorialValidationHarness`; this one captures them.
 public final class BlogTutorialScreenshots {
-    private static final int W = 1280;
-    private static final int H = 800;
+    // Render the editor in a roomy window so the toolbar lays out without crowding,
+    // then publish the PNG a little smaller (SHOT_SCALE). Heroes are 1024x512 JPEGs.
+    private static final int W = 1680;
+    private static final int H = 1050;
+    private static final double SHOT_SCALE = 0.8;
+    private static final int HERO_W = 1024;
+    private static final int HERO_H = 512;
     private static final String OUT = "../../docs/website/static/blog/gamebuilder";
 
     private static GameBuilder gb;
@@ -110,6 +116,7 @@ public final class BlogTutorialScreenshots {
             m.setActiveLayer("Actors");
             m.setSelectedAssetId("player");
             GameElement player = c.placeElement(2 * ts, (rows - 3) * ts);
+            player.setName("player");        // named objects become generated Sprite fields
             player.setProperty("lives", 3);
             player.setProperty("jumpHeight", 110);
             m.setSelection(player);
@@ -154,35 +161,64 @@ public final class BlogTutorialScreenshots {
 
         live();
         shot("platformer-7-play");
-        recordGif("platformer", true);
+        hero("platformer");
+        recordGif("platformer");
         stop();
     }
+
+    // Raw key codes the JavaSE port maps to game actions (Display.GAME_* constants
+    // themselves map to 0 via getGameAction, so we must feed the device codes).
+    private static final int K_UP = -91;
+    private static final int K_RIGHT = -94;
 
     /// Records a short gameplay GIF of the live preview by driving scripted input each frame
     /// and cropping to the canvas (the device-framed game). Frames are written to a temp dir
     /// and assembled into a GIF by the build step.
-    private static void recordGif(String name, boolean platformer) {
+    private static void recordGif(String name) {
+        final int frames = 24;
+        final int mode = gb.getController().model().level().getMode();
+        final GameElement[] mover = new GameElement[1];
+        final double[] path = new double[4]; // fromX, fromY, toX, toY (board piece slide)
         Display.getInstance().callSeriallyAndWait(() -> {
             ensureLive();
-            if (platformer) {
-                gb.getCanvas().keyPressed(Display.GAME_RIGHT);   // run right
+            if (mode == GameLevel.MODE_2D) {
+                gb.getCanvas().keyPressed(K_RIGHT);   // run right
+            } else if (mode == GameLevel.MODE_3D) {
+                gb.getCanvas().keyPressed(K_UP);      // walk forward (3D)
             } else {
-                gb.getCanvas().keyPressed(Display.GAME_UP);      // walk forward (3D)
+                GameElement t = firstToken();                    // slide a checker piece
+                if (t != null) {
+                    int ts = gb.getController().model().level().getTileSize();
+                    mover[0] = t;
+                    path[0] = t.getX();
+                    path[1] = t.getY();
+                    path[2] = t.getX() + 3 * ts;
+                    path[3] = t.getY() + 3 * ts;
+                }
             }
         });
-        for (int f = 0; f < 24; f++) {
+        for (int f = 0; f < frames; f++) {
             final int fr = f;
             Display.getInstance().callSeriallyAndWait(() -> {
-                if (platformer) {
+                if (mode == GameLevel.MODE_2D) {
                     if (fr % 6 == 0) {
-                        gb.getCanvas().keyPressed(Display.GAME_UP);     // periodic jump (edge)
+                        gb.getCanvas().keyPressed(K_UP);     // periodic jump (edge)
                     } else if (fr % 6 == 2) {
-                        gb.getCanvas().keyReleased(Display.GAME_UP);
+                        gb.getCanvas().keyReleased(K_UP);
                     }
-                } else if (fr % 8 == 4) {
-                    gb.getCanvas().keyPressed(Display.GAME_RIGHT);      // occasional turn (3D)
-                } else if (fr % 8 == 6) {
-                    gb.getCanvas().keyReleased(Display.GAME_RIGHT);
+                } else if (mode == GameLevel.MODE_3D) {
+                    // walk forward down the corridor, then pan to look around (so the
+                    // camera never jams head-on into the far wall and goes gray).
+                    if (fr == frames / 2) {
+                        gb.getCanvas().keyReleased(K_UP);
+                        gb.getCanvas().keyPressed(K_RIGHT);
+                    }
+                } else if (mover[0] != null) {
+                    double t = (fr + 1) / (double) frames;              // ease + hop the piece
+                    double ease = t * t * (3 - 2 * t);
+                    double hop = Math.abs(Math.sin(t * Math.PI * 3)) * 10;
+                    mover[0].setPosition(path[0] + (path[2] - path[0]) * ease,
+                            path[1] + (path[3] - path[1]) * ease - hop);
                 }
                 gb.getCanvas().tick(0.06);
             });
@@ -272,6 +308,13 @@ public final class BlogTutorialScreenshots {
 
         edit(() -> gb.getController().model().setSelection(null));
         shot("board-4-build");
+
+        live();
+        tick();
+        shot("board-5-play");
+        hero("board");
+        recordGif("board");
+        stop();
     }
 
     // ---- Tutorial 3: first-person 3D dungeon "Crypt Walk" --------------------
@@ -300,12 +343,18 @@ public final class BlogTutorialScreenshots {
             int ts = lvl.getTileSize();
             com.codename1.gaming.level.Layer models = lvl.layers().get(lvl.layers().size() - 1);
             m.setActiveLayer(models.getName());
+            // two pillar walls flanking an open central corridor, so walking forward
+            // sends the walls sweeping past the camera (a real first-person move).
+            int cx = lvl.getCols() / 2;
             m.setSelectedAssetId("pillar");
-            for (int i = 6; i <= 10; i++) {
-                c.placeElement(i * ts + ts / 2.0, 5 * ts + ts / 2.0);
+            for (int r = 0; r < lvl.getRows(); r++) {
+                c.placeElement((cx - 2) * ts + ts / 2.0, r * ts + ts / 2.0);
+                c.placeElement((cx + 2) * ts + ts / 2.0, r * ts + ts / 2.0);
             }
+            // keep the central lane clear (a head-on rock would jam the walk); tuck the
+            // rock into a side niche as scenery.
             m.setSelectedAssetId("rock");
-            c.placeElement(8 * ts + ts / 2.0, 7 * ts + ts / 2.0);
+            c.placeElement((cx - 1) * ts + ts / 2.0, 2 * ts + ts / 2.0);
         });
         shot("dungeon-3-walls");
 
@@ -313,8 +362,9 @@ public final class BlogTutorialScreenshots {
             EditorController c = gb.getController();
             EditorModel m = c.model();
             int ts = m.level().getTileSize();
+            int cx = m.level().getCols() / 2;
             m.setSelectedAssetId("spawn");
-            spawn[0] = c.placeElement(8 * ts + ts / 2.0, 11 * ts + ts / 2.0);
+            spawn[0] = c.placeElement(cx * ts + ts / 2.0, (m.level().getRows() - 2) * ts + ts / 2.0);
             if (spawn[0] != null) {
                 spawn[0].setProperty("player", true);
                 m.setSelection(spawn[0]);
@@ -327,7 +377,8 @@ public final class BlogTutorialScreenshots {
             tick();
         }
         shot("dungeon-5-walk");
-        recordGif("dungeon", false);
+        hero("dungeon");
+        recordGif("dungeon");
         stop();
     }
 
@@ -377,15 +428,64 @@ public final class BlogTutorialScreenshots {
         try {
             File dir = new File(OUT);
             dir.mkdirs();
+            Image scaled = img[0].scaled((int) Math.round(W * SHOT_SCALE), (int) Math.round(H * SHOT_SCALE));
             File out = new File(dir, name + ".png");
             try (OutputStream os = new FileOutputStream(out)) {
-                ImageIO.getImageIO().save(img[0], os, ImageIO.FORMAT_PNG, 1f);
+                ImageIO.getImageIO().save(scaled, os, ImageIO.FORMAT_PNG, 1f);
             }
             count++;
             System.out.println("[BlogShots] " + out.getName());
         } catch (Exception ex) {
             com.codename1.io.Log.e(ex);
         }
+    }
+
+    /// Writes a 1024x512 JPEG hero banner from the current live game viewport
+    /// (cover-cropped from the canvas, so it reads as gameplay, not editor chrome).
+    private static void hero(String name) {
+        final Image[] img = new Image[1];
+        final int[] box = new int[4];
+        Display.getInstance().callSeriallyAndWait(() -> {
+            Form f = Display.getInstance().getCurrent();
+            f.setWidth(W);
+            f.setHeight(H);
+            f.revalidate();
+            f.layoutContainer();
+            Image i = Image.createImage(W, H, 0xff061634);
+            f.paintComponent(i.getGraphics(), true);
+            img[0] = i;
+            box[0] = gb.getCanvas().getAbsoluteX();
+            box[1] = gb.getCanvas().getAbsoluteY();
+            box[2] = gb.getCanvas().getWidth();
+            box[3] = gb.getCanvas().getHeight();
+        });
+        try {
+            Image crop = img[0].subImage(Math.max(0, box[0]), Math.max(0, box[1]),
+                    Math.min(box[2], W - box[0]), Math.min(box[3], H - box[1]), true);
+            Image cover = crop.scaledLargerRatio(HERO_W, HERO_H);
+            int cx = Math.max(0, (cover.getWidth() - HERO_W) / 2);
+            int cy = Math.max(0, (cover.getHeight() - HERO_H) / 2);
+            Image banner = cover.subImage(cx, cy, HERO_W, HERO_H, true);
+            File dir = new File(OUT);
+            dir.mkdirs();
+            File out = new File(dir, name + "-hero.jpg");
+            try (OutputStream os = new FileOutputStream(out)) {
+                ImageIO.getImageIO().save(banner, os, ImageIO.FORMAT_JPEG, 0.9f);
+            }
+            System.out.println("[BlogShots] " + out.getName());
+        } catch (Exception ex) {
+            com.codename1.io.Log.e(ex);
+        }
+    }
+
+    private static GameElement firstToken() {
+        List<GameElement> els = gb.getController().model().level().elements();
+        for (int i = 0; i < els.size(); i++) {
+            if ("token".equals(els.get(i).getAssetId())) {
+                return els.get(i);
+            }
+        }
+        return els.isEmpty() ? null : els.get(0);
     }
 
     private static Component find(Container root, String name) {

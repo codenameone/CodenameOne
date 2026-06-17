@@ -185,7 +185,7 @@ public final class TutorialValidationHarness {
         }
         // emits a usable companion class + .game data
         String java = CompanionCodeGen.companionJava(m.getSceneName().toLowerCase(), m.getSceneName(),
-                "/games/" + m.getSceneName() + ".game");
+                "/" + m.getSceneName() + ".game", m.level());
         check(java != null && java.contains(m.getSceneName()), name + ": companion Java generated");
         String data = CompanionCodeGen.gameData(m);
         check(data != null && data.length() > 10, name + ": .game data generated");

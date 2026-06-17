@@ -22,6 +22,12 @@
  */
 package com.codename1.gamebuilder.editor;
 
+import com.codename1.gaming.level.GameElement;
+import com.codename1.gaming.level.GameLevel;
+
+import java.util.ArrayList;
+import java.util.List;
+
 /// Generates the two files the builder writes into a project for a scene, mirroring how
 /// the GUI builder pairs a {@code .gui} data file with a {@code .java} companion:
 ///
@@ -44,13 +50,64 @@ public final class CompanionCodeGen {
         return model.level().toJson();
     }
 
-    /// The companion Java source for the scene. {@code gameResourcePath} is the runtime
-    /// classpath path of the {@code .game} file (e.g. {@code /games/Level1.game}).
+    /// The companion Java source for the scene with no level introspection (no generated
+    /// fields). Prefer `#companionJava(String, String, String, GameLevel)` so the objects
+    /// you named in the editor become wired fields.
     public static String companionJava(String packageName, String className, String gameResourcePath) {
+        return companionJava(packageName, className, gameResourcePath, null);
+    }
+
+    /// The companion Java source for the scene. {@code gameResourcePath} is the runtime
+    /// classpath path of the {@code .game} file -- the runtime uses a flat resource
+    /// namespace, so this is {@code /Level1.game}, not {@code /games/Level1.game}.
+    ///
+    /// When {@code level} is supplied, every named object becomes a {@code protected Sprite}
+    /// field initialized in {@code initScene()} via `GameSceneView#findByName(String)`, and
+    /// a player carrying a {@code lives} property seeds `GameSceneView#setLives(int)` -- so
+    /// the user's {@code onUpdate} starts from real variables instead of boilerplate.
+    public static String companionJava(String packageName, String className, String gameResourcePath, GameLevel level) {
         boolean blank = packageName == null || packageName.trim().isEmpty();
         String pkg = blank ? "" : "package " + packageName + ";\n\n";
+
+        StringBuilder fieldDecls = new StringBuilder();
+        StringBuilder init = new StringBuilder();
+        String livesField = null;
+        if (level != null) {
+            List<String> used = new ArrayList<>();
+            List<String[]> named = new ArrayList<>();
+            for (GameElement el : level.elements()) {
+                String name = el.getName();
+                if (name == null || name.trim().isEmpty()) {
+                    continue;
+                }
+                String field = toFieldName(name);
+                if (field.isEmpty() || used.contains(field)) {
+                    continue;
+                }
+                used.add(field);
+                named.add(new String[]{field, name});
+                if (livesField == null && el.hasProperty("lives")) {
+                    livesField = field;
+                }
+            }
+            for (String[] f : named) {
+                fieldDecls.append("    /// The \"").append(f[1]).append("\" object you placed in the editor.\n");
+                fieldDecls.append("    protected Sprite ").append(f[0]).append(";\n");
+                init.append("        ").append(f[0]).append(" = findByName(\"").append(f[1]).append("\");\n");
+            }
+            if (livesField != null) {
+                init.append("        if (").append(livesField).append(" != null) {\n");
+                init.append("            setLives(elementOf(").append(livesField).append(").getInt(\"lives\", 3));\n");
+                init.append("        }\n");
+            }
+        }
+        if (init.length() == 0) {
+            init.append("        // name objects in the editor's Inspector to get fields wired here\n");
+        }
+        String spriteImport = fieldDecls.length() == 0 ? "" : "import com.codename1.gaming.Sprite;\n";
+
         String body = """
-                import com.codename1.gaming.level.AssetCatalog;
+                {SPRITE_IMPORT}import com.codename1.gaming.level.AssetCatalog;
                 import com.codename1.gaming.level.GameLevel;
                 import com.codename1.gaming.level.GameSceneView;
                 import com.codename1.ui.Display;
@@ -65,7 +122,7 @@ public final class CompanionCodeGen {
                     }
 
                     {BEGIN}
-                    private static GameLevel loadLevel() {
+                {FIELDS}    private static GameLevel loadLevel() {
                         try {
                             return GameLevel.load(Display.getInstance().getResourceAsStream({CLS}.class, "{RES}"));
                         } catch (java.io.IOException err) {
@@ -73,9 +130,10 @@ public final class CompanionCodeGen {
                         }
                     }
 
+                    /// Wires the objects you named in the editor to fields and seeds game
+                    /// state. The editor refreshes this whenever you re-edit the level.
                     private void initScene() {
-                        // generated behavior wiring is refreshed here by the editor
-                    }
+                {INIT}    }
                     {END}
 
                     @Override
@@ -85,9 +143,35 @@ public final class CompanionCodeGen {
                 }
                 """;
         return pkg + body
+                .replace("{SPRITE_IMPORT}", spriteImport)
+                .replace("{FIELDS}", fieldDecls.toString())
+                .replace("{INIT}", init.toString())
                 .replace("{RES}", gameResourcePath)
                 .replace("{CLS}", className)
                 .replace("{BEGIN}", GEN_BEGIN)
                 .replace("{END}", GEN_END);
+    }
+
+    /// Turns an editor object name into a conventional Java field identifier: keeps
+    /// ASCII letters/digits/underscore (no leading digit), and lower-cases the first
+    /// letter. Returns an empty string when nothing usable remains.
+    private static String toFieldName(String name) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            boolean digit = c >= '0' && c <= '9';
+            if (letter || c == '_' || (digit && b.length() > 0)) {
+                b.append(c);
+            }
+        }
+        if (b.length() == 0) {
+            return "";
+        }
+        char first = b.charAt(0);
+        if (first >= 'A' && first <= 'Z') {
+            b.setCharAt(0, (char) (first - 'A' + 'a'));
+        }
+        return b.toString();
     }
 }

@@ -91,7 +91,7 @@ public final class GameBuilderStructureHarness {
         EditorCanvas canvas = gb.getCanvas();
 
         // ---- structure present ----
-        check(find(form, "btn.build") != null, "Build button present");
+        check(find(form, "btn.save") != null, "Save button present");
         check(find(form, "btn.live") != null, "Live button present");
         check(find(form, "btn.project") != null, "Project button present");
         check(find(form, "btn.undo") != null && find(form, "btn.redo") != null, "undo/redo present");
@@ -198,7 +198,7 @@ public final class GameBuilderStructureHarness {
 
         // ---- tooltips on every control (#7) ----
         String[] tipped = {
-            "btn.build", "btn.live", "btn.project", "btn.undo", "btn.redo",
+            "btn.save", "btn.live", "btn.project", "btn.undo", "btn.redo",
             "btn.grid", "btn.snap", "btn.addlayer", "btn.zoomin", "btn.zoomout",
             "scene.card", "tool.SELECT", "tool.MOVE", "tool.BRUSH", "tool.FILL",
             "tool.ERASE", "tool.PAN", "tab.platformer", "asset.ground", "asset.player"

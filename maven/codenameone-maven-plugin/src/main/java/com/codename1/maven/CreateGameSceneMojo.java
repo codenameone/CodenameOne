@@ -77,7 +77,9 @@ public class CreateGameSceneMojo extends AbstractCN1Mojo {
         String pkg = fqn.contains(".") ? fqn.substring(0, fqn.lastIndexOf('.')) : "";
         String simple = fqn.contains(".") ? fqn.substring(fqn.lastIndexOf('.') + 1) : fqn;
         String normMode = normalizeMode(mode);
-        String resourcePath = "/games/" + simple + ".game";
+        // The CN1 runtime resource namespace is flat, so the file is loaded as
+        // "/<Name>.game" regardless of the games/ source folder it is stored in.
+        String resourcePath = "/" + simple + ".game";
 
         File base = getCN1ProjectDir();
         File gameFile = new File(base, "src/main/resources/games/" + simple + ".game");

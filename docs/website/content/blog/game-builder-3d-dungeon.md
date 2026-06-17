@@ -8,7 +8,7 @@ description: A code-included walkthrough that builds a first-person 3D dungeon w
 feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/game-dungeon.gif" alt="A first-person 3D dungeon built with the Game Builder" /> A code-included walkthrough that builds a first-person 3D dungeon with the Codename One Game Builder — terrain, walls, a spawn, the companion code, and streaming large worlds.'
 ---
 
-![Walking the dungeon, in the Game Builder preview](/blog/gamebuilder/game-dungeon.gif)
+![A first-person 3D dungeon built with the Game Builder](/blog/gamebuilder/dungeon-hero.jpg)
 
 The final tutorial takes the same data-driven pattern from [Tutorial 1](/blog/game-builder-2d-platformer/) and [Tutorial 2](/blog/game-builder-board-game/) into **3D**. We'll build **Crypt Walk**: a first-person dungeon where pillars are walls you navigate around. The headline difference from the 2D tutorial is what happens at runtime — instead of sprites in a `Scene`, each element becomes a GPU-rendered `Model` under a perspective camera with lighting. You author the same way; the runtime renders it in 3D.
 
@@ -53,13 +53,17 @@ Press **Live**. In dungeon style you walk in **first person** — **Left/Right t
 
 ![Walking the dungeon in first person](/blog/gamebuilder/dungeon-5-walk.png)
 
+Live, you walk the corridor in first person and look around — the pillars stop you like real walls:
+
+![Walking the dungeon, in the Game Builder preview](/blog/gamebuilder/game-dungeon.gif)
+
 ## Sculpting terrain (floors, hills, holes, ramps)
 
 3D levels aren't just objects on a flat plane. Select the **Terrain** tool and you can paint the ground itself: **Raise/Lower** elevation, carve **holes** (open sky a flight level can fall through), stamp **walls**, and **Paint** a surface material — grass, road, stone, sand, water. Painted elevation changes render as **smooth slopes**, not stairs, so a road can ramp uphill. The walker rides the terrain height and is stopped by walls and holes.
 
 ## What got saved, and how it renders
 
-**Build** writes `src/main/resources/games/CryptWalk.game`. A 3D level stores the play style, the placed elements (with elevation and per-object scale), and any terrain you sculpted:
+**Save** writes `src/main/resources/games/CryptWalk.game` (loaded at runtime as `/CryptWalk.game` — the resource namespace is flat). A 3D level stores the play style, the placed elements (with elevation and per-object scale), and any terrain you sculpted:
 
 ```json
 {
@@ -93,9 +97,24 @@ protected void onUpdate(double deltaSeconds) {
 
 ## Physics, effects and overriding defaults
 
-* **Collision** — dungeon style blocks the walker at walls and holes for free. For richer physics (projectiles, doors, movable crates) step a physics world from `onUpdate`, reading per-element properties.
-* **Effects** — play a footstep `SoundPool` clip per step, fade the lights as the player descends, or spawn a particle when a torch is lit.
-* **Overriding** — the play styles are presets. Want a hybrid (walk like a dungeon but no wall collision)? Set *open* and add your own collision in `onUpdate`.
+**Collision** is handled for you — dungeon style stops the walker at walls and holes. For richer physics (projectiles, doors, movable crates) step a `PhysicsWorld` from `onUpdate` exactly as in [Tutorial 1's physics section](/blog/game-builder-2d-platformer/#physics-effects-and-overriding-defaults).
+
+**Effects** hang off the same loop. A concrete example — a footstep sound and a torch-lit light fade, both reading the level's own data:
+
+```java
+private final SoundPool sound = SoundPool.create(4);
+private SoundEffect step;            // step = sound.load("/footstep.wav");
+
+// in onUpdate, when the player advances a tile:
+sound.play(step, 0.6f, 0f, 1f, 0);   // volume, pan, rate, no loop
+getLight().setColor(torchLit ? 0xfff2e0 : 0x404858);   // brighten when a torch is lit
+```
+
+**Overriding** — the play styles are presets, not constraints. Want a hybrid (walk like a dungeon but with no wall collision)? Set *open* and add your own collision in `onUpdate`.
+
+## Menus and HUD in 3D
+
+A 3D game has its own interface to manage too — a map toggle, an inventory, a "you died" screen, a pause overlay — and because `GameSceneView` is a Codename One `Component`, all of it is the ordinary UI toolkit, not a 3D-specific layer. Drop a `Dialog` for the death screen, a `Toolbar` command for the map toggle, a `Container` of item buttons for the inventory. [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause-where-codename-one-spoils-you) applies unchanged — the game underneath happens to be 3D, but the menus are pure Codename One.
 
 ## Scaling up: streaming worlds
 

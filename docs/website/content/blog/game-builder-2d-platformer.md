@@ -8,7 +8,7 @@ description: A complete, code-included walkthrough that builds a playable 2D pla
 feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/game-platformer.gif" alt="Coin Run, a 2D platformer built with the Game Builder" /> A complete, code-included walkthrough that builds a playable 2D platformer with the Codename One Game Builder — level design, an enemy, a goal flag, and the win/lose code.'
 ---
 
-![Coin Run running in the Game Builder](/blog/gamebuilder/game-platformer.gif)
+![Coin Run, a 2D platformer built with the Game Builder](/blog/gamebuilder/platformer-hero.jpg)
 
 Most game tutorials make you hand-place every sprite in code. The [Game Builder](/manual/game-builder/) flips that around: you **draw** the level visually, tag objects with the numbers your game needs (`lives`, `value`, `speed`), and the editor saves it as a small data file that the runtime plays. Your code shrinks to the part that's actually *yours* — the rules.
 
@@ -86,9 +86,13 @@ Press **Live**. Move with the **arrow keys**, **Up / Space** to jump. Gravity an
 
 ![Playing Coin Run in the editor](/blog/gamebuilder/platformer-7-play.png)
 
+The same level, live in the preview — run right, jump the slime, grab the coins:
+
+![Coin Run gameplay](/blog/gamebuilder/game-platformer.gif)
+
 ## What just got saved? The `.game` file
 
-**Build** (or saving) writes the level to `src/main/resources/games/CoinRun.game`. It's plain JSON — readable, diff-able, and yours to ship as a resource. A trimmed version:
+**Save** writes the level to `src/main/resources/games/CoinRun.game`. It's plain JSON — readable, diff-able, and yours to ship as a resource. (Codename One's resource namespace is flat, so at runtime you load it as `/CoinRun.game`, not `/games/CoinRun.game` — the `games/` folder just keeps your sources tidy.) A trimmed version:
 
 ```json
 {
@@ -112,7 +116,7 @@ Nothing is hard-coded into Java. To re-edit, run `mvn cn1:gamebuilder` again —
 
 ## Loading and showing the game
 
-`create-game-scene` generated the companion class. The part between the `DO NOT EDIT` markers loads the `.game` resource; the constructor and `onUpdate` are yours:
+`create-game-scene` generated the companion class. The part between the `DO NOT EDIT` markers loads the `.game` resource **and wires every object you named in the editor to a field** — because you named the player `player`, the editor generated a `player` field and even seeded `lives` from its property. The constructor and `onUpdate` are yours:
 
 ```java
 public class CoinRun extends GameSceneView {
@@ -122,11 +126,20 @@ public class CoinRun extends GameSceneView {
     }
 
     //-- GAMEBUILDER GENERATED - DO NOT EDIT BELOW
+    /// The "player" object you placed in the editor.
+    protected Sprite player;
     private static GameLevel loadLevel() {
         try {
-            return GameLevel.load(Display.getInstance().getResourceAsStream(CoinRun.class, "/games/CoinRun.game"));
+            return GameLevel.load(Display.getInstance().getResourceAsStream(CoinRun.class, "/CoinRun.game"));
         } catch (java.io.IOException err) {
-            throw new RuntimeException("failed to load level /games/CoinRun.game", err);
+            throw new RuntimeException("failed to load level /CoinRun.game", err);
+        }
+    }
+
+    private void initScene() {
+        player = findByName("player");
+        if (player != null) {
+            setLives(elementOf(player).getInt("lives", 3));
         }
     }
     //-- GAMEBUILDER GENERATED - DO NOT EDIT ABOVE
@@ -137,6 +150,8 @@ public class CoinRun extends GameSceneView {
     }
 }
 ```
+
+You don't write `findByName`/`setLives` yourself — the editor regenerates that block every time you save, so renaming or adding objects in the Inspector just updates your fields.
 
 `GameSceneView` is a `GameView` (a Codename One `Component`), so you show it like any other and `start()` its loop:
 
@@ -158,67 +173,46 @@ That's a complete, playable game already — the floor, coins, slime and flag ar
 
 `GameSceneView` realizes every `GameElement` into a `Sprite` whose `getUserData()` is the source element — so at runtime you still have the `lives`/`value`/`speed` numbers you typed in the editor. The starter behaviors (gravity, tile collision, arrow-key movement, jump, coin pickup, enemy patrol) are what you saw in the preview. You override or extend them in `onUpdate(double deltaSeconds)`, called once per frame.
 
+`GameSceneView` also hands you the small helpers every game loop needs, so you never re-roll them: `findByAsset(id)` and `findByName(name)` locate a sprite, `findAllByAsset(id)` returns every match, `elementOf(sprite)` reads its editor properties, `overlaps(a, b)` is a null-safe collision test, and `addScore`/`getScore`/`loseLife`/`getLives`/`isGameOver` track the usual game state. They're all `protected`, so the rules below read like rules — not plumbing.
+
 ## Your rules — coins, the slime, and winning
 
-Here's a complete `onUpdate` that scores coins, costs a life when the slime touches you, and wins at the flag. It reads the same properties you set in the editor and manipulates the live `Scene`:
+Here's a complete `onUpdate` that scores coins, costs a life when the slime touches you, and wins at the flag. It uses the generated `player` field and the base-class helpers — no boilerplate — and reads the same properties you set in the editor:
 
 ```java
-private int score;
-private int lives = -1;          // lazy-init from the player's "lives" property
 private boolean won;
 
 @Override
 protected void onUpdate(double deltaSeconds) {
-    Scene scene = getScene();
-    Sprite player = findByAsset(scene, "player");
     if (player == null || won) {
         return;
     }
-    if (lives < 0) {
-        lives = element(player).getInt("lives", 3);
-    }
-
-    for (int i = scene.size() - 1; i >= 0; i--) {
-        Sprite s = scene.get(i);
-        if (s == player || !overlaps(player, s)) {
-            continue;
-        }
-        String asset = element(s).getAssetId();
-        if ("coin".equals(asset)) {
-            score += element(s).getInt("value", 10);   // the value you set in the editor
-            scene.remove(s);                            // pick it up
-        } else if ("slime".equals(asset)) {
-            if (--lives <= 0) {
-                gameOver();
-            }
-            scene.remove(s);                            // simple: enemy is consumed on hit
-        } else if ("flag".equals(asset)) {
-            won = true;
-            youWin(score);
+    // collect every coin the player touches (value comes from the editor)
+    for (Sprite coin : findAllByAsset("coin")) {
+        if (overlaps(player, coin)) {
+            addScore(elementOf(coin).getInt("value", 10));
+            getScene().remove(coin);
         }
     }
-}
-
-// helpers
-private static GameElement element(Sprite s) {
-    return (GameElement) s.getUserData();
-}
-
-private Sprite findByAsset(Scene scene, String assetId) {
-    for (int i = 0; i < scene.size(); i++) {
-        if (assetId.equals(element(scene.get(i)).getAssetId())) {
-            return scene.get(i);
+    // the slime costs a life on contact; GameSceneView counts lives for you
+    Sprite slime = findByAsset("slime");
+    if (overlaps(player, slime)) {
+        getScene().remove(slime);
+        if (loseLife() == 0) {
+            gameOver();
         }
     }
-    return null;
-}
-
-private boolean overlaps(Sprite a, Sprite b) {
-    return Math.abs(a.getX() - b.getX()) < 24 && Math.abs(a.getY() - b.getY()) < 24;
+    // reaching the flag wins
+    if (overlaps(player, findByAsset("flag"))) {
+        won = true;
+        youWin(getScore());
+    }
 }
 ```
 
-Want custom movement instead of the default? Poll input directly and move the player sprite yourself:
+That's the whole rule set — about twenty lines, all of it *your* game. Compare it to the old way: no `getUserData()` casts, no scene-scanning loops, no hand-written overlap math.
+
+Want custom movement instead of the default? Poll input directly and move the `player` sprite yourself:
 
 ```java
 GameInput in = getInput();
@@ -230,20 +224,99 @@ if (in.wasKeyPressed(Display.GAME_FIRE)) {
 }
 ```
 
-Because you're editing `onUpdate` and not the generated load block, re-running `cn1:gamebuilder` to tweak the level **keeps this logic intact**.
+Because you're editing `onUpdate` and not the generated block, re-running `cn1:gamebuilder` to tweak the level **keeps this logic intact**.
 
 ## Physics, effects and overriding defaults
 
-* **Physics.** The starter movement is lightweight arcade physics driven by the level's `gravity`. For real rigid-body physics — slopes, stacking, bouncing — wrap the scene in the gaming API's Box2D physics world and step it from `onUpdate`; the same `GameElement` properties (mass, restitution) carry over.
-* **Effects.** Trigger a `SoundPool` clip on coin pickup, spawn a short `AnimatedSprite` for a sparkle, or shake the camera on a hit — all from the same collision branch above.
-* **Overriding defaults.** Don't want auto-collected coins or auto-patrolling enemies? Ignore the defaults and drive everything from `onUpdate` (as the movement snippet shows). The defaults are a convenience, not a constraint.
+The starter movement is lightweight arcade physics. When you want more, the gaming API has the real thing — here are concrete drop-ins.
+
+**Real rigid-body physics (Box2D).** Swap the arcade jump for an actual physics world: gravity, stacking, slopes, and bounce. A `PhysicsBody` linked to your sprite writes its transform back into the sprite on every `step`:
+
+```java
+import com.codename1.gaming.physics.PhysicsWorld;
+import com.codename1.gaming.physics.PhysicsBody;
+import com.codename1.gaming.physics.BodyType;
+
+private PhysicsWorld physics;
+private PhysicsBody body;
+
+private void enablePhysics() {                                 // call once, after the level loads
+    physics = new PhysicsWorld(0, (float) (getLevel().getDouble("gravity", 9.8) * 100));
+    physics.createBox(0, getHeight() - 16, getWidth(), 16, BodyType.STATIC);   // the floor
+    body = physics.createBox((float) player.getX(), (float) player.getY(), 24, 32, BodyType.DYNAMIC);
+    body.setLinkedSprite(player);                              // step() drives the sprite
+}
+
+// in onUpdate:
+physics.step((float) deltaSeconds);
+if (getInput().wasKeyPressed(Display.GAME_FIRE)) {
+    body.applyLinearImpulse(0, -400);                          // jump
+}
+```
+
+**Sound and effects.** Play a clip on pickup and add a little juice — the gaming API ships a low-latency `SoundPool`:
+
+```java
+private final SoundPool sound = SoundPool.create(8);
+private SoundEffect coinSfx;                                   // coinSfx = sound.load("/coin.wav");
+
+// inside the coin branch, instead of a bare remove:
+sound.play(coinSfx);                                           // ping!
+int shake = (int) (Math.random() * 5 - 2);                     // a one-frame screen-shake on a hit
+getScene().setCamera(shake, shake);
+getScene().remove(coin);
+```
+
+**Overriding defaults.** Don't want auto-collected coins or auto-patrolling enemies? Ignore the defaults and drive everything from `onUpdate` (as the custom-movement snippet showed). The defaults are a convenience, not a constraint.
+
+## Menus, HUD and pause — where Codename One spoils you
+
+This is the part most game engines make painful and Codename One makes trivial: **the menus**. A `GameSceneView` is an ordinary Codename One `Component`, so the *entire* Codename One UI toolkit — `Form`, `Toolbar`, `Dialog`, layouts, CSS theming, animations — is right there around your game. The level select, the pause screen, the settings page, the score HUD: all of it is the same UI API you'd use for any app, not a bespoke game-UI framework you have to learn.
+
+A **score/lives HUD** is just a label laid over the game:
+
+```java
+Form f = new Form("Coin Run", new BorderLayout());
+Label hud = new Label("Score 0   Lives 3");
+f.add(BorderLayout.NORTH, hud).add(BorderLayout.CENTER, game);
+// update it each frame from onUpdate via callSerially:
+hud.setText("Score " + getScore() + "   Lives " + getLives());
+```
+
+A **pause menu** is a one-line `Dialog` over the frozen game:
+
+```java
+game.stop();                                                   // freeze the loop
+Command resume = new Command("Resume");
+Command quit = new Command("Quit to menu");
+if (Dialog.show("Paused", "Score: " + game.getScore(), resume, quit) == resume) {
+    game.start();
+} else {
+    showLevelMenu();
+}
+```
+
+And a **level-select screen** is a themed `Form` with a real toolbar — the kind of polish that's a slog elsewhere:
+
+```java
+Form menu = new Form("Coin Run", BoxLayout.y());
+menu.getToolbar().addCommandToRightBar("Settings", null, e -> showSettings());
+for (String level : new String[] {"CoinRun", "Caverns", "SkyRun"}) {
+    Button play = new Button(level);
+    play.addActionListener(e -> startLevel(level));            // loads /<level>.game
+    menu.add(play);
+}
+menu.show();
+```
+
+Because it's all standard Codename One UI, your menus inherit your app's theme, your fonts, right-to-left support, accessibility and the simulator's live preview — for free.
 
 ## The finished game and where to go next
 
 You now have **Coin Run**: a drawn level, an enemy, a goal, and roughly forty lines of rules. Natural next steps:
 
-* **More levels** — ship many `.game` files and load whichever the player picks; the companion pattern is identical.
-* **Lives UI and respawn** — draw `score`/`lives` with a `Label` overlay; on `gameOver`, reload the level.
+* **More levels** — ship many `.game` files and load whichever the player picks from the level-select screen above; the companion pattern is identical.
+* **Respawn and persistence** — on `gameOver`, reload the level; save the high score with `Storage`.
 * **Smarter enemies** — read a `patrol` range or `behavior` property per slime and branch in `onUpdate`.
 * **Hazards** — the **Spike** tile and a `damage` property make instant-death floors.
 

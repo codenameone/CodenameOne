@@ -8,7 +8,7 @@ description: A code-included walkthrough that builds an isometric board game wit
 feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/board-3-pieces.png" alt="A board game built with the Game Builder" /> A code-included walkthrough that builds an isometric board game with the Codename One Game Builder — lay the board, tag the pieces, and drive turn logic from code.'
 ---
 
-![A board game laid out in the Game Builder](/blog/gamebuilder/board-3-pieces.png)
+![A board game built with the Game Builder](/blog/gamebuilder/board-hero.jpg)
 
 In [Tutorial 1](/blog/game-builder-2d-platformer/) the player moved with arcade physics. A board game has none of that — pieces sit on squares and the *rules* decide what happens. This tutorial shows how the same Game Builder pattern (visual data + an `onUpdate` companion) handles a turn-based game, where your code reads per-piece properties instead of simulating motion. We'll build **Checkers Start**: a board, two players' tokens, and the scaffolding to drive turns.
 
@@ -41,9 +41,9 @@ Select the **Pieces** layer, pick **Token**, and stamp pieces on their squares. 
 
 ![Placing pieces tagged with player and cell](/blog/gamebuilder/board-3-pieces.png)
 
-## Step 4 — Build
+## Step 4 — Save
 
-**Build** writes `src/main/resources/games/Checkers.game`. The board, the pieces and their properties all live there as data:
+**Save** writes `src/main/resources/games/Checkers.game` (loaded at runtime as `/Checkers.game` — Codename One's resource namespace is flat). The board, the pieces and their properties all live there as data:
 
 ```json
 {
@@ -59,11 +59,17 @@ Select the **Pieces** layer, pick **Token**, and stamp pieces on their squares. 
 }
 ```
 
-![The finished board ready to build](/blog/gamebuilder/board-4-build.png)
+![The finished board ready to save](/blog/gamebuilder/board-4-build.png)
+
+## Play it
+
+Press **Live** and the flat grid tilts into an isometric board you can interact with. Here a piece slides across the squares:
+
+![Moving a piece on the board](/blog/gamebuilder/game-board.gif)
 
 ## The rules live in code
 
-The companion is the same shape as Tutorial 1 — `GameSceneView` with a generated `loadLevel()` and your `onUpdate`. Board mode realizes the pieces through the isometric projection, and each sprite's `getUserData()` is its source `GameElement`, so you read the `player`/`cell` tags you set in the editor. A minimal turn skeleton:
+The companion is the same shape as Tutorial 1 — `GameSceneView` with a generated `loadLevel()` and your `onUpdate`. Board mode realizes the pieces through the isometric projection, and `elementOf(sprite)` reads the `player`/`cell` tags you set in the editor. A minimal turn skeleton, using the same base-class helpers:
 
 ```java
 private int currentPlayer = 1;   // whose turn it is
@@ -75,12 +81,9 @@ protected void onUpdate(double deltaSeconds) {
         return;   // turn-based: act only on a tap
     }
     Sprite tapped = pieceAt(in.getPointerX(), in.getPointerY());
-    if (tapped == null) {
-        return;
-    }
-    GameElement piece = (GameElement) tapped.getUserData();
-    if (piece.getInt("player", 0) != currentPlayer) {
-        return;   // not your piece — ignore
+    GameElement piece = elementOf(tapped);
+    if (piece == null || piece.getInt("player", 0) != currentPlayer) {
+        return;   // empty square or not your piece — ignore
     }
     // ...select it, validate a move against piece.getString("cell", ""), then:
     endTurn();
@@ -103,6 +106,8 @@ private Sprite pieceAt(int px, int py) {
 ```
 
 Moving a piece is just updating its sprite position (and the element's `cell` if you persist state). Because the level is data, you can ship a *King's Court* board and a *Checkers* board as two `.game` files and load whichever the player picks — the rules code is identical.
+
+A turn-based game leans even harder on Codename One's UI than an action game does — and that's exactly where Codename One shines. A "whose turn" banner is a `Label` in the toolbar; a move menu, a promotion choice or a rematch prompt is a `Dialog.show(...)`; a piece tray is a `GridLayout`. As [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause-where-codename-one-spoils-you) shows, all of it is the standard UI toolkit wrapped around your `GameSceneView` — no separate game-UI layer to learn.
 
 ## Variations and next steps
 

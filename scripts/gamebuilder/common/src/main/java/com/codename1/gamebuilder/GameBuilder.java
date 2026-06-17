@@ -441,15 +441,15 @@ public class GameBuilder extends Lifecycle {
         live.setGap(Display.getInstance().convertToPixels(1.6f));
         live.setTooltip("Play the level in place (Stop to return) — Cmd+R");
         live.addActionListener(e -> toggleLive());
-        Button build = new Button("Build", "GBBuild");
-        build.setName("btn.build");
-        FontImage.setMaterialIcon(build, FontImage.MATERIAL_BUILD, 4.5f);
-        build.setGap(Display.getInstance().convertToPixels(1.6f));
-        build.setTooltip("Save the level to the project (Cmd+S)");
-        build.addActionListener(e -> save());
+        Button save = new Button("Save", "GBBuild");
+        save.setName("btn.save");
+        FontImage.setMaterialIcon(save, FontImage.MATERIAL_SAVE, 4.5f);
+        save.setGap(Display.getInstance().convertToPixels(1.6f));
+        save.setTooltip("Save the level to the project (Cmd+S)");
+        save.addActionListener(e -> save());
         Container right = new Container(new FlowLayout(Component.RIGHT, Component.CENTER));
         right.add(live);
-        right.add(build);
+        right.add(save);
         bar.add(BorderLayout.EAST, right);
         return bar;
     }
@@ -1834,7 +1834,7 @@ public class GameBuilder extends Lifecycle {
         Dialog d = new Dialog("Generated " + controller.model().getSceneName() + ".java");
         d.setLayout(new BorderLayout());
         String java = CompanionCodeGen.companionJava(packageName, controller.model().getSceneName(),
-                "/games/" + controller.model().getSceneName() + ".game");
+                "/" + controller.model().getSceneName() + ".game", controller.model().level());
         TextArea ta = new TextArea(java, 26, 70);
         ta.setEditable(false);
         ta.setUIID("GBCode");

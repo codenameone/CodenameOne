@@ -24,6 +24,8 @@ package com.codename1.gaming.level;
 
 import com.codename1.gaming.GameView;
 import com.codename1.gaming.Model;
+import com.codename1.gaming.Scene;
+import com.codename1.gaming.Sprite;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
@@ -48,6 +50,8 @@ public class GameSceneView extends GameView {
     private final AssetCatalog catalog;
     private final IsoProjection projection = new IsoProjection();
     private boolean boardRealized;
+    private int score;
+    private int lives = -1;
 
     public GameSceneView(GameLevel level, AssetCatalog catalog) {
         this.level = level;
@@ -87,6 +91,116 @@ public class GameSceneView extends GameView {
     /// sized frame).
     public IsoProjection getProjection() {
         return projection;
+    }
+
+    // ---- scene queries + game state -------------------------------------
+    // So a generated scene (and your onUpdate) needs no hand-rolled boilerplate:
+    // the editor wires named elements to fields and your logic uses these helpers.
+
+    /// The `GameElement` a sprite was realized from -- its `Sprite#getUserData()` --
+    /// or `null` if the sprite did not come from a level element. This is the bridge
+    /// back to the typed `lives`/`value`/`speed` numbers you set in the editor.
+    protected GameElement elementOf(Sprite sprite) {
+        if (sprite == null) {
+            return null;
+        }
+        Object data = sprite.getUserData();
+        return data instanceof GameElement ? (GameElement) data : null;
+    }
+
+    /// The first sprite in the scene whose source element has the given `name` (the
+    /// name typed in the Inspector), or `null`. The generated scene initializes a
+    /// field per named element with this.
+    protected Sprite findByName(String name) {
+        if (name == null) {
+            return null;
+        }
+        Scene scene = getScene();
+        for (int i = 0; i < scene.size(); i++) {
+            GameElement el = elementOf(scene.get(i));
+            if (el != null && name.equals(el.getName())) {
+                return scene.get(i);
+            }
+        }
+        return null;
+    }
+
+    /// The first sprite stamped from the given asset id (e.g. `"player"`, `"coin"`),
+    /// or `null`.
+    protected Sprite findByAsset(String assetId) {
+        if (assetId == null) {
+            return null;
+        }
+        Scene scene = getScene();
+        for (int i = 0; i < scene.size(); i++) {
+            GameElement el = elementOf(scene.get(i));
+            if (el != null && assetId.equals(el.getAssetId())) {
+                return scene.get(i);
+            }
+        }
+        return null;
+    }
+
+    /// Every sprite stamped from the given asset id, in z-order -- handy for a
+    /// "collect all the coins" loop. Never `null` (empty when none match).
+    protected java.util.List<Sprite> findAllByAsset(String assetId) {
+        java.util.List<Sprite> matches = new java.util.ArrayList<Sprite>();
+        if (assetId == null) {
+            return matches;
+        }
+        Scene scene = getScene();
+        for (int i = 0; i < scene.size(); i++) {
+            GameElement el = elementOf(scene.get(i));
+            if (el != null && assetId.equals(el.getAssetId())) {
+                matches.add(scene.get(i));
+            }
+        }
+        return matches;
+    }
+
+    /// Whether two sprites' bounding boxes overlap -- a null-safe shorthand for
+    /// `Sprite#intersects(Sprite)`, the usual "did they touch?" collision test.
+    protected boolean overlaps(Sprite a, Sprite b) {
+        return a != null && b != null && a.intersects(b);
+    }
+
+    /// The running score (starts at zero). Add to it with `#addScore(int)`.
+    public int getScore() {
+        return score;
+    }
+
+    public void setScore(int score) {
+        this.score = score;
+    }
+
+    /// Adds `delta` to the score and returns the new total.
+    public int addScore(int delta) {
+        score += delta;
+        return score;
+    }
+
+    /// Remaining lives, or `-1` until `#setLives(int)` is called. The generated scene
+    /// seeds this from the player's `lives` property.
+    public int getLives() {
+        return lives;
+    }
+
+    public void setLives(int lives) {
+        this.lives = lives;
+    }
+
+    /// Decrements the life count (never below zero) and returns what remains.
+    public int loseLife() {
+        if (lives > 0) {
+            lives--;
+        }
+        return lives;
+    }
+
+    /// True once `#setLives(int)` has been given a count that has since reached zero --
+    /// the standard "game over" test (false while lives are uninitialized).
+    public boolean isGameOver() {
+        return lives == 0;
     }
 
     /// {@inheritDoc} For a 3D level, configures the camera + light and builds the models.
