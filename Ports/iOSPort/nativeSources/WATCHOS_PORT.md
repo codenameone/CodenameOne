@@ -4,6 +4,38 @@ This documents the watchOS slice of the iOS port (full CN1 UI on Apple Watch via
 a Core Graphics backend). Everything is additive under `#if TARGET_OS_WATCH`, so
 the iOS slice is byte-for-byte unchanged.
 
+## The watch render-driver (the new-port core) — scoped contract
+
+watchOS ships UIKit headers but marks `UIView`/`UIViewController`/`UIEvent`/
+`CADisplayLink`/`UITextView`/`UIDatePicker`/etc. `__attribute__((unavailable))`,
+so `CodenameOne_GLViewController` (a `UIViewController` subclass) and
+`CodenameOne_GLAppDelegate` (a `UIApplication` delegate) **cannot compile for
+watchOS**. They are excluded from the watch slice; a watch render-driver
+provides their surface, modeled on `Ports/LinuxPort/nativeSources/cn1_linux_graphics.c`
+(a non-view-controller native renderer over a 2D API — Cairo there, Core
+Graphics here via `CN1CGGraphics`).
+
+Contract the render-driver must provide (everything else already compiles):
+- **55 native C functions** currently defined in `CodenameOne_GLViewController.m`
+  (`Java_com_codename1_impl_ios_IOSImplementation_*Impl` + helpers): the graphics
+  primitives (which enqueue `ExecutableOp`s), `flushBuffer`, paint/EDT hooks,
+  peer/video/picker entry points. The graphics + `flushBuffer` + queue ones are
+  implemented for real (enqueue → drain → `CN1CGGraphics`); the peer/video/picker
+  ones are no-ops on watch.
+- A **`[CodenameOne_GLViewController instance]`-compatible singleton** (NSObject,
+  NOT UIViewController) exposing the selectors the other 10 files call:
+  `drawFrame`, `flushBuffer`, `drawString`, `upcomingAddClip`, `eaglView`/`view`
+  (return the `CN1WatchRenderingView`), `isPaintFinished`, and no-op
+  `present*ViewController*`.
+- The op queue (`currentTarget`/`upcomingTarget` swap) + `drawFrame` draining
+  into the CG context (the logic from `GLViewController.drawFrame`, minus the GL
+  framebuffer setup).
+- Bootstrap: `cn1_watch_runtime_start/paint/pointer*` start the EDT (the
+  generated main) + drive `drawFrame` from `CN1WatchHost`'s timer.
+
+This is a bounded ~few-hundred-line reimplementation (LinuxPort's renderer is a
+comparable size), not a port of the 4000-line GL view controller.
+
 ## watchMain entry point & seamless double-app build
 
 A CN1 project declares the watch entry point next to the phone main in
