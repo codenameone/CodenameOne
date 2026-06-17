@@ -33,7 +33,7 @@
 
 extern float scaleValue;
 #ifdef USE_ES2
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;

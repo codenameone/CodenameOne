@@ -73,9 +73,16 @@ int connections = 0;
 }
 
 - (void)connect {
+#if TARGET_OS_WATCH
+    // NSURLConnection's synchronous delegate initializer is unavailable on
+    // watchOS (NSURLSession is the supported API). Networking via this legacy
+    // path is a no-op on the watch slice for now.
+    connection = nil;
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
          connection = [[NSURLConnection alloc] initWithRequest:request delegate:self startImmediately:YES];
     });
+#endif
 }
 
 -(NSCachedURLResponse*)connection:(NSURLConnection*)connection willCacheResponse:(NSCachedURLResponse *)cachedResponse {

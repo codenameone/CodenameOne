@@ -73,6 +73,21 @@ void CN1CGFillPolygon(int color, int alpha, float *xPoints, float *yPoints, int 
 void CN1CGDrawImage(CGImageRef img, int alpha, int x, int y, int w, int h);
 void CN1CGTileImage(CGImageRef img, int alpha, int x, int y, int w, int h);
 
+// Fill an 8-bit coverage/alpha mask (row-major, top-down, w*h bytes) with the
+// given color. Used to rasterize anti-aliased shapes (DrawPath / the alpha-mask
+// shape pipeline) that the iOS port renders through a GL alpha texture.
+void CN1CGFillAlphaMask(int color, int alpha, int x, int y, int w, int h, const unsigned char *maskAlphas);
+
+// On watchOS the iOS "alpha mask texture" (a GL/Metal texture handle on those
+// platforms) is replaced by a heap-allocated copy of the coverage bytes. The
+// JAVA_LONG texture handle returned by nativePathRendererCreateTexture points
+// at one of these; DrawTextureAlphaMask reads it and feeds CN1CGFillAlphaMask.
+typedef struct {
+    int width;
+    int height;
+    unsigned char *alphas; // width*height bytes, row-major top-down
+} CN1CGAlphaMask;
+
 // Draw str at (x,y) (top-left baseline-independent) in the given font/color
 // via Core Text, honoring the active clip + transform.
 void CN1CGDrawString(int color, int alpha, int x, int y, NSString *str, UIFont *font);

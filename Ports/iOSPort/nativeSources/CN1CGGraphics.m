@@ -145,6 +145,35 @@ void CN1CGTileImage(CGImageRef img, int alpha, int x, int y, int w, int h) {
     CGContextRestoreGState(cn1ActiveContext);
 }
 
+void CN1CGFillAlphaMask(int color, int alpha, int x, int y, int w, int h, const unsigned char *maskAlphas) {
+    if (cn1ActiveContext == NULL || maskAlphas == NULL || w <= 0 || h <= 0) { return; }
+    CGFloat r, g, b, a;
+    cn1Components(color, alpha, &r, &g, &b, &a);
+    // Bake color * coverage into a premultiplied-RGBA bitmap so the result
+    // matches the GL "alpha texture modulated by color" semantics exactly.
+    size_t count = (size_t)w * (size_t)h;
+    unsigned char *rgba = (unsigned char *)malloc(count * 4);
+    if (rgba == NULL) { return; }
+    for (size_t i = 0; i < count; i++) {
+        CGFloat cov = ((CGFloat)maskAlphas[i] / 255.0) * a;
+        rgba[i * 4 + 0] = (unsigned char)(r * cov * 255.0 + 0.5);
+        rgba[i * 4 + 1] = (unsigned char)(g * cov * 255.0 + 0.5);
+        rgba[i * 4 + 2] = (unsigned char)(b * cov * 255.0 + 0.5);
+        rgba[i * 4 + 3] = (unsigned char)(cov * 255.0 + 0.5);
+    }
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGContextRef bmp = CGBitmapContextCreate(rgba, w, h, 8, w * 4, space,
+                                             kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGImageRef img = bmp != NULL ? CGBitmapContextCreateImage(bmp) : NULL;
+    if (img != NULL) {
+        CN1CGDrawImage(img, 255, x, y, w, h);
+        CGImageRelease(img);
+    }
+    if (bmp != NULL) { CGContextRelease(bmp); }
+    CGColorSpaceRelease(space);
+    free(rgba);
+}
+
 void CN1CGDrawString(int color, int alpha, int x, int y, NSString *str, UIFont *font) {
     if (cn1ActiveContext == NULL || str == nil || str.length == 0) { return; }
     CGFloat r, g, b, a;

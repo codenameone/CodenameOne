@@ -318,6 +318,18 @@ class WatchNativeBuilder {
                 + "typedef struct { float v[4]; } GLKVector4;\n"
                 + "typedef struct { float v[3]; } GLKVector3;\n"
                 + "typedef struct { float v[2]; } GLKVector2;\n"
+                // Inline GLKit math so the GLKMatrix4 transform machinery in the
+                // op files (SetTransform/ClipRect/etc.) compiles on watchOS even
+                // though the GLKit framework is absent. The watch render path uses
+                // the Core Graphics backend (CN1CGGraphics); these helpers only
+                // keep the transform bookkeeping (column-major 4x4) consistent.
+                + "static const GLKMatrix4 GLKMatrix4Identity = { { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };\n"
+                + "static inline GLKVector4 GLKVector4Make(float x,float y,float z,float w){ GLKVector4 v; v.v[0]=x; v.v[1]=y; v.v[2]=z; v.v[3]=w; return v; }\n"
+                + "static inline GLKVector3 GLKVector3Make(float x,float y,float z){ GLKVector3 v; v.v[0]=x; v.v[1]=y; v.v[2]=z; return v; }\n"
+                + "static inline GLKMatrix4 GLKMatrix4Multiply(GLKMatrix4 a, GLKMatrix4 b){ GLKMatrix4 r; for(int c=0;c<4;c++){ for(int row=0;row<4;row++){ float s=0; for(int k=0;k<4;k++){ s += a.m[k*4+row]*b.m[c*4+k]; } r.m[c*4+row]=s; } } return r; }\n"
+                + "static inline GLKMatrix4 GLKMatrix4MakeTranslation(float tx,float ty,float tz){ GLKMatrix4 r = GLKMatrix4Identity; r.m[12]=tx; r.m[13]=ty; r.m[14]=tz; return r; }\n"
+                + "static inline GLKMatrix4 GLKMatrix4Translate(GLKMatrix4 m,float tx,float ty,float tz){ return GLKMatrix4Multiply(m, GLKMatrix4MakeTranslation(tx,ty,tz)); }\n"
+                + "static inline GLKMatrix4 GLKMatrix4MakeScale(float sx,float sy,float sz){ GLKMatrix4 r = GLKMatrix4Identity; r.m[0]=sx; r.m[5]=sy; r.m[10]=sz; return r; }\n"
                 + "@interface GLKView : NSObject @end\n@interface GLKBaseEffect : NSObject @end\n"
                 + "@interface GLKTextureLoader : NSObject @end\n@interface GLKTextureInfo : NSObject @end\n#endif\n");
         owner.log("[watchNative] Wrote watchOS stub headers under " + stubsDir.getAbsolutePath());
