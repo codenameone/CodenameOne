@@ -542,7 +542,10 @@ class WatchNativeBuilder {
         // translated classes + the Stub.main the bootstrap calls) and instead
         // rename its C main away with a per-file -Dmain. -Wno-error=return-type
         // covers the original main()'s implicit fallthrough once renamed.
-        s.append("stub_name = '").append(mangle(mainClass)).append("Stub.m'\n")
+        // The generated phone Stub source is named from the FQN-mangled class
+        // (com_<pkg>_<Main>Stub.m), not the simple name -- match that so the
+        // per-file -Dmain rename actually lands (else duplicate _main vs @main).
+        s.append("stub_name = '").append(mainStub).append(".m'\n")
                 .append("watch_target.source_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path && File.basename(ref.path) == stub_name\n")
