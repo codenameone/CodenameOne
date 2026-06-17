@@ -5566,7 +5566,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREA
 UIPopoverController* popoverController;
 #endif // !TARGET_OS_WATCH
 void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie, JAVA_INT quality, JAVA_INT duration) {
-#ifdef INCLUDE_CAMERA_USAGE
+// UIImagePickerController / UIPopoverController / presentModalViewController are
+// all unavailable on watchOS; camera capture is a no-op there.
+#if defined(INCLUDE_CAMERA_USAGE) && !TARGET_OS_WATCH
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera; // default
@@ -11744,7 +11746,12 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         if (alertSound != NULL) {
             NSString *soundName = toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
             if (soundName != nil && [soundName length] > 0) {
+#if TARGET_OS_WATCH
+                // UNNotificationSound soundNamed: is unavailable on watchOS.
+                content.sound = [UNNotificationSound defaultSound];
+#else
                 content.sound = [UNNotificationSound soundNamed:soundName];
+#endif
             }
         }
         if (badgeNumber >= 0) {
@@ -11849,7 +11856,12 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification2___java_lang_St
         if (alertSound != NULL) {
             NSString *soundName = toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
             if (soundName != nil && [soundName length] > 0) {
+#if TARGET_OS_WATCH
+                // UNNotificationSound soundNamed: is unavailable on watchOS.
+                content.sound = [UNNotificationSound defaultSound];
+#else
                 content.sound = [UNNotificationSound soundNamed:soundName];
+#endif
             }
         }
         if (badgeNumber >= 0) {
@@ -11934,9 +11946,12 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_requestNotificationPermission___int(C
                 if (@available(iOS 12.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusProvisional) { level = 3; }
                 }
+#if !TARGET_OS_WATCH
+                // UNAuthorizationStatusEphemeral is unavailable on watchOS.
                 if (@available(iOS 14.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusEphemeral) { level = 4; }
                 }
+#endif
                 BOOL g = (level == 2 || level == 3 || level == 4);
                 com_codename1_impl_ios_IOSImplementation_notificationPermissionResult___boolean_int(CN1_THREAD_GET_STATE_PASS_ARG g ? JAVA_TRUE : JAVA_FALSE, level);
             }];
