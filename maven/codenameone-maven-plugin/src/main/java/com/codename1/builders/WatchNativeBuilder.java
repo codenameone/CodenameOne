@@ -85,6 +85,12 @@ class WatchNativeBuilder {
         // UIWebView-based legacy browser peer (UIWebView + UIApplication
         // networkActivityIndicator are unavailable on watchOS).
         "UIWebViewEventDelegate.m",
+        // UIKit peer components unavailable on watchOS: tap gesture
+        // (UIGestureRecognizer), inline text editors (UITextField/UITextView),
+        // and the low-level AudioQueue recorder (AudioToolbox). Their headers
+        // are empty under #if !TARGET_OS_WATCH so importers still compile.
+        "CN1TapGestureRecognizer.m", "CN1UITextField.m", "CN1UITextView.m",
+        "CN1AudioUnit.m",
         "CodenameOne_GLViewController.xib", "MainWindow.xib",
         "CodenameOne_METALViewController.xib", "MainWindowMETAL.xib"
     };

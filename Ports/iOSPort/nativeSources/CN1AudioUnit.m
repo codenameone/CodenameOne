@@ -21,6 +21,10 @@
  * need additional information or have any questions.
  */
 #import "CN1AudioUnit.h"
+#include "TargetConditionals.h"
+// AudioToolbox / AudioQueue are unavailable on watchOS. The whole low-level
+// PCM recorder is compiled out on the watch slice.
+#if !TARGET_OS_WATCH
 #import <AudioToolbox/AudioToolbox.h>
 #import "com_codename1_media_MediaManager.h"
 #import "com_codename1_media_AudioBuffer.h"
@@ -192,4 +196,5 @@ static void HandleInputBuffer (
 }
 
 @end
+#endif // !TARGET_OS_WATCH
 

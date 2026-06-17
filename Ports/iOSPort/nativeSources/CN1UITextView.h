@@ -21,6 +21,10 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
+#include "TargetConditionals.h"
+// UITextView is unavailable on watchOS; this text-input peer is excluded
+// from the watch slice and the header is empty there.
+#if !TARGET_OS_WATCH
 @interface CN1UITextView : UITextView
 
 @property BOOL blockPaste;
@@ -28,5 +32,6 @@
 @property BOOL blockCut;
 
 @end
+#endif // !TARGET_OS_WATCH
 
 
