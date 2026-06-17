@@ -77,11 +77,16 @@ class WatchNativeBuilder {
         "CN1MetalShaders.metal",
         "DrawGradientTextureCache.m", "DrawStringTextureCache.m",
         "CodenameOne_GLSceneDelegate.m",
-        // The GL view controller + UIApplication delegate are UIViewController/
-        // UIApplication based, both API_UNAVAILABLE on watchOS. They are replaced
-        // on the watch slice by CN1WatchViewController.m (NSObject render-driver)
-        // + the SwiftUI @main shell (CN1WatchApp.swift) / CN1WatchHost.
-        "CodenameOne_GLViewController.m", "CodenameOne_GLAppDelegate.m",
+        // The UIApplication delegate is UIApplication/UIApplicationMain based
+        // (unavailable on watchOS) and is replaced by the SwiftUI @main shell
+        // (CN1WatchApp.swift) / CN1WatchHost. CodenameOne_GLViewController.m is
+        // NOT excluded: it carries the shared CGContext/op-based graphics
+        // primitives (createImage, fonts, the *Impl drawing entry points) that
+        // the watch slice reuses. Its UIViewController class + UIKit event code
+        // are guarded with #if !TARGET_OS_WATCH, and the watch render-driver
+        // class (CodenameOne_GLViewController as an NSObject) lives in
+        // CN1WatchViewController.m.
+        "CodenameOne_GLAppDelegate.m",
         // UIWebView-based legacy browser peer (UIWebView + UIApplication
         // networkActivityIndicator are unavailable on watchOS).
         "UIWebViewEventDelegate.m",
