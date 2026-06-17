@@ -9,6 +9,7 @@
  */
 package com.codename1.builders.util;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -154,12 +155,27 @@ public final class CrashProtectionOptIn {
                 ZipEntry e = entries.nextElement();
                 if (e.isDirectory() || !e.getName().endsWith(".class")) continue;
                 try (InputStream in = zf.getInputStream(e)) {
-                    byte[] bytes = in.readAllBytes();
+                    byte[] bytes = drain(in);
                     if (containsMarker(bytes)) return true;
                 }
             }
         }
         return false;
+    }
+
+    /**
+     * Stream-to-byte-array. {@code InputStream.readAllBytes()} would
+     * be cleaner but only landed in Java 9; this module compiles for
+     * Java 8 source to match the wider CN1 maven plugin baseline.
+     */
+    private static byte[] drain(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) >= 0) {
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
     }
 
     /**

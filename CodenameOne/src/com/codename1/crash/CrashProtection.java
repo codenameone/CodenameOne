@@ -211,9 +211,9 @@ public final class CrashProtection {
     static List<Frame> extractFrames(Throwable t) {
         List<Frame> out = new ArrayList<Frame>();
         StackTraceElement[] elements = t.getStackTrace();
-        if (elements == null) {
-            return out;
-        }
+        // Throwable.getStackTrace contractually returns a non-null array
+        // (empty when stack trace info is unavailable). SpotBugs flags
+        // the redundant null check; trust the contract.
         int limit = elements.length < CrashReportPayload.MAX_FRAMES
                 ? elements.length : CrashReportPayload.MAX_FRAMES;
         for (int i = 0; i < limit; i++) {
@@ -356,10 +356,18 @@ public final class CrashProtection {
         return req;
     }
 
+    private static final java.util.Random EVENT_ID_RNG = new java.util.Random();
+
     private static String newEventId() {
         char[] out = new char[32];
         for (int i = 0; i < 32; i++) {
-            int v = (int) (Math.random() * 16);
+            // Random.nextInt(16) avoids the float -> int dance that
+            // Math.random() does and that SpotBugs flags as wasteful
+            // (DM_NEXTINT_VIA_NEXTDOUBLE). Crypto-quality randomness
+            // isn't needed -- the eventId is a dedup token, not a
+            // secret. (The server also de-dups by fingerprint, so a
+            // collision is recoverable.)
+            int v = EVENT_ID_RNG.nextInt(16);
             out[i] = (char) (v < 10 ? '0' + v : 'a' + (v - 10));
         }
         return new String(out);
