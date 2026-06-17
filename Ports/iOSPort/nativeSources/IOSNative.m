@@ -1430,6 +1430,16 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__(CN1_THREAD_STA
 
 void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
 {
+#if TARGET_OS_WATCH
+    // The watch slice currently leaks native image/peer handles rather than
+    // releasing them here. Under the concurrent GC the finalizer can hand back
+    // a peer pointer whose backing was already reclaimed, and the resulting
+    // objc_release on a dangling pointer crashes (pointer-auth fault) -- a
+    // peer-lifecycle hardening item tracked separately. Leaking is acceptable
+    // for the short-lived screenshot-test process; revisit for shipping apps.
+    (void)n1;
+    return;
+#else
     if(n1 != 0) {
         // this prevents a race condition where the gc might be invoked too soon
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -1437,6 +1447,7 @@ void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(CN1_THREAD_STATE_M
             [n release];
         });
     }
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_deleteNativeFontPeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
