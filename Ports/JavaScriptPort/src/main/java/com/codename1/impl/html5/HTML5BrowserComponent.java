@@ -67,20 +67,22 @@ public class HTML5BrowserComponent extends HTML5Peer {
 
         @Override
         public void handleEvent(final MessageEvent e) {
-            Window win = iframe == null ? Window.current() : iframe.getContentWindow();
-            //HTML5Implementation._log("Received event "+e.getDataAsString());
-            if (getEventSource(e) == win) {
-                //HTML5Implementation._log("From our iframe");
+            // Original code only forwarded the message when
+            // ``getEventSource(e) == iframe.getContentWindow()``. On the worker-
+            // based ParparVM port those are two different worker-side wrappers
+            // for the same window (the comparison is always false), so onMessage
+            // never fired at all. The worker cannot reliably compare window
+            // identity, so instead forward any message that carries a source
+            // (i.e. came from a posting window such as our iframe). Apps that
+            // host multiple frames disambiguate in their own onMessage handler.
+            if (getEventSource(e) != null) {
+                final String data = e.getDataAsString();
                 HTML5Implementation.callSerially(new Runnable() {
                     public void run() {
-                        parent.fireWebEvent(BrowserComponent.onMessage, new ActionEvent(e.getDataAsString()));
-
+                        parent.fireWebEvent(BrowserComponent.onMessage, new ActionEvent(data));
                     }
                 });
-            } else {
-                //HTML5Implementation._log("Not from our iframe");
             }
-
         }
 
     };
@@ -632,7 +634,7 @@ public class HTML5BrowserComponent extends HTML5Peer {
             throw new RuntimeException("Cannot execute javascript in this browser component because it is CORS-restricted. Javascript was "+javascript);
         }
         WindowExt win =  iframe == null ? ((WindowExt)Window.current()) : (WindowExt)iframe.getContentWindow();
-        
+
         win.eval(javascript);
         //Window win = iframe.getContentWindow();
         //win.getLocation().assign("javascript:"+javascript);

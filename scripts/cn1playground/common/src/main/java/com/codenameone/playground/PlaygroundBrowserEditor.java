@@ -250,6 +250,13 @@ final class PlaygroundBrowserEditor {
             return;
         }
         if ("change".equals(type)) {
+            // On the JS port onMessage is delivered to every editor's handler
+            // (the port can't match a message to a specific iframe), so each
+            // editor only acts on changes tagged with its own language.
+            String language = asString(payload.get("language"));
+            if (language.length() > 0 && !language.equals(mode.monacoLanguage())) {
+                return;
+            }
             String text = asString(payload.get("text"));
             int version = asInt(payload.get("version"));
             listener.onSourceChanged(text, version);

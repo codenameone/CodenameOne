@@ -604,7 +604,11 @@
       post({
         type: "change",
         text: state.model.getValue(),
-        version: state.version
+        version: state.version,
+        // The host's onMessage now receives messages from every editor iframe
+        // (the JS port can't match a message to a specific iframe), so tag the
+        // language and let the host route this change to the right editor.
+        language: state.language
       });
     }, 280);
   }

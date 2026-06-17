@@ -543,6 +543,27 @@
     if ('altKey'   in evt) out.altKey   = !!evt.altKey;
     if ('metaKey'  in evt) out.metaKey  = !!evt.metaKey;
     if ('repeat'   in evt) out.repeat   = !!evt.repeat;
+    // MessageEvent fields (window.postMessage / BrowserComponent.onMessage).
+    // Without these the worker-side MessageEvent.getDataAsString() returns null
+    // and the source-identity check (getEventSource(e) == iframe.contentWindow)
+    // always fails, so iframe->app messages are silently dropped. ``source`` is
+    // stored as a host-ref so it dedupes to the SAME worker wrapper as
+    // iframe.getContentWindow() (storeHostRef keys by object identity), making
+    // the identity check pass.
+    if ('data' in evt) {
+      var d = evt.data;
+      if (d != null && typeof d === 'object' && typeof storeHostRef === 'function') {
+        out.data = storeHostRef(d);
+      } else {
+        out.data = d;
+        // getDataAsString() resolves to the ``dataAsString`` getter on the
+        // worker side, so expose the string form under that name too.
+        out.dataAsString = d == null ? null : String(d);
+      }
+    }
+    if ('origin' in evt) out.origin = evt.origin == null ? '' : String(evt.origin);
+    if ('lastEventId' in evt) out.lastEventId = evt.lastEventId == null ? '' : String(evt.lastEventId);
+    if (evt.source && typeof storeHostRef === 'function') out.source = storeHostRef(evt.source);
     // preventDefault / stopPropagation are fire-and-forget from the worker
     // side (we eagerly call them on the main-thread event just in case).
     // touches arrays are serialised shallow — most user code reads the
