@@ -1,0 +1,121 @@
+== Crash Protection
+
+Crash Protection is an opt-in service that captures uncaught exceptions in your shipping app and files them as deduplicated issues on your GitHub repository. Symbolicated stack traces, PII-scrubbed messages, and a per-bug counter are all recorded server-side; you triage from GitHub Issues like any other bug.
+
+The service is available on the *Pro* and *Enterprise* subscription tiers. See the link:https://www.codenameone.com/pricing.html[pricing page] for current limits.
+
+=== What gets stored where
+
+Three things move when you opt in:
+
+. *Symbol bundles* (ProGuard `mapping.txt` on Android, dSYM on iOS, debug-info-bearing binaries on Mac/Linux/Win32). Uploaded by the cloud build server after each release build. Stored compressed; subject to per-tier storage quota.
+. *Crash reports* (one per device occurrence). Sent by the app at runtime via `CrashProtection.capture(t)` or the automatic EDT error handler. PII-scrubbed on the device before transmission.
+. *GitHub issues* — the actual triage surface. One issue per unique crash fingerprint. Subsequent occurrences of the same fingerprint bump a counter on the issue body rather than filing duplicates.
+
+Codename One never reads or persists the unscrubbed message body. The crash data store IS the issue tracker on your repository, not a database on our side. We keep only the minimum lookup state needed to find the right issue on the next occurrence.
+
+=== Opting in
+
+Two independent signals enable crash protection. *Either is sufficient*.
+
+==== Signal 1: build property
+
+Add to `codenameone_settings.properties`:
+
+[source]
+----
+codename1.crashProtection.enabled=true
+----
+
+When set, the cloud build server will upload your release build's symbol bundle to the crash protection service after each successful release build.
+
+==== Signal 2: API reference in code
+
+If any class in your app references `com.codename1.crash.CrashProtection`, the build server detects it via bytecode scan and treats the build as crash-protection-enabled. This way calling the runtime API automatically wires the build-time upload too -- you do not have to set the property separately.
+
+==== Runtime hook
+
+In `Lifecycle.init`:
+
+[source,java]
+----
+public void init(Object context) {
+    CrashProtection.install();
+    CrashProtection.setEnabled(true);  // default is false; user-controlled opt-in
+}
+----
+
+`install()` registers the EDT error handler and (on Android) wires `Thread.UncaughtExceptionHandler`. It is idempotent and a no-op on the simulator. `setEnabled(boolean)` controls whether captured crashes actually get sent to the server -- the captured payload is always persisted locally first, so `setEnabled(true)` after the fact drains the buffer.
+
+You can also report a caught-but-noteworthy exception with `CrashProtection.capture(e)`.
+
+=== Per-platform opt-out
+
+Sometimes one platform's symbols are noisy or you do not ship that target. Disable a platform with:
+
+[source]
+----
+codename1.crashProtection.android.enabled=false
+codename1.crashProtection.ios.enabled=false
+codename1.crashProtection.mac.enabled=false
+codename1.crashProtection.linux.enabled=false
+codename1.crashProtection.win32.enabled=false
+----
+
+Setting one of these to `false` makes `CrashProtection.install()` a no-op at runtime on that platform AND skips the build-time symbol upload for it. Setting to `true` (or leaving unset) keeps the platform enabled.
+
+The runtime check uses `Display.getInstance().getPlatformName()`. Recognised values: `android`, `ios`, `mac`, `linux`, `win32`, `javascript`, `javase`.
+
+=== Tier limits
+
+[options="header",cols="1,1,1"]
+|===
+| Tier        | Storage quota   | Symbol retention
+| Pro         | 100 MB compressed | 3 weeks
+| Enterprise  | 500 MB compressed | 6 weeks
+|===
+
+Symbol bundles are gzipped before storage. `mapping.txt` files typically compress ~10x; dSYMs ~2x. The quota admits several recent builds per app for a typical developer.
+
+When a new symbol upload would push you over the quota, the build's symbol step is rejected with HTTP 413 (the build itself succeeds). You can free space from the *Tracked apps* tab in the console -- delete an old build's symbols or remove a whole app's enrollment.
+
+=== Privacy: what gets sent
+
+`CrashReportPayload` carries these fields. The marked ones go through `PiiScrubber` before transmission.
+
+- `eventId` (UUID, used for idempotent dedup)
+- `buildKey` (anti-spoofing token; matched against the uploaded symbol bundle)
+- `packageName`, `appVersion`, `platform`, `osVersion`, `locale`
+- `exceptionClass`
+- `messageScrubbed` -- **scrubbed**
+- `frames[]` -- class / method / file / line / `native` flag per frame
+- `deviceMeta` -- free memory + locale only; not device IDs
+- `clientTs`
+
+Default scrubber rules in `PiiScrubber`:
+
+- Emails partially redacted: `joe.smith@example.com` becomes `joe***@example.com` (preserves first 3 chars of local-part + full domain).
+- Runs of 6 or more consecutive digits collapsed to `[num]`.
+- URLs are NOT scrubbed.
+
+Override `scrubMessage(String)` or `scrubFrame(String, String)` on a `PiiScrubber` subclass and register via `CrashProtection.setScrubber(myScrubber)` if you need stricter rules.
+
+=== Mapping packages to repositories
+
+In the console at https://cloud.codenameone.com/console/index.html, open *Repo mappings* and click *Add mapping*:
+
+. *Package name* -- the exact value from `codenameone_settings.properties`.
+. *Installation* -- if you have more than one GitHub App installation linked.
+. *Repository* -- pick from the dropdown of the installation's repos.
+
+You must have authorised the Codename One Crash Protection GitHub App for at least one of your repositories first. The mapping page has a *Connect on GitHub* button that opens the App install flow on github.com. The post-install redirect brings you back to the same page with the installation already loaded.
+
+=== Setup checklist
+
+. Pro or Enterprise subscription.
+. Add `codename1.crashProtection.enabled=true` to `codenameone_settings.properties` (or just call `CrashProtection.install()` in your code -- either signal triggers the upload).
+. Call `CrashProtection.install()` in `init`. Call `CrashProtection.setEnabled(true)` once you have the user's consent.
+. Build your app for release. The cloud build server uploads symbols automatically.
+. Open the console -> *Repo mappings* -> *Connect on GitHub* and install the App on the repo you want crashes to land in.
+. Add a mapping for your package -> repo.
+. Crashes from your release builds will now appear as GitHub issues on the mapped repo.

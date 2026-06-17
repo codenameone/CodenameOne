@@ -85,6 +85,8 @@ include::Testing-with-JUnit.adoc[]
 
 include::Advertising.asciidoc[]
 
+include::Crash-Protection.asciidoc[]
+
 include::Monetization.asciidoc[]
 
 include::Apple-Wallet-Extension.asciidoc[]

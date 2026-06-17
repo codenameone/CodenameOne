@@ -329,7 +329,45 @@ public class LinuxNativeBuilder extends Executor {
             throw new BuildException("Failed to collect the built executable", ex);
         }
         log("Native Linux executable: " + linuxExecutable.getAbsolutePath() + " (" + arch + ")");
+
+        maybeUploadCrashSymbols(request, linuxExecutable);
         return true;
+    }
+
+    /**
+     * Crash protection symbol upload hook. Opt-in via the
+     * {@code codename1.crashProtection.enabled} build property or via
+     * the user's code referencing
+     * {@code com.codename1.crash.CrashProtection}. Per-platform opt-out
+     * via {@code codename1.crashProtection.linux.enabled=false}.
+     *
+     * <p>Skipped silently when not running on the cloud build executor
+     * (which is the only context that sets
+     * {@code BUILDCLOUD_CRASH_ENDPOINT}). Failure to upload never fails
+     * the build -- the symbol bundle is an auxiliary artifact.
+     */
+    private void maybeUploadCrashSymbols(BuildRequest request, File executable) {
+        String endpoint = com.codename1.builders.util.CrashSymbolUploader.endpointFromEnv();
+        String secret = com.codename1.builders.util.CrashSymbolUploader.sharedSecretFromEnv();
+        String buildKey = com.codename1.builders.util.CrashSymbolUploader.buildKeyFromEnv();
+        if (endpoint == null || endpoint.isEmpty()
+                || secret == null || secret.isEmpty()
+                || buildKey == null || buildKey.isEmpty()) {
+            return;
+        }
+        java.util.Map<String, String> props = new java.util.HashMap<>();
+        props.put(com.codename1.builders.util.CrashProtectionOptIn.PROPERTY_GLOBAL,
+                request.getArg(com.codename1.builders.util.CrashProtectionOptIn.PROPERTY_GLOBAL, ""));
+        String perPlatform = String.format(
+                com.codename1.builders.util.CrashProtectionOptIn.PROPERTY_PER_PLATFORM_TEMPLATE,
+                com.codename1.builders.util.CrashSymbolUploader.PLATFORM_LINUX);
+        props.put(perPlatform, request.getArg(perPlatform, ""));
+        if (!com.codename1.builders.util.CrashProtectionOptIn.shouldUpload(
+                com.codename1.builders.util.CrashSymbolUploader.PLATFORM_LINUX, props, null)) {
+            return;
+        }
+        com.codename1.builders.util.CrashSymbolUploader.uploadLinuxSymbols(
+                endpoint, secret, buildKey, executable);
     }
 
     /**

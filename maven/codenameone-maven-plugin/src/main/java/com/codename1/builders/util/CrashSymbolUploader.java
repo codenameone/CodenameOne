@@ -38,6 +38,12 @@ public final class CrashSymbolUploader {
     public static final String PLATFORM_ANDROID = "android";
     /** Platform constant for an iOS dSYM zip. */
     public static final String PLATFORM_IOS = "ios";
+    /** Platform constant for a Mac-native binary / dSYM. */
+    public static final String PLATFORM_MAC = "mac";
+    /** Platform constant for a Linux-native ELF binary or separate .debug file. */
+    public static final String PLATFORM_LINUX = "linux";
+    /** Platform constant for a Windows-native PE binary or accompanying .pdb. */
+    public static final String PLATFORM_WIN32 = "win32";
 
     private CrashSymbolUploader() {
     }
@@ -158,5 +164,68 @@ public final class CrashSymbolUploader {
     public static boolean uploadIosDsym(String endpointBase, String sharedSecret,
             String buildKey, String dsymUuid, File dsymZip) {
         return upload(endpointBase, sharedSecret, buildKey, PLATFORM_IOS, dsymUuid, dsymZip);
+    }
+
+    /**
+     * Mac-native symbol upload. Pass either the produced executable
+     * (DWARF embedded) or a {@code dsymutil}-generated {@code .dSYM}
+     * bundle zip. Symbolication on the server side uses the same
+     * {@code llvm-symbolizer} pipeline as iOS, so either format works.
+     */
+    public static boolean uploadMacSymbols(String endpointBase, String sharedSecret,
+            String buildKey, File binaryOrDsymZip) {
+        return upload(endpointBase, sharedSecret, buildKey, PLATFORM_MAC, null, binaryOrDsymZip);
+    }
+
+    /**
+     * Linux-native symbol upload. Pass either the produced ELF
+     * executable (DWARF embedded if the build wasn't stripped) or
+     * the separate {@code .debug} file produced by
+     * {@code objcopy --only-keep-debug}.
+     */
+    public static boolean uploadLinuxSymbols(String endpointBase, String sharedSecret,
+            String buildKey, File binaryOrDebug) {
+        return upload(endpointBase, sharedSecret, buildKey, PLATFORM_LINUX, null, binaryOrDebug);
+    }
+
+    /**
+     * Windows-native symbol upload. Pass the {@code .pdb} produced by
+     * the MSVC link step (preferred) or the {@code .exe} itself (which
+     * carries enough info for stack walking but not source-level
+     * symbolication).
+     */
+    public static boolean uploadWin32Symbols(String endpointBase, String sharedSecret,
+            String buildKey, File pdbOrExe) {
+        return upload(endpointBase, sharedSecret, buildKey, PLATFORM_WIN32, null, pdbOrExe);
+    }
+
+    /**
+     * Resolve the upload endpoint base from the executor's environment.
+     * The cloud build executor sets {@code BUILDCLOUD_CRASH_ENDPOINT};
+     * local Maven runs leave it unset, which causes every upload call
+     * to skip cleanly. Centralised here so each builder doesn't have to
+     * remember the env var name.
+     */
+    public static String endpointFromEnv() {
+        return System.getenv("BUILDCLOUD_CRASH_ENDPOINT");
+    }
+
+    /**
+     * Resolve the shared secret from the executor's environment.
+     * Companion to {@link #endpointFromEnv}.
+     */
+    public static String sharedSecretFromEnv() {
+        return System.getenv("BUILDCLOUD_BUILDSERVER_SECRET");
+    }
+
+    /**
+     * Resolve the current build's {@code buildEntryKey} from the
+     * executor's environment. Set by the cloud build executor before
+     * it invokes the maven plugin so each builder can tag its
+     * symbol upload with the right build. Empty in local Maven
+     * invocations, which is how callers detect "no upload to do."
+     */
+    public static String buildKeyFromEnv() {
+        return System.getenv("BUILDCLOUD_CURRENT_BUILD_KEY");
     }
 }

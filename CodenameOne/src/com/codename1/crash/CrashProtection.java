@@ -89,7 +89,10 @@ public final class CrashProtection {
 
     /// Installs the crash protection hooks. Idempotent: calling more
     /// than once has no effect. Does nothing on the simulator (matches
-    /// the legacy {@code Log.bindCrashProtection} behaviour).
+    /// the legacy `Log.bindCrashProtection` behaviour) or when crash
+    /// protection has been disabled for the current platform via the
+    /// `codename1.crashProtection.<platform>.enabled` build property
+    /// (see [#isPlatformDisabled]).
     ///
     /// Side effect: any crashes previously persisted to storage but not
     /// yet uploaded will be drained in the background if uploads are
@@ -99,6 +102,14 @@ public final class CrashProtection {
             return;
         }
         if (Display.getInstance().isSimulator()) {
+            installed = true;
+            return;
+        }
+        if (isPlatformDisabled()) {
+            // Developer has explicitly opted this platform out via the
+            // build property. We mark `installed` so subsequent calls
+            // also short-circuit; the rest of the crash machinery
+            // stays inert (no error handler, no drain).
             installed = true;
             return;
         }
@@ -114,6 +125,30 @@ public final class CrashProtection {
         if (isEnabled()) {
             drainAsync();
         }
+    }
+
+    /// Returns `true` when the developer has explicitly opted out of
+    /// crash protection for the current platform via
+    /// `codename1.crashProtection.<platform>.enabled=false` in
+    /// `codenameone_settings.properties`. The property is read at
+    /// runtime via [com.codename1.ui.Display#getProperty(String,String)],
+    /// which on each platform consumes the build-time settings file
+    /// baked into the deliverable. Returns `false` when the property
+    /// is unset or `true` (the default-on behaviour).
+    ///
+    /// Recognised platform names: `android`, `ios`, `mac`, `linux`,
+    /// `win32`, `javascript`, `javase`. The name is whatever
+    /// `Display.getPlatformName()` returns, lowercased.
+    static boolean isPlatformDisabled() {
+        String platform = Display.getInstance().getPlatformName();
+        if (platform == null || platform.isEmpty()) return false;
+        String key = "codename1.crashProtection." + platform.toLowerCase() + ".enabled";
+        String v = Display.getInstance().getProperty(key, "");
+        if (v == null || v.isEmpty()) return false;
+        // Only an explicit `false` disables. Anything else (true / typo
+        // / unrecognised) leaves the platform enabled -- safer to
+        // upload than to silently swallow crashes.
+        return "false".equalsIgnoreCase(v.trim());
     }
 
     /// @return `true` if crash uploads are enabled. Default is `false`.
