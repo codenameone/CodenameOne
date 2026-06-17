@@ -47,17 +47,29 @@ codename1.watchMain=com.example.MyWatchApp  # watch lifecycle (Apple Watch + Wea
 `codename1.watchMain` flows through `CN1BuildMojo` as the `watchMain` build arg.
 `WatchNativeBuilder.parseHints` auto-enables the watch slice whenever `watchMain`
 is present (no separate `watchNative.enabled` needed), so the regular iPhone
-build emits the packaged double app. The watch lifecycle class may equal the
-phone main, but a distinct class lets the watch slice tree-shake from its own
-root (a follow-up can run a second ParparVM pass rooted at `watchMain` for a
-smaller watch binary; today both slices share one translation).
+build emits the packaged double app.
+
+**Important - current bootstrap reality (do NOT assume watchMain tree-shaking):**
+The watch target compiles the SAME single ParparVM translation as the phone and
+boots the **regular main class's** generated `Stub.main` (see
+`cn1_watch_app_main` in the generated `CN1WatchBootstrap.m`, which calls
+`<pkg>_<Main>Stub_main___...`). So the watch binary contains the FULL app code -
+it is NOT separately tree-shaken to a watch-only API surface, and `watchMain`
+(`HelloCodenameOneWatch`) is currently NOT the entry point used by the
+screenshot build (it isn't even guaranteed to be translated, since nothing
+roots it from the phone main). A future enhancement could run a second ParparVM
+pass rooted at `watchMain` for a smaller, watch-specific binary; until then both
+"apps" are the same translated code, entered through the regular main. This
+matters when diagnosing watch rendering: missing/incorrect output is a
+Core-Graphics-backend issue, not absent code.
 
 `WatchNativeBuilder.writeWatchEntry` generates the watch target's entry point:
 - `CN1WatchApp.swift` - the SwiftUI `@main` shell that starts `CN1WatchHost`
   and forwards Digital Crown + tap input;
 - `CN1WatchBootstrap.m` - defines the `cn1_watch_*` hooks `CN1WatchHost` calls,
-  delegating to `cn1_watch_runtime_*` (the CN1 runtime started at the watchMain
-  lifecycle, emitted by the generated watch Stub - the remaining rollout item);
+  delegating to `cn1_watch_runtime_*` (implemented in `CN1WatchRuntime.m`), and
+  emits the app-specific `cn1_watch_app_main` that enters the regular main
+  class's `Stub.main`;
 - a Swift bridging header.
 
 Because the watch app is SwiftUI-`@main`-rooted, the shared ParparVM `int main()`

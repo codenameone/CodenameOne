@@ -1656,6 +1656,17 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
         currentMutableTransform = affine;
         currentMutableTransformSet = YES;
     }
+#else
+    // watchOS: build the 2D affine submatrix directly (same components
+    // CATransform3DGetAffineTransform would extract: a=m11,b=m12,c=m21,d=m22,
+    // tx=m41,ty=m42 of the column-major matrix). Without this the mutable-image
+    // transform was never applied on watch -> rotate/translate/perspective did
+    // nothing on the "image" graphics variants.
+    CGAffineTransform affine = CGAffineTransformMake(a0, b0, a1, b1, a3, b3);
+    if (!CGAffineTransformIsIdentity(affine)) {
+        currentMutableTransform = affine;
+        currentMutableTransformSet = YES;
+    }
 #endif
     POOL_END();
 #endif

@@ -194,27 +194,6 @@
                                         <include name="android_holo_light.res"/>
                                     </fileset>
                                 </copy>
-                                <!-- Generate the Apple Watch simulator skins
-                                     (placeholder bezel art + correct geometry,
-                                     watch=true, roundScreen, safe areas) into
-                                     the output dir so JavaSEPort can load them
-                                     as classpath resources. Driven by the
-                                     committed generator; reuses the downloaded
-                                     iPhoneX.skin only for its theme .res.
-                                     .skin files are gitignored (like
-                                     iPhoneX.skin), so we regenerate at build. -->
-                                <echo>Generating Apple Watch skins</echo>
-                                <mkdir dir="${project.build.directory}/watch-skins-gen"/>
-                                <javac srcdir="${project.basedir}/../../tools/watch-skins"
-                                       destdir="${project.build.directory}/watch-skins-gen"
-                                       includeantruntime="false" fork="true"/>
-                                <java classname="GenerateWatchSkins" fork="true" failonerror="true">
-                                    <classpath>
-                                        <pathelement location="${project.build.directory}/watch-skins-gen"/>
-                                    </classpath>
-                                    <arg value="${project.build.outputDirectory}/iPhoneX.skin"/>
-                                    <arg value="${project.build.outputDirectory}"/>
-                                </java>
                             </target>
                         </configuration>
                         <goals>
