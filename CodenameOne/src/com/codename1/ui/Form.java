@@ -3406,6 +3406,11 @@ public class Form extends Container {
     @Override
     public void pointerPressed(int x, int y) {
         currentPointerPress = new Object();
+        // a press (the start of a click or drag) dismisses any tooltip so it can't linger
+        // over a drag image or get stranded when the gesture rebuilds the UI
+        if (TooltipManager.getInstance() != null) {
+            TooltipManager.getInstance().clearTooltip();
+        }
         // See https://github.com/codenameone/CodenameOne/issues/2352
         if (resumeDragAfterScrolling(x, y)) {
             pointerPressedAgainDuringDrag = true;

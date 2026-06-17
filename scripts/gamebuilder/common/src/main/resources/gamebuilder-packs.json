@@ -1,0 +1,61 @@
+{
+  "packs": [
+    {
+      "id": "platformer",
+      "name": "Platformer",
+      "assets": [
+        { "id": "ground", "name": "Ground", "kind": "tile", "color": "#6B4A2B" },
+        { "id": "grass",  "name": "Grass",  "kind": "tile", "color": "#4FA64F" },
+        { "id": "brick",  "name": "Brick",  "kind": "tile", "color": "#C2603A" },
+        { "id": "crate",  "name": "Crate",  "kind": "tile", "color": "#C9923F" },
+        { "id": "ladder", "name": "Ladder", "kind": "tile", "color": "#9A7B4F" },
+        { "id": "spike",  "name": "Spike",  "kind": "tile", "color": "#9AA7B8" },
+        { "id": "coin",   "name": "Coin",   "kind": "actor", "w": 24, "h": 24, "color": "#F6C944", "defaults": { "value": 10 } },
+        { "id": "gem",    "name": "Gem",    "kind": "actor", "w": 24, "h": 24, "color": "#43C6E0", "defaults": { "value": 50 } },
+        { "id": "player", "name": "Player", "kind": "actor", "w": 28, "h": 32, "color": "#4D86FF", "unique": true, "defaults": { "lives": 3, "jumpHeight": 96 } },
+        { "id": "slime",  "name": "Enemy",  "kind": "actor", "w": 30, "h": 24, "color": "#7BCB4F", "defaults": { "speed": 1.5, "patrol": 64 } },
+        { "id": "door",   "name": "Door",   "kind": "actor", "w": 32, "h": 48, "color": "#8A5A33", "defaults": { "target": "Level 2" } },
+        { "id": "flag",   "name": "Goal",   "kind": "actor", "w": 28, "h": 44, "color": "#E0466A", "defaults": { "target": "Level 2" } }
+      ]
+    },
+    {
+      "id": "topdown",
+      "name": "Top-Down RPG",
+      "assets": [
+        { "id": "floor", "name": "Floor", "kind": "tile", "color": "#C9B79A" },
+        { "id": "wall",  "name": "Wall",  "kind": "tile", "color": "#6E7686" },
+        { "id": "water", "name": "Water", "kind": "tile", "color": "#3E8FD0" },
+        { "id": "tree",  "name": "Tree",  "kind": "tile", "color": "#3E8F58" },
+        { "id": "path",  "name": "Path",  "kind": "tile", "color": "#B89B73" },
+        { "id": "hero",  "name": "Hero",  "kind": "actor", "w": 28, "h": 30, "color": "#4D86FF", "unique": true, "defaults": { "lives": 3, "jumpHeight": 96 } },
+        { "id": "npc",   "name": "NPC",   "kind": "actor", "w": 28, "h": 30, "color": "#C77BD0", "defaults": { "dialog": "Hello, traveller." } },
+        { "id": "chest", "name": "Chest", "kind": "actor", "w": 28, "h": 24, "color": "#B6862C", "defaults": { "loot": "Gold x40" } },
+        { "id": "torch", "name": "Torch", "kind": "actor", "w": 18, "h": 30, "color": "#F08A2A", "defaults": { "lightRadius": 48 } }
+      ]
+    },
+    {
+      "id": "board",
+      "name": "Board & Card",
+      "assets": [
+        { "id": "boardtile", "name": "Square", "kind": "tile", "color": "#E8E2D2" },
+        { "id": "start",     "name": "Start",  "kind": "tile", "color": "#5BBE6B" },
+        { "id": "card",      "name": "Card",   "kind": "actor", "w": 44, "h": 60, "color": "#FAFAFC", "defaults": { "suit": "Spades", "rank": "A" } },
+        { "id": "token",     "name": "Token",  "kind": "actor", "w": 26, "h": 26, "color": "#E0466A", "defaults": { "player": "P1", "cell": 0 } },
+        { "id": "dice",      "name": "Dice",   "kind": "actor", "w": 28, "h": 28, "color": "#FFFFFF", "defaults": { "sides": 6 } }
+      ]
+    },
+    {
+      "id": "kit3d",
+      "name": "3D Kit",
+      "assets": [
+        { "id": "block",  "name": "Block",  "kind": "actor", "color": "#9AA3B0" },
+        { "id": "crate3d","name": "Crate",  "kind": "actor", "color": "#C9923F" },
+        { "id": "barrel", "name": "Barrel", "kind": "actor", "color": "#8A5A33" },
+        { "id": "pillar", "name": "Pillar", "kind": "actor", "color": "#CFD2D9" },
+        { "id": "tree3d", "name": "Tree",   "kind": "actor", "color": "#3E8F58" },
+        { "id": "rock",   "name": "Rock",   "kind": "actor", "color": "#6E7686" },
+        { "id": "spawn",  "name": "Spawn",  "kind": "actor", "color": "#4D86FF", "unique": true, "defaults": { "team": "blue" } }
+      ]
+    }
+  ]
+}

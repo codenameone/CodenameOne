@@ -49,6 +49,15 @@ public class TooltipManager {
         return instance;
     }
 
+    /// Immediately hides any showing or pending tooltip. Call this before tearing down /
+    /// rebuilding a Form so a tooltip anchored to a removed component can't be stranded in
+    /// the popup layer (a full-size layered pane there would swallow pointer events).
+    public static void hideTooltip() {
+        if (instance != null) {
+            instance.clearTooltip();
+        }
+    }
+
     /// Enables the tooltip manager and default tooltip behavior
     public static void enableTooltips() {
         instance = new TooltipManager();
@@ -113,6 +122,13 @@ public class TooltipManager {
     ///
     /// - `cmp`: the component
     protected void showTooltip(final String tip, final Component cmp) {
+        // The anchor may have been removed (e.g. the form was rebuilt) between scheduling and
+        // now -- showing a popup on a detached component throws and can wedge the UI, so bail.
+        Form f = cmp.getComponentForm();
+        if (f == null || f != Display.getInstance().getCurrent()) {
+            clearTooltip();
+            return;
+        }
         currentTooltip = new InteractionDialog(new BorderLayout());
 
         TextArea text = new TextArea(tip);
