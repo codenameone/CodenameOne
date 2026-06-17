@@ -356,6 +356,11 @@ public final class GeneratedAccess_com_codenameone_playground {
                 return typedTarget.isSupported();
             }
         }
+        if ("locationHref".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.locationHref();
+            }
+        }
         if ("notifyUiReady".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.notifyUiReady(); return null;

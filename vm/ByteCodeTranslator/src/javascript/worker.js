@@ -34,6 +34,9 @@ self.onmessage = function(event) {
   const protocol = jvm.protocol.messages;
   if (event.data.type === protocol.START) {
     self.__cn1LocationSearch = event.data.locationSearch ? String(event.data.locationSearch) : '';
+    // Full host-page URL (browser_bridge.js forwards it) so getProperty(
+    // "browser.window.location.*") reflects the PAGE, not the worker script URL.
+    self.__cn1LocationHref = event.data.locationHref ? String(event.data.locationHref) : '';
     // Main thread forwarded window.devicePixelRatio — surface it on self so
     // existing `win.devicePixelRatio` lookups (via the `self.window = self;`
     // alias above) return the real ratio instead of undefined.

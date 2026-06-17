@@ -324,6 +324,11 @@ public final class GeneratedAccess_com_codename1_annotations {
     }
 
     private static Object invoke2(com.codename1.annotations.Concrete typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("linux".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.linux();
+            }
+        }
         if ("name".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.name();

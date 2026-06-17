@@ -221,8 +221,21 @@ body.cn1-playground-page-body .main {
       loader.classList.add("done");
     };
 
+    // The app posts {type:"cn1-app-ready"} once its own boot splash clears
+    // (see browser_bridge.js __cn1_hide_splash__). Hold this overlay loader
+    // until then so the two loaders fade out together instead of revealing the
+    // app's bare "Loading…" splash mid-boot.
+    window.addEventListener("message", function (evt) {
+      var d = evt && evt.data;
+      if (d && (d.type === "cn1-app-ready" || d === "cn1-app-ready")) {
+        hideLoader();
+      }
+    });
+
+    // Safety net: if the ready signal never arrives (older bundle, error), don't
+    // strand the loader forever -- fall back to a generous delay after load.
     frame.addEventListener("load", function () {
-      window.setTimeout(hideLoader, 1200);
+      window.setTimeout(hideLoader, 15000);
     });
   }
 })();

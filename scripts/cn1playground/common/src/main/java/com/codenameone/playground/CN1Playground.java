@@ -846,13 +846,36 @@ public class CN1Playground extends Lifecycle {
         return PlaygroundStateStore.loadCurrentScript();
     }
 
+    /// Resolves the host-page URL. ``CN.getProperty("browser.window.location.href")``
+    /// is unreliable on the JavaScript port (the call devirtualises past
+    /// ``HTML5Implementation.getProperty`` so deep-link params are never seen), so
+    /// we go through the ``WebsiteThemeNative`` bridge when it's available and only
+    /// fall back to the portable property when it isn't (other ports / off-browser).
+    private String browserHref() {
+        try {
+            WebsiteThemeNative nt = websiteThemeNative;
+            if (nt == null) {
+                nt = NativeLookup.create(WebsiteThemeNative.class);
+            }
+            if (nt != null && nt.isSupported()) {
+                String h = nt.locationHref();
+                if (h != null && !h.isEmpty()) {
+                    return h;
+                }
+            }
+        } catch (Throwable ignored) {
+            // Native bridge unavailable -- fall back to the portable property.
+        }
+        return CN.getProperty("browser.window.location.href", null);
+    }
+
     private String resolveInitialCss() {
         String sharedCss = cssFromUrl();
         return sharedCss == null ? PlaygroundStateStore.loadCurrentCss() : sharedCss;
     }
 
     private String scriptFromUrl() {
-        String href = CN.getProperty("browser.window.location.href", null);
+        String href = browserHref();
         if (href == null || href.isEmpty()) {
             return null;
         }
@@ -871,7 +894,7 @@ public class CN1Playground extends Lifecycle {
     }
 
     private String cssFromUrl() {
-        String href = CN.getProperty("browser.window.location.href", null);
+        String href = browserHref();
         if (href == null || href.isEmpty()) {
             return null;
         }
@@ -923,7 +946,7 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void copyCurrentSourceUrl() {
-        String base = CN.getProperty("browser.window.location.href", null);
+        String base = browserHref();
         if (base == null || base.isEmpty()) {
             return;
         }

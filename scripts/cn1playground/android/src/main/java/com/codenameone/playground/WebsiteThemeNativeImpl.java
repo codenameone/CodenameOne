@@ -11,4 +11,8 @@ public class WebsiteThemeNativeImpl {
 
     public void notifyUiReady() {
     }
+
+    public String locationHref() {
+        return null;
+    }
 }

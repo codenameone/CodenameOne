@@ -1350,6 +1350,15 @@
     if (!doc) {
       return null;
     }
+    // Tell an embedding page (e.g. the website's Playground wrapper) that the
+    // app is fully up, so its own overlay loader can fade out exactly when ours
+    // does -- avoiding the visible "switch" from the host loader to this splash.
+    try {
+      var w = (global.window || global);
+      if (w.parent && w.parent !== w && typeof w.parent.postMessage === 'function') {
+        w.parent.postMessage({ type: 'cn1-app-ready' }, '*');
+      }
+    } catch (_pmErr) { /* cross-origin parent -- ignore */ }
     var splash = doc.getElementById('cn1-splash');
     if (!splash) {
       return null;
@@ -2813,6 +2822,92 @@
 
   var appStarter = null;
 
+  // Peer interactivity: the app renders to #codenameone-canvas which sits ON TOP
+  // (z-index 0) of native peer components (BrowserComponent iframes, GL/video
+  // surfaces) parked behind it at z-index -1000 and shown through transparent
+  // ("punched") regions of the canvas. With the canvas at pointer-events:auto it
+  // captures EVERY pointer event, so peers (e.g. the Playground's Monaco editor)
+  // never receive clicks/keys -- they look live but can't be interacted with.
+  // Fix on the main thread (no per-move worker round-trip): on pointer move,
+  // flip the canvas to pointer-events:none whenever a real peer element is under
+  // the cursor, so the browser delivers the event straight to the peer; restore
+  // auto over CN1-painted content so the canvas keeps receiving app input. The
+  // window-level capture listener still fires while the canvas is "none" (the
+  // event lands on a sibling, not inside an iframe), so it re-evaluates as the
+  // cursor leaves the peer. Apps with no peers never see an iframe under the
+  // cursor, so the canvas stays auto and behaviour is unchanged.
+  //
+  // CRITICAL: a peer's box can be under the cursor while the canvas paints OPAQUE
+  // UI on top of it -- e.g. the Playground's "Samples" sheet slides over the
+  // editor iframe. The iframe still occupies that region (it's only hidden behind
+  // the canvas), so a box-only test would wrongly route the panel's clicks to the
+  // hidden editor. The canvas only lets a peer through where it is genuinely
+  // TRANSPARENT (an actual punched hole), so we additionally require the canvas
+  // pixel under the cursor to be (near-)transparent before yielding to the peer.
+  function installPeerPointerToggle() {
+    var alphaCtx = null;
+    function canvasAlphaAt(canvas, x, y) {
+      // Returns the canvas' painted alpha (0-255) at client point (x,y), or -1 if
+      // it cannot be read. Maps CSS coords -> backing-store pixels (devicePixelRatio).
+      try {
+        var rect = canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) { return -1; }
+        var px = Math.round((x - rect.left) * (canvas.width / rect.width));
+        var py = Math.round((y - rect.top) * (canvas.height / rect.height));
+        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) { return -1; }
+        if (!alphaCtx) {
+          alphaCtx = canvas.getContext('2d', { willReadFrequently: true })
+                  || canvas.getContext('2d');
+        }
+        if (!alphaCtx || typeof alphaCtx.getImageData !== 'function') { return -1; }
+        return alphaCtx.getImageData(px, py, 1, 1).data[3];
+      } catch (e) { return -1; }
+    }
+    function pointerOverPeer(x, y) {
+      var canvas = document.getElementById('codenameone-canvas');
+      if (!canvas) { return null; }
+      if (typeof document.elementsFromPoint !== 'function') { return null; }
+      var els = document.elementsFromPoint(x, y);
+      var peerUnder = false;
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (el === canvas) { continue; }
+        if (el === document.body || el === document.documentElement) { break; }
+        if (el.tagName === 'IFRAME') { peerUnder = true; break; }
+        // A peer element nested inside the peers container (but not the empty
+        // full-screen container itself).
+        if (el.closest) {
+          var pc = el.closest('#cn1-peers-container');
+          if (pc && pc !== el) { peerUnder = true; break; }
+        }
+      }
+      if (!peerUnder) { return false; }
+      // A peer box is under the cursor -- only yield to it where the canvas is an
+      // actual transparent hole. If the canvas paints opaque content here (a sheet
+      // or panel over the peer), keep the click on the canvas. When the alpha can't
+      // be read we fall back to box-only behaviour (yield to the peer).
+      var alpha = canvasAlphaAt(canvas, x, y);
+      if (alpha < 0) { return true; }
+      return alpha < 16;
+    }
+    function evaluate(e) {
+      var canvas = document.getElementById('codenameone-canvas');
+      if (!canvas) { return; }
+      var over = pointerOverPeer(e.clientX, e.clientY);
+      if (over === null) { return; }
+      var want = over ? 'none' : 'auto';
+      if (canvas.style.pointerEvents !== want) {
+        canvas.style.pointerEvents = want;
+      }
+    }
+    window.addEventListener('pointermove', evaluate, true);
+    window.addEventListener('mousemove', evaluate, true);
+    // Also evaluate on pointerdown so a press immediately following a move
+    // (or a synthesized tap) routes to the right layer before dispatch settles.
+    window.addEventListener('pointerdown', evaluate, true);
+  }
+  try { installPeerPointerToggle(); } catch (e) { /* non-fatal */ }
+
   global.startParparVmApp = function() {
     log('startParparVmApp');
     diag('INIT', 'startParparVmApp', 'entered');
@@ -2849,6 +2944,10 @@
     worker.postMessage({
       type: 'start',
       locationSearch: (global.location && global.location.search) ? String(global.location.search) : '',
+      // Full host-page URL so the worker's getProperty("browser.window.location.*")
+      // reflects the PAGE (deep links / ?sample= / ?code= share links) rather than
+      // the worker script's own URL. See HTML5Implementation.mainLocationHref.
+      locationHref: (global.location && global.location.href) ? String(global.location.href) : '',
       devicePixelRatio: dpr
     });
   };
