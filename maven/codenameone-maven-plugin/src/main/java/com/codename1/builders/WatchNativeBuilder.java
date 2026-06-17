@@ -74,6 +74,7 @@ class WatchNativeBuilder {
         "EAGLView.m", "METALView.m",
         "CN1ES1compat.m", "CN1ES2compat.m", "CN1GL3D.m",
         "CN1Metalcompat.m", "CN1MetalGlyphAtlas.m", "CN1MetalPipelineCache.m",
+        "CN1MetalShaders.metal",
         "DrawGradientTextureCache.m", "DrawStringTextureCache.m",
         "CodenameOne_GLSceneDelegate.m",
         "CodenameOne_GLViewController.xib", "MainWindow.xib",
@@ -123,9 +124,11 @@ class WatchNativeBuilder {
         distribution = request.getArg("watchNative.distribution", "companion");
         bundleId = request.getArg("watchNative.bundleId",
                 request.getPackageName() + ".watchkitapp");
-        // watchOS 9 is the modern floor: single-target WKApplication apps +
-        // WidgetKit complications. Lower only if the project explicitly asks.
-        minDeploymentTarget = request.getArg("watchNative.minDeploymentTarget", "9.0");
+        // watchOS 10 is the floor: single-target WKApplication apps, WidgetKit
+        // complications, and the SwiftUI onChange(of:) two-parameter API the
+        // generated CN1WatchRootView uses. Lower only if the project explicitly
+        // asks (and adjusts the generated shell accordingly).
+        minDeploymentTarget = request.getArg("watchNative.minDeploymentTarget", "10.0");
         teamId = request.getArg("watchNative.teamId",
                 request.getArg("ios.release.teamId",
                         request.getArg("ios.teamId",
@@ -186,14 +189,46 @@ class WatchNativeBuilder {
           .append("    }\n")
           .append("}\n\n")
           .append("final class CN1WatchAppDelegate: NSObject, WKApplicationDelegate {\n")
-          .append("    func applicationDidFinishLaunching() {\n")
-          .append("        let d = WKInterfaceDevice.current()\n")
-          .append("        CN1WatchHost.shared().start(withWidth: Int32(d.screenBounds.width),\n")
-          .append("                                    height: Int32(d.screenBounds.height),\n")
-          .append("                                    scale: d.screenScale)\n")
-          .append("    }\n")
           .append("    func applicationDidBecomeActive() { CN1WatchHost.shared().applicationDidBecomeActive() }\n")
           .append("    func applicationWillResignActive() { CN1WatchHost.shared().applicationWillResignActive() }\n")
+          .append("}\n\n")
+          .append("// Surface bridge: CN1WatchHost pushes rendered frames here (main thread);\n")
+          .append("// SwiftUI observes `image` and redraws.\n")
+          .append("final class CN1WatchFrameModel: NSObject, ObservableObject, CN1WatchSurface {\n")
+          .append("    @Published var image: UIImage?\n")
+          .append("    func displayFrame(_ frame: UIImage) { self.image = frame }\n")
+          .append("}\n\n")
+          .append("struct CN1WatchRootView: View {\n")
+          .append("    @StateObject private var model = CN1WatchFrameModel()\n")
+          .append("    @State private var crown: Double = 0\n")
+          .append("    var body: some View {\n")
+          .append("        GeometryReader { geo in\n")
+          .append("            ZStack {\n")
+          .append("                Color.black\n")
+          .append("                if let img = model.image {\n")
+          .append("                    Image(uiImage: img).resizable().frame(width: geo.size.width, height: geo.size.height)\n")
+          .append("                }\n")
+          .append("            }\n")
+          .append("            .focusable(true)\n")
+          .append("            .digitalCrownRotation($crown, from: -1_000_000, through: 1_000_000,\n")
+          .append("                                  by: 1, sensitivity: .medium, isContinuous: true)\n")
+          .append("            .onChange(of: crown) { oldValue, newValue in\n")
+          .append("                CN1WatchHost.shared().crownRotated(by: newValue - oldValue)\n")
+          .append("            }\n")
+          .append("            .gesture(SpatialTapGesture().onEnded { e in\n")
+          .append("                CN1WatchHost.shared().tapAt(x: Int32(e.location.x), y: Int32(e.location.y))\n")
+          .append("            })\n")
+          .append("            .ignoresSafeArea()\n")
+          .append("            .onAppear {\n")
+          .append("                let d = WKInterfaceDevice.current()\n")
+          .append("                CN1WatchHost.shared().surface = model\n")
+          .append("                CN1WatchHost.shared().start(withWidth: Int32(d.screenBounds.width),\n")
+          .append("                                            height: Int32(d.screenBounds.height),\n")
+          .append("                                            scale: d.screenScale)\n")
+          .append("            }\n")
+          .append("        }\n")
+          .append("        .ignoresSafeArea()\n")
+          .append("    }\n")
           .append("}\n");
         owner.createFile(new File(appSrcDir, "CN1WatchApp.swift"),
                 sw.toString().getBytes(StandardCharsets.UTF_8));
@@ -228,6 +263,60 @@ class WatchNativeBuilder {
         // 3) Bridging header.
         owner.createFile(new File(appSrcDir, mainClass + "-Watch-Bridging-Header.h"),
                 "#import \"CN1WatchHost.h\"\n".getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Write stub GLKit / OpenGLES headers under {@code watchOSStubs/} so the
+     * shared sources that {@code #import <GLKit/...>} / {@code <OpenGLES/...>}
+     * (chiefly CN1ES2compat.h) compile on watchOS, where those frameworks don't
+     * exist. The stubs provide the GL scalar types + GLKMatrix4/GLKVector*
+     * typedefs the declarations reference; the GL functions are never called on
+     * the watch slice (the TARGET_OS_WATCH op branches route to CN1CGGraphics).
+     * Same approach MacNativeBuilder uses for the Catalyst slice.
+     */
+    void writeStubHeaders(File appSrcDir) throws IOException {
+        File stubsDir = new File(appSrcDir, "watchOSStubs");
+        File openGLESes1 = new File(new File(stubsDir, "OpenGLES"), "ES1");
+        File openGLESes2 = new File(new File(stubsDir, "OpenGLES"), "ES2");
+        File eagl = new File(stubsDir, "OpenGLES");
+        File glkit = new File(stubsDir, "GLKit");
+        openGLESes1.mkdirs();
+        openGLESes2.mkdirs();
+        glkit.mkdirs();
+        String glTypes =
+                "#ifndef CN1_WATCHOS_STUB_GLES_TYPES\n#define CN1_WATCHOS_STUB_GLES_TYPES\n"
+                + "typedef unsigned int GLenum;\ntypedef unsigned int GLuint;\n"
+                + "typedef int GLint;\ntypedef int GLsizei;\ntypedef float GLfloat;\n"
+                + "typedef float GLclampf;\ntypedef unsigned char GLubyte;\n"
+                + "typedef unsigned char GLboolean;\ntypedef void GLvoid;\n"
+                + "typedef signed char GLbyte;\ntypedef short GLshort;\n"
+                + "typedef unsigned short GLushort;\ntypedef int GLfixed;\n"
+                + "typedef unsigned int GLbitfield;\ntypedef long GLintptr;\n"
+                + "typedef long GLsizeiptr;\n#endif\n";
+        writeStub(new File(eagl, "EAGL.h"),
+                "#ifndef CN1_WATCHOS_STUB_EAGL_H\n#define CN1_WATCHOS_STUB_EAGL_H\n"
+                + "#import <Foundation/Foundation.h>\n"
+                + "@interface EAGLContext : NSObject @end\n"
+                + "typedef enum { kEAGLRenderingAPIOpenGLES1 = 1, kEAGLRenderingAPIOpenGLES2 = 2,"
+                + " kEAGLRenderingAPIOpenGLES3 = 3 } EAGLRenderingAPI;\n#endif\n");
+        writeStub(new File(openGLESes1, "gl.h"), glTypes);
+        writeStub(new File(openGLESes1, "glext.h"), "");
+        writeStub(new File(openGLESes2, "gl.h"), glTypes);
+        writeStub(new File(openGLESes2, "glext.h"), "");
+        writeStub(new File(glkit, "GLKit.h"),
+                "#ifndef CN1_WATCHOS_STUB_GLKIT_H\n#define CN1_WATCHOS_STUB_GLKIT_H\n"
+                + "#import <Foundation/Foundation.h>\n#import <OpenGLES/ES2/gl.h>\n"
+                + "typedef struct { float m[16]; } GLKMatrix4;\n"
+                + "typedef struct { float v[4]; } GLKVector4;\n"
+                + "typedef struct { float v[3]; } GLKVector3;\n"
+                + "typedef struct { float v[2]; } GLKVector2;\n"
+                + "@interface GLKView : NSObject @end\n@interface GLKBaseEffect : NSObject @end\n"
+                + "@interface GLKTextureLoader : NSObject @end\n@interface GLKTextureInfo : NSObject @end\n#endif\n");
+        owner.log("[watchNative] Wrote watchOS stub headers under " + stubsDir.getAbsolutePath());
+    }
+
+    private void writeStub(File f, String content) throws IOException {
+        owner.createFile(f, content.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -354,8 +443,12 @@ class WatchNativeBuilder {
                 .append("watch_target.build_configurations.each do |config|\n")
                 .append("  bs = config.build_settings\n")
                 .append("  bs['SDKROOT'] = 'watchos'\n")
-                .append("  bs['ARCHS'] = 'arm64_32 arm64'\n")
-                .append("  bs['VALID_ARCHS'] = 'arm64_32 arm64'\n")
+                // arm64_32 is the watchOS *device* ABI; the watch *simulator*
+                // on Apple Silicon is arm64 (and x86_64 on Intel). Set the arch
+                // per-SDK so the simulator build doesn't try arm64_32 (whose
+                // Swift stdlib slice doesn't exist -> 'Unable to find module Swift').
+                .append("  bs['ARCHS[sdk=watchos*]'] = 'arm64_32'\n")
+                .append("  bs['ARCHS[sdk=watchsimulator*]'] = '$(ARCHS_STANDARD)'\n")
                 .append("  bs['WATCHOS_DEPLOYMENT_TARGET'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(minDeploymentTarget)).append("'\n")
                 .append("  bs['TARGETED_DEVICE_FAMILY'] = '4'\n")
@@ -378,6 +471,11 @@ class WatchNativeBuilder {
                 .append("  bs['SWIFT_VERSION'] = '5.0'\n")
                 .append("  bs['SWIFT_OBJC_BRIDGING_HEADER'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + mainClass + "-Watch-Bridging-Header.h")).append("'\n")
+                // Resolve <GLKit/..> and <OpenGLES/..> to the watchOS stub
+                // headers (writeStubHeaders) since neither framework exists on
+                // watchOS; the stubs supply the GL types the shared decls use.
+                .append("  bs['HEADER_SEARCH_PATHS'] = '$(inherited) $(SRCROOT)/")
+                .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
                 .append("  bs['SKIP_INSTALL'] = 'YES'\n");
         if (resolvedTeamId != null && !resolvedTeamId.isEmpty()) {
             s.append("  bs['DEVELOPMENT_TEAM'] = '").append(resolvedTeamId).append("'\n");

@@ -2998,6 +2998,7 @@ public class IPhoneBuilder extends Executor {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
                     watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
+                    watchNativeBuilder.writeStubHeaders(appSrcDir);
                     watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                 }
 
