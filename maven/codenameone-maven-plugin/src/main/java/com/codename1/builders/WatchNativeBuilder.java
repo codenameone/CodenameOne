@@ -272,7 +272,11 @@ class WatchNativeBuilder {
         // on a dedicated thread; Stub.main sets the main class and calls
         // Display.init, which starts the EDT and blocks the thread inside initVM
         // (mirroring iOS main() + UIApplicationMain).
-        String mainStub = mangle(mainClass) + "Stub";
+        // request.getMainClass() is the SIMPLE class name; the generated Stub's
+        // C symbol is mangled from the fully-qualified <package>.<Main>Stub.
+        String mainFqn = (request.getPackageName() == null || request.getPackageName().isEmpty())
+                ? mainClass : (request.getPackageName() + "." + mainClass);
+        String mainStub = mangle(mainFqn) + "Stub";
         StringBuilder bs = new StringBuilder();
         bs.append("#include \"TargetConditionals.h\"\n")
           .append("#if TARGET_OS_WATCH\n")
