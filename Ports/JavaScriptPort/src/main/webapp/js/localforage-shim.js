@@ -190,6 +190,31 @@
       if (!stopped) {
         callBack(successCallback, null);
       }
-    }
+    },
+    // Synchronous, value-returning variants. The ParparVM JS port runs the app
+    // in a Web Worker; the legacy callback methods above hand their result back
+    // to the worker as a ``worker-callback`` message, which the Java side waited
+    // for with a ``while(!done){Thread.sleep(20);}`` poll. That tight timer loop
+    // STARVES the worker's ``self.onmessage`` (it never gets a turn to deliver
+    // the callback), so every storage op hit the 10s poll timeout and the EDT
+    // was permanently blocked -> the whole app froze to input. These *Sync
+    // methods are invoked from Java as ordinary BLOCKING JSO host calls that
+    // RETURN the value directly (the worker parks on HOST_CALL and resumes on
+    // HOST_CALLBACK -- a path that is NOT starved), so no poll/Thread.sleep and
+    // no message starvation. localStorage is itself synchronous, so there is
+    // nothing async to wait for here.
+    getItemSync: function(key) { return getItemImpl(key); },
+    setItemSync: function(key, value) { return setItemImpl(key, value); },
+    removeItemSync: function(key) { window.localStorage.removeItem(namespacedKey(key)); return true; },
+    clearSync: function() {
+      var doomed = [];
+      eachKey(function(k) { doomed.push(k); });
+      for (var i = 0; i < doomed.length; i++) {
+        window.localStorage.removeItem(namespacedKey(doomed[i]));
+      }
+      return true;
+    },
+    lengthSync: function() { var n = 0; eachKey(function() { n++; }); return n; },
+    keysSync: function() { var out = []; eachKey(function(k) { out.push(k); }); return out; }
   };
 })();
