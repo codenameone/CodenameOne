@@ -45,6 +45,7 @@ public class StreamingTerrain implements Terrain {
         this.provider = provider;
         this.cacheSize = Math.max(4, cacheSize);
         this.loaded = new LinkedHashMap<Long, TerrainChunk>(16, 0.75f, true) {
+            @Override
             protected boolean removeEldestEntry(Map.Entry<Long, TerrainChunk> eldest) {
                 if (size() > StreamingTerrain.this.cacheSize) {
                     TerrainChunk c = eldest.getValue();
@@ -107,26 +108,32 @@ public class StreamingTerrain implements Terrain {
         return chunk(floorDiv(x, TerrainChunk.SIZE), floorDiv(z, TerrainChunk.SIZE));
     }
 
+    @Override
     public float getHeight(int x, int z) {
         return chunkForCell(x, z).getHeight(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE));
     }
 
+    @Override
     public void setHeight(int x, int z, float height) {
         chunkForCell(x, z).setHeight(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE), height);
     }
 
+    @Override
     public boolean hasGround(int x, int z) {
         return getHeight(x, z) != NO_GROUND;
     }
 
+    @Override
     public String getMaterial(int x, int z) {
         return chunkForCell(x, z).getMaterial(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE));
     }
 
+    @Override
     public void setMaterial(int x, int z, String materialId) {
         chunkForCell(x, z).setMaterial(floorMod(x, TerrainChunk.SIZE), floorMod(z, TerrainChunk.SIZE), materialId);
     }
 
+    @Override
     public List<TerrainFeature> features() {
         List<TerrainFeature> all = new ArrayList<TerrainFeature>();
         for (TerrainChunk c : loaded.values()) {
@@ -135,19 +142,23 @@ public class StreamingTerrain implements Terrain {
         return all;
     }
 
+    @Override
     public void addFeature(TerrainFeature feature) {
         chunkForCell((int) Math.floor(feature.getX()), (int) Math.floor(feature.getZ())).features().add(feature);
         chunkForCell((int) Math.floor(feature.getX()), (int) Math.floor(feature.getZ())).touch();
     }
 
+    @Override
     public boolean isBounded() {
         return false;
     }
 
+    @Override
     public int getCols() {
         return -1;
     }
 
+    @Override
     public int getRows() {
         return -1;
     }
@@ -193,11 +204,13 @@ public class StreamingTerrain implements Terrain {
     public static final class MemoryChunkProvider implements ChunkProvider {
         private final Map<Long, TerrainChunk> store = new HashMap<Long, TerrainChunk>();
 
+        @Override
         public TerrainChunk loadChunk(int cx, int cz) {
             TerrainChunk c = store.get(Long.valueOf(key(cx, cz)));
             return c != null ? c : new TerrainChunk(cx, cz);
         }
 
+        @Override
         public void saveChunk(TerrainChunk chunk) {
             store.put(Long.valueOf(key(chunk.getChunkX(), chunk.getChunkZ())), chunk);
         }

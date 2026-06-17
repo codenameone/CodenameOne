@@ -69,6 +69,7 @@ public class AssetCatalog {
             try {
                 r.close();
             } catch (IOException ignore) {
+                // ignore: failing to close the input stream is harmless here
             }
         }
     }
@@ -80,8 +81,8 @@ public class AssetCatalog {
         }
         List<Object> packList = Json.asList(root.get("packs"));
         if (packList != null) {
-            for (int i = 0; i < packList.size(); i++) {
-                Map<String, Object> pm = Json.asMap(packList.get(i));
+            for (Object packEntry : packList) {
+                Map<String, Object> pm = Json.asMap(packEntry);
                 if (pm != null) {
                     catalog.addPack(AssetPack.fromMap(pm));
                 }
@@ -93,8 +94,7 @@ public class AssetCatalog {
     public AssetCatalog addPack(AssetPack pack) {
         packs.put(pack.getId(), pack);
         List<AssetDef> defs = pack.assets();
-        for (int i = 0; i < defs.size(); i++) {
-            AssetDef d = defs.get(i);
+        for (AssetDef d : defs) {
             if (!byId.containsKey(d.getId())) {
                 byId.put(d.getId(), d);
             }

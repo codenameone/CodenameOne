@@ -90,8 +90,8 @@ public class AssetPack {
         AssetPack pack = new AssetPack(Json.str(m.get("id"), null), Json.str(m.get("name"), null));
         List<Object> assetList = Json.asList(m.get("assets"));
         if (assetList != null) {
-            for (int i = 0; i < assetList.size(); i++) {
-                Map<String, Object> am = Json.asMap(assetList.get(i));
+            for (Object assetEntry : assetList) {
+                Map<String, Object> am = Json.asMap(assetEntry);
                 if (am != null) {
                     pack.add(AssetDef.fromMap(am));
                 }

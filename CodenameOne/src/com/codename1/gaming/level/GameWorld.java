@@ -88,7 +88,7 @@ public class GameWorld {
     public static GameWorld fromMap(Map<String, Object> root) {
         GameWorld w = new GameWorld();
         w.keepRadius = Json.intval(root.get("keepRadius"), 1);
-        java.util.List<Object> rs = Json.asList(root.get("regions"));
+        List<Object> rs = Json.asList(root.get("regions"));
         if (rs != null) {
             for (int i = 0; i < rs.size(); i++) {
                 Map<String, Object> rm = Json.asMap(rs.get(i));
@@ -169,8 +169,8 @@ public class GameWorld {
         frontier.add(active.getId());
         for (int depth = 0; depth < keepRadius; depth++) {
             List<String> next = new ArrayList<String>();
-            for (int i = 0; i < frontier.size(); i++) {
-                Region r = getRegion(frontier.get(i));
+            for (String frontierId : frontier) {
+                Region r = getRegion(frontierId);
                 if (r == null) {
                     continue;
                 }
@@ -192,8 +192,8 @@ public class GameWorld {
                     toEvict.add(id);
                 }
             }
-            for (int i = 0; i < toEvict.size(); i++) {
-                Region r = regions.remove(toEvict.get(i));
+            for (String id : toEvict) {
+                Region r = regions.remove(id);
                 if (r != null) {
                     provider.saveRegion(r);
                 }

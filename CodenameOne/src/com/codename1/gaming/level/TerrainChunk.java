@@ -156,8 +156,8 @@ public class TerrainChunk {
         c.palette.clear();
         List<Object> pal = Json.asList(m.get("palette"));
         if (pal != null) {
-            for (int i = 0; i < pal.size(); i++) {
-                c.palette.add(Json.str(pal.get(i), MaterialRegistry.GRASS));
+            for (Object paletteEntry : pal) {
+                c.palette.add(Json.str(paletteEntry, MaterialRegistry.GRASS));
             }
         }
         if (c.palette.isEmpty()) {
@@ -177,8 +177,8 @@ public class TerrainChunk {
         }
         List<Object> fs = Json.asList(m.get("features"));
         if (fs != null) {
-            for (int i = 0; i < fs.size(); i++) {
-                Map<String, Object> fm = Json.asMap(fs.get(i));
+            for (Object featureEntry : fs) {
+                Map<String, Object> fm = Json.asMap(featureEntry);
                 if (fm != null) {
                     c.features.add(TerrainFeature.read(fm));
                 }

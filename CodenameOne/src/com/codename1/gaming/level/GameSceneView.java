@@ -22,7 +22,6 @@
  */
 package com.codename1.gaming.level;
 
-import com.codename1.gaming.GameCamera;
 import com.codename1.gaming.GameView;
 import com.codename1.gaming.Model;
 import com.codename1.gpu.GraphicsDevice;

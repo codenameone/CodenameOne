@@ -34,7 +34,6 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -199,8 +198,7 @@ public class GameLevel {
     }
 
     public Layer getLayer(String name) {
-        for (int i = 0; i < layers.size(); i++) {
-            Layer l = layers.get(i);
+        for (Layer l : layers) {
             if (name == null ? l.getName() == null : name.equals(l.getName())) {
                 return l;
             }
@@ -325,8 +323,7 @@ public class GameLevel {
             return;
         }
         // tile layers
-        for (int li = 0; li < layers.size(); li++) {
-            Layer layer = layers.get(li);
+        for (Layer layer : layers) {
             if (layer.getKind() != Layer.KIND_TILE || !layer.isVisible()) {
                 continue;
             }
@@ -342,15 +339,14 @@ public class GameLevel {
                     continue;
                 }
                 Sprite s = new Sprite(img);
-                placeCell(s, cr[0], cr[1], projection, true);
+                placeCell(s, cr[0], cr[1], projection);
                 s.setZOrder(z);
                 s.setUserData(layer);
                 scene.add(s);
             }
         }
         // freely placed elements
-        for (int ei = 0; ei < elements.size(); ei++) {
-            GameElement el = elements.get(ei);
+        for (GameElement el : elements) {
             Layer layer = getLayer(el.getLayer());
             if (layer != null && !layer.isVisible()) {
                 continue;
@@ -362,7 +358,7 @@ public class GameLevel {
             Sprite s = new Sprite(img);
             if (mode == MODE_BOARD && projection != null) {
                 // board elements are placed by their (col,row) stored as x,y
-                placeCell(s, (int) Math.round(el.getX()), (int) Math.round(el.getY()), projection, false);
+                placeCell(s, (int) Math.round(el.getX()), (int) Math.round(el.getY()), projection);
             } else {
                 s.setAnchor(0.5, 0.5);
                 s.setPosition(el.getX(), el.getY(), el.getZ());
@@ -375,7 +371,7 @@ public class GameLevel {
         }
     }
 
-    private void placeCell(Sprite s, int col, int row, IsoProjection projection, boolean tile) {
+    private void placeCell(Sprite s, int col, int row, IsoProjection projection) {
         if (mode == MODE_BOARD && projection != null) {
             s.setAnchor(0.5, 0.5);
             s.setPosition(projection.tileCenterX(row, col), projection.tileCenterY(row, col));
@@ -415,6 +411,7 @@ public class GameLevel {
             try {
                 r.close();
             } catch (IOException ignore) {
+                // ignore: failing to close the input stream after a successful parse is harmless
             }
         }
     }
@@ -453,8 +450,8 @@ public class GameLevel {
 
         List<Object> lts = Json.asList(root.get("lights"));
         if (lts != null) {
-            for (int i = 0; i < lts.size(); i++) {
-                Map<String, Object> lm = Json.asMap(lts.get(i));
+            for (Object lightEntry : lts) {
+                Map<String, Object> lm = Json.asMap(lightEntry);
                 if (lm == null) {
                     continue;
                 }
@@ -522,8 +519,8 @@ public class GameLevel {
 
         List<Object> es = Json.asList(root.get("elements"));
         if (es != null) {
-            for (int i = 0; i < es.size(); i++) {
-                Map<String, Object> em = Json.asMap(es.get(i));
+            for (Object elementEntry : es) {
+                Map<String, Object> em = Json.asMap(elementEntry);
                 if (em == null) {
                     continue;
                 }
@@ -551,7 +548,7 @@ public class GameLevel {
             return new float[]{dx, dy, dz};
         }
         return new float[]{
-                l.size() > 0 ? (float) Json.num(l.get(0), dx) : dx,
+                !l.isEmpty() ? (float) Json.num(l.get(0), dx) : dx,
                 l.size() > 1 ? (float) Json.num(l.get(1), dy) : dy,
                 l.size() > 2 ? (float) Json.num(l.get(2), dz) : dz};
     }

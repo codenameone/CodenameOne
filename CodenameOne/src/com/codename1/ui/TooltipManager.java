@@ -125,7 +125,7 @@ public class TooltipManager {
         // The anchor may have been removed (e.g. the form was rebuilt) between scheduling and
         // now -- showing a popup on a detached component throws and can wedge the UI, so bail.
         Form f = cmp.getComponentForm();
-        if (f == null || f != Display.getInstance().getCurrent()) {
+        if (f == null || f != Display.getInstance().getCurrent()) { //NOPMD CompareObjectsWithEquals
             clearTooltip();
             return;
         }

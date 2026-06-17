@@ -187,7 +187,7 @@ public class Region {
         try {
             return fromMap(com.codename1.io.JSONParser.parseJSON(json));
         } catch (java.io.IOException ex) {
-            throw new RuntimeException("bad region json: " + ex);
+            throw new RuntimeException("bad region json", ex);
         }
     }
 
@@ -207,8 +207,8 @@ public class Region {
         }
         List<Object> els = Json.asList(root.get("elements"));
         if (els != null) {
-            for (int i = 0; i < els.size(); i++) {
-                Map<String, Object> em = Json.asMap(els.get(i));
+            for (Object elementEntry : els) {
+                Map<String, Object> em = Json.asMap(elementEntry);
                 if (em != null) {
                     r.elements.add(GameElement.read(em));
                 }
@@ -217,8 +217,8 @@ public class Region {
         List<Object> chunks = Json.asList(root.get("chunks"));
         if (chunks != null && !chunks.isEmpty()) {
             StreamingTerrain.MemoryChunkProvider mem = new StreamingTerrain.MemoryChunkProvider();
-            for (int i = 0; i < chunks.size(); i++) {
-                Map<String, Object> cm = Json.asMap(chunks.get(i));
+            for (Object chunkEntry : chunks) {
+                Map<String, Object> cm = Json.asMap(chunkEntry);
                 if (cm != null) {
                     mem.saveChunk(TerrainChunk.read(cm));
                 }
