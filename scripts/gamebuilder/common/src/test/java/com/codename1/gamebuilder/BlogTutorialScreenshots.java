@@ -131,15 +131,101 @@ public final class BlogTutorialScreenshots {
 
         edit(() -> {
             EditorController c = gb.getController();
+            EditorModel m = c.model();
+            int ts = lvl[0].getTileSize();
+            int rows = lvl[0].getRows();
+            // an enemy to dodge and a flag to reach — the goal of the level
+            m.setSelectedAssetId("slime");
+            GameElement slime = c.placeElement(11 * ts, (rows - 3) * ts);
+            slime.setProperty("speed", 40);
+            m.setSelectedAssetId("flag");
+            c.placeElement((lvl[0].getCols() - 2) * ts, (rows - 3) * ts);
+            m.setSelection(slime);
+        });
+        shot("platformer-5-enemy-goal");
+
+        edit(() -> {
+            EditorController c = gb.getController();
             c.setLevelProperty("gravity", 9.8);
             c.setLevelProperty("background", "Sky");
             c.model().setSelection(null);
         });
-        shot("platformer-5-scene");
+        shot("platformer-6-scene");
 
         live();
-        shot("platformer-6-play");
+        shot("platformer-7-play");
+        recordGif("platformer", true);
         stop();
+    }
+
+    /// Records a short gameplay GIF of the live preview by driving scripted input each frame
+    /// and cropping to the canvas (the device-framed game). Frames are written to a temp dir
+    /// and assembled into a GIF by the build step.
+    private static void recordGif(String name, boolean platformer) {
+        Display.getInstance().callSeriallyAndWait(() -> {
+            ensureLive();
+            if (platformer) {
+                gb.getCanvas().keyPressed(Display.GAME_RIGHT);   // run right
+            } else {
+                gb.getCanvas().keyPressed(Display.GAME_UP);      // walk forward (3D)
+            }
+        });
+        for (int f = 0; f < 24; f++) {
+            final int fr = f;
+            Display.getInstance().callSeriallyAndWait(() -> {
+                if (platformer) {
+                    if (fr % 6 == 0) {
+                        gb.getCanvas().keyPressed(Display.GAME_UP);     // periodic jump (edge)
+                    } else if (fr % 6 == 2) {
+                        gb.getCanvas().keyReleased(Display.GAME_UP);
+                    }
+                } else if (fr % 8 == 4) {
+                    gb.getCanvas().keyPressed(Display.GAME_RIGHT);      // occasional turn (3D)
+                } else if (fr % 8 == 6) {
+                    gb.getCanvas().keyReleased(Display.GAME_RIGHT);
+                }
+                gb.getCanvas().tick(0.06);
+            });
+            cropFrame(name, fr);
+        }
+    }
+
+    private static void ensureLive() {
+        Component live = find(Display.getInstance().getCurrent(), "btn.live");
+        if (live instanceof Button && !gb.getCanvas().isPlayMode()) {
+            ((Button) live).released();
+        }
+        gb.getCanvas().tick(0.06);
+    }
+
+    private static void cropFrame(String name, int fr) {
+        final Image[] img = new Image[1];
+        final int[] box = new int[4];
+        Display.getInstance().callSeriallyAndWait(() -> {
+            Form f = Display.getInstance().getCurrent();
+            f.setWidth(W);
+            f.setHeight(H);
+            f.revalidate();
+            f.layoutContainer();
+            Image i = Image.createImage(W, H, 0xff061634);
+            f.paintComponent(i.getGraphics(), true);
+            img[0] = i;
+            box[0] = gb.getCanvas().getAbsoluteX();
+            box[1] = gb.getCanvas().getAbsoluteY();
+            box[2] = gb.getCanvas().getWidth();
+            box[3] = gb.getCanvas().getHeight();
+        });
+        try {
+            Image crop = img[0].subImage(Math.max(0, box[0]), Math.max(0, box[1]),
+                    Math.min(box[2], W - box[0]), Math.min(box[3], H - box[1]), true);
+            File dir = new File("target/gifframes/" + name);
+            dir.mkdirs();
+            try (OutputStream os = new FileOutputStream(new File(dir, String.format("%02d.png", fr)))) {
+                ImageIO.getImageIO().save(crop, os, ImageIO.FORMAT_PNG, 1f);
+            }
+        } catch (Exception ex) {
+            com.codename1.io.Log.e(ex);
+        }
     }
 
     // ---- Tutorial 2: board game "Checkers Start" -----------------------------
@@ -241,6 +327,7 @@ public final class BlogTutorialScreenshots {
             tick();
         }
         shot("dungeon-5-walk");
+        recordGif("dungeon", false);
         stop();
     }
 
