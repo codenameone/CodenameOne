@@ -51,6 +51,9 @@
 #import "CN1UITextField.h"
 #if !TARGET_OS_WATCH
 #import <AudioToolbox/AudioToolbox.h>
+#else
+#import "CN1WatchHost.h"
+#import "CN1WatchRenderingView.h"
 #endif
 #import "DrawGradientTextureCache.h"
 #import "DrawStringTextureCache.h"
@@ -1879,6 +1882,8 @@ int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
     //CN1Log(@"Font is %i", (int)f);
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl finished");
 #if TARGET_OS_WATCH
+    if (s == nil) { return 0; }
+    if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
     return (int)[s sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
     return (int)[s sizeWithFont:f].width;
@@ -1890,6 +1895,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 (void* peer, int chr) {
     UIFont* f = (BRIDGE_CAST UIFont*)peer;
 #if TARGET_OS_WATCH
+    if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
     return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
     return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithFont:f].width;
@@ -1972,6 +1978,14 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
  * Signature: ()I
  */
 int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
+#if TARGET_OS_WATCH
+    // No UIView metrics on watchOS; the CG surface is the source of truth.
+    // scaleValue is 1 on the watch slice, so logical points == CN1 pixels.
+    CN1WatchRenderingView *v = [CN1WatchHost sharedHost].renderingView;
+    if (v != nil && [v logicalWidth] > 0) {
+        return [v logicalWidth];
+    }
+#endif
     return displayWidth;
 }
 
@@ -1983,6 +1997,12 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
 int
 Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
     //GET_DIPLAY_HEIGHT_MARKER
+#if TARGET_OS_WATCH
+    CN1WatchRenderingView *v = [CN1WatchHost sharedHost].renderingView;
+    if (v != nil && [v logicalHeight] > 0) {
+        return [v logicalHeight];
+    }
+#endif
     return displayHeight;
 }
 

@@ -30,6 +30,8 @@
 #import "CN1ES2compat.h"
 #if TARGET_OS_WATCH
 #import "CN1CGGraphics.h"
+#import "CN1WatchHost.h"
+#import "CN1WatchRenderingView.h"
 #endif
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
@@ -492,7 +494,19 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
     POOL_END();
 #else
     // The watch app provides its own SwiftUI @main entry point, so there is no
-    // UIApplicationMain bootstrap here.
+    // UIApplicationMain. Mirror UIApplicationMain's role precisely: schedule the
+    // lifecycle callback (sets IOSImplementation.initialized and serial-
+    // dispatches the app start onto the EDT) and then block this dedicated
+    // bootstrap thread forever. Blocking is essential -- it stops Display.init
+    // -> postInit from falling through into super.postInit()'s
+    // initDefaultUserAgent, which does a blocking AsyncResource.get() that iOS
+    // never reaches (because UIApplicationMain never returns). The SwiftUI main
+    // thread and the CN1WatchHost paint pump keep running; the EDT runs the app.
+    extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_callback__(struct ThreadLocalData* threadStateData);
+    com_codename1_impl_ios_IOSImplementation_callback__(threadStateData);
+    while (1) {
+        [NSThread sleepForTimeInterval:3600];
+    }
 #endif // !TARGET_OS_WATCH
 }
 
@@ -6958,8 +6972,36 @@ static UIImage* cn1_captureView(UIView *view) {
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_WATCH
-    // watchOS has no UIView/UIWindow hierarchy capture; report an empty screenshot.
-    com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG JAVA_NULL);
+    // Capture the Core Graphics surface. Drain any pending ops first so the
+    // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
+    [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+    CN1WatchRenderingView *wv = [CN1WatchHost sharedHost].renderingView;
+    UIImage *wimg = wv != nil ? [wv currentFrame] : nil;
+    NSData *wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
+    JAVA_OBJECT wbyteArr = JAVA_NULL;
+    if (wpng != nil && [wpng length] > 0) {
+        int wlen = (int)[wpng length];
+#ifdef CN1_WATCH_DEBUG_DUMP_SHOTS
+        {
+            static int wshotIdx = 0;
+            NSArray *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *p = [[docs firstObject] stringByAppendingPathComponent:[NSString stringWithFormat:@"cn1ss_%03d.png", wshotIdx++]];
+            [wpng writeToFile:p atomically:YES];
+        }
+#endif
+#ifndef NEW_CODENAME_ONE_VM
+        org_xmlvm_runtime_XMLVMArray* warr = XMLVMArray_createSingleDimension(__CLASS_byte, wlen);
+        memcpy(warr->fields.org_xmlvm_runtime_XMLVMArray.array_, [wpng bytes], wlen);
+        wbyteArr = warr;
+#else
+        enteringNativeAllocations();
+        JAVA_OBJECT warr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG wlen);
+        memcpy(((JAVA_ARRAY)warr)->data, [wpng bytes], wlen);
+        finishedNativeAllocations();
+        wbyteArr = warr;
+#endif
+    }
+    com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG wbyteArr);
     return;
 #else
 #ifdef NEW_CODENAME_ONE_VM

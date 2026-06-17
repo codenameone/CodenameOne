@@ -37,9 +37,12 @@
 #import "CN1WatchHost.h"
 #import "CodenameOne_GLViewController.h"
 #include "cn1_globals.h"
+#include <pthread.h>
 
 extern void initConstantPool(void);
-// Emitted per-app into CN1WatchBootstrap.m: runs <Main>Stub.main + callback.
+// Emitted per-app into CN1WatchBootstrap.m: runs <Main>Stub.main, which inits
+// Display (starting the EDT) and blocks this thread inside initVM (see
+// IOSNative.m) exactly like UIApplicationMain blocks the iOS main thread.
 extern void cn1_watch_app_main(void);
 
 extern void pointerPressedC(int* x, int* y, int length);
@@ -48,6 +51,16 @@ extern void pointerReleasedC(int* x, int* y, int length);
 
 static BOOL cn1WatchRuntimeStarted = NO;
 
+// Dedicated bootstrap thread. On iOS the main thread runs Stub.main and is then
+// consumed forever by UIApplicationMain. On watchOS the SwiftUI run loop already
+// owns the main thread, so the VM bootstrap (which blocks forever in initVM)
+// must run on its own thread to keep SwiftUI + the paint pump alive.
+static void *cn1WatchVMThread(void *arg) {
+    (void)arg;
+    cn1_watch_app_main();
+    return NULL;
+}
+
 void cn1_watch_runtime_start(const char *watchMainClass) {
     (void)watchMainClass;
     if (cn1WatchRuntimeStarted) {
@@ -55,7 +68,10 @@ void cn1_watch_runtime_start(const char *watchMainClass) {
     }
     cn1WatchRuntimeStarted = YES;
     initConstantPool();
-    cn1_watch_app_main();
+    pthread_t vmThread;
+    if (pthread_create(&vmThread, NULL, cn1WatchVMThread, NULL) == 0) {
+        pthread_detach(vmThread);
+    }
 }
 
 void cn1_watch_runtime_paint(void) {
