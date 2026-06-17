@@ -410,8 +410,7 @@ public class GameLevel {
         } finally {
             try {
                 r.close();
-            } catch (IOException ignore) {
-                // ignore: failing to close the input stream after a successful parse is harmless
+            } catch (IOException ignore) { //NOPMD - closing the reader is best-effort
             }
         }
     }

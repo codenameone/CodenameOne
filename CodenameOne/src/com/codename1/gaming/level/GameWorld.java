@@ -90,8 +90,8 @@ public class GameWorld {
         w.keepRadius = Json.intval(root.get("keepRadius"), 1);
         List<Object> rs = Json.asList(root.get("regions"));
         if (rs != null) {
-            for (int i = 0; i < rs.size(); i++) {
-                Map<String, Object> rm = Json.asMap(rs.get(i));
+            for (Object ro : rs) {
+                Map<String, Object> rm = Json.asMap(ro);
                 if (rm != null) {
                     w.addRegion(Region.fromMap(rm));
                 }

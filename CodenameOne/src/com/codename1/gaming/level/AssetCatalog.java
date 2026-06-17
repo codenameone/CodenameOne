@@ -68,8 +68,7 @@ public class AssetCatalog {
         } finally {
             try {
                 r.close();
-            } catch (IOException ignore) {
-                // ignore: failing to close the input stream is harmless here
+            } catch (IOException ignore) { //NOPMD - closing the reader is best-effort
             }
         }
     }
