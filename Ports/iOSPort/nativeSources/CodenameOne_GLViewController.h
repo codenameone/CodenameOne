@@ -97,6 +97,13 @@
 // only needs INCLUDE_CAMERA_USAGE) do NOT drag in the new AVFoundation-based
 // natives. Keep this independent of INCLUDE_CAMERA_USAGE on purpose.
 //#define INCLUDE_CN1_CAMERA
+// The AVFoundation capture stack (CN1Camera.{h,m} + IOSNative camera natives)
+// is unavailable on watchOS. IPhoneBuilder uncomments the define above for all
+// targets; undo it on the watch slice from this central header (included first
+// by every camera TU) so the whole camera path compiles out consistently.
+#if TARGET_OS_WATCH
+#undef INCLUDE_CN1_CAMERA
+#endif
 
 // CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge
 // (AuthenticationServices.framework import, ASWebAuthenticationSession code
