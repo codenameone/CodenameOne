@@ -61,15 +61,26 @@ WATCH_TARGET="${SCHEME}Watch"
 rw_log "Project=$PROJECT_PATH watchTarget=$WATCH_TARGET"
 
 # --- Pick a watch simulator -------------------------------------------------
+# Screenshots are pixel-compared, so the device screen size must match the one
+# the goldens were captured on: a 46mm Apple Watch (416x496 px). Prefer a 46mm
+# model for determinism; fall back to any Apple Watch (override with
+# CN1SS_WATCH_UDID / CN1SS_WATCH_MODEL). If only a non-46mm device exists the
+# comparison will flag size mismatches rather than silently drifting.
+WATCH_MODEL_PREF="${CN1SS_WATCH_MODEL:-46mm}"
 WATCH_UDID="${CN1SS_WATCH_UDID:-}"
+DEVLIST="$(xcrun simctl list devices available 2>/dev/null | grep -iE 'Apple Watch')"
 if [ -z "$WATCH_UDID" ]; then
-  WATCH_UDID="$(xcrun simctl list devices available 2>/dev/null \
-    | grep -iE 'Apple Watch' | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+  WATCH_UDID="$(printf '%s\n' "$DEVLIST" | grep -i "$WATCH_MODEL_PREF" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+fi
+if [ -z "$WATCH_UDID" ]; then
+  rw_log "No '$WATCH_MODEL_PREF' Apple Watch found; falling back to any available Apple Watch"
+  WATCH_UDID="$(printf '%s\n' "$DEVLIST" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
 fi
 if [ -z "$WATCH_UDID" ]; then
   rw_log "No Apple Watch simulator available. Install a watchOS runtime in Xcode."; exit 4
 fi
-rw_log "Using watch simulator $WATCH_UDID"
+rw_log "Watch simulators available:"; printf '%s\n' "$DEVLIST" | sed 's/^/  /' >&2
+rw_log "Using watch simulator $WATCH_UDID (pref '$WATCH_MODEL_PREF')"
 xcrun simctl boot "$WATCH_UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$WATCH_UDID" -b 2>/dev/null || true
 
