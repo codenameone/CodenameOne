@@ -212,6 +212,40 @@ void CN1DismissLaunchPlaceholder(void);
 
 //ADD_INCLUDE
 
+#if TARGET_OS_WATCH
+// watchOS has no UIViewController/UIView/CADisplayLink (the SDK marks them
+// API_UNAVAILABLE(watchos)). The watch slice replaces the GL view controller
+// with a plain NSObject render-driver (CN1WatchViewController.m) that owns the
+// same ExecutableOp queue and drives drawFrame into the Core Graphics surface
+// (CN1WatchRenderingView). Same class name so the ~10 callers + the translated
+// runtime resolve unchanged.
+@class EAGLView;
+@interface CodenameOne_GLViewController : NSObject {
+@private
+    GLUIImage* currentMutableImage;
+    NSMutableArray* currentTarget;
+    NSMutableArray* upcomingTarget;
+    BOOL painted;
+}
+@property (nonatomic) NSInteger animationFrameInterval;
+@property (readwrite, assign) GLUIImage* currentMutableImage;
++(CodenameOne_GLViewController*)instance;
+-(EAGLView*)eaglView;
+-(id)view;
+-(void)startAnimation;
+-(void)stopAnimation;
++(BOOL)isDrawTextureSupported;
+-(void)initVars;
++(void)upcoming:(ExecutableOp*)op;
+-(void)upcomingAdd:(ExecutableOp*)op;
+-(void)upcomingAddClip:(ExecutableOp*)op;
+-(BOOL)isPaintFinished;
+-(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
+-(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
+-(void)drawScreen;
+-(void)drawFrame:(CGRect)rect;
+@end
+#else
 @interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate,
 #if !TARGET_OS_WATCH
 MFMailComposeViewControllerDelegate,
@@ -317,3 +351,4 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate, UIPickerViewDelegate, UIDocu
 +(CGAffineTransform) currentMutableTransform;
 -(void)updateCanvas:(BOOL)animated;
 @end
+#endif // TARGET_OS_WATCH (GL view controller interface variant)
