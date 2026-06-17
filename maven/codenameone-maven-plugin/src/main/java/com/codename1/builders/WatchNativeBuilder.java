@@ -565,6 +565,28 @@ class WatchNativeBuilder {
                 .append("  bf.remove_from_project if gl.include?(File.basename(ref.path))\n")
                 .append("end\n");
 
+        // Mirror the iOS app's bundle resources into the watch target. The CN1
+        // runtime loads its theme + assets from the app bundle at runtime
+        // (Resources.open(\"/iOS7Theme.res\"), the app theme.res / CN1Resource.res,
+        // material-design-font.ttf for FontImage glyphs, etc.). The watch target
+        // ships with an empty resources phase, so without this the watch app
+        // can't find the native theme (falls back to the default look), the app
+        // theme, or any bundled image/font -> wrong styling + missing images.
+        // Copying the iOS app-icon PNGs along too is harmless (the watch uses its
+        // own Info.plist icon set; the extra files are just ignored).
+        // Skip iOS-only UI / icon assets: the asset catalog's AppIcon set has no
+        // watch-applicable content (build error), and storyboards/xibs are the
+        // iOS UI. The CN1 runtime resources (.res/.ttf/data) are what we need.
+        s.append("res_skip = %w[.xcassets .storyboard .xib]\n")
+                .append("app_target.resources_build_phase.files.to_a.each do |bf|\n")
+                .append("  ref = bf.file_ref\n")
+                .append("  next unless ref && ref.path\n")
+                .append("  next if res_skip.any? { |ext| ref.path.to_s.end_with?(ext) }\n")
+                .append("  unless watch_target.resources_build_phase.files_references.include?(ref)\n")
+                .append("    watch_target.resources_build_phase.add_file_reference(ref)\n")
+                .append("  end\n")
+                .append("end\n");
+
         // Companion embedding is opt-in (watchNative.embedCompanion=true) and OFF
         // by default. Embedding adds the watch target as a build dependency of the
         // iOS app, which makes building the iOS app also build the watch target --
