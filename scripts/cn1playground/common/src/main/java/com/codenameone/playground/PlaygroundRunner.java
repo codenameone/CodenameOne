@@ -177,6 +177,17 @@ final class PlaygroundRunner {
         namespace.importPackage("com.codename1.ui.geom");
         namespace.importClass("com.codename1.ui.Component");
         namespace.importClass("com.codenameone.playground.PlaygroundContext");
+        // The bsh default-imports (java.lang/java.util/java.io) are not reliably
+        // applied to this eval namespace on the ParparVM JS port, so the runner's
+        // own `Object build(ctx)` wrapper and lifecycle `void init(Object)` failed
+        // to resolve `Object` ("Class: Object not found in namespace"), the method
+        // declaration was skipped, and no previewable component was ever captured.
+        // Import the core JRE packages explicitly so script methods install.
+        namespace.importPackage("java.lang");
+        namespace.importPackage("java.util");
+        namespace.importPackage("java.io");
+        namespace.importClass("java.lang.Object");
+        namespace.importClass("java.lang.String");
     }
 
     /// Returns the Display singleton, or the Display class itself when no
