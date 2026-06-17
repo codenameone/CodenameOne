@@ -93,7 +93,7 @@ protected void onUpdate(double deltaSeconds) {
 
 ## Physics, effects and overriding defaults
 
-* **Collision** — dungeon style blocks the walker at walls and holes for free. For richer physics (projectiles, doors, pushable crates) step a physics world from `onUpdate`, reading per-element properties.
+* **Collision** — dungeon style blocks the walker at walls and holes for free. For richer physics (projectiles, doors, movable crates) step a physics world from `onUpdate`, reading per-element properties.
 * **Effects** — play a footstep `SoundPool` clip per step, fade the lights as the player descends, or spawn a particle when a torch is lit.
 * **Overriding** — the play styles are presets. Want a hybrid (walk like a dungeon but no wall collision)? Set *open* and add your own collision in `onUpdate`.
 
