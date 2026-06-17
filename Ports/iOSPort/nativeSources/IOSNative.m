@@ -73,14 +73,20 @@
 #include <netinet/in.h>
 #include <SystemConfiguration/SystemConfiguration.h>
 #include <SystemConfiguration/SCNetworkReachability.h>
+// MessageUI + AddressBookUI are unavailable on watchOS (and AddressBookUI on Mac
+// Catalyst). The native methods that use them are guarded to no-ops on watch.
+#if !TARGET_OS_WATCH
 #import <MessageUI/MFMailComposeViewController.h>
-#if !TARGET_OS_MACCATALYST
+#endif
+#if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH
 // AddressBookUI and the legacy AddressBook C API are unavailable on Mac
 // Catalyst. Skip the import; the contacts path falls back to Contacts.framework
 // (handled via INCLUDE_CONTACTS_USAGE undef below).
 #import <AddressBookUI/AddressBookUI.h>
 #endif
+#if !TARGET_OS_WATCH
 #import <MessageUI/MFMessageComposeViewController.h>
+#endif
 
 #if TARGET_OS_MACCATALYST
 // AddressBook.framework (the C ABAddressBookRef API) is unavailable on Mac
@@ -4176,7 +4182,10 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                                                                                                            JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
-    
+#if TARGET_OS_WATCH
+    // No MessageUI on watchOS; email composition is a no-op.
+    return;
+#else
     if (![MFMailComposeViewController canSendMail]) {
         launchMailAppOnDevice(recipients, subject, content);
         return;
@@ -4329,6 +4338,7 @@ void startVideoComponentAV(JAVA_LONG peer) {
         POOL_END();
     });
 #endif
+#endif // !TARGET_OS_WATCH (sendEmailMessage)
 }
 
 void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -6911,9 +6921,9 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
-#if TARGET_OS_MACCATALYST
-    // SMS hardware is absent on Mac; MFMessageComposeViewController canSendText
-    // returns NO. Short-circuit to keep behaviour deterministic on Mac.
+#if TARGET_OS_MACCATALYST || TARGET_OS_WATCH
+    // SMS hardware is absent on Mac / watchOS (no MessageUI on watch);
+    // MFMessageComposeViewController canSendText returns NO. Short-circuit.
     return;
 #else
     NSString *recipient = toNSString(CN1_THREAD_STATE_PASS_ARG number);

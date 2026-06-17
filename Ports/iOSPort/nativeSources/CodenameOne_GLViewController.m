@@ -1852,7 +1852,9 @@ int Java_com_codename1_impl_ios_IOSImplementation_getFontDescentNativeImpl
 }
 
 void vibrateDevice() {
+#if !TARGET_OS_WATCH
     AudioServicesPlayAlertSound(kSystemSoundID_Vibrate);
+#endif
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
@@ -4789,6 +4791,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 
 }
 
+#if !TARGET_OS_WATCH
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
 	[self dismissModalViewControllerAnimated:YES];
 }
@@ -4796,6 +4799,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 -(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result {
 	[self dismissModalViewControllerAnimated:YES];
 }
+#endif // !TARGET_OS_WATCH (MessageUI delegates)
 
 extern JAVA_OBJECT productsArrayPending;
 

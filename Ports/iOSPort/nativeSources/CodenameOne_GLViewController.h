@@ -32,14 +32,21 @@
 #import "ExecutableOp.h"
 #import "PaintOp.h"
 #import "GLUIImage.h"
+// MessageUI (mail/SMS composer) is unavailable on watchOS; the email/SMS native
+// methods are #if !TARGET_OS_WATCH-guarded in IOSNative.m, and the matching
+// delegate conformances below are likewise dropped on the watch slice.
+#if !TARGET_OS_WATCH
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MessageUI/MFMessageComposeViewController.h>
+#endif
 #import <CoreLocation/CoreLocation.h>
 //#define CN1_USE_STOREKIT
 #ifdef CN1_USE_STOREKIT
 #import "StoreKit/StoreKit.h"
 #endif
+#if !TARGET_OS_WATCH
 #import <AudioToolbox/AudioServices.h>
+#endif
 #import <AVFoundation/AVFoundation.h>
 //#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
 //#define ENABLE_WKWEBVIEW
@@ -205,11 +212,18 @@ void CN1DismissLaunchPlaceholder(void);
 
 //ADD_INCLUDE
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, UIScrollViewDelegate,
-#ifdef CN1_USE_STOREKIT
-SKProductsRequestDelegate, SKPaymentTransactionObserver, 
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate,
+#if !TARGET_OS_WATCH
+MFMailComposeViewControllerDelegate,
 #endif
-MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
+UIScrollViewDelegate,
+#ifdef CN1_USE_STOREKIT
+SKProductsRequestDelegate, SKPaymentTransactionObserver,
+#endif
+#if !TARGET_OS_WATCH
+MFMessageComposeViewControllerDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate,
+#endif
+CLLocationManagerDelegate, AVAudioRecorderDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
 #endif
