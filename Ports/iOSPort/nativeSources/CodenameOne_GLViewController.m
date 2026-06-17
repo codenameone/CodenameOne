@@ -2349,7 +2349,34 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
     }
 #endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl started");
+#if TARGET_OS_WATCH
+    // On watch the instance's drawString enqueues a SCREEN op; for the mutable
+    // image we must draw straight into the active UIGraphics image context
+    // (set up by startDrawingOnImageImpl) or the text never lands in the image.
+    {
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        if (context == NULL) { return; }
+        UIFont *f = (BRIDGE_CAST UIFont*)fontPeer;
+        if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
+        if (str == nil) { return; }
+        CGContextSaveGState(context);
+        if (currentMutableTransformSet) {
+            CGContextConcatCTM(context, currentMutableTransform);
+        }
+        CGFloat rr = ((color >> 16) & 0xff) / 255.0;
+        CGFloat gg = ((color >> 8) & 0xff) / 255.0;
+        CGFloat bb = (color & 0xff) / 255.0;
+        NSDictionary *attrs = @{
+            NSFontAttributeName : f,
+            NSForegroundColorAttributeName : [UIColor colorWithRed:rr green:gg blue:bb alpha:alpha / 255.0]
+        };
+        [str drawAtPoint:CGPointMake(x, y) withAttributes:attrs];
+        CGContextRestoreGState(context);
+    }
+    return;
+#else
     [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(BRIDGE_CAST UIFont*)fontPeer str:str x:x y:y];
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
 }
 

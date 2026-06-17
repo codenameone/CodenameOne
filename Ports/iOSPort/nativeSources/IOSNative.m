@@ -32,6 +32,7 @@
 #import "CN1CGGraphics.h"
 #import "CN1WatchHost.h"
 #import "CN1WatchRenderingView.h"
+#import <Accelerate/Accelerate.h>
 #endif
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
@@ -928,8 +929,50 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     POOL_END();
     return (BRIDGE_CAST void*)gl;
 #else
-    // watchOS has no CoreImage / CIFilter; return the input image unmodified.
-    return n1;
+    // watchOS has no CoreImage/CIFilter; approximate CIGaussianBlur with a
+    // 3-pass vImage box convolve (Accelerate, available on watchOS).
+    POOL_BEGIN();
+    GLUIImage* glu = (BRIDGE_CAST GLUIImage*)n1;
+    if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == glu) {
+        Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    }
+    UIImage *original = [glu getImage];
+    if (original == nil || original.CGImage == NULL) { POOL_END(); return n1; }
+    CGImageRef cg = original.CGImage;
+    size_t w = CGImageGetWidth(cg), h = CGImageGetHeight(cg);
+    if (w == 0 || h == 0) { POOL_END(); return n1; }
+    size_t bytesPerRow = w * 4;
+    void *srcBuf = calloc(h, bytesPerRow);
+    void *dstBuf = calloc(h, bytesPerRow);
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef inCtx = CGBitmapContextCreate(srcBuf, w, h, 8, bytesPerRow, cs,
+                                               kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    GLUIImage *resultGl = nil;
+    if (inCtx != NULL && srcBuf != NULL && dstBuf != NULL) {
+        CGContextDrawImage(inCtx, CGRectMake(0, 0, w, h), cg);
+        vImage_Buffer vsrc = { srcBuf, h, w, bytesPerRow };
+        vImage_Buffer vdst = { dstBuf, h, w, bytesPerRow };
+        uint32_t k = (uint32_t)(radius * 2.0f) | 1u; // odd kernel size from radius
+        if (k < 3) { k = 3; }
+        vImageBoxConvolve_ARGB8888(&vsrc, &vdst, NULL, 0, 0, k, k, NULL, kvImageEdgeExtend);
+        vImageBoxConvolve_ARGB8888(&vdst, &vsrc, NULL, 0, 0, k, k, NULL, kvImageEdgeExtend);
+        vImageBoxConvolve_ARGB8888(&vsrc, &vdst, NULL, 0, 0, k, k, NULL, kvImageEdgeExtend);
+        CGContextRef outCtx = CGBitmapContextCreate(dstBuf, w, h, 8, bytesPerRow, cs,
+                                                    kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+        if (outCtx != NULL) {
+            CGImageRef outImg = CGBitmapContextCreateImage(outCtx);
+            if (outImg != NULL) {
+                resultGl = [[GLUIImage alloc] initWithImage:[UIImage imageWithCGImage:outImg]];
+                CGImageRelease(outImg);
+            }
+            CGContextRelease(outCtx);
+        }
+    }
+    if (inCtx != NULL) { CGContextRelease(inCtx); }
+    CGColorSpaceRelease(cs);
+    free(srcBuf); free(dstBuf);
+    POOL_END();
+    return resultGl != nil ? (BRIDGE_CAST void*)resultGl : n1;
 #endif // !TARGET_OS_WATCH
 }
 
