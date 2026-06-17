@@ -194,8 +194,14 @@ class WatchNativeBuilder {
         String mainClass = request.getMainClass();
 
         // 1) SwiftUI @main shell.
+        // The whole file is guarded with `#if os(watchOS)`: it is generated into
+        // the shared <mainClass>-src/ dir and gets globbed into the iOS / Mac
+        // Catalyst app target too, where WatchKit does not exist. The guard makes
+        // it an empty translation unit everywhere except watchOS, so the iOS
+        // build can't fail on `import WatchKit` even if the file is compiled.
         StringBuilder sw = new StringBuilder();
-        sw.append("import SwiftUI\n")
+        sw.append("#if os(watchOS)\n")
+          .append("import SwiftUI\n")
           .append("import WatchKit\n\n")
           .append("// Generated watch entry point. Hosts the Codename One Core\n")
           .append("// Graphics frames produced by CN1WatchHost (started at the\n")
@@ -248,7 +254,8 @@ class WatchNativeBuilder {
           .append("        }\n")
           .append("        .ignoresSafeArea()\n")
           .append("    }\n")
-          .append("}\n");
+          .append("}\n")
+          .append("#endif // os(watchOS)\n");
         owner.createFile(new File(appSrcDir, "CN1WatchApp.swift"),
                 sw.toString().getBytes(StandardCharsets.UTF_8));
 
