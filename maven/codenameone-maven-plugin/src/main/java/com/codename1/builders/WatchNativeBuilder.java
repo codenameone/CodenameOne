@@ -555,7 +555,18 @@ class WatchNativeBuilder {
                 .append("  bf.remove_from_project if gl.include?(File.basename(ref.path))\n")
                 .append("end\n");
 
-        if (!isStandalone()) {
+        // Companion embedding is opt-in (watchNative.embedCompanion=true) and OFF
+        // by default. Embedding adds the watch target as a build dependency of the
+        // iOS app, which makes building the iOS app also build the watch target --
+        // and Xcode builds that embedded dependency against the iOS app's
+        // iphonesimulator SDK, where the real OpenGLES framework collides with the
+        // watchOSStubs (duplicate EAGLContext) and breaks the iOS screenshot build.
+        // The watch slice is built + tested independently (build-ios-watch /
+        // run-watch-ui-tests.sh), so the test pipeline does not need the embed.
+        // Re-enabling companion packaging needs the embedded dependency pinned to
+        // the watchsimulator/watchos SDK; tracked as a follow-up.
+        boolean embedCompanion = "true".equals(request.getArg("watchNative.embedCompanion", "false"));
+        if (embedCompanion && !isStandalone()) {
             // Companion: embed the watch .app into the iOS app under
             // $(CONTENTS_FOLDER_PATH)/Watch and add a build dependency so the
             // pair archives together.

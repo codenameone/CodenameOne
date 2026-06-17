@@ -29,8 +29,17 @@ source "$SCRIPT_DIR/lib/cn1ss.sh"
 mkdir -p "$ARTIFACTS_DIR"
 
 # --- Xcode / project resolution -------------------------------------------
-XCODE_APP="${XCODE_APP:-/Applications/Xcode.app}"
+# Prefer Xcode 26 (watchOS 26 SDK + arm64 watch simulator), matching
+# build-ios-app.sh. The runner's default xcodebuild is often an older Xcode
+# (16.x) whose watchOS SDK can't build the slice.
+if [ -z "${XCODE_APP:-}" ]; then
+  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+fi
+if [ ! -x "${XCODE_APP:-}/Contents/Developer/usr/bin/xcodebuild" ]; then
+  XCODE_APP="/Applications/Xcode.app"
+fi
 export DEVELOPER_DIR="${DEVELOPER_DIR:-$XCODE_APP/Contents/Developer}"
+rw_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
 if ! command -v xcodebuild >/dev/null 2>&1; then
   rw_log "xcodebuild not found (DEVELOPER_DIR=$DEVELOPER_DIR)"; exit 3
 fi
