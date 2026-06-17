@@ -143,6 +143,12 @@
 #endif
 #import "Rotate.h"
 //#define CN1_USE_AVKIT
+// AVKit / AVPlayerViewController are unavailable on watchOS. IPhoneBuilder
+// uncomments the define above for all targets; undo it on the watch slice so
+// the AVKit video paths compile out (the watch video stubs return defaults).
+#if TARGET_OS_WATCH
+#undef CN1_USE_AVKIT
+#endif
 #ifdef CN1_USE_AVKIT
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <AVKit/AVKit.h>
