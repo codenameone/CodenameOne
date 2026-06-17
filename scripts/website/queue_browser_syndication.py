@@ -52,6 +52,36 @@ from syndicate_blog_posts import (  # noqa: E402
 QUEUE_FILE = Path(__file__).resolve().parent / "syndication-queue.json"
 DEFAULT_PLATFORMS = "medium,dzone"
 
+# Platforms that only receive the weekly Friday digest post, rather than every
+# eligible post. This mirrors FoojayAdapter.accepts in
+# syndicate_browser_posts.py (post.date.weekday() == 4 -> Friday); deep-dive
+# posts published on other weekdays are not syndicated to these platforms.
+WEEKLY_FRIDAY_PLATFORMS = {"dzone"}
+
+
+def _platform_accepts(platform: str, post: Post) -> bool:
+    """Whether ``platform`` wants ``post`` at all. Friday-only platforms take
+    just the weekly digest post; everyone else takes every eligible post."""
+    if platform in WEEKLY_FRIDAY_PLATFORMS:
+        return post.date.weekday() == 4
+    return True
+
+
+def _task_is_allowed(task: dict, dates_by_slug: dict[str, dt.date]) -> bool:
+    """Whether an existing queue task is still permitted under the per-platform
+    rules. Used to prune tasks that were queued before the Friday-only filter
+    existed (or added by hand): the drain tool submits whatever is in the
+    queue, so a disallowed task left here would still reach moderation. A task
+    whose post date is unknown is kept — we never silently drop something we
+    cannot evaluate."""
+    platform = task.get("site")
+    if platform not in WEEKLY_FRIDAY_PLATFORMS:
+        return True
+    post_date = dates_by_slug.get(task.get("slug"))
+    if post_date is None:
+        return True
+    return post_date.weekday() == 4
+
 
 def _markdown_to_html(text: str) -> str:
     try:
@@ -104,18 +134,38 @@ def main(argv: list[str]) -> int:
     floor = dt.date.fromisoformat(args.floor)
     platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
     state = State.load(Path(args.state_file))
-    posts = _eligible_posts(today, floor, args.min_age_days, Path(args.blog_dir))
+    blog_dir = Path(args.blog_dir)
+    posts = _eligible_posts(today, floor, args.min_age_days, blog_dir)
+    # Slug -> publish date for *every* post, so existing queue tasks can be
+    # re-checked against the per-platform rules regardless of eligibility.
+    dates_by_slug = {p.slug: p.date for p in discover_posts(blog_dir)}
 
     queue_path = Path(args.queue_file)
     if queue_path.exists():
         queue = json.loads(queue_path.read_text(encoding="utf-8"))
     else:
         queue = {"tasks": []}
-    existing_ids = {t.get("id") for t in queue.get("tasks", [])}
+
+    # Prune any already-queued task that the per-platform rules no longer
+    # allow (e.g. a non-Friday DZone task queued before the Friday-only
+    # filter landed, or one added by hand). The drain tool submits whatever
+    # sits in the queue, so this prune is what actually stops a stray task
+    # from reaching moderation.
+    original_tasks = queue.get("tasks", [])
+    kept_tasks = [t for t in original_tasks if _task_is_allowed(t, dates_by_slug)]
+    pruned = [t for t in original_tasks if t not in kept_tasks]
+    if pruned:
+        print(f"Pruning {len(pruned)} disallowed task(s) from the queue:")
+        for t in pruned:
+            print(f"  - {t.get('id')}")
+    queue["tasks"] = kept_tasks
+    existing_ids = {t.get("id") for t in kept_tasks}
 
     new_tasks: list[dict] = []
     for post in posts:
         for platform in platforms:
+            if not _platform_accepts(platform, post):
+                continue
             task_id = f"{platform}:{post.slug}"
             if task_id in existing_ids:
                 continue
@@ -123,19 +173,21 @@ def main(argv: list[str]) -> int:
                 continue
             new_tasks.append(_build_task(post, platform))
 
-    if not new_tasks:
+    if new_tasks:
+        print(f"Queueing {len(new_tasks)} new task(s):")
+        for t in new_tasks:
+            print(f"  + {t['id']}")
+    elif not pruned:
         print("No new browser-syndication tasks to queue.")
-        return 0
-
-    print(f"Queueing {len(new_tasks)} new task(s):")
-    for t in new_tasks:
-        print(f"  + {t['id']}")
 
     if args.dry_run:
         return 0
 
-    queue.setdefault("tasks", []).extend(new_tasks)
-    queue_path.write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
+    # Write when there is anything to add OR anything was pruned, so the
+    # cleaned queue is persisted even on a run that queues nothing new.
+    if new_tasks or pruned:
+        queue.setdefault("tasks", []).extend(new_tasks)
+        queue_path.write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
     return 0
 
 
