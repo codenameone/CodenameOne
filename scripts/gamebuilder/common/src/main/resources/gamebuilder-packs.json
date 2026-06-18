@@ -14,9 +14,11 @@
         { "id": "mountain", "name": "Mountain", "kind": "actor", "w": 180, "h": 120, "color": "#8A93A8" },
         { "id": "hill",     "name": "Hill",     "kind": "actor", "w": 220, "h": 96,  "color": "#5A8F57" },
         { "id": "coin",   "name": "Coin",   "kind": "actor", "w": 24, "h": 24, "color": "#F6C944", "type": "sheet", "frameW": 24, "frameH": 24, "frames": 6, "fps": 12, "defaults": { "value": 10 } },
+        { "id": "coffee", "name": "Coffee", "kind": "actor", "w": 22, "h": 26, "color": "#6F4E37", "defaults": { "value": 10 } },
         { "id": "gem",    "name": "Gem",    "kind": "actor", "w": 24, "h": 24, "color": "#43C6E0", "defaults": { "value": 50 } },
-        { "id": "player", "name": "Player", "kind": "actor", "w": 28, "h": 32, "color": "#4D86FF", "unique": true, "defaults": { "lives": 3, "jumpHeight": 96 } },
-        { "id": "slime",  "name": "Enemy",  "kind": "actor", "w": 30, "h": 24, "color": "#7BCB4F", "defaults": { "speed": 50, "patrol": 64 } },
+        { "id": "player", "name": "Duke",   "kind": "actor", "w": 40, "h": 44, "type": "sheet", "frameW": 254, "frameH": 252, "frames": 5, "fps": 12, "source": "duke_run.png", "unique": true, "defaults": { "lives": 3, "jumpHeight": 110 } },
+        { "id": "slime",  "name": "Slime",  "kind": "actor", "w": 30, "h": 24, "color": "#7BCB4F", "defaults": { "speed": 50, "patrol": 64 } },
+        { "id": "exception", "name": "Exception", "kind": "actor", "w": 32, "h": 32, "color": "#C0392B", "defaults": { "speed": 55, "patrol": 80 } },
         { "id": "door",   "name": "Door",   "kind": "actor", "w": 32, "h": 48, "color": "#8A5A33", "defaults": { "target": "Level 2" } },
         { "id": "flag",   "name": "Goal",   "kind": "actor", "w": 28, "h": 44, "color": "#E0466A", "defaults": { "target": "Level 2" } }
       ]

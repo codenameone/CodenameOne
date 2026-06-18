@@ -459,14 +459,15 @@ public class GameSceneView extends GameView {
     /// removes it). Defaults to `coin`/`gem`/`star`/`token`; override to add yours.
     protected boolean isCollectible(String assetId) {
         return assetId != null && (assetId.equals("coin") || assetId.equals("gem")
-                || assetId.equals("star") || assetId.equals("token"));
+                || assetId.equals("star") || assetId.equals("token") || assetId.equals("coffee"));
     }
 
     /// Whether an asset id is an enemy (the default arcade behavior patrols it and
     /// costs a life on contact). Defaults to `slime`/`enemy*`/`npc*`; override yours.
     protected boolean isEnemy(String assetId) {
         return assetId != null && (assetId.equals("slime") || assetId.equals("enemy")
-                || assetId.startsWith("enemy") || assetId.startsWith("npc"));
+                || assetId.startsWith("enemy") || assetId.startsWith("npc")
+                || assetId.equals("exception") || assetId.equals("bug"));
     }
 
     /// Whether a box centered at `(cx, cy)` with half-size `(hw, hh)` overlaps any

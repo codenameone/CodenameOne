@@ -359,6 +359,12 @@ public class GameLevel {
                 continue;
             }
             Sprite s = makeSprite(catalog, el.getAssetId(), img);
+            // render at the asset's intended size, not the raw frame size (a sprite-sheet
+            // frame can be far larger than the on-screen sprite)
+            AssetDef def = catalog == null ? null : catalog.def(el.getAssetId());
+            if (def != null) {
+                s.setSize(def.getWidth(), def.getHeight());
+            }
             if (mode == MODE_BOARD && projection != null) {
                 // board elements are placed by their (col,row) stored as x,y
                 placeCell(s, (int) Math.round(el.getX()), (int) Math.round(el.getY()), projection);

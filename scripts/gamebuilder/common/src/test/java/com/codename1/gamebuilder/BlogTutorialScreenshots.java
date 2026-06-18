@@ -151,7 +151,7 @@ public final class BlogTutorialScreenshots {
             EditorModel m = c.model();
             int ts = lvl[0].getTileSize();
             int rows = lvl[0].getRows();
-            m.setSelectedAssetId("coin");
+            m.setSelectedAssetId("coffee");
             c.placeElement(5 * ts, (rows - 4) * ts);
             c.placeElement(6 * ts, (rows - 4) * ts);
             c.placeElement(7 * ts, (rows - 4) * ts);
@@ -164,16 +164,16 @@ public final class BlogTutorialScreenshots {
             EditorModel m = c.model();
             int ts = lvl[0].getTileSize();
             int rows = lvl[0].getRows();
-            // an enemy to dodge and a flag to reach — the goal of the level. Naming them
-            // makes the editor generate `slime` and `flag` fields in the companion class.
-            m.setSelectedAssetId("slime");
-            GameElement slime = c.placeElement(11 * ts, (rows - 3) * ts);
-            slime.setName("slime");
-            slime.setProperty("speed", 40);
+            // an exception monster to dodge and a flag to reach — the goal of the level.
+            // Naming them makes the editor generate `enemy` and `flag` fields in the companion.
+            m.setSelectedAssetId("exception");
+            GameElement enemy = c.placeElement(11 * ts, (rows - 3) * ts);
+            enemy.setName("enemy");
+            enemy.setProperty("speed", 45);
             m.setSelectedAssetId("flag");
             GameElement flag = c.placeElement((lvl[0].getCols() - 2) * ts, (rows - 3) * ts);
             flag.setName("flag");
-            m.setSelection(slime);
+            m.setSelection(enemy);
         });
         shot("platformer-5-enemy-goal");
 

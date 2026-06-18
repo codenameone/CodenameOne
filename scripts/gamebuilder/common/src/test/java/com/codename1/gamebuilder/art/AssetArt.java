@@ -80,6 +80,8 @@ public final class AssetArt {
             case "mountain" -> mountain(g, w, h, c);
             case "hill" -> hill(g, w, h, c);
             case "coin" -> coin(g, w, h, c);
+            case "coffee" -> coffee(g, w, h, c);
+            case "exception", "bug" -> exceptionMonster(g, w, h, c);
             case "gem" -> gem(g, w, h, c);
             case "player", "hero", "spawn", "npc" -> figure(g, w, h, c);
             case "slime" -> slime(g, w, h, c);
@@ -233,6 +235,45 @@ public final class AssetArt {
         g.fillArc(-w / 4, h / 3, w * 3 / 2, h * 2, 0, 360);
         g.setColor(shade(c, 1.12));
         g.fillArc(w / 6, h / 2, w / 2, h, 0, 360);
+    }
+
+    private static void coffee(Graphics g, int w, int h, int c) {
+        int top = h / 4;
+        // steam
+        g.setColor(0xcfd6e0);
+        g.drawArc(w * 2 / 5 - 2, 2, 6, top, -90, 200);
+        g.drawArc(w * 3 / 5 - 2, 2, 6, top, 90, 200);
+        // white cup with coffee fill
+        g.setColor(0xf2f4f8);
+        g.fillRoundRect(w / 6, top, w * 2 / 3, h - top - 2, 6, 6);
+        g.setColor(c);
+        g.fillRoundRect(w / 6 + 2, top + 5, w * 2 / 3 - 4, h - top - 9, 5, 5);
+        g.setColor(shade(c, 0.6));
+        g.fillArc(w / 6 + 2, top + 2, w * 2 / 3 - 4, 8, 0, 360);
+        // handle
+        g.setColor(0xf2f4f8);
+        g.drawArc(w * 5 / 6 - w / 12, top + 4, w / 4, h / 3, -80, 180);
+    }
+
+    private static void exceptionMonster(Graphics g, int w, int h, int c) {
+        // jagged horns
+        g.setColor(shade(c, 0.7));
+        g.fillPolygon(new int[]{w / 5, w / 3, w * 5 / 12}, new int[]{h / 3, h / 12, h / 3}, 3);
+        g.fillPolygon(new int[]{w * 7 / 12, w * 2 / 3, w * 4 / 5}, new int[]{h / 3, h / 12, h / 3}, 3);
+        // round body
+        g.setColor(c);
+        g.fillArc(w / 8, h / 5, w * 3 / 4, h * 3 / 4, 0, 360);
+        // angry white eyes with dark pupils
+        g.setColor(0xffffff);
+        g.fillArc(w / 3 - w / 12, h / 2 - h / 12, w / 6, h / 6, 0, 360);
+        g.fillArc(w * 2 / 3 - w / 12, h / 2 - h / 12, w / 6, h / 6, 0, 360);
+        g.setColor(0x201020);
+        g.fillArc(w / 3 - 2, h / 2 - 1, 4, 4, 0, 360);
+        g.fillArc(w * 2 / 3 - 2, h / 2 - 1, 4, 4, 0, 360);
+        // fanged grimace
+        g.drawLine(w / 3, h * 3 / 4, w * 2 / 3, h * 3 / 4);
+        g.setColor(0xffffff);
+        g.fillPolygon(new int[]{w * 5 / 12, w / 2, w * 7 / 12}, new int[]{h * 3 / 4, h * 5 / 6, h * 3 / 4}, 3);
     }
 
     private static void coin(Graphics g, int w, int h, int c) {

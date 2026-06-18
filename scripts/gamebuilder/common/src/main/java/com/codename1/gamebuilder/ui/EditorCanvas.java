@@ -29,9 +29,11 @@ import com.codename1.gaming.level.AssetDef;
 import com.codename1.gaming.level.GameElement;
 import com.codename1.gaming.level.GameLevel;
 import com.codename1.gaming.level.Layer;
+import com.codename1.gaming.SpriteSheet;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 
 import java.util.List;
 
@@ -267,11 +269,13 @@ public class EditorCanvas extends Component {
     }
 
     private static boolean isEnemy(String id) {
-        return id != null && (id.equals("slime") || id.equals("enemy") || id.startsWith("enemy") || id.startsWith("npc"));
+        return id != null && (id.equals("slime") || id.equals("enemy") || id.startsWith("enemy")
+                || id.startsWith("npc") || id.equals("exception") || id.equals("bug"));
     }
 
     private static boolean isCollectible(String id) {
-        return id != null && (id.equals("coin") || id.equals("gem") || id.equals("star") || id.equals("token"));
+        return id != null && (id.equals("coin") || id.equals("gem") || id.equals("star")
+                || id.equals("token") || id.equals("coffee"));
     }
 
     /// Default enemy behavior: patrol horizontally, turning at walls and level edges.
@@ -1651,8 +1655,19 @@ public class EditorCanvas extends Component {
     }
 
     private void drawAsset(Graphics g, AssetCatalog cat, String assetId, int x, int y, int w, int h) {
-        if (cat != null && cat.hasImage(assetId)) {
-            g.drawImage(cat.image(assetId), x, y, w, h);
+        Image img = cat == null ? null : cat.image(assetId);
+        if (img != null) {
+            AssetDef def = cat.def(assetId);
+            // animate a sprite sheet while playing (the editor preview of the runtime
+            // AnimatedSprite); edit mode shows the first frame
+            if (playMode && def != null && def.isSheet()) {
+                SpriteSheet sh = cat.sheet(assetId);
+                if (sh != null) {
+                    int n = def.getFrameCount() > 0 ? def.getFrameCount() : sh.getFrameCount();
+                    img = sh.getFrame(((int) (playClock * def.getFps())) % Math.max(1, n));
+                }
+            }
+            g.drawImage(img, x, y, w, h);
             return;
         }
         AssetDef def = cat == null ? null : cat.def(assetId);

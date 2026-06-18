@@ -51,6 +51,10 @@ public final class StarterArtGenerator {
         int count = 0;
         for (AssetPack pack : catalog.packs()) {
             for (AssetDef def : pack.assets()) {
+                // skip assets that ship their own art file (e.g. Duke's hand-made run sheet)
+                if (def.getSource() != null && !def.getSource().equals(def.getId() + ".png")) {
+                    continue;
+                }
                 if ("coin".equals(def.getId())) {
                     write(spinSheet(def), new File(dir, def.getId() + ".png"));
                 } else {
