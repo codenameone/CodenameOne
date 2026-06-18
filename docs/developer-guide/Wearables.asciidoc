@@ -5,14 +5,15 @@ Codename One can build and run your application UI on smartwatches: Apple Watch
 phone app drives the watch app -- you write Codename One UI as usual, and the
 build pipeline produces the appropriate watch artifact for each platform.
 
-The two platforms reach the watch very differently, and understanding the
-difference explains why the build hints and the supported feature sets differ:
+The two platforms reach the watch through different mechanisms, and
+understanding the difference explains why the build hints and the supported
+feature sets differ:
 
 * *Wear OS is Android.* A Wear OS app is an ordinary Android app that declares
   the watch hardware feature. The existing Codename One Android port renders the
   UI through exactly the same pipeline it uses on phones and tablets, so almost
   everything that works on Android works on the watch.
-* *watchOS is not iOS.* watchOS has no UIKit view hierarchy, no OpenGL ES and no
+* *watchOS isn't iOS.* watchOS has no UIKit view hierarchy, no OpenGL ES and no
   Metal. The Codename One watchOS port therefore ships a dedicated *Core
   Graphics* rendering backend and a separate watch application target that hosts
   the Codename One runtime (the ParparVM-translated app) inside a SwiftUI shell.
@@ -43,7 +44,7 @@ f.show();
 ----
 
 On Android `isWatch()` is derived from `PackageManager.FEATURE_WATCH`
-(`android.hardware.type.watch`); on iOS it is reported natively by the watchOS
+(`android.hardware.type.watch`); on iOS it's reported natively by the watchOS
 runtime. On every other platform it returns `false`.
 
 NOTE: `isWatch()` describes the device form factor, not the screen shape. A Wear
@@ -59,9 +60,9 @@ A watch screen is small and is frequently round. A few practical guidelines:
   on the Y axis). The Digital Crown on Apple Watch and the rotary input on Wear
   OS scroll the focused scrollable container.
 * Keep interactive targets large and few. There is little room for a `Toolbar`,
-  side menu or tabs -- hide the title area when you do not need it.
+  side menu or tabs -- hide the title area when you don't need it.
 * On round screens, keep content away from the corners. Use the form's safe-area
-  insets so important content is not clipped by the rounded bezel.
+  insets so important content isn't clipped by the rounded bezel.
 * Use the `"watch"` theme/constant overrides if you want a distinct watch look
   without forking your code (the override layer activates on watch devices the
   same way platform overrides do elsewhere).
@@ -97,7 +98,7 @@ automatically as part of the regular iOS build:
 codename1.watchMain=com.mycompany.myapp.MyWatchMain
 ----
 
-If you do not declare a distinct `watchMain`, the watch app reuses your phone
+If you don't declare a distinct `watchMain`, the watch app reuses your phone
 main class as its lifecycle entry point.
 
 ==== watchOS Build Hints
@@ -112,7 +113,7 @@ main class as its lifecycle entry point.
 
 |`codename1.watchMain` (a.k.a. `watchMain`)
 |_(none)_
-|Fully-qualified watch lifecycle entry class. Setting it auto-enables the watch
+|Fully-qualified watch lifecycle entry class. Setting it also turns on the watch
 build.
 
 |`watchNative.distribution`
@@ -146,7 +147,7 @@ the iOS build is unaffected; enable it for a packaged companion submission.
 [[watch-supported-apis]]
 
 Because watchOS lacks UIKit views, GPU rendering and several iOS frameworks, the
-APIs that depend on them are not available on the watch slice. They are guarded
+APIs that depend on them aren't available on the watch slice. They're guarded
 so that the shared sources still link, and they degrade rather than crash:
 
 * *Unavailable:* `BrowserComponent` / web view, camera capture, `MediaPlayer`
@@ -190,8 +191,8 @@ This injects the watch hardware feature into the manifest:
 <uses-feature android:name="android.hardware.type.watch" android:required="true" />
 ----
 
-and (by default) declares the app *standalone* so it installs and runs directly
-on the watch without a paired phone app:
+By default it also declares the app *standalone*, so it installs and runs
+directly on the watch without a paired phone app:
 
 [source,xml]
 ----
