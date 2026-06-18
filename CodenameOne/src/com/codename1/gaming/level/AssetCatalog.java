@@ -196,10 +196,7 @@ public class AssetCatalog {
                 if (d.isMesh()) {
                     meshes.put(d.getId(), readBytes(in));
                 } else {
-                    Image img = Image.createImage(in);
-                    if (img == null) {
-                        continue;
-                    }
+                    Image img = Image.createImage(in);   // never null: throws on a bad stream
                     if (d.isSheet() && d.getFrameWidth() > 0) {
                         int fh = d.getFrameHeight() > 0 ? d.getFrameHeight() : img.getHeight();
                         sheets.put(d.getId(), new SpriteSheet(img, d.getFrameWidth(), fh));
