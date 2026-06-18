@@ -49,6 +49,15 @@ Duke's hand here is on 16 — too low to stand on. He **hits**, and a third card
 
 ![Duke hits and reaches 19](/blog/gamebuilder/board-4-hit.png)
 
+## Where the card art comes from
+
+A reasonable question looking at those cards: *is that a picture, or is it generated?* It's both, split the way a real deck is — and knowing which is which tells you exactly what to edit.
+
+* **The back (the "cover") is an image asset.** Every face-down card draws the **Card** asset's art — the bundled file `src/main/resources/card.png` (or whatever you import over it). It's an ordinary editable image: open it in your editor, or drop in your own PNG, and *every* card back in the game changes. That's the one file to touch to re-skin the deck.
+* **The faces are generated from data, not 52 images.** A card element carries only `rank` and `suit`; the renderer composes the face from them — the rank in the corners, the suit pip (red for hearts and diamonds, black for spades and clubs), and a Duke crown on the Jack, Queen and King. So a full deck is *one* back image plus a tiny bit of drawing code, not 52 hand-drawn files you have to keep in sync.
+
+Why this split? A deck is 52 cards that differ only by two small symbols, so drawing the faces from `rank`/`suit` is far less work than painting them — and it means you can change the whole look in code. If you *do* want bespoke face art (a hand-painted King of Hearts), the data-driven hook still helps: import images named by rank and suit and have the renderer draw `king_hearts.png` for that card instead of the pips. Either way, the element stays pure data; only how you turn that data into pixels changes.
+
 ## The rules: a blackjack engine
 
 The cards are just data; the *game* is the rules that read them. Here is a complete, self-contained blackjack engine — no Codename One dependency, so you can drop it straight into your companion (or unit-test it on its own). The only subtlety in blackjack is the Ace, which is worth 11 unless that would bust the hand, in which case it drops to 1:

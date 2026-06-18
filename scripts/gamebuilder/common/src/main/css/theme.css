@@ -42,9 +42,9 @@ GBLayer { background-color: #0E2552; padding: 1.2mm 1.6mm 1.2mm 0.8mm; }
 GBLayerActive { background-color: #143169; padding: 1.2mm 1.6mm 1.2mm 0.8mm; border-left: 0.7mm solid #4D86FF; }
 GBLayerName { background-color: transparent; color: #EAF1FF; font-size: 2.9mm; padding: 1mm 0.5mm 1mm 0.5mm; }
 GBLayerNameOff { background-color: transparent; color: #5E739B; font-size: 2.9mm; padding: 1mm 0.5mm 1mm 0.5mm; }
-GBChevron { background-color: transparent; color: #AEC0E6; padding: 1mm; }
-GBCount { background-color: transparent; color: #AEC0E6; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; }
-GBRowIcon { background-color: transparent; color: #AEC0E6; padding: 1mm; margin: 0; }
+GBChevron { background-color: transparent; color: #AEC0E6; padding: 0.5mm; }
+GBCount { background-color: transparent; color: #AEC0E6; font-size: 2.5mm; padding: 0 0.8mm 0 0.8mm; }
+GBRowIcon { background-color: transparent; color: #AEC0E6; padding: 0.5mm; margin: 0; }
 
 /* entity rows (Buttons) */
 GBEntity { background-color: #0E2552; color: #EAF1FF; padding: 1mm 1.6mm 1mm 5mm; font-size: 2.7mm; }

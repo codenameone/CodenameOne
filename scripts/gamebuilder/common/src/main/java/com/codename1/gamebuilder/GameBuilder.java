@@ -226,7 +226,9 @@ public class GameBuilder extends Lifecycle {
         leftCol.setUIID("GBSidebar");
         leftCol.add(BorderLayout.WEST, rail);
         leftCol.add(BorderLayout.CENTER, hierarchyPanel());
-        leftCol.setPreferredW(Display.getInstance().convertToPixels(42f));
+        // wide enough that hierarchy row labels (e.g. "Spawn", "Tea Cup 2") read in full
+        // alongside their icon and any UNIQUE badge, instead of truncating to "Spa"
+        leftCol.setPreferredW(Display.getInstance().convertToPixels(62f));
         leftCol.add(BorderLayout.EAST, vDivider(leftCol, +1));   // drag to resize the left panel
 
         Button assetSmaller = iconBtn("btn.assetcollapse", FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, "GBChromeBtn",

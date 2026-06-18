@@ -800,7 +800,7 @@ public class EditorCanvas extends Component {
         int x = (int) Math.round(ox + el.getX() * scale - w / 2);
         int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
         if ("card".equals(el.getAssetId())) {   // Duke Jack: draw the actual rank/suit/face
-            drawCardFace(g, x, y, (int) Math.round(w), (int) Math.round(h),
+            drawCardFace(g, cat, x, y, (int) Math.round(w), (int) Math.round(h),
                     el.getString("rank", "A"), el.getString("suit", "Spades"),
                     el.getBoolean("faceUp", true));
             return;
@@ -808,19 +808,25 @@ public class EditorCanvas extends Component {
         drawAsset(g, cat, el.getAssetId(), x, y, (int) Math.round(w), (int) Math.round(h));
     }
 
-    /// Draws a playing card: a face-down Duke-blue back, or a white face with the rank in two
-    /// corners, a centred suit pip (red for hearts/diamonds, black for spades/clubs) and a
-    /// little Duke crown on the picture cards. Used by the Duke Jack board tutorial.
-    private void drawCardFace(Graphics g, int x, int y, int w, int h,
+    /// Draws a playing card. The face-down **back** is the editable `card` asset art (the
+    /// bundled `/card.png`, so changing the cover means editing that one file); the **face** is
+    /// composed from the card's data — the rank in two corners, a centred suit pip (red for
+    /// hearts/diamonds, black for spades/clubs) and a Duke crown on the picture cards — so a
+    /// 52-card deck needs no per-card images. Used by the Duke Jack board tutorial.
+    private void drawCardFace(Graphics g, AssetCatalog cat, int x, int y, int w, int h,
             String rank, String suit, boolean faceUp) {
         int rad = Math.max(4, w / 7);
         if (!faceUp) {
-            g.setColor(0x1B3A6B);
+            Image back = cat == null ? null : cat.image("card");
+            if (back != null) {
+                g.drawImage(back, x, y, w, h);   // the card cover = the editable card asset
+                return;
+            }
+            g.setColor(0x1B3A6B);                // fallback if the art hasn't loaded
             g.fillRoundRect(x, y, w - 1, h - 1, rad, rad);
             g.setColor(0x4D86FF);
             g.drawRoundRect(x, y, w - 1, h - 1, rad, rad);
             g.drawRoundRect(x + w / 8, y + h / 8, w - w / 4, h - h / 4, rad, rad);
-            // a Duke diamond monogram on the back
             suitPip(g, x + w / 2, y + h / 2, Math.max(4, w / 5), 0xBcd2ff, "Diamonds");
             return;
         }

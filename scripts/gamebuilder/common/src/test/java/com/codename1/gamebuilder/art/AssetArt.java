@@ -372,13 +372,27 @@ public final class AssetArt {
         g.fillArc(w / 3, h / 8, w / 3, h / 3, 0, 360);
     }
 
+    /// The card *cover* (back): a Duke-blue card with a double border and a diamond emblem.
+    /// This is the editable `/card.png` the runtime draws for a face-down card — replace the
+    /// art (or this method) to restyle every card back. Card *faces* are drawn from rank/suit
+    /// data by the board renderer, so they're not baked here.
     private static void card(Graphics g, int w, int h, int c) {
-        g.setColor(c);
+        g.setColor(0xFAFAFC);                       // white rim
         g.fillRoundRect(0, 0, w - 1, h - 1, 6, 6);
-        g.setColor(0x9DB0D6);
-        g.drawRoundRect(0, 0, w - 1, h - 1, 6, 6);
-        g.setColor(0xE0466A);
-        g.fillArc(3, 3, w / 4, w / 4, 0, 360);
+        g.setColor(0x1B3A6B);                       // deep-blue field
+        g.fillRoundRect(2, 2, w - 5, h - 5, 5, 5);
+        g.setColor(0x4D86FF);                       // inner border
+        g.drawRoundRect(w / 8, h / 10, w - w / 4, h - h / 5, 5, 5);
+        // a Duke diamond emblem in the centre
+        int cx = w / 2;
+        int cy = h / 2;
+        int r = w / 4;
+        g.setColor(0x9DC2FF);
+        g.fillPolygon(new int[]{cx, cx + r * 7 / 10, cx, cx - r * 7 / 10},
+                new int[]{cy - r, cy, cy + r, cy}, 4);
+        g.setColor(0x1B3A6B);
+        g.fillPolygon(new int[]{cx, cx + r * 4 / 10, cx, cx - r * 4 / 10},
+                new int[]{cy - r * 6 / 10, cy, cy + r * 6 / 10, cy}, 4);
     }
 
     private static void token(Graphics g, int w, int h, int c) {

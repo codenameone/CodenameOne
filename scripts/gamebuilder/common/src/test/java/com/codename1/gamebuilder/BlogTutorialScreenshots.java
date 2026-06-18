@@ -23,6 +23,7 @@
 package com.codename1.gamebuilder;
 
 import com.codename1.gaming.level.AssetCatalog;
+import com.codename1.gaming.level.AssetDef;
 import com.codename1.gaming.level.GameElement;
 import com.codename1.gaming.level.GameLevel;
 import com.codename1.gamebuilder.editor.EditorController;
@@ -121,10 +122,10 @@ public final class BlogTutorialScreenshots {
             double horizon = (lvl[0].getRows() - 2) * ts;   // ground top
             m.setActiveLayer("Background");
             m.setSelectedAssetId("mountain");
-            mountain(c, 70, horizon, 1.0);
-            mountain(c, 300, horizon, 1.45);
-            mountain(c, 540, horizon, 0.8);
-            mountain(c, 760, horizon, 1.2);
+            onGround(c, 70, horizon, 1.0);
+            onGround(c, 300, horizon, 1.45);
+            onGround(c, 540, horizon, 0.8);
+            onGround(c, 760, horizon, 1.2);
             m.setSelectedAssetId("cloud");
             place(c, 150, 90, 1.1);
             place(c, 440, 64, 0.65);
@@ -141,7 +142,7 @@ public final class BlogTutorialScreenshots {
             int rows = lvl[0].getRows();
             m.setActiveLayer("Actors");
             m.setSelectedAssetId("player");
-            GameElement player = c.placeElement(2 * ts, (rows - 3) * ts);
+            GameElement player = onGround(c, 2 * ts, (rows - 2) * ts, 1.0);   // feet on the grass
             player.setName("player");        // named objects become generated Sprite fields
             player.setProperty("lives", 3);
             player.setProperty("jumpHeight", 110);
@@ -169,12 +170,13 @@ public final class BlogTutorialScreenshots {
             int rows = lvl[0].getRows();
             // an exception monster to dodge and a flag to reach — the goal of the level.
             // Naming them makes the editor generate `enemy` and `flag` fields in the companion.
+            double horizon = (rows - 2) * ts;   // top of the grass
             m.setSelectedAssetId("exception");
-            GameElement enemy = c.placeElement(11 * ts, (rows - 3) * ts);
+            GameElement enemy = onGround(c, 11 * ts, horizon, 1.0);
             enemy.setName("enemy");
             enemy.setProperty("speed", 45);
             m.setSelectedAssetId("flag");
-            GameElement flag = c.placeElement((lvl[0].getCols() - 2) * ts, (rows - 3) * ts);
+            GameElement flag = onGround(c, (lvl[0].getCols() - 2) * ts, horizon, 1.0);
             flag.setName("flag");
             m.setSelection(enemy);
         });
@@ -630,10 +632,16 @@ public final class BlogTutorialScreenshots {
         return e;
     }
 
-    /// Places a mountain so its base sinks a little below the horizon — the grass floor
-    /// (a higher layer band) then overlaps the base, so the mountain reads as *behind* it.
-    private static GameElement mountain(EditorController c, double x, double horizon, double scale) {
-        return place(c, x, horizon - 60 * scale + 22, scale);
+    /// Places the active asset so its *rendered base* rests exactly on `groundY` (no float).
+    /// The editor clamps an element's on-screen size to at most 1.8 cells, so the rendered
+    /// half-height is derived from that clamp — not the asset's raw pixel height — which is
+    /// why a naive `y = ground - height/2` left mountains and flags hovering.
+    private static GameElement onGround(EditorController c, double x, double groundY, double scale) {
+        int ts = c.model().level().getTileSize();
+        AssetDef d = c.model().catalog().def(c.model().getSelectedAssetId());
+        double cells = Math.max(0.3, Math.min(1.8, (d == null ? ts : d.getHeight()) / (double) ts));
+        double halfWorld = cells * ts * scale / 2.0;
+        return place(c, x, groundY - halfWorld, scale);
     }
 
     private static Component find(Container root, String name) {
