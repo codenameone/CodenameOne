@@ -59,6 +59,7 @@
         { "id": "pillar", "name": "Pillar", "kind": "actor", "color": "#CFD2D9" },
         { "id": "tree3d", "name": "Tree",   "kind": "actor", "color": "#3E8F58" },
         { "id": "rock",   "name": "Rock",   "kind": "actor", "color": "#6E7686" },
+        { "id": "teacup", "name": "Tea Cup", "kind": "actor", "w": 34, "h": 36, "color": "#EDEFF4", "defaults": { "value": 25, "speed": 35, "patrol": 64 } },
         { "id": "spawn",  "name": "Spawn",  "kind": "actor", "color": "#4D86FF", "unique": true, "defaults": { "team": "blue" } }
       ]
     }

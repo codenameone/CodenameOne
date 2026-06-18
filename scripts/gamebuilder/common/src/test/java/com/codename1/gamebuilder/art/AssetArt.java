@@ -81,6 +81,7 @@ public final class AssetArt {
             case "hill" -> hill(g, w, h, c);
             case "coin" -> coin(g, w, h, c);
             case "coffee" -> coffee(g, w, h, c);
+            case "teacup" -> teacup(g, w, h, c);
             case "exception", "bug" -> exceptionMonster(g, w, h, c);
             case "gem" -> gem(g, w, h, c);
             case "player", "hero", "spawn", "npc" -> figure(g, w, h, c);
@@ -253,6 +254,38 @@ public final class AssetArt {
         // handle
         g.setColor(0xf2f4f8);
         g.drawArc(w * 5 / 6 - w / 12, top + 4, w / 4, h / 3, -80, 180);
+    }
+
+    /// The dungeon villain: a porcelain tea cup with an angry face. Drinking the enemy's
+    /// brew, so to speak -- Duke fires coffee beans at these.
+    private static void teacup(Graphics g, int w, int h, int c) {
+        int top = h / 3;
+        // steam
+        g.setColor(0xcfd6e0);
+        g.drawArc(w * 2 / 5 - 2, 2, 6, top, -90, 200);
+        g.drawArc(w * 3 / 5 - 2, 2, 6, top, 90, 200);
+        // saucer
+        g.setColor(shade(c, 0.85));
+        g.fillArc(w / 12, h - h / 5, w * 5 / 6, h / 5, 0, 360);
+        // porcelain cup body (tapered)
+        g.setColor(c);
+        g.fillPolygon(new int[]{w / 5, w * 4 / 5, w * 7 / 10, w * 3 / 10},
+                new int[]{top, top, h - h / 6, h - h / 6}, 4);
+        // blue rim band + tea fill
+        g.setColor(0x6ea0d8);
+        g.fillRect(w / 5, top, w * 3 / 5, Math.max(2, h / 12));
+        g.setColor(0xb98a4a);
+        g.fillArc(w / 5 + 2, top + 1, w * 3 / 5 - 4, 7, 0, 360);
+        // handle
+        g.setColor(c);
+        g.drawArc(w * 4 / 5 - 2, top + 3, w / 4, h / 3, -80, 180);
+        // angry face
+        g.setColor(0x33414e);
+        g.fillArc(w * 5 / 12 - w / 12, top + h / 6, w / 7, h / 9, 0, 360);
+        g.fillArc(w * 7 / 12 - w / 12, top + h / 6, w / 7, h / 9, 0, 360);
+        g.drawLine(w / 3, top + h / 8, w * 5 / 12, top + h / 5);   // angled brows
+        g.drawLine(w * 2 / 3, top + h / 8, w * 7 / 12, top + h / 5);
+        g.drawArc(w * 5 / 12, h * 2 / 3, w / 6, h / 8, 0, 180);    // frown
     }
 
     private static void exceptionMonster(Graphics g, int w, int h, int c) {

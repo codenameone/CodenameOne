@@ -10,7 +10,7 @@ feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/game-dungeon.
 
 ![A first-person 3D dungeon built with the Game Builder](/blog/gamebuilder/dungeon-hero.jpg)
 
-The final tutorial takes the same data-driven pattern from [Tutorial 1](/blog/game-builder-2d-platformer/) and [Tutorial 2](/blog/game-builder-board-game/) into **3D**. Duke's last adventure sends him underground: **Crypt Walk**, a first-person dungeon where pillars are walls to navigate — and, once you wire them in (see the closing section), the exception monsters from Tutorial 1 to dodge. The headline difference from the 2D tutorial is what happens at runtime — instead of sprites in a `Scene`, each element becomes a GPU-rendered `Model` under a perspective camera with lighting. You author the same way; the runtime renders it in 3D.
+The final tutorial takes the same data-driven pattern from [Tutorial 1](/blog/game-builder-2d-platformer/) and [Tutorial 2](/blog/game-builder-board-game/) into **3D**. Duke's last adventure sends him underground: **Crypt Walk**, a first-person dungeon of stone corridors where the tea cups have invaded his coffee break. He hunts them through the maze and fires coffee beans to smash them, while the walls box him in. The headline difference from the 2D tutorial is what happens at runtime — instead of sprites in a `Scene`, each element becomes a GPU-rendered `Model` under a perspective camera with lighting. You author the same way; the runtime renders it in 3D.
 
 Project setup is identical to Tutorial 1 — only the mode changes:
 
@@ -68,6 +68,42 @@ Press **Live**. In dungeon style you walk in **first person** — **Left/Right t
 Live, you walk the corridor in first person and look around — the walls stop you, and the sunlit faces brighten or fall into shadow as you turn:
 
 ![Walking the dungeon, in the Game Builder preview](/blog/gamebuilder/game-dungeon.gif)
+
+## Coffee versus tea: fighting back
+
+A maze to walk is a start, but Duke came down here to clear out the tea cups. From the 3D Kit, drop **Tea Cup** actors along the corridor — they're the enemy — and give Duke a ranged attack: **Fire** (or the space bar) launches a coffee bean straight ahead.
+
+![Duke fires coffee beans at the tea cups](/blog/gamebuilder/dungeon-6-combat.png)
+
+In the preview the beans fly down the corridor, and a hit pops the cup and scores it. In a shipped game that's an ordinary projectile loop in `onUpdate` — spawn a bean on the fire key, advance the live ones, and test each against the enemies:
+
+```java
+private final List<float[]> beans = new ArrayList<>();   // {x, z, dirX, dirZ}
+
+@Override
+protected void onUpdate(double dt) {
+    GameInput in = getInput();
+    if (in.wasGameKeyPressed(Display.GAME_FIRE)) {
+        beans.add(new float[]{playerX(), playerZ(),
+                (float) Math.sin(yaw()), (float) -Math.cos(yaw())});
+    }
+    for (Iterator<float[]> it = beans.iterator(); it.hasNext();) {
+        float[] b = it.next();
+        b[0] += b[2] * 7 * dt;
+        b[1] += b[3] * 7 * dt;
+        GameElement cup = enemyNear(b[0], b[1], 0.5);   // your spatial test
+        if (cup != null) {
+            scene().remove(spriteFor(cup));              // smash it
+            addScore(cup.getInt("value", 25));
+            it.remove();
+        } else if (hitWall(b[0], b[1])) {
+            it.remove();                                  // bean spent
+        }
+    }
+}
+```
+
+The cups are just elements whose `assetId` your code treats as an enemy — exactly the "your rules read the data" idea from [Tutorial 1](/blog/game-builder-2d-platformer/#your-rules-coins-the-slime-and-winning), now in three dimensions. Want them to fight back? Move each cup toward Duke a little every frame and cost him a life on contact.
 
 ## Light and shade
 

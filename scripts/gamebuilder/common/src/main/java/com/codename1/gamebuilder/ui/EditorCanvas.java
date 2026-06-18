@@ -93,6 +93,11 @@ public class EditorCanvas extends Component {
     private double fpPitch;   // flight: nose up/down
     private double fpAlt = 0.6;   // flight: altitude
     private double fpSpeed;   // race: current throttle
+    // dungeon combat: coffee-bean projectiles Duke fires at tea-cup enemies. Each entry is
+    // {x, z, dirX, dirZ, life} in recentred board units (the same space as fpX/fpZ).
+    private final java.util.List<double[]> beans = new java.util.ArrayList<>();
+    private boolean fireRequested;   // edge-triggered fire (Space / Fire) — consumed each step
+    private double fireCooldown;     // seconds until the next bean can be fired
 
     // default-behavior play state (score, lives, collected items, enemy direction)
     private int score;
@@ -139,6 +144,9 @@ public class EditorCanvas extends Component {
         kLeft = kRight = kUp = kDown = false;
         relLeft = relRight = relUp = relDown = -1;
         jumpRequested = false;
+        fireRequested = false;
+        fireCooldown = 0;
+        beans.clear();
         vx = vy = 0;
         grounded = false;
         orbit = 0;
@@ -270,7 +278,8 @@ public class EditorCanvas extends Component {
 
     private static boolean isEnemy(String id) {
         return id != null && (id.equals("slime") || id.equals("enemy") || id.startsWith("enemy")
-                || id.startsWith("npc") || id.equals("exception") || id.equals("bug"));
+                || id.startsWith("npc") || id.equals("exception") || id.equals("bug")
+                || id.equals("teacup"));
     }
 
     private static boolean isCollectible(String id) {
@@ -363,6 +372,16 @@ public class EditorCanvas extends Component {
         String type = view3dType();
         double hc = level.getCols() / 2.0;
         double hr = level.getRows() / 2.0;
+        // dungeon combat: advance any in-flight coffee beans and let Duke fire new ones
+        if ("dungeon".equals(type)) {
+            fireCooldown = Math.max(0, fireCooldown - dt);
+            if (fireRequested && fireCooldown <= 0) {
+                beans.add(new double[]{fpX, fpZ, Math.sin(fpYaw), -Math.cos(fpYaw), 1.2});
+                fireCooldown = 0.35;
+            }
+            beanStep(dt);
+        }
+        fireRequested = false;
         int lr = (kRight ? 1 : 0) - (kLeft ? 1 : 0);
         int ud = (kUp ? 1 : 0) - (kDown ? 1 : 0);
         double nx;
@@ -458,6 +477,50 @@ public class EditorCanvas extends Component {
                     collected.clear();
                 }
                 player.setPosition(playerStartX, playerStartY);
+            }
+        }
+    }
+
+    /// Advances coffee-bean projectiles: fly forward, expire on range/walls, and pop a
+    /// tea-cup enemy on contact (scoring its value). Mirrors the kind of projectile loop a
+    /// shipped game runs from `onUpdate`.
+    private void beanStep(double dt) {
+        if (beans.isEmpty()) {
+            return;
+        }
+        GameLevel level = model().level();
+        double ts = Math.max(1, level.getTileSize());
+        double hc = level.getCols() / 2.0;
+        double hr = level.getRows() / 2.0;
+        double speed = 7.0;
+        List<GameElement> els = level.elements();
+        for (int i = beans.size() - 1; i >= 0; i--) {
+            double[] b = beans.get(i);
+            b[0] += b[2] * speed * dt;
+            b[1] += b[3] * speed * dt;
+            b[4] -= dt;
+            boolean dead = b[4] <= 0 || b[0] < -hc || b[0] > hc || b[1] < -hr || b[1] > hr
+                    || terrainBlocks(level, b[0] + hc, b[1] + hr, false);
+            if (!dead) {
+                for (int j = 0; j < els.size(); j++) {
+                    GameElement el = els.get(j);
+                    if (collected.contains(el.getId()) || !isEnemy(el.getAssetId())) {
+                        continue;
+                    }
+                    double ex = el.getX() / ts - hc;
+                    double ez = el.getY() / ts - hr;
+                    double dx = ex - b[0];
+                    double dz = ez - b[1];
+                    if (dx * dx + dz * dz < 0.5 * 0.5) {
+                        collected.add(el.getId());   // tea cup smashed
+                        score += el.getInt("value", 25);
+                        dead = true;
+                        break;
+                    }
+                }
+            }
+            if (dead) {
+                beans.remove(i);
             }
         }
     }
@@ -568,7 +631,24 @@ public class EditorCanvas extends Component {
             if (down) { kRight = true; relRight = -1; } else { relRight = playClock; }
         } else if (g == Display.GAME_DOWN) {
             if (down) { kDown = true; relDown = -1; } else { relDown = playClock; }
-        } else if (g == Display.GAME_UP || g == Display.GAME_FIRE || keyCode == ' ') {
+        } else if (g == Display.GAME_FIRE || keyCode == ' ') {
+            // Fire/Space shoots a coffee bean in 3D; in 2D it doubles as jump (next branch).
+            if (model().level().getMode() == GameLevel.MODE_3D) {
+                if (down) {
+                    fireRequested = true;
+                }
+                return;
+            }
+            if (down) {
+                if (!kUp) {
+                    jumpRequested = true;
+                }
+                kUp = true;
+                relUp = -1;
+            } else {
+                relUp = playClock;
+            }
+        } else if (g == Display.GAME_UP) {
             if (down) {
                 if (!kUp) {
                     jumpRequested = true;   // edge only: a held/repeating Up doesn't re-bounce
@@ -579,6 +659,12 @@ public class EditorCanvas extends Component {
                 relUp = playClock;
             }
         }
+    }
+
+    /// Fire a coffee bean (the dungeon's ranged attack). Public so the screenshot harness can
+    /// stage combat; the Fire/Space key also routes here in the 3D preview.
+    public void fire() {
+        fireRequested = true;
     }
 
     public double getZoom() {
@@ -713,7 +799,82 @@ public class EditorCanvas extends Component {
         double bob = playMode ? playBob(el, def) * scale : 0;
         int x = (int) Math.round(ox + el.getX() * scale - w / 2);
         int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
+        if ("card".equals(el.getAssetId())) {   // Duke Jack: draw the actual rank/suit/face
+            drawCardFace(g, x, y, (int) Math.round(w), (int) Math.round(h),
+                    el.getString("rank", "A"), el.getString("suit", "Spades"),
+                    el.getBoolean("faceUp", true));
+            return;
+        }
         drawAsset(g, cat, el.getAssetId(), x, y, (int) Math.round(w), (int) Math.round(h));
+    }
+
+    /// Draws a playing card: a face-down Duke-blue back, or a white face with the rank in two
+    /// corners, a centred suit pip (red for hearts/diamonds, black for spades/clubs) and a
+    /// little Duke crown on the picture cards. Used by the Duke Jack board tutorial.
+    private void drawCardFace(Graphics g, int x, int y, int w, int h,
+            String rank, String suit, boolean faceUp) {
+        int rad = Math.max(4, w / 7);
+        if (!faceUp) {
+            g.setColor(0x1B3A6B);
+            g.fillRoundRect(x, y, w - 1, h - 1, rad, rad);
+            g.setColor(0x4D86FF);
+            g.drawRoundRect(x, y, w - 1, h - 1, rad, rad);
+            g.drawRoundRect(x + w / 8, y + h / 8, w - w / 4, h - h / 4, rad, rad);
+            // a Duke diamond monogram on the back
+            suitPip(g, x + w / 2, y + h / 2, Math.max(4, w / 5), 0xBcd2ff, "Diamonds");
+            return;
+        }
+        boolean red = "Hearts".equals(suit) || "Diamonds".equals(suit);
+        int ink = red ? 0xC0392B : 0x1A1A1A;
+        g.setColor(0xFAFAFC);
+        g.fillRoundRect(x, y, w - 1, h - 1, rad, rad);
+        g.setColor(0xC2CBDA);
+        g.drawRoundRect(x, y, w - 1, h - 1, rad, rad);
+        // rank in the top-left and bottom-right corners
+        g.setColor(ink);
+        com.codename1.ui.Font f = com.codename1.ui.Font.createSystemFont(
+                com.codename1.ui.Font.FACE_PROPORTIONAL, com.codename1.ui.Font.STYLE_BOLD,
+                com.codename1.ui.Font.SIZE_MEDIUM);
+        g.setFont(f);
+        int pad = Math.max(2, w / 12);
+        g.drawString(rank, x + pad, y + pad);
+        g.drawString(rank, x + w - pad - f.stringWidth(rank), y + h - pad - f.getHeight());
+        // centre: a big suit pip, plus a Duke crown on J/Q/K
+        int cx = x + w / 2;
+        int cy = y + h / 2;
+        suitPip(g, cx, cy, Math.max(5, w / 4), ink, suit);
+        if ("J".equals(rank) || "Q".equals(rank) || "K".equals(rank)) {
+            g.setColor(0xE0A21E);
+            int cw = w / 3;
+            int ch = h / 12;
+            int[] xs = {cx - cw / 2, cx - cw / 4, cx, cx + cw / 4, cx + cw / 2};
+            int[] ys = {cy - h / 5, cy - h / 5 - ch, cy - h / 5, cy - h / 5 - ch, cy - h / 5};
+            g.fillPolygon(xs, ys, 5);
+        }
+    }
+
+    /// A suit symbol centred at (cx,cy) with half-size `r`.
+    private void suitPip(Graphics g, int cx, int cy, int r, int color, String suit) {
+        g.setColor(color);
+        if ("Diamonds".equals(suit)) {
+            g.fillPolygon(new int[]{cx, cx + r * 7 / 10, cx, cx - r * 7 / 10},
+                    new int[]{cy - r, cy, cy + r, cy}, 4);
+        } else if ("Hearts".equals(suit)) {
+            g.fillArc(cx - r, cy - r, r, r, 0, 360);
+            g.fillArc(cx, cy - r, r, r, 0, 360);
+            g.fillPolygon(new int[]{cx - r, cx + r, cx}, new int[]{cy - r / 3, cy - r / 3, cy + r}, 3);
+        } else if ("Clubs".equals(suit)) {
+            int lobe = r * 3 / 4;
+            g.fillArc(cx - lobe, cy - lobe / 2, lobe, lobe, 0, 360);
+            g.fillArc(cx, cy - lobe / 2, lobe, lobe, 0, 360);
+            g.fillArc(cx - lobe / 2, cy - lobe, lobe, lobe, 0, 360);
+            g.fillRect(cx - r / 8, cy, Math.max(2, r / 4), r);
+        } else {   // Spades
+            g.fillArc(cx - r, cy - r / 3, r, r, 0, 360);
+            g.fillArc(cx, cy - r / 3, r, r, 0, 360);
+            g.fillPolygon(new int[]{cx, cx + r, cx - r}, new int[]{cy - r, cy + r / 3, cy + r / 3}, 3);
+            g.fillRect(cx - r / 8, cy, Math.max(2, r / 4), r);
+        }
     }
 
     /// Clamps a follow-camera origin to [0, max] (centers when the level is smaller
@@ -1149,6 +1310,11 @@ public class EditorCanvas extends Component {
             if (el == player) {
                 continue;
             }
+            // enemies and pickups (tea cups, coffee) draw as upright sprite billboards in a
+            // later pass so they're recognizable, not flat-coloured boxes.
+            if (isEnemy(el.getAssetId()) || isCollectible(el.getAssetId())) {
+                continue;
+            }
             AssetDef def = cat == null ? null : cat.def(el.getAssetId());
             double wx = el.getX() / ts - halfC;
             double wz = el.getY() / ts - halfR;
@@ -1184,6 +1350,39 @@ public class EditorCanvas extends Component {
                     g.drawLine(f.xs[e], f.ys[e], f.xs[e2], f.ys[e2]);
                 }
             }
+        }
+        // upright sprite billboards for enemies + pickups (tea cups, coffee), drawn after the
+        // solid geometry and depth-sorted far→near, with a line-of-sight test so a cup behind a
+        // wall stays hidden. Then the in-flight coffee beans on top.
+        for (int i = 0; i < els.size(); i++) {
+            GameElement el = els.get(i);
+            if (el == player || collected.contains(el.getId())) {
+                continue;
+            }
+            String id = el.getAssetId();
+            if (!isEnemy(id) && !isCollectible(id)) {
+                continue;
+            }
+            double wx = el.getX() / ts - halfC;
+            double wz = el.getY() / ts - halfR;
+            if ("dungeon".equals(type) && !hasLineOfSight(level, wx, wz)) {
+                continue;
+            }
+            double baseY = el.getZ() / ts + groundAt(level, el.getX() / ts, el.getY() / ts);
+            drawBillboard(g, cat, id, wx, baseY, wz, 0.9 * el.getScaleX());
+        }
+        for (int i = 0; i < beans.size(); i++) {
+            double[] b = beans.get(i);
+            double by = groundAt(level, b[0] + halfC, b[1] + halfR) + 1.2;
+            double[] sp = project3D(b[0], by, b[1]);
+            if (sp == null || sp[2] < 0.6) {
+                continue;   // skip beans right at the muzzle (they'd be a screen-filling blob)
+            }
+            int rad = Math.max(2, Math.min(sw / 26, (int) (0.12 * p3f / sp[2])));
+            g.setColor(0x3a241a);
+            g.fillArc((int) sp[0] - rad, (int) sp[1] - rad, rad * 2, rad * 2, 0, 360);
+            g.setColor(0x6F4E37);
+            g.fillArc((int) sp[0] - rad + 1, (int) sp[1] - rad + 1, rad * 2 - 2, rad * 2 - 2, 0, 360);
         }
         // faint ground grid for spatial reference (skip in flight + dungeon: a maze floor
         // should read as continuous stone, not a tile grid)
@@ -1326,6 +1525,57 @@ public class EditorCanvas extends Component {
         addFace(faces, x1, y0, z0, x0, y0, z0, x0, y1, z0, x1, y1, z0, shade(color, sunFactor(0, 0, -1)));   // -z
         addFace(faces, x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1, shade(color, sunFactor(1, 0, 0)));    // +x
         addFace(faces, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, shade(color, sunFactor(-1, 0, 0)));   // -x
+    }
+
+    /// Draws an asset as an upright billboard standing at (wx, baseY, wz): the sprite's feet
+    /// sit on the ground point and it rises `worldH` board units toward the sky, sized by
+    /// perspective. Sprite sheets animate (via #drawAsset) just like the 2D preview.
+    private void drawBillboard(Graphics g, AssetCatalog cat, String id,
+            double wx, double baseY, double wz, double worldH) {
+        double[] sb = project3D(wx, baseY, wz);
+        if (sb == null) {
+            return;
+        }
+        double hpx = worldH * p3f / sb[2];
+        if (hpx < 2) {
+            return;
+        }
+        AssetDef def = cat == null ? null : cat.def(id);
+        double aspect = def == null ? 0.8 : (double) def.getWidth() / Math.max(1, def.getHeight());
+        int hh = (int) hpx;
+        int ww = Math.max(2, (int) (hpx * aspect));
+        drawAsset(g, cat, id, (int) sb[0] - ww / 2, (int) sb[1] - hh, ww, hh);
+    }
+
+    /// Whether the straight line from the eye to a target board point is clear of terrain
+    /// walls — so a billboard behind a wall is culled rather than drawn through it.
+    private boolean hasLineOfSight(GameLevel level, double tx, double tz) {
+        com.codename1.gaming.level.TerrainGrid t = level.getTerrain();
+        if (t == null) {
+            return true;
+        }
+        double halfC = level.getCols() / 2.0;
+        double halfR = level.getRows() / 2.0;
+        double dx = tx - fpX;
+        double dz = tz - fpZ;
+        double dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < 0.01) {
+            return true;
+        }
+        int steps = (int) (dist / 0.25) + 1;
+        for (int s = 1; s < steps; s++) {
+            double f = s / (double) steps;
+            if (dist * (1 - f) < 0.45) {   // within the target cell — stop before culling it
+                break;
+            }
+            int col = (int) Math.floor(fpX + dx * f + halfC);
+            int row = (int) Math.floor(fpZ + dz * f + halfR);
+            if (col >= 0 && row >= 0 && col < level.getCols() && row < level.getRows()
+                    && t.getWall(col, row) > 0f) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int shade(int rgb, double f) {

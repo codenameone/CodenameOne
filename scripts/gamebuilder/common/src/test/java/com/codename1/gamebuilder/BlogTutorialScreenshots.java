@@ -28,6 +28,8 @@ import com.codename1.gaming.level.GameLevel;
 import com.codename1.gamebuilder.editor.EditorController;
 import com.codename1.gamebuilder.editor.EditorModel;
 import com.codename1.gamebuilder.editor.StarterPacks;
+import com.codename1.gamebuilder.game.Blackjack;
+import com.codename1.gamebuilder.game.Blackjack.Card;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -42,6 +44,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Random;
 
 /// Drives the editor through the exact steps of the three blog tutorials (2D platformer, board
 /// game, 3D dungeon) and writes a screenshot after each step into the website's blog image
@@ -212,14 +215,25 @@ public final class BlogTutorialScreenshots {
             } else if (mode == GameLevel.MODE_3D) {
                 gb.getCanvas().keyPressed(K_UP);      // walk forward (3D)
             } else {
-                GameElement t = firstToken();                    // slide a checker piece
-                if (t != null) {
-                    int ts = gb.getController().model().level().getTileSize();
-                    mover[0] = t;
-                    path[0] = t.getX();
-                    path[1] = t.getY();
-                    path[2] = t.getX() + 3 * ts;
-                    path[3] = t.getY() + 3 * ts;
+                // Duke Jack: deal a fresh card off the deck (top) and flip it into his hand
+                EditorController c = gb.getController();
+                GameLevel lvl = c.model().level();
+                double cx = lvl.getCols() * lvl.getTileSize() / 2.0;
+                double deal = lvl.getRows() * lvl.getTileSize() * 0.72;
+                c.model().setActiveLayer("Pieces");
+                c.model().setSelectedAssetId("card");
+                GameElement card = c.placeElement(cx, 40);
+                if (card != null) {
+                    card.setPosition(cx, 40);
+                    card.setScale(2.3f);
+                    card.setProperty("rank", "K");
+                    card.setProperty("suit", "Spades");
+                    card.setProperty("faceUp", false);
+                    mover[0] = card;
+                    path[0] = cx;
+                    path[1] = 40;
+                    path[2] = cx + 78;
+                    path[3] = deal;
                 }
             }
         });
@@ -233,18 +247,23 @@ public final class BlogTutorialScreenshots {
                         gb.getCanvas().keyReleased(K_UP);
                     }
                 } else if (mode == GameLevel.MODE_3D) {
-                    // walk forward down the corridor, then pan to look around (so the
-                    // camera never jams head-on into the far wall and goes gray).
-                    if (fr == frames / 2) {
+                    // step a little way into the corridor, then stop and fire coffee beans at
+                    // the tea cups ahead (so the clip shows the dungeon's combat, not just a walk).
+                    if (fr == 5) {
                         gb.getCanvas().keyReleased(K_UP);
-                        gb.getCanvas().keyPressed(K_RIGHT);
+                    }
+                    if (fr >= 6 && fr % 3 == 0) {
+                        gb.getCanvas().fire();
                     }
                 } else if (mover[0] != null) {
-                    double t = (fr + 1) / (double) frames;              // ease + hop the piece
+                    double t = (fr + 1) / (double) frames;              // ease + hop the card
                     double ease = t * t * (3 - 2 * t);
                     double hop = Math.abs(Math.sin(t * Math.PI * 3)) * 10;
                     mover[0].setPosition(path[0] + (path[2] - path[0]) * ease,
                             path[1] + (path[3] - path[1]) * ease - hop);
+                    if (t > 0.6) {
+                        mover[0].setProperty("faceUp", true);           // flip it face-up on landing
+                    }
                 }
                 gb.getCanvas().tick(0.06);
             });
@@ -290,50 +309,65 @@ public final class BlogTutorialScreenshots {
         }
     }
 
-    // ---- Tutorial 2: board game "Checkers Start" -----------------------------
+    // ---- Tutorial 2: card game "Duke Jack" (blackjack) -----------------------
+    // Duke starts on 16, hits to 19 (still his turn — the dealer hasn't drawn yet), then
+    // stands; the dealer draws to 17 and Duke wins 19 over 17. Chosen so each step's table is
+    // truthful (the dealer's extra cards don't appear until he actually plays).
+    private static final int BJ_SEED = 43;
+
     private static void board() {
         edit(() -> {
-            gb.getController().loadLevel(StarterPacks.newLevel(GameLevel.MODE_BOARD), "CheckersStart");
+            GameLevel lvl = StarterPacks.newLevel(GameLevel.MODE_BOARD);
+            lvl.setGrid(8, 5, 64);   // a compact card table (not a 10x10 game board)
+            gb.getController().loadLevel(lvl, "DukeJack");
             gb.getController().model().setSelection(null);
         });
         shot("board-1-new-scene");
 
+        // green felt: paint the whole board with the green tile
         edit(() -> {
             EditorController c = gb.getController();
             EditorModel m = c.model();
             GameLevel lvl = m.level();
             m.setActiveLayer("Board");
-            m.setSelectedAssetId("boardtile");
+            m.setSelectedAssetId("start");
             for (int r = 0; r < lvl.getRows(); r++) {
                 for (int col = 0; col < lvl.getCols(); col++) {
                     c.paintTile(col, r);
                 }
             }
         });
-        shot("board-2-tiles");
+        shot("board-2-felt");
 
+        // a real blackjack deal, sourced from the Blackjack engine the tutorial documents
+        final Blackjack[] game = {null};
         edit(() -> {
-            EditorController c = gb.getController();
-            EditorModel m = c.model();
-            int ts = m.level().getTileSize();
-            m.setActiveLayer("Pieces");
-            m.setSelectedAssetId("token");
-            GameElement p1 = c.placeElement(ts / 2.0, ts / 2.0);
-            GameElement p2 = c.placeElement(2 * ts + ts / 2.0, 2 * ts + ts / 2.0);
-            if (p1 != null) {
-                p1.setProperty("player", 1);
-                p1.setProperty("cell", "a1");
-            }
-            if (p2 != null) {
-                p2.setProperty("player", 2);
-                p2.setProperty("cell", "c3");
-            }
-            m.setSelection(p1);
+            game[0] = new Blackjack(new Random(BJ_SEED));
+            layoutHands(gb.getController(), game[0], false);   // dealer hole hidden
+            gb.getController().model().setSelection(null);
         });
-        shot("board-3-pieces");
+        shot("board-3-deal");
 
-        edit(() -> gb.getController().model().setSelection(null));
-        shot("board-4-build");
+        // Duke's turn: hit while low, then layout his grown hand (hole still hidden)
+        edit(() -> {
+            Blackjack g = game[0];
+            if (g.phase() == Blackjack.Phase.PLAYER_TURN && g.playerValue() < 17) {
+                g.hit();
+            }
+            layoutHands(gb.getController(), g, false);
+            gb.getController().model().setSelection(null);
+        });
+        shot("board-4-hit");
+
+        // Duke stands: the dealer reveals the hole card and plays out; show the resolved table
+        edit(() -> {
+            Blackjack g = game[0];
+            if (g.phase() == Blackjack.Phase.PLAYER_TURN) {
+                g.stand();
+            }
+            layoutHands(gb.getController(), g, true);
+            gb.getController().model().setSelection(null);
+        });
 
         live();
         tick();
@@ -341,6 +375,46 @@ public final class BlogTutorialScreenshots {
         hero("board");
         recordGif("board");
         stop();
+    }
+
+    private static String suitName(int suit) {
+        switch (suit) {
+            case Blackjack.SUIT_HEARTS: return "Hearts";
+            case Blackjack.SUIT_DIAMONDS: return "Diamonds";
+            case Blackjack.SUIT_CLUBS: return "Clubs";
+            default: return "Spades";
+        }
+    }
+
+    /// Clears the table and lays the dealer's hand (top) and Duke's hand (bottom) as card
+    /// elements, reading rank/suit from the engine. The dealer's second card stays face-down
+    /// until `reveal`.
+    private static void layoutHands(EditorController c, Blackjack g, boolean reveal) {
+        GameLevel lvl = c.model().level();
+        lvl.elements().removeIf(e -> "card".equals(e.getAssetId()));
+        c.model().setActiveLayer("Pieces");
+        c.model().setSelectedAssetId("card");
+        double boardH = lvl.getRows() * lvl.getTileSize();
+        placeHand(c, g.dealerHand(), boardH * 0.30, reveal ? -1 : 1);
+        placeHand(c, g.playerHand(), boardH * 0.72, -1);
+    }
+
+    private static void placeHand(EditorController c, List<Card> hand, double y, int hideIndex) {
+        double cx = c.model().level().getCols() * c.model().level().getTileSize() / 2.0;
+        int n = hand.size();
+        double spacing = 78;
+        double startX = cx - (n - 1) * spacing / 2;
+        for (int i = 0; i < n; i++) {
+            Card card = hand.get(i);
+            GameElement e = c.placeElement(startX + i * spacing, y);
+            if (e != null) {
+                e.setPosition(startX + i * spacing, y);
+                e.setScale(2.3f);   // big enough to read as a real card on the table
+                e.setProperty("rank", card.rankLabel());
+                e.setProperty("suit", suitName(card.suit));
+                e.setProperty("faceUp", i != hideIndex);
+            }
+        }
     }
 
     // ---- Tutorial 3: first-person 3D dungeon "Crypt Walk" --------------------
@@ -412,11 +486,40 @@ public final class BlogTutorialScreenshots {
         });
         shot("dungeon-4-spawn");
 
+        // Tea-cup enemies down the central corridor — Duke's targets.
+        edit(() -> {
+            EditorController c = gb.getController();
+            EditorModel m = c.model();
+            int ts = m.level().getTileSize();
+            int cx = m.level().getCols() / 2;
+            int rows = m.level().getRows();
+            m.setActiveLayer("Models");
+            m.setSelectedAssetId("teacup");
+            for (int dr = 5; dr <= 11; dr += 3) {
+                c.placeElement(cx * ts + ts / 2.0, (rows - dr) * ts + ts / 2.0);
+            }
+            m.setSelection(null);
+        });
+
         live();
         for (int i = 0; i < 3; i++) {
             tick();
         }
         shot("dungeon-5-walk");
+
+        // fire coffee beans down the corridor at the tea cups: land two hits (score climbs,
+        // cups vanish), then loose a third bean and capture it mid-flight.
+        Display.getInstance().callSeriallyAndWait(() -> {
+            for (int shot = 0; shot < 2; shot++) {
+                gb.getCanvas().fire();
+                for (int k = 0; k < 6; k++) {
+                    gb.getCanvas().tick(0.08);   // let the bean fly to its cup (cooldown clears)
+                }
+            }
+            gb.getCanvas().fire();
+            gb.getCanvas().tick(0.16);            // let the bean clear the muzzle for the shot
+        });
+        shot("dungeon-6-combat");
         hero("dungeon");
         recordGif("dungeon");
         stop();
@@ -531,16 +634,6 @@ public final class BlogTutorialScreenshots {
     /// (a higher layer band) then overlaps the base, so the mountain reads as *behind* it.
     private static GameElement mountain(EditorController c, double x, double horizon, double scale) {
         return place(c, x, horizon - 60 * scale + 22, scale);
-    }
-
-    private static GameElement firstToken() {
-        List<GameElement> els = gb.getController().model().level().elements();
-        for (int i = 0; i < els.size(); i++) {
-            if ("token".equals(els.get(i).getAssetId())) {
-                return els.get(i);
-            }
-        }
-        return els.isEmpty() ? null : els.get(0);
     }
 
     private static Component find(Container root, String name) {

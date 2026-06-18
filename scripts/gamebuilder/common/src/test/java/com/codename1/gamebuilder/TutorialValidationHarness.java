@@ -99,33 +99,34 @@ public final class TutorialValidationHarness {
         validate("platformer", m, cat, 3);
     }
 
-    // ---- Tutorial 2: a board game ("Checkers Start") ------------------------
+    // ---- Tutorial 2: a card game ("Duke Jack" blackjack) --------------------
     private static void boardGame() {
         AssetCatalog cat = StarterPacks.loadCatalog();
         EditorModel m = new EditorModel(StarterPacks.newLevel(GameLevel.MODE_BOARD), cat);
-        m.setSceneName("Checkers");
+        m.setSceneName("DukeJack");
         EditorController c = new EditorController(m);
         GameLevel lvl = m.level();
-        // Step: fill the board tiles (the "boardtile" square)
+        // Step: lay the green felt (the "start" tile)
         Layer board = firstTileLayer(lvl);
         m.setActiveLayer(board.getName());
-        m.setSelectedAssetId("boardtile");
+        m.setSelectedAssetId("start");
         for (int r = 0; r < lvl.getRows(); r++) {
             for (int col = 0; col < lvl.getCols(); col++) {
                 c.paintTile(col, r);
             }
         }
-        check(board.tiles().size() > 0, "board: tiles painted");
-        // Step: place a piece (the "token" actor) on the Pieces layer with a "player" property
+        check(board.tiles().size() > 0, "board: felt painted");
+        // Step: deal a card (the "card" actor) on the Pieces layer with rank/suit/faceUp
         Layer pieces = firstEntityLayer(lvl);
         m.setActiveLayer(pieces.getName());
-        m.setSelectedAssetId("token");
+        m.setSelectedAssetId("card");
         int ts = lvl.getTileSize();
-        GameElement p1 = c.placeElement(ts / 2.0, ts / 2.0);
-        check(p1 != null, "board: piece placed");
-        if (p1 != null) {
-            p1.setProperty("player", 1);
-            p1.setProperty("cell", "a1");
+        GameElement card = c.placeElement(ts / 2.0, ts / 2.0);
+        check(card != null, "board: card dealt");
+        if (card != null) {
+            card.setProperty("rank", "A");
+            card.setProperty("suit", "Spades");
+            card.setProperty("faceUp", true);
         }
         validate("board", m, cat, 1);
     }

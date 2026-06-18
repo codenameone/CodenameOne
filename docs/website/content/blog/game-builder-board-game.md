@@ -1,121 +1,157 @@
 ---
-title: "Game Builder Tutorial 2: Build a Turn-Based Board Game"
+title: "Game Builder Tutorial 2: Build a Blackjack Card Game (Duke Jack)"
 slug: game-builder-board-game
 url: /blog/game-builder-board-game/
 date: '2026-07-02'
 author: Shai Almog
-description: A code-included walkthrough that builds an isometric board game with the Codename One Game Builder — lay the board, place pieces tagged with the data your rules read, and drive turn logic from the generated companion class.
-feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/board-3-pieces.png" alt="A board game built with the Game Builder" /> A code-included walkthrough that builds an isometric board game with the Codename One Game Builder — lay the board, tag the pieces, and drive turn logic from code.'
+description: A code-included walkthrough that builds Duke Jack, a playable blackjack card game, with the Codename One Game Builder — lay a felt table, deal real cards as data-driven elements, and drive the full hit/stand/dealer rules from the companion class.
+feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/board-3-deal.png" alt="A blackjack card game built with the Game Builder" /> A code-included walkthrough that builds Duke Jack, a playable blackjack game with the Codename One Game Builder — felt table, cards as data, and the full blackjack rules in code.'
 ---
 
-![A board game built with the Game Builder](/blog/gamebuilder/board-hero.jpg)
+![Duke Jack, a blackjack game built with the Game Builder](/blog/gamebuilder/board-hero.jpg)
 
-In [Tutorial 1](/blog/game-builder-2d-platformer/) Duke dashed for coffee with arcade physics. Now he sets the cup down for a calmer contest: a turn-based board game. A board has none of that arcade motion — pieces sit on squares and the *rules* decide what happens. This tutorial shows how the same Game Builder pattern (visual data + an `onUpdate` companion) handles a turn-based game, where your code reads per-piece properties instead of simulating motion. We'll build **Checkers Start** — Duke's tabletop challenge: a board, two players' tokens, and the scaffolding to drive turns.
+In [Tutorial 1](/blog/game-builder-2d-platformer/) Duke dashed for coffee with arcade physics. Now he sets the cup down for a calmer contest: **Duke Jack**, a game of blackjack. A card game has none of that arcade motion — cards sit on the felt and the *rules* decide who wins. This tutorial shows how the same Game Builder pattern (visual data + an `onUpdate` companion) handles a card game, where your code reads the cards and runs the table instead of simulating movement. We'll build a felt table, deal a real hand, and wire up the complete blackjack rules: hit, stand, the dealer's draw, and the win/lose decision.
 
 If you haven't set up a project yet, the [project setup in Tutorial 1](/blog/game-builder-2d-platformer/#step-0-create-the-project-and-scaffold-a-scene) applies verbatim — only the mode changes (board mode isn't the default, so the `-Dmode=board` flag is required here):
 
 ```bash
-mvn cn1:create-game-scene -DclassName=com.example.checkers.Checkers -Dmode=board
+mvn cn1:create-game-scene -DclassName=com.example.dukejack.DukeJack -Dmode=board
 mvn cn1:gamebuilder
 ```
 
-## Why board mode?
+## Why board mode for cards?
 
-Board mode renders your grid through an **isometric projection** (`IsoProjection`), so the same flat data you author becomes a clean 2.5D board at runtime — no per-piece 3D work. You author in a simple top-down grid; the runtime tilts it. That's the whole appeal: design like a spreadsheet, ship like a board.
+Board mode is the Game Builder's grid mode: you place elements on a flat board of cells instead of a free-scrolling world. That's a natural fit for a card table — the felt is a tile layer, and each card is an element you position by hand, carrying its own `rank`, `suit` and `faceUp` data. There's no physics and no camera to chase; the layout *is* the game state, and your rules read it. (Board mode can also tilt the grid into an isometric view through `IsoProjection` for tabletop games — for cards we keep it flat and top-down.)
 
-## Step 1 — A board scene
+## Step 1 — A card-table scene
 
-Pick **New scene → Board**. You get a **Board** (tile) layer for the squares and a **Pieces** (entity) layer for the movable tokens. Keeping squares and pieces on separate layers matters: the board is static grid data, while pieces are objects your rules move.
+Pick **New scene → Board**. You get a **Board** (tile) layer for the table surface and a **Pieces** (entity) layer for the cards. Keeping the felt and the cards on separate layers matters: the felt is static grid data, while the cards are objects your rules deal, flip, and clear. A small grid (here 8×5) is all a card table needs.
 
-![A new board scene](/blog/gamebuilder/board-1-new-scene.png)
+![A new board scene for the card table](/blog/gamebuilder/board-1-new-scene.png)
 
-## Step 2 — Lay the board
+## Step 2 — Lay the felt
 
-Select the **Board** layer, pick the **Square** tile, and fill the grid. Because it's a tile layer, the whole board is just a compact `cell → assetId` map — cheap to store and render.
+Select the **Board** layer, pick the green tile from the palette, and paint the whole grid. That green surface is your table; everything else sits on top of it.
 
-![Laying the board tiles](/blog/gamebuilder/board-2-tiles.png)
+![The green felt table](/blog/gamebuilder/board-2-felt.png)
 
-## Step 3 — Place pieces and tag them with data
+## Step 3 — Deal the hands
 
-Select the **Pieces** layer, pick **Token**, and stamp pieces on their squares. This is the key idea: in the Inspector's **Behavior** section, tag each piece with the data your rules need — `player = 1` (or `2`) for ownership and `cell = a1` for its board coordinate. Your code never hard-codes piece positions; it reads these properties.
+Switch to the **Pieces** layer and place **Card** actors: a row for the dealer along the top and a row for Duke along the bottom. Each card carries three properties in the Inspector — `rank` (`A`, `2`…`10`, `J`, `Q`, `K`), `suit` (Spades / Hearts / Diamonds / Clubs) and `faceUp`. Turn the dealer's second card **face-down** — that's the hole card the player can't see yet.
 
-![Placing pieces tagged with player and cell](/blog/gamebuilder/board-3-pieces.png)
+![The opening blackjack deal](/blog/gamebuilder/board-3-deal.png)
 
-## Step 4 — Save
+You *can* place cards by hand for a fixed layout, but a real game deals them from a shuffled deck at runtime — your companion creates the card elements from the engine below. The editor just lets you design the table, the card art and the seating; the deal is data your code produces.
 
-**Save** writes `src/main/resources/games/Checkers.game` (loaded at runtime as `/Checkers.game` — Codename One's resource namespace is flat). The board, the pieces and their properties all live there as data:
+## Step 4 — Hit or stand
 
-```json
-{
-  "mode": "board", "cols": 8, "rows": 8, "tileSize": 64,
-  "layers": [
-    { "name": "Board",  "kind": "tile",   "tiles": { "0,0": "boardtile", "1,1": "boardtile" } },
-    { "name": "Pieces", "kind": "entity" }
-  ],
-  "elements": [
-    { "id": "p1", "assetId": "token", "layer": "Pieces", "x": 32, "y": 32,   "props": { "player": 1, "cell": "a1" } },
-    { "id": "p2", "assetId": "token", "layer": "Pieces", "x": 160, "y": 160, "props": { "player": 2, "cell": "c3" } }
-  ]
+Duke's hand here is on 16 — too low to stand on. He **hits**, and a third card brings him to 19, a total worth standing on. The companion spawns the new card element and lays it next to the others; the same `faceUp`/`rank`/`suit` data drives how it draws. The dealer's hole card stays face-down — it's still Duke's turn.
+
+![Duke hits and reaches 19](/blog/gamebuilder/board-4-hit.png)
+
+## The rules: a blackjack engine
+
+The cards are just data; the *game* is the rules that read them. Here is a complete, self-contained blackjack engine — no Codename One dependency, so you can drop it straight into your companion (or unit-test it on its own). The only subtlety in blackjack is the Ace, which is worth 11 unless that would bust the hand, in which case it drops to 1:
+
+```java
+public int handValue(List<Card> hand) {
+    int total = 0, aces = 0;
+    for (Card c : hand) {
+        total += c.value();           // face cards 10, Ace 11 (for now)
+        if (c.isAce()) aces++;
+    }
+    while (total > 21 && aces > 0) {  // soften Aces until we stop busting
+        total -= 10;
+        aces--;
+    }
+    return total;
+}
+
+public void hit() {                   // player draws
+    player.add(draw());
+    if (handValue(player) >= 21) stand();   // 21 stands, a bust ends the round
+}
+
+public void stand() {                 // player done — dealer plays, then settle
+    if (handValue(player) <= 21) {
+        while (handValue(dealer) < 17) dealer.add(draw());   // dealer hits below 17
+    }
+    settle();
+}
+
+private void settle() {
+    int p = handValue(player), d = handValue(dealer);
+    if (p > 21)                                   outcome = DEALER_WIN;   // player bust
+    else if (isBlackjack(player) && !isBlackjack(dealer)) outcome = PLAYER_BLACKJACK;
+    else if (d > 21 || p > d)                     outcome = PLAYER_WIN;   // dealer bust / higher
+    else if (p < d)                               outcome = DEALER_WIN;
+    else                                          outcome = PUSH;         // equal totals
 }
 ```
 
-![The finished board ready to save](/blog/gamebuilder/board-4-build.png)
+The deck is a shuffled list of 52 `Card`s (`rank` 1–13, `suit` 0–3); `draw()` pops the next one. A two-card 21 is a natural that wins immediately and pays before the dealer draws. That's the whole game — everything else is presentation.
 
-## Play it
+## Wiring it into the companion
 
-Press **Live** and the flat grid tilts into an isometric board you can interact with. Here a piece slides across the squares:
-
-![Moving a piece on the board](/blog/gamebuilder/game-board.gif)
-
-## The rules live in code
-
-The companion is the same shape as Tutorial 1 — `GameSceneView` with a generated `loadLevel()` and your `onUpdate`. Board mode realizes the pieces through the isometric projection, and `elementOf(sprite)` reads the `player`/`cell` tags you set in the editor. A minimal turn skeleton, using the same base-class helpers:
+The companion is the same shape as Tutorial 1 — a `GameSceneView` with a generated `loadLevel()` and your `onUpdate`. You deal in `onSetup`, then read taps (or on-screen **Hit** / **Stand** buttons) and turn them into engine calls, re-laying the card elements after each move:
 
 ```java
-private int currentPlayer = 1;   // whose turn it is
+private final Blackjack game = new Blackjack(new Random());
 
 @Override
 protected void onUpdate(double deltaSeconds) {
     GameInput in = getInput();
-    if (!in.wasPointerPressed()) {
-        return;   // turn-based: act only on a tap
-    }
-    Sprite tapped = pieceAt(in.getPointerX(), in.getPointerY());
-    GameElement piece = elementOf(tapped);
-    if (piece == null || piece.getInt("player", 0) != currentPlayer) {
-        return;   // empty square or not your piece — ignore
-    }
-    // ...select it, validate a move against piece.getString("cell", ""), then:
-    endTurn();
-}
-
-private void endTurn() {
-    currentPlayer = currentPlayer == 1 ? 2 : 1;
-}
-
-private Sprite pieceAt(int px, int py) {
-    Scene scene = getScene();
-    for (int i = 0; i < scene.size(); i++) {
-        Sprite s = scene.get(i);
-        if (Math.abs(s.getX() - px) < 32 && Math.abs(s.getY() - py) < 32) {
-            return s;
+    if (game.phase() == Blackjack.Phase.PLAYER_TURN && in.wasPointerPressed()) {
+        // tap the top half of the screen to hit, the bottom half to stand
+        if (in.getPointerY() < getHeight() / 2) game.hit();
+        else                                    game.stand();
+        layoutCards();                          // re-place the card sprites from the hands
+        if (game.phase() == Blackjack.Phase.DONE) {
+            Dialog.show("Duke Jack", game.resultText(), "Deal again", null);
         }
     }
-    return null;
 }
 ```
 
-Moving a piece is just updating its sprite position (and the element's `cell` if you persist state). Because the level is data, you can ship a *King's Court* board and a *Checkers* board as two `.game` files and load whichever the player picks — the rules code is identical.
+`layoutCards()` is the bridge from rules to pixels: clear the old card sprites and, for each card in `game.dealerHand()` and `game.playerHand()`, place a card element with that `rank`/`suit` (and the dealer's hole card face-down until `game.phase()` leaves `PLAYER_TURN`). Because cards are just elements, dealing, hitting and clearing the table are the same add/remove operations you used for coins in [Tutorial 1](/blog/game-builder-2d-platformer/#your-rules-coins-the-slime-and-winning).
 
-A turn-based game leans even harder on Codename One's UI than an action game does — and that's exactly where Codename One shines. A "whose turn" banner is a `Label` in the toolbar; a move menu, a promotion choice or a rematch prompt is a `Dialog.show(...)`; a piece tray is a `GridLayout`. As [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause) shows, all of it is the standard UI toolkit wrapped around your `GameSceneView` — no separate game-UI layer to learn.
+## Play it
+
+Press **Live**. The table comes up, Duke stands on his 19, and the dealer turns over the hole card and draws up to 17 — Duke wins the hand:
+
+![Duke wins the hand, 19 over 17](/blog/gamebuilder/board-5-play.png)
+
+Dealing a card is just creating its element and sliding it onto the felt:
+
+![Dealing a card in Duke Jack](/blog/gamebuilder/game-board.gif)
+
+## What got saved, and how it renders
+
+**Save** writes `src/main/resources/games/DukeJack.game` (loaded at runtime as `/DukeJack.game` — Codename One's resource namespace is flat). The felt and any cards you placed by hand live there as data; the dealt cards are created by your companion at runtime:
+
+```json
+{
+  "mode": "board", "cols": 8, "rows": 5, "tileSize": 64,
+  "layers": [
+    { "name": "Board",  "kind": "tile",   "tiles": { "0,0": "start", "1,0": "start" } },
+    { "name": "Pieces", "kind": "entity" }
+  ],
+  "elements": [
+    { "id": "d1", "assetId": "card", "layer": "Pieces", "x": 217, "y": 96,  "props": { "rank": "6", "suit": "Hearts", "faceUp": true } },
+    { "id": "d2", "assetId": "card", "layer": "Pieces", "x": 295, "y": 96,  "props": { "rank": "2", "suit": "Spades", "faceUp": false } }
+  ]
+}
+```
+
+A turn-based card game leans even harder on Codename One's UI than an action game does — and that's exactly where Codename One shines. A running-total label is a `Label` in the toolbar; the **Hit**/**Stand** controls are two `Button`s; the result is a `Dialog.show(...)` with a "Deal again" option. As [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause) shows, all of it is the standard UI toolkit wrapped around your `GameSceneView` — no separate game-UI layer to learn.
 
 ## Variations and next steps
 
-The board pattern generalizes to most grid games:
+The card pattern generalizes to most table games:
 
-* **A card game** — use the **Card** and **Dice** actors with `suit` / `rank` / `sides` properties; deal by spawning sprites from a shuffled list.
-* **Capture rules** — when a move lands on an opponent's `cell`, remove that sprite from the `Scene` (exactly like the coin pickup in Tutorial 1).
-* **Win check** — after `endTurn`, scan the pieces and test your victory condition (no opposing pieces, a piece on the back rank, and so forth).
-* **AI** — for player 2, pick a legal move in code instead of waiting for a tap.
+* **Betting and a bankroll** — track chips, pay 3:2 on a natural, and let the player raise before the deal.
+* **Split and double-down** — both are just more engine states over the same hands and card elements.
+* **Other games** — the `Card` element plus a rules class gives you solitaire, poker or war; only the rules change, the table and the deal don't.
+* **Multiplayer** — deal extra hands as more rows of card elements and loop the turn over them.
 
-Next: [Tutorial 3 — a first-person 3D dungeon](/blog/game-builder-3d-dungeon/), where the same data drives a 3D `GameView` with walls, terrain, and models.
+Next: [Tutorial 3 — a first-person 3D dungeon](/blog/game-builder-3d-dungeon/), where the same data drives a 3D `GameView` with walls, terrain, lighting, and Duke fighting tea cups with coffee beans.
