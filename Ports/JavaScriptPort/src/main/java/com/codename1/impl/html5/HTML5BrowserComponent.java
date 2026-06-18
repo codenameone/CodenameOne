@@ -156,7 +156,30 @@ public class HTML5BrowserComponent extends HTML5Peer {
             if (iframe == null) {
                 return;
             }
+            // These listeners live on the iframe's own content window, so they
+            // only fire when a pointer/mouse/touch event actually reaches the
+            // iframe -- i.e. when #codenameone-canvas has been flipped to
+            // pointer-events:none over a transparent ("punched") hole because the
+            // peer is showing through (see browser_bridge.js installPeerPointerToggle).
+            // In that state the event genuinely belongs to the peer (e.g. typing /
+            // clicking in the Playground's Monaco editor), so re-dispatching a
+            // synthetic copy back into CN1 is wrong: CN1 treats it as a press on the
+            // peer component and relayout/refocus churn reloads the iframe, wiping
+            // the editor back to its bootstrap source. When the canvas is opaque the
+            // event never reaches here (the canvas consumes it), so there is nothing
+            // to forward. Hence: if the canvas is "none", let the peer keep the event.
+            HTMLElement oc = HTML5Implementation.getInstance().outputCanvas;
+            if (oc != null && "none".equals(oc.getStyle().getPropertyValue("pointer-events"))) {
+                return;
+            }
             TextRectangle clRect = iframe.getBoundingClientRect();
+            if (clRect == null) {
+                // getBoundingClientRect can come back null when invoked through the
+                // worker JSO bridge (the iframe arg is a host-ref proxy); without a
+                // rect we cannot offset coordinates, and dereferencing it throws an
+                // NPE on every event. Nothing to forward -- leave the event to the peer.
+                return;
+            }
             Event evt;
             if ("MozMousePixelScroll".equals(eventType) || eventType.equals(HTML5Implementation.getWheelEventType())) {
                 evt = copyWheelEvent(event, iframe, clRect.getLeft(), clRect.getTop()); 
@@ -557,18 +580,26 @@ public class HTML5BrowserComponent extends HTML5Peer {
         setURL(getURL());
     }
 
-    @JSBody(
-            params={"el"},
-            script="var doc = el ? el.ownerDocument : null;"
-                    + "if (!doc) { return false; }"
-                    + "if (doc.documentElement && typeof doc.documentElement.contains === 'function') {"
-                    + "  return doc.documentElement.contains(el);"
-                    + "}"
-                    + "if (doc.body && typeof doc.body.contains === 'function') {"
-                    + "  return doc.body.contains(el);"
-                    + "}"
-                    + "return !!el.isConnected;")
-    private native static boolean documentContains(HTMLElement el);
+    // NOTE: this must NOT be an @JSBody. On the ParparVM worker model an @JSBody
+    // script runs in the worker, where ``el`` is a host-ref proxy with no live DOM,
+    // so ``doc.documentElement.contains(el)`` compares the worker's doc proxy
+    // against the el proxy and ALWAYS returns false. initComponent() then thinks the
+    // iframe was never added and re-appends it on every call -- and re-inserting an
+    // iframe RELOADS it, which re-runs editor.js / re-bootstraps Monaco and wipes the
+    // user's edits back to the bootstrap source ("typed character erased immediately"
+    // / "no interaction"). Because clicking a peer now actually reaches it (the
+    // pointer-events toggle), initComponent gets driven repeatedly and the editor
+    // reloaded on every interaction. Probe through the JSO bridge instead:
+    // getParentNode() runs on the MAIN thread and reliably reports null (detached)
+    // vs a real parent, and the peer's only parent is the in-document peers
+    // container. Same class of worker-proxy bug as isCORSRestricted() below.
+    private static boolean documentContains(HTMLElement el) {
+        try {
+            return el != null && el.getParentNode() != null;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
     
     
     @Override

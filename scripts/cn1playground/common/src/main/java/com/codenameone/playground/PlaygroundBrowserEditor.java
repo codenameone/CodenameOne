@@ -259,6 +259,13 @@ final class PlaygroundBrowserEditor {
             }
             String text = asString(payload.get("text"));
             int version = asInt(payload.get("version"));
+            // Keep pendingSource current with what the user has typed. If the
+            // editor iframe is ever reloaded/re-bootstrapped (peer recreation),
+            // flush() re-sends pendingSource -- if that were still the stale
+            // bootstrap source it would wipe the user's edits ("typed char erased
+            // immediately"). Tracking the latest text here makes a re-bootstrap
+            // restore the current content instead.
+            pendingSource = text == null ? "" : text;
             listener.onSourceChanged(text, version);
         }
     }
