@@ -82,7 +82,7 @@ the pair installs together. The watch app is rooted in a generated SwiftUI
 tap input into the runtime.
 
 .Codename One UI rendered on the watchOS simulator via the Core Graphics backend
-image::wearables/apple-watch-simulator.png[Codename One running on the Apple Watch simulator,scaledwidth=30%]
+image::img/wearables/apple-watch-simulator.png[Codename One running on the Apple Watch simulator,scaledwidth=30%]
 
 ==== Enabling the watchOS Build
 
