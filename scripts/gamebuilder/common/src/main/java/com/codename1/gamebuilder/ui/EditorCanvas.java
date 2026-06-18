@@ -668,41 +668,52 @@ public class EditorCanvas extends Component {
     /// same routine serves the editor (zoom) and the live device preview (fit).
     private void drawContent(Graphics g, AssetCatalog cat, GameLevel level, int ox, int oy, double ts) {
         double scale = ts / Math.max(1, level.getTileSize());
-        List<Layer> layers = level.layers();
-        for (int li = 0; li < layers.size(); li++) {
-            Layer layer = layers.get(li);
-            if (layer.getKind() != Layer.KIND_TILE || !layer.isVisible()) {
+        // draw layers in band order so a Background layer (e.g. parallax mountains) renders
+        // behind the Terrain tiles, and Actors render on top
+        for (Layer layer : level.layers()) {
+            if (!layer.isVisible()) {
                 continue;
             }
-            for (var e : layer.tiles().entrySet()) {
-                int[] cr = parseCell(e.getKey());
-                if (cr == null) {
-                    continue;
+            if (layer.getKind() == Layer.KIND_TILE) {
+                for (var e : layer.tiles().entrySet()) {
+                    int[] cr = parseCell(e.getKey());
+                    if (cr == null) {
+                        continue;
+                    }
+                    drawAsset(g, cat, e.getValue(),
+                            (int) Math.round(ox + cr[0] * ts), (int) Math.round(oy + cr[1] * ts),
+                            (int) Math.round(ts), (int) Math.round(ts));
                 }
-                drawAsset(g, cat, e.getValue(),
-                        (int) Math.round(ox + cr[0] * ts), (int) Math.round(oy + cr[1] * ts),
-                        (int) Math.round(ts), (int) Math.round(ts));
+            } else {
+                for (GameElement el : level.elements()) {
+                    if (level.getLayer(el.getLayer()) == layer) {
+                        drawElement(g, cat, level, el, ox, oy, ts, scale);
+                    }
+                }
             }
         }
-        List<GameElement> els = level.elements();
-        for (int i = 0; i < els.size(); i++) {
-            GameElement el = els.get(i);
-            if (playMode && collected.contains(el.getId())) {
-                continue;   // picked up during play
+        // elements with no (or unknown) layer draw last, on top
+        for (GameElement el : level.elements()) {
+            if (level.getLayer(el.getLayer()) == null) {
+                drawElement(g, cat, level, el, ox, oy, ts, scale);
             }
-            Layer elLayer = level.getLayer(el.getLayer());
-            if (elLayer != null && !elLayer.isVisible()) {
-                continue;   // honor the layer's visibility (eye toggle) for entities too
-            }
-            AssetDef def = cat == null ? null : cat.def(el.getAssetId());
-            double esc = el.getScaleX();   // per-instance size
-            double w = elementCells(level, def == null ? level.getTileSize() : def.getWidth()) * ts * esc;
-            double h = elementCells(level, def == null ? level.getTileSize() : def.getHeight()) * ts * esc;
-            double bob = playMode ? playBob(el, def) * scale : 0;
-            int x = (int) Math.round(ox + el.getX() * scale - w / 2);
-            int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
-            drawAsset(g, cat, el.getAssetId(), x, y, (int) Math.round(w), (int) Math.round(h));
         }
+    }
+
+    /// Draws one placed element at origin (ox,oy) with tile size ts.
+    private void drawElement(Graphics g, AssetCatalog cat, GameLevel level, GameElement el,
+            int ox, int oy, double ts, double scale) {
+        if (playMode && collected.contains(el.getId())) {
+            return;   // picked up during play
+        }
+        AssetDef def = cat == null ? null : cat.def(el.getAssetId());
+        double esc = el.getScaleX();   // per-instance size
+        double w = elementCells(level, def == null ? level.getTileSize() : def.getWidth()) * ts * esc;
+        double h = elementCells(level, def == null ? level.getTileSize() : def.getHeight()) * ts * esc;
+        double bob = playMode ? playBob(el, def) * scale : 0;
+        int x = (int) Math.round(ox + el.getX() * scale - w / 2);
+        int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
+        drawAsset(g, cat, el.getAssetId(), x, y, (int) Math.round(w), (int) Math.round(h));
     }
 
     /// Clamps a follow-camera origin to [0, max] (centers when the level is smaller
@@ -720,47 +731,48 @@ public class EditorCanvas extends Component {
     private void drawContentScrolling(Graphics g, AssetCatalog cat, GameLevel level,
             int sX, int sY, double scale, double camX, double camY) {
         double ts = level.getTileSize() * scale;
-        List<Layer> layers = level.layers();
-        for (int li = 0; li < layers.size(); li++) {
-            Layer layer = layers.get(li);
-            if (layer.getKind() != Layer.KIND_TILE || !layer.isVisible()) {
+        // band order: a parallax Background layer draws behind the Terrain tiles
+        for (Layer layer : level.layers()) {
+            if (!layer.isVisible()) {
                 continue;
             }
             int ox = (int) Math.round(sX - camX * layer.getParallaxX() * scale);
             int oy = (int) Math.round(sY - camY * layer.getParallaxY() * scale);
-            for (var e : layer.tiles().entrySet()) {
-                int[] cr = parseCell(e.getKey());
-                if (cr == null) {
-                    continue;
+            if (layer.getKind() == Layer.KIND_TILE) {
+                for (var e : layer.tiles().entrySet()) {
+                    int[] cr = parseCell(e.getKey());
+                    if (cr == null) {
+                        continue;
+                    }
+                    drawAsset(g, cat, e.getValue(),
+                            (int) Math.round(ox + cr[0] * ts), (int) Math.round(oy + cr[1] * ts),
+                            (int) Math.round(ts), (int) Math.round(ts));
                 }
-                drawAsset(g, cat, e.getValue(),
-                        (int) Math.round(ox + cr[0] * ts), (int) Math.round(oy + cr[1] * ts),
-                        (int) Math.round(ts), (int) Math.round(ts));
+            } else {
+                for (GameElement el : level.elements()) {
+                    if (level.getLayer(el.getLayer()) == layer) {
+                        drawScrollingElement(g, cat, level, el, ox, oy, ts, scale);
+                    }
+                }
             }
         }
-        List<GameElement> els = level.elements();
-        for (int i = 0; i < els.size(); i++) {
-            GameElement el = els.get(i);
-            if (collected.contains(el.getId())) {
-                continue;
-            }
-            Layer elLayer = level.getLayer(el.getLayer());
-            if (elLayer != null && !elLayer.isVisible()) {
-                continue;
-            }
-            float px = elLayer == null ? 1f : elLayer.getParallaxX();
-            float py = elLayer == null ? 1f : elLayer.getParallaxY();
-            int ox = (int) Math.round(sX - camX * px * scale);
-            int oy = (int) Math.round(sY - camY * py * scale);
-            AssetDef def = cat == null ? null : cat.def(el.getAssetId());
-            double esc = el.getScaleX();
-            double w = elementCells(level, def == null ? level.getTileSize() : def.getWidth()) * ts * esc;
-            double h = elementCells(level, def == null ? level.getTileSize() : def.getHeight()) * ts * esc;
-            double bob = playBob(el, def) * scale;
-            int x = (int) Math.round(ox + el.getX() * scale - w / 2);
-            int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
-            drawAsset(g, cat, el.getAssetId(), x, y, (int) Math.round(w), (int) Math.round(h));
+    }
+
+    /// Draws one placed element through the scrolling camera (its layer's parallax origin
+    /// is already folded into ox/oy).
+    private void drawScrollingElement(Graphics g, AssetCatalog cat, GameLevel level, GameElement el,
+            int ox, int oy, double ts, double scale) {
+        if (collected.contains(el.getId())) {
+            return;
         }
+        AssetDef def = cat == null ? null : cat.def(el.getAssetId());
+        double esc = el.getScaleX();
+        double w = elementCells(level, def == null ? level.getTileSize() : def.getWidth()) * ts * esc;
+        double h = elementCells(level, def == null ? level.getTileSize() : def.getHeight()) * ts * esc;
+        double bob = playBob(el, def) * scale;
+        int x = (int) Math.round(ox + el.getX() * scale - w / 2);
+        int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
+        drawAsset(g, cat, el.getAssetId(), x, y, (int) Math.round(w), (int) Math.round(h));
     }
 
     /// Top-down terrain map: each cell tinted by ground elevation (dark = low, bright =

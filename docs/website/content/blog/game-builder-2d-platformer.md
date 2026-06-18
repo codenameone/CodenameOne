@@ -35,7 +35,7 @@ mvn cn1:gamebuilder
 
 ![A new 2D platformer scene](/blog/gamebuilder/platformer-1-new-scene.png)
 
-## Step 1 — Get your art in (the part tutorials skip)
+## Step 1 — Get your art in
 
 A real game starts with art, so let's do that first instead of pretending sprites appear by magic. An *asset* is a reusable definition — an id (`grass`, `coffee`, `player`), a kind (a grid **tile** or a freely placed **actor**), default properties, and a pointer to its **art file**. Each art file is one of three **formats**:
 
@@ -64,12 +64,12 @@ Now wire it up as an asset. Sprite sheets carry a little metadata (frame size + 
 ```json
 { "id": "player", "name": "Duke", "kind": "actor",
   "type": "sheet", "source": "duke_run.png",
-  "frameW": 254, "frameH": 252, "frames": 5, "fps": 12,
-  "w": 40, "h": 44, "unique": true,
+  "frameW": 269, "frameH": 312, "frames": 5, "fps": 12,
+  "w": 42, "h": 48, "unique": true,
   "defaults": { "lives": 3, "jumpHeight": 110 } }
 ```
 
-`type: "sheet"` plus `frameW`/`frameH` tell the runtime to slice `duke_run.png` into frames and play them as an `AnimatedSprite`; `w`/`h` are the on-screen size (the big 254×252 frames are scaled down to a 40×44 sprite). Static images (`coffee.png`, `exception.png`) need no metadata — `type` defaults to image. Plain images you can also bring in with the Asset Library's **Import** button, which copies the file into `games/assets/` and adds it to a *Custom* pack for you; sheets and meshes use the file-plus-pack-entry route above. With the art in place, the **Asset Library** now shows Duke, coffee and the exception monster ready to stamp down.
+`type: "sheet"` plus `frameW`/`frameH` tell the runtime to slice `duke_run.png` into frames and play them as an `AnimatedSprite`; `w`/`h` are the on-screen size (the big 269×312 frames are scaled down to a 42×48 sprite). Static images (`coffee.png`, `exception.png`) need no metadata — `type` defaults to image. Plain images you can also bring in with the Asset Library's **Import** button, which copies the file into `games/assets/` and adds it to a *Custom* pack for you; sheets and meshes use the file-plus-pack-entry route above. With the art in place, the **Asset Library** now shows Duke, coffee and the exception monster ready to stamp down.
 
 ## Step 2 — Paint the ground
 
@@ -328,7 +328,7 @@ protected boolean onPickup(Sprite item) {
 
 **Opting out entirely.** The arcade behavior is a convenience, not a constraint. Don't want it? Call `setArcadeBehavior(false)` (or delete it from the constructor) and drive everything from `onUpdate` — poll `getInput().isGameKeyDown(Display.GAME_RIGHT)` and move the `player` sprite yourself. You can also keep the behavior but replace one piece by overriding a single hook (`updatePlayer`, `updateEnemies`, …) — the rest still runs.
 
-## Menus, HUD and pause — where Codename One spoils you
+## Menus, HUD and pause
 
 This is the part most game engines make painful and Codename One makes trivial: **the menus**. A `GameSceneView` is an ordinary Codename One `Component`, so the *entire* Codename One UI toolkit — `Form`, `Toolbar`, `Dialog`, layouts, CSS theming, animations — is right there around your game. The level select, the pause screen, the settings page, the score HUD: all of it is the same UI API you'd use for any app, not a bespoke game-UI framework you have to learn.
 

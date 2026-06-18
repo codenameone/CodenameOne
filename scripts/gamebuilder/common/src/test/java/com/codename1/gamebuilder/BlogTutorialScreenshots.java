@@ -513,9 +513,10 @@ public final class BlogTutorialScreenshots {
         return e;
     }
 
-    /// Places a mountain so its base sits on the horizon (mountain art is 120px tall).
+    /// Places a mountain so its base sinks a little below the horizon — the grass floor
+    /// (a higher layer band) then overlaps the base, so the mountain reads as *behind* it.
     private static GameElement mountain(EditorController c, double x, double horizon, double scale) {
-        return place(c, x, horizon - 60 * scale, scale);
+        return place(c, x, horizon - 60 * scale + 22, scale);
     }
 
     private static GameElement firstToken() {

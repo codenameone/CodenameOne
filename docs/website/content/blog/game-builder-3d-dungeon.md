@@ -29,6 +29,16 @@ Pick **New scene → 3D Map**. Placement defaults to an accurate top-down grid (
 
 ![A new 3D scene with the 3D Kit](/blog/gamebuilder/dungeon-1-new-scene.png)
 
+## 3D assets are meshes
+
+This is the big difference from Tutorials 1 and 2: in 2D an asset's art is an image or a sprite sheet, but in **3D it's a mesh** — geometry, not pixels. That's the asset model's third format, `TYPE_MESH`: `source` points at a **glTF / `.glb`** file, and at runtime `GameSceneView.buildModels` loads it with `GltfLoader` and realizes a `Model` under the perspective camera and lighting.
+
+```json
+{ "id": "statue", "name": "Statue", "kind": "actor", "type": "mesh", "source": "statue.glb" }
+```
+
+The starter **3D Kit** stays dependency-free by building its blocks, pillars and crates from **primitive meshes** (`Primitives.cube(...)`) shaded with each asset's colour, so you can lay out a level immediately without modeling anything. To use real modeled art, export a `.glb` from Blender (or drop in a CC0 model), put it in `games/assets/`, and set the asset's `type` to `mesh` with `source` pointing at the file — `buildModels` loads any element whose asset is a mesh and falls back to the primitive cube otherwise. Unlike sprites, meshes are **resolution-independent**: there's no DPI or frame bookkeeping, the GPU just scales the geometry.
+
 ## Step 2 — Pick the dungeon play style
 
 With nothing selected, set the Inspector's **3D play style** to **dungeon**. That switches the preview to a first-person walker with wall collision — the genre we're building. (Switch it to *open* for a free arena or *flight* for an aerial flyby of the same layout; the level data doesn't change, only how it plays.)
@@ -114,7 +124,7 @@ getLight().setColor(torchLit ? 0xfff2e0 : 0x404858);   // brighten when a torch 
 
 ## Menus and HUD in 3D
 
-A 3D game has its own interface to manage too — a map toggle, an inventory, a "you died" screen, a pause overlay — and because `GameSceneView` is a Codename One `Component`, all of it is the ordinary UI toolkit, not a 3D-specific layer. Drop a `Dialog` for the death screen, a `Toolbar` command for the map toggle, a `Container` of item buttons for the inventory. [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause-where-codename-one-spoils-you) applies unchanged — the game underneath happens to be 3D, but the menus are pure Codename One.
+A 3D game has its own interface to manage too — a map toggle, an inventory, a "you died" screen, a pause overlay — and because `GameSceneView` is a Codename One `Component`, all of it is the ordinary UI toolkit, not a 3D-specific layer. Drop a `Dialog` for the death screen, a `Toolbar` command for the map toggle, a `Container` of item buttons for the inventory. [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause) applies unchanged — the game underneath happens to be 3D, but the menus are pure Codename One.
 
 ## Scaling up: streaming worlds
 

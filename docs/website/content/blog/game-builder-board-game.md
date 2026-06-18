@@ -107,7 +107,7 @@ private Sprite pieceAt(int px, int py) {
 
 Moving a piece is just updating its sprite position (and the element's `cell` if you persist state). Because the level is data, you can ship a *King's Court* board and a *Checkers* board as two `.game` files and load whichever the player picks — the rules code is identical.
 
-A turn-based game leans even harder on Codename One's UI than an action game does — and that's exactly where Codename One shines. A "whose turn" banner is a `Label` in the toolbar; a move menu, a promotion choice or a rematch prompt is a `Dialog.show(...)`; a piece tray is a `GridLayout`. As [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause-where-codename-one-spoils-you) shows, all of it is the standard UI toolkit wrapped around your `GameSceneView` — no separate game-UI layer to learn.
+A turn-based game leans even harder on Codename One's UI than an action game does — and that's exactly where Codename One shines. A "whose turn" banner is a `Label` in the toolbar; a move menu, a promotion choice or a rematch prompt is a `Dialog.show(...)`; a piece tray is a `GridLayout`. As [Tutorial 1's menu section](/blog/game-builder-2d-platformer/#menus-hud-and-pause) shows, all of it is the standard UI toolkit wrapped around your `GameSceneView` — no separate game-UI layer to learn.
 
 ## Variations and next steps
 
