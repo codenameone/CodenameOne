@@ -8195,6 +8195,20 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String prefix = body.substring(0, swOpen + 1);
         String region = body.substring(swOpen + 1, swClose);
         String suffix = body.substring(swClose);
+        // PERF: this inline-goto fold is a pure SIZE optimization and is
+        // super-linear -- each pass calls findSimpleGotoSource() (a full O(regionLen)
+        // scan) for every unique-source case, and the whole region string is rebuilt
+        // per fold, so cost is ~O(folds * cases * regionLen). On the largest generated
+        // state-machine methods this single peephole dominated JS codegen (profiled:
+        // ~1266s of a ~1310s translation -> ~21 of 22 min). It never affects
+        // correctness, only bundle size, so skip it once a method's switch body grows
+        // past a budget: the few huge methods stay slightly larger but the translation
+        // is an order of magnitude faster. Tunable via -Dparparvm.js.inlineFold.maxRegion
+        // (chars; <=0 disables the cap and restores unconditional folding).
+        int foldMaxRegion = Integer.getInteger("parparvm.js.inlineFold.maxRegion", 4000);
+        if (foldMaxRegion > 0 && region.length() > foldMaxRegion) {
+            return prefix + region + suffix;
+        }
         int iter = 0;
         while (iter++ < 200) {
             String next = applyOneInlineFold(region);
