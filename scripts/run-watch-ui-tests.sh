@@ -162,23 +162,41 @@ done < <(/usr/bin/find "$WS_RAW_DIR" -name '*.png' | sort)
 cp -f "$WS_RAW_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
 
 COMPARE_JSON="$SS_TMP/compare.json"; SUMMARY_OUT="$SS_TMP/summary.txt"; COMMENT_OUT="$SS_TMP/comment.md"
+
+# --- Gate (mirrors the iOS jobs, enforced centrally in scripts/lib/cn1ss.sh) -
+# The watch form factor is intentionally very different from the phone and some
+# tests are not meaningful on a watch, so the goldens need not be pretty -- but
+# every test must RUN and the goldens must stay in SYNC, so any drift fails CI.
+# cn1ss_process_and_report returns (only when CN1SS_FAIL_ON_MISMATCH=1):
+#   15 - a screenshot differs from / errored against its golden
+#   17 - fewer screenshots were produced than there are goldens (a test failed
+#        to emit; the suite most likely hung or crashed partway).
+# We additionally fail on "missing_expected" (a screenshot streamed that has no
+# golden yet) so a new test cannot land without its golden.
+export CN1SS_FAIL_ON_MISMATCH="${CN1SS_FAIL_ON_MISMATCH:-1}"
+export CN1SS_ALLOWED_MISSING="${CN1SS_ALLOWED_MISSING:-0}"
+set +e
 CN1SS_SUCCESS_MESSAGE="${CN1SS_SUCCESS_MESSAGE:-Apple Watch (watchOS, Core Graphics) screenshots match the goldens.}" \
 cn1ss_process_and_report \
   "Apple Watch (watchOS / Core Graphics)" \
   "$COMPARE_JSON" "$SUMMARY_OUT" "$COMMENT_OUT" \
   "$REF_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" \
-  "${ACTUAL[@]}" || true
+  "${ACTUAL[@]}"
+gate_rc=$?
+set -e
 
 cp -f "$COMPARE_JSON" "$SUMMARY_OUT" "$COMMENT_OUT" "$ARTIFACTS_DIR/" 2>/dev/null || true
 cn1ss_post_pr_comment "$COMMENT_OUT" "$PREVIEW_DIR" || true
 
-# --- Gate (mirrors the iOS jobs) -------------------------------------------
-MISSING="$(cn1ss_count_missing "$COMPARE_JSON" 2>/dev/null || echo 0)"
-MISMATCH="$(grep -c '"status"[[:space:]]*:[[:space:]]*"mismatch"' "$COMPARE_JSON" 2>/dev/null || echo 0)"
-rw_log "missing=$MISSING mismatch=$MISMATCH (allowed_missing=${CN1SS_ALLOWED_MISSING:-0})"
-rc=0
-if [ "${CN1SS_FAIL_ON_MISMATCH:-1}" = "1" ] && [ "$MISMATCH" -gt 0 ]; then rc=1; fi
-if [ "$MISSING" -gt "${CN1SS_ALLOWED_MISSING:-0}" ]; then rc=1; fi
-[ "$prev" -gt 0 ] || rc=1
-rw_log "exit rc=$rc"
+rc="$gate_rc"
+# A streamed screenshot with no golden (missing_expected) keeps the goldens out
+# of sync; the central gate treats it as "extra" and ignores it, so fail here.
+if [ -f "$SUMMARY_OUT" ] && grep -q "^missing_expected|" "$SUMMARY_OUT"; then
+  me="$(grep -c "^missing_expected|" "$SUMMARY_OUT" 2>/dev/null || echo 0)"
+  rw_log "FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to scripts/ios/screenshots-watch."
+  [ "$rc" -eq 0 ] && rc=17
+fi
+# The suite must have produced something at all.
+[ "${#ACTUAL[@]}" -gt 0 ] || rc=1
+rw_log "exit rc=$rc (gate_rc=$gate_rc, mismatch_fail=${CN1SS_FAIL_ON_MISMATCH}, allowed_missing=${CN1SS_ALLOWED_MISSING})"
 exit "$rc"
