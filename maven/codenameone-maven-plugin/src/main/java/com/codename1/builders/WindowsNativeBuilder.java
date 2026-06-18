@@ -182,6 +182,18 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("Failed to unzip the application sources", ex);
         }
 
+        // The JDK class set the translator emits as java_lang_*.c/.h /
+        // java_util_*.c/.h is shipped as a separate classpath resource inside
+        // the codenameone-parparvm bundle. Unzipping it into classesDir adds
+        // those classes to the translator source roots; without this step the
+        // translator emits cn1_globals.c referencing java_lang_Class.h but
+        // never produces the header (iOS uses the same wire-up).
+        try {
+            unzip(getResourceAsStream("/parparvm-java-api.jar"), classesDir, classesDir, classesDir);
+        } catch (Exception ex) {
+            throw new BuildException("Failed to load JavaAPI.jar", ex);
+        }
+
         // ParparVM translator + the WindowsPort native layer (translated platform
         // classes and the C/C++ nativeSources) are bundled with the build.
         File parparVMCompilerJar;
@@ -231,7 +243,13 @@ public class WindowsNativeBuilder extends Executor {
         // copy the port's nativeSources (incl. the C++ COM layer) into srcRoot.
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
-        parparCmd.add("-Xmx768m");
+        // 2g: the clean target's readNativeFiles loads both .m and .c (clean's
+        // extension), so the in-memory native-source set is ~2x what the iOS
+        // target loads, and the markDependencies/NativeSymbolIndex pass needs
+        // headroom on top of that. Without the JavaAPI in classesDir the
+        // translator never reaches that stage at scale; once JavaAPI is added
+        // the older 768m cap GC-thrashes.
+        parparCmd.add("-Xmx2g");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         // Output type: the portable "clean" C target. The "windows" app type
