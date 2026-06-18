@@ -10,9 +10,9 @@ feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/board-3-piece
 
 ![A board game built with the Game Builder](/blog/gamebuilder/board-hero.jpg)
 
-In [Tutorial 1](/blog/game-builder-2d-platformer/) the player moved with arcade physics. A board game has none of that — pieces sit on squares and the *rules* decide what happens. This tutorial shows how the same Game Builder pattern (visual data + an `onUpdate` companion) handles a turn-based game, where your code reads per-piece properties instead of simulating motion. We'll build **Checkers Start**: a board, two players' tokens, and the scaffolding to drive turns.
+In [Tutorial 1](/blog/game-builder-2d-platformer/) Duke dashed for coffee with arcade physics. Now he sets the cup down for a calmer contest: a turn-based board game. A board has none of that arcade motion — pieces sit on squares and the *rules* decide what happens. This tutorial shows how the same Game Builder pattern (visual data + an `onUpdate` companion) handles a turn-based game, where your code reads per-piece properties instead of simulating motion. We'll build **Checkers Start** — Duke's tabletop challenge: a board, two players' tokens, and the scaffolding to drive turns.
 
-If you haven't set up a project yet, the [project setup in Tutorial 1](/blog/game-builder-2d-platformer/#step-0-create-the-project-and-launch-the-editor) applies verbatim — only the mode changes:
+If you haven't set up a project yet, the [project setup in Tutorial 1](/blog/game-builder-2d-platformer/#step-0-create-the-project-and-scaffold-a-scene) applies verbatim — only the mode changes (board mode isn't the default, so the `-Dmode=board` flag is required here):
 
 ```bash
 mvn cn1:create-game-scene -DclassName=com.example.checkers.Checkers -Dmode=board

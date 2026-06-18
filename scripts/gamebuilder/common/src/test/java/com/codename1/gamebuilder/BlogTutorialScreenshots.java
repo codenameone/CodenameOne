@@ -88,7 +88,7 @@ public final class BlogTutorialScreenshots {
     // ---- Tutorial 1: 2D platformer "Coin Run" --------------------------------
     private static void platformer() {
         edit(() -> {
-            gb.getController().loadLevel(StarterPacks.newLevel(GameLevel.MODE_2D), "CoinRun");
+            gb.getController().loadLevel(StarterPacks.newLevel(GameLevel.MODE_2D), "CoffeeRun");
             gb.getController().model().setSelection(null);
         });
         shot("platformer-1-new-scene");

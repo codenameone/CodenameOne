@@ -10,7 +10,7 @@ feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/game-dungeon.
 
 ![A first-person 3D dungeon built with the Game Builder](/blog/gamebuilder/dungeon-hero.jpg)
 
-The final tutorial takes the same data-driven pattern from [Tutorial 1](/blog/game-builder-2d-platformer/) and [Tutorial 2](/blog/game-builder-board-game/) into **3D**. We'll build **Crypt Walk**: a first-person dungeon where pillars are walls you navigate around. The headline difference from the 2D tutorial is what happens at runtime — instead of sprites in a `Scene`, each element becomes a GPU-rendered `Model` under a perspective camera with lighting. You author the same way; the runtime renders it in 3D.
+The final tutorial takes the same data-driven pattern from [Tutorial 1](/blog/game-builder-2d-platformer/) and [Tutorial 2](/blog/game-builder-board-game/) into **3D**. Duke's last adventure sends him underground: **Crypt Walk**, a first-person dungeon where pillars are walls to navigate — and, once you wire them in (see the closing section), the exception monsters from Tutorial 1 to dodge. The headline difference from the 2D tutorial is what happens at runtime — instead of sprites in a `Scene`, each element becomes a GPU-rendered `Model` under a perspective camera with lighting. You author the same way; the runtime renders it in 3D.
 
 Project setup is identical to Tutorial 1 — only the mode changes:
 
