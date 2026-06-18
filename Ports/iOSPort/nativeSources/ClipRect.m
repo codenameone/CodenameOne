@@ -22,6 +22,9 @@
  */
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
@@ -95,6 +98,25 @@ static CGRect drawingRect;
 }
 
 -(void)execute {
+#if TARGET_OS_WATCH
+    // Core Graphics clip: rectangular clip -> CN1CGSetClipRect; polygon clip
+    // -> CN1CGSetClipPolygon; texture-mask clip falls back to its bbox.
+    if (numPoints > 0 && xPoints != NULL && yPoints != NULL) {
+        CN1CGSetClipPolygon(xPoints, yPoints, numPoints);
+        clipApplied = YES;
+    } else {
+        int sx = x, sy = y, sw = width, sh = height;
+        if (sx < 0) { sw += sx; sx = 0; }
+        if (sy < 0) { sh += sy; sy = 0; }
+        if (sw > 0 && sh > 0) {
+            CN1CGSetClipRect(sx, sy, sw, sh);
+            clipApplied = YES;
+        } else {
+            CN1CGResetClip();
+            clipApplied = NO;
+        }
+    }
+#else
 #ifdef CN1_USE_METAL
     // Issue #3921 path. Three shapes can arrive here:
     //
@@ -250,6 +272,7 @@ static CGRect drawingRect;
         clipApplied = NO;
     }
 #endif // CN1_USE_METAL
+#endif // TARGET_OS_WATCH
 
 }
 
@@ -258,7 +281,7 @@ static CGRect drawingRect;
     if ( clipIsTexture ){
         return;
     }
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
     int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     if(currentScaleX == 1 && currentScaleY == 1) {
         //_glEnable(GL_SCISSOR_TEST);

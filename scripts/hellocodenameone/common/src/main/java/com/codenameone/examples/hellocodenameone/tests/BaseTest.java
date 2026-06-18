@@ -62,10 +62,19 @@ public abstract class BaseTest extends AbstractTest {
     /// it reports no in-flight animations, then take the screenshot. Guarded
     /// by a max-wait so a runaway animation can't deadlock the suite.
     private void awaitAnimationsThenScreenshot(Form form, String imageName) {
-        awaitAnimationsThenScreenshot(form, imageName, 0);
+        awaitSettledThenCapture(form, imageName, 0, this::done);
     }
 
-    private void awaitAnimationsThenScreenshot(final Form form, final String imageName, final int waitedMs) {
+    /// Capture {@code form} as {@code imageName} once it settles, then invoke
+    /// {@code onComplete} (instead of the default done()). Lets a single test
+    /// chain several screenshots - e.g. a watch-form-factor test that emits one
+    /// full-screen capture per variant rather than a single multi-tile grid.
+    protected void captureWhenSettled(Form form, String imageName, Runnable onComplete) {
+        awaitSettledThenCapture(form, imageName, 0, onComplete);
+    }
+
+    private void awaitSettledThenCapture(final Form form, final String imageName, final int waitedMs,
+                                         final Runnable onComplete) {
         if (waitedMs == 0) {
             captureStage = "settle-timer-fired";
         }
@@ -74,10 +83,10 @@ public abstract class BaseTest extends AbstractTest {
                 || Display.getInstance().isInTransition();
         if (!animating || waitedMs >= 5000) {
             markCaptureStarted();
-            Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, BaseTest.this::done);
+            Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, onComplete);
             return;
         }
-        UITimer.timer(50, false, form, () -> awaitAnimationsThenScreenshot(form, imageName, waitedMs + 50));
+        UITimer.timer(50, false, form, () -> awaitSettledThenCapture(form, imageName, waitedMs + 50, onComplete));
     }
 
     protected synchronized void done() {

@@ -22,7 +22,9 @@
  */
 #import "CN1UITextField.h"
 #include "xmlvm.h"
-@implementation CN1UITextField 
+#include "TargetConditionals.h"
+#if !TARGET_OS_WATCH
+@implementation CN1UITextField
 
 
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender
@@ -37,3 +39,4 @@
     return [super canPerformAction:action withSender:sender];
 }
 @end
+#endif // !TARGET_OS_WATCH

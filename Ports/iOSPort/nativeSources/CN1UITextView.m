@@ -22,6 +22,8 @@
  */
 #import "CN1UITextView.h"
 #include "xmlvm.h"
+#include "TargetConditionals.h"
+#if !TARGET_OS_WATCH
 @implementation CN1UITextView
 
 
@@ -37,3 +39,4 @@
     return [super canPerformAction:action withSender:sender];
 }
 @end
+#endif // !TARGET_OS_WATCH

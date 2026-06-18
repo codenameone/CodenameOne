@@ -28,6 +28,9 @@
 #import "Transformer.h"
 #import "PathConsumer.h"
 #import "AlphaConsumer.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
 #define abs(x) ((x)>0?(x):-(x))
@@ -44,7 +47,24 @@
 }
 -(void)execute
 {
-#ifdef CN1_USE_METAL
+#if TARGET_OS_WATCH
+    JAVA_INT wbounds[4];
+    Renderer_getOutputBounds(renderer, (JAVA_INT*)&wbounds);
+    JAVA_INT wx = min(wbounds[0], wbounds[2]);
+    JAVA_INT wy = min(wbounds[1], wbounds[3]);
+    JAVA_INT ww = wbounds[2]-wbounds[0];
+    JAVA_INT wh = wbounds[3]-wbounds[1];
+    if ( ww < 0 ) ww = -ww;
+    if ( wh < 0 ) wh = -wh;
+    if (ww == 0 || wh == 0) {
+        return;
+    }
+    AlphaConsumer wac = { wx, wy, ww, wh };
+    jbyte wmask[wac.width*wac.height];
+    wac.alphas = (JAVA_BYTE*)&wmask;
+    Renderer_produceAlphas(renderer, &wac);
+    CN1CGFillAlphaMask(color, alpha, wx, wy, ww, wh, (const unsigned char*)wmask);
+#elif defined(CN1_USE_METAL)
     // DrawPath is an ES1 alpha-mask path; on the Metal backend shapes are
     // rasterised via DrawTextureAlphaMask + CN1Metalcompat. Nothing to do
     // here in Metal mode. Gating the body also keeps the Mac Catalyst
@@ -132,7 +152,7 @@
 }
 -(void)dealloc
 {
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
     glDeleteTextures(1, &tex);
 #endif
     Renderer_destroy(renderer);

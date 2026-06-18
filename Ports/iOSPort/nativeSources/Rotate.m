@@ -27,6 +27,10 @@
 #ifdef USE_ES2
 #import "SetTransform.h"
 #endif
+#include "TargetConditionals.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 
 float currentRotate = 1;
 float currentRotateX = 1;
@@ -38,6 +42,7 @@ float currentRotateY = 1;
     x = xx;
     y = yy;
     angle = ang;
+#if !TARGET_OS_WATCH
 #ifdef USE_ES2
     m = [SetTransform currentTransform];
     float a = angle * M_PI / 180.0;
@@ -88,15 +93,24 @@ float currentRotateY = 1;
     [SetTransform currentTransform:m];
 
 #endif
+#endif // !TARGET_OS_WATCH
     return self;
 }
 
+#if TARGET_OS_WATCH
+-(void)execute {
+    CN1CGRotate((CGFloat)(angle * M_PI / 180.0), x, y);
+    currentRotateX = x;
+    currentRotateY = y;
+    currentRotate = angle;
+}
+#else
 -(void)execute {
 #ifndef USE_ES2
     _glTranslatef(x, y, 0);
     _glRotatef(angle, 0, 0, 1);
     _glTranslatef(-x, -y, 0);
-    
+
     GLErrorLog;
 #else
     SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:0 originY:0];
@@ -107,6 +121,7 @@ float currentRotateY = 1;
     currentRotateY = y;
     currentRotate = angle;
 }
+#endif // TARGET_OS_WATCH
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {

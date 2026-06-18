@@ -24,7 +24,12 @@
 // When defined, the Metal rendering backend (METALView, CN1Metalcompat) is
 // activated and the OpenGL ES 2 backend stays linked but unused. See
 // Ports/iOSPort/METAL_PORT_STATUS.md for the migration plan.
+// watchOS has no Metal (nor OpenGL ES); the guard keeps CN1_USE_METAL undefined
+// on the watch slice even after the builder uncomments the define, so the watch
+// target uses the Core Graphics backend (CN1CGGraphics) instead.
+#if !TARGET_OS_WATCH
 //#define CN1_USE_METAL
+#endif
 // IPhoneBuilder.java replaces the line below with one of:
 //   #define CN1_METAL_COLORSPACE_SRGB
 //   #define CN1_METAL_COLORSPACE_DISPLAY_P3

@@ -21,6 +21,9 @@
  * need additional information or have any questions.
  */
 #import "SetTransform.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
 #import "CodenameOne_GLViewController.h"
@@ -59,7 +62,10 @@ static BOOL currentTransformInitialized = NO;
 
 -(void)execute
 {
-#ifdef CN1_USE_METAL
+#if TARGET_OS_WATCH
+    // Column-major GLKMatrix4 -> CG affine 2x3 submatrix.
+    CN1CGSetAffine(m.m[0], m.m[1], m.m[4], m.m[5], m.m[12], m.m[13], 0, 0);
+#elif defined(CN1_USE_METAL)
     CN1MetalSetTransform(m);
 #else
     glSetTransformES2(m);

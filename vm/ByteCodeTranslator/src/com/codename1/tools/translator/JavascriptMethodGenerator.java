@@ -3796,7 +3796,7 @@ final class JavascriptMethodGenerator {
             Instruction instruction = instructions.get(i);
             if (instruction instanceof Jump) {
                 Integer t = labelToIndex.get(((Jump) instruction).getLabel());
-                Integer tb = t == null ? null : startToBlock.get((int) t);
+                Integer tb = t == null ? null : startToBlock.get(t);
                 if (tb == null) {
                     return _sb(method, instructions, "L3100");
                 }
@@ -5842,7 +5842,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 SwitchInstruction sw = (SwitchInstruction) last;
                 if (sw.getDefaultLabel() != null) {
                     Integer d = labelToIndex.get(sw.getDefaultLabel());
-                    if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                    if (d != null && startToBlock.containsKey(d)) { b.succs.add(startToBlock.get(d)); }
                 }
                 if (sw.getLabels() != null) {
                     for (Label l : sw.getLabels()) {
