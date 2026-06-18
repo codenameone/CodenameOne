@@ -8,7 +8,7 @@ The service is available on the *Pro* and *Enterprise* subscription tiers. See t
 
 Three things move when you opt in:
 
-. *Symbol bundles* (ProGuard `mapping.txt` on Android, dSYM on iOS, debug-info-bearing binaries on Mac/Linux/Win32). Uploaded by the cloud build server after each release build. Stored compressed; subject to per-tier storage quota.
+. *Symbol bundles* (ProGuard `mapping.txt` on Android, dSYM on iOS, debug-info-bearing binaries on Mac/Linux/Win32). Uploaded by the Codename One build server after each release build. Stored compressed; subject to per-tier storage quota.
 . *Crash reports* (one per device occurrence). Sent by the app at runtime via `CrashProtection.capture(t)` or the automatic EDT error handler. PII-scrubbed on the device before transmission.
 . *GitHub issues* -- the actual triage surface. One issue per unique crash fingerprint. Subsequent occurrences of the same fingerprint bump a counter on the issue body rather than filing duplicates.
 
@@ -27,7 +27,7 @@ Add to `codenameone_settings.properties`:
 codename1.crashProtection.enabled=true
 ----
 
-When set, the cloud build server uploads your release build's symbol bundle to the crash protection service after each successful release build.
+When set, the Codename One build server uploads your release build's symbol bundle to the crash protection service after each successful release build.
 
 ==== Signal 2: API reference in code
 
@@ -94,7 +94,7 @@ When a new symbol upload would push you over the quota, the build's symbol step 
 
 Default scrubber rules in `PiiScrubber`:
 
-- Emails partially redacted: `joe.smith@example.com` becomes `joe***@example.com` (preserves first 3 chars of local-part + full domain).
+- Emails redacted to the first 3 chars of local-part: `joe.smith@example.com` becomes `joe***@example.com` (full domain preserved).
 - Runs of 6 or more consecutive digits collapsed to `[num]`.
 - URLs aren't scrubbed.
 
@@ -108,14 +108,14 @@ In the console at https://cloud.codenameone.com/console/index.html, open *Repo m
 . *Installation* -- if you have more than one GitHub App installation linked.
 . *Repository* -- pick from the dropdown of the installation's repos.
 
-You must have authorized the Codename One Crash Protection GitHub App for at least one of your repositories first. The mapping page has a *Connect on GitHub* button that opens the App install flow on github.com. The post-install redirect brings you back to the same page with the installation already loaded.
+You must have authorized the Codename One Crash Protection GitHub App for at least one of your repositories first. The mapping page renders a button labeled *Connect on GitHub* that opens the App install flow on github.com. The post-install redirect brings you back to the same page with the installation already loaded.
 
 === Setup checklist
 
 . Pro or Enterprise subscription.
 . Add `codename1.crashProtection.enabled=true` to `codenameone_settings.properties` (or just call `CrashProtection.install()` in your code -- either signal triggers the upload).
 . Call `CrashProtection.install()` in `init`. Call `CrashProtection.setEnabled(true)` once you have the user's consent.
-. Build your app for release. The cloud build server uploads symbols automatically.
+. Build your app for release. The Codename One build server uploads symbols automatically.
 . Open the console, go to *Repo mappings*, click *Connect on GitHub*, and install the App on the repo you want crashes to land in.
 . Add a mapping for your package -> repo.
 . Crashes from your release builds will now appear as GitHub issues on the mapped repo.

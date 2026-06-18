@@ -184,7 +184,11 @@ public final class CrashProtectionOptIn {
      * UTF-8 entries store the marker verbatim.
      */
     private static boolean containsMarker(byte[] bytes) {
-        byte[] needle = API_MARKER.getBytes();
+        // Explicit US_ASCII because the marker is a JVM-internal name
+        // (only [A-Za-z0-9/_$]); avoids SpotBugs DM_DEFAULT_ENCODING
+        // and matches the encoding actually used by the constant-pool
+        // UTF-8 entries we are scanning.
+        byte[] needle = API_MARKER.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
         if (needle.length == 0 || bytes.length < needle.length) return false;
         outer:
         for (int i = 0; i <= bytes.length - needle.length; i++) {
