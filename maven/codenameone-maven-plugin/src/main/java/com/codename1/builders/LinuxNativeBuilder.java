@@ -487,7 +487,13 @@ public class LinuxNativeBuilder extends Executor {
             javacPath = "javac";
         }
         String[] st = stubCompileSourceTarget(javacPath);
-        String cp = classesDir.getAbsolutePath() + File.pathSeparator + portClasses.getAbsolutePath();
+        // App classes + Linux port classes + every JAR on this plugin's
+        // own classloader (which includes codenameone-core via the
+        // plugin's pom). System.getProperty("java.class.path") sees only
+        // Maven's launcher jar -- not the plugin's resolved deps. See
+        // WindowsNativeBuilder#buildStubCompileClasspath for the same
+        // pattern.
+        String cp = buildStubCompileClasspath(classesDir, portClasses);
         if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", st[0], "-target", st[1],
                 "-classpath", cp, "-d", classesDir.getAbsolutePath())) {
             throw new BuildException("Failed to compile the generated native interface / bootstrap stubs");
@@ -680,5 +686,40 @@ public class LinuxNativeBuilder extends Executor {
             sb.append(f.getAbsolutePath());
         }
         return sb.toString();
+    }
+
+    /**
+     * Build the classpath used to compile the generated stub .java files.
+     * Includes the app classes, the Linux port classes, and every JAR on
+     * this maven plugin's own classloader -- the latter is how
+     * codenameone-core (which provides the abstract
+     * com.codename1.impl.CodenameOneImplementation base class) lands on cp.
+     * Mirrors WindowsNativeBuilder#buildStubCompileClasspath.
+     */
+    private String buildStubCompileClasspath(File classesDir, File portClasses) {
+        StringBuilder cp = new StringBuilder();
+        cp.append(classesDir.getAbsolutePath())
+          .append(File.pathSeparator)
+          .append(portClasses.getAbsolutePath());
+        ClassLoader cl = getClass().getClassLoader();
+        java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+        while (cl != null) {
+            if (cl instanceof java.net.URLClassLoader) {
+                for (java.net.URL u : ((java.net.URLClassLoader) cl).getURLs()) {
+                    if ("file".equalsIgnoreCase(u.getProtocol())) {
+                        try {
+                            seen.add(new File(u.toURI()).getAbsolutePath());
+                        } catch (Throwable ignored) {
+                            /* malformed URL -- skip */
+                        }
+                    }
+                }
+            }
+            cl = cl.getParent();
+        }
+        for (String p : seen) {
+            cp.append(File.pathSeparator).append(p);
+        }
+        return cp.toString();
     }
 }
