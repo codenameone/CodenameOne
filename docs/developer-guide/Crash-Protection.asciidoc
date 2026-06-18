@@ -55,16 +55,16 @@ Sometimes one platform's symbols are noisy or you don't ship that target. Disabl
 
 [source]
 ----
-codename1.crashProtection.android.enabled=false
+codename1.crashProtection.and.enabled=false
 codename1.crashProtection.ios.enabled=false
 codename1.crashProtection.mac.enabled=false
 codename1.crashProtection.linux.enabled=false
-codename1.crashProtection.win32.enabled=false
+codename1.crashProtection.win.enabled=false
 ----
 
 Setting one of these to `false` makes `CrashProtection.install()` a no-op at runtime on that platform AND skips the build-time symbol upload for it. Setting to `true` (or leaving unset) keeps the platform enabled.
 
-The runtime check uses `Display.getInstance().getPlatformName()`. Supported values: `android`, `ios`, `mac`, `linux`, `win32`, `javascript`, `javase`.
+The runtime check uses `Display.getInstance().getPlatformName()`. Supported values: `and`, `ios`, `mac`, `linux`, `win`, `javascript`, `javase`.
 
 === Tier limits
 

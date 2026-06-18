@@ -164,9 +164,8 @@ public final class CrashProtection {
     /// baked into the deliverable. Returns `false` when the property
     /// is unset or `true` (the default-on behaviour).
     ///
-    /// Recognised platform names: `android`, `ios`, `mac`, `linux`,
-    /// `win32`, `javascript`, `javase`. The name is whatever
-    /// `Display.getPlatformName()` returns, lowercased.
+    /// Recognised platform names match {@link Display#getPlatformName()}:
+    /// `and`, `ios`, `mac`, `linux`, `win`, `javascript`, `javase`.
     static boolean isPlatformDisabled() {
         String platform = Display.getInstance().getPlatformName();
         if (platform == null || platform.isEmpty()) {

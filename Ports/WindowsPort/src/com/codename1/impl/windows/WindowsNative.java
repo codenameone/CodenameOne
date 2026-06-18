@@ -50,6 +50,18 @@ public final class WindowsNative {
      */
     public static native boolean faultSelfTestEnabled();
 
+    /* ----------------------------------------- crash protection */
+    // Pairs with cn1_windows_crash_protection.c. crashProtectionInstall is
+    // idempotent; SetUnhandledExceptionFilter catches every SEH-raised
+    // fault (access violation, stack overflow, divide-by-zero, illegal
+    // instruction) and signal() catches the abort()/raise() paths the
+    // CRT exposes. Stderr is spliced into a 32 KB ring buffer so the
+    // OutputDebugString / fprintf chatter leading up to the crash makes
+    // it into the GitHub issue body.
+    public static native void crashProtectionInstall();
+    public static native String crashProtectionLogSnapshot();
+    public static native String crashProtectionConsumePending();
+
     /* ----------------------------------------- BrowserComponent (WebView2) */
 
     /** True when WebView2 is compiled in (the SDK was present at build time). */

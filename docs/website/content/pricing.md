@@ -70,4 +70,4 @@ On your GitHub repository, as issues. Each unique stack-trace fingerprint become
 Codename One never reads or persists the unscrubbed crash payload — emails are partially redacted on the device before transmission, and the issue body is the only canonical record.
 
 ### Can I disable Crash Protection on specific platforms?
-Yes. Per-platform opt-outs are independent of the master switch — set e.g. `codename1.crashProtection.android.enabled=false` to skip Android while still capturing iOS / Mac / Linux / Windows crashes.
+Yes. Per-platform opt-outs are independent of the master switch — set e.g. `codename1.crashProtection.and.enabled=false` to skip Android while still capturing iOS / Mac / Linux / Windows crashes.

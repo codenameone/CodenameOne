@@ -50,6 +50,18 @@ public final class LinuxNative {
      */
     public static native boolean faultSelfTestEnabled();
 
+    /* ----------------------------------------- crash protection */
+    // Pairs with cn1_linux_crash_protection.{h,c}. crashProtectionInstall
+    // is idempotent; sigaction-installs handlers for SIGSEGV/SIGABRT/SIGBUS/
+    // SIGILL/SIGFPE/SIGTRAP/SIGPIPE, splices stderr into an in-memory ring
+    // buffer (so GTK/Cairo/glib chatter leading up to the crash makes it
+    // into the issue body), and writes a CN1NATIVECRASH v1 text record to
+    // $XDG_CACHE_HOME/.cn1_pending_native_crash (or ~/.cache/, or /tmp)
+    // when the process is killed by one of those signals.
+    public static native void crashProtectionInstall();
+    public static native String crashProtectionLogSnapshot();
+    public static native String crashProtectionConsumePending();
+
     /* ----------------------------------------- BrowserComponent (WebView2) */
 
     /** True when WebView2 is compiled in (the SDK was present at build time). */
