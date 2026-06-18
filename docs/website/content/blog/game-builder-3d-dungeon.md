@@ -61,13 +61,25 @@ Place a **Spawn** where the player starts and tick **This is the player** in its
 
 ## Step 5 — Walk it
 
-Press **Live**. In dungeon style you walk in **first person** — **Left/Right turn, Up/Down walk** — and the pillars stop you like real walls. A radar in the corner shows where everything is, which is essential once a level grows beyond one room.
+Press **Live**. In dungeon style you walk in **first person** — **Left/Right turn, Up/Down walk** — and the maze walls stop you like real walls. A radar in the corner shows where everything is, which is essential once a level grows beyond one room.
 
 ![Walking the dungeon in first person](/blog/gamebuilder/dungeon-5-walk.png)
 
-Live, you walk the corridor in first person and look around — the pillars stop you like real walls:
+Live, you walk the corridor in first person and look around — the walls stop you, and the sunlit faces brighten or fall into shadow as you turn:
 
 ![Walking the dungeon, in the Game Builder preview](/blog/gamebuilder/game-dungeon.gif)
+
+## Light and shade
+
+Look up and you'll see the **sun**. A 3D level carries one or more lights (the `lights` array in the `.game`), and the renderer shades every surface by how directly it faces the light: wall faces turned toward the sun are bright, faces turned away fall into shadow — which is exactly what gives the maze its depth as you move. That's the whole point of having a visible light source rather than flat-lit boxes. Change the mood from code via `getLight()`:
+
+```java
+getLight().setDirection(0.3f, -1f, 0.2f)    // a lower sun casts longer, moodier shadows
+          .setColor(0xfff2c14e)              // warm sunlight
+          .setAmbientColor(0xff404858);      // fill light so shadows aren't pure black
+```
+
+On device this is real GPU lighting; the editor preview approximates the same sun angle so you can judge it while authoring.
 
 ## Sculpting terrain (floors, hills, holes, ramps)
 

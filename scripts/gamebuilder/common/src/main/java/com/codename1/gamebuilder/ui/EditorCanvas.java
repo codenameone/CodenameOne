@@ -1032,7 +1032,9 @@ public class EditorCanvas extends Component {
     private void paintScene3D(Graphics g, GameLevel level, AssetCatalog cat, int sX, int sY, int sw, int sh) {
         String type = view3dType();
         boolean ground = !"flight".equals(type);
-        int[] sky = "dungeon".equals(type) ? new int[]{0xff090a10, 0xff15161e}
+        // an open-top, sun-lit maze (so the light source is visible and its impact on the
+        // walls is obvious) rather than a pitch-black crypt
+        int[] sky = "dungeon".equals(type) ? new int[]{0xff2c5a96, 0xff6f93c4, 0xffe9c79a}
                 : "flight".equals(type) ? new int[]{0xff2f63ad, 0xff79afe6, 0xffd2e8ff}
                 : new int[]{0xff1b2742, 0xff39517a, 0xff86a0c8};
         paintBackdrop(g, sky, sX, sY, sw, sh);
@@ -1063,6 +1065,23 @@ public class EditorCanvas extends Component {
         copy(fwd, p3fwd);
         copy(norm(cross(p3fwd, new double[]{0, 1, 0})), p3right);
         copy(cross(p3right, p3fwd), p3up);
+
+        // the sun: a far point along the light direction. Drawn as a glow + disc in the sky
+        // so the light source is visible and its angle matches the shading on the geometry.
+        if (!"race".equals(type)) {
+            double[] sunPt = project3D(p3eye[0] + SUN[0] * 80, p3eye[1] + SUN[1] * 80, p3eye[2] + SUN[2] * 80);
+            if (sunPt != null) {
+                int sxp = (int) sunPt[0];
+                int syp = (int) sunPt[1];
+                int rad = Math.max(10, sw / 14);
+                g.setColor(0xf2c14e);
+                g.setAlpha(70);
+                g.fillArc(sxp - rad * 2, syp - rad * 2, rad * 4, rad * 4, 0, 360);   // glow
+                g.setAlpha(255);
+                g.setColor(0xfff0c0);
+                g.fillArc(sxp - rad, syp - rad, rad * 2, rad * 2, 0, 360);            // disc
+            }
+        }
 
         com.codename1.gaming.level.TerrainGrid terrain = level.getTerrain();
         java.util.ArrayList<Face> faces = new java.util.ArrayList<Face>();
@@ -1286,15 +1305,27 @@ public class EditorCanvas extends Component {
     /// Adds the 5 visible faces (top + 4 sides) of a box centred at (cx, *, cz), resting at
     /// baseY, with horizontal half-extent `hwd` and the given `height`. Faces are shaded so
     /// it reads as a solid 3D block.
+    /// The sun direction (normalized, pointing FROM the surface TO the sun): high and to
+    /// the upper-right. Faces pointing toward it are bright, faces in shadow are dark --
+    /// so as you turn in 3D you see the light source's impact on the geometry.
+    private static final double[] SUN = {0.45, 0.82, 0.36};
+
+    /// Brightness multiplier for a face with the given normal, lit by #SUN: ambient
+    /// (0.45) plus diffuse (0.6) scaled by how directly the face faces the sun.
+    private static double sunFactor(double nx, double ny, double nz) {
+        double d = nx * SUN[0] + ny * SUN[1] + nz * SUN[2];
+        return 0.45 + 0.6 * Math.max(0, d);
+    }
+
     private void addBox(java.util.ArrayList<Face> faces, double cx, double baseY, double cz,
             double hwd, double height, int color) {
         double x0 = cx - hwd, x1 = cx + hwd, z0 = cz - hwd, z1 = cz + hwd;
         double y0 = baseY, y1 = baseY + height;
-        addFace(faces, x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, shade(color, 1.0));   // top
-        addFace(faces, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, shade(color, 0.78));  // +z
-        addFace(faces, x1, y0, z0, x0, y0, z0, x0, y1, z0, x1, y1, z0, shade(color, 0.62));  // -z
-        addFace(faces, x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1, shade(color, 0.70));  // +x
-        addFace(faces, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, shade(color, 0.55));  // -x
+        addFace(faces, x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, shade(color, sunFactor(0, 1, 0)));    // top
+        addFace(faces, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, shade(color, sunFactor(0, 0, 1)));    // +z
+        addFace(faces, x1, y0, z0, x0, y0, z0, x0, y1, z0, x1, y1, z0, shade(color, sunFactor(0, 0, -1)));   // -z
+        addFace(faces, x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1, shade(color, sunFactor(1, 0, 0)));    // +x
+        addFace(faces, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, shade(color, sunFactor(-1, 0, 0)));   // -x
     }
 
     private static int shade(int rgb, double f) {
