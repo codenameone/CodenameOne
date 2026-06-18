@@ -188,7 +188,7 @@ public class AssetCatalog {
                     || sheets.containsKey(d.getId()) || meshes.containsKey(d.getId())) {
                 continue;
             }
-            InputStream in = openResource(src);
+            InputStream in = openResource(src);   //NOPMD CloseResource - closed in the finally below (no try-with-resources at -source 1.5)
             if (in == null) {
                 continue;
             }
@@ -220,12 +220,12 @@ public class AssetCatalog {
     private static InputStream openResource(String src) {
         String path = src.startsWith("/") ? src : "/" + src;
         InputStream in = Display.getInstance().getResourceAsStream(AssetCatalog.class, path);
-        if (in == null) {
-            int slash = src.lastIndexOf('/');
-            String base = slash >= 0 ? src.substring(slash + 1) : src;
-            in = Display.getInstance().getResourceAsStream(AssetCatalog.class, "/" + base);
+        if (in != null) {
+            return in;
         }
-        return in;
+        int slash = src.lastIndexOf('/');
+        String base = slash >= 0 ? src.substring(slash + 1) : src;
+        return Display.getInstance().getResourceAsStream(AssetCatalog.class, "/" + base);
     }
 
     private static byte[] readBytes(InputStream in) throws IOException {
