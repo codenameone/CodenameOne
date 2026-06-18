@@ -395,16 +395,14 @@ public final class AssetArt {
     private static Image dukeFrame;
     private static boolean dukeTried;
 
-    /// First frame of the bundled Duke run sheet (`/duke_run.png`, 5 frames of 269px) — the
-    /// same mascot the platformer uses. Loaded once; null if the art isn't on the classpath.
+    /// The classic waving Duke mascot (`/duke_wave.png`, BSD-licensed OpenJDK Duke). Loaded
+    /// once; null if the art isn't on the classpath.
     private static Image dukeFrame() {
         if (!dukeTried) {
             dukeTried = true;
-            try (InputStream in = AssetArt.class.getResourceAsStream("/duke_run.png")) {
+            try (InputStream in = AssetArt.class.getResourceAsStream("/duke_wave.png")) {
                 if (in != null) {
-                    Image full = Image.createImage(in);
-                    int fw = Math.min(269, full.getWidth());
-                    dukeFrame = full.subImage(0, 0, fw, full.getHeight(), true);
+                    dukeFrame = Image.createImage(in);
                 }
             } catch (IOException e) {
                 dukeFrame = null;   // fall back to a plain back

@@ -35,6 +35,9 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 import java.util.List;
 
 /// The editing surface: paints the level's scene background, grid, tile layers, placed
@@ -98,7 +101,8 @@ public class EditorCanvas extends Component {
     private final java.util.List<double[]> beans = new java.util.ArrayList<>();
     private boolean fireRequested;   // edge-triggered fire (Space / Fire) — consumed each step
     private double fireCooldown;     // seconds until the next bean can be fired
-    private Image dukeCard;          // the Duke mascot frame drawn on card backs + face cards
+    private Image dukeCard;          // the waving Duke mascot drawn on card backs + face cards
+    private boolean dukeTried;       // guards the one-time /duke_wave.png load
 
     // default-behavior play state (score, lives, collected items, enemy direction)
     private int score;
@@ -801,7 +805,7 @@ public class EditorCanvas extends Component {
         int x = (int) Math.round(ox + el.getX() * scale - w / 2);
         int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
         if ("card".equals(el.getAssetId())) {   // Duke Jack: draw the actual rank/suit/face
-            drawCardFace(g, cat, x, y, (int) Math.round(w), (int) Math.round(h),
+            drawCardFace(g, x, y, (int) Math.round(w), (int) Math.round(h),
                     el.getString("rank", "A"), el.getString("suit", "Spades"),
                     el.getBoolean("faceUp", true));
             return;
@@ -814,12 +818,12 @@ public class EditorCanvas extends Component {
     /// Duke mascot (on the J/Q/K) or a suit pip (red for hearts/diamonds, black otherwise) in
     /// the middle. Two pieces of art — the Duke sprite and the suit shapes — cover all 52 cards;
     /// the rest is the rank text laid out from the element's data. Used by the Duke Jack tutorial.
-    private void drawCardFace(Graphics g, AssetCatalog cat, int x, int y, int w, int h,
+    private void drawCardFace(Graphics g, int x, int y, int w, int h,
             String rank, String suit, boolean faceUp) {
         int rad = Math.max(4, w / 7);
         int cx = x + w / 2;
         int cy = y + h / 2;
-        Image duke = dukeCardImage(cat);
+        Image duke = dukeCardImage();
         if (!faceUp) {
             // the back ("cover"): a Duke-blue card with the Duke mascot
             g.setColor(0xFAFAFC);
@@ -849,9 +853,13 @@ public class EditorCanvas extends Component {
         // the picture cards (J/Q/K) show Duke himself; number cards show a big suit pip
         boolean face = "J".equals(rank) || "Q".equals(rank) || "K".equals(rank);
         if (face && duke != null) {
-            g.setColor(red ? 0xF6DCDC : 0xDCE6F6);
-            g.fillRect(x + pad, y + h / 5, w - 2 * pad, h * 3 / 5);   // a tint panel behind Duke
-            drawDuke(g, duke, cx, cy, h / 2);
+            // Duke straight on the white card (his sprite has transparency — no backing panel,
+            // which would just be a square showing through the alpha)
+            drawDuke(g, duke, cx, cy, h * 3 / 5);
+            // a small suit pip under each corner rank so the suit still reads on a face card
+            int pr = Math.max(3, w / 8);
+            suitPip(g, x + pad + pr / 2, y + pad + f.getHeight() + pr / 2, pr / 2, ink, suit);
+            suitPip(g, x + w - pad - pr / 2, y + h - pad - f.getHeight() - pr / 2, pr / 2, ink, suit);
         } else {
             suitPip(g, cx, cy, Math.max(5, w / 4), ink, suit);
         }
@@ -867,13 +875,17 @@ public class EditorCanvas extends Component {
         g.drawImage(duke, cx - dw / 2, cy - dh / 2, dw, dh);
     }
 
-    /// Duke for the cards: the first frame of the Tutorial-1 Duke run sheet (the `player`
-    /// asset). Cached so we slice it once. Same mascot art across all three tutorials.
-    private Image dukeCardImage(AssetCatalog cat) {
-        if (dukeCard == null && cat != null) {
-            SpriteSheet sh = cat.sheet("player");
-            if (sh != null && sh.getFrameCount() > 0) {
-                dukeCard = sh.getFrame(0);
+    /// Duke for the cards: the classic waving Duke mascot (`/duke_wave.png`, the BSD-licensed
+    /// OpenJDK Duke). Loaded and cached once; null if the art isn't on the classpath.
+    private Image dukeCardImage() {
+        if (dukeCard == null && !dukeTried) {
+            dukeTried = true;
+            try (InputStream in = getClass().getResourceAsStream("/duke_wave.png")) {
+                if (in != null) {
+                    dukeCard = Image.createImage(in);
+                }
+            } catch (IOException e) {
+                dukeCard = null;   // fall back to no portrait
             }
         }
         return dukeCard;

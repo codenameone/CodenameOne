@@ -75,7 +75,7 @@ void drawCard(Graphics g, int x, int y, int w, int h, String rank, String suit, 
 }
 ```
 
-`duke` here is the **Duke mascot** — the very same `duke_run.png` sprite from [Tutorial 1](/blog/game-builder-2d-platformer/), an editable image bundled with the game. He rides the card **back** and every **picture card** (Jack, Queen, King), which is what actually makes it *Duke* Jack. The number cards are a rank label plus a drawn suit shape, so **two pieces of art — the Duke sprite and the four suit symbols — cover the entire 52-card deck**; everything else is text the code positions.
+`duke` here is the **Duke mascot** — the classic waving Duke (the [BSD-licensed Java mascot](https://wiki.openjdk.org/display/duke/Main)), bundled with the game as an editable image. He rides the card **back** and every **picture card** (Jack, Queen, King), which is what actually makes it *Duke* Jack. The number cards are a rank label plus a drawn suit shape, so **two pieces of art — the Duke image and the four suit symbols — cover the entire 52-card deck**; everything else is text the code positions.
 
 So, to answer "is it an image or is it drawn?" — **both, and your code decides the mix:**
 
