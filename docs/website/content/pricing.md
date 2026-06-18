@@ -54,7 +54,7 @@ Native platform sources may be uploaded when required for native compilation.
 Pro and Enterprise plans include a managed crash-reporting service that captures uncaught exceptions in your shipping app, symbolicates the stack trace, and files a deduplicated issue on your own GitHub repository. There is no separate dashboard — you triage from GitHub Issues. Crashes hit by multiple devices roll up into a single issue with a counter and a "last seen" timestamp.
 
 ### How do I turn Crash Protection on?
-Add `codename1.crashProtection.enabled=true` to your `codenameone_settings.properties`, install the Codename One Crash Protection GitHub App on the repo you want crashes to land in, and map your package to that repo from `cloud.codenameone.com/console/index.html → Repo mappings`. See the [Crash Protection chapter](/docs/developer-guide/) of the Developer Guide for the full setup including the on-device `CrashProtection` API.
+Add `codename1.crashProtection.enabled=true` to your `codenameone_settings.properties`, install the Codename One Crash Protection GitHub App on the repo you want crashes to land in, and map your package to that repo from `cloud.codenameone.com/console/index.html → Repo mappings`. See the [Developer Guide](/developer-guide) for the full Crash Protection chapter, including the on-device `CrashProtection` API.
 
 ### What are the storage limits for Crash Protection?
 Symbol bundles (Android `mapping.txt`, iOS dSYM, native-port debug info) are gzipped and stored against your account's quota:

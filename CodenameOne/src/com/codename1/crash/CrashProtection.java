@@ -114,6 +114,7 @@ public final class CrashProtection {
             return;
         }
         Display.getInstance().addEdtErrorHandler(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 Object src = evt.getSource();
                 if (src instanceof Throwable) {
@@ -141,10 +142,14 @@ public final class CrashProtection {
     /// `Display.getPlatformName()` returns, lowercased.
     static boolean isPlatformDisabled() {
         String platform = Display.getInstance().getPlatformName();
-        if (platform == null || platform.isEmpty()) return false;
+        if (platform == null || platform.isEmpty()) {
+            return false;
+        }
         String key = "codename1.crashProtection." + platform.toLowerCase() + ".enabled";
         String v = Display.getInstance().getProperty(key, "");
-        if (v == null || v.isEmpty()) return false;
+        if (v == null || v.isEmpty()) {
+            return false;
+        }
         // Only an explicit `false` disables. Anything else (true / typo
         // / unrecognised) leaves the platform enabled -- safer to
         // upload than to silently swallow crashes.
@@ -247,7 +252,9 @@ public final class CrashProtection {
 
     private static int countStored() {
         String[] all = Storage.getInstance().listEntries();
-        if (all == null) return 0;
+        if (all == null) {
+            return 0;
+        }
         int c = 0;
         for (int i = 0; i < all.length; i++) {
             if (all[i] != null && all[i].startsWith(STORAGE_PREFIX)) {
@@ -259,11 +266,15 @@ public final class CrashProtection {
 
     private static void evictOldest() {
         String[] all = Storage.getInstance().listEntries();
-        if (all == null) return;
+        if (all == null) {
+            return;
+        }
         String oldest = null;
         for (int i = 0; i < all.length; i++) {
             String n = all[i];
-            if (n == null || !n.startsWith(STORAGE_PREFIX)) continue;
+            if (n == null || !n.startsWith(STORAGE_PREFIX)) {
+                continue;
+            }
             if (oldest == null || n.compareTo(oldest) < 0) {
                 oldest = n;
             }
@@ -299,7 +310,9 @@ public final class CrashProtection {
         }
         for (int i = 0; i < all.length; i++) {
             String name = all[i];
-            if (name == null || !name.startsWith(STORAGE_PREFIX)) continue;
+            if (name == null || !name.startsWith(STORAGE_PREFIX)) {
+                continue;
+            }
             String json = readStored(name);
             if (json == null) {
                 Storage.getInstance().deleteStorageFile(name);
