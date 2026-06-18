@@ -12,6 +12,7 @@
  */
 
 #import "CN1CrashProtection.h"
+#import "CodenameOne_GLViewController.h"
 
 #import <execinfo.h>
 #import <signal.h>
@@ -397,18 +398,15 @@ NSString * cn1_crash_protection_consume_pending(void) {
  *   crashProtectionConsumePending()
  */
 
-#ifdef NEW_CODENAME_ONE_VM
-extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
-#else
-extern JAVA_OBJECT fromNSString(NSString* str);
-#endif
+/* fromNSString comes in via CodenameOne_GLViewController.h -> xmlvm.h ->
+ * cn1_globals.h; no forward declaration needed. */
 
 void com_codename1_impl_ios_IOSNative_crashProtectionInstall__(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     cn1_crash_protection_install();
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_crashProtectionLogSnapshot__(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_crashProtectionLogSnapshot___R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     __block JAVA_OBJECT result = JAVA_NULL;
     POOL_BEGIN();
@@ -420,7 +418,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_crashProtectionLogSnapshot__(
     return result;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_crashProtectionConsumePending__(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_crashProtectionConsumePending___R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     __block JAVA_OBJECT result = JAVA_NULL;
     POOL_BEGIN();
