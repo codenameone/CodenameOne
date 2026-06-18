@@ -653,6 +653,18 @@ public final class IOSNative {
     public native boolean appleSignInIsLoggedIn();
     public native void appleSignInSignOut();
 
+    // Crash protection -- see nativeSources/CN1CrashProtection.m.
+    // crashProtectionInstall() is idempotent; hooks SIGSEGV/SIGABRT/
+    // SIGBUS/SIGILL/SIGFPE/SIGPIPE/SIGTRAP plus
+    // NSSetUncaughtExceptionHandler, writes a JSON record to the
+    // documents directory before the process dies.
+    // crashProtectionLogSnapshot() returns the recent stderr/NSLog
+    // ring buffer (~32 KB cap). crashProtectionConsumePending() reads
+    // and deletes the pending-crash JSON written on a prior launch.
+    public native void crashProtectionInstall();
+    public native String crashProtectionLogSnapshot();
+    public native String crashProtectionConsumePending();
+
     // WebAuthn / passkeys --
     // ASAuthorizationPlatformPublicKeyCredentialProvider (iOS 16+).
     // See nativeSources/CN1WebAuthn.m for the Obj-C side.

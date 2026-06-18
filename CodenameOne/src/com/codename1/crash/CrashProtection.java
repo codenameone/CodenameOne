@@ -42,16 +42,23 @@ import java.util.List;
 /// each crash to {@link Storage} immediately, and uploads to the
 /// Codename One cloud crash service when enabled.
 ///
-/// Quick start:
+/// Quick start -- call from your `Lifecycle.init` (NOT from `start`,
+/// which runs on every resume):
 ///
 /// ```java
-/// // In your start() method, after Display has initialised:
 /// CrashProtection.install();
-/// // Once your app has obtained user consent (e.g. from a settings
-/// // screen) flip this on. The default is off so no data leaves the
-/// // device until the developer explicitly enables uploads.
 /// CrashProtection.setEnabled(true);
 /// ```
+///
+/// `install()` is idempotent and wires the EDT error handler, the
+/// platform native crash handler, and the native log capture. It also
+/// replays any crash data persisted by the previous run (Java-side
+/// failures buffered in {@link Storage}, plus native-layer crash
+/// records written by the platform crash handler before the process
+/// died).
+///
+/// `setEnabled` defaults to `false`, so no data leaves the device
+/// until the developer explicitly enables uploads.
 ///
 /// Pluggable PII scrubbing: override {@link PiiScrubber} and register
 /// your subclass via {@link #setScrubber(PiiScrubber)} to extend the
@@ -64,9 +71,6 @@ import java.util.List;
 /// for builds produced by the Codename One cloud build server within
 /// the last 30 days; out-of-tier or stale builds are silently dropped
 /// by the server.
-///
-/// This runs in parallel with the legacy {@code Log.bindCrashProtection}
-/// path; both can be installed in the same app without conflict.
 public final class CrashProtection {
 
     /// Production crash-upload endpoint. Fixed; not configurable from
@@ -77,7 +81,12 @@ public final class CrashProtection {
 
     static final String STORAGE_PREFIX = "CN1Crash__$";
     static final String PREF_ENABLED = "crashProtectionEnabled";
-    static final int MAX_STORED = 100;
+    /// Hard cap on locally-buffered crashes. Crashes are rare events
+    /// and the server dedups by fingerprint anyway, so the buffer is
+    /// just protection against a runaway-throw loop offline. 5 is
+    /// plenty; beyond that we evict the oldest to keep disk footprint
+    /// negligible.
+    static final int MAX_STORED = 5;
 
     private static String endpoint = DEFAULT_ENDPOINT;
     private static PiiScrubber scrubber = new PiiScrubber();
@@ -122,6 +131,24 @@ public final class CrashProtection {
                 }
             }
         });
+        // Wire the platform native crash handler so signals / Mach
+        // exceptions / Objective-C NSException / JNI segfaults that
+        // never reach the JVM error path still produce a record.
+        Display.getInstance().installNativeCrashHandler();
+        // Replay any native crash record the platform handler wrote
+        // before the process died on a prior launch. The impl deletes
+        // the record as it's read so we don't re-upload it.
+        String pendingNative = Display.getInstance().consumePendingNativeCrash();
+        if (pendingNative != null && pendingNative.length() > 0) {
+            CrashReportPayload synthetic = new CrashReportPayload(
+                    newEventId(),
+                    "NativeCrash",
+                    "Process terminated by native fault",
+                    new ArrayList<Frame>(0),
+                    null,
+                    pendingNative);
+            persistJson(synthetic.toJson());
+        }
         installed = true;
         if (isEnabled()) {
             drainAsync();
@@ -210,7 +237,44 @@ public final class CrashProtection {
         String exClass = t.getClass().getName();
         String message = scrubber.scrubMessage(t.getMessage());
         List<Frame> frames = extractFrames(t);
-        return new CrashReportPayload(newEventId(), exClass, message, frames);
+        String nativeLog = safeNativeLog();
+        return new CrashReportPayload(newEventId(), exClass, message,
+                frames, nativeLog, null);
+    }
+
+    /// Pulls the platform log snapshot, swallowing any exception the
+    /// platform implementation throws -- crash protection must never
+    /// itself crash the host. Returns `null` on platforms without a
+    /// readable process log or when the snapshot fails.
+    private static String safeNativeLog() {
+        try {
+            return Display.getInstance().getNativeLogSnapshot();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /// Persists a JSON payload directly into the same drain queue
+    /// used by Java-side captures. Used for synthetic native-crash
+    /// records replayed at install time.
+    private static void persistJson(String json) {
+        if (json == null || json.length() == 0) {
+            return;
+        }
+        if (countStored() >= MAX_STORED) {
+            evictOldest();
+        }
+        String name = STORAGE_PREFIX + newEventId();
+        OutputStream os = null;
+        try {
+            os = Storage.getInstance().createOutputStream(name);
+            os.write(json.getBytes("UTF-8"));
+            os.flush();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        } finally {
+            Util.cleanup(os);
+        }
     }
 
     static List<Frame> extractFrames(Throwable t) {

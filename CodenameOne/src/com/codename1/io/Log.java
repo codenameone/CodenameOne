@@ -375,37 +375,14 @@ public class Log {
         return instance;
     }
 
-    /// Binds pro based crash protection logic that will send out an email in case of an exception thrown on the EDT
-    ///
-    /// #### Parameters
-    ///
-    /// - `consumeError`: @param consumeError true will hide the error from the user, false will leave the builtin logic that defaults to
-    /// showing an error dialog to the user
+    /// @deprecated Replaced by `com.codename1.crash.CrashProtection`,
+    /// which captures the full structured crash record (Java exception
+    /// + native crash data + platform log snapshot) and uploads it to
+    /// the managed crash-reporting service. Call
+    /// `CrashProtection.install()` plus `CrashProtection.setEnabled(true)`
+    /// from your `Lifecycle.init` instead. This method is now a no-op.
+    @Deprecated
     public static void bindCrashProtection(final boolean consumeError) {
-        if (Display.getInstance().isSimulator()) {
-            return;
-        }
-        Display.getInstance().addEdtErrorHandler(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                if (consumeError) {
-                    evt.consume();
-                }
-                p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
-                p("OS " + Display.getInstance().getPlatformName());
-                p("Error " + evt.getSource());
-                if (Display.getInstance().getCurrent() != null) {
-                    p("Current Form " + Display.getInstance().getCurrent().getName());
-                } else {
-                    p("Before the first form!");
-                }
-                e((Throwable) evt.getSource());
-                if (getUniqueDeviceKey() != null) {
-                    sendLog();
-                }
-            }
-        });
-        crashBound = true;
     }
 
     /// Returns true if the user bound crash protection

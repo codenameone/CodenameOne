@@ -229,11 +229,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread t, Throwable e) {
-            if(com.codename1.io.Log.isCrashBound()) {
-                com.codename1.io.Log.p("Uncaught exception in thread " + t.getName());
-                com.codename1.io.Log.e(e);
-                com.codename1.io.Log.sendLog();
-            }
             try {
                 com.codename1.crash.CrashProtection.capture(e);
             } catch (Throwable ignore) {
@@ -8226,6 +8221,45 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String getPlatformName() {
         return "and";
+    }
+
+    /**
+     * Snapshot of the recent process logcat for crash protection. Since
+     * Android 4.1 (API 16) apps can only read their own process log
+     * without the READ_LOGS permission, which is exactly what we want.
+     * Returns the last ~200 lines (capped at 32 KB).
+     */
+    @Override
+    public String getNativeLogSnapshot() {
+        java.io.BufferedReader reader = null;
+        Process proc = null;
+        try {
+            proc = Runtime.getRuntime().exec(new String[]{
+                "logcat", "-d", "-t", "200", "-v", "threadtime"});
+            reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(proc.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder(8192);
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+                if (sb.length() > 32 * 1024) {
+                    break;
+                }
+            }
+            return sb.length() == 0 ? null : sb.toString();
+        } catch (Throwable ignored) {
+            // logcat unavailable (very old Android, locked-down ROM,
+            // etc.) -- crash protection still works, just without the
+            // device log context.
+            return null;
+        } finally {
+            if (reader != null) {
+                try { reader.close(); } catch (java.io.IOException ignored) { }
+            }
+            if (proc != null) {
+                try { proc.destroy(); } catch (Throwable ignored) { }
+            }
+        }
     }
 
     /**

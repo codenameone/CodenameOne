@@ -36,6 +36,15 @@ final class CrashReportPayload {
 
     static final int MAX_FRAMES = 32;
     static final int MAX_MESSAGE_LEN = 8192;
+    /// Hard cap on the attached native-log snapshot. Logcat dumps on
+    /// Android and stderr ring buffers on iOS can be huge; the server
+    /// rejects anything larger and we'd rather truncate client-side
+    /// than have the upload silently dropped.
+    static final int MAX_NATIVE_LOG_LEN = 32 * 1024;
+    /// Hard cap on the native-stack string. Native backtraces from
+    /// signal handlers are usually compact (~64 frames * ~120 chars),
+    /// but a corrupt stack can produce arbitrarily long output.
+    static final int MAX_NATIVE_STACK_LEN = 16 * 1024;
 
     final String eventId;
     final String buildKey;
@@ -47,15 +56,28 @@ final class CrashReportPayload {
     final String exceptionClass;
     final String messageScrubbed;
     final List<Frame> frames;
+    /// Recent platform-log output captured at crash time. Provides
+    /// context the Java stack frame alone can't (NSLog/os_log on iOS,
+    /// logcat on Android). `null` if the platform has no readable log
+    /// or the snapshot failed.
+    final String nativeLog;
+    /// Raw native backtrace string for crashes captured by the
+    /// platform native crash handler (signal/Mach exception/uncaught
+    /// Objective-C). `null` for pure-Java crashes -- their stack lives
+    /// in {@link #frames}.
+    final String nativeStack;
     final String locale;
     final long clientTs;
 
     CrashReportPayload(String eventId, String exceptionClass,
-            String messageScrubbed, List<Frame> frames) {
+            String messageScrubbed, List<Frame> frames,
+            String nativeLog, String nativeStack) {
         this.eventId = eventId;
         this.exceptionClass = exceptionClass;
         this.messageScrubbed = trim(messageScrubbed, MAX_MESSAGE_LEN);
         this.frames = capFrames(frames);
+        this.nativeLog = trim(nativeLog, MAX_NATIVE_LOG_LEN);
+        this.nativeStack = trim(nativeStack, MAX_NATIVE_STACK_LEN);
         Display d = Display.getInstance();
         this.buildKey = d.getProperty("build_key", "");
         this.packageName = d.getProperty("package_name", "");
@@ -100,6 +122,8 @@ final class CrashReportPayload {
         appendString(b, "exceptionClass", exceptionClass, false);
         appendString(b, "message", messageScrubbed, false);
         appendString(b, "locale", locale, false);
+        appendString(b, "nativeLog", nativeLog, false);
+        appendString(b, "nativeStack", nativeStack, false);
         b.append(",\"clientTs\":").append(clientTs);
         b.append(",\"frames\":[");
         for (int i = 0; i < frames.size(); i++) {
