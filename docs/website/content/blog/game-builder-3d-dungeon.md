@@ -45,11 +45,13 @@ With nothing selected, set the Inspector's **3D play style** to **dungeon**. Tha
 
 ![Choosing the dungeon play style](/blog/gamebuilder/dungeon-2-style.png)
 
-## Step 3 — Build the crypt walls
+## Step 3 — Build the maze walls
 
-From the **3D Kit**, place **Pillar** assets to form walls and corridors, and a **Rock** as scenery. *Why pillars as walls?* In dungeon style, solid (non-collectible) elements block movement, so a row of pillars is a wall you can't walk through. Use the Inspector's per-object **Size** to vary them — that scales only the selected object, not the shared asset, so you can mix fat columns and thin posts.
+A maze wants *continuous* walls, not a row of separate posts — so build them with the **Terrain** tool's **Wall** brush rather than placing individual pillar objects. Select **Terrain → Wall** and paint the maze: a solid perimeter plus a few inner walls, leaving a corridor for Duke. Each painted cell becomes a full-width stone block, so adjacent cells join into a seamless wall (and the radar shows them as solid, not dotted). In dungeon play style those walls stop the walker, and the floor is laid as continuous stone — no tile-grid gaps.
 
-![Building walls from pillars](/blog/gamebuilder/dungeon-3-walls.png)
+(You *can* still drop standalone **Pillar** or **Rock** objects from the 3D Kit as scenery; they're great as freestanding columns, just not as a maze wall.)
+
+![Building the maze with the Wall brush](/blog/gamebuilder/dungeon-3-walls.png)
 
 ## Step 4 — Add the player spawn
 
@@ -82,10 +84,10 @@ Live, you walk the corridor in first person and look around — the pillars stop
   "camera": { "eye": [0,8,14], "target": [0,0,0], "fov": 60 },
   "lights": [ { "dir": [0.4,-1,0.3], "color": "fff2e0", "ambient": "2a2f3a" } ],
   "elements": [
-    { "id": "w1", "assetId": "pillar", "layer": "Models", "x": 6, "y": 5, "scaleX": 1 },
-    { "id": "sp", "assetId": "spawn",  "layer": "Models", "x": 8, "y": 11, "props": { "player": true } }
+    { "id": "sp", "assetId": "spawn", "layer": "Models", "x": 8, "y": 14, "props": { "player": true } }
   ],
-  "terrain": { "cols": 16, "rows": 16, "heights": [ ], "materials": [ ] }
+  "terrain": { "cols": 16, "rows": 16, "heights": [ ], "materials": [ ],
+               "walls": [ "...a height per maze-wall cell, 0 elsewhere..." ] }
 }
 ```
 

@@ -1104,8 +1104,9 @@ public class EditorCanvas extends Component {
                     double x0 = c - halfC, x1 = c + 1 - halfC;
                     double z0 = r - halfR, z1 = r + 1 - halfR;
                     double k = Math.max(0, Math.min(1, (terrain.getHeight(c, r) + 2) / 6.0));
-                    int gc = shade(materialColor(terrain.getMaterial(c, r)), 0.8 + k * 0.4);
-                    addFace(faces, x0, y00, z0, x1, y10, z0, x1, y11, z1, x0, y01, z1, gc);
+                    int base = "dungeon".equals(type) ? 0x3b3e46 : materialColor(terrain.getMaterial(c, r));
+                    int gc = shade(base, 0.8 + k * 0.4);
+                    addFace(faces, x0, y00, z0, x1, y10, z0, x1, y11, z1, x0, y01, z1, gc, false);
                     float wall = terrain.getWall(c, r);
                     if (wall > 0f) {
                         addBox(faces, c + 0.5 - halfC, terrain.getHeight(c, r),
@@ -1114,9 +1115,9 @@ public class EditorCanvas extends Component {
                 }
             }
         } else if (ground) {
-            int gc = "race".equals(type) ? 0x3a3f4a : 0x2c5d3a;   // road grey vs grass
+            int gc = "dungeon".equals(type) ? 0x3b3e46 : "race".equals(type) ? 0x3a3f4a : 0x2c5d3a;
             addFace(faces, -halfC, 0, -halfR, cols - halfC, 0, -halfR,
-                    cols - halfC, 0, rows - halfR, -halfC, 0, rows - halfR, gc);
+                    cols - halfC, 0, rows - halfR, -halfC, 0, rows - halfR, gc, false);
         }
         List<GameElement> els = level.elements();
         for (int i = 0; i < els.size(); i++) {
@@ -1156,15 +1157,18 @@ public class EditorCanvas extends Component {
             Face f = faces.get(i);
             g.setColor(f.color);
             g.fillPolygon(f.xs, f.ys, f.xs.length);
-            g.setColor(shade(f.color, 0.45));   // edge so blocks read crisply
-            int n = f.xs.length;
-            for (int e = 0; e < n; e++) {
-                int e2 = (e + 1) % n;
-                g.drawLine(f.xs[e], f.ys[e], f.xs[e2], f.ys[e2]);
+            if (f.outline) {
+                g.setColor(shade(f.color, 0.45));   // edge so blocks read crisply
+                int n = f.xs.length;
+                for (int e = 0; e < n; e++) {
+                    int e2 = (e + 1) % n;
+                    g.drawLine(f.xs[e], f.ys[e], f.xs[e2], f.ys[e2]);
+                }
             }
         }
-        // faint ground grid for spatial reference (skip in flight)
-        if (ground) {
+        // faint ground grid for spatial reference (skip in flight + dungeon: a maze floor
+        // should read as continuous stone, not a tile grid)
+        if (ground && !"dungeon".equals(type)) {
             g.setColor("race".equals(type) ? 0x556070 : 0x6fae7f);
             g.setAlpha(120);
             for (int c = 0; c <= cols; c += 1) {
@@ -1183,6 +1187,7 @@ public class EditorCanvas extends Component {
         int[] xs;
         int[] ys;
         int color;
+        boolean outline = true;   // crisp edge for boxes; off for a seamless floor
     }
 
     /// Projects a quad's 4 world corners and, if all are in front of the camera, queues it
@@ -1190,6 +1195,12 @@ public class EditorCanvas extends Component {
     private void addFace(java.util.ArrayList<Face> faces,
             double x0, double y0, double z0, double x1, double y1, double z1,
             double x2, double y2, double z2, double x3, double y3, double z3, int color) {
+        addFace(faces, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, color, true);
+    }
+
+    private void addFace(java.util.ArrayList<Face> faces,
+            double x0, double y0, double z0, double x1, double y1, double z1,
+            double x2, double y2, double z2, double x3, double y3, double z3, int color, boolean outline) {
         double[] a = project3D(x0, y0, z0);
         double[] b = project3D(x1, y1, z1);
         double[] c = project3D(x2, y2, z2);
@@ -1202,6 +1213,7 @@ public class EditorCanvas extends Component {
         f.ys = new int[]{(int) a[1], (int) b[1], (int) c[1], (int) d[1]};
         f.depth = (a[2] + b[2] + c[2] + d[2]) / 4.0;
         f.color = color;
+        f.outline = outline;
         faces.add(f);
     }
 

@@ -361,29 +361,43 @@ public final class BlogTutorialScreenshots {
         });
         shot("dungeon-2-style");
 
-        final GameElement[] spawn = new GameElement[1];
         edit(() -> {
             EditorController c = gb.getController();
-            EditorModel m = c.model();
-            GameLevel lvl = m.level();
-            int ts = lvl.getTileSize();
-            com.codename1.gaming.level.Layer models = lvl.layers().get(lvl.layers().size() - 1);
-            m.setActiveLayer(models.getName());
-            // two pillar walls flanking an open central corridor, so walking forward
-            // sends the walls sweeping past the camera (a real first-person move).
-            int cx = lvl.getCols() / 2;
-            m.setSelectedAssetId("pillar");
-            for (int r = 0; r < lvl.getRows(); r++) {
-                c.placeElement((cx - 2) * ts + ts / 2.0, r * ts + ts / 2.0);
-                c.placeElement((cx + 2) * ts + ts / 2.0, r * ts + ts / 2.0);
+            GameLevel lvl = c.model().level();
+            int cols = lvl.getCols();
+            int rows = lvl.getRows();
+            int cx = cols / 2;
+            com.codename1.gaming.level.TerrainGrid t = lvl.getTerrain();
+            float wall = 2.4f;
+            // a real maze built from continuous TERRAIN WALLS (not spaced pillars): a solid
+            // perimeter plus internal walls, leaving the central column open as Duke's corridor.
+            for (int col = 0; col < cols; col++) {
+                t.setWall(col, 0, wall);
+                t.setWall(col, rows - 1, wall);
             }
-            // keep the central lane clear (a head-on rock would jam the walk); tuck the
-            // rock into a side niche as scenery.
-            m.setSelectedAssetId("rock");
-            c.placeElement((cx - 1) * ts + ts / 2.0, 2 * ts + ts / 2.0);
+            for (int r = 0; r < rows; r++) {
+                t.setWall(0, r, wall);
+                t.setWall(cols - 1, r, wall);
+            }
+            for (int r = 2; r <= 6; r++) {
+                t.setWall(cx - 3, r, wall);
+            }
+            for (int col = cx - 3; col <= cx - 1; col++) {
+                t.setWall(col, 6, wall);
+            }
+            for (int r = 4; r <= 9; r++) {
+                t.setWall(cx + 3, r, wall);
+            }
+            for (int col = cx + 1; col <= cx + 3; col++) {
+                t.setWall(col, 4, wall);
+            }
+            for (int r = 9; r <= 12; r++) {
+                t.setWall(cx - 2, r, wall);
+            }
         });
         shot("dungeon-3-walls");
 
+        final GameElement[] spawn = new GameElement[1];
         edit(() -> {
             EditorController c = gb.getController();
             EditorModel m = c.model();
