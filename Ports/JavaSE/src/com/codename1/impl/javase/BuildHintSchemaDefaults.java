@@ -141,7 +141,7 @@ final class BuildHintSchemaDefaults {
         set("{{#watchNative#watchNative.minDeploymentTarget}}.label", "Minimum watchOS version");
         set("{{#watchNative#watchNative.minDeploymentTarget}}.type", "String");
         set("{{#watchNative#watchNative.minDeploymentTarget}}.description",
-                "WATCHOS_DEPLOYMENT_TARGET for the watch target. Defaults to 9.0 "
+                "WATCHOS_DEPLOYMENT_TARGET for the watch target. Defaults to 10.0 "
                 + "(single-target WKApplication apps + WidgetKit complications).");
 
         set("{{#watchNative#watchNative.teamId}}.label", "Apple team id");
@@ -149,6 +149,51 @@ final class BuildHintSchemaDefaults {
         set("{{#watchNative#watchNative.teamId}}.description",
                 "Development team for signing the watch target. Defaults to the "
                 + "iOS team id (ios.teamId / ios.release.teamId).");
+
+        set("{{#watchNative#watchNative.displayName}}.label", "Watch app name");
+        set("{{#watchNative#watchNative.displayName}}.type", "String");
+        set("{{#watchNative#watchNative.displayName}}.description",
+                "Name shown under the watch app icon. Defaults to the app display "
+                + "name (codename1.displayName), then the main class name.");
+
+        set("{{#watchNative#watchNative.embedCompanion}}.label", "Embed in iOS app");
+        set("{{#watchNative#watchNative.embedCompanion}}.type", "Select");
+        set("{{#watchNative#watchNative.embedCompanion}}.values", "false,true");
+        set("{{#watchNative#watchNative.embedCompanion}}.description",
+                "When true (companion distribution), adds the watch app as a build "
+                + "dependency of the iOS app so the pair archives together. Off by "
+                + "default so the iOS build is unaffected; enable it for a packaged "
+                + "companion submission.");
+
+        // Wear OS native build (Android). A Wear OS app is a regular Android app
+        // that declares the watch hardware feature; the CN1 UI renders through
+        // the normal Android pipeline (no separate backend, unlike watchOS).
+        set("{{@androidWear}}.label", "Wear OS (Android)");
+        set("{{@androidWear}}.description",
+                "Builds the Android app as a Wear OS app: declares the watch "
+                + "hardware feature, marks the app standalone (runs without a "
+                + "paired phone app) and raises the minimum SDK to the Wear OS 2.0 "
+                + "baseline (API 23). CN.isWatch() returns true at runtime via "
+                + "PackageManager.FEATURE_WATCH. Independent of the Apple Watch "
+                + "build; enable both to target both wearables.");
+
+        set("{{#androidWear#android.wear}}.label", "Enable Wear OS build");
+        set("{{#androidWear#android.wear}}.type", "Select");
+        set("{{#androidWear#android.wear}}.values", "false,true");
+        set("{{#androidWear#android.wear}}.description",
+                "When true, marks the Android build as a Wear OS app (manifest "
+                + "uses-feature android.hardware.type.watch, standalone meta-data, "
+                + "minimum SDK floor API 23). With the hint off the manifest is "
+                + "unchanged.");
+
+        set("{{#androidWear#android.wear.standalone}}.label", "Standalone Wear app");
+        set("{{#androidWear#android.wear.standalone}}.type", "Select");
+        set("{{#androidWear#android.wear.standalone}}.values", "true,false");
+        set("{{#androidWear#android.wear.standalone}}.description",
+                "Declares the Wear app standalone (com.google.android.wearable."
+                + "standalone), so it installs and runs directly on the watch "
+                + "without a companion phone app. Defaults to true. Only applies "
+                + "when android.wear=true.");
     }
 
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */

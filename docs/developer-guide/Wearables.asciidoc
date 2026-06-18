@@ -81,6 +81,9 @@ the pair installs together. The watch app is rooted in a generated SwiftUI
 `@main` shell that hosts the Codename One frames and forwards Digital Crown and
 tap input into the runtime.
 
+.Codename One UI rendered on the watchOS simulator via the Core Graphics backend
+image::wearables/apple-watch-simulator.png[Codename One running on the Apple Watch simulator,scaledwidth=30%]
+
 ==== Enabling the watchOS Build
 
 Set the build hint:
@@ -100,6 +103,12 @@ codename1.watchMain=com.mycompany.myapp.MyWatchMain
 
 If you don't declare a distinct `watchMain`, the watch app reuses your phone
 main class as its lifecycle entry point.
+
+NOTE: `codename1.watchMain` (and `watchNative.enabled`) affect only the Apple
+Watch (watchOS) build. They have no effect on Android: a Wear OS build is never
+produced implicitly -- you enable it explicitly with `android.wear=true` (see
+<<wear-os-android>>). A project can target both wearables at once by setting a
+`watchMain` (or `watchNative.enabled=true`) and `android.wear=true` together.
 
 ==== watchOS Build Hints
 
@@ -172,6 +181,7 @@ with the native Xcode tools as usual. Cloud builds support the watch target
 through the same iOS build -- set the hints above and build for iOS.
 
 === Android (Wear OS)
+[[wear-os-android]]
 
 A Wear OS app is a regular Android app. The Codename One Android port renders the
 UI with the same pipeline it uses on phones, so no special rendering backend is
