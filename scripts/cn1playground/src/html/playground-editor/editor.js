@@ -610,7 +610,7 @@
         // language and let the host route this change to the right editor.
         language: state.language
       });
-    }, 280);
+    }, 120);
   }
 
   function scheduleLocalLint() {

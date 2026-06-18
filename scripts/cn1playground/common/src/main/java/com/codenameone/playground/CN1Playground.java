@@ -1226,7 +1226,7 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         final int runTicket = ++autoRunSequence;
-        UITimer.timer(850, false, appForm, () -> {
+        UITimer.timer(300, false, appForm, () -> {
             if (runTicket == autoRunSequence) {
                 runScript(appForm);
             }
