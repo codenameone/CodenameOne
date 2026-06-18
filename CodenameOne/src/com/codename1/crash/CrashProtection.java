@@ -28,9 +28,8 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.system.CrashReport;
 import com.codename1.ui.Display;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -122,13 +121,17 @@ public final class CrashProtection {
             installed = true;
             return;
         }
-        Display.getInstance().addEdtErrorHandler(new ActionListener() {
+        // setCrashReporter is the right hook -- it fires unconditionally
+        // in Display's EDT catch block before impl.handleEDTException
+        // gets a chance to short-circuit (the legacy
+        // AndroidImplementation.handleEDTException returns true after
+        // showing its own AlertDialog and would otherwise eat the
+        // exception). addEdtErrorHandler runs only when the impl
+        // returns false, which leaves Android uncovered.
+        Display.getInstance().setCrashReporter(new CrashReport() {
             @Override
-            public void actionPerformed(ActionEvent evt) {
-                Object src = evt.getSource();
-                if (src instanceof Throwable) {
-                    capture((Throwable) src);
-                }
+            public void exception(Throwable t) {
+                capture(t);
             }
         });
         // Wire the platform native crash handler so signals / Mach

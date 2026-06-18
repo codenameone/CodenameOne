@@ -1149,8 +1149,15 @@ public final class Display extends CN1Constants {
                 }
                 Log.e(err);
                 if (crashReporter != null) {
-                    CodenameOneThread.handleException(err);
+                    // Hand the actual throwable to the registered reporter
+                    // BEFORE impl.handleEDTException gets a chance to short
+                    // circuit (legacy AndroidImplementation returns true
+                    // after showing its own AlertDialog, which used to
+                    // silently lose the exception for anyone hooking via
+                    // setCrashReporter -- including CrashProtection).
+                    crashReporter.exception(err);
                 }
+                CodenameOneThread.handleException(err);
                 if (!impl.handleEDTException(err)) {
                     if (errorHandler != null) {
                         errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
