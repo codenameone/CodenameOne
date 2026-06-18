@@ -45,18 +45,44 @@ You *can* place cards by hand for a fixed layout, but a real game deals them fro
 
 ## Step 4 — Hit or stand
 
-Duke's hand here is on 16 — too low to stand on. He **hits**, and a third card brings him to 19, a total worth standing on. The companion spawns the new card element and lays it next to the others; the same `faceUp`/`rank`/`suit` data drives how it draws. The dealer's hole card stays face-down — it's still Duke's turn.
+Duke's hand here is on 15 (and his Jack already wears the Duke mascot) — too low to stand on. He **hits**, and a third card brings him to 19, a total worth standing on. The companion spawns the new card element and lays it next to the others; the same `faceUp`/`rank`/`suit` data drives how it draws. The dealer's hole card stays face-down — it's still Duke's turn.
 
 ![Duke hits and reaches 19](/blog/gamebuilder/board-4-hit.png)
 
 ## Where the card art comes from
 
-A reasonable question looking at those cards: *is that a picture, or is it generated?* It's both, split the way a real deck is — and knowing which is which tells you exactly what to edit.
+Let's be exact about this, because "the faces are generated" explains nothing. There is **no card generator in the framework**. Your companion class draws each card itself with the ordinary `Graphics` API — the same one you'd use to custom-paint any Codename One component. When a card needs to be shown, your code is handed a `Graphics` and a rectangle and decides what goes in it.
 
-* **The back (the "cover") is an image asset.** Every face-down card draws the **Card** asset's art — the bundled file `src/main/resources/card.png` (or whatever you import over it). It's an ordinary editable image: open it in your editor, or drop in your own PNG, and *every* card back in the game changes. That's the one file to touch to re-skin the deck.
-* **The faces are generated from data, not 52 images.** A card element carries only `rank` and `suit`; the renderer composes the face from them — the rank in the corners, the suit pip (red for hearts and diamonds, black for spades and clubs), and a Duke crown on the Jack, Queen and King. So a full deck is *one* back image plus a tiny bit of drawing code, not 52 hand-drawn files you have to keep in sync.
+A card element holds just two fields, `rank` and `suit`. One short method in *your* game turns that into a card — this is the actual routine the preview above uses:
 
-Why this split? A deck is 52 cards that differ only by two small symbols, so drawing the faces from `rank`/`suit` is far less work than painting them — and it means you can change the whole look in code. If you *do* want bespoke face art (a hand-painted King of Hearts), the data-driven hook still helps: import images named by rank and suit and have the renderer draw `king_hearts.png` for that card instead of the pips. Either way, the element stays pure data; only how you turn that data into pixels changes.
+```java
+void drawCard(Graphics g, int x, int y, int w, int h, String rank, String suit, boolean faceUp) {
+    if (!faceUp) {                                  // the back: a blue card with the Duke mascot
+        g.setColor(0x1B3A6B);
+        g.fillRoundRect(x, y, w, h, 8, 8);
+        g.drawImage(duke, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+        return;
+    }
+    g.setColor(0xFFFFFF);                           // the face: a white card...
+    g.fillRoundRect(x, y, w, h, 8, 8);
+    g.setColor(isRed(suit) ? 0xC0392B : 0x1A1A1A);
+    g.drawString(rank, x + 4, y + 4);               // ...rank in the corner...
+    if (isFaceCard(rank)) {
+        g.drawImage(duke, x + (w - dw) / 2, y + h / 4, dw, dh);   // Duke on the J, Q and K
+    } else {
+        drawSuitPip(g, x + w / 2, y + h / 2, suit);  // ...or a suit symbol in the middle
+    }
+}
+```
+
+`duke` here is the **Duke mascot** — the very same `duke_run.png` sprite from [Tutorial 1](/blog/game-builder-2d-platformer/), an editable image bundled with the game. He rides the card **back** and every **picture card** (Jack, Queen, King), which is what actually makes it *Duke* Jack. The number cards are a rank label plus a drawn suit shape, so **two pieces of art — the Duke sprite and the four suit symbols — cover the entire 52-card deck**; everything else is text the code positions.
+
+So, to answer "is it an image or is it drawn?" — **both, and your code decides the mix:**
+
+* **Drawn from data (the default).** Cheapest by far: one method, two images, 52 cards, and you restyle the whole deck by editing that method. To change the back, swap the Duke image or draw something else in the `!faceUp` branch.
+* **Fully painted cards.** Prefer a hand-illustrated King of Hearts? Import 52 images named by rank and suit and `g.drawImage` the matching one — it's the same method with a different branch.
+
+Either way it's plain drawing code living in your companion class, not a black box you have to accept as-is.
 
 ## The rules: a blackjack engine
 
@@ -126,9 +152,9 @@ protected void onUpdate(double deltaSeconds) {
 
 ## Play it
 
-Press **Live**. The table comes up, Duke stands on his 19, and the dealer turns over the hole card and draws up to 17 — Duke wins the hand:
+Press **Live**. The table comes up, Duke stands on his 19, and the dealer turns over the hole card and draws up to 18 — Duke wins the hand:
 
-![Duke wins the hand, 19 over 17](/blog/gamebuilder/board-5-play.png)
+![Duke wins the hand, 19 over 18](/blog/gamebuilder/board-5-play.png)
 
 Dealing a card is just creating its element and sliding it onto the felt:
 

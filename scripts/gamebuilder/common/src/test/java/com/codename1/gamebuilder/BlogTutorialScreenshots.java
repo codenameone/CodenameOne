@@ -312,10 +312,10 @@ public final class BlogTutorialScreenshots {
     }
 
     // ---- Tutorial 2: card game "Duke Jack" (blackjack) -----------------------
-    // Duke starts on 16, hits to 19 (still his turn — the dealer hasn't drawn yet), then
-    // stands; the dealer draws to 17 and Duke wins 19 over 17. Chosen so each step's table is
-    // truthful (the dealer's extra cards don't appear until he actually plays).
-    private static final int BJ_SEED = 43;
+    // Duke holds 5H + JC (15) — the Jack shows Duke — hits a 4D to 19 (still his turn), then
+    // stands; the dealer (QH up, also a Duke face card) draws to 18 and Duke wins 19 over 18.
+    // Chosen so a Duke face card is on the table and each step's table is truthful.
+    private static final int BJ_SEED = 173;
 
     private static void board() {
         edit(() -> {

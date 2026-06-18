@@ -28,6 +28,8 @@ import com.codename1.gaming.level.AssetPack;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 /// Generates recognizable sprite art for the starter packs procedurally (art "translated
@@ -372,10 +374,9 @@ public final class AssetArt {
         g.fillArc(w / 3, h / 8, w / 3, h / 3, 0, 360);
     }
 
-    /// The card *cover* (back): a Duke-blue card with a double border and a diamond emblem.
-    /// This is the editable `/card.png` the runtime draws for a face-down card — replace the
-    /// art (or this method) to restyle every card back. Card *faces* are drawn from rank/suit
-    /// data by the board renderer, so they're not baked here.
+    /// The card *cover* (back): a Duke-blue card with the Duke mascot. This is the bundled
+    /// `/card.png` used for palette/hierarchy thumbnails and as the importable cover image;
+    /// the board renderer draws the same Duke (and the suit faces) live on the table.
     private static void card(Graphics g, int w, int h, int c) {
         g.setColor(0xFAFAFC);                       // white rim
         g.fillRoundRect(0, 0, w - 1, h - 1, 6, 6);
@@ -383,16 +384,33 @@ public final class AssetArt {
         g.fillRoundRect(2, 2, w - 5, h - 5, 5, 5);
         g.setColor(0x4D86FF);                       // inner border
         g.drawRoundRect(w / 8, h / 10, w - w / 4, h - h / 5, 5, 5);
-        // a Duke diamond emblem in the centre
-        int cx = w / 2;
-        int cy = h / 2;
-        int r = w / 4;
-        g.setColor(0x9DC2FF);
-        g.fillPolygon(new int[]{cx, cx + r * 7 / 10, cx, cx - r * 7 / 10},
-                new int[]{cy - r, cy, cy + r, cy}, 4);
-        g.setColor(0x1B3A6B);
-        g.fillPolygon(new int[]{cx, cx + r * 4 / 10, cx, cx - r * 4 / 10},
-                new int[]{cy - r * 6 / 10, cy, cy + r * 6 / 10, cy}, 4);
+        Image duke = dukeFrame();
+        if (duke != null) {                         // the Duke mascot, centred
+            int dh = h * 3 / 5;
+            int dw = duke.getWidth() * dh / Math.max(1, duke.getHeight());
+            g.drawImage(duke, w / 2 - dw / 2, h / 2 - dh / 2, dw, dh);
+        }
+    }
+
+    private static Image dukeFrame;
+    private static boolean dukeTried;
+
+    /// First frame of the bundled Duke run sheet (`/duke_run.png`, 5 frames of 269px) — the
+    /// same mascot the platformer uses. Loaded once; null if the art isn't on the classpath.
+    private static Image dukeFrame() {
+        if (!dukeTried) {
+            dukeTried = true;
+            try (InputStream in = AssetArt.class.getResourceAsStream("/duke_run.png")) {
+                if (in != null) {
+                    Image full = Image.createImage(in);
+                    int fw = Math.min(269, full.getWidth());
+                    dukeFrame = full.subImage(0, 0, fw, full.getHeight(), true);
+                }
+            } catch (IOException e) {
+                dukeFrame = null;   // fall back to a plain back
+            }
+        }
+        return dukeFrame;
     }
 
     private static void token(Graphics g, int w, int h, int c) {
