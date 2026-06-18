@@ -64,7 +64,6 @@ public class GameSceneView extends GameView {
     private double playerStartX;
     private double playerStartY;
     private boolean playerStartCaptured;
-    private double pvx;
     private double pvy;
     private boolean grounded;
     private boolean jumpHeld;
@@ -327,7 +326,7 @@ public class GameSceneView extends GameView {
         boolean left = getInput().isGameKeyDown(Display.GAME_LEFT);
         boolean right = getInput().isGameKeyDown(Display.GAME_RIGHT);
         boolean up = getInput().isGameKeyDown(Display.GAME_UP) || getInput().isGameKeyDown(Display.GAME_FIRE);
-        pvx = ((right ? 1 : 0) - (left ? 1 : 0)) * speed;
+        double pvx = ((right ? 1 : 0) - (left ? 1 : 0)) * speed;
         if (up && !jumpHeld && grounded) {
             pvy = -jump;
             grounded = false;
@@ -404,7 +403,7 @@ public class GameSceneView extends GameView {
         Scene scene = getScene();
         for (int i = scene.size() - 1; i >= 0; i--) {
             Sprite s = scene.get(i);
-            if (s == player) {
+            if (s == player) {   //NOPMD CompareObjectsWithEquals - sprite identity is intended
                 continue;
             }
             GameElement el = elementOf(s);
