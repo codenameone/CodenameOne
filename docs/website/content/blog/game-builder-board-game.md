@@ -84,6 +84,8 @@ So, to answer "is it an image or is it drawn?" — **both, and your code decides
 
 Either way it's plain drawing code living in your companion class, not a black box you have to accept as-is.
 
+And that's the quietly powerful part of building games this way. `drawCard` isn't using some games-only drawing layer — it's the very same `Graphics` API Codename One has painted every button, label and chart with for fourteen years. A `GameView` is an ordinary Codename One `Component`, so the entire mature graphics stack works *inside* your game: `Image.createImage(w, h, argb)` mutable-image buffers you draw a sprite into once and reuse, anti-aliased shapes, system fonts, affine transforms, even the chart and SVG libraries. The new gaming API didn't replace any of that — it plugged into it. So a "new" thing (a card game, a 3D dungeon) is really fourteen years of battle-tested API and tooling pointed at a game scene; the card faces here are just the smallest, clearest example of it.
+
 ## The rules: a blackjack engine
 
 The cards are just data; the *game* is the rules that read them. Here is a complete, self-contained blackjack engine — no Codename One dependency, so you can drop it straight into your companion (or unit-test it on its own). The only subtlety in blackjack is the Ace, which is worth 11 unless that would bust the hand, in which case it drops to 1:
