@@ -47,6 +47,8 @@ public class Layer {
     private boolean visible = true;
     private boolean locked;
     private int band;
+    private float parallaxX = 1;
+    private float parallaxY = 1;
 
     /// cellKey ("col,row") -> assetId, only used by `#KIND_TILE` layers. Insertion
     /// ordered so a saved level reloads its tiles in a stable order.
@@ -102,6 +104,25 @@ public class Layer {
 
     public Layer setBand(int band) {
         this.band = band;
+        return this;
+    }
+
+    /// The horizontal parallax factor applied to every sprite realized from this layer
+    /// (default `1` = scrolls with the world). A background layer of clouds/mountains
+    /// uses a small factor (e.g. `0.3`) so it drifts behind the foreground as the
+    /// camera scrolls.
+    public float getParallaxX() {
+        return parallaxX;
+    }
+
+    /// The vertical parallax factor for this layer (default `1`); see `#getParallaxX()`.
+    public float getParallaxY() {
+        return parallaxY;
+    }
+
+    public Layer setParallax(float x, float y) {
+        this.parallaxX = x;
+        this.parallaxY = y;
         return this;
     }
 

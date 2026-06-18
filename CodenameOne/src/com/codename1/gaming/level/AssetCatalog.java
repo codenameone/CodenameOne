@@ -41,10 +41,10 @@ import java.util.Map;
 /// It indexes one or more `AssetPack`s and answers two questions: `#def(String)`
 /// (the `AssetDef` template for an id, used for size / default props / kind) and
 /// `#image(String)` (the artwork). Real art is supplied with `#setImage(String, Image)`
-/// -- the build-time SVG/Lottie transcode step or an editor wires those in. Until then
-/// `#image(String)` returns a cached solid-color placeholder sized from the def (the
-/// same flat-color look the editor uses while authoring), so a level always realizes
-/// to something visible.
+/// -- the game builder draws procedural art for the starter packs and decodes any images
+/// you import, then wires them in here. Until an image is supplied `#image(String)`
+/// returns a cached solid-color placeholder sized from the def (the same flat-color look
+/// the editor uses while authoring), so a level always realizes to something visible.
 public class AssetCatalog {
     private final Map<String, AssetPack> packs = new LinkedHashMap<String, AssetPack>();
     /// flat assetId -> def index across all packs (first pack wins on a clash).

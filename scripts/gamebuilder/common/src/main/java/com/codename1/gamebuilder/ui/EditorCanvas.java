@@ -290,7 +290,7 @@ public class EditorCanvas extends Component {
             AssetDef def = cat == null ? null : cat.def(el.getAssetId());
             double hw = (def == null ? ts : def.getWidth()) / 2.0;
             double hh = (def == null ? ts : def.getHeight()) / 2.0;
-            double spd = el.getDouble("speed", 1.5) * 40;
+            double spd = el.getDouble("speed", 60);
             double nx = el.getX() + dir * spd * dt;
             if (hitsSolid(level, nx, el.getY(), hw, hh) || nx < hw || nx > level.getCols() * ts - hw) {
                 dir = -dir;
@@ -465,7 +465,11 @@ public class EditorCanvas extends Component {
         AssetDef def = cat == null ? null : cat.def(player.getAssetId());
         double hw = (def == null ? ts : def.getWidth()) / 2.0;
         double hh = (def == null ? ts : def.getHeight()) / 2.0;
-        double speed = 170, jump = 440, grav = 1300;
+        // same tunables the runtime GameSceneView arcade behavior reads, so the
+        // preview matches a shipped game: gravity prop, walkSpeed prop, player jumpHeight.
+        double speed = level.getDouble("walkSpeed", 170);
+        double jump = player.getInt("jumpHeight", 110) * 4;
+        double grav = level.getDouble("gravity", 9.8) * 132;
 
         vx = ((kRight ? 1 : 0) - (kLeft ? 1 : 0)) * speed;
         if (jumpRequested && grounded) {   // one jump per key press (edge-triggered)
@@ -525,7 +529,9 @@ public class EditorCanvas extends Component {
         List<Layer> layers = level.layers();
         for (int i = 0; i < layers.size(); i++) {
             Layer l = layers.get(i);
-            if (l.getKind() == Layer.KIND_TILE && l.isVisible() && l.getTile(col, row) != null) {
+            // a parallax background layer (clouds, mountains) is decoration, not a wall
+            if (l.getKind() == Layer.KIND_TILE && l.isVisible()
+                    && l.getParallaxX() == 1f && l.getParallaxY() == 1f && l.getTile(col, row) != null) {
                 return true;
             }
         }
@@ -695,6 +701,64 @@ public class EditorCanvas extends Component {
         }
     }
 
+    /// Clamps a follow-camera origin to [0, max] (centers when the level is smaller
+    /// than the view, i.e. max <= 0).
+    private static double clampCam(double v, double max) {
+        if (max <= 0) {
+            return max / 2;
+        }
+        return v < 0 ? 0 : (v > max ? max : v);
+    }
+
+    /// Draws the level through a scrolling follow-camera, applying each layer's parallax
+    /// factor to its scroll offset -- the editor preview of the runtime `SpriteRenderer`
+    /// behavior, so a background layer drifts behind the foreground as the player moves.
+    private void drawContentScrolling(Graphics g, AssetCatalog cat, GameLevel level,
+            int sX, int sY, double scale, double camX, double camY) {
+        double ts = level.getTileSize() * scale;
+        List<Layer> layers = level.layers();
+        for (int li = 0; li < layers.size(); li++) {
+            Layer layer = layers.get(li);
+            if (layer.getKind() != Layer.KIND_TILE || !layer.isVisible()) {
+                continue;
+            }
+            int ox = (int) Math.round(sX - camX * layer.getParallaxX() * scale);
+            int oy = (int) Math.round(sY - camY * layer.getParallaxY() * scale);
+            for (var e : layer.tiles().entrySet()) {
+                int[] cr = parseCell(e.getKey());
+                if (cr == null) {
+                    continue;
+                }
+                drawAsset(g, cat, e.getValue(),
+                        (int) Math.round(ox + cr[0] * ts), (int) Math.round(oy + cr[1] * ts),
+                        (int) Math.round(ts), (int) Math.round(ts));
+            }
+        }
+        List<GameElement> els = level.elements();
+        for (int i = 0; i < els.size(); i++) {
+            GameElement el = els.get(i);
+            if (collected.contains(el.getId())) {
+                continue;
+            }
+            Layer elLayer = level.getLayer(el.getLayer());
+            if (elLayer != null && !elLayer.isVisible()) {
+                continue;
+            }
+            float px = elLayer == null ? 1f : elLayer.getParallaxX();
+            float py = elLayer == null ? 1f : elLayer.getParallaxY();
+            int ox = (int) Math.round(sX - camX * px * scale);
+            int oy = (int) Math.round(sY - camY * py * scale);
+            AssetDef def = cat == null ? null : cat.def(el.getAssetId());
+            double esc = el.getScaleX();
+            double w = elementCells(level, def == null ? level.getTileSize() : def.getWidth()) * ts * esc;
+            double h = elementCells(level, def == null ? level.getTileSize() : def.getHeight()) * ts * esc;
+            double bob = playBob(el, def) * scale;
+            int x = (int) Math.round(ox + el.getX() * scale - w / 2);
+            int y = (int) Math.round(oy + el.getY() * scale - h / 2 + bob);
+            drawAsset(g, cat, el.getAssetId(), x, y, (int) Math.round(w), (int) Math.round(h));
+        }
+    }
+
     /// Top-down terrain map: each cell tinted by ground elevation (dark = low, bright =
     /// high), holes shown as a hatched void, walls as a solid stone block with an "X". This
     /// is what makes the Terrain tool's edits visible while authoring 3D levels.
@@ -827,6 +891,18 @@ public class EditorCanvas extends Component {
         if (level.getMode() == GameLevel.MODE_3D) {
             // true 3D: perspective projection of the board + element billboards
             paintScene3D(g, level, cat, sX, sY, screenW, screenH);
+        } else if (player != null) {
+            // a real game scrolls: zoom in and follow the player so the level scrolls
+            // past, which is what makes a parallax background drift behind it (this
+            // matches the shipped GameSceneView follow camera + per-layer parallax).
+            int visRows = Math.min(level.getRows(), 10);
+            double scale = screenH / (visRows * (double) level.getTileSize());
+            double viewWorldW = screenW / scale;
+            double viewWorldH = screenH / scale;
+            double camX = clampCam(player.getX() - viewWorldW / 2, levelW - viewWorldW);
+            double camY = clampCam(player.getY() - viewWorldH / 2, levelH - viewWorldH);
+            paintBackdrop(g, backdrop(level), sX, sY, screenW, screenH);
+            drawContentScrolling(g, cat, level, sX, sY, scale, camX, camY);
         } else {
             double scale = Math.min(screenW / levelW, screenH / levelH);
             double ts = level.getTileSize() * scale;

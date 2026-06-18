@@ -342,6 +342,7 @@ public class GameLevel {
                 placeCell(s, cr[0], cr[1], projection);
                 s.setZOrder(z);
                 s.setUserData(layer);
+                s.setParallax(layer.getParallaxX(), layer.getParallaxY());
                 scene.add(s);
             }
         }
@@ -367,6 +368,9 @@ public class GameLevel {
             s.setScale(el.getScaleX(), el.getScaleY());
             s.setZOrder((layer == null ? 0 : layer.getBand() * 1000) + 1);
             s.setUserData(el);
+            if (layer != null) {
+                s.setParallax(layer.getParallaxX(), layer.getParallaxY());
+            }
             scene.add(s);
         }
     }
@@ -506,6 +510,8 @@ public class GameLevel {
                 layer.setVisible(Json.bool(lm.get("visible"), true));
                 layer.setLocked(Json.bool(lm.get("locked"), false));
                 layer.setBand(Json.intval(lm.get("band"), i));
+                layer.setParallax((float) Json.num(lm.get("parallaxX"), 1),
+                        (float) Json.num(lm.get("parallaxY"), 1));
                 Map<String, Object> tm = Json.asMap(lm.get("tiles"));
                 if (tm != null) {
                     for (Map.Entry<String, Object> te : tm.entrySet()) {
@@ -704,6 +710,14 @@ public class GameLevel {
             sb.append(",\"locked\":").append(layer.isLocked() ? "true" : "false");
             sb.append(",\"band\":");
             Json.writeNumber(sb, layer.getBand());
+            if (layer.getParallaxX() != 1f) {
+                sb.append(",\"parallaxX\":");
+                Json.writeNumber(sb, layer.getParallaxX());
+            }
+            if (layer.getParallaxY() != 1f) {
+                sb.append(",\"parallaxY\":");
+                Json.writeNumber(sb, layer.getParallaxY());
+            }
             if (layer.getKind() == Layer.KIND_TILE && !layer.tiles().isEmpty()) {
                 sb.append(',');
                 kv(sb, "tiles");

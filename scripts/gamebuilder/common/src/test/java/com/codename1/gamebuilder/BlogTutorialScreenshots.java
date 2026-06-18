@@ -108,6 +108,28 @@ public final class BlogTutorialScreenshots {
         });
         shot("platformer-2-ground");
 
+        // a parallax background: mountains along the horizon and clouds in the sky,
+        // painted on the slow-scrolling Background layer
+        edit(() -> {
+            EditorController c = gb.getController();
+            EditorModel m = c.model();
+            int rows = lvl[0].getRows();
+            int cols = lvl[0].getCols();
+            m.setActiveLayer("Background");
+            m.setSelectedAssetId("mountain");
+            for (int col = 0; col < cols; col += 2) {
+                c.paintTile(col, rows - 4);
+                c.paintTile(col + 1, rows - 3);
+            }
+            m.setSelectedAssetId("cloud");
+            c.paintTile(3, 2);
+            c.paintTile(9, 1);
+            c.paintTile(15, 3);
+            c.paintTile(21, 2);
+            m.setSelection(null);
+        });
+        shot("platformer-2b-background");
+
         edit(() -> {
             EditorController c = gb.getController();
             EditorModel m = c.model();

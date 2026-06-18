@@ -158,14 +158,16 @@ and re-indexes the catalog so `def(id)` resolves;
 On the next launch `ProjectIO.loadCustomPack` reads `custompack.json` back and reloads
 each imported PNG from `<gamesDir>/assets/`, restoring your custom pack into the catalog.
 
-==== The SVG / Lottie build-time transcode path
+==== Vector / animated source art (`source`)
 
-Beyond raster art, an `AssetDef`'s `getSource()` can point at vector or animated source art
-(an SVG or Lottie key). This is the standard Codename One pipeline: the build-time step
-transcodes the vector/animated source into a real `Image`, which is wired into the catalog
-with `setImage`. This gives the crispest, resolution-independent art, but unlike
-art-as-code it depends on the transcoder running as part of the build rather than being
-pure runtime `Graphics` calls.
+An `AssetDef` also carries an optional `getSource()` -- a reference to source art such as a
+resource path, or a vector / animated key. Today the two wired paths are the ones above:
+procedural art-as-code for the starter packs and decoded raster images for anything you
+import. The `source` field is the hook a build step would use to transcode vector or
+animated art (the same way Codename One handles SVG and Lottie elsewhere) into a real
+`Image` and wire it in with `setImage`; that transcode step isn't part of the gaming
+asset pipeline yet, so treat `source` as a forward-looking field rather than an active
+path. For crisp art now, import a high-resolution PNG or draw it as code.
 
 In every case the catalog falls back to the flat-colour placeholder
 (`AssetCatalog#image`) when no image has been supplied for an id, so a level is never

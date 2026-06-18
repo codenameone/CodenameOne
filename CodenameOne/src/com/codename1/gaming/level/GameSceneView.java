@@ -31,6 +31,10 @@ import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.Primitives;
+import com.codename1.ui.Display;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /// A turnkey `GameView` that plays a `GameLevel`: it wires the whole lifecycle so a
 /// generated game scene can be a thin subclass that only adds behavior.
@@ -52,6 +56,19 @@ public class GameSceneView extends GameView {
     private boolean boardRealized;
     private int score;
     private int lives = -1;
+
+    // ---- opt-in 2D arcade behavior (off by default) ----
+    private boolean arcadeBehavior;
+    private boolean followCamera = true;
+    private Sprite arcadePlayer;
+    private double playerStartX;
+    private double playerStartY;
+    private boolean playerStartCaptured;
+    private double pvx;
+    private double pvy;
+    private boolean grounded;
+    private boolean jumpHeld;
+    private final Map<String, Double> enemyDir = new HashMap<String, Double>();
 
     public GameSceneView(GameLevel level, AssetCatalog catalog) {
         this.level = level;
@@ -79,6 +96,9 @@ public class GameSceneView extends GameView {
             projection.fit(n, getWidth(), getHeight());
             level.realizeSprites(getScene(), catalog, projection);
             boardRealized = true;
+        }
+        if (arcadeBehavior && level.getMode() == GameLevel.MODE_2D) {
+            updateArcade(deltaSeconds);
         }
         onUpdate(deltaSeconds);
     }
@@ -201,6 +221,276 @@ public class GameSceneView extends GameView {
     /// the standard "game over" test (false while lives are uninitialized).
     public boolean isGameOver() {
         return lives == 0;
+    }
+
+    // ---- opt-in 2D arcade behavior ---------------------------------------
+    // The editor's Live preview play-tests a level with built-in arcade behavior
+    // (gravity, run/jump, tile collision, enemy patrol, pickups). That same
+    // behavior is OFF by default at runtime so board/3D/your-own games are not
+    // affected -- turn it on with setArcadeBehavior(true) and "what you preview is
+    // what ships". Each piece is a protected hook you can override (or ignore the
+    // lot and drive everything from onUpdate).
+
+    /// Enables (or disables) the built-in 2D arcade behavior -- gravity, run/jump,
+    /// tile collision, enemy patrol and pickups -- that the editor preview shows.
+    /// Off by default. Has no effect on board or 3D levels.
+    public GameSceneView setArcadeBehavior(boolean on) {
+        this.arcadeBehavior = on;
+        return this;
+    }
+
+    public boolean isArcadeBehavior() {
+        return arcadeBehavior;
+    }
+
+    /// Whether the arcade behavior scrolls the scene camera to follow the player
+    /// (on by default) -- this is what makes a parallax background scroll.
+    public GameSceneView setFollowCamera(boolean on) {
+        this.followCamera = on;
+        return this;
+    }
+
+    /// Runs one arcade frame: player physics, enemy patrol, pickups, and the
+    /// follow camera. Called automatically before `#onUpdate(double)` when
+    /// `#setArcadeBehavior(boolean)` is on and the level is 2D.
+    protected void updateArcade(double deltaSeconds) {
+        Sprite player = arcadePlayer();
+        if (player != null) {
+            updatePlayer(player, deltaSeconds);
+            checkPickups(player);
+        }
+        updateEnemies(deltaSeconds);
+        if (player != null && followCamera) {
+            int ts = Math.max(4, level.getTileSize());
+            int camX = (int) Math.round(player.getX() - getWidth() / 2.0);
+            int maxX = level.getCols() * ts - getWidth();
+            if (camX < 0) {
+                camX = 0;
+            }
+            if (maxX > 0 && camX > maxX) {
+                camX = maxX;
+            }
+            getScene().setCamera(camX, 0);
+        }
+    }
+
+    /// The player sprite the arcade behavior drives: an element flagged
+    /// `player = true` wins, else the first `player`/`hero` asset. Cached; also
+    /// seeds `#setLives(int)` from the player's `lives` property on first resolve.
+    protected Sprite arcadePlayer() {
+        if (arcadePlayer != null) {
+            return arcadePlayer;
+        }
+        Scene scene = getScene();
+        Sprite found = null;
+        for (int i = 0; i < scene.size() && found == null; i++) {
+            GameElement el = elementOf(scene.get(i));
+            if (el != null && el.getBoolean("player", false)) {
+                found = scene.get(i);
+            }
+        }
+        if (found == null) {
+            found = findByAsset("player");
+        }
+        if (found == null) {
+            found = findByAsset("hero");
+        }
+        if (found != null) {
+            arcadePlayer = found;
+            if (!playerStartCaptured) {
+                playerStartX = found.getX();
+                playerStartY = found.getY();
+                playerStartCaptured = true;
+            }
+            if (lives < 0) {
+                GameElement el = elementOf(found);
+                setLives(el == null ? 3 : el.getInt("lives", 3));
+            }
+        }
+        return arcadePlayer;
+    }
+
+    /// Default player physics: run with Left/Right, jump on Up/Fire (edge-triggered),
+    /// gravity from the level's `gravity` property, jump height from the player's
+    /// `jumpHeight` property, stopped by solid tiles, respawning if it falls out.
+    /// Override to change movement, or `#setArcadeBehavior(boolean)` off to opt out.
+    protected void updatePlayer(Sprite player, double deltaSeconds) {
+        int ts = Math.max(4, level.getTileSize());
+        GameElement el = elementOf(player);
+        AssetDef def = catalog == null || el == null ? null : catalog.def(el.getAssetId());
+        double hw = (def == null ? ts : def.getWidth()) / 2.0;
+        double hh = (def == null ? ts : def.getHeight()) / 2.0;
+        double grav = level.getDouble("gravity", 9.8) * 132;
+        double speed = level.getDouble("walkSpeed", 170);
+        double jump = (el == null ? 110 : el.getInt("jumpHeight", 110)) * 4;
+
+        boolean left = getInput().isGameKeyDown(Display.GAME_LEFT);
+        boolean right = getInput().isGameKeyDown(Display.GAME_RIGHT);
+        boolean up = getInput().isGameKeyDown(Display.GAME_UP) || getInput().isGameKeyDown(Display.GAME_FIRE);
+        pvx = ((right ? 1 : 0) - (left ? 1 : 0)) * speed;
+        if (up && !jumpHeld && grounded) {
+            pvy = -jump;
+            grounded = false;
+        }
+        jumpHeld = up;
+        pvy += grav * deltaSeconds;
+        if (pvy > 1000) {
+            pvy = 1000;
+        }
+
+        double nx = player.getX() + pvx * deltaSeconds;
+        if (!isSolidAt(nx, player.getY(), hw, hh)) {
+            player.setX(nx);
+        }
+        double ny = player.getY() + pvy * deltaSeconds;
+        if (!isSolidAt(player.getX(), ny, hw, hh)) {
+            player.setY(ny);
+            grounded = false;
+        } else {
+            if (pvy > 0) {
+                grounded = true;
+            }
+            pvy = 0;
+        }
+        double maxX = level.getCols() * ts - hw;
+        if (player.getX() < hw) {
+            player.setX(hw);
+        }
+        if (player.getX() > maxX) {
+            player.setX(maxX);
+        }
+        if (player.getY() > level.getRows() * ts + hh * 3) {
+            player.setPosition(playerStartX, playerStartY);
+            pvy = 0;
+        }
+    }
+
+    /// Default enemy behavior: every `#isEnemy(String)` sprite patrols horizontally
+    /// at its `speed` property, turning at walls and level edges.
+    protected void updateEnemies(double deltaSeconds) {
+        int ts = Math.max(4, level.getTileSize());
+        Scene scene = getScene();
+        for (int i = 0; i < scene.size(); i++) {
+            Sprite s = scene.get(i);
+            GameElement el = elementOf(s);
+            if (el == null || !isEnemy(el.getAssetId())) {
+                continue;
+            }
+            Double d = enemyDir.get(el.getId());
+            double dir = d == null ? 1.0 : d.doubleValue();
+            AssetDef def = catalog == null ? null : catalog.def(el.getAssetId());
+            double hw = (def == null ? ts : def.getWidth()) / 2.0;
+            double hh = (def == null ? ts : def.getHeight()) / 2.0;
+            double spd = el.getDouble("speed", 60);
+            double nx = s.getX() + dir * spd * deltaSeconds;
+            if (isSolidAt(nx, s.getY(), hw, hh) || nx < hw || nx > level.getCols() * ts - hw) {
+                dir = -dir;
+            } else {
+                s.setX(nx);
+            }
+            enemyDir.put(el.getId(), Double.valueOf(dir));
+        }
+    }
+
+    /// Default pickups: when the player overlaps a `#isCollectible(String)` sprite,
+    /// `#onPickup(Sprite)` fires (scores and consumes it); when it overlaps an
+    /// `#isEnemy(String)` sprite, `#onPlayerHit(Sprite)` fires (costs a life).
+    protected void checkPickups(Sprite player) {
+        int ts = Math.max(4, level.getTileSize());
+        GameElement pel = elementOf(player);
+        AssetDef pd = catalog == null || pel == null ? null : catalog.def(pel.getAssetId());
+        double phw = (pd == null ? ts : pd.getWidth()) / 2.0;
+        double phh = (pd == null ? ts : pd.getHeight()) / 2.0;
+        Scene scene = getScene();
+        for (int i = scene.size() - 1; i >= 0; i--) {
+            Sprite s = scene.get(i);
+            if (s == player) {
+                continue;
+            }
+            GameElement el = elementOf(s);
+            if (el == null) {
+                continue;
+            }
+            String id = el.getAssetId();
+            boolean coll = isCollectible(id);
+            if (!coll && !isEnemy(id)) {
+                continue;
+            }
+            AssetDef def = catalog == null ? null : catalog.def(id);
+            double hw = (def == null ? ts : def.getWidth()) / 2.0;
+            double hh = (def == null ? ts : def.getHeight()) / 2.0;
+            boolean hit = Math.abs(player.getX() - s.getX()) < phw + hw
+                    && Math.abs(player.getY() - s.getY()) < phh + hh;
+            if (!hit) {
+                continue;
+            }
+            if (coll) {
+                if (onPickup(s)) {
+                    scene.remove(s);
+                }
+            } else {
+                onPlayerHit(s);
+            }
+        }
+    }
+
+    /// Called when the player touches a collectible. The default adds the item's
+    /// `value` property to the score and returns `true` to consume it. Override for
+    /// power-ups: read the asset id / properties, change state, and return whether
+    /// to remove the item.
+    protected boolean onPickup(Sprite item) {
+        GameElement el = elementOf(item);
+        addScore(el == null ? 0 : el.getInt("value", 10));
+        return true;
+    }
+
+    /// Called when the player touches an enemy. The default costs a life and
+    /// respawns the player at its start. Override for HP, knockback, invulnerability
+    /// frames, checkpoints or a death screen.
+    protected void onPlayerHit(Sprite enemy) {
+        loseLife();
+        if (arcadePlayer != null) {
+            arcadePlayer.setPosition(playerStartX, playerStartY);
+            pvy = 0;
+        }
+    }
+
+    /// Whether an asset id is a collectible (the default arcade behavior scores and
+    /// removes it). Defaults to `coin`/`gem`/`star`/`token`; override to add yours.
+    protected boolean isCollectible(String assetId) {
+        return assetId != null && (assetId.equals("coin") || assetId.equals("gem")
+                || assetId.equals("star") || assetId.equals("token"));
+    }
+
+    /// Whether an asset id is an enemy (the default arcade behavior patrols it and
+    /// costs a life on contact). Defaults to `slime`/`enemy*`/`npc*`; override yours.
+    protected boolean isEnemy(String assetId) {
+        return assetId != null && (assetId.equals("slime") || assetId.equals("enemy")
+                || assetId.startsWith("enemy") || assetId.startsWith("npc"));
+    }
+
+    /// Whether a box centered at `(cx, cy)` with half-size `(hw, hh)` overlaps any
+    /// solid tile (a non-empty cell of a visible tile layer). The collision query
+    /// the default player/enemy physics uses; override for one-way platforms etc.
+    protected boolean isSolidAt(double cx, double cy, double hw, double hh) {
+        int ts = Math.max(4, level.getTileSize());
+        int c0 = (int) Math.floor((cx - hw + 1) / ts);
+        int c1 = (int) Math.floor((cx + hw - 1) / ts);
+        int r0 = (int) Math.floor((cy - hh + 1) / ts);
+        int r1 = (int) Math.floor((cy + hh - 1) / ts);
+        for (int r = r0; r <= r1; r++) {
+            for (int c = c0; c <= c1; c++) {
+                for (Layer l : level.layers()) {
+                    // only tile layers in the play plane collide; a parallax background
+                    // (clouds, mountains) is decoration, not a wall.
+                    if (l.getKind() == Layer.KIND_TILE && l.isVisible()
+                            && l.getParallaxX() == 1f && l.getParallaxY() == 1f && l.getTile(c, r) != null) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /// {@inheritDoc} For a 3D level, configures the camera + light and builds the models.

@@ -73,6 +73,7 @@ class CompanionCodeGenTest {
         assertTrue(src.contains("protected Sprite slime;"), "field for named slime");
         assertTrue(src.contains("player = findByName(\"player\");"), "wires player field");
         assertTrue(src.contains("setLives(elementOf(player).getInt(\"lives\", 3));"), "seeds lives");
+        assertTrue(src.contains("setArcadeBehavior(true);"), "2D scene enables arcade behavior");
         // unnamed element gets no field
         assertFalse(src.contains("Sprite coin;"), "no field for unnamed element");
     }

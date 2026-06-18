@@ -10,10 +10,13 @@
         { "id": "crate",  "name": "Crate",  "kind": "tile", "color": "#C9923F" },
         { "id": "ladder", "name": "Ladder", "kind": "tile", "color": "#9A7B4F" },
         { "id": "spike",  "name": "Spike",  "kind": "tile", "color": "#9AA7B8" },
+        { "id": "cloud",    "name": "Cloud",    "kind": "tile", "color": "#E8F0FF" },
+        { "id": "mountain", "name": "Mountain", "kind": "tile", "color": "#8A93A8" },
+        { "id": "hill",     "name": "Hill",     "kind": "tile", "color": "#5A8F57" },
         { "id": "coin",   "name": "Coin",   "kind": "actor", "w": 24, "h": 24, "color": "#F6C944", "defaults": { "value": 10 } },
         { "id": "gem",    "name": "Gem",    "kind": "actor", "w": 24, "h": 24, "color": "#43C6E0", "defaults": { "value": 50 } },
         { "id": "player", "name": "Player", "kind": "actor", "w": 28, "h": 32, "color": "#4D86FF", "unique": true, "defaults": { "lives": 3, "jumpHeight": 96 } },
-        { "id": "slime",  "name": "Enemy",  "kind": "actor", "w": 30, "h": 24, "color": "#7BCB4F", "defaults": { "speed": 1.5, "patrol": 64 } },
+        { "id": "slime",  "name": "Enemy",  "kind": "actor", "w": 30, "h": 24, "color": "#7BCB4F", "defaults": { "speed": 50, "patrol": 64 } },
         { "id": "door",   "name": "Door",   "kind": "actor", "w": 32, "h": 48, "color": "#8A5A33", "defaults": { "target": "Level 2" } },
         { "id": "flag",   "name": "Goal",   "kind": "actor", "w": 28, "h": 44, "color": "#E0466A", "defaults": { "target": "Level 2" } }
       ]

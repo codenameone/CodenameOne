@@ -76,6 +76,9 @@ public final class AssetArt {
             case "water" -> water(g, w, h, c);
             case "wall", "rock", "block", "pillar" -> block(g, w, h, c);
             case "tree", "tree3d" -> tree(g, w, h, c);
+            case "cloud" -> cloud(g, w, h, c);
+            case "mountain" -> mountain(g, w, h, c);
+            case "hill" -> hill(g, w, h, c);
             case "coin" -> coin(g, w, h, c);
             case "gem" -> gem(g, w, h, c);
             case "player", "hero", "spawn", "npc" -> figure(g, w, h, c);
@@ -205,6 +208,31 @@ public final class AssetArt {
         g.fillArc(0, 0, w, (int) (h * 0.75), 0, 360);
         g.setColor(shade(c, 1.25));
         g.fillArc(w / 6, h / 12, w / 2, h / 3, 0, 360);
+    }
+
+    private static void cloud(Graphics g, int w, int h, int c) {
+        g.setColor(shade(c, 0.92));
+        g.fillArc(0, h / 3, w * 2 / 3, h * 2 / 3, 0, 360);
+        g.fillArc(w / 3, h / 4, w * 2 / 3, h * 3 / 4, 0, 360);
+        g.fillArc(w / 5, h / 2, w / 2, h / 2, 0, 360);
+        g.setColor(c);
+        g.fillArc(w / 4, h / 3, w / 3, h / 3, 0, 360);
+    }
+
+    private static void mountain(Graphics g, int w, int h, int c) {
+        g.setColor(c);
+        g.fillPolygon(new int[]{0, w / 2, w}, new int[]{h, 0, h}, 3);
+        g.setColor(shade(c, 0.8));   // shaded right face
+        g.fillPolygon(new int[]{w / 2, w, w / 2}, new int[]{0, h, h}, 3);
+        g.setColor(shade(c, 1.5));   // snow cap
+        g.fillPolygon(new int[]{w / 2, w * 5 / 8, w * 3 / 8}, new int[]{0, h / 4, h / 4}, 3);
+    }
+
+    private static void hill(Graphics g, int w, int h, int c) {
+        g.setColor(c);
+        g.fillArc(-w / 4, h / 3, w * 3 / 2, h * 2, 0, 360);
+        g.setColor(shade(c, 1.12));
+        g.fillArc(w / 6, h / 2, w / 2, h, 0, 360);
     }
 
     private static void coin(Graphics g, int w, int h, int c) {

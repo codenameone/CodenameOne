@@ -86,7 +86,7 @@ public final class StarterPacks {
             }
             default -> {
                 level.setGrid(26, 16, 32);
-                level.addLayer(new Layer("Background", Layer.KIND_TILE).setBand(0));
+                level.addLayer(new Layer("Background", Layer.KIND_TILE).setBand(0).setParallax(0.4f, 0.6f));
                 level.addLayer(new Layer("Terrain", Layer.KIND_TILE).setBand(1));
                 level.addLayer(new Layer("Items", Layer.KIND_ENTITY).setBand(2));
                 level.addLayer(new Layer("Actors", Layer.KIND_ENTITY).setBand(3));

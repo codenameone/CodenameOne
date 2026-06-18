@@ -12,7 +12,7 @@ feed_html: '<img src="https://www.codenameone.com/blog/gamebuilder/game-platform
 
 Most game tutorials make you hand-place every sprite in code. The [Game Builder](/manual/game-builder/) flips that around: you **draw** the level visually, tag objects with the numbers your game needs (`lives`, `value`, `speed`), and the editor saves it as a small data file that the runtime plays. Your code shrinks to the part that's actually *yours* — the rules.
 
-This is the first of three tutorials. We'll build **Coin Run**: a side-scroller where the player runs right across a grassy floor, collects three coins, dodges a slime, and reaches a flag to win. By the end you'll have a *running game* and understand every moving part — the level file, the generated companion class, the default physics you get for free, and where your own logic goes. Tutorials [2 (board game)](/blog/game-builder-board-game/) and [3 (3D dungeon)](/blog/game-builder-3d-dungeon/) build on it.
+This is the first of three tutorials. We'll build **Coin Run**: a side-scroller where the player runs right across a grassy floor, collects three coins, dodges a slime, and reaches a flag to win. By the end you'll have a *running game* and understand every moving part — the level file, the generated companion class, the built-in arcade behavior, and where your own logic goes. Tutorials [2 (board game)](/blog/game-builder-board-game/) and [3 (3D dungeon)](/blog/game-builder-3d-dungeon/) build on it.
 
 ## Why a game builder?
 
@@ -50,37 +50,54 @@ If you scaffolded with `-Dmode=2d` the scene is ready; otherwise pick **New scen
 
 ![A new 2D platformer scene](/blog/gamebuilder/platformer-1-new-scene.png)
 
+## Assets: what they are and where they come from
+
+Before you paint, a word on the **Asset Library** — "the art you stamp down" deserves a real answer. An *asset* is a reusable template: an id (`grass`, `player`, `coin`), a size, a kind (a grid **tile** or a freely placed **actor**), and default properties. You stamp instances of it into the level; each instance just references the asset by id, so editing the asset updates them all.
+
+Where does the art come from? Two paths ship today:
+
+* **Drawn in code.** The starter packs (Platformer, Top-Down, Board, 3D Kit) have *no image files* — each sprite is painted with plain `Graphics` calls when the catalog loads. That's why they render identically on every Codename One platform with nothing to bundle, and why the editor looks exactly like the device.
+* **Your own images.** Click **Import** in the Asset Library and pick a PNG; the editor decodes it, adds it to a *Custom* pack, and saves it under `src/main/resources/games/assets/` (reloaded on next launch). This is how you bring in real artwork.
+
+Packs themselves are plain JSON (`/gamebuilder-packs.json`) — id, name, size, color and defaults per asset — so you can hand-author a pack or tweak one in a text editor and supply the image yourself with `catalog.setImage(id, image)`. Need more art? Draw it, import PNGs, or grab openly licensed sprite sheets (check the license). The developer guide's *Game Assets* chapter documents the format in full. (An `AssetDef` also has a `source` field meant for a future build-time vector/animated transcode — it isn't wired into the pipeline yet, so today the two live paths are code-drawn art and imported PNGs.)
+
 ## Step 2 — Paint the ground
 
 Select the **Terrain** layer, pick the **Grass** tile, and drag across the bottom row. *Why a tile layer?* Tiles are a compact grid of `assetId`-per-cell — perfect for a floor of identical blocks — and the runtime batch-renders them, so a long floor costs almost nothing. Leave a gap or raise a few tiles to make a ledge to jump.
 
 ![Painting a grass floor](/blog/gamebuilder/platformer-2-ground.png)
 
-## Step 3 — Place the player and give it behavior
+## Step 3 — A parallax background (clouds and mountains)
 
-Select the **Actors** layer, pick **Player**, and click where it starts. *Actors* are freely positioned objects (not grid-snapped like tiles), because a character lives at an arbitrary point and moves smoothly. With the player selected, open the Inspector's **Behavior** section and set the numbers your code will read: `lives = 3` and `jumpHeight = 110`. Use **Add property** for any custom field — these are just typed key/value pairs stored with the object.
+The bottom **Background** layer scrolls *slower* than the rest — a real parallax effect that gives the scene depth. Select it, then paint **Mountain** along the horizon and a few **Cloud** tiles up in the sky. This isn't a painted-on trick: every layer carries its own **parallax factor** (the Background layer ships at `0.4`), and the renderer offsets each layer by `camera × factor`, so distant tiles drift behind the action as the camera follows the player. A parallax layer is decoration — its tiles never block the player, unlike the solid Terrain.
+
+![A parallax mountain-and-cloud background](/blog/gamebuilder/platformer-2b-background.png)
+
+## Step 4 — Place the player and give it behavior
+
+Select the **Actors** layer, pick **Player**, and click where it starts. *Actors* are freely positioned objects (not grid-snapped like tiles), because a character lives at an arbitrary point and moves smoothly. Give it the **Name** `player` (the editor turns each named object into a field you can use in code), then open the Inspector's **Behavior** section and set the numbers your code reads: `lives = 3` and `jumpHeight = 110`. Use **Add property** for any custom field — these are just typed key/value pairs stored with the object.
 
 ![Placing the player and setting behavior values](/blog/gamebuilder/platformer-3-player.png)
 
-## Step 4 — Add coins to collect
+## Step 5 — Add coins to collect
 
-Pick **Coin** and stamp three above the floor. Give each a `value` (say `10`) in its Behavior section — that's the score it's worth. Coins are the *task*: the reason to move across the level. The preview already collects them on contact (a built-in behavior), so you can test immediately.
+Pick **Coin** and stamp three above the floor. Give each a `value` (say `10`) in its Behavior section — that's the score it's worth. Coins are the *task*: the reason to move across the level. The built-in arcade behavior collects them on contact and adds their `value` to the score, so you can test immediately.
 
 ![Stamping coins to collect](/blog/gamebuilder/platformer-4-coins.png)
 
-## Step 5 — Add an enemy and a goal
+## Step 6 — Add an enemy and a goal
 
 A game needs stakes and an end. Pick **Slime** and place it on the floor to the right; give it `speed = 40` so it patrols. Then pick **Flag** and place it at the far edge — reaching it is winning. Now the level has a loop: *run right, grab coins, time your jump past the slime, touch the flag.*
 
 ![Adding a patrolling slime enemy and a goal flag](/blog/gamebuilder/platformer-5-enemy-goal.png)
 
-## Step 6 — Scene-wide rules
+## Step 7 — Scene-wide rules
 
 Deselect everything to edit the whole level. In the Inspector set **Gravity** (try `9.8`) and the **Background** (Sky). Gravity is a level property the platformer physics reads — raise it for a heavier, snappier feel, lower it for floaty moon-jumps.
 
 ![Scene-wide gravity and background](/blog/gamebuilder/platformer-6-scene.png)
 
-## Step 7 — Play it
+## Step 8 — Play it
 
 Press **Live**. Move with the **arrow keys**, **Up / Space** to jump. Gravity and tile collision are simulated, coins add to the SCORE, and the slime patrols. **Stop** returns to editing — playing never mutates your level.
 
@@ -123,6 +140,7 @@ public class CoinRun extends GameSceneView {
     public CoinRun(AssetCatalog catalog) {
         super(loadLevel(), catalog);   // realizes the level into a Scene of Sprites
         initScene();
+        setArcadeBehavior(true);       // built-in run/jump/gravity/patrol/pickups (2D)
     }
 
     //-- GAMEBUILDER GENERATED - DO NOT EDIT BELOW
@@ -151,7 +169,7 @@ public class CoinRun extends GameSceneView {
 }
 ```
 
-You don't write `findByName`/`setLives` yourself — the editor regenerates that block every time you save, so renaming or adding objects in the Inspector just updates your fields.
+You don't write `findByName`/`setLives` yourself — the editor regenerates that block every time you save, so renaming or adding objects in the Inspector just updates your fields. The `setArcadeBehavior(true)` call is the important one: for a 2D scene the editor turns on the same gravity, run, jump, patrol and pickup behavior you play-tested in the preview, so the generated game is **playable before you write a line of logic**. (More on opting out below.)
 
 `GameSceneView` is a `GameView` (a Codename One `Component`), so you show it like any other and `start()` its loop:
 
@@ -167,17 +185,25 @@ public class CoinRunApp {
 }
 ```
 
-That's a complete, playable game already — the floor, coins, slime and flag are live sprites, with the default behaviors below running. Everything after this is *your* rules.
+That's a complete, playable game already — the floor, coins, slime and flag are live sprites, and because the constructor called `setArcadeBehavior(true)` the player runs, jumps and falls, the slime patrols, and coins score on contact. Everything after this is *your* rules.
 
-## What you get for free (default behavior)
+## Preview, runtime, and the arcade behavior
 
-`GameSceneView` realizes every `GameElement` into a `Sprite` whose `getUserData()` is the source element — so at runtime you still have the `lives`/`value`/`speed` numbers you typed in the editor. The starter behaviors (gravity, tile collision, arrow-key movement, jump, coin pickup, enemy patrol) are what you saw in the preview. You override or extend them in `onUpdate(double deltaSeconds)`, called once per frame.
+One thing worth being precise about, because it trips people up: **the editor's Live preview and a shipped `GameSceneView` are two different runtimes.** The preview is a play-test simulator built into the editor; a shipped game is your companion class. So a bare `GameSceneView` does *nothing* automatically except realize the level and call your `onUpdate` each frame — it has no built-in gravity or movement of its own.
 
-`GameSceneView` also hands you the small helpers every game loop needs, so you never re-roll them: `findByAsset(id)` and `findByName(name)` locate a sprite, `findAllByAsset(id)` returns every match, `elementOf(sprite)` reads its editor properties, `overlaps(a, b)` is a null-safe collision test, and `addScore`/`getScore`/`loseLife`/`getLives`/`isGameOver` track the usual game state. They're all `protected`, so the rules below read like rules — not plumbing.
+What makes them match is `setArcadeBehavior(true)`. It enables, at runtime, the exact behavior the preview shows:
 
-## Your rules — coins, the slime, and winning
+* **Gravity** from the level's `gravity` property and **run** (Left/Right) at `walkSpeed`.
+* **Jump** (Up / Space / Fire) using the player's `jumpHeight`, with **tile collision** against the solid Terrain (parallax background layers don't block).
+* **Enemy patrol** for every `slime`/`enemy*`/`npc*`, turning at walls.
+* **Pickups**: touching a `coin`/`gem`/`star`/`token` scores its `value`; touching an enemy costs a life.
+* A **follow camera** that scrolls to keep the player in view (which is what makes your parallax background drift).
 
-Here's a complete `onUpdate` that scores coins, costs a life when the slime touches you, and wins at the flag. It uses the generated `player` field and the base-class helpers — no boilerplate — and reads the same properties you set in the editor:
+Every one of those is a `protected` method you can override — `updatePlayer`, `updateEnemies`, `onPickup`, `onPlayerHit`, `isCollectible`, `isEnemy`, `isSolidAt` — so "overriding defaults" means *override the hook* (or call `setArcadeBehavior(false)` and do everything yourself). And `GameSceneView` hands you the small helpers every loop needs, so you never re-roll them: `findByAsset(id)`/`findByName(name)` locate a sprite, `findAllByAsset(id)` returns every match, `elementOf(sprite)` reads its editor properties, `overlaps(a, b)` is a null-safe collision test, and `addScore`/`getScore`/`loseLife`/`getLives`/`isGameOver` track game state.
+
+## Your rules — winning, power-ups, and death
+
+The arcade behavior already runs movement, coins and the slime, so your `onUpdate` only has to add what the engine *can't* know: the win condition. Reaching the flag wins:
 
 ```java
 private boolean won;
@@ -187,44 +213,53 @@ protected void onUpdate(double deltaSeconds) {
     if (player == null || won) {
         return;
     }
-    // collect every coin the player touches (value comes from the editor)
-    for (Sprite coin : findAllByAsset("coin")) {
-        if (overlaps(player, coin)) {
-            addScore(elementOf(coin).getInt("value", 10));
-            getScene().remove(coin);
-        }
-    }
-    // the slime costs a life on contact; GameSceneView counts lives for you
-    Sprite slime = findByAsset("slime");
-    if (overlaps(player, slime)) {
-        getScene().remove(slime);
-        if (loseLife() == 0) {
-            gameOver();
-        }
-    }
-    // reaching the flag wins
-    if (overlaps(player, findByAsset("flag"))) {
+    if (overlaps(player, findByAsset("flag"))) {   // the goal
         won = true;
         youWin(getScore());
     }
 }
 ```
 
-That's the whole rule set — about twenty lines, all of it *your* game. Compare it to the old way: no `getUserData()` casts, no scene-scanning loops, no hand-written overlap math.
-
-Want custom movement instead of the default? Poll input directly and move the `player` sprite yourself:
+Everything else is a one-method override of an arcade hook — that's the whole point of "overriding defaults." A **power-up** is just an `onPickup` that branches on the asset id; return `false` to keep an item in the world, `true` to consume it:
 
 ```java
-GameInput in = getInput();
-if (in.isGameKeyDown(Display.GAME_RIGHT)) {
-    player.setX(player.getX() + 120 * deltaSeconds);
-}
-if (in.wasKeyPressed(Display.GAME_FIRE)) {
-    // start a jump
+@Override
+protected boolean onPickup(Sprite item) {
+    GameElement el = elementOf(item);
+    switch (el.getAssetId()) {
+        case "gem"   -> { addScore(el.getInt("value", 50)); return true; }
+        case "star"  -> { invincibleUntil = time() + 5; return true; }   // power-up
+        default      -> { return super.onPickup(item); }                 // coins: default scoring
+    }
 }
 ```
 
-Because you're editing `onUpdate` and not the generated block, re-running `cn1:gamebuilder` to tweak the level **keeps this logic intact**.
+**Hit, HP and respawn** live in `onPlayerHit`. The default costs one life and respawns at the start; override it for hit points, invulnerability frames, a checkpoint, or a death screen:
+
+```java
+private int hp = 3;
+private double checkpointX, checkpointY;
+
+@Override
+protected void onPlayerHit(Sprite enemy) {
+    if (time() < invincibleUntil) {
+        return;                       // a star makes you immune
+    }
+    if (--hp > 0) {
+        player.setPosition(checkpointX, checkpointY);   // back to the last savepoint
+    } else {
+        loseLife();                   // out of HP: lose a life (GameSceneView counts them)
+        hp = 3;
+        if (isGameOver()) {
+            showDeathScreen();
+        }
+    }
+}
+```
+
+A **checkpoint** is just a collision branch in `onUpdate` that records where to respawn — `if (overlaps(player, findByAsset("flag"))) { checkpointX = player.getX(); ... }`. None of this is framework ceremony: it's reading the numbers you set in the editor and calling the same `loseLife`/`isGameOver`/`addScore` helpers the engine uses.
+
+Because you edit `onUpdate` and overrides — not the generated block — re-running `cn1:gamebuilder` to tweak the level **keeps this logic intact**.
 
 ## Physics, effects and overriding defaults
 
@@ -254,20 +289,22 @@ if (getInput().wasKeyPressed(Display.GAME_FIRE)) {
 }
 ```
 
-**Sound and effects.** Play a clip on pickup and add a little juice — the gaming API ships a low-latency `SoundPool`:
+**Sound and effects.** Add a little juice by overriding `onPickup` — the gaming API ships a low-latency `SoundPool`:
 
 ```java
 private final SoundPool sound = SoundPool.create(8);
 private SoundEffect coinSfx;                                   // coinSfx = sound.load("/coin.wav");
 
-// inside the coin branch, instead of a bare remove:
-sound.play(coinSfx);                                           // ping!
-int shake = (int) (Math.random() * 5 - 2);                     // a one-frame screen-shake on a hit
-getScene().setCamera(shake, shake);
-getScene().remove(coin);
+@Override
+protected boolean onPickup(Sprite item) {
+    sound.play(coinSfx);                                      // ping!
+    int shake = (int) (Math.random() * 5 - 2);                // a one-frame screen-shake
+    getScene().setCamera(shake, shake);
+    return super.onPickup(item);                              // keep the default scoring
+}
 ```
 
-**Overriding defaults.** Don't want auto-collected coins or auto-patrolling enemies? Ignore the defaults and drive everything from `onUpdate` (as the custom-movement snippet showed). The defaults are a convenience, not a constraint.
+**Opting out entirely.** The arcade behavior is a convenience, not a constraint. Don't want it? Call `setArcadeBehavior(false)` (or delete it from the constructor) and drive everything from `onUpdate` — poll `getInput().isGameKeyDown(Display.GAME_RIGHT)` and move the `player` sprite yourself. You can also keep the behavior but replace one piece by overriding a single hook (`updatePlayer`, `updateEnemies`, …) — the rest still runs.
 
 ## Menus, HUD and pause — where Codename One spoils you
 

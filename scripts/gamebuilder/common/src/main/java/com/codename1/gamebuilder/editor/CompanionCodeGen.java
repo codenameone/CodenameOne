@@ -104,6 +104,10 @@ public final class CompanionCodeGen {
         if (init.length() == 0) {
             init.append("        // name objects in the editor's Inspector to get fields wired here\n");
         }
+        // a 2D scene gets the built-in arcade behavior (gravity/run/jump/pickups) so the
+        // generated game is immediately playable; remove it to drive everything yourself.
+        String arcade = level != null && level.getMode() == GameLevel.MODE_2D
+                ? "\n        setArcadeBehavior(true);" : "";
         String spriteImport = fieldDecls.length() == 0 ? "" : "import com.codename1.gaming.Sprite;\n";
 
         String body = """
@@ -118,7 +122,7 @@ public final class CompanionCodeGen {
                 public class {CLS} extends GameSceneView {
                     public {CLS}(AssetCatalog catalog) {
                         super(loadLevel(), catalog);
-                        initScene();
+                        initScene();{ARCADE}
                     }
 
                     {BEGIN}
@@ -144,6 +148,7 @@ public final class CompanionCodeGen {
                 """;
         return pkg + body
                 .replace("{SPRITE_IMPORT}", spriteImport)
+                .replace("{ARCADE}", arcade)
                 .replace("{FIELDS}", fieldDecls.toString())
                 .replace("{INIT}", init.toString())
                 .replace("{RES}", gameResourcePath)

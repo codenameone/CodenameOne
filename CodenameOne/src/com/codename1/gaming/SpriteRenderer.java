@@ -418,8 +418,8 @@ public class SpriteRenderer implements Renderer {
     private float[] orthoMatrix(Sprite s) {
         float w = s.getRenderWidth() * s.getScaleX();
         float h = s.getRenderHeight() * s.getScaleY();
-        float worldX = (float) (s.getX() - scene.getCameraX()) - viewWidth / 2f;
-        float worldY = viewHeight / 2f - (float) (s.getY() - scene.getCameraY());
+        float worldX = (float) (s.getX() - scene.getCameraX() * s.getParallaxX()) - viewWidth / 2f;
+        float worldY = viewHeight / 2f - (float) (s.getY() - scene.getCameraY() * s.getParallaxY());
 
         // anchor offset in unit-quad space so the anchor lands at the position
         float[] anchor = Matrix4.translation(0.5f - (float) s.getAnchorX(),
