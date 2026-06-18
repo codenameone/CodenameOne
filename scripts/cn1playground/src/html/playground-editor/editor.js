@@ -785,6 +785,16 @@
 
   function bootstrap(metadataJson, source, language, darkMode, markers, messages, uiids) {
     ensureMonaco(function() {
+      // bootstrap() can be invoked more than once: the editor re-signals "ready"
+      // every 400ms until it sees state.bootstrapped, and on the JS port a "ready"
+      // from ANY editor iframe is delivered to every editor's host handler, so the
+      // host calls bootstrap repeatedly while things settle. Re-running setSource()
+      // on those later calls is destructive -- model.setValue() resets the caret to
+      // 1:1 and (within the change debounce window) can re-push stale text, which is
+      // exactly the "type a char, a second later it bounces to 0,0 / can only type at
+      // the start" symptom. So only seed the source on the FIRST bootstrap; later
+      // bootstraps just refresh non-destructive bits (markers/messages/theme).
+      var alreadyBootstrapped = state.bootstrapped;
       state.metadata = normalizeMetadata(JSON.parse(metadataJson));
       state.language = language || "java";
       state.uiids = uiids || [];
@@ -792,7 +802,9 @@
       if (state.model && state.model.getLanguageId && state.model.getLanguageId() !== state.language) {
         monaco.editor.setModelLanguage(state.model, state.language);
       }
-      setSource(source || "");
+      if (!alreadyBootstrapped) {
+        setSource(source || "");
+      }
       setMarkers(markers || []);
       setInlineMessages(messages || []);
       applyTheme(!!darkMode);

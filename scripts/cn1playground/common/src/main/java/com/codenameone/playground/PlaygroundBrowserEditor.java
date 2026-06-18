@@ -245,6 +245,13 @@ final class PlaygroundBrowserEditor {
         }
         String type = asString(payload.get("type"));
         if ("ready".equals(type)) {
+            // The editor re-signals "ready" every 400ms until it's bootstrapped, and
+            // on the JS port a ready from any editor iframe reaches every editor's
+            // handler. Only bootstrap once -- re-flushing re-runs setSource in the
+            // editor and resets the caret / re-pushes stale text while the user types.
+            if (ready) {
+                return;
+            }
             ready = true;
             flush();
             return;
