@@ -22,8 +22,10 @@
  */
 package com.codename1.gaming.level;
 
+import com.codename1.gaming.AnimatedSprite;
 import com.codename1.gaming.Scene;
 import com.codename1.gaming.Sprite;
+import com.codename1.gaming.SpriteSheet;
 import com.codename1.io.JSONParser;
 import com.codename1.ui.Image;
 
@@ -356,7 +358,7 @@ public class GameLevel {
             if (img == null) {
                 continue;
             }
-            Sprite s = new Sprite(img);
+            Sprite s = makeSprite(catalog, el.getAssetId(), img);
             if (mode == MODE_BOARD && projection != null) {
                 // board elements are placed by their (col,row) stored as x,y
                 placeCell(s, (int) Math.round(el.getX()), (int) Math.round(el.getY()), projection);
@@ -373,6 +375,27 @@ public class GameLevel {
             }
             scene.add(s);
         }
+    }
+
+    /// Builds the runtime sprite for an element: an animated `AnimatedSprite` when the
+    /// asset is a sprite sheet (`AssetDef#TYPE_SHEET`), else a plain `Sprite`.
+    private Sprite makeSprite(AssetCatalog catalog, String assetId, Image img) {
+        if (catalog != null) {
+            AssetDef def = catalog.def(assetId);
+            SpriteSheet sheet = catalog.sheet(assetId);
+            if (def != null && def.isSheet() && sheet != null) {
+                int n = def.getFrameCount() > 0 ? def.getFrameCount() : sheet.getFrameCount();
+                int[] idx = new int[Math.max(1, n)];
+                for (int i = 0; i < idx.length; i++) {
+                    idx[i] = i;
+                }
+                AnimatedSprite anim = new AnimatedSprite(sheet, idx, 1.0 / Math.max(1.0, def.getFps()));
+                anim.setLooping(true);
+                anim.play();
+                return anim;
+            }
+        }
+        return new Sprite(img);
     }
 
     private void placeCell(Sprite s, int col, int row, IsoProjection projection) {

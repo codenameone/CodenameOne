@@ -26,6 +26,7 @@ import com.codename1.gaming.GameView;
 import com.codename1.gaming.Model;
 import com.codename1.gaming.Scene;
 import com.codename1.gaming.Sprite;
+import com.codename1.gpu.GltfLoader;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
@@ -518,6 +519,7 @@ public class GameSceneView extends GameView {
     /// `com.codename1.gpu.GltfLoader`) keyed off the element's asset id.
     protected void buildModels(GraphicsDevice device) {
         Mesh cube = Primitives.cube(device, 1f);
+        Map<String, Mesh> meshCache = new HashMap<String, Mesh>();
         for (int i = 0; i < level.elements().size(); i++) {
             GameElement el = level.elements().get(i);
             int color = 0xffcccccc;
@@ -525,13 +527,34 @@ public class GameSceneView extends GameView {
             if (def != null) {
                 color = def.getColor();
             }
+            Mesh mesh = meshFor(device, el.getAssetId(), cube, meshCache);
             Material mat = new Material(Material.Type.LAMBERT).setColor(color);
-            Model model = new Model(cube, mat);
+            Model model = new Model(mesh, mat);
             model.setPosition((float) el.getX(), (float) el.getY(), (float) el.getZ());
             model.setScale(el.getScaleX(), el.getScaleY(), el.getScaleZ());
             model.setRotation(0, el.getRotation(), 0);
             model.setUserData(el);
             addModel(model);
         }
+    }
+
+    /// The mesh for an asset: a real glTF/glb mesh (`AssetDef#TYPE_MESH`) loaded from the
+    /// catalog and cached per asset id, falling back to the shared unit cube when the
+    /// asset has no mesh or it fails to load.
+    private Mesh meshFor(GraphicsDevice device, String assetId, Mesh cube, Map<String, Mesh> cache) {
+        byte[] glb = catalog == null ? null : catalog.meshData(assetId);
+        if (glb == null) {
+            return cube;
+        }
+        Mesh m = cache.get(assetId);
+        if (m == null) {
+            try {
+                m = GltfLoader.load(device, glb);
+            } catch (Exception ex) { //NOPMD - a bad mesh falls back to the cube
+                m = cube;
+            }
+            cache.put(assetId, m);
+        }
+        return m;
     }
 }

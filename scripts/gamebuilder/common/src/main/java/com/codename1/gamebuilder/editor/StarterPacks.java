@@ -24,6 +24,7 @@ package com.codename1.gamebuilder.editor;
 
 import com.codename1.gaming.level.AssetCatalog;
 import com.codename1.gaming.level.AssetDef;
+import com.codename1.gaming.level.AssetPack;
 import com.codename1.gaming.level.GameElement;
 import com.codename1.gaming.level.GameLevel;
 import com.codename1.gaming.level.Layer;
@@ -50,7 +51,18 @@ public final class StarterPacks {
             if (in == null) {
                 throw new IllegalStateException("missing resource " + RESOURCE);
             }
-            return AssetCatalog.load(in);
+            AssetCatalog catalog = AssetCatalog.load(in);
+            // each starter asset's art is a bundled file at the (flat) resource root,
+            // /<id>.png; default the source so the catalog resolves it (custom imports
+            // set their own source).
+            for (AssetPack pack : catalog.packs()) {
+                for (AssetDef def : pack.assets()) {
+                    if (def.getSource() == null) {
+                        def.setSource(def.getId() + ".png");
+                    }
+                }
+            }
+            return catalog;
         } catch (IOException e) {
             throw new IllegalStateException("failed to read " + RESOURCE, e);
         }
@@ -86,7 +98,8 @@ public final class StarterPacks {
             }
             default -> {
                 level.setGrid(26, 16, 32);
-                level.addLayer(new Layer("Background", Layer.KIND_TILE).setBand(0).setParallax(0.4f, 0.6f));
+                // a freely-placed parallax backdrop (clouds/mountains are big and not grid-snapped)
+                level.addLayer(new Layer("Background", Layer.KIND_ENTITY).setBand(0).setParallax(0.4f, 0.6f));
                 level.addLayer(new Layer("Terrain", Layer.KIND_TILE).setBand(1));
                 level.addLayer(new Layer("Items", Layer.KIND_ENTITY).setBand(2));
                 level.addLayer(new Layer("Actors", Layer.KIND_ENTITY).setBand(3));

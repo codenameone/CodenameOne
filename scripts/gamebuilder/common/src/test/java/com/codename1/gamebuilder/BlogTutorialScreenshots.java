@@ -109,23 +109,24 @@ public final class BlogTutorialScreenshots {
         shot("platformer-2-ground");
 
         // a parallax background: mountains along the horizon and clouds in the sky,
-        // painted on the slow-scrolling Background layer
+        // freely placed on the slow-scrolling Background layer at varied sizes (they're
+        // big and not grid-snapped)
         edit(() -> {
             EditorController c = gb.getController();
             EditorModel m = c.model();
-            int rows = lvl[0].getRows();
-            int cols = lvl[0].getCols();
+            int ts = lvl[0].getTileSize();
+            double horizon = (lvl[0].getRows() - 2) * ts;   // ground top
             m.setActiveLayer("Background");
             m.setSelectedAssetId("mountain");
-            for (int col = 0; col < cols; col += 2) {
-                c.paintTile(col, rows - 4);
-                c.paintTile(col + 1, rows - 3);
-            }
+            mountain(c, 70, horizon, 1.0);
+            mountain(c, 300, horizon, 1.45);
+            mountain(c, 540, horizon, 0.8);
+            mountain(c, 760, horizon, 1.2);
             m.setSelectedAssetId("cloud");
-            c.paintTile(3, 2);
-            c.paintTile(9, 1);
-            c.paintTile(15, 3);
-            c.paintTile(21, 2);
+            place(c, 150, 90, 1.1);
+            place(c, 440, 64, 0.65);
+            place(c, 640, 140, 1.3);
+            place(c, 800, 96, 0.85);
             m.setSelection(null);
         });
         shot("platformer-2b-background");
@@ -163,12 +164,15 @@ public final class BlogTutorialScreenshots {
             EditorModel m = c.model();
             int ts = lvl[0].getTileSize();
             int rows = lvl[0].getRows();
-            // an enemy to dodge and a flag to reach — the goal of the level
+            // an enemy to dodge and a flag to reach — the goal of the level. Naming them
+            // makes the editor generate `slime` and `flag` fields in the companion class.
             m.setSelectedAssetId("slime");
             GameElement slime = c.placeElement(11 * ts, (rows - 3) * ts);
+            slime.setName("slime");
             slime.setProperty("speed", 40);
             m.setSelectedAssetId("flag");
-            c.placeElement((lvl[0].getCols() - 2) * ts, (rows - 3) * ts);
+            GameElement flag = c.placeElement((lvl[0].getCols() - 2) * ts, (rows - 3) * ts);
+            flag.setName("flag");
             m.setSelection(slime);
         });
         shot("platformer-5-enemy-goal");
@@ -498,6 +502,20 @@ public final class BlogTutorialScreenshots {
         } catch (Exception ex) {
             com.codename1.io.Log.e(ex);
         }
+    }
+
+    /// Places the active asset at a pixel position with a per-instance scale.
+    private static GameElement place(EditorController c, double x, double y, double scale) {
+        GameElement e = c.placeElement(x, y);
+        if (e != null) {
+            e.setScale((float) scale);
+        }
+        return e;
+    }
+
+    /// Places a mountain so its base sits on the horizon (mountain art is 120px tall).
+    private static GameElement mountain(EditorController c, double x, double horizon, double scale) {
+        return place(c, x, horizon - 60 * scale, scale);
     }
 
     private static GameElement firstToken() {

@@ -52,14 +52,15 @@ If you scaffolded with `-Dmode=2d` the scene is ready; otherwise pick **New scen
 
 ## Assets: what they are and where they come from
 
-Before you paint, a word on the **Asset Library** — "the art you stamp down" deserves a real answer. An *asset* is a reusable template: an id (`grass`, `player`, `coin`), a size, a kind (a grid **tile** or a freely placed **actor**), and default properties. You stamp instances of it into the level; each instance just references the asset by id, so editing the asset updates them all.
+Before you paint, here's what the **Asset Library** actually holds. An *asset* is a reusable definition: an id (`grass`, `player`, `coin`), a size, a kind (a grid **tile** or a freely placed **actor**), default properties, and a pointer to its **art file**. You stamp instances of it into the level; each instance references the asset by id, so swapping the art updates them all.
 
-Where does the art come from? Two paths ship today:
+Crucially, the art isn't "just a PNG" — an asset declares one of three **formats**, each backed by a real, editable file the runtime loads:
 
-* **Drawn in code.** The starter packs (Platformer, Top-Down, Board, 3D Kit) have *no image files* — each sprite is painted with plain `Graphics` calls when the catalog loads. That's why they render identically on every Codename One platform with nothing to bundle, and why the editor looks exactly like the device.
-* **Your own images.** Click **Import** in the Asset Library and pick a PNG; the editor decodes it, adds it to a *Custom* pack, and saves it under `src/main/resources/games/assets/` (reloaded on next launch). This is how you bring in real artwork.
+* **Image** — a single static `.png`/`.jpg`, realized as a `Sprite`. (Ground, the player, mountains.)
+* **Sprite sheet** — one image laid out as a grid of equal frames plus a frame size and rate; realized as an `AnimatedSprite` that plays the frames. The starter **coin** is a 6-frame sheet, so it spins at runtime with no code.
+* **Mesh** — a glTF/`.glb` model for 3D levels, loaded with `GltfLoader` and realized as a `Model`. (Sprite sheets and mesh loading are existing Codename One features — the asset model just makes them first-class.)
 
-Packs themselves are plain JSON (`/gamebuilder-packs.json`) — id, name, size, color and defaults per asset — so you can hand-author a pack or tweak one in a text editor and supply the image yourself with `catalog.setImage(id, image)`. Need more art? Draw it, import PNGs, or grab openly licensed sprite sheets (check the license). The developer guide's *Game Assets* chapter documents the format in full. (An `AssetDef` also has a `source` field meant for a future build-time vector/animated transcode — it isn't wired into the pipeline yet, so today the two live paths are code-drawn art and imported PNGs.)
+The starter packs ship as ordinary image files (one per asset, plus the coin sheet) bundled with the game, so every starter asset is a file you can open in any editor and replace — there's no art hidden in code. To bring your own image, click **Import** in the Asset Library and pick a PNG/JPG; the editor copies it into your project's `src/main/resources/games/assets/` and adds it to a *Custom* pack. Sprite sheets and glTF meshes are assets too — drop the file into `games/assets/` and add a pack entry naming its `type` (and, for a sheet, its frame size); the starter coin shows the sheet format. Packs are plain JSON (`/gamebuilder-packs.json`) listing each asset's `id`, `kind`, `type`, `source` file and `defaults`, so you can hand-author or tweak one in a text editor, and openly licensed art sets drop straight in. The developer guide's *Game Assets* chapter documents the format in full.
 
 ## Step 2 — Paint the ground
 
@@ -116,18 +117,24 @@ The same level, live in the preview — run right, jump the slime, grab the coin
   "mode": "2d", "cols": 26, "rows": 16, "tileSize": 32,
   "props": { "gravity": 9.8, "background": "Sky" },
   "layers": [
-    { "name": "Terrain", "kind": "tile", "tiles": { "0,14": "grass", "1,14": "grass" } },
-    { "name": "Actors", "kind": "entity" }
+    { "name": "Background", "kind": "entity", "band": 0, "parallaxX": 0.4, "parallaxY": 0.6 },
+    { "name": "Terrain", "kind": "tile", "band": 1, "tiles": { "0,14": "grass", "1,14": "grass" } },
+    { "name": "Items",  "kind": "entity", "band": 2 },
+    { "name": "Actors", "kind": "entity", "band": 3 }
   ],
   "elements": [
-    { "id": "e1", "assetId": "player", "layer": "Actors", "x": 64, "y": 416,
+    { "id": "e1", "assetId": "mountain", "name": "mountain", "layer": "Background",
+      "x": 300, "y": 361, "scaleX": 1.45, "scaleY": 1.45, "scaleZ": 1.45 },
+    { "id": "e2", "assetId": "player", "name": "player", "layer": "Actors", "x": 64, "y": 416,
       "props": { "lives": 3, "jumpHeight": 110 } },
-    { "id": "e2", "assetId": "coin",  "layer": "Actors", "x": 160, "y": 384, "props": { "value": 10 } },
-    { "id": "e7", "assetId": "slime", "layer": "Actors", "x": 352, "y": 416, "props": { "speed": 40 } },
-    { "id": "e8", "assetId": "flag",  "layer": "Actors", "x": 768, "y": 416 }
+    { "id": "e3", "assetId": "coin",  "layer": "Actors", "x": 160, "y": 384, "props": { "value": 10 } },
+    { "id": "e4", "assetId": "slime", "name": "slime", "layer": "Actors", "x": 352, "y": 416, "props": { "speed": 40 } },
+    { "id": "e5", "assetId": "flag",  "name": "flag",  "layer": "Actors", "x": 768, "y": 416 }
   ]
 }
 ```
+
+The named objects (`mountain`, `player`, `slime`, `flag`) become the generated fields below; the `Background` layer's `parallaxX`/`parallaxY` are what make it drift.
 
 Nothing is hard-coded into Java. To re-edit, run `mvn cn1:gamebuilder` again — the editor rewrites this file and *preserves your code*.
 
@@ -146,6 +153,10 @@ public class CoinRun extends GameSceneView {
     //-- GAMEBUILDER GENERATED - DO NOT EDIT BELOW
     /// The "player" object you placed in the editor.
     protected Sprite player;
+    /// The "slime" object you placed in the editor.
+    protected Sprite slime;
+    /// The "flag" object you placed in the editor.
+    protected Sprite flag;
     private static GameLevel loadLevel() {
         try {
             return GameLevel.load(Display.getInstance().getResourceAsStream(CoinRun.class, "/CoinRun.game"));
@@ -156,6 +167,8 @@ public class CoinRun extends GameSceneView {
 
     private void initScene() {
         player = findByName("player");
+        slime = findByName("slime");
+        flag = findByName("flag");
         if (player != null) {
             setLives(elementOf(player).getInt("lives", 3));
         }
@@ -213,7 +226,7 @@ protected void onUpdate(double deltaSeconds) {
     if (player == null || won) {
         return;
     }
-    if (overlaps(player, findByAsset("flag"))) {   // the goal
+    if (overlaps(player, flag)) {   // reach the goal you named "flag"
         won = true;
         youWin(getScore());
     }
@@ -257,7 +270,7 @@ protected void onPlayerHit(Sprite enemy) {
 }
 ```
 
-A **checkpoint** is just a collision branch in `onUpdate` that records where to respawn — `if (overlaps(player, findByAsset("flag"))) { checkpointX = player.getX(); ... }`. None of this is framework ceremony: it's reading the numbers you set in the editor and calling the same `loseLife`/`isGameOver`/`addScore` helpers the engine uses.
+A **checkpoint** is just a collision branch in `onUpdate` that records where to respawn — `if (overlaps(player, flag)) { checkpointX = player.getX(); ... }`. None of this is framework ceremony: it's reading the numbers you set in the editor and calling the same `loseLife`/`isGameOver`/`addScore` helpers the engine uses.
 
 Because you edit `onUpdate` and overrides — not the generated block — re-running `cn1:gamebuilder` to tweak the level **keeps this logic intact**.
 

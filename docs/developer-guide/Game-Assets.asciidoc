@@ -120,58 +120,54 @@ boolean, `source` is the optional art reference, and `defaults` becomes
 
 === Where the art comes from
 
-An `AssetDef` only describes an asset; the actual pixels can come from three places.
+An `AssetDef` names an art *format* -- `TYPE_IMAGE`, `TYPE_SHEET` or `TYPE_MESH` -- and a
+`getSource()` art file. `AssetCatalog.resolveArt()` loads each asset's art from that file
+into the catalog, so the same definition drives the editor palette and a shipped game.
 
-==== Procedural art-as-code (`AssetArt`)
+==== Static images (`TYPE_IMAGE`)
 
-The Game Builder draws its starter-pack sprites in code. `AssetArt.install(catalog)`
-walks every asset in every pack and, for any id that has no image yet, renders a
-recognizable sprite with `Graphics` into a mutable `Image` and registers it via
-`catalog.setImage(id, ...)`. There is a hand-written drawing routine per id -- coins,
-gems, the player/hero figure, slime, brick, crate, grass, ladder, spike, water, tree,
-chest, door, flag, torch, card, token, dice, barrel -- with a generic "chip" fallback for
-anything unrecognized.
+A single `.png`/`.jpg`. `resolveArt()` decodes it; `image(id)` returns it and the level
+realizer wraps it in a `com.codename1.gaming.Sprite`. The starter packs ship one image file
+per asset (at the flat resource root, loaded as `/<id>.png`), so every starter sprite --
+ground, the player, the mountains -- is a real file you can open in any editor and replace.
 
-The big advantage: because it's plain `Graphics` drawing, it runs *identically on every
-platform with no SVG/Lottie transcode dependency*. The trade-off is that the art is
-simple/stylized and authored in Java rather than in an art tool. `AssetArt.install`
-requires a live `Display`, so call it from the UI, not from headless code.
+==== Sprite sheets (`TYPE_SHEET`)
 
-==== Imported images (the editor's Import button)
+One image laid out as a grid of equal frames, plus a frame size and rate (`frameW`,
+`frameH`, `fps`). `resolveArt()` builds a `com.codename1.gaming.SpriteSheet`; the realizer
+creates an animated `com.codename1.gaming.AnimatedSprite` that the scene advances each
+frame. The starter *coin* is a six-frame sheet, so it spins at runtime with no code;
+`image(id)` returns its first frame for the editor palette.
 
-Inside the editor you can import your own artwork. The *Import* action opens the gallery
-(`Display#openGallery`) and hands the chosen image's bytes to
-`GameBuilder.registerImportedAsset(data, displayName)`, which:
+==== Meshes (`TYPE_MESH`)
 
-. decodes the bytes into an `Image` and derives the natural size from it;
-. picks the kind from the active layer (tile layer -> `KIND_TILE`, otherwise
-`KIND_ACTOR`);
-. builds an `AssetDef` with a sanitized, de-duplicated id and `source` set to
-`assets/<id>.png`;
-. adds it to a pack named *Custom* (`ProjectIO.CUSTOM_PACK_ID`, created on first import)
-and re-indexes the catalog so `def(id)` resolves;
-. makes the art usable immediately via `catalog.setImage(id, img)`;
-. when the editor is bound to a project, persists the PNG to
-`<gamesDir>/assets/<id>.png` (`ProjectIO.saveCustomAsset`) and the pack definition to
-`<gamesDir>/custompack.json` (`ProjectIO.saveCustomPack`) so it survives a reload.
+A glTF/`.glb` model for a 3D level. `resolveArt()` keeps the file's bytes and
+`GameSceneView.buildModels` loads them with `com.codename1.gpu.GltfLoader`, realizing a
+`com.codename1.gaming.Model` (and falling back to a primitive cube for an asset that has no
+mesh). Sprite sheets and glTF loading are existing Codename One features; the asset model
+just makes them first-class so the editor and runtime treat them as assets.
 
-On the next launch `ProjectIO.loadCustomPack` reads `custompack.json` back and reloads
-each imported PNG from `<gamesDir>/assets/`, restoring your custom pack into the catalog.
+==== Imported art (the editor's Import button)
 
-==== Vector / animated source art (`source`)
+The *Import* action opens the gallery (`Display#openGallery`) and hands the chosen image's
+bytes to `GameBuilder.registerImportedAsset(...)`, which builds an image `AssetDef` (kind
+from the active layer), adds it to a *Custom* pack and persists the PNG to
+`<gamesDir>/assets/` plus the pack definition to `<gamesDir>/custompack.json`. On the next
+launch `ProjectIO.loadCustomPack` reads them back, so an imported image survives a reload.
+Sprite sheets and glTF meshes are added the same way at the file level -- drop the file into
+`<gamesDir>/assets/` and add a pack entry with the matching `type` (and frame size for a
+sheet); `resolveArt` then loads it like any other asset. (A dedicated sheet/mesh import UI is
+a natural follow-up.)
 
-An `AssetDef` also carries an optional `getSource()` -- a reference to source art such as a
-resource path, or a vector / animated key. Today the two wired paths are the ones above:
-procedural art-as-code for the starter packs and decoded raster images for anything you
-import. The `source` field is the hook a build step would use to transcode vector or
-animated art (the same way Codename One handles SVG and Lottie elsewhere) into a real
-`Image` and wire it in with `setImage`; that transcode step isn't part of the gaming
-asset pipeline yet, so treat `source` as a forward-looking field rather than an active
-path. For crisp art now, import a high-resolution PNG or draw it as code.
+==== Generating the starter images
 
-In every case the catalog falls back to the flat-colour placeholder
-(`AssetCatalog#image`) when no image has been supplied for an id, so a level is never
-un-renderable.
+The bundled starter PNGs are produced once by a build-time generator
+(`StarterArtGenerator`, which draws each sprite with `Graphics` through `AssetArt`) and
+committed as resources -- there's no art-drawing code in the shipped runtime. Re-run the
+generator after changing a starter sprite or pack.
+
+In every case the catalog falls back to the flat-colour placeholder when an asset's art is
+missing, so a level is never un-renderable.
 
 === Creating your own asset
 
@@ -206,13 +202,18 @@ Anything other than `"tile"` is treated as an actor.
 * `color` -- `#rrggbb` placeholder colour used until real art is supplied. Optional.
 * `unique` -- `true` to limit the level to one instance. Optional; default `false`.
 * `defaults` -- a map of default property values copied onto each placed element.
-* `source` -- optional art reference (resource / SVG / Lottie / `assets/<id>.png`).
+* `source` -- the art file the runtime loads: a `.png`/`.jpg` (image, sheet) or a
+`.glb`/`.gltf` (mesh). Optional; the starter packs default it to `<id>.png`.
+* `type` -- `"image"`, `"sheet"` or `"mesh"`. Optional; inferred from `source` (a
+`.glb` is a mesh) or `frameW` (a sheet) when omitted.
+* `frameW` / `frameH` / `frames` / `fps` -- sprite-sheet frame size, frame count
+(0 = all) and playback rate, for a `"sheet"` asset.
 
 You can add this to a copy of `gamebuilder-packs.json`, or build a pack in code with
 `new AssetPack(id, name).add(new AssetDef(...))` and register it with
-`catalog.addPack(pack)`. To give it real art, either supply an image via
-`catalog.setImage("key", image)` or add a drawing case for the id in the art-as-code
-layer.
+`catalog.addPack(pack)`. To give it real art, point `source` at a bundled art file and
+call `catalog.resolveArt()`, or supply an image directly with
+`catalog.setImage("key", image)`.
 
 ==== Path 2: Import an image in the editor
 

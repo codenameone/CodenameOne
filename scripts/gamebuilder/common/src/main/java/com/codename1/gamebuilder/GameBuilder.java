@@ -22,7 +22,6 @@
  */
 package com.codename1.gamebuilder;
 
-import com.codename1.gamebuilder.art.AssetArt;
 import com.codename1.gamebuilder.editor.CompanionCodeGen;
 import com.codename1.gamebuilder.editor.EditorController;
 import com.codename1.gamebuilder.editor.EditorModel;
@@ -159,7 +158,7 @@ public class GameBuilder extends Lifecycle {
         thumb = Display.getInstance().convertToPixels(5f);
 
         AssetCatalog catalog = StarterPacks.loadCatalog();
-        AssetArt.install(catalog);
+        catalog.resolveArt();   // load each asset's real art (PNG / sprite sheet / mesh)
 
         binding = ProjectIO.loadBinding();
         GameLevel initial = StarterPacks.demoLevel();
