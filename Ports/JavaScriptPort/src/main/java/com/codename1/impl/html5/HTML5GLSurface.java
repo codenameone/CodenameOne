@@ -83,6 +83,13 @@ class HTML5GLSurface extends HTML5Peer {
             ctx = canvas.getContext("experimental-webgl", opts); // LINT-ALLOW-CANVAS-BARRIER-READ: one-time legacy context creation
         }
         if (ctx == null) {
+            // Some browsers (notably Firefox configurations where the WebGL 1
+            // path is blocklisted) expose only WebGL 2. A WebGL2RenderingContext
+            // is a superset of WebGLRenderingContext, so every call this device
+            // makes still resolves; try it before giving up.
+            ctx = canvas.getContext("webgl2", opts); // LINT-ALLOW-CANVAS-BARRIER-READ: one-time WebGL2 context creation
+        }
+        if (ctx == null) {
             return null;
         }
         HTML5GLSurface surface = new HTML5GLSurface(canvas, view);

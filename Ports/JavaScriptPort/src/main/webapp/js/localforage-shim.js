@@ -57,14 +57,84 @@
       catch (_e) { /* user callbacks own their errors */ }
     }
   }
+  // Binary helpers. The Codename One Storage layer hands the shim a Uint8Array
+  // of serialised bytes. JSON.stringify(Uint8Array) yields a numeric-keyed
+  // object ({"0":1,"1":0,...}) which JSON.parse revives as a plain object, NOT a
+  // Uint8Array -- so the read path (which checks `instanceof Uint8Array`) failed
+  // with "Unknown object type" and all saved state was unreadable. Encode bytes
+  // as base64 under a distinct "b:" prefix and revive them as a real Uint8Array.
+  function isBytes(v) {
+    return v instanceof Uint8Array
+        || (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView && ArrayBuffer.isView(v) && !(v instanceof DataView))
+        || (v && v.constructor && v.constructor.name === "Uint8Array");
+  }
+  // The Storage layer only ever stores Strings or a byte array, but the
+  // ParparVM<->JS boundary can deliver that byte array as a real Uint8Array OR
+  // as a plain array-like object ({0:..,1:..}); normalise both to a Uint8Array.
+  // Returns null when the value is genuinely not a byte array.
+  function toBytes(v) {
+    if (v == null || typeof v !== "object") { return null; }
+    if (v instanceof Uint8Array) { return v; }
+    if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView && ArrayBuffer.isView(v) && !(v instanceof DataView)) {
+      return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+    }
+    if (typeof ArrayBuffer !== "undefined" && v instanceof ArrayBuffer) { return new Uint8Array(v); }
+    var n;
+    if (typeof v.length === "number") { n = v.length; }
+    else {
+      n = Object.keys(v).length;
+      for (var i = 0; i < n; i++) { if (!(String(i) in v)) { return null; } }
+    }
+    if (n === 0 && !Array.isArray(v) && !(typeof v.length === "number")) { return null; }
+    var u8 = new Uint8Array(n);
+    for (var j = 0; j < n; j++) {
+      var b = v[j];
+      if (typeof b !== "number" || b < 0 || b > 255 || (b | 0) !== b) { return null; }
+      u8[j] = b;
+    }
+    return u8;
+  }
+  function bytesToB64(u8) {
+    if (!(u8 instanceof Uint8Array)) { u8 = new Uint8Array(u8.buffer || u8); }
+    var CHUNK = 0x8000, parts = [];
+    for (var i = 0; i < u8.length; i += CHUNK) {
+      parts.push(String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK)));
+    }
+    return btoa(parts.join(""));
+  }
+  function b64ToBytes(b64) {
+    var bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }
+    return u8;
+  }
+  // Recover a Uint8Array from a legacy "j:" numeric-keyed byte map (state saved
+  // before the "b:" encoding existed). The Storage layer only ever stores
+  // Strings or byte arrays, so a parsed object with sequential 0..n-1 byte-value
+  // keys is unambiguously a mis-encoded Uint8Array.
+  function reviveBytes(o) {
+    if (o == null || typeof o !== "object" || Array.isArray(o)) { return o; }
+    var keys = Object.keys(o), n = keys.length;
+    if (n === 0) { return o; }
+    for (var i = 0; i < n; i++) {
+      if (!(String(i) in o)) { return o; }
+      var v = o[i];
+      if (typeof v !== "number" || v < 0 || v > 255 || (v | 0) !== v) { return o; }
+    }
+    var u8 = new Uint8Array(n);
+    for (var j = 0; j < n; j++) { u8[j] = o[j]; }
+    return u8;
+  }
   function setItemImpl(key, value) {
     var serialised;
     var valType = (value == null) ? "null" : (typeof value);
     var valCtor = (value && value.constructor && value.constructor.name) ? value.constructor.name : valType;
+    var asBytes;
     if (value == null) {
       serialised = null;
     } else if (typeof value === "string") {
       serialised = "s:" + value;
+    } else if ((asBytes = toBytes(value)) != null) {
+      serialised = "b:" + bytesToB64(asBytes);
     } else {
       try { serialised = "j:" + JSON.stringify(value); }
       catch (_e) { serialised = "j:" + JSON.stringify(String(value)); }
@@ -103,9 +173,11 @@
     if (raw.indexOf("s:") === 0) {
       return raw.substring(2);
     }
+    if (raw.indexOf("b:") === 0) {
+      try { return b64ToBytes(raw.substring(2)); } catch (_e) { return null; }
+    }
     if (raw.indexOf("j:") === 0) {
-      try { return JSON.parse(raw.substring(2)); }
-      catch (_e) { return null; }
+      try { return reviveBytes(JSON.parse(raw.substring(2))); } catch (_e) { return null; }
     }
     return raw;
   }

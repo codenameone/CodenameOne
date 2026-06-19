@@ -7633,7 +7633,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return LocalForage.getInstance().openInputStream(wrapped);
     }
     
-    @JSBody(params={"o", "type"}, script="return (o instanceof window[type]);")
+    // Runs in a Web Worker where `window` is a partial shim without built-in
+    // constructors (Blob/Uint8Array); `window[type]` was undefined and the
+    // instanceof threw. Resolve off the real worker global and guard it.
+    @JSBody(params={"o", "type"}, script="var t=(typeof globalThis!=='undefined'?globalThis:self)[type]; return (typeof t==='function')?(o instanceof t):false;")
     private static native boolean instanceOf(JSObject o, String type);
     
     
