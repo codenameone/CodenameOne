@@ -28,9 +28,9 @@
 /// description of a scene that the editor writes and a game loads, decoupled from how
 /// it is drawn.
 ///
-/// A level has a mode -- `GameLevel#MODE_2D` (tile + sprite), `GameLevel#MODE_3D`
+/// A level has a mode -- `GameLevel.Mode#TWO_D` (tile + sprite), `GameLevel.Mode#THREE_D`
 /// (meshes, `TerrainGrid` and `LevelLight`s in a perspective world) or
-/// `GameLevel#MODE_BOARD` (an `IsoProjection` grid) -- ordered `Layer`s (a tile layer
+/// `GameLevel.Mode#BOARD` (an `IsoProjection` grid) -- ordered `Layer`s (a tile layer
 /// paints an `assetId`-per-cell grid; entity / model layers group freely placed
 /// things), a list of `GameElement`s (pure data: an asset id, a transform and a typed
 /// property bag, *not* a `com.codename1.gaming.Sprite`) and an `AssetCatalog` of

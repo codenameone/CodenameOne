@@ -75,7 +75,7 @@ public final class GameWorkflowHarness {
     private static void run() throws Exception {
         AssetCatalog cat = StarterPacks.loadCatalog();
         AssetArt.install(cat);
-        EditorModel model = new EditorModel(StarterPacks.newLevel(GameLevel.MODE_2D), cat);
+        EditorModel model = new EditorModel(StarterPacks.newLevel(GameLevel.Mode.TWO_D), cat);
         model.setSceneName("Arena");
         EditorController c = new EditorController(model);
 
@@ -162,7 +162,7 @@ public final class GameWorkflowHarness {
         check(model.level().elements().size() != n || c.canRedo(), "undo affects the build history");
 
         // --- terrain sculpting (3D): elevation, holes, walls round-trip through JSON ---
-        EditorController t3 = new EditorController(new EditorModel(StarterPacks.newLevel(GameLevel.MODE_3D), cat));
+        EditorController t3 = new EditorController(new EditorModel(StarterPacks.newLevel(GameLevel.Mode.THREE_D), cat));
         t3.paintTerrain(2, 3, com.codename1.gamebuilder.editor.TerrainBrush.RAISE);
         t3.paintTerrain(2, 3, com.codename1.gamebuilder.editor.TerrainBrush.RAISE);
         t3.paintTerrain(4, 4, com.codename1.gamebuilder.editor.TerrainBrush.GROUND);   // carve a hole

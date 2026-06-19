@@ -110,7 +110,7 @@ public final class ScreenshotHarness {
         // canvas, the element reads as one object (not the whole board), and zoom works
         Display.getInstance().callSeriallyAndWait(() -> {
             GameBuilder gb = gbRef[0];
-            GameLevel l3d = StarterPacks.newLevel(GameLevel.MODE_3D);
+            GameLevel l3d = StarterPacks.newLevel(GameLevel.Mode.THREE_D);
             AssetCatalog cat = StarterPacks.loadCatalog();
             int ts = l3d.getTileSize();
             String[][] placements = {

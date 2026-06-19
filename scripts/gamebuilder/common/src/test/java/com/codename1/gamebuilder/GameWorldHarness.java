@@ -112,7 +112,7 @@ public final class GameWorldHarness {
         // GameLevel <-> GameWorld JSON integration (large-world level persists through .game)
         try {
             com.codename1.gaming.level.GameLevel lvl = new com.codename1.gaming.level.GameLevel(
-                    com.codename1.gaming.level.GameLevel.MODE_3D);
+                    com.codename1.gaming.level.GameLevel.Mode.THREE_D);
             GameWorld w = new GameWorld();
             Region home = new Region("home", "Home").setOrigin(0, 0).setSpan(128, 128).link("east", "east-1");
             home.terrain().setHeight(2, 2, 1.5f);

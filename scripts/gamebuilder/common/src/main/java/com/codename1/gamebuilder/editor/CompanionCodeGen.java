@@ -106,7 +106,7 @@ public final class CompanionCodeGen {
         }
         // a 2D scene gets the built-in arcade behavior (gravity/run/jump/pickups) so the
         // generated game is immediately playable; remove it to drive everything yourself.
-        String arcade = level != null && level.getMode() == GameLevel.MODE_2D
+        String arcade = level != null && level.getMode() == GameLevel.Mode.TWO_D
                 ? "\n        setArcadeBehavior(true);" : "";
         String spriteImport = fieldDecls.length() == 0 ? "" : "import com.codename1.gaming.Sprite;\n";
 

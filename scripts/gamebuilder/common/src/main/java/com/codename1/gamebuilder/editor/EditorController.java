@@ -65,7 +65,7 @@ public class EditorController {
     // ---- new / undo / redo ---------------------------------------------------
 
     /// Starts a fresh level for the given `GameLevel` mode, clearing history.
-    public void newLevel(int mode) {
+    public void newLevel(GameLevel.Mode mode) {
         undo.clear();
         redo.clear();
         model.setLevel(StarterPacks.newLevel(mode));
@@ -153,7 +153,7 @@ public class EditorController {
 
     private Layer activeTileLayer() {
         Layer l = model.level().getLayer(model.getActiveLayer());
-        return (l != null && l.getKind() == Layer.KIND_TILE) ? l : null;
+        return (l != null && l.getKind() == Layer.Kind.TILE) ? l : null;
     }
 
     private boolean inGrid(int col, int row) {
@@ -237,12 +237,12 @@ public class EditorController {
     /// elements, otherwise the first such layer.
     private Layer targetElementLayer() {
         Layer active = model.level().getLayer(model.getActiveLayer());
-        if (active != null && active.getKind() != Layer.KIND_TILE) {
+        if (active != null && active.getKind() != Layer.Kind.TILE) {
             return active;
         }
         List<Layer> ls = model.level().layers();
         for (int i = 0; i < ls.size(); i++) {
-            if (ls.get(i).getKind() != Layer.KIND_TILE) {
+            if (ls.get(i).getKind() != Layer.Kind.TILE) {
                 return ls.get(i);
             }
         }
@@ -429,7 +429,7 @@ public class EditorController {
     /// Applies the current terrain brush to one cell (undoable). Returns true if it changed.
     public boolean paintTerrain(int col, int row, TerrainBrush brush) {
         GameLevel l = model.level();
-        if (l.getMode() != GameLevel.MODE_3D || col < 0 || row < 0
+        if (l.getMode() != GameLevel.Mode.THREE_D || col < 0 || row < 0
                 || col >= l.getCols() || row >= l.getRows()) {
             return false;
         }
@@ -459,7 +459,7 @@ public class EditorController {
     /// away to open sky (present=false). Undoable. Only meaningful for MODE_3D.
     public void fillGround(boolean present) {
         GameLevel l = model.level();
-        if (l.getMode() != GameLevel.MODE_3D) {
+        if (l.getMode() != GameLevel.Mode.THREE_D) {
             return;
         }
         TerrainGrid t = ensureTerrain();
@@ -496,7 +496,7 @@ public class EditorController {
     public Layer addEntityLayer(String name) {
         beginEdit();
         int band = model.level().layers().size();
-        Layer layer = new Layer(name, Layer.KIND_ENTITY).setBand(band);
+        Layer layer = new Layer(name, Layer.Kind.ENTITY).setBand(band);
         model.level().addLayer(layer);
         model.setActiveLayer(name);
         model.setDirty(true);
@@ -538,10 +538,10 @@ public class EditorController {
         }
         beginEdit();
         layers.remove(layer);
-        if (layer.getKind() != Layer.KIND_TILE) {
+        if (layer.getKind() != Layer.Kind.TILE) {
             String fallback = null;
             for (Layer l : layers) {
-                if (l.getKind() != Layer.KIND_TILE) {
+                if (l.getKind() != Layer.Kind.TILE) {
                     fallback = l.getName();
                     break;
                 }

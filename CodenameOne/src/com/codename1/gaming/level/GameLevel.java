@@ -42,8 +42,8 @@ import java.util.Map;
 /// A saved, mode-aware game level or map: the data the visual editor writes and the
 /// runtime loads, deliberately decoupled from how it is drawn.
 ///
-/// A level has a `#getMode()` -- `#MODE_2D` (tiles + sprites), `#MODE_3D` (meshes in a
-/// perspective world with terrain and lights) or `#MODE_BOARD` (an isometric grid) --
+/// A level has a `#getMode()` -- `Mode#TWO_D` (tiles + sprites), `Mode#THREE_D` (meshes in a
+/// perspective world with terrain and lights) or `Mode#BOARD` (an isometric grid) --
 /// an `#getAssetPack()` it draws from, a grid size, ordered `Layer`s, freely placed
 /// `GameElement`s, and mode-specific extras (a camera rig, `#lights()`,
 /// `#getTerrain()`). It is pure data: load it with `#load(String)`, edit it,
@@ -52,14 +52,48 @@ import java.util.Map;
 /// `GameSceneView` wires the full lifecycle (including the 3D camera and lights, which
 /// need the GPU device).
 public class GameLevel {
-    /// Orthographic 2D: tile layers + sprites in pixel space.
-    public static final int MODE_2D = 0;
-    /// Perspective 3D: meshes, terrain and lights in a world.
-    public static final int MODE_3D = 1;
-    /// Isometric board: sprites placed through an `IsoProjection`.
-    public static final int MODE_BOARD = 2;
+    /// The kind of a level, which decides how its elements are realized and rendered. Each
+    /// constant carries its JSON wire token (`#wireName()`) and a display `#label()`.
+    public enum Mode {
+        /// Orthographic 2D: tile layers + sprites in pixel space.
+        TWO_D("2d", "2D"),
+        /// Perspective 3D: meshes, terrain and lights in a world.
+        THREE_D("3d", "3D"),
+        /// Isometric board: sprites placed through an `IsoProjection`.
+        BOARD("board", "Board");
 
-    private int mode = MODE_2D;
+        private final String wire;
+        private final String label;
+
+        Mode(String wire, String label) {
+            this.wire = wire;
+            this.label = label;
+        }
+
+        /// The lowercase token this mode is written as in the `.game` JSON (`"2d"` / `"3d"` /
+        /// `"board"`).
+        public String wireName() {
+            return wire;
+        }
+
+        /// A human-readable label for menus (`"2D"` / `"3D"` / `"Board"`).
+        public String label() {
+            return label;
+        }
+
+        /// The mode for a JSON wire token (case-insensitive); defaults to `#TWO_D` for an
+        /// unknown or missing token, so an older or hand-edited file still loads.
+        public static Mode fromWire(String name) {
+            for (Mode m : values()) {
+                if (m.wire.equalsIgnoreCase(name)) {
+                    return m;
+                }
+            }
+            return TWO_D;
+        }
+    }
+
+    private Mode mode = Mode.TWO_D;
     private String assetPack;
     private int cols = 20;
     private int rows = 12;
@@ -86,58 +120,35 @@ public class GameLevel {
     public GameLevel() {
     }
 
-    public GameLevel(int mode) {
-        this.mode = mode;
+    public GameLevel(Mode mode) {
+        this.mode = mode == null ? Mode.TWO_D : mode;
     }
 
     // ---- mode ----------------------------------------------------------------
 
-    public int getMode() {
+    /// This level's `Mode`.
+    public Mode getMode() {
         return mode;
     }
 
-    public GameLevel setMode(int mode) {
-        this.mode = mode;
+    public GameLevel setMode(Mode mode) {
+        this.mode = mode == null ? Mode.TWO_D : mode;
         return this;
     }
 
+    /// True for an orthographic 2D level (`Mode#TWO_D`).
+    public boolean is2D() {
+        return mode == Mode.TWO_D;
+    }
+
+    /// True for a perspective 3D level (`Mode#THREE_D`).
     public boolean is3D() {
-        return mode == MODE_3D;
+        return mode == Mode.THREE_D;
     }
 
+    /// True for an isometric board level (`Mode#BOARD`).
     public boolean isBoard() {
-        return mode == MODE_BOARD;
-    }
-
-    static String modeName(int mode) {
-        if (mode == MODE_3D) {
-            return "3d";
-        }
-        if (mode == MODE_BOARD) {
-            return "board";
-        }
-        return "2d";
-    }
-
-    /// A human-readable label for a mode (`"2D"`, `"3D"`, `"Board"`).
-    public static String modeLabel(int mode) {
-        if (mode == MODE_3D) {
-            return "3D";
-        }
-        if (mode == MODE_BOARD) {
-            return "Board";
-        }
-        return "2D";
-    }
-
-    static int modeFromName(String name) {
-        if ("3d".equalsIgnoreCase(name)) {
-            return MODE_3D;
-        }
-        if ("board".equalsIgnoreCase(name)) {
-            return MODE_BOARD;
-        }
-        return MODE_2D;
+        return mode == Mode.BOARD;
     }
 
     // ---- simple accessors ----------------------------------------------------
@@ -307,26 +318,26 @@ public class GameLevel {
     // ---- realization (2D / board) -------------------------------------------
 
     /// Builds `Sprite`s for the 2D / board content of this level and adds them to the
-    /// scene: every painted tile of each visible `Layer#KIND_TILE` layer plus every
+    /// scene: every painted tile of each visible `Layer.Kind#TILE` layer plus every
     /// `GameElement` whose layer is an entity layer. Each sprite's z-order is its
     /// layer band times 1000 (so a higher layer always draws on top), and its
     /// `Sprite#getUserData()` is the source `GameElement` (for tiles, the source
     /// `Layer`), so an editor can map a picked sprite back to its data.
     ///
-    /// In `#MODE_3D` this is a no-op (3D content is realized by `GameSceneView` once the
-    /// GPU device exists). In `#MODE_BOARD` positions go through `projection` (board
+    /// In `Mode#THREE_D` this is a no-op (3D content is realized by `GameSceneView` once the
+    /// GPU device exists). In `Mode#BOARD` positions go through `projection` (board
     /// elements store their column/row in x/y), so pass a fitted `IsoProjection`.
     public void realizeSprites(Scene scene, AssetCatalog catalog) {
         realizeSprites(scene, catalog, null);
     }
 
     public void realizeSprites(Scene scene, AssetCatalog catalog, IsoProjection projection) {
-        if (mode == MODE_3D) {
+        if (mode == Mode.THREE_D) {
             return;
         }
         // tile layers
         for (Layer layer : layers) {
-            if (layer.getKind() != Layer.KIND_TILE || !layer.isVisible()) {
+            if (layer.getKind() != Layer.Kind.TILE || !layer.isVisible()) {
                 continue;
             }
             int z = layer.getBand() * 1000;
@@ -365,7 +376,7 @@ public class GameLevel {
             if (def != null) {
                 s.setSize(def.getWidth(), def.getHeight());
             }
-            if (mode == MODE_BOARD && projection != null) {
+            if (mode == Mode.BOARD && projection != null) {
                 // board elements are placed by their (col,row) stored as x,y
                 placeCell(s, (int) Math.round(el.getX()), (int) Math.round(el.getY()), projection);
             } else {
@@ -384,7 +395,7 @@ public class GameLevel {
     }
 
     /// Builds the runtime sprite for an element: an animated `AnimatedSprite` when the
-    /// asset is a sprite sheet (`AssetDef#TYPE_SHEET`), else a plain `Sprite`.
+    /// asset is a sprite sheet (`AssetDef.Type#SHEET`), else a plain `Sprite`.
     private Sprite makeSprite(AssetCatalog catalog, String assetId, Image img) {
         if (catalog != null) {
             AssetDef def = catalog.def(assetId);
@@ -405,7 +416,7 @@ public class GameLevel {
     }
 
     private void placeCell(Sprite s, int col, int row, IsoProjection projection) {
-        if (mode == MODE_BOARD && projection != null) {
+        if (mode == Mode.BOARD && projection != null) {
             s.setAnchor(0.5, 0.5);
             s.setPosition(projection.tileCenterX(row, col), projection.tileCenterY(row, col));
         } else {
@@ -454,7 +465,7 @@ public class GameLevel {
         if (root == null) {
             return level;
         }
-        level.mode = modeFromName(Json.str(root.get("mode"), "2d"));
+        level.mode = Mode.fromWire(Json.str(root.get("mode"), "2d"));
         level.assetPack = Json.str(root.get("assetPack"), null);
         level.cols = Json.intval(root.get("cols"), level.cols);
         level.rows = Json.intval(root.get("rows"), level.rows);
@@ -535,7 +546,7 @@ public class GameLevel {
                 if (lm == null) {
                     continue;
                 }
-                Layer layer = new Layer(Json.str(lm.get("name"), "Layer"), kindFromName(Json.str(lm.get("kind"), "entity")));
+                Layer layer = new Layer(Json.str(lm.get("name"), "Layer"), Layer.Kind.fromWire(Json.str(lm.get("kind"), "entity")));
                 layer.setVisible(Json.bool(lm.get("visible"), true));
                 layer.setLocked(Json.bool(lm.get("locked"), false));
                 layer.setBand(Json.intval(lm.get("band"), i));
@@ -587,25 +598,6 @@ public class GameLevel {
                 l.size() > 2 ? (float) Json.num(l.get(2), dz) : dz};
     }
 
-    private static int kindFromName(String name) {
-        if ("tile".equalsIgnoreCase(name)) {
-            return Layer.KIND_TILE;
-        }
-        if ("model".equalsIgnoreCase(name)) {
-            return Layer.KIND_MODEL;
-        }
-        return Layer.KIND_ENTITY;
-    }
-
-    private static String kindName(int kind) {
-        if (kind == Layer.KIND_TILE) {
-            return "tile";
-        }
-        if (kind == Layer.KIND_MODEL) {
-            return "model";
-        }
-        return "entity";
-    }
 
     /// Serializes this level to a compact JSON string (round-trips through
     /// `#load(String)`).
@@ -613,7 +605,7 @@ public class GameLevel {
         StringBuilder sb = new StringBuilder(512);
         sb.append('{');
         kv(sb, "mode");
-        Json.writeString(sb, modeName(mode));
+        Json.writeString(sb, mode.wireName());
         if (assetPack != null) {
             sb.append(',');
             kv(sb, "assetPack");
@@ -635,7 +627,7 @@ public class GameLevel {
             Json.writeValue(sb, props);
         }
 
-        if (mode == MODE_3D) {
+        if (mode == Mode.THREE_D) {
             sb.append(',');
             kv(sb, "camera");
             sb.append("{\"eye\":[");
@@ -734,7 +726,7 @@ public class GameLevel {
             Json.writeString(sb, layer.getName() == null ? "" : layer.getName());
             sb.append(',');
             kv(sb, "kind");
-            Json.writeString(sb, kindName(layer.getKind()));
+            Json.writeString(sb, layer.getKind().wireName());
             sb.append(",\"visible\":").append(layer.isVisible() ? "true" : "false");
             sb.append(",\"locked\":").append(layer.isLocked() ? "true" : "false");
             sb.append(",\"band\":");
@@ -747,7 +739,7 @@ public class GameLevel {
                 sb.append(",\"parallaxY\":");
                 Json.writeNumber(sb, layer.getParallaxY());
             }
-            if (layer.getKind() == Layer.KIND_TILE && !layer.tiles().isEmpty()) {
+            if (layer.getKind() == Layer.Kind.TILE && !layer.tiles().isEmpty()) {
                 sb.append(',');
                 kv(sb, "tiles");
                 sb.append('{');

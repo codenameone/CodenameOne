@@ -33,14 +33,14 @@ class GameLevelTest {
 
     @Test
     void roundTrip2D() throws Exception {
-        GameLevel level = new GameLevel(GameLevel.MODE_2D);
+        GameLevel level = new GameLevel(GameLevel.Mode.TWO_D);
         level.setAssetPack("platformer").setGrid(26, 16, 32);
         level.props().put("gravity", 9.8);
         level.props().put("title", "Pixel Quest");
 
-        Layer terrain = new Layer("Terrain", Layer.KIND_TILE).setBand(1);
+        Layer terrain = new Layer("Terrain", Layer.Kind.TILE).setBand(1);
         terrain.putTile(0, 15, "ground").putTile(1, 15, "ground").putTile(5, 11, "brick");
-        Layer actors = new Layer("Actors", Layer.KIND_ENTITY).setBand(3);
+        Layer actors = new Layer("Actors", Layer.Kind.ENTITY).setBand(3);
         level.addLayer(terrain).addLayer(actors);
 
         GameElement player = new GameElement("e1", "player").setName("Player 1").setLayer("Actors");
@@ -51,7 +51,7 @@ class GameLevelTest {
 
         GameLevel back = GameLevel.load(level.toJson());
 
-        assertEquals(GameLevel.MODE_2D, back.getMode());
+        assertEquals(GameLevel.Mode.TWO_D, back.getMode());
         assertEquals("platformer", back.getAssetPack());
         assertEquals(26, back.getCols());
         assertEquals(16, back.getRows());
@@ -62,7 +62,7 @@ class GameLevelTest {
         assertEquals(2, back.layers().size());
         Layer bt = back.getLayer("Terrain");
         assertNotNull(bt);
-        assertEquals(Layer.KIND_TILE, bt.getKind());
+        assertEquals(Layer.Kind.TILE, bt.getKind());
         assertEquals(1, bt.getBand());
         assertEquals(3, bt.tiles().size());
         assertEquals("brick", bt.getTile(5, 11));
@@ -83,7 +83,7 @@ class GameLevelTest {
 
     @Test
     void roundTrip3D() throws Exception {
-        GameLevel level = new GameLevel(GameLevel.MODE_3D);
+        GameLevel level = new GameLevel(GameLevel.Mode.THREE_D);
         level.setAssetPack("kit3d").setGrid(8, 8, 1);
         level.setCamera(0, 6, 12, 0, 0, 0).setLens(55, 0.2f, 800);
         level.lights().add(new LevelLight(0.3f, -1f, 0.2f, 0xfffff0e0, 0xff303040));
@@ -93,12 +93,12 @@ class GameLevelTest {
 
         GameElement crate = new GameElement("m1", "crate").setLayer("Models");
         crate.setPosition(1, 0.5, -2).setScale(2, 1, 1).setRotation(30);
-        level.addLayer(new Layer("Models", Layer.KIND_MODEL).setBand(0));
+        level.addLayer(new Layer("Models", Layer.Kind.MODEL).setBand(0));
         level.addElement(crate);
 
         GameLevel back = GameLevel.load(level.toJson());
 
-        assertEquals(GameLevel.MODE_3D, back.getMode());
+        assertEquals(GameLevel.Mode.THREE_D, back.getMode());
         assertEquals(6f, back.getEyeY(), 0.0001);
         assertEquals(12f, back.getEyeZ(), 0.0001);
         assertEquals(55f, back.getFov(), 0.0001);
@@ -127,9 +127,9 @@ class GameLevelTest {
 
     @Test
     void roundTripBoard() throws Exception {
-        GameLevel level = new GameLevel(GameLevel.MODE_BOARD);
+        GameLevel level = new GameLevel(GameLevel.Mode.BOARD);
         level.setAssetPack("board").setGrid(8, 8, 64);
-        Layer squares = new Layer("Board", Layer.KIND_TILE).setBand(0);
+        Layer squares = new Layer("Board", Layer.Kind.TILE).setBand(0);
         squares.putTile(0, 0, "boardtile").putTile(7, 7, "start");
         level.addLayer(squares);
         // board elements store their column/row in x/y
@@ -137,7 +137,7 @@ class GameLevelTest {
                 .setProperty("player", "P1"));
 
         GameLevel back = GameLevel.load(level.toJson());
-        assertEquals(GameLevel.MODE_BOARD, back.getMode());
+        assertEquals(GameLevel.Mode.BOARD, back.getMode());
         assertEquals("start", back.getLayer("Board").getTile(7, 7));
         GameElement t = back.elements().get(0);
         assertEquals(3, t.getX(), 0.0001);
@@ -194,7 +194,7 @@ class GameLevelTest {
         assertEquals(0xffC2603A, brick.getColor());
 
         AssetDef coin = catalog.def("coin");
-        assertEquals(AssetDef.KIND_ACTOR, coin.getKind());
+        assertEquals(AssetDef.Kind.ACTOR, coin.getKind());
         assertEquals(24, coin.getWidth());
         assertEquals(10, Json.intval(coin.defaultProperties().get("value"), 0));
 
@@ -209,7 +209,7 @@ class GameLevelTest {
 
     @Test
     void layerTileHelpers() {
-        Layer l = new Layer("T", Layer.KIND_TILE);
+        Layer l = new Layer("T", Layer.Kind.TILE);
         l.putTile(2, 3, "brick");
         assertEquals("brick", l.getTile(2, 3));
         assertEquals("2,3", Layer.cellKey(2, 3));

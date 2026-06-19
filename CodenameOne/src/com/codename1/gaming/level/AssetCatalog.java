@@ -129,7 +129,7 @@ public class AssetCatalog {
         return images.containsKey(assetId);
     }
 
-    /// Supplies the sprite sheet for an animated (`AssetDef#TYPE_SHEET`) asset.
+    /// Supplies the sprite sheet for an animated (`AssetDef.Type#SHEET`) asset.
     public AssetCatalog setSheet(String assetId, SpriteSheet sheet) {
         sheets.put(assetId, sheet);
         return this;
@@ -140,7 +140,7 @@ public class AssetCatalog {
         return sheets.get(assetId);
     }
 
-    /// Supplies the glTF/glb bytes for a 3D (`AssetDef#TYPE_MESH`) asset.
+    /// Supplies the glTF/glb bytes for a 3D (`AssetDef.Type#MESH`) asset.
     public AssetCatalog setMeshData(String assetId, byte[] data) {
         meshes.put(assetId, data);
         return this;
@@ -178,7 +178,7 @@ public class AssetCatalog {
     }
 
     /// Loads each asset's art from its `AssetDef#getSource()` resource: a static image,
-    /// a sprite sheet (`AssetDef#TYPE_SHEET`), or glTF/glb mesh bytes (`AssetDef#TYPE_MESH`).
+    /// a sprite sheet (`AssetDef.Type#SHEET`), or glTF/glb mesh bytes (`AssetDef.Type#MESH`).
     /// Best-effort -- an asset whose source is missing keeps its placeholder. Tries the
     /// source path as-is and, for the flat device bundle, by file name. Returns `this`.
     public AssetCatalog resolveArt() {

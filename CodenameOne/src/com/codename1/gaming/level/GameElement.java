@@ -57,6 +57,12 @@ public class GameElement {
 
     private final Map<String, Object> properties = new HashMap<String, Object>();
 
+    /// Lazily-cached resolution of `#getAssetId()` through an `AssetCatalog` (see
+    /// `#resolveDef(AssetCatalog)`). Transient: it never serializes, and `#setAssetId` clears
+    /// it. The stored data stays the catalog-independent id; this is only a per-element cache so
+    /// per-frame code does not re-hit the catalog's map.
+    private transient AssetDef resolvedDef;
+
     public GameElement() {
     }
 
@@ -90,7 +96,20 @@ public class GameElement {
 
     public GameElement setAssetId(String assetId) {
         this.assetId = assetId;
+        this.resolvedDef = null;   // invalidate the cached resolution
         return this;
+    }
+
+    /// The `AssetDef` this element's `#getAssetId()` resolves to in the given catalog, cached
+    /// after the first lookup. The element stays pure, catalog-independent data (only the id is
+    /// stored and serialized); this just spares per-frame callers a repeated catalog-map lookup.
+    /// Returns `null` for a null catalog or an unknown id. The cache is cleared by `#setAssetId`;
+    /// if you re-register an asset under the same id, build a fresh element or set the id again.
+    public AssetDef resolveDef(AssetCatalog catalog) {
+        if (resolvedDef == null && catalog != null) {
+            resolvedDef = catalog.def(assetId);
+        }
+        return resolvedDef;
     }
 
     /// The name of the `Layer` this element belongs to.
@@ -111,7 +130,7 @@ public class GameElement {
         return y;
     }
 
-    /// The world-space depth, meaningful only in `GameLevel#MODE_3D`.
+    /// The world-space depth, meaningful only in `GameLevel.Mode#THREE_D`.
     public double getZ() {
         return z;
     }

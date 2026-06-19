@@ -35,14 +35,14 @@ class CompanionCodeGenTest {
     @Test
     void gameDataRoundTrips() throws Exception {
         EditorController c = new EditorController(
-                new EditorModel(StarterPacks.newLevel(GameLevel.MODE_2D), StarterPacks.loadCatalog()));
+                new EditorModel(StarterPacks.newLevel(GameLevel.Mode.TWO_D), StarterPacks.loadCatalog()));
         c.model().setActiveLayer("Actors");
         c.model().setSelectedAssetId("player");
         c.placeElement(64, 64);
 
         String json = CompanionCodeGen.gameData(c.model());
         GameLevel reloaded = GameLevel.load(json);
-        assertEquals(GameLevel.MODE_2D, reloaded.getMode());
+        assertEquals(GameLevel.Mode.TWO_D, reloaded.getMode());
         GameElement el = reloaded.elements().get(0);
         assertEquals("player", el.getAssetId());
         assertEquals(3, el.getInt("lives", -1));
@@ -62,7 +62,7 @@ class CompanionCodeGenTest {
 
     @Test
     void companionJavaGeneratesFieldsForNamedElements() {
-        GameLevel level = StarterPacks.newLevel(GameLevel.MODE_2D);
+        GameLevel level = StarterPacks.newLevel(GameLevel.Mode.TWO_D);
         level.addElement(new GameElement("e1", "player").setName("player").setProperty("lives", 3));
         level.addElement(new GameElement("e2", "slime").setName("slime"));
         level.addElement(new GameElement("e3", "coin")); // unnamed -> no field

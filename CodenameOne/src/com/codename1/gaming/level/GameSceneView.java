@@ -74,7 +74,7 @@ public class GameSceneView extends GameView {
         this.level = level;
         this.catalog = catalog;
         setClearColor(level.getInt("clearColor", 0xff101018));
-        if (level.getMode() == GameLevel.MODE_2D) {
+        if (level.getMode() == GameLevel.Mode.TWO_D) {
             level.realizeSprites(getScene(), catalog);
         }
     }
@@ -91,13 +91,13 @@ public class GameSceneView extends GameView {
     /// defers to `#onUpdate(double)`.
     @Override
     protected void update(double deltaSeconds) {
-        if (level.getMode() == GameLevel.MODE_BOARD && !boardRealized && getWidth() > 0 && getHeight() > 0) {
+        if (level.getMode() == GameLevel.Mode.BOARD && !boardRealized && getWidth() > 0 && getHeight() > 0) {
             int n = Math.max(level.getCols(), level.getRows());
             projection.fit(n, getWidth(), getHeight());
             level.realizeSprites(getScene(), catalog, projection);
             boardRealized = true;
         }
-        if (arcadeBehavior && level.getMode() == GameLevel.MODE_2D) {
+        if (arcadeBehavior && level.getMode() == GameLevel.Mode.TWO_D) {
             updateArcade(deltaSeconds);
         }
         onUpdate(deltaSeconds);
@@ -317,7 +317,7 @@ public class GameSceneView extends GameView {
     protected void updatePlayer(Sprite player, double deltaSeconds) {
         int ts = Math.max(4, level.getTileSize());
         GameElement el = elementOf(player);
-        AssetDef def = catalog == null || el == null ? null : catalog.def(el.getAssetId());
+        AssetDef def = el == null ? null : el.resolveDef(catalog);
         double hw = (def == null ? ts : def.getWidth()) / 2.0;
         double hh = (def == null ? ts : def.getHeight()) / 2.0;
         double grav = level.getDouble("gravity", 9.8) * 132;
@@ -378,7 +378,7 @@ public class GameSceneView extends GameView {
             }
             Double d = enemyDir.get(el.getId());
             double dir = d == null ? 1.0 : d.doubleValue();
-            AssetDef def = catalog == null ? null : catalog.def(el.getAssetId());
+            AssetDef def = el.resolveDef(catalog);
             double hw = (def == null ? ts : def.getWidth()) / 2.0;
             double hh = (def == null ? ts : def.getHeight()) / 2.0;
             double spd = el.getDouble("speed", 60);
@@ -398,7 +398,7 @@ public class GameSceneView extends GameView {
     protected void checkPickups(Sprite player) {
         int ts = Math.max(4, level.getTileSize());
         GameElement pel = elementOf(player);
-        AssetDef pd = catalog == null || pel == null ? null : catalog.def(pel.getAssetId());
+        AssetDef pd = pel == null ? null : pel.resolveDef(catalog);
         double phw = (pd == null ? ts : pd.getWidth()) / 2.0;
         double phh = (pd == null ? ts : pd.getHeight()) / 2.0;
         Scene scene = getScene();
@@ -416,7 +416,7 @@ public class GameSceneView extends GameView {
             if (!coll && !isEnemy(id)) {
                 continue;
             }
-            AssetDef def = catalog == null ? null : catalog.def(id);
+            AssetDef def = el.resolveDef(catalog);
             double hw = (def == null ? ts : def.getWidth()) / 2.0;
             double hh = (def == null ? ts : def.getHeight()) / 2.0;
             boolean hit = Math.abs(player.getX() - s.getX()) < phw + hw
@@ -484,7 +484,7 @@ public class GameSceneView extends GameView {
                 for (Layer l : level.layers()) {
                     // only tile layers in the play plane collide; a parallax background
                     // (clouds, mountains) is decoration, not a wall.
-                    if (l.getKind() == Layer.KIND_TILE && l.isVisible()
+                    if (l.getKind() == Layer.Kind.TILE && l.isVisible()
                             && l.getParallaxX() == 1f && l.getParallaxY() == 1f && l.getTile(c, r) != null) {
                         return true;
                     }
@@ -497,7 +497,7 @@ public class GameSceneView extends GameView {
     /// {@inheritDoc} For a 3D level, configures the camera + light and builds the models.
     @Override
     protected void onSetup(GraphicsDevice device) {
-        if (level.getMode() != GameLevel.MODE_3D) {
+        if (level.getMode() != GameLevel.Mode.THREE_D) {
             return;
         }
         getCamera()
@@ -524,7 +524,7 @@ public class GameSceneView extends GameView {
         for (int i = 0; i < level.elements().size(); i++) {
             GameElement el = level.elements().get(i);
             int color = 0xffcccccc;
-            AssetDef def = catalog == null ? null : catalog.def(el.getAssetId());
+            AssetDef def = el.resolveDef(catalog);
             if (def != null) {
                 color = def.getColor();
             }
@@ -539,7 +539,7 @@ public class GameSceneView extends GameView {
         }
     }
 
-    /// The mesh for an asset: a real glTF/glb mesh (`AssetDef#TYPE_MESH`) loaded from the
+    /// The mesh for an asset: a real glTF/glb mesh (`AssetDef.Type#MESH`) loaded from the
     /// catalog and cached per asset id, falling back to the shared unit cube when the
     /// asset has no mesh or it fails to load.
     private Mesh meshFor(GraphicsDevice device, String assetId, Mesh cube, Map<String, Mesh> cache) {

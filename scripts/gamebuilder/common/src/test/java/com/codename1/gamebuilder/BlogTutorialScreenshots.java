@@ -92,7 +92,7 @@ public final class BlogTutorialScreenshots {
     // ---- Tutorial 1: 2D platformer "Coin Run" --------------------------------
     private static void platformer() {
         edit(() -> {
-            gb.getController().loadLevel(StarterPacks.newLevel(GameLevel.MODE_2D), "CoffeeRun");
+            gb.getController().loadLevel(StarterPacks.newLevel(GameLevel.Mode.TWO_D), "CoffeeRun");
             gb.getController().model().setSelection(null);
         });
         shot("platformer-1-new-scene");
@@ -207,14 +207,14 @@ public final class BlogTutorialScreenshots {
     /// and assembled into a GIF by the build step.
     private static void recordGif(String name) {
         final int frames = 24;
-        final int mode = gb.getController().model().level().getMode();
+        final GameLevel.Mode mode = gb.getController().model().level().getMode();
         final GameElement[] mover = new GameElement[1];
         final double[] path = new double[4]; // fromX, fromY, toX, toY (board piece slide)
         Display.getInstance().callSeriallyAndWait(() -> {
             ensureLive();
-            if (mode == GameLevel.MODE_2D) {
+            if (mode == GameLevel.Mode.TWO_D) {
                 gb.getCanvas().keyPressed(K_RIGHT);   // run right
-            } else if (mode == GameLevel.MODE_3D) {
+            } else if (mode == GameLevel.Mode.THREE_D) {
                 gb.getCanvas().keyPressed(K_UP);      // walk forward (3D)
             } else {
                 // Duke Jack: deal a fresh card off the deck (top) and flip it into his hand
@@ -242,13 +242,13 @@ public final class BlogTutorialScreenshots {
         for (int f = 0; f < frames; f++) {
             final int fr = f;
             Display.getInstance().callSeriallyAndWait(() -> {
-                if (mode == GameLevel.MODE_2D) {
+                if (mode == GameLevel.Mode.TWO_D) {
                     if (fr % 6 == 0) {
                         gb.getCanvas().keyPressed(K_UP);     // periodic jump (edge)
                     } else if (fr % 6 == 2) {
                         gb.getCanvas().keyReleased(K_UP);
                     }
-                } else if (mode == GameLevel.MODE_3D) {
+                } else if (mode == GameLevel.Mode.THREE_D) {
                     // step a little way into the corridor, then stop and fire coffee beans at
                     // the tea cups ahead (so the clip shows the dungeon's combat, not just a walk).
                     if (fr == 5) {
@@ -319,7 +319,7 @@ public final class BlogTutorialScreenshots {
 
     private static void board() {
         edit(() -> {
-            GameLevel lvl = StarterPacks.newLevel(GameLevel.MODE_BOARD);
+            GameLevel lvl = StarterPacks.newLevel(GameLevel.Mode.BOARD);
             lvl.setGrid(8, 5, 64);   // a compact card table (not a 10x10 game board)
             gb.getController().loadLevel(lvl, "DukeJack");
             gb.getController().model().setSelection(null);
@@ -422,7 +422,7 @@ public final class BlogTutorialScreenshots {
     // ---- Tutorial 3: first-person 3D dungeon "Crypt Walk" --------------------
     private static void dungeon() {
         edit(() -> {
-            gb.getController().loadLevel(StarterPacks.newLevel(GameLevel.MODE_3D), "CryptWalk");
+            gb.getController().loadLevel(StarterPacks.newLevel(GameLevel.Mode.THREE_D), "CryptWalk");
             gb.getController().model().setSelection(null);
             Component kit = find(Display.getInstance().getCurrent(), "tab.kit3d");
             if (kit instanceof Button) {

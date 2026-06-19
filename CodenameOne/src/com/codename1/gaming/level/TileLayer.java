@@ -30,7 +30,7 @@ import com.codename1.gaming.SpriteSheet;
 /// indices into one `SpriteSheet` (-1 means "empty cell").
 ///
 /// This is the fast representation a game uses when every tile comes from the same
-/// atlas -- contrast with a `Layer` of `Layer#KIND_TILE`, which stores an
+/// atlas -- contrast with a `Layer` of `Layer.Kind#TILE`, which stores an
 /// `assetId`-per-cell map and can mix assets from different packs. `#toScene(Scene,
 /// int)` materializes the non-empty cells as `Sprite`s anchored at their top-left at
 /// `tileSize` spacing.

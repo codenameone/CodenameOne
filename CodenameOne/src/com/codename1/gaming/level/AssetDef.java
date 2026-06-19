@@ -29,42 +29,86 @@ import java.util.Map;
 /// `GameElement` references through its `GameElement#getAssetId()`.
 ///
 /// It mirrors an entry in the editor's asset catalog -- an id, a display name, a
-/// `#getKind()` (a `#KIND_TILE` painted into a grid cell vs a freely placed
-/// `#KIND_ACTOR`), a natural pixel size, a base `#getColor()` (used to render a
+/// `#getKind()` (a `Kind#TILE` painted into a grid cell vs a freely placed
+/// `Kind#ACTOR`), a natural pixel size, a base `#getColor()` (used to render a
 /// placeholder until the real art loads), whether the level may hold more than one
 /// (`#isUnique()`), the default authoring properties copied onto a freshly placed
 /// element, and -- the part that makes it a real asset -- a `#getType()` and a
 /// `#getSource()` art file:
 ///
-/// - `#TYPE_IMAGE` -- a single static image (`source` is a PNG/JPG path), realized as a
+/// - `Type#IMAGE` -- a single static image (`source` is a PNG/JPG path), realized as a
 ///   `com.codename1.gaming.Sprite`.
-/// - `#TYPE_SHEET` -- a sprite sheet: an image of equal frames in a grid
+/// - `Type#SHEET` -- a sprite sheet: an image of equal frames in a grid
 ///   (`#getFrameWidth()` x `#getFrameHeight()`, `#getFps()`), realized as an
 ///   animated `com.codename1.gaming.AnimatedSprite`.
-/// - `#TYPE_MESH` -- a 3D mesh (`source` is a glTF/glb path), realized as a
+/// - `Type#MESH` -- a 3D mesh (`source` is a glTF/glb path), realized as a
 ///   `com.codename1.gaming.Model` in a 3D level.
 public class AssetDef {
-    /// Painted into a grid cell of a `Layer#KIND_TILE` layer.
-    public static final int KIND_TILE = 0;
-    /// A freely placed entity / model.
-    public static final int KIND_ACTOR = 1;
+    /// How an asset is placed: painted into a grid cell, or freely positioned.
+    public enum Kind {
+        /// Painted into a grid cell of a `Layer.Kind#TILE` layer.
+        TILE("tile"),
+        /// A freely placed entity / model.
+        ACTOR("actor");
 
-    /// Art format: a single static image.
-    public static final int TYPE_IMAGE = 0;
-    /// Art format: a sprite sheet (a grid of equal frames) played as an animation.
-    public static final int TYPE_SHEET = 1;
-    /// Art format: a 3D mesh (glTF/glb), realized as a `com.codename1.gaming.Model`.
-    public static final int TYPE_MESH = 2;
+        private final String wire;
+
+        Kind(String wire) {
+            this.wire = wire;
+        }
+
+        /// The lowercase JSON token for this kind (`"tile"` / `"actor"`).
+        public String wireName() {
+            return wire;
+        }
+
+        /// The kind for a JSON token (case-insensitive); defaults to `#ACTOR`.
+        public static Kind fromWire(String name) {
+            return "tile".equalsIgnoreCase(name) ? TILE : ACTOR;
+        }
+    }
+
+    /// The art format of an asset, which decides what it is realized into.
+    public enum Type {
+        /// A single static image (`source` is a PNG/JPG), realized as a `com.codename1.gaming.Sprite`.
+        IMAGE("image"),
+        /// A sprite sheet (a grid of equal frames) played as an animated `com.codename1.gaming.AnimatedSprite`.
+        SHEET("sheet"),
+        /// A 3D mesh (glTF/glb), realized as a `com.codename1.gaming.Model`.
+        MESH("mesh");
+
+        private final String wire;
+
+        Type(String wire) {
+            this.wire = wire;
+        }
+
+        /// The lowercase JSON token for this format (`"image"` / `"sheet"` / `"mesh"`).
+        public String wireName() {
+            return wire;
+        }
+
+        /// The format for an explicit JSON token (case-insensitive); `null`/unknown is `#IMAGE`.
+        public static Type fromWire(String name) {
+            if ("sheet".equalsIgnoreCase(name)) {
+                return SHEET;
+            }
+            if ("mesh".equalsIgnoreCase(name)) {
+                return MESH;
+            }
+            return IMAGE;
+        }
+    }
 
     private String id;
     private String name;
-    private int kind = KIND_ACTOR;
+    private Kind kind = Kind.ACTOR;
     private int width = 32;
     private int height = 32;
     private int color = 0xff888888;
     private boolean unique;
-    /// The art format -- `#TYPE_IMAGE`, `#TYPE_SHEET` or `#TYPE_MESH`.
-    private int type = TYPE_IMAGE;
+    /// The art format -- `Type#IMAGE`, `Type#SHEET` or `Type#MESH`.
+    private Type type = Type.IMAGE;
     /// The art file: a PNG/JPG (image, sheet) or a glTF/glb (mesh), resolved from
     /// bundled resources or the project's `games/assets/` folder at load time.
     private String source;
@@ -80,10 +124,10 @@ public class AssetDef {
     public AssetDef() {
     }
 
-    public AssetDef(String id, int kind, int color, int width, int height) {
+    public AssetDef(String id, Kind kind, int color, int width, int height) {
         this.id = id;
         this.name = id;
-        this.kind = kind;
+        this.kind = kind == null ? Kind.ACTOR : kind;
         this.color = color;
         this.width = width;
         this.height = height;
@@ -107,17 +151,18 @@ public class AssetDef {
         return this;
     }
 
-    public int getKind() {
+    /// How this asset is placed (`Kind#TILE` vs `Kind#ACTOR`).
+    public Kind getKind() {
         return kind;
     }
 
-    public AssetDef setKind(int kind) {
-        this.kind = kind;
+    public AssetDef setKind(Kind kind) {
+        this.kind = kind == null ? Kind.ACTOR : kind;
         return this;
     }
 
     public boolean isTile() {
-        return kind == KIND_TILE;
+        return kind == Kind.TILE;
     }
 
     public int getWidth() {
@@ -161,22 +206,22 @@ public class AssetDef {
         return this;
     }
 
-    /// The art format: `#TYPE_IMAGE`, `#TYPE_SHEET` or `#TYPE_MESH`.
-    public int getType() {
+    /// The art format: `Type#IMAGE`, `Type#SHEET` or `Type#MESH`.
+    public Type getType() {
         return type;
     }
 
-    public AssetDef setType(int type) {
-        this.type = type;
+    public AssetDef setType(Type type) {
+        this.type = type == null ? Type.IMAGE : type;
         return this;
     }
 
     public boolean isSheet() {
-        return type == TYPE_SHEET;
+        return type == Type.SHEET;
     }
 
     public boolean isMesh() {
-        return type == TYPE_MESH;
+        return type == Type.MESH;
     }
 
     /// Sprite-sheet frame width in pixels (0 = the whole image is one frame).
@@ -201,7 +246,7 @@ public class AssetDef {
 
     /// Marks this asset as a sprite sheet with the given frame grid and rate.
     public AssetDef setSheet(int frameWidth, int frameHeight, int frameCount, double fps) {
-        this.type = TYPE_SHEET;
+        this.type = Type.SHEET;
         this.frameWidth = frameWidth;
         this.frameHeight = frameHeight;
         this.frameCount = frameCount;
@@ -225,7 +270,7 @@ public class AssetDef {
         AssetDef d = new AssetDef();
         d.id = Json.str(m.get("id"), null);
         d.name = Json.str(m.get("name"), d.id);
-        d.kind = "tile".equalsIgnoreCase(Json.str(m.get("kind"), "actor")) ? KIND_TILE : KIND_ACTOR;
+        d.kind = Kind.fromWire(Json.str(m.get("kind"), "actor"));
         d.width = Json.intval(m.get("w"), 32);
         d.height = Json.intval(m.get("h"), 32);
         d.color = Json.color(m.get("color"), 0xff888888);
@@ -246,33 +291,16 @@ public class AssetDef {
     /// Resolves the art format from an explicit {@code "type"} key, else infers it: a
     /// {@code .glb}/{@code .gltf} source is a mesh, a frame width means a sheet, else an
     /// image.
-    static int typeFromName(String type, String source, int frameWidth) {
+    static Type typeFromName(String type, String source, int frameWidth) {
         if (type != null) {
-            if ("sheet".equalsIgnoreCase(type)) {
-                return TYPE_SHEET;
-            }
-            if ("mesh".equalsIgnoreCase(type)) {
-                return TYPE_MESH;
-            }
-            return TYPE_IMAGE;
+            return Type.fromWire(type);
         }
         if (source != null) {
             String s = source.toLowerCase();
             if (s.endsWith(".glb") || s.endsWith(".gltf")) {
-                return TYPE_MESH;
+                return Type.MESH;
             }
         }
-        return frameWidth > 0 ? TYPE_SHEET : TYPE_IMAGE;
-    }
-
-    /// The lowercase keyword for an art format, for JSON output.
-    static String typeName(int type) {
-        if (type == TYPE_SHEET) {
-            return "sheet";
-        }
-        if (type == TYPE_MESH) {
-            return "mesh";
-        }
-        return "image";
+        return frameWidth > 0 ? Type.SHEET : Type.IMAGE;
     }
 }

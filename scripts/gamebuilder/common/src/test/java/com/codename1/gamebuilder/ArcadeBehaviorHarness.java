@@ -87,7 +87,7 @@ public final class ArcadeBehaviorHarness {
 
     public static void main(String[] args) throws Exception {
         Display.init(null);
-        GameLevel level = StarterPacks.newLevel(GameLevel.MODE_2D);
+        GameLevel level = StarterPacks.newLevel(GameLevel.Mode.TWO_D);
         AssetCatalog catalog = StarterPacks.loadCatalog();
         int ts = level.getTileSize();
         int cols = level.getCols();
@@ -144,7 +144,7 @@ public final class ArcadeBehaviorHarness {
         check(camRight == cols * ts - 400, "camera clamps at the right edge (camX=" + camRight + ")");
 
         // override: a non-consuming pickup (power-up) stays in the scene
-        GameLevel level2 = StarterPacks.newLevel(GameLevel.MODE_2D);
+        GameLevel level2 = StarterPacks.newLevel(GameLevel.Mode.TWO_D);
         for (int c = 0; c < level2.getCols(); c++) {
             solidLayer(level2).putTile(c, level2.getRows() - 2, "grass");
         }
@@ -161,11 +161,11 @@ public final class ArcadeBehaviorHarness {
         check(view2.getScore() > 0, "onPickup override scored");
 
         // ---- parallax: a layer's factor flows onto its realized sprites + JSON ----
-        GameLevel pl = StarterPacks.newLevel(GameLevel.MODE_2D);
+        GameLevel pl = StarterPacks.newLevel(GameLevel.Mode.TWO_D);
         Layer bg = null;
         Layer fg = null;
         for (Layer l : pl.layers()) {
-            if (l.getKind() == Layer.KIND_TILE) {
+            if (l.getKind() == Layer.Kind.TILE) {
                 if (bg == null) {
                     bg = l;
                 } else if (fg == null) {
@@ -211,7 +211,7 @@ public final class ArcadeBehaviorHarness {
     /// since a parallax background layer is decoration and does not collide.
     private static Layer solidLayer(GameLevel level) {
         for (Layer l : level.layers()) {
-            if (l.getKind() == Layer.KIND_TILE && l.getParallaxX() == 1f && l.getParallaxY() == 1f) {
+            if (l.getKind() == Layer.Kind.TILE && l.getParallaxX() == 1f && l.getParallaxY() == 1f) {
                 return l;
             }
         }

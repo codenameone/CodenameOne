@@ -175,7 +175,7 @@ public class GameBuilder extends Lifecycle {
                     com.codename1.io.Log.e(e);
                 }
             } else {
-                initial = StarterPacks.newLevel(GameLevel.MODE_2D);
+                initial = StarterPacks.newLevel(GameLevel.Mode.TWO_D);
             }
         }
         EditorModel model = new EditorModel(initial, catalog);
@@ -274,9 +274,9 @@ public class GameBuilder extends Lifecycle {
         int primary = Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY;
         int shift = Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT;
 
-        menu("File", "New 2D Platformer", (char) 0, 0, () -> newScene(GameLevel.MODE_2D));
-        menu("File", "New 3D Map", (char) 0, 0, () -> newScene(GameLevel.MODE_3D));
-        menu("File", "New Board Game", (char) 0, 0, () -> newScene(GameLevel.MODE_BOARD));
+        menu("File", "New 2D Platformer", (char) 0, 0, () -> newScene(GameLevel.Mode.TWO_D));
+        menu("File", "New 3D Map", (char) 0, 0, () -> newScene(GameLevel.Mode.THREE_D));
+        menu("File", "New Board Game", (char) 0, 0, () -> newScene(GameLevel.Mode.BOARD));
         menu("File", "Open Scene…", 'O', primary, this::openProjectDialog);
         menu("File", "Save", 'S', primary, this::save);
         menu("File", "Open Java in IDE", (char) 0, 0, this::openInIde);
@@ -339,7 +339,7 @@ public class GameBuilder extends Lifecycle {
         form.getToolbar().addCommandToOverflowMenu(c);
     }
 
-    private void newScene(int mode) {
+    private void newScene(GameLevel.Mode mode) {
         controller.newLevel(mode);
         activePackTab = controller.model().level().getAssetPack();
         collapsedLayers.clear();
@@ -504,7 +504,7 @@ public class GameBuilder extends Lifecycle {
 
     private void populateRail() {
         rail.removeAll();
-        boolean is3d = controller.model().level().getMode() == GameLevel.MODE_3D;
+        boolean is3d = controller.model().level().getMode() == GameLevel.Mode.THREE_D;
         for (Tool t : Tool.values()) {
             if (t == Tool.TERRAIN && !is3d) {
                 continue;   // terrain sculpting is a 3D-only concept
@@ -728,7 +728,7 @@ public class GameBuilder extends Lifecycle {
     }
 
     private int layerCount(Layer layer) {
-        if (layer.getKind() == Layer.KIND_TILE) {
+        if (layer.getKind() == Layer.Kind.TILE) {
             return layer.tiles().size();
         }
         int n = 0;
@@ -991,7 +991,7 @@ public class GameBuilder extends Lifecycle {
         boolean tile = isTileActiveLayer();
         int w = clampDim(img.getWidth());
         int h = clampDim(img.getHeight());
-        AssetDef def = new AssetDef(id, tile ? AssetDef.KIND_TILE : AssetDef.KIND_ACTOR, 0xffcccccc, w, h)
+        AssetDef def = new AssetDef(id, tile ? AssetDef.Kind.TILE : AssetDef.Kind.ACTOR, 0xffcccccc, w, h)
                 .setName(displayName).setSource("assets/" + id + ".png");
         AssetPack custom = cat.getPack(ProjectIO.CUSTOM_PACK_ID);
         if (custom == null) {
@@ -1015,7 +1015,7 @@ public class GameBuilder extends Lifecycle {
 
     private boolean isTileActiveLayer() {
         Layer l = controller.model().level().getLayer(controller.model().getActiveLayer());
-        return l != null && l.getKind() == Layer.KIND_TILE;
+        return l != null && l.getKind() == Layer.Kind.TILE;
     }
 
     private static int clampDim(int d) {
@@ -1125,11 +1125,11 @@ public class GameBuilder extends Lifecycle {
     private void selectFirstTileLayer() {
         EditorModel m = controller.model();
         Layer active = m.level().getLayer(m.getActiveLayer());
-        if (active != null && active.getKind() == Layer.KIND_TILE) {
+        if (active != null && active.getKind() == Layer.Kind.TILE) {
             return;
         }
         for (Layer l : m.level().layers()) {
-            if (l.getKind() == Layer.KIND_TILE) {
+            if (l.getKind() == Layer.Kind.TILE) {
                 m.setActiveLayer(l.getName());
                 return;
             }
@@ -1157,7 +1157,7 @@ public class GameBuilder extends Lifecycle {
         List<Layer> ls = controller.model().level().layers();
         List<String> names = new java.util.ArrayList<>();
         for (Layer l : ls) {
-            if (l.getKind() != Layer.KIND_TILE) {
+            if (l.getKind() != Layer.Kind.TILE) {
                 names.add(l.getName());
             }
         }
@@ -1167,11 +1167,11 @@ public class GameBuilder extends Lifecycle {
     private void selectFirstEntityLayer() {
         EditorModel m = controller.model();
         Layer active = m.level().getLayer(m.getActiveLayer());
-        if (active != null && active.getKind() != Layer.KIND_TILE) {
+        if (active != null && active.getKind() != Layer.Kind.TILE) {
             return;
         }
         for (Layer l : m.level().layers()) {
-            if (l.getKind() != Layer.KIND_TILE) {
+            if (l.getKind() != Layer.Kind.TILE) {
                 m.setActiveLayer(l.getName());
                 return;
             }
@@ -1185,7 +1185,7 @@ public class GameBuilder extends Lifecycle {
         EditorModel m = controller.model();
         GameLevel level = m.level();
         GameElement sel = m.getSelection();
-        if (m.getTool() == Tool.TERRAIN && level.getMode() == GameLevel.MODE_3D) {
+        if (m.getTool() == Tool.TERRAIN && level.getMode() == GameLevel.Mode.THREE_D) {
             addTerrainBrushPanel(level);
         }
         if (sel == null) {
@@ -1211,8 +1211,8 @@ public class GameBuilder extends Lifecycle {
                 inspector.add(dropdownRow("Background", new String[]{"Sky", "Forest", "Night", "Cave"},
                         level.getString("background", "Sky"),
                         v -> { controller.setLevelProperty("background", v); refresh(); }));
-                inspector.add(propRow("Mode", GameLevel.modeLabel(level.getMode())));
-                if (level.getMode() == GameLevel.MODE_3D) {
+                inspector.add(propRow("Mode", level.getMode().label()));
+                if (level.getMode() == GameLevel.Mode.THREE_D) {
                     inspector.add(dropdownRow("3D play style", new String[]{"open", "flight", "race", "dungeon"},
                             level.getString("view3d", "open"),
                             v -> { controller.setLevelProperty("view3d", v); refresh(); }));
@@ -1236,7 +1236,7 @@ public class GameBuilder extends Lifecycle {
             inspector.add(editRow("Name", sel.getName() == null ? "" : sel.getName(), v -> { sel.setName(v); markDirty(); }));
             inspector.add(editRow("X", trim(sel.getX()), v -> { sel.setX(parse(v, sel.getX())); markDirty(); }));
             inspector.add(editRow("Y", trim(sel.getY()), v -> { sel.setY(parse(v, sel.getY())); markDirty(); }));
-            if (level.getMode() == GameLevel.MODE_3D) {
+            if (level.getMode() == GameLevel.Mode.THREE_D) {
                 inspector.add(editRow("Elevation (Z)", trim(sel.getZ()),
                         v -> { sel.setZ(parse(v, sel.getZ())); markDirty(); }));
             }
@@ -1877,9 +1877,9 @@ public class GameBuilder extends Lifecycle {
         }
         d.addComponent(new Label("New scene (game type)", "GBPropLabel"));
         Container modes = new Container(new GridLayout(2, 2));
-        modes.add(newSceneButton("2D", GameLevel.MODE_2D, d));
-        modes.add(newSceneButton("3D Map", GameLevel.MODE_3D, d));
-        modes.add(newSceneButton("Board", GameLevel.MODE_BOARD, d));
+        modes.add(newSceneButton("2D", GameLevel.Mode.TWO_D, d));
+        modes.add(newSceneButton("3D Map", GameLevel.Mode.THREE_D, d));
+        modes.add(newSceneButton("Board", GameLevel.Mode.BOARD, d));
         Button largeWorld = new Button("Large World", "GBMini");
         largeWorld.setName("btn.newlargeworld");
         largeWorld.addActionListener(e -> { d.dispose(); newLargeWorldScene(); });
@@ -1908,7 +1908,7 @@ public class GameBuilder extends Lifecycle {
         }
     }
 
-    private Button newSceneButton(String label, int mode, InteractionDialog d) {
+    private Button newSceneButton(String label, GameLevel.Mode mode, InteractionDialog d) {
         Button b = new Button(label, "GBMini");
         b.addActionListener(e -> { d.dispose(); newScene(mode); });
         return b;

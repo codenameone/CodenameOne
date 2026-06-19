@@ -237,7 +237,7 @@ public class EditorCanvas extends Component {
 
     /// True when the 3D map should be drawn/edited in perspective (vs flat top-down).
     private boolean perspective3D() {
-        return model().level().getMode() == GameLevel.MODE_3D && !topDown3D;
+        return model().level().getMode() == GameLevel.Mode.THREE_D && !topDown3D;
     }
 
     public boolean isPlayMode() {
@@ -268,7 +268,7 @@ public class EditorCanvas extends Component {
             kDown = false;
             relDown = -1;
         }
-        if (model().level().getMode() == GameLevel.MODE_3D) {
+        if (model().level().getMode() == GameLevel.Mode.THREE_D) {
             stepPlay3D(seconds);
         } else {
             if (player != null) {
@@ -602,7 +602,7 @@ public class EditorCanvas extends Component {
         for (int i = 0; i < layers.size(); i++) {
             Layer l = layers.get(i);
             // a parallax background layer (clouds, mountains) is decoration, not a wall
-            if (l.getKind() == Layer.KIND_TILE && l.isVisible()
+            if (l.getKind() == Layer.Kind.TILE && l.isVisible()
                     && l.getParallaxX() == 1f && l.getParallaxY() == 1f && l.getTile(col, row) != null) {
                 return true;
             }
@@ -638,7 +638,7 @@ public class EditorCanvas extends Component {
             if (down) { kDown = true; relDown = -1; } else { relDown = playClock; }
         } else if (g == Display.GAME_FIRE || keyCode == ' ') {
             // Fire/Space shoots a coffee bean in 3D; in 2D it doubles as jump (next branch).
-            if (model().level().getMode() == GameLevel.MODE_3D) {
+            if (model().level().getMode() == GameLevel.Mode.THREE_D) {
                 if (down) {
                     fireRequested = true;
                 }
@@ -739,7 +739,7 @@ public class EditorCanvas extends Component {
         // the scene background fills only the level rectangle
         paintBackdrop(g, backdrop(level), ox, oy, lw, lh);
 
-        if (level.getMode() == GameLevel.MODE_3D && level.getTerrain() != null) {
+        if (level.getMode() == GameLevel.Mode.THREE_D && level.getTerrain() != null) {
             drawTerrainTopDown(g, level, ox, oy, ts);
         }
         drawContent(g, cat, level, ox, oy, ts);
@@ -765,7 +765,7 @@ public class EditorCanvas extends Component {
             if (!layer.isVisible()) {
                 continue;
             }
-            if (layer.getKind() == Layer.KIND_TILE) {
+            if (layer.getKind() == Layer.Kind.TILE) {
                 for (var e : layer.tiles().entrySet()) {
                     int[] cr = parseCell(e.getKey());
                     if (cr == null) {
@@ -937,7 +937,7 @@ public class EditorCanvas extends Component {
             }
             int ox = (int) Math.round(sX - camX * layer.getParallaxX() * scale);
             int oy = (int) Math.round(sY - camY * layer.getParallaxY() * scale);
-            if (layer.getKind() == Layer.KIND_TILE) {
+            if (layer.getKind() == Layer.Kind.TILE) {
                 for (var e : layer.tiles().entrySet()) {
                     int[] cr = parseCell(e.getKey());
                     if (cr == null) {
@@ -1090,8 +1090,8 @@ public class EditorCanvas extends Component {
 
         // header label above the device
         g.setColor(0x9DB0D6);
-        String kind = level.getMode() == GameLevel.MODE_3D ? "3D PREVIEW"
-                : level.getMode() == GameLevel.MODE_BOARD ? "BOARD PREVIEW" : "LIVE PREVIEW · iPhone 15";
+        String kind = level.getMode() == GameLevel.Mode.THREE_D ? "3D PREVIEW"
+                : level.getMode() == GameLevel.Mode.BOARD ? "BOARD PREVIEW" : "LIVE PREVIEW · iPhone 15";
         g.drawString(kind + " · " + model().getSceneName(), devX, devY - 20);
 
         // bezel
@@ -1103,7 +1103,7 @@ public class EditorCanvas extends Component {
         // scene clipped to the screen
         int ccx = g.getClipX(), ccy = g.getClipY(), ccw = g.getClipWidth(), cch = g.getClipHeight();
         g.setClip(sX, sY, screenW, screenH);
-        if (level.getMode() == GameLevel.MODE_3D) {
+        if (level.getMode() == GameLevel.Mode.THREE_D) {
             // true 3D: perspective projection of the board + element billboards
             paintScene3D(g, level, cat, sX, sY, screenW, screenH);
         } else if (player != null) {
@@ -1146,7 +1146,7 @@ public class EditorCanvas extends Component {
         // on-screen controls hint so it's clear how to play
         g.setColor(0xCFE0FF);
         String hint;
-        if (level.getMode() == GameLevel.MODE_3D) {
+        if (level.getMode() == GameLevel.Mode.THREE_D) {
             String t = view3dType();
             hint = "flight".equals(t) ? "Flight — ← → bank, ↑ ↓ climb / dive (no gravity)"
                     : "race".equals(t) ? "Race — ↑ accelerate, ↓ brake, ← → steer"
@@ -1157,7 +1157,7 @@ public class EditorCanvas extends Component {
         }
         g.drawString(hint, sX + 10, sY + screenH - 20);
 
-        if (level.getMode() == GameLevel.MODE_3D) {
+        if (level.getMode() == GameLevel.Mode.THREE_D) {
             drawRadar(g, level, sX, sY, screenW, screenH);
         }
     }
@@ -2072,7 +2072,7 @@ public class EditorCanvas extends Component {
     /// centre (bottom-aligning a 32-unit mesh on a 1-unit board would throw it off-grid).
     private double[] snapCenter(int col, int row, AssetDef def) {
         double ts = Math.max(1, model().level().getTileSize());
-        if (model().level().getMode() != GameLevel.MODE_2D) {
+        if (model().level().getMode() != GameLevel.Mode.TWO_D) {
             return new double[]{col * ts + ts / 2.0, row * ts + ts / 2.0};
         }
         double h = def == null ? ts : def.getHeight();
@@ -2090,7 +2090,7 @@ public class EditorCanvas extends Component {
         AssetDef def = cat == null ? null : cat.def(sel.getAssetId());
         int col = (int) Math.floor(sel.getX() / ts);
         int row;
-        if (model().level().getMode() == GameLevel.MODE_2D) {
+        if (model().level().getMode() == GameLevel.Mode.TWO_D) {
             // the cell whose bottom the feet rest on
             row = (int) Math.floor((sel.getY() + (def == null ? ts : def.getHeight()) / 2.0) / ts) - 1;
         } else {

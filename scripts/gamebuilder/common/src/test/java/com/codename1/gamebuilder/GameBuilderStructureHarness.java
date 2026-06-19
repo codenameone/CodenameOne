@@ -137,11 +137,11 @@ public final class GameBuilderStructureHarness {
         fire(form, "asset.ground");
         check("ground".equals(c.model().getSelectedAssetId()), "ground asset selects");
         check(c.model().level().getLayer(c.model().getActiveLayer()).getKind()
-                == com.codename1.gaming.level.Layer.KIND_TILE, "tile asset activates a tile layer");
+                == com.codename1.gaming.level.Layer.Kind.TILE, "tile asset activates a tile layer");
         fire(form, "asset.player");
         check("player".equals(c.model().getSelectedAssetId()), "player asset selects");
         check(c.model().level().getLayer(c.model().getActiveLayer()).getKind()
-                != com.codename1.gaming.level.Layer.KIND_TILE, "actor asset activates an entity layer");
+                != com.codename1.gaming.level.Layer.Kind.TILE, "actor asset activates an entity layer");
 
         // ---- the critical one: Live play toggles in-place and returns ----
         check(!gb.isPlaying(), "not playing initially");
@@ -181,7 +181,7 @@ public final class GameBuilderStructureHarness {
                         "layer dropdown shows the element's current layer");
             }
             com.codename1.gaming.level.Layer assigned = c.model().level().getLayer(actor.getLayer());
-            check(assigned != null && assigned.getKind() != com.codename1.gaming.level.Layer.KIND_TILE,
+            check(assigned != null && assigned.getKind() != com.codename1.gaming.level.Layer.Kind.TILE,
                     "element sits on a valid entity layer");
             // metadata controls (#17)  (the Asset section is collapsed by default)
             check(find(form, "btn.addprop") != null, "Add-property control present");
@@ -293,7 +293,7 @@ public final class GameBuilderStructureHarness {
             // pick a different entity layer if one exists
             String dest = null;
             for (com.codename1.gaming.level.Layer ly : c.model().level().layers()) {
-                if (ly.getKind() != com.codename1.gaming.level.Layer.KIND_TILE && !ly.getName().equals(mv.getLayer())) {
+                if (ly.getKind() != com.codename1.gaming.level.Layer.Kind.TILE && !ly.getName().equals(mv.getLayer())) {
                     dest = ly.getName();
                     break;
                 }

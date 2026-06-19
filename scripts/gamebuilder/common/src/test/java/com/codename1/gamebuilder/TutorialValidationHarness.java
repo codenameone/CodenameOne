@@ -69,7 +69,7 @@ public final class TutorialValidationHarness {
     // ---- Tutorial 1: a 2D platformer ("Coin Run") ---------------------------
     private static void platformer2D() {
         AssetCatalog cat = StarterPacks.loadCatalog();
-        EditorModel m = new EditorModel(StarterPacks.newLevel(GameLevel.MODE_2D), cat);
+        EditorModel m = new EditorModel(StarterPacks.newLevel(GameLevel.Mode.TWO_D), cat);
         m.setSceneName("CoinRun");
         EditorController c = new EditorController(m);
         GameLevel lvl = m.level();
@@ -102,7 +102,7 @@ public final class TutorialValidationHarness {
     // ---- Tutorial 2: a card game ("Duke Jack" blackjack) --------------------
     private static void boardGame() {
         AssetCatalog cat = StarterPacks.loadCatalog();
-        EditorModel m = new EditorModel(StarterPacks.newLevel(GameLevel.MODE_BOARD), cat);
+        EditorModel m = new EditorModel(StarterPacks.newLevel(GameLevel.Mode.BOARD), cat);
         m.setSceneName("DukeJack");
         EditorController c = new EditorController(m);
         GameLevel lvl = m.level();
@@ -134,7 +134,7 @@ public final class TutorialValidationHarness {
     // ---- Tutorial 3: a 3D dungeon ("Crypt Walk") ----------------------------
     private static void dungeon3D() {
         AssetCatalog cat = StarterPacks.loadCatalog();
-        EditorModel m = new EditorModel(StarterPacks.newLevel(GameLevel.MODE_3D), cat);
+        EditorModel m = new EditorModel(StarterPacks.newLevel(GameLevel.Mode.THREE_D), cat);
         m.setSceneName("CryptWalk");
         EditorController c = new EditorController(m);
         GameLevel lvl = m.level();
@@ -164,7 +164,7 @@ public final class TutorialValidationHarness {
         GameLevel lvl = m.level();
         check(lvl.elements().size() >= minElements, name + ": has the placed elements ("
                 + lvl.elements().size() + ")");
-        boolean is3d = lvl.getMode() == GameLevel.MODE_3D;
+        boolean is3d = lvl.getMode() == GameLevel.Mode.THREE_D;
         // 2D / board realize into live Sprites; 3D realizes into Models (no 2D sprites).
         if (!is3d) {
             Scene scene = new Scene();
@@ -178,7 +178,7 @@ public final class TutorialValidationHarness {
             check(re.getMode() == lvl.getMode(), name + ": JSON round-trips mode");
             GameSceneView view = new GameSceneView(re, cat);   // must construct without error
             check(view != null, name + ": runtime GameSceneView builds");
-            if (lvl.getMode() == GameLevel.MODE_2D) {
+            if (lvl.getMode() == GameLevel.Mode.TWO_D) {
                 check(view.getScene().size() > 0, name + ": runtime GameSceneView realizes sprites");
             }
         } catch (Exception e) {
@@ -194,7 +194,7 @@ public final class TutorialValidationHarness {
 
     private static Layer firstTileLayer(GameLevel lvl) {
         for (Layer l : lvl.layers()) {
-            if (l.getKind() == Layer.KIND_TILE) {
+            if (l.getKind() == Layer.Kind.TILE) {
                 return l;
             }
         }
@@ -203,7 +203,7 @@ public final class TutorialValidationHarness {
 
     private static Layer firstEntityLayer(GameLevel lvl) {
         for (Layer l : lvl.layers()) {
-            if (l.getKind() != Layer.KIND_TILE) {
+            if (l.getKind() != Layer.Kind.TILE) {
                 return l;
             }
         }

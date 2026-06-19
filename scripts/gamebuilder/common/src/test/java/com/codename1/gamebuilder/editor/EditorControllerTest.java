@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /// Display is touched, so these run on a plain JVM.
 class EditorControllerTest {
 
-    private EditorController controller(int mode) {
+    private EditorController controller(GameLevel.Mode mode) {
         AssetCatalog cat = StarterPacks.loadCatalog();
         EditorModel model = new EditorModel(StarterPacks.newLevel(mode), cat);
         return new EditorController(model);
@@ -41,9 +41,9 @@ class EditorControllerTest {
 
     @Test
     void starterLayersPerMode() {
-        assertEquals(4, controller(GameLevel.MODE_2D).model().level().layers().size());
-        assertEquals(2, controller(GameLevel.MODE_BOARD).model().level().layers().size());
-        EditorController three = controller(GameLevel.MODE_3D);
+        assertEquals(4, controller(GameLevel.Mode.TWO_D).model().level().layers().size());
+        assertEquals(2, controller(GameLevel.Mode.BOARD).model().level().layers().size());
+        EditorController three = controller(GameLevel.Mode.THREE_D);
         assertEquals(1, three.model().level().layers().size());
         assertNotNull(three.model().level().getTerrain());
         assertEquals(1, three.model().level().lights().size());
@@ -51,7 +51,7 @@ class EditorControllerTest {
 
     @Test
     void paintEraseAndUndoRedo() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         c.model().setActiveLayer("Terrain");
         c.model().setSelectedAssetId("brick");
 
@@ -75,7 +75,7 @@ class EditorControllerTest {
 
     @Test
     void floodFillBounded() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         c.model().setActiveLayer("Background");
         c.model().setSelectedAssetId("ground");
         int cols = c.model().level().getCols();
@@ -91,7 +91,7 @@ class EditorControllerTest {
 
     @Test
     void placeElementCopiesDefaultsAndUnique() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         c.model().setActiveLayer("Actors");
 
         c.model().setSelectedAssetId("coin");
@@ -113,7 +113,7 @@ class EditorControllerTest {
 
     @Test
     void selectMoveDelete() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         c.model().setActiveLayer("Actors");
         c.model().setSelectedAssetId("gem");
         GameElement gem = c.placeElement(100, 100);
@@ -135,7 +135,7 @@ class EditorControllerTest {
 
     @Test
     void resizeGridIsUndoable() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         assertEquals(26, c.model().level().getCols());
         assertTrue(c.resizeGrid(30, 20, 48));
         assertEquals(30, c.model().level().getCols());
@@ -149,7 +149,7 @@ class EditorControllerTest {
 
     @Test
     void setLevelPropertyAndRename() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         c.setLevelProperty("background", "Night");
         assertEquals("Night", c.model().level().getString("background", "Sky"));
         c.undo();
@@ -160,7 +160,7 @@ class EditorControllerTest {
 
     @Test
     void addEntityLayerBecomesActive() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         int before = c.model().level().layers().size();
         c.addEntityLayer("Foreground");
         assertEquals(before + 1, c.model().level().layers().size());
@@ -172,32 +172,32 @@ class EditorControllerTest {
 
     @Test
     void loadLevelReplacesAndClearsHistory() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         c.model().setActiveLayer("Terrain");
         c.model().setSelectedAssetId("brick");
         c.paintTile(1, 1);
         assertTrue(c.canUndo());
-        c.loadLevel(StarterPacks.newLevel(GameLevel.MODE_BOARD), "Board1");
+        c.loadLevel(StarterPacks.newLevel(GameLevel.Mode.BOARD), "Board1");
         assertFalse(c.canUndo());
-        assertEquals(GameLevel.MODE_BOARD, c.model().level().getMode());
+        assertEquals(GameLevel.Mode.BOARD, c.model().level().getMode());
         assertEquals("Board1", c.model().getSceneName());
     }
 
     @Test
     void snapDefaultsOn() {
-        assertTrue(controller(GameLevel.MODE_2D).model().isSnap());
+        assertTrue(controller(GameLevel.Mode.TWO_D).model().isSnap());
     }
 
     @Test
     void newLevelClearsHistory() {
-        EditorController c = controller(GameLevel.MODE_2D);
+        EditorController c = controller(GameLevel.Mode.TWO_D);
         c.model().setActiveLayer("Terrain");
         c.model().setSelectedAssetId("brick");
         c.paintTile(1, 1);
         assertTrue(c.canUndo());
-        c.newLevel(GameLevel.MODE_BOARD);
+        c.newLevel(GameLevel.Mode.BOARD);
         assertFalse(c.canUndo());
-        assertEquals(GameLevel.MODE_BOARD, c.model().level().getMode());
+        assertEquals(GameLevel.Mode.BOARD, c.model().level().getMode());
         assertFalse(c.model().isDirty());
     }
 }

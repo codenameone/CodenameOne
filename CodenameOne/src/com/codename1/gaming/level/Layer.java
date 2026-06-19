@@ -28,38 +28,63 @@ import java.util.Map;
 /// A named drawing band in a `GameLevel`: the editor's "Background / Terrain / Items /
 /// Actors" rows, and the rendering order behind them.
 ///
-/// A layer has a `#getKind()` -- `#KIND_TILE` layers paint a grid of asset ids into
-/// cells (stored as a `"col,row" -> assetId` map), while `#KIND_ENTITY` and
-/// `#KIND_MODEL` layers just group freely-placed `GameElement`s. `#isVisible()` and
+/// A layer has a `#getKind()` -- `Kind#TILE` layers paint a grid of asset ids into
+/// cells (stored as a `"col,row" -> assetId` map), while `Kind#ENTITY` and
+/// `Kind#MODEL` layers just group freely-placed `GameElement`s. `#isVisible()` and
 /// `#isLocked()` mirror the editor toggles; `#getBand()` is the layer's slot in the
 /// stack and is folded into the rendered z-order (`band * 1000 + per-sprite z`) so a
 /// higher layer always draws over a lower one.
 public class Layer {
-    /// A grid of tiles addressed by cell, each cell holding an asset id.
-    public static final int KIND_TILE = 0;
-    /// A group of freely placed 2D entities (sprites).
-    public static final int KIND_ENTITY = 1;
-    /// A group of freely placed 3D models.
-    public static final int KIND_MODEL = 2;
+    /// What a layer holds, which decides how its content is realized.
+    public enum Kind {
+        /// A grid of tiles addressed by cell, each cell holding an asset id.
+        TILE("tile"),
+        /// A group of freely placed 2D entities (sprites).
+        ENTITY("entity"),
+        /// A group of freely placed 3D models.
+        MODEL("model");
+
+        private final String wire;
+
+        Kind(String wire) {
+            this.wire = wire;
+        }
+
+        /// The lowercase JSON token for this kind (`"tile"` / `"entity"` / `"model"`).
+        public String wireName() {
+            return wire;
+        }
+
+        /// The kind for a JSON token (case-insensitive); defaults to `#ENTITY`.
+        public static Kind fromWire(String name) {
+            if ("tile".equalsIgnoreCase(name)) {
+                return TILE;
+            }
+            if ("model".equalsIgnoreCase(name)) {
+                return MODEL;
+            }
+            return ENTITY;
+        }
+    }
 
     private String name;
-    private int kind = KIND_ENTITY;
+    private Kind kind = Kind.ENTITY;
     private boolean visible = true;
     private boolean locked;
     private int band;
     private float parallaxX = 1;
     private float parallaxY = 1;
 
-    /// cellKey ("col,row") -> assetId, only used by `#KIND_TILE` layers. Insertion
+    /// cellKey ("col,row") -> assetId, only used by `Kind#TILE` layers. Insertion
     /// ordered so a saved level reloads its tiles in a stable order.
     private final Map<String, String> tiles = new LinkedHashMap<String, String>();
 
     public Layer() {
     }
 
-    public Layer(String name, int kind) {
+    public Layer(String name, Kind kind) {
         this.name = name;
-        this.kind = kind;
+        this.kind = kind == null ? Kind.ENTITY : kind;
     }
 
     public String getName() {
@@ -71,12 +96,13 @@ public class Layer {
         return this;
     }
 
-    public int getKind() {
+    /// What this layer holds (`Kind#TILE` / `Kind#ENTITY` / `Kind#MODEL`).
+    public Kind getKind() {
         return kind;
     }
 
-    public Layer setKind(int kind) {
-        this.kind = kind;
+    public Layer setKind(Kind kind) {
+        this.kind = kind == null ? Kind.ENTITY : kind;
         return this;
     }
 

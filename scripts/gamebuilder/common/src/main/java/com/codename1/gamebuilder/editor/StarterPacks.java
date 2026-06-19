@@ -69,10 +69,10 @@ public final class StarterPacks {
     }
 
     /// The default asset pack id for a level mode.
-    public static String defaultPackFor(int mode) {
+    public static String defaultPackFor(GameLevel.Mode mode) {
         return switch (mode) {
-            case GameLevel.MODE_3D -> "kit3d";
-            case GameLevel.MODE_BOARD -> "board";
+            case THREE_D -> "kit3d";
+            case BOARD -> "board";
             default -> "platformer";
         };
     }
@@ -80,30 +80,30 @@ public final class StarterPacks {
     /// A blank level for the given mode, pre-populated with the conventional layers
     /// (and, for 3D, a light + a small flat terrain) so the editor opens onto something
     /// usable.
-    public static GameLevel newLevel(int mode) {
+    public static GameLevel newLevel(GameLevel.Mode mode) {
         GameLevel level = new GameLevel(mode);
         level.setAssetPack(defaultPackFor(mode));
         switch (mode) {
-            case GameLevel.MODE_3D -> {
+            case THREE_D -> {
                 level.setGrid(16, 16, 1);
                 level.setCamera(0, 8, 14, 0, 0, 0).setLens(60, 0.1f, 500);
                 level.lights().add(new LevelLight(0.4f, -1f, 0.3f, 0xfffff2e0, 0xff2a2f3a));
                 level.setTerrain(new TerrainGrid(16, 16, 1f));
-                level.addLayer(new Layer("Models", Layer.KIND_MODEL).setBand(0));
+                level.addLayer(new Layer("Models", Layer.Kind.MODEL).setBand(0));
             }
-            case GameLevel.MODE_BOARD -> {
+            case BOARD -> {
                 level.setGrid(10, 10, 64);
-                level.addLayer(new Layer("Board", Layer.KIND_TILE).setBand(0));
-                level.addLayer(new Layer("Pieces", Layer.KIND_ENTITY).setBand(2));
+                level.addLayer(new Layer("Board", Layer.Kind.TILE).setBand(0));
+                level.addLayer(new Layer("Pieces", Layer.Kind.ENTITY).setBand(2));
             }
             default -> {
                 level.setGrid(26, 16, 32);
                 // a freely-placed parallax backdrop (clouds/mountains are big and not grid-snapped);
                 // horizontal parallax only (parallaxY 1) so the mountains stay anchored to the horizon
-                level.addLayer(new Layer("Background", Layer.KIND_ENTITY).setBand(0).setParallax(0.4f, 1.0f));
-                level.addLayer(new Layer("Terrain", Layer.KIND_TILE).setBand(1));
-                level.addLayer(new Layer("Items", Layer.KIND_ENTITY).setBand(2));
-                level.addLayer(new Layer("Actors", Layer.KIND_ENTITY).setBand(3));
+                level.addLayer(new Layer("Background", Layer.Kind.ENTITY).setBand(0).setParallax(0.4f, 1.0f));
+                level.addLayer(new Layer("Terrain", Layer.Kind.TILE).setBand(1));
+                level.addLayer(new Layer("Items", Layer.Kind.ENTITY).setBand(2));
+                level.addLayer(new Layer("Actors", Layer.Kind.ENTITY).setBand(3));
             }
         }
         return level;
@@ -114,7 +114,7 @@ public final class StarterPacks {
     /// neighbour to demonstrate seamless transitions. The active region's `StreamingTerrain` is
     /// the authoritative terrain; chunks page in/out so the world can be arbitrarily large.
     public static GameLevel newLargeWorld() {
-        GameLevel level = newLevel(GameLevel.MODE_3D);
+        GameLevel level = newLevel(GameLevel.Mode.THREE_D);
         level.props().put("view3d", "open");
         com.codename1.gaming.level.GameWorld world = new com.codename1.gaming.level.GameWorld();
         com.codename1.gaming.level.Region home =
@@ -140,7 +140,7 @@ public final class StarterPacks {
     /// A small populated platformer level (a "Pixel Quest"-style starter) so the editor
     /// opens onto a real scene rather than a blank grid.
     public static GameLevel demoLevel() {
-        GameLevel level = newLevel(GameLevel.MODE_2D);
+        GameLevel level = newLevel(GameLevel.Mode.TWO_D);
         int cols = level.getCols();
         int rows = level.getRows();
         int ts = level.getTileSize();
