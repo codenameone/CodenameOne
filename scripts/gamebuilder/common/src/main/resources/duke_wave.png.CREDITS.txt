@@ -1,0 +1,12 @@
+duke_wave.png is the Java mascot "Duke" in his classic waving pose, used as card
+art in the Game Builder sample's "Duke Jack" tutorial.
+
+Source:  https://commons.wikimedia.org/wiki/File:Duke_(Java_mascot)_waving.svg
+License: BSD license. Duke was created by Joe Palrang and open-sourced by Sun
+         Microsystems, Inc. on 2006-11-13 under the BSD license. See the "Duke
+         (the Java mascot)" section of the repository's top-level NOTICE file for
+         the full license text.
+
+Modifications for this repository: rasterized from the source SVG to a PNG,
+trimmed to the figure's bounding box, and downscaled to 233x420. The artwork
+itself was not altered.

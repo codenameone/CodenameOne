@@ -1,0 +1,4 @@
+.m2-local/
+.m2-settings.xml
+sandbox/
+**/target/

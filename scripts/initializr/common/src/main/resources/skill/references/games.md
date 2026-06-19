@@ -153,6 +153,35 @@ world.step((float) dt);     // integrates and syncs every linked sprite
 
 `GameView` can render 3D meshes through the camera: switch `getCamera().setMode(GameCamera.MODE_PERSPECTIVE)`, set it up with `setPerspective/setPosition/setTarget`, build a `Model` from a `Mesh` (see `references/3d-graphics.md` for `Primitives`, `GltfLoader`, materials), and `addModel(model)`. For raw 3D without the game loop, use `com.codename1.gpu` directly.
 
+## Levels, modes & serialization (`com.codename1.gaming.level`)
+
+For data-driven games (and the visual **game builder**), `com.codename1.gaming.level` adds a
+saveable level model that is decoupled from rendering:
+
+- **`GameLevel`** — a mode-aware level (`MODE_2D` / `MODE_3D` / `MODE_BOARD`) with a grid,
+  ordered `Layer`s, `GameElement`s, and (for 3D) a camera rig, `LevelLight`s and a
+  `TerrainGrid`. `GameLevel.load(json)` / `level.toJson()` round-trip it as JSON
+  (uses `com.codename1.io.JSONParser`).
+- **`GameElement`** — pure placement data (id, name, assetId, transform, typed property
+  bag), *not* a `Sprite`, so the same level works in 2D (→ `Sprite`) and 3D (→ `Model`).
+- **`AssetCatalog` / `AssetPack` / `AssetDef`** — resolve an `assetId` to artwork and
+  default properties; `AssetCatalog.load(json)` reads asset packs.
+- **`GameSceneView extends GameView`** — turnkey: give it a `GameLevel` + `AssetCatalog`
+  and it realizes 2D/board sprites, and for 3D sets up the perspective camera, lights and
+  a `Model` per element. Put game logic in `onUpdate(dt)`.
+
+```java
+GameLevel level = GameLevel.load(Display.getInstance().getResourceAsStream(MyScene.class, "/games/Level1.game"));
+GameSceneView view = new GameSceneView(level, AssetCatalog.load(packsJson));
+form.add(BorderLayout.CENTER, view);
+form.show();
+view.start();
+```
+
+Scaffold a scene with `mvn cn1:create-game-scene -DclassName=com.example.Level1 -Dmode=2d`
+(writes `<Name>.game` + a `GameSceneView` companion), then edit it visually with
+`mvn cn1:gamebuilder` (the standalone level/map editor; Java-17 CN1 projects only).
+
 ## Platform support
 
 The gaming API is part of `codenameone-core` — no extra dependency, no build hint. Rendering uses the platform GPU backend (OpenGL ES on Android, Metal on iOS, WebGL on web, OpenGL/software on the simulator) and degrades gracefully where 3D is unavailable. Box2D physics is pure Java and identical everywhere.
