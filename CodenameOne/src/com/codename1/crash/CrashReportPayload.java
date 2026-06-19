@@ -128,7 +128,9 @@ final class CrashReportPayload {
         b.append(",\"frames\":[");
         for (int i = 0; i < frames.size(); i++) {
             Frame f = frames.get(i);
-            if (i > 0) b.append(',');
+            if (i > 0) {
+                b.append(',');
+            }
             b.append('{');
             appendString(b, "cls", f.className, true);
             appendString(b, "method", f.methodName, false);
@@ -179,8 +181,12 @@ final class CrashReportPayload {
     }
 
     private static String trim(String s, int max) {
-        if (s == null) return null;
-        if (s.length() <= max) return s;
+        if (s == null) {
+            return null;
+        }
+        if (s.length() <= max) {
+            return s;
+        }
         return s.substring(0, max);
     }
 
