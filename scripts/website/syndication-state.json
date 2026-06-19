@@ -437,6 +437,24 @@
         "featured_media_id": 124287,
         "yoast_meta_set": true,
         "syndicated_at": "2026-06-19T14:03:17+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/2022b8c584cc/edit",
+        "syndicated_at": "2026-06-19T15:01:37+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3660925/edit.html",
+        "syndicated_at": "2026-06-19T15:02:42+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmql26z7b00010cj70fr4dhpw",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a355a1d60ca9562960803dc",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-19T15:03:50+00:00"
       }
     }
   }
