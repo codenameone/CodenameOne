@@ -121,12 +121,28 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/xcode-native-tests.log"
 
+# Reuse a shared derived-data dir when one is supplied (CN1_IOS_DERIVED_DATA): the UI-smoke
+# step in the same job already compiled the app + core into it, so this test build reuses those
+# object files instead of recompiling the whole translated core a second time. Unset = default
+# per-run derived data (previous behavior), so other pipelines are unaffected.
+DERIVED_ARGS=()
+if [ -n "${CN1_IOS_DERIVED_DATA:-}" ]; then
+  mkdir -p "$CN1_IOS_DERIVED_DATA"
+  DERIVED_ARGS=(-derivedDataPath "$CN1_IOS_DERIVED_DATA")
+  ri_log "Reusing shared derived data at $CN1_IOS_DERIVED_DATA"
+fi
+# Match the smoke step's optimization level so the shared derived-data objects are reused rather
+# than treated as stale (xcodebuild rebuilds a TU when its build settings change).
+if [ -n "${CN1_TEST_OPT_LEVEL:-}" ]; then
+  DERIVED_ARGS+=("GCC_OPTIMIZATION_LEVEL=$CN1_TEST_OPT_LEVEL")
+fi
 ri_log "Running xcodebuild test (scheme=$TEST_SCHEME, destination=$DESTINATION)"
 set +e
 xcodebuild \
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" \
   -scheme "$TEST_SCHEME" \
   -destination "$DESTINATION" \
+  "${DERIVED_ARGS[@]}" \
   test | tee "$TEST_LOG"
 RC=${PIPESTATUS[0]}
 set -e

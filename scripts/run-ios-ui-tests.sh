@@ -494,8 +494,18 @@ case "$HOST_ARCH" in
   *) BUILD_ARCH="arm64" ;;
 esac
 
-DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
-rm -rf "$DERIVED_DATA_DIR"
+# A shared/stable derived-data dir can be supplied via CN1_IOS_DERIVED_DATA so the compiled
+# app + core are reused by a later step in the same job (e.g. the native test build) and across
+# re-runs, instead of compiling the whole translated core from scratch every time. Unset = a
+# fresh per-run dir (previous behavior), leaving other pipelines unchanged.
+if [ -n "${CN1_IOS_DERIVED_DATA:-}" ]; then
+  DERIVED_DATA_DIR="$CN1_IOS_DERIVED_DATA"
+  mkdir -p "$DERIVED_DATA_DIR"
+  ri_log "Reusing shared derived data at $DERIVED_DATA_DIR (incremental build)"
+else
+  DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
+  rm -rf "$DERIVED_DATA_DIR"
+fi
 BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
