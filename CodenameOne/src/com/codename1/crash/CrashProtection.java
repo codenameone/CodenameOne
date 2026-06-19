@@ -267,11 +267,22 @@ public final class CrashProtection {
             evictOldest();
         }
         String name = STORAGE_PREFIX + newEventId();
-        try (OutputStream os = Storage.getInstance().createOutputStream(name)) {
+        // Manual close-in-finally rather than try-with-resources --
+        // codenameone-core compiles with -source 1.5 for backward
+        // compatibility, and try-with-resources is Java 7+. Calling
+        // close() directly (rather than via Util.cleanup) lets PMD's
+        // CloseResource analyser see the close path.
+        OutputStream os = null;
+        try {
+            os = Storage.getInstance().createOutputStream(name);
             os.write(json.getBytes("UTF-8"));
             os.flush();
         } catch (IOException ex) {
             ex.printStackTrace();
+        } finally {
+            if (os != null) {
+                try { os.close(); } catch (IOException ignored) { /* best-effort */ }
+            }
         }
     }
 
@@ -298,13 +309,19 @@ public final class CrashProtection {
             evictOldest();
         }
         String name = STORAGE_PREFIX + payload.eventId;
-        try (OutputStream os = Storage.getInstance().createOutputStream(name)) {
+        OutputStream os = null;
+        try {
+            os = Storage.getInstance().createOutputStream(name);
             os.write(payload.toJson().getBytes("UTF-8"));
             os.flush();
             return name;
         } catch (IOException ex) {
             ex.printStackTrace();
             return null;
+        } finally {
+            if (os != null) {
+                try { os.close(); } catch (IOException ignored) { /* best-effort */ }
+            }
         }
     }
 
@@ -381,7 +398,9 @@ public final class CrashProtection {
     }
 
     private static String readStored(String name) {
-        try (InputStream is = Storage.getInstance().createInputStream(name)) {
+        InputStream is = null;
+        try {
+            is = Storage.getInstance().createInputStream(name);
             if (is == null) {
                 return null;
             }
@@ -390,6 +409,10 @@ public final class CrashProtection {
         } catch (IOException ex) {
             ex.printStackTrace();
             return null;
+        } finally {
+            if (is != null) {
+                try { is.close(); } catch (IOException ignored) { /* best-effort */ }
+            }
         }
     }
 
