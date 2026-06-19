@@ -355,48 +355,7 @@ public class WindowsNativeBuilder extends Executor {
         // / "Unknown publisher").
         signWindowsExecutable(windowsExecutable, request);
         log("Native Windows executable: " + windowsExecutable.getAbsolutePath() + " (" + arch + ")");
-
-        maybeUploadCrashSymbols(request, windowsExecutable, buildDir);
         return true;
-    }
-
-    /**
-     * Crash protection symbol upload hook. Opt-in via the
-     * {@code codename1.crashProtection.enabled} build property or via
-     * the user's code referencing
-     * {@code com.codename1.crash.CrashProtection}. Per-platform opt-out
-     * via {@code codename1.crashProtection.win32.enabled=false}.
-     *
-     * <p>Prefers the {@code .pdb} produced by the linker if present
-     * (gives source-level symbolication later); falls back to the
-     * {@code .exe} itself which carries enough info for stack-walking.
-     * Failure to upload never fails the build.
-     */
-    private void maybeUploadCrashSymbols(BuildRequest request, File exe, File buildDir) {
-        String endpoint = com.codename1.builders.util.CrashSymbolUploader.endpointFromEnv();
-        String secret = com.codename1.builders.util.CrashSymbolUploader.sharedSecretFromEnv();
-        String buildKey = com.codename1.builders.util.CrashSymbolUploader.buildKeyFromEnv();
-        if (endpoint == null || endpoint.isEmpty()
-                || secret == null || secret.isEmpty()
-                || buildKey == null || buildKey.isEmpty()) {
-            return;
-        }
-        java.util.Map<String, String> props = new java.util.HashMap<>();
-        props.put(com.codename1.builders.util.CrashProtectionOptIn.PROPERTY_GLOBAL,
-                request.getArg(com.codename1.builders.util.CrashProtectionOptIn.PROPERTY_GLOBAL, ""));
-        String perPlatform = String.format(
-                com.codename1.builders.util.CrashProtectionOptIn.PROPERTY_PER_PLATFORM_TEMPLATE,
-                com.codename1.builders.util.CrashSymbolUploader.PLATFORM_WIN32);
-        props.put(perPlatform, request.getArg(perPlatform, ""));
-        if (!com.codename1.builders.util.CrashProtectionOptIn.shouldUpload(
-                com.codename1.builders.util.CrashSymbolUploader.PLATFORM_WIN32, props, null)) {
-            return;
-        }
-        // Prefer the .pdb if MSVC produced one alongside the build.
-        File pdb = new File(buildDir, request.getMainClass() + ".pdb");
-        File payload = pdb.isFile() ? pdb : exe;
-        com.codename1.builders.util.CrashSymbolUploader.uploadWin32Symbols(
-                endpoint, secret, buildKey, payload);
     }
 
     /**

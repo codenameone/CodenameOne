@@ -4463,14 +4463,6 @@ public class AndroidGradleBuilder extends Executor {
                 throw new BuildException("Failed to create keyStore file", ex);
             }
         }
-        // Crash protection symbol upload hook: the cloud build executor
-        // calls this method to scaffold the gradle project but the
-        // actual `./gradlew assembleRelease` runs in the executor's
-        // post-build stage, after which `mapping.txt` is available at
-        // app/build/outputs/mapping/release/mapping.txt. The executor
-        // should invoke CrashSymbolUploader.uploadAndroidMapping there
-        // (when ProGuard is enabled, which is the default). Doing it
-        // here is wrong because gradle hasn't run yet.
         return true;
     }
 
