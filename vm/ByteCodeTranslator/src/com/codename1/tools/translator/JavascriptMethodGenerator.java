@@ -3824,7 +3824,7 @@ final class JavascriptMethodGenerator {
                 }
                 for (Label l : swLabels) {
                     Integer t = l == null ? null : labelToIndex.get(l);
-                    Integer tb = t == null ? null : startToBlock.get((int) t);
+                    Integer tb = t == null ? null : startToBlock.get(t);
                     if (tb == null) {
                         return _sb(method, instructions, "L3116");
                     }
@@ -5847,7 +5847,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 if (sw.getLabels() != null) {
                     for (Label l : sw.getLabels()) {
                         Integer d = l == null ? null : labelToIndex.get(l);
-                        if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                        if (d != null && startToBlock.containsKey(d)) { b.succs.add(startToBlock.get(d)); }
                     }
                 }
                 addFallThrough = false;
