@@ -1509,16 +1509,9 @@ public class EditorCanvas extends Component {
         return top * (1 - fz) + bot * fz;
     }
 
-    /// Base colour for a painted surface material (see TerrainGrid.MAT_*).
-    private static int materialColor(int mat) {
-        switch (mat) {
-            case com.codename1.gaming.level.TerrainGrid.MAT_ROAD: return 0x3b3e46;
-            case com.codename1.gaming.level.TerrainGrid.MAT_STONE: return 0x6f6a62;
-            case com.codename1.gaming.level.TerrainGrid.MAT_SAND: return 0xc2a86a;
-            case com.codename1.gaming.level.TerrainGrid.MAT_WATER: return 0x2f6fa8;
-            case com.codename1.gaming.level.TerrainGrid.MAT_DIRT: return 0x7a5a38;
-            default: return 0x3f7d3a;   // grass
-        }
+    /// Base colour for a painted surface material id, from the shared `MaterialRegistry`.
+    private static int materialColor(String materialId) {
+        return com.codename1.gaming.level.MaterialRegistry.get(materialId).getColor();
     }
 
     /// Whether the given fractional cell coordinate is blocked for a walker: a terrain wall or

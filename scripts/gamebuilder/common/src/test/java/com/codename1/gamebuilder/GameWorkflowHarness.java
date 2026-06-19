@@ -177,11 +177,11 @@ public final class GameWorkflowHarness {
         check(rg != null && Math.abs(rg.getHeight(2, 3) - tg.getHeight(2, 3)) < 1e-4
                 && !rg.hasGround(4, 4) && rg.getWall(5, 5) > 0f, "terrain survives JSON round-trip");
         // paint a road surface and confirm it persists through JSON
-        t3.model().setTerrainMaterial(com.codename1.gaming.level.TerrainGrid.MAT_ROAD);
+        t3.model().setTerrainMaterial(com.codename1.gaming.level.MaterialRegistry.ROAD);
         t3.paintTerrain(6, 6, com.codename1.gamebuilder.editor.TerrainBrush.PAINT);
-        check(tg.getMaterial(6, 6) == com.codename1.gaming.level.TerrainGrid.MAT_ROAD, "PAINT sets the surface material");
+        check(com.codename1.gaming.level.MaterialRegistry.ROAD.equals(tg.getMaterial(6, 6)), "PAINT sets the surface material");
         GameLevel rt2 = GameLevel.load(t3.model().level().toJson());
-        check(rt2.getTerrain().getMaterial(6, 6) == com.codename1.gaming.level.TerrainGrid.MAT_ROAD,
+        check(com.codename1.gaming.level.MaterialRegistry.ROAD.equals(rt2.getTerrain().getMaterial(6, 6)),
                 "surface material survives JSON round-trip");
         t3.fillGround(false);
         check(!t3.model().level().getTerrain().hasGround(0, 0), "Clear-to-sky removes the floor");

@@ -138,12 +138,12 @@ public final class ScreenshotHarness {
             for (int rr = 0; rr < l3d.getRows(); rr++) {
                 for (int cc = 0; cc < l3d.getCols(); cc++) {
                     ter.setHeight(cc, rr, Math.max(0f, (8 - rr) * 0.35f));   // ramps up toward the back
-                    ter.setMaterial(cc, rr, com.codename1.gaming.level.TerrainGrid.MAT_GRASS);
+                    ter.setMaterial(cc, rr, com.codename1.gaming.level.MaterialRegistry.GRASS);
                 }
             }
             for (int rr = 0; rr < l3d.getRows(); rr++) {
-                ter.setMaterial(8, rr, com.codename1.gaming.level.TerrainGrid.MAT_ROAD);   // a road down the middle
-                ter.setMaterial(7, rr, com.codename1.gaming.level.TerrainGrid.MAT_ROAD);
+                ter.setMaterial(8, rr, com.codename1.gaming.level.MaterialRegistry.ROAD);   // a road down the middle
+                ter.setMaterial(7, rr, com.codename1.gaming.level.MaterialRegistry.ROAD);
             }
             ter.setWall(6, 9, 2.2f);
             ter.setWall(10, 9, 2.2f);

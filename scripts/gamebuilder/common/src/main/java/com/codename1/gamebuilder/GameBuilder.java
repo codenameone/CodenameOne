@@ -1584,6 +1584,11 @@ public class GameBuilder extends Lifecycle {
     }
 
     private static final String[] MATERIAL_LABELS = {"Grass", "Road", "Stone", "Sand", "Water", "Dirt"};
+    /// The MaterialRegistry ids parallel to MATERIAL_LABELS (the value stored on the model).
+    private static final String[] MATERIAL_IDS = {
+        com.codename1.gaming.level.MaterialRegistry.GRASS, com.codename1.gaming.level.MaterialRegistry.ROAD,
+        com.codename1.gaming.level.MaterialRegistry.STONE, com.codename1.gaming.level.MaterialRegistry.SAND,
+        com.codename1.gaming.level.MaterialRegistry.WATER, com.codename1.gaming.level.MaterialRegistry.DIRT};
 
     /// The Terrain tool's controls: pick what a dab does (raise/lower/ground/wall/paint), the
     /// surface material to paint, and fill/clear the whole floor. Shown at the top of the
@@ -1609,11 +1614,17 @@ public class GameBuilder extends Lifecycle {
                 }
                 refresh();
             }));
-            int curMat = Math.max(0, Math.min(MATERIAL_LABELS.length - 1, controller.model().getTerrainMaterial()));
+            int curMat = 0;
+            for (int i = 0; i < MATERIAL_IDS.length; i++) {
+                if (MATERIAL_IDS[i].equals(controller.model().getTerrainMaterial())) {
+                    curMat = i;
+                    break;
+                }
+            }
             inspector.add(dropdownRow("Surface", MATERIAL_LABELS, MATERIAL_LABELS[curMat], v -> {
                 for (int i = 0; i < MATERIAL_LABELS.length; i++) {
                     if (MATERIAL_LABELS[i].equals(v)) {
-                        controller.model().setTerrainMaterial(i);
+                        controller.model().setTerrainMaterial(MATERIAL_IDS[i]);
                         break;
                     }
                 }

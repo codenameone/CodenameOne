@@ -41,7 +41,7 @@ public class EditorModel {
     private boolean dirty;
     private boolean snap = true;
     private TerrainBrush terrainBrush = TerrainBrush.RAISE;
-    private int terrainMaterial = com.codename1.gaming.level.TerrainGrid.MAT_GRASS;
+    private String terrainMaterial = com.codename1.gaming.level.MaterialRegistry.GRASS;
 
     public EditorModel(GameLevel level, AssetCatalog catalog) {
         this.catalog = catalog;
@@ -97,11 +97,11 @@ public class EditorModel {
     }
 
     /// The surface material the PAINT brush / Fill applies (see TerrainGrid.MAT_*).
-    public int getTerrainMaterial() {
+    public String getTerrainMaterial() {
         return terrainMaterial;
     }
 
-    public void setTerrainMaterial(int terrainMaterial) {
+    public void setTerrainMaterial(String terrainMaterial) {
         this.terrainMaterial = terrainMaterial;
     }
 

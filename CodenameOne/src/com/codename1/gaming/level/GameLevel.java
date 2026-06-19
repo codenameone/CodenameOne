@@ -525,10 +525,10 @@ public class GameLevel {
                 }
             }
             List<Object> ms = Json.asList(ter.get("materials"));
-            int[] mats = grid.materials();
+            String[] mats = grid.materials();
             if (ms != null) {
                 for (int i = 0; i < ms.size() && i < mats.length; i++) {
-                    mats[i] = Json.intval(ms.get(i), 0);
+                    mats[i] = materialId(ms.get(i));
                 }
             }
             level.terrain = grid;
@@ -585,6 +585,23 @@ public class GameLevel {
             }
         }
         return level;
+    }
+
+    /// A terrain material id from a JSON value: a String id is used as-is; a legacy numeric
+    /// ordinal is mapped onto the original built-in order (0=grass..5=dirt) so older `.game`
+    /// files that stored material indices still load.
+    private static String materialId(Object v) {
+        if (v instanceof String) {
+            return (String) v;
+        }
+        switch (Json.intval(v, 0)) {
+            case 1: return MaterialRegistry.ROAD;
+            case 2: return MaterialRegistry.STONE;
+            case 3: return MaterialRegistry.SAND;
+            case 4: return MaterialRegistry.WATER;
+            case 5: return MaterialRegistry.DIRT;
+            default: return MaterialRegistry.GRASS;
+        }
     }
 
     private static float[] readVec3(Object v, float dx, float dy, float dz) {
@@ -702,12 +719,12 @@ public class GameLevel {
                     Json.writeNumber(sb, w[i]);
                 }
                 sb.append("],\"materials\":[");
-                int[] mm = terrain.materials();
+                String[] mm = terrain.materials();
                 for (int i = 0; i < mm.length; i++) {
                     if (i > 0) {
                         sb.append(',');
                     }
-                    Json.writeNumber(sb, mm[i]);
+                    Json.writeString(sb, mm[i] == null ? MaterialRegistry.GRASS : mm[i]);
                 }
                 sb.append("]}");
             }

@@ -31,23 +31,15 @@ public class TerrainGrid {
     /// level have a partial floor -- e.g. a flight level with only a few ground patches.
     public static final float NO_GROUND = -1024f;
 
-    /// Surface materials painted on the floor (a texture-splat id per cell). Plain authoring
-    /// data; a realizer maps these to real materials/textures at runtime.
-    public static final int MAT_GRASS = 0;
-    public static final int MAT_ROAD = 1;
-    public static final int MAT_STONE = 2;
-    public static final int MAT_SAND = 3;
-    public static final int MAT_WATER = 4;
-    public static final int MAT_DIRT = 5;
-
     private int cols;
     private int rows;
     private float cellSize = 1f;
     private float[] heights;
     /// Per-cell wall height above the ground (0 = no wall); used by dungeon-style levels.
     private float[] walls;
-    /// Per-cell surface material id (see MAT_* constants); 0 (grass) by default.
-    private int[] materials;
+    /// Per-cell surface material id from `MaterialRegistry` (the same pluggable, String-keyed
+    /// materials the streaming terrain uses); `null`/`MaterialRegistry#GRASS` by default.
+    private String[] materials;
 
     public TerrainGrid() {
     }
@@ -58,7 +50,7 @@ public class TerrainGrid {
         this.cellSize = cellSize;
         this.heights = new float[Math.max(0, cols * rows)];
         this.walls = new float[Math.max(0, cols * rows)];
-        this.materials = new int[Math.max(0, cols * rows)];
+        this.materials = new String[Math.max(0, cols * rows)];
     }
 
     public int getCols() {
@@ -91,10 +83,11 @@ public class TerrainGrid {
         return walls;
     }
 
-    /// The raw row-major surface-material array (length `cols * rows`); see MAT_* constants.
-    public int[] materials() {
+    /// The raw row-major surface-material array (length `cols * rows`) of `MaterialRegistry`
+    /// ids; a `null` entry means the default `MaterialRegistry#GRASS`.
+    public String[] materials() {
         if (materials == null || materials.length != cols * rows) {
-            materials = new int[Math.max(0, cols * rows)];
+            materials = new String[Math.max(0, cols * rows)];
         }
         return materials;
     }
@@ -109,20 +102,23 @@ public class TerrainGrid {
             walls = new float[Math.max(0, cols * rows)];
         }
         if (materials == null || materials.length != cols * rows) {
-            materials = new int[Math.max(0, cols * rows)];
+            materials = new String[Math.max(0, cols * rows)];
         }
     }
 
-    public int getMaterial(int col, int row) {
-        int[] m = materials();
+    /// The surface material id at a cell (a `MaterialRegistry` id); never null -- an unpainted
+    /// cell reads as `MaterialRegistry#GRASS`.
+    public String getMaterial(int col, int row) {
+        String[] m = materials();
         if (col < 0 || row < 0 || col >= cols || row >= rows) {
-            return MAT_GRASS;
+            return MaterialRegistry.GRASS;
         }
-        return m[row * cols + col];
+        String v = m[row * cols + col];
+        return v == null ? MaterialRegistry.GRASS : v;
     }
 
-    public TerrainGrid setMaterial(int col, int row, int material) {
-        int[] m = materials();
+    public TerrainGrid setMaterial(int col, int row, String material) {
+        String[] m = materials();
         if (col >= 0 && row >= 0 && col < cols && row < rows) {
             m[row * cols + col] = material;
         }
