@@ -21,6 +21,11 @@
  * need additional information or have any questions.
  */
 #import "CN1TapGestureRecognizer.h"
+#include "TargetConditionals.h"
+// The tap gesture peer is UIGestureRecognizer/UIView based; both are
+// unavailable on watchOS. The whole implementation is compiled out there
+// (watch input is delivered through CN1WatchHost crown/tap instead).
+#if !TARGET_OS_WATCH
 #import "CodenameOne_GLViewController.h"
 
 
@@ -313,3 +318,4 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 	//	not being called after moving a certain threshold
 }
 @end
+#endif // !TARGET_OS_WATCH

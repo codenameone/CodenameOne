@@ -36,10 +36,13 @@
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 
 
 #ifdef USE_ES2
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -125,6 +128,12 @@ static GLuint getOGLProgram(){
     //CN1Log(@"Num points: %d", numPoints);
     return self;
 }
+#if TARGET_OS_WATCH
+-(void)execute
+{
+    CN1CGFillPolygon(color, alpha, x, y, numPoints);
+}
+#else
 -(void)execute
 {
 #ifdef CN1_USE_METAL
@@ -200,6 +209,7 @@ static GLuint getOGLProgram(){
 
 #endif // CN1_USE_METAL
 }
+#endif // TARGET_OS_WATCH
 
 -(void)dealloc
 {

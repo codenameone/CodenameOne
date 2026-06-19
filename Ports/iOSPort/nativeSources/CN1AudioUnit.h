@@ -22,6 +22,11 @@
  */
 #import <Foundation/Foundation.h>
 #import "xmlvm.h"
+#include "TargetConditionals.h"
+// AudioToolbox / AudioQueue are unavailable on watchOS; this low-level PCM
+// recorder is iOS/Mac-only. The implementation file is excluded from the watch
+// slice and this header is empty there.
+#if !TARGET_OS_WATCH
 
 #import <AudioToolbox/AudioQueue.h>
 
@@ -46,3 +51,4 @@
 -(float)sampleRate;
 -(int)channels;
 @end
+#endif // !TARGET_OS_WATCH

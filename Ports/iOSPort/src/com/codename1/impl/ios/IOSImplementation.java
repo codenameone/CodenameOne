@@ -338,7 +338,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean isDesktop() {
         return nativeInstance.isRunningOnMac();
     }
-    
+
+    @Override
+    public boolean isWatch() {
+        return nativeInstance.isRunningOnWatch();
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {
@@ -9399,6 +9404,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
+        if(isWatch()) {
+            return new String[] {"watch", "ios", "applewatch"};
+        }
         if(isTablet()) {
             return new String[] {"tablet", "ios", "ipad"};
         } else {

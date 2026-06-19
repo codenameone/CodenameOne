@@ -167,8 +167,11 @@ AudioPlayer* currentlyPlaying = nil;
     if (!success) {
         CN1Log(@"ERROR");
     }
+#if !TARGET_OS_WATCH
+    // UIApplication is unavailable on watchOS.
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
-    
+#endif
+
     currentlyPlaying = self;
     if(playerInstance != nil) {
 /*#ifndef CN1_USE_ARC

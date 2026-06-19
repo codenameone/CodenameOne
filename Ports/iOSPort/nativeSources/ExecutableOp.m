@@ -28,7 +28,7 @@
 
 
 extern void logGlErrorAt(const char *f, int l) {
-#ifdef CN1_USE_METAL
+#if defined(CN1_USE_METAL) || TARGET_OS_WATCH
     // No GL context on the Metal backend (and no GL symbols at all on
     // the Mac Catalyst slice). Callers still expand GLErrorLog macros
     // unconditionally; honour them with a no-op so the rendering ops

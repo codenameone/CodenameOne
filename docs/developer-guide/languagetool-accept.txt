@@ -609,6 +609,7 @@ syscall
 dlopen
 # The zig toolchain (zig cc), used to pin an old glibc for the Linux port.
 zig
+transcoder
 
 # Crash protection terminology.
 # "Symbolicated" / "symbolicate" is the term of art for resolving raw

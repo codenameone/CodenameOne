@@ -5669,6 +5669,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 >= Configuration.SCREENLAYOUT_SIZE_LARGE;
     }
 
+    private Boolean watchCache;
+
+    @Override
+    public boolean isWatch() {
+        if(watchCache == null) {
+            // PackageManager.FEATURE_WATCH ("android.hardware.type.watch") is
+            // the canonical Wear OS marker; use the string literal so this
+            // compiles regardless of the configured minimum SDK level.
+            watchCache = getContext().getPackageManager()
+                    .hasSystemFeature("android.hardware.type.watch");
+        }
+        return watchCache;
+    }
+
     /**
      * Executes r on the UI thread and blocks the EDT to completion
      * @param r runnable to execute
@@ -8266,6 +8280,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
+        if (isWatch()) {
+            return new String[]{"watch", "android", "android-watch"};
+        }
         if (isTablet()) {
             return new String[]{"tablet", "android", "android-tab"};
         } else {

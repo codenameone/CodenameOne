@@ -666,5 +666,18 @@
                 <module>errorprone-checks</module>
             </modules>
         </profile>
+        <!-- Release lane for the Game Builder editor jar. Off by default (the editor is a CN1
+             app that depends on the just-built plugin/core/javase, so it must build AFTER them).
+             Activate during the release to build + deploy com.codenameone:codenameone-gamebuilder
+             at the CN1 version, so cn1:gamebuilder resolves it from Central like the Designer jar:
+                 mvn -Pgamebuilder-release -Pexecutable-jar deploy
+             The module lives outside maven/ (scripts/gamebuilder); it is version-synced to the
+             reactor (8.0-SNAPSHOT) and pulls codenameone-core/javase/maven-plugin from it. -->
+        <profile>
+            <id>gamebuilder-release</id>
+            <modules>
+                <module>../scripts/gamebuilder</module>
+            </modules>
+        </profile>
     </profiles>
 </project>

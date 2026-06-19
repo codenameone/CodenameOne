@@ -281,7 +281,11 @@ public final class CrashProtection {
             ex.printStackTrace();
         } finally {
             if (os != null) {
-                try { os.close(); } catch (IOException ignored) { /* best-effort */ }
+                try {
+                    os.close();
+                } catch (IOException ignored) {
+                    /* best-effort */
+                }
             }
         }
     }
@@ -320,7 +324,11 @@ public final class CrashProtection {
             return null;
         } finally {
             if (os != null) {
-                try { os.close(); } catch (IOException ignored) { /* best-effort */ }
+                try {
+                    os.close();
+                } catch (IOException ignored) {
+                    /* best-effort */
+                }
             }
         }
     }
@@ -410,7 +418,11 @@ public final class CrashProtection {
             return null;
         } finally {
             if (is != null) {
-                try { is.close(); } catch (IOException ignored) { /* best-effort */ }
+                try {
+                    is.close();
+                } catch (IOException ignored) {
+                    /* best-effort */
+                }
             }
         }
     }

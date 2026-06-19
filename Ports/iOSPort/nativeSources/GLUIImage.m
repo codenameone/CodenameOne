@@ -56,10 +56,11 @@ extern int nextPowerOf2(int val);
 }
 
 -(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight {
-#ifdef CN1_USE_METAL
+#if defined(CN1_USE_METAL) || TARGET_OS_WATCH
     // Metal builds never sample via GL texture handles; DrawImage / TileImage
-    // route through getMTLTexture instead. Return 0 so the GL helpers are
-    // preprocessed away and the Mac Catalyst slice can link without GL
+    // route through getMTLTexture instead. watchOS has no GL at all and renders
+    // images directly from the UIImage via the Core Graphics backend. Return 0
+    // so the GL helpers are preprocessed away and the slice links without GL
     // function symbols.
     return 0;
 #else
@@ -151,7 +152,7 @@ extern int nextPowerOf2(int val);
     [mtlTexture release];
     mtlTexture = nil;
 #endif
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
     if(textureName != 0) {
         int tname = textureName;
         textureName = 0;
@@ -167,7 +168,7 @@ extern int nextPowerOf2(int val);
             });
         }
     }
-#endif // !CN1_USE_METAL
+#endif // !CN1_USE_METAL && !TARGET_OS_WATCH
 }
 
 -(void)setName:(NSString*)s {
@@ -239,7 +240,7 @@ extern int nextPowerOf2(int val);
         [name release];
 #endif
     }
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
     if(textureName != 0) {
         int tname = textureName;
         textureName = 0;
@@ -255,7 +256,7 @@ extern int nextPowerOf2(int val);
             });
         }
     }
-#endif // !CN1_USE_METAL
+#endif // !CN1_USE_METAL && !TARGET_OS_WATCH
 #ifdef CN1_USE_METAL
     // Both ivars hold a +1 MTLTexture retain (newTextureWithDescriptor /
     // CN1MetalTextureFromUIImage both return owned references). Without

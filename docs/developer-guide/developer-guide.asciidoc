@@ -69,6 +69,10 @@ include::3D-Graphics.asciidoc[]
 
 include::Game-Development.asciidoc[]
 
+include::Game-Builder.asciidoc[]
+
+include::Game-Assets.asciidoc[]
+
 include::Events.asciidoc[]
 
 include::io.asciidoc[]
@@ -132,6 +136,8 @@ include::Desktop-Integration.asciidoc[]
 
 include::Working-With-Windows.asciidoc[]
 include::Working-With-Linux.asciidoc[]
+
+include::Wearables.asciidoc[]
 
 include::Working-With-CodenameOne-Sources.asciidoc[]
 

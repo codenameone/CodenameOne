@@ -27,6 +27,10 @@
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
+#include "TargetConditionals.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 
 float currentScaleX = 1;
 float currentScaleY = 1;
@@ -39,6 +43,13 @@ float currentScaleY = 1;
     return self;
 }
 
+#if TARGET_OS_WATCH
+-(void)execute {
+    CN1CGScale(x, y);
+    currentScaleX = x;
+    currentScaleY = y;
+}
+#else
 -(void)execute {
 #ifdef CN1_USE_METAL
     {
@@ -77,6 +88,7 @@ float currentScaleY = 1;
     currentScaleY = y;
 #endif // !CN1_USE_METAL
 }
+#endif // TARGET_OS_WATCH
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {

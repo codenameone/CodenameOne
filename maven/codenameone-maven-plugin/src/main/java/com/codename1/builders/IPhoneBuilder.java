@@ -59,6 +59,11 @@ public class IPhoneBuilder extends Executor {
     // that is an implementation detail -- never surfaced in hint names.
     private final MacNativeBuilder macNativeBuilder = new MacNativeBuilder(this);
 
+    // watchNative.* delegate: adds an Apple Watch (watchOS) target rendered via
+    // the Core Graphics backend. Like macNativeBuilder this is inert unless the
+    // watchNative.enabled hint is set, keeping the iOS build unchanged.
+    private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
+
     private boolean enableGalleryMultiselect;
     private boolean usePhotoKitForMultigallery;
     private boolean enableWKWebView, disableUIWebView;
@@ -320,6 +325,15 @@ public class IPhoneBuilder extends Executor {
             // Mac requires the iPad device family. iphone-only is incompatible.
             macNativeBuilder.validateProjectType(request);
             // Ruby + xcodeproj gem is unconditionally required for the Mac slice.
+            ensureXcodeprojInstalled();
+        }
+
+        // watchNative: parse + prep. The watch app is a separate target (not a
+        // slice), built from the shared sources for arm64_32 and rendered via
+        // Core Graphics, so no iOS-side renderer knobs change here -- we only
+        // need the xcodeproj gem to add and wire the target post-generate.
+        watchNativeBuilder.parseHints(request);
+        if (watchNativeBuilder.isEnabled()) {
             ensureXcodeprojInstalled();
         }
 
@@ -2313,6 +2327,11 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
                 if (macNativeBuilder.isEnabled()) {
                     parparCmd.add(macNativeBuilder.parparvmOptionalFrameworksArg());
+                } else if (watchNativeBuilder.isEnabled()) {
+                    // Weak-link the watch-incompatible frameworks so the shared
+                    // sources link on both the iOS app target and the watch
+                    // target. (macNative already widens the set when both apply.)
+                    parparCmd.add(watchNativeBuilder.parparvmOptionalFrameworksArg());
                 }
                 parparCmd.add("-Xmx384m");
                 parparCmd.add("-jar");
@@ -2973,6 +2992,14 @@ public class IPhoneBuilder extends Executor {
                     macNativeBuilder.writeStubHeaders(appSrcDir);
                     macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                     macNativeBuilder.writeExportOptions(request, new File(tmpFile, "dist"));
+                }
+
+                if (watchNativeBuilder.isEnabled()) {
+                    File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
+                    watchNativeBuilder.writeWatchEntry(request, appSrcDir);
+                    watchNativeBuilder.writeStubHeaders(appSrcDir);
+                    watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                 }
 
             } catch (Exception ex) {

@@ -27,6 +27,10 @@
 #import "SetTransform.h"
 #endif
 #include "xmlvm.h"
+#include "TargetConditionals.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
 
@@ -41,6 +45,7 @@ extern float currentScaleY;
 @implementation ResetAffine
 
 -(id)init {
+#if !TARGET_OS_WATCH
 #ifdef USE_ES2
 #ifdef CN1_USE_METAL
     // The Mac Catalyst stub GLKit header omits the GLKMatrix4Identity
@@ -52,10 +57,18 @@ extern float currentScaleY;
     [SetTransform currentTransform:GLKMatrix4Identity];
 #endif
 #endif
+#endif // !TARGET_OS_WATCH
 
     return self;
 }
 
+#if TARGET_OS_WATCH
+-(void)execute {
+    CN1CGResetAffine();
+    currentScaleX = 1;
+    currentScaleY = 1;
+}
+#else
 -(void)execute {
     //_glMatrixMode(GL_PROJECTION);
     //GLErrorLog;
@@ -86,6 +99,7 @@ extern float currentScaleY;
     currentScaleX = 1;
     currentScaleY = 1;
 }
+#endif // TARGET_OS_WATCH
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {

@@ -23,12 +23,16 @@
 #import "DrawRect.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#include "TargetConditionals.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
 
 #ifdef USE_ES2
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -108,7 +112,11 @@ static GLuint getOGLProgram(){
     height = h;
     return self;
 }
-#ifdef USE_ES2
+#if TARGET_OS_WATCH
+-(void)execute {
+    CN1CGDrawRect(color, alpha, x, y, width, height, 1);
+}
+#elif defined(USE_ES2)
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalDrawRect(color, alpha, x, y, width, height);

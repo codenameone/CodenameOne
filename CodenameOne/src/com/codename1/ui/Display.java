@@ -4380,6 +4380,17 @@ public final class Display extends CN1Constants {
         return impl.isDesktop();
     }
 
+    /// Indicates whether the application is running on a smartwatch form factor
+    /// (Apple Watch / Wear OS). Notice that this is often a guess derived from
+    /// the device metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a smartwatch
+    public boolean isWatch() {
+        return impl.isWatch();
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns

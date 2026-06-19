@@ -898,6 +898,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
+        // watchMain: optional separate lifecycle entry point for the Apple Watch
+        // / Wear OS slice, declared next to codename1.mainName in
+        // codenameone_settings.properties as codename1.watchMain. May legally
+        // point at the same class as mainName, but a distinct entry point lets
+        // the watch slice tree-shake more aggressively. Passed as a build arg so
+        // it rides the extensible args map (no BuildRequest wire-format change)
+        // and reaches WatchNativeBuilder via request.getArg("watchMain").
+        {
+            String cn1WatchMain = props.getProperty("codename1.watchMain");
+            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
+                r.putArgument("watchMain", cn1WatchMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         File iconFile = new File(iconPath);
@@ -1137,6 +1150,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
+        // watchMain: optional separate lifecycle entry point for the Apple Watch
+        // / Wear OS slice, declared next to codename1.mainName in
+        // codenameone_settings.properties as codename1.watchMain. May legally
+        // point at the same class as mainName, but a distinct entry point lets
+        // the watch slice tree-shake more aggressively. Passed as a build arg so
+        // it rides the extensible args map (no BuildRequest wire-format change)
+        // and reaches WatchNativeBuilder via request.getArg("watchMain").
+        {
+            String cn1WatchMain = props.getProperty("codename1.watchMain");
+            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
+                r.putArgument("watchMain", cn1WatchMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         File iconFile = new File(iconPath);
@@ -1243,6 +1269,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
+        // watchMain: optional separate lifecycle entry point for the Apple Watch
+        // / Wear OS slice, declared next to codename1.mainName in
+        // codenameone_settings.properties as codename1.watchMain. May legally
+        // point at the same class as mainName, but a distinct entry point lets
+        // the watch slice tree-shake more aggressively. Passed as a build arg so
+        // it rides the extensible args map (no BuildRequest wire-format change)
+        // and reaches WatchNativeBuilder via request.getArg("watchMain").
+        {
+            String cn1WatchMain = props.getProperty("codename1.watchMain");
+            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
+                r.putArgument("watchMain", cn1WatchMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         r.setVendor(props.getProperty("codename1.vendor"));
         r.setType("windows");
@@ -1323,6 +1362,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
+        // watchMain: optional separate lifecycle entry point for the Apple Watch
+        // / Wear OS slice, declared next to codename1.mainName in
+        // codenameone_settings.properties as codename1.watchMain. May legally
+        // point at the same class as mainName, but a distinct entry point lets
+        // the watch slice tree-shake more aggressively. Passed as a build arg so
+        // it rides the extensible args map (no BuildRequest wire-format change)
+        // and reaches WatchNativeBuilder via request.getArg("watchMain").
+        {
+            String cn1WatchMain = props.getProperty("codename1.watchMain");
+            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
+                r.putArgument("watchMain", cn1WatchMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         r.setVendor(props.getProperty("codename1.vendor"));
         r.setType("linux");
@@ -1379,6 +1431,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
+        // watchMain: optional separate lifecycle entry point for the Apple Watch
+        // / Wear OS slice, declared next to codename1.mainName in
+        // codenameone_settings.properties as codename1.watchMain. May legally
+        // point at the same class as mainName, but a distinct entry point lets
+        // the watch slice tree-shake more aggressively. Passed as a build arg so
+        // it rides the extensible args map (no BuildRequest wire-format change)
+        // and reaches WatchNativeBuilder via request.getArg("watchMain").
+        {
+            String cn1WatchMain = props.getProperty("codename1.watchMain");
+            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
+                r.putArgument("watchMain", cn1WatchMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         if (iconPath != null) {

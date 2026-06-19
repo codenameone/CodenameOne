@@ -3183,14 +3183,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return;
             }
             lastInputEvent = e;
-            if(invokePointerHover) {
+            // Deliver hover so tooltips and hover cursors "just work" on the desktop -- the
+            // invokePointerHover skin flag is off for no-skin desktop apps, which previously
+            // left them without hover even after TooltipManager.enableTooltips().
+            if(invokePointerHover || JavaSEPort.this.isDesktop()) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     JavaSEPort.this.pointerHover(x, y);
                 }
-                
-                
+
+
             }
             Form f = Display.getInstance().getCurrent();
             if (f != null && f.isEnableCursors()) {

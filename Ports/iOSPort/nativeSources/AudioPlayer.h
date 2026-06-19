@@ -23,7 +23,12 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
+#include "TargetConditionals.h"
+#if !TARGET_OS_WATCH
+// AudioToolbox is unavailable on watchOS; AudioPlayer uses AVAudioPlayer
+// (AVFoundation, present on watch) and doesn't need AudioToolbox types here.
 #import <AudioToolbox/AudioToolbox.h>
+#endif
 
 @interface AudioPlayer : NSObject<AVAudioPlayerDelegate> {
     AVAudioPlayer* playerInstance;
