@@ -331,8 +331,8 @@ public final class CrashProtection {
             return 0;
         }
         int c = 0;
-        for (int i = 0; i < all.length; i++) {
-            if (all[i] != null && all[i].startsWith(STORAGE_PREFIX)) {
+        for (String entry : all) {
+            if (entry != null && entry.startsWith(STORAGE_PREFIX)) {
                 c++;
             }
         }
@@ -345,8 +345,7 @@ public final class CrashProtection {
             return;
         }
         String oldest = null;
-        for (int i = 0; i < all.length; i++) {
-            String n = all[i];
+        for (String n : all) {
             if (n == null || !n.startsWith(STORAGE_PREFIX)) {
                 continue;
             }
@@ -365,6 +364,7 @@ public final class CrashProtection {
         }
         draining = true;
         new Thread(new Runnable() {
+            @Override
             public void run() {
                 try {
                     drain();
@@ -383,8 +383,7 @@ public final class CrashProtection {
         if (all == null) {
             return;
         }
-        for (int i = 0; i < all.length; i++) {
-            String name = all[i];
+        for (String name : all) {
             if (name == null || !name.startsWith(STORAGE_PREFIX)) {
                 continue;
             }
