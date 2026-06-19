@@ -63,8 +63,17 @@ EOF
 # split across multiple javadoc invocations, each regenerating the same output
 # directory. The last batch (the Ports/CLDC11 java.* sources) then clobbers the
 # full API docs, leaving only the CLDC packages. An @argfile has no length limit.
+#
+# The internal implementation package com.codename1.impl (and every sub package
+# such as com.codename1.impl.gpu) is never part of the published API. The
+# javadoc `-exclude` option only filters packages discovered through
+# `-subpackages`; with an explicit source @argfile it has no effect, so we drop
+# the impl sources from the list here. They remain reachable for symbol
+# resolution through `-sourcepath` below, so references from documented classes
+# still resolve without documenting impl itself.
 SOURCES_ARGFILE="$CN1_DIR/build/javadoc-sources.txt"
-find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" > "$SOURCES_ARGFILE"
+find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" \
+  | grep -v '/com/codename1/impl/' > "$SOURCES_ARGFILE"
 
 "$JAVADOC_CMD" \
   --allow-script-in-comments \
@@ -72,6 +81,7 @@ find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java
   --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
   --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
   --release 8 \
+  -sourcepath "$CN1_DIR/build/tempJavaSources:$ROOT_DIR/Ports/CLDC11/src" \
   -exclude com.codename1.impl \
   -Xdoclint:none \
   -quiet \
@@ -84,6 +94,14 @@ find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java
 # build (e.g. only the CLDC java.* packages) ships silently to the website.
 if [ ! -f "$CN1_DIR/dist/javadoc/com/codename1/ui/Component.html" ]; then
   echo "JavaDoc generation produced no core com.codename1.ui output; aborting." >&2
+  exit 1
+fi
+
+# Guard: com.codename1.impl is an internal package and must never reach the
+# published API. If a regression documents it anyway, fail loudly here rather
+# than shipping internal classes to the website.
+if [ -e "$CN1_DIR/dist/javadoc/com/codename1/impl" ]; then
+  echo "JavaDoc generated com.codename1.impl output; the internal implementation package must stay excluded." >&2
   exit 1
 fi
 
