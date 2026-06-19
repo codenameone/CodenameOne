@@ -342,43 +342,40 @@ final class PlaygroundExamples {
             import com.codename1.ui.*;
             import com.codename1.ui.geom.*;
             import com.codename1.ui.layouts.*;
-            import com.codename1.gaming.physics.*;
+            import com.codename1.ui.util.*;
 
-            // 2D physics with Codename One's bundled engine: drop a few balls
-            // into a box and let them bounce. The world is stepped from a
-            // UITimer and the bodies are drawn straight from their positions.
-            final PhysicsWorld world = new PhysicsWorld(0, 1400);
-            final java.util.ArrayList balls = new java.util.ArrayList();
-            world.createBox(160, 470, 320, 24, BodyType.STATIC);   // floor
-            world.createBox(8, 240, 16, 480, BodyType.STATIC);     // left wall
-            world.createBox(312, 240, 16, 480, BodyType.STATIC);   // right wall
-            for (int i = 0; i < 6; i++) {
-                PhysicsBody ball = world.createCircle(45 + i * 44, 50 + (i % 3) * 34, 15, BodyType.DYNAMIC);
-                ball.setRestitution(0.72f);
-                balls.add(ball);
-            }
+            // A tiny game loop: balls fall under gravity and bounce off the
+            // walls and floor. Position / velocity live in parallel float[]
+            // arrays; the loop runs from a UITimer and the scene is drawn through
+            // GameScripting.canvas, which bridges a (Graphics, Component) lambda
+            // to a paintable Component (bsh can't subclass Component to override
+            // paint() on the ahead-of-time-compiled JavaScript port).
+            float[] x = { 40f, 78f, 116f, 154f, 192f, 230f, 268f };
+            float[] y = { 40f, 70f, 100f, 40f, 70f, 100f, 40f };
+            float[] vx = { 2.4f, -2.0f, 2.8f, -2.6f, 2.2f, -2.4f, 2.0f };
+            float[] vy = { 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            int[] col = { 0x5fd0d6, 0xf2b134, 0xe8615f, 0x9b8cf2, 0x6fcf6b, 0xf28cc8, 0x7aa7ff };
 
-            Component view = new Component() {
-                protected Dimension calcPreferredSize() {
-                    return new Dimension(320, 480);
+            Component view = GameScripting.canvas(320, 480, g -> {
+                g.setColor(0x10182a);
+                g.fillRect(0, 0, 320, 480);
+                for (int i = 0; i < x.length; i++) {
+                    g.setColor(col[i]);
+                    g.fillArc((int) x[i] - 16, (int) y[i] - 16, 32, 32, 0, 360);
                 }
-                public void paint(Graphics g) {
-                    g.setColor(0x10182a);
-                    g.fillRect(getX(), getY(), getWidth(), getHeight());
-                    g.setColor(0x3dc8d1);
-                    for (int i = 0; i < balls.size(); i++) {
-                        PhysicsBody b = (PhysicsBody) balls.get(i);
-                        int cx = getX() + (int) b.getX();
-                        int cy = getY() + (int) b.getY();
-                        g.fillArc(cx - 15, cy - 15, 30, 30, 0, 360);
-                    }
-                }
-            };
+            });
 
-            Form form = new Form("Physics", new BorderLayout());
+            Form form = new Form("Bouncing Balls", new BorderLayout());
             form.add(BorderLayout.CENTER, view);
             UITimer.timer(16, true, form, () -> {
-                world.step(1f / 60f);
+                for (int i = 0; i < x.length; i++) {
+                    vy[i] += 0.45f;
+                    x[i] += vx[i];
+                    y[i] += vy[i];
+                    if (x[i] < 16f) { x[i] = 16f; vx[i] = -vx[i]; }
+                    if (x[i] > 304f) { x[i] = 304f; vx[i] = -vx[i]; }
+                    if (y[i] > 464f) { y[i] = 464f; vy[i] = -vy[i] * 0.78f; }
+                }
                 view.repaint();
             });
             form.show();
@@ -387,35 +384,36 @@ final class PlaygroundExamples {
     static final String GPU_SCRIPT = """
             import com.codename1.ui.*;
             import com.codename1.ui.layouts.*;
-            import com.codename1.gaming.*;
             import com.codename1.gpu.*;
 
-            // GPU 3D: a spinning cube rendered through the GameView / gpu API.
-            // Renders on GPU-capable targets (device builds, WebGL browsers).
-            final double[] angle = { 0 };
-            final Model[] cubeRef = new Model[1];
-
-            GameView game = new GameView() {
-                protected void onSetup(GraphicsDevice device) {
-                    setClearColor(0xff10182a);
-                    Model cube = new Model(Primitives.cube(device, 1.0f));
-                    addModel(cube);
-                    cubeRef[0] = cube;
-                    getCamera().setPerspective(60, 0.1f, 100f)
-                               .setPosition(0, 0, 4)
-                               .setTarget(0, 0, 0);
-                }
-                protected void update(double deltaSeconds) {
-                    angle[0] += deltaSeconds * 45;
-                    if (cubeRef[0] != null) {
-                        cubeRef[0].setRotation((float) angle[0], (float) (angle[0] * 0.7), 0);
-                    }
-                }
-            };
-
+            // GPU 3D: a spinning cube rendered through the RenderView / gpu API.
+            // The two lambdas are the Renderer's onInit / onFrame callbacks
+            // (GpuScripting bridges them to the multi-method Renderer interface).
+            // Renders on GPU-capable targets (WebGL browsers, device builds).
             Form form = new Form("3D / GPU", new BorderLayout());
-            form.add(BorderLayout.CENTER, game);
-            game.start();
+
+            Camera camera = new Camera()
+                    .setPerspective(60f, 0.1f, 100f)
+                    .setPosition(0f, 0f, 4f)
+                    .setTarget(0f, 0f, 0f);
+            Mesh[] cube = new Mesh[1];
+            Material[] material = new Material[1];
+            float[] angle = { 0f };
+
+            RenderView view = new RenderView(GpuScripting.renderer(
+                device -> {
+                    cube[0] = Primitives.cube(device, 1f);
+                    material[0] = new Material(Material.Type.PHONG).setColor(0xff3399ff);
+                },
+                device -> {
+                    angle[0] += 0.02f;
+                    device.clear(0xff10182a, true, true);
+                    device.setCamera(camera);
+                    device.draw(cube[0], material[0], Matrix4.rotation(angle[0], 0.4f, 1f, 0.2f));
+                }));
+            view.setContinuous(true);
+
+            form.add(BorderLayout.CENTER, view);
             form.show();
             """;
 
@@ -432,7 +430,7 @@ final class PlaygroundExamples {
             new Sample("Network Fetch", NETWORK_SCRIPT),
             new Sample("REST Request", REST_SCRIPT),
             new Sample("Camera Capture", CAMERA_SCRIPT),
-            new Sample("Physics", PHYSICS_SCRIPT),
+            new Sample("Bouncing Balls", PHYSICS_SCRIPT),
             new Sample("3D / GPU", GPU_SCRIPT)
     };
 

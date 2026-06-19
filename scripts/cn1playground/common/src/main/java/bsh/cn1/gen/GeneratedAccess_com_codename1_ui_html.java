@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_ui_html {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -64,6 +69,24 @@ public final class GeneratedAccess_com_codename1_ui_html {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.ui.html.AsyncDocumentRequestHandlerImpl.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.html.AsyncDocumentRequestHandlerImpl();
+            }
+        }
+        if (type == com.codename1.ui.html.DefaultDocumentRequestHandler.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.html.DefaultDocumentRequestHandler();
+            }
+        }
+        if (type == com.codename1.ui.html.DefaultHTMLCallback.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.html.DefaultHTMLCallback();
+            }
+        }
         if (type == com.codename1.ui.html.HTMLComponent.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);

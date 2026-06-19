@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -103,10 +108,34 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics {
                 return new com.codename1.gaming.physics.box2d.dynamics.FixtureDef();
             }
         }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.FixtureProxy.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.FixtureProxy();
+            }
+        }
         if (type == com.codename1.gaming.physics.box2d.dynamics.Island.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.gaming.physics.box2d.dynamics.Island();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.Profile.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.Profile();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.SolverData.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.SolverData();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.TimeStep.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.TimeStep();
             }
         }
         if (type == com.codename1.gaming.physics.box2d.dynamics.World.class) {

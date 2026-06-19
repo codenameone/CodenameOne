@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_io_wifi {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -68,6 +73,18 @@ public final class GeneratedAccess_com_codename1_io_wifi {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.io.wifi.WiFiSecurity.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.io.wifi.WiFiSecurity.class}, false);
                 return new com.codename1.io.wifi.WiFiNetwork((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), (com.codename1.io.wifi.WiFiSecurity) adaptedArgs[4]);
+            }
+        }
+        if (type == com.codename1.io.wifi.WifiDirectPlatform.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.wifi.WifiDirectPlatform();
+            }
+        }
+        if (type == com.codename1.io.wifi.WifiPlatform.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.wifi.WifiPlatform();
             }
         }
         throw unsupportedConstruct(type, safeArgs);

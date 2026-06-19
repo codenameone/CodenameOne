@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_charts_compat {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -65,6 +70,30 @@ public final class GeneratedAccess_com_codename1_charts_compat {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.GradientDrawable.Orientation.class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.GradientDrawable.Orientation.class, int[].class}, false);
                 return new com.codename1.charts.compat.GradientDrawable((com.codename1.charts.compat.GradientDrawable.Orientation) adaptedArgs[0], (int[]) adaptedArgs[1]);
+            }
+        }
+        if (type == com.codename1.charts.compat.Paint.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.compat.Paint();
+            }
+        }
+        if (type == com.codename1.charts.compat.Paint.Align.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.compat.Paint.Align();
+            }
+        }
+        if (type == com.codename1.charts.compat.Paint.Cap.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.compat.Paint.Cap();
+            }
+        }
+        if (type == com.codename1.charts.compat.Paint.Join.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.compat.Paint.Join();
             }
         }
         if (type == com.codename1.charts.compat.PathMeasure.class) {

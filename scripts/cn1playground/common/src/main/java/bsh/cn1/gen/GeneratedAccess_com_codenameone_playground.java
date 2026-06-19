@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codenameone_playground {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -26,6 +31,12 @@ public final class GeneratedAccess_com_codenameone_playground {
     private static Class<?> findClassChunk0(String simpleName) {
         if ("CN1Playground".equals(simpleName)) {
             return com.codenameone.playground.CN1Playground.class;
+        }
+        if ("GameScripting".equals(simpleName)) {
+            return com.codenameone.playground.GameScripting.class;
+        }
+        if ("GpuScripting".equals(simpleName)) {
+            return com.codenameone.playground.GpuScripting.class;
         }
         if ("PlaygroundContext".equals(simpleName)) {
             return com.codenameone.playground.PlaygroundContext.class;
@@ -49,6 +60,12 @@ public final class GeneratedAccess_com_codenameone_playground {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codenameone.playground.CN1Playground.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codenameone.playground.CN1Playground();
+            }
+        }
         if (type == com.codenameone.playground.PlaygroundContext.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class}, false);
@@ -59,16 +76,50 @@ public final class GeneratedAccess_com_codenameone_playground {
                 return new com.codenameone.playground.PlaygroundContext((com.codename1.ui.Form) adaptedArgs[0], (com.codename1.ui.Container) adaptedArgs[1], (com.codename1.ui.util.Resources) adaptedArgs[2], (com.codenameone.playground.PlaygroundContext.Logger) adaptedArgs[3], (com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter) adaptedArgs[4]);
             }
         }
+        if (type == com.codenameone.playground.PlaygroundLambdaBridge.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codenameone.playground.PlaygroundLambdaBridge();
+            }
+        }
+        if (type == com.codenameone.playground.PlaygroundListenerBridge.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codenameone.playground.PlaygroundListenerBridge();
+            }
+        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codenameone.playground.PlaygroundContext.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codenameone.playground.GameScripting.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codenameone.playground.GpuScripting.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codenameone.playground.PlaygroundContext.class) return invokeStatic2(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("canvas".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.util.function.Consumer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.util.function.Consumer.class}, false);
+                return com.codenameone.playground.GameScripting.canvas(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (java.util.function.Consumer) adaptedArgs[2]);
+            }
+        }
+        throw unsupportedStatic(com.codenameone.playground.GameScripting.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("renderer".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.function.Consumer.class, java.util.function.Consumer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.function.Consumer.class, java.util.function.Consumer.class}, false);
+                return com.codenameone.playground.GpuScripting.renderer((java.util.function.Consumer) adaptedArgs[0], (java.util.function.Consumer) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedStatic(com.codenameone.playground.GpuScripting.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("debug".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);

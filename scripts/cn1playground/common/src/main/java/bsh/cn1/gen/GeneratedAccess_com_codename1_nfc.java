@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_nfc {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -85,6 +90,24 @@ public final class GeneratedAccess_com_codename1_nfc {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.nfc.IsoDep.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.IsoDep();
+            }
+        }
+        if (type == com.codename1.nfc.MifareClassic.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.MifareClassic();
+            }
+        }
+        if (type == com.codename1.nfc.MifareUltralight.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.MifareUltralight();
+            }
+        }
         if (type == com.codename1.nfc.NdefMessage.class) {
             if (matches(safeArgs, new Class<?>[]{java.util.List.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class}, false);
@@ -105,6 +128,18 @@ public final class GeneratedAccess_com_codename1_nfc {
                 return new com.codename1.nfc.NdefRecord((byte) toIntValue(adaptedArgs[0]), (byte[]) adaptedArgs[1], (byte[]) adaptedArgs[2], (byte[]) adaptedArgs[3]);
             }
         }
+        if (type == com.codename1.nfc.NfcA.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.NfcA();
+            }
+        }
+        if (type == com.codename1.nfc.NfcB.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.NfcB();
+            }
+        }
         if (type == com.codename1.nfc.NfcException.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.nfc.NfcError.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.nfc.NfcError.class}, false);
@@ -117,6 +152,24 @@ public final class GeneratedAccess_com_codename1_nfc {
             if (matches(safeArgs, new Class<?>[]{com.codename1.nfc.NfcError.class, java.lang.String.class, java.lang.Throwable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.nfc.NfcError.class, java.lang.String.class, java.lang.Throwable.class}, false);
                 return new com.codename1.nfc.NfcException((com.codename1.nfc.NfcError) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.Throwable) adaptedArgs[2]);
+            }
+        }
+        if (type == com.codename1.nfc.NfcF.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.NfcF();
+            }
+        }
+        if (type == com.codename1.nfc.NfcReadOptions.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.NfcReadOptions();
+            }
+        }
+        if (type == com.codename1.nfc.NfcV.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.nfc.NfcV();
             }
         }
         throw unsupportedConstruct(type, safeArgs);

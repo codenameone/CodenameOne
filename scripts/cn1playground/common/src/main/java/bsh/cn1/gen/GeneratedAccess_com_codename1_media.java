@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_media {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -92,6 +97,36 @@ public final class GeneratedAccess_com_codename1_media {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return new com.codename1.media.AudioBuffer(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if (type == com.codename1.media.MediaMetaData.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.media.MediaMetaData();
+            }
+        }
+        if (type == com.codename1.media.MediaRecorderBuilder.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.media.MediaRecorderBuilder();
+            }
+        }
+        if (type == com.codename1.media.RecognitionOptions.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.media.RecognitionOptions();
+            }
+        }
+        if (type == com.codename1.media.RemoteControlListener.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.media.RemoteControlListener();
+            }
+        }
+        if (type == com.codename1.media.TtsOptions.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.media.TtsOptions();
             }
         }
         if (type == com.codename1.media.WAVWriter.class) {

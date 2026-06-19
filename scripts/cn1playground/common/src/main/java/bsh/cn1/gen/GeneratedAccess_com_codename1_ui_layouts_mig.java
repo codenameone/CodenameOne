@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -99,10 +104,28 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 return new com.codename1.ui.layouts.mig.BoundSize((com.codename1.ui.layouts.mig.UnitValue) adaptedArgs[0], (com.codename1.ui.layouts.mig.UnitValue) adaptedArgs[1], (com.codename1.ui.layouts.mig.UnitValue) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), (java.lang.String) adaptedArgs[4]);
             }
         }
+        if (type == com.codename1.ui.layouts.mig.CC.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.layouts.mig.CC();
+            }
+        }
+        if (type == com.codename1.ui.layouts.mig.DimConstraint.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.layouts.mig.DimConstraint();
+            }
+        }
         if (type == com.codename1.ui.layouts.mig.Grid.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.layouts.mig.ContainerWrapper.class, com.codename1.ui.layouts.mig.LC.class, com.codename1.ui.layouts.mig.AC.class, com.codename1.ui.layouts.mig.AC.class, java.util.Map.class, java.util.ArrayList.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.layouts.mig.ContainerWrapper.class, com.codename1.ui.layouts.mig.LC.class, com.codename1.ui.layouts.mig.AC.class, com.codename1.ui.layouts.mig.AC.class, java.util.Map.class, java.util.ArrayList.class}, false);
                 return new com.codename1.ui.layouts.mig.Grid((com.codename1.ui.layouts.mig.ContainerWrapper) adaptedArgs[0], (com.codename1.ui.layouts.mig.LC) adaptedArgs[1], (com.codename1.ui.layouts.mig.AC) adaptedArgs[2], (com.codename1.ui.layouts.mig.AC) adaptedArgs[3], (java.util.Map) adaptedArgs[4], (java.util.ArrayList) adaptedArgs[5]);
+            }
+        }
+        if (type == com.codename1.ui.layouts.mig.LC.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.layouts.mig.LC();
             }
         }
         if (type == com.codename1.ui.layouts.mig.MigLayout.class) {

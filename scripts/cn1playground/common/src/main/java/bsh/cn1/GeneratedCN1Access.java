@@ -1228,6 +1228,8 @@ public final class GeneratedCN1Access implements CN1Access {
         "com.codename1.xml.XMLParser",
         "com.codename1.xml.XMLWriter",
         "com.codenameone.playground.CN1Playground",
+        "com.codenameone.playground.GameScripting",
+        "com.codenameone.playground.GpuScripting",
         "com.codenameone.playground.PlaygroundContext",
         "com.codenameone.playground.PlaygroundContext.Logger",
         "com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter",
@@ -2610,6 +2612,8 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLParser", splitMembers(""));
         index.put("com.codename1.xml.XMLWriter", splitMembers(""));
         index.put("com.codenameone.playground.CN1Playground", splitMembers("destroy()getTheme()init(Object)onReceivedSharedContent(SharedContent)runApp()start()stop()"));
+        index.put("com.codenameone.playground.GameScripting", splitMembers("canvas(int, int, Consumer)"));
+        index.put("com.codenameone.playground.GpuScripting", splitMembers("renderer(Consumer, Consumer)"));
         index.put("com.codenameone.playground.PlaygroundContext", splitMembers("captureShownForm(Form)clearCreatedComponents()clearPreview()clearShownForm()getCreatedComponents()getFirstCreatedComponent()getFirstCreatedForm()getHostForm()getPreviewRoot()getShownForm()getTheme()log(String)recordCreatedComponent(Component)refreshPreview()reportRuntimeError(String, Throwable)setTitle(String)debug(String)getCurrent()interceptMethodInvocation(Object, String, Object[])notifyConstructed(Object)"));
         index.put("com.codenameone.playground.PlaygroundContext.Logger", splitMembers("log(String)"));
         index.put("com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter", splitMembers("reportRuntimeError(String, Throwable)"));
@@ -2662,11 +2666,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.Error", splitMembers(""));
         index.put("java.lang.Exception", splitMembers(""));
         index.put("java.lang.Float", splitMembers(""));
-        index.put("java.lang.IllegalAccessException", splitMembers(""));
-        index.put("java.lang.IllegalArgumentException", splitMembers(""));
     }
 
     private static void fillMethodIndex18(Map<String, String[]> index) {
+        index.put("java.lang.IllegalAccessException", splitMembers(""));
+        index.put("java.lang.IllegalArgumentException", splitMembers(""));
         index.put("java.lang.IllegalMonitorStateException", splitMembers(""));
         index.put("java.lang.IllegalStateException", splitMembers(""));
         index.put("java.lang.IncompatibleClassChangeError", splitMembers(""));
@@ -2729,11 +2733,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.time.OffsetDateTime", splitMembers(""));
         index.put("java.time.Period", splitMembers(""));
         index.put("java.time.ZoneId", splitMembers(""));
-        index.put("java.time.ZoneOffset", splitMembers(""));
-        index.put("java.time.ZonedDateTime", splitMembers(""));
     }
 
     private static void fillMethodIndex19(Map<String, String[]> index) {
+        index.put("java.time.ZoneOffset", splitMembers(""));
+        index.put("java.time.ZonedDateTime", splitMembers(""));
         index.put("java.time.format.DateTimeFormatter", splitMembers(""));
         index.put("java.time.format.DateTimeParseException", splitMembers(""));
         index.put("java.time.temporal.TemporalAccessor", splitMembers(""));
@@ -2796,11 +2800,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.Vector", splitMembers(""));
         index.put("java.util.concurrent.ThreadLocalRandom", splitMembers(""));
         index.put("java.util.concurrent.atomic.AtomicBoolean", splitMembers(""));
-        index.put("java.util.concurrent.atomic.AtomicInteger", splitMembers(""));
-        index.put("java.util.concurrent.atomic.AtomicLong", splitMembers(""));
     }
 
     private static void fillMethodIndex20(Map<String, String[]> index) {
+        index.put("java.util.concurrent.atomic.AtomicInteger", splitMembers(""));
+        index.put("java.util.concurrent.atomic.AtomicLong", splitMembers(""));
         index.put("java.util.concurrent.atomic.AtomicReference", splitMembers(""));
         index.put("java.util.function.BiConsumer", splitMembers(""));
         index.put("java.util.function.BiFunction", splitMembers(""));
@@ -3992,6 +3996,8 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLParser", splitMembers(""));
         index.put("com.codename1.xml.XMLWriter", splitMembers(""));
         index.put("com.codenameone.playground.CN1Playground", splitMembers(""));
+        index.put("com.codenameone.playground.GameScripting", splitMembers(""));
+        index.put("com.codenameone.playground.GpuScripting", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundContext", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundContext.Logger", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter", splitMembers(""));
@@ -4044,11 +4050,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.Error", splitMembers(""));
         index.put("java.lang.Exception", splitMembers(""));
         index.put("java.lang.Float", splitMembers(""));
-        index.put("java.lang.IllegalAccessException", splitMembers(""));
-        index.put("java.lang.IllegalArgumentException", splitMembers(""));
     }
 
     private static void fillFieldIndex18(Map<String, String[]> index) {
+        index.put("java.lang.IllegalAccessException", splitMembers(""));
+        index.put("java.lang.IllegalArgumentException", splitMembers(""));
         index.put("java.lang.IllegalMonitorStateException", splitMembers(""));
         index.put("java.lang.IllegalStateException", splitMembers(""));
         index.put("java.lang.IncompatibleClassChangeError", splitMembers(""));
@@ -4111,11 +4117,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.time.OffsetDateTime", splitMembers(""));
         index.put("java.time.Period", splitMembers(""));
         index.put("java.time.ZoneId", splitMembers(""));
-        index.put("java.time.ZoneOffset", splitMembers(""));
-        index.put("java.time.ZonedDateTime", splitMembers(""));
     }
 
     private static void fillFieldIndex19(Map<String, String[]> index) {
+        index.put("java.time.ZoneOffset", splitMembers(""));
+        index.put("java.time.ZonedDateTime", splitMembers(""));
         index.put("java.time.format.DateTimeFormatter", splitMembers(""));
         index.put("java.time.format.DateTimeParseException", splitMembers(""));
         index.put("java.time.temporal.TemporalAccessor", splitMembers(""));
@@ -4178,11 +4184,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.Vector", splitMembers(""));
         index.put("java.util.concurrent.ThreadLocalRandom", splitMembers(""));
         index.put("java.util.concurrent.atomic.AtomicBoolean", splitMembers(""));
-        index.put("java.util.concurrent.atomic.AtomicInteger", splitMembers(""));
-        index.put("java.util.concurrent.atomic.AtomicLong", splitMembers(""));
     }
 
     private static void fillFieldIndex20(Map<String, String[]> index) {
+        index.put("java.util.concurrent.atomic.AtomicInteger", splitMembers(""));
+        index.put("java.util.concurrent.atomic.AtomicLong", splitMembers(""));
         index.put("java.util.concurrent.atomic.AtomicReference", splitMembers(""));
         index.put("java.util.function.BiConsumer", splitMembers(""));
         index.put("java.util.function.BiFunction", splitMembers(""));
@@ -4588,708 +4594,716 @@ public final class GeneratedCN1Access implements CN1Access {
 
     @Override
     public Object construct(Class<?> type, Object[] args) throws Exception {
-        String packageName = packageName(type);
-        if ("com.codename1.ads".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ads.construct(type, args);
-        }
-        if ("com.codename1.ads.spi".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ads_spi.construct(type, args);
-        }
-        if ("com.codename1.ai".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ai.construct(type, args);
-        }
-        if ("com.codename1.analytics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_analytics.construct(type, args);
-        }
-        if ("com.codename1.annotations".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations.construct(type, args);
-        }
-        if ("com.codename1.annotations.graphql".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_graphql.construct(type, args);
-        }
-        if ("com.codename1.annotations.grpc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_grpc.construct(type, args);
-        }
-        if ("com.codename1.annotations.rest".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_rest.construct(type, args);
-        }
-        if ("com.codename1.background".equals(packageName)) {
-            return GeneratedAccess_com_codename1_background.construct(type, args);
-        }
-        if ("com.codename1.binding".equals(packageName)) {
-            return GeneratedAccess_com_codename1_binding.construct(type, args);
-        }
-        if ("com.codename1.camera".equals(packageName)) {
-            return GeneratedAccess_com_codename1_camera.construct(type, args);
-        }
-        if ("com.codename1.capture".equals(packageName)) {
-            return GeneratedAccess_com_codename1_capture.construct(type, args);
-        }
-        if ("com.codename1.charts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts.construct(type, args);
-        }
-        if ("com.codename1.charts.compat".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_compat.construct(type, args);
-        }
-        if ("com.codename1.charts.models".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_models.construct(type, args);
-        }
-        if ("com.codename1.charts.renderers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_renderers.construct(type, args);
-        }
-        if ("com.codename1.charts.transitions".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_transitions.construct(type, args);
-        }
-        if ("com.codename1.charts.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_util.construct(type, args);
-        }
-        if ("com.codename1.charts.views".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_views.construct(type, args);
-        }
-        if ("com.codename1.cloud".equals(packageName)) {
-            return GeneratedAccess_com_codename1_cloud.construct(type, args);
-        }
-        if ("com.codename1.codescan".equals(packageName)) {
-            return GeneratedAccess_com_codename1_codescan.construct(type, args);
-        }
-        if ("com.codename1.compat.java.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_compat_java_util.construct(type, args);
-        }
-        if ("com.codename1.components".equals(packageName)) {
-            return GeneratedAccess_com_codename1_components.construct(type, args);
-        }
-        if ("com.codename1.contacts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_contacts.construct(type, args);
-        }
-        if ("com.codename1.db".equals(packageName)) {
-            return GeneratedAccess_com_codename1_db.construct(type, args);
-        }
-        if ("com.codename1.facebook".equals(packageName)) {
-            return GeneratedAccess_com_codename1_facebook.construct(type, args);
-        }
-        if ("com.codename1.facebook.ui".equals(packageName)) {
-            return GeneratedAccess_com_codename1_facebook_ui.construct(type, args);
-        }
-        if ("com.codename1.gaming".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.callbacks".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.common".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_common.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.construct(type, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.construct(type, args);
-        }
-        if ("com.codename1.gpu".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gpu.construct(type, args);
-        }
-        if ("com.codename1.io".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io.construct(type, args);
-        }
-        if ("com.codename1.io.bonjour".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_bonjour.construct(type, args);
-        }
-        if ("com.codename1.io.graphql".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_graphql.construct(type, args);
-        }
-        if ("com.codename1.io.grpc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_grpc.construct(type, args);
-        }
-        if ("com.codename1.io.gzip".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_gzip.construct(type, args);
-        }
-        if ("com.codename1.io.oidc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_oidc.construct(type, args);
-        }
-        if ("com.codename1.io.rest".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_rest.construct(type, args);
-        }
-        if ("com.codename1.io.services".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_services.construct(type, args);
-        }
-        if ("com.codename1.io.tar".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_tar.construct(type, args);
-        }
-        if ("com.codename1.io.usb".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_usb.construct(type, args);
-        }
-        if ("com.codename1.io.webauthn".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_webauthn.construct(type, args);
-        }
-        if ("com.codename1.io.wifi".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_wifi.construct(type, args);
-        }
-        if ("com.codename1.javascript".equals(packageName)) {
-            return GeneratedAccess_com_codename1_javascript.construct(type, args);
-        }
-        if ("com.codename1.l10n".equals(packageName)) {
-            return GeneratedAccess_com_codename1_l10n.construct(type, args);
-        }
-        if ("com.codename1.location".equals(packageName)) {
-            return GeneratedAccess_com_codename1_location.construct(type, args);
-        }
-        if ("com.codename1.mapping".equals(packageName)) {
-            return GeneratedAccess_com_codename1_mapping.construct(type, args);
-        }
-        if ("com.codename1.maps".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps.construct(type, args);
-        }
-        if ("com.codename1.maps.layers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps_layers.construct(type, args);
-        }
-        if ("com.codename1.maps.providers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps_providers.construct(type, args);
-        }
-        if ("com.codename1.media".equals(packageName)) {
-            return GeneratedAccess_com_codename1_media.construct(type, args);
-        }
-        if ("com.codename1.messaging".equals(packageName)) {
-            return GeneratedAccess_com_codename1_messaging.construct(type, args);
-        }
-        if ("com.codename1.nfc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_nfc.construct(type, args);
-        }
-        if ("com.codename1.notifications".equals(packageName)) {
-            return GeneratedAccess_com_codename1_notifications.construct(type, args);
-        }
-        if ("com.codename1.orm".equals(packageName)) {
-            return GeneratedAccess_com_codename1_orm.construct(type, args);
-        }
-        if ("com.codename1.payment".equals(packageName)) {
-            return GeneratedAccess_com_codename1_payment.construct(type, args);
-        }
-        if ("com.codename1.plugin".equals(packageName)) {
-            return GeneratedAccess_com_codename1_plugin.construct(type, args);
-        }
-        if ("com.codename1.plugin.event".equals(packageName)) {
-            return GeneratedAccess_com_codename1_plugin_event.construct(type, args);
-        }
-        if ("com.codename1.printing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_printing.construct(type, args);
-        }
-        if ("com.codename1.processing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_processing.construct(type, args);
-        }
-        if ("com.codename1.properties".equals(packageName)) {
-            return GeneratedAccess_com_codename1_properties.construct(type, args);
-        }
-        if ("com.codename1.push".equals(packageName)) {
-            return GeneratedAccess_com_codename1_push.construct(type, args);
-        }
-        if ("com.codename1.router".equals(packageName)) {
-            return GeneratedAccess_com_codename1_router.construct(type, args);
-        }
-        if ("com.codename1.security".equals(packageName)) {
-            return GeneratedAccess_com_codename1_security.construct(type, args);
-        }
-        if ("com.codename1.share".equals(packageName)) {
-            return GeneratedAccess_com_codename1_share.construct(type, args);
-        }
-        if ("com.codename1.social".equals(packageName)) {
-            return GeneratedAccess_com_codename1_social.construct(type, args);
-        }
-        if ("com.codename1.system".equals(packageName)) {
-            return GeneratedAccess_com_codename1_system.construct(type, args);
-        }
-        if ("com.codename1.testing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_testing.construct(type, args);
-        }
-        if ("com.codename1.ui".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui.construct(type, args);
-        }
-        if ("com.codename1.ui.animations".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_animations.construct(type, args);
-        }
-        if ("com.codename1.ui.css".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_css.construct(type, args);
-        }
-        if ("com.codename1.ui.events".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_events.construct(type, args);
-        }
-        if ("com.codename1.ui.geom".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_geom.construct(type, args);
-        }
-        if ("com.codename1.ui.html".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_html.construct(type, args);
-        }
-        if ("com.codename1.ui.layouts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_layouts.construct(type, args);
-        }
-        if ("com.codename1.ui.layouts.mig".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_layouts_mig.construct(type, args);
-        }
-        if ("com.codename1.ui.list".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_list.construct(type, args);
-        }
-        if ("com.codename1.ui.painter".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_painter.construct(type, args);
-        }
-        if ("com.codename1.ui.plaf".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_plaf.construct(type, args);
-        }
-        if ("com.codename1.ui.scene".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_scene.construct(type, args);
-        }
-        if ("com.codename1.ui.spinner".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_spinner.construct(type, args);
-        }
-        if ("com.codename1.ui.table".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_table.construct(type, args);
-        }
-        if ("com.codename1.ui.tree".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_tree.construct(type, args);
-        }
-        if ("com.codename1.ui.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_util.construct(type, args);
-        }
-        if ("com.codename1.ui.validation".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_validation.construct(type, args);
-        }
-        if ("com.codename1.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util.construct(type, args);
-        }
-        if ("com.codename1.util.promise".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util_promise.construct(type, args);
-        }
-        if ("com.codename1.util.regex".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util_regex.construct(type, args);
-        }
-        if ("com.codename1.xml".equals(packageName)) {
-            return GeneratedAccess_com_codename1_xml.construct(type, args);
-        }
-        if ("com.codenameone.playground".equals(packageName)) {
-            return GeneratedAccess_com_codenameone_playground.construct(type, args);
-        }
-        if ("java.io".equals(packageName)) {
-            return GeneratedAccess_java_io.construct(type, args);
-        }
-        if ("java.lang".equals(packageName)) {
-            return GeneratedAccess_java_lang.construct(type, args);
-        }
-        if ("java.lang.ref".equals(packageName)) {
-            return GeneratedAccess_java_lang_ref.construct(type, args);
-        }
-        if ("java.lang.reflect".equals(packageName)) {
-            return GeneratedAccess_java_lang_reflect.construct(type, args);
-        }
-        if ("java.net".equals(packageName)) {
-            return GeneratedAccess_java_net.construct(type, args);
-        }
-        if ("java.nio.charset".equals(packageName)) {
-            return GeneratedAccess_java_nio_charset.construct(type, args);
-        }
-        if ("java.text".equals(packageName)) {
-            return GeneratedAccess_java_text.construct(type, args);
-        }
-        if ("java.time".equals(packageName)) {
-            return GeneratedAccess_java_time.construct(type, args);
-        }
-        if ("java.time.format".equals(packageName)) {
-            return GeneratedAccess_java_time_format.construct(type, args);
-        }
-        if ("java.time.temporal".equals(packageName)) {
-            return GeneratedAccess_java_time_temporal.construct(type, args);
-        }
-        if ("java.util".equals(packageName)) {
-            return GeneratedAccess_java_util.construct(type, args);
-        }
-        if ("java.util.concurrent".equals(packageName)) {
-            return GeneratedAccess_java_util_concurrent.construct(type, args);
-        }
-        if ("java.util.concurrent.atomic".equals(packageName)) {
-            return GeneratedAccess_java_util_concurrent_atomic.construct(type, args);
-        }
-        if ("java.util.function".equals(packageName)) {
-            return GeneratedAccess_java_util_function.construct(type, args);
-        }
-        if ("java.util.stream".equals(packageName)) {
-            return GeneratedAccess_java_util_stream.construct(type, args);
+        String candidate = packageName(type);
+        while (candidate != null) {
+            if ("com.codename1.ads".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ads.construct(type, args);
+            }
+            if ("com.codename1.ads.spi".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ads_spi.construct(type, args);
+            }
+            if ("com.codename1.ai".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ai.construct(type, args);
+            }
+            if ("com.codename1.analytics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_analytics.construct(type, args);
+            }
+            if ("com.codename1.annotations".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations.construct(type, args);
+            }
+            if ("com.codename1.annotations.graphql".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_graphql.construct(type, args);
+            }
+            if ("com.codename1.annotations.grpc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_grpc.construct(type, args);
+            }
+            if ("com.codename1.annotations.rest".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_rest.construct(type, args);
+            }
+            if ("com.codename1.background".equals(candidate)) {
+                return GeneratedAccess_com_codename1_background.construct(type, args);
+            }
+            if ("com.codename1.binding".equals(candidate)) {
+                return GeneratedAccess_com_codename1_binding.construct(type, args);
+            }
+            if ("com.codename1.camera".equals(candidate)) {
+                return GeneratedAccess_com_codename1_camera.construct(type, args);
+            }
+            if ("com.codename1.capture".equals(candidate)) {
+                return GeneratedAccess_com_codename1_capture.construct(type, args);
+            }
+            if ("com.codename1.charts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts.construct(type, args);
+            }
+            if ("com.codename1.charts.compat".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_compat.construct(type, args);
+            }
+            if ("com.codename1.charts.models".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_models.construct(type, args);
+            }
+            if ("com.codename1.charts.renderers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_renderers.construct(type, args);
+            }
+            if ("com.codename1.charts.transitions".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_transitions.construct(type, args);
+            }
+            if ("com.codename1.charts.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_util.construct(type, args);
+            }
+            if ("com.codename1.charts.views".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_views.construct(type, args);
+            }
+            if ("com.codename1.cloud".equals(candidate)) {
+                return GeneratedAccess_com_codename1_cloud.construct(type, args);
+            }
+            if ("com.codename1.codescan".equals(candidate)) {
+                return GeneratedAccess_com_codename1_codescan.construct(type, args);
+            }
+            if ("com.codename1.compat.java.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_compat_java_util.construct(type, args);
+            }
+            if ("com.codename1.components".equals(candidate)) {
+                return GeneratedAccess_com_codename1_components.construct(type, args);
+            }
+            if ("com.codename1.contacts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_contacts.construct(type, args);
+            }
+            if ("com.codename1.db".equals(candidate)) {
+                return GeneratedAccess_com_codename1_db.construct(type, args);
+            }
+            if ("com.codename1.facebook".equals(candidate)) {
+                return GeneratedAccess_com_codename1_facebook.construct(type, args);
+            }
+            if ("com.codename1.facebook.ui".equals(candidate)) {
+                return GeneratedAccess_com_codename1_facebook_ui.construct(type, args);
+            }
+            if ("com.codename1.gaming".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.callbacks".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.common".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_common.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.construct(type, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.construct(type, args);
+            }
+            if ("com.codename1.gpu".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gpu.construct(type, args);
+            }
+            if ("com.codename1.io".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io.construct(type, args);
+            }
+            if ("com.codename1.io.bonjour".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_bonjour.construct(type, args);
+            }
+            if ("com.codename1.io.graphql".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_graphql.construct(type, args);
+            }
+            if ("com.codename1.io.grpc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_grpc.construct(type, args);
+            }
+            if ("com.codename1.io.gzip".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_gzip.construct(type, args);
+            }
+            if ("com.codename1.io.oidc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_oidc.construct(type, args);
+            }
+            if ("com.codename1.io.rest".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_rest.construct(type, args);
+            }
+            if ("com.codename1.io.services".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_services.construct(type, args);
+            }
+            if ("com.codename1.io.tar".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_tar.construct(type, args);
+            }
+            if ("com.codename1.io.usb".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_usb.construct(type, args);
+            }
+            if ("com.codename1.io.webauthn".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_webauthn.construct(type, args);
+            }
+            if ("com.codename1.io.wifi".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_wifi.construct(type, args);
+            }
+            if ("com.codename1.javascript".equals(candidate)) {
+                return GeneratedAccess_com_codename1_javascript.construct(type, args);
+            }
+            if ("com.codename1.l10n".equals(candidate)) {
+                return GeneratedAccess_com_codename1_l10n.construct(type, args);
+            }
+            if ("com.codename1.location".equals(candidate)) {
+                return GeneratedAccess_com_codename1_location.construct(type, args);
+            }
+            if ("com.codename1.mapping".equals(candidate)) {
+                return GeneratedAccess_com_codename1_mapping.construct(type, args);
+            }
+            if ("com.codename1.maps".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps.construct(type, args);
+            }
+            if ("com.codename1.maps.layers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps_layers.construct(type, args);
+            }
+            if ("com.codename1.maps.providers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps_providers.construct(type, args);
+            }
+            if ("com.codename1.media".equals(candidate)) {
+                return GeneratedAccess_com_codename1_media.construct(type, args);
+            }
+            if ("com.codename1.messaging".equals(candidate)) {
+                return GeneratedAccess_com_codename1_messaging.construct(type, args);
+            }
+            if ("com.codename1.nfc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_nfc.construct(type, args);
+            }
+            if ("com.codename1.notifications".equals(candidate)) {
+                return GeneratedAccess_com_codename1_notifications.construct(type, args);
+            }
+            if ("com.codename1.orm".equals(candidate)) {
+                return GeneratedAccess_com_codename1_orm.construct(type, args);
+            }
+            if ("com.codename1.payment".equals(candidate)) {
+                return GeneratedAccess_com_codename1_payment.construct(type, args);
+            }
+            if ("com.codename1.plugin".equals(candidate)) {
+                return GeneratedAccess_com_codename1_plugin.construct(type, args);
+            }
+            if ("com.codename1.plugin.event".equals(candidate)) {
+                return GeneratedAccess_com_codename1_plugin_event.construct(type, args);
+            }
+            if ("com.codename1.printing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_printing.construct(type, args);
+            }
+            if ("com.codename1.processing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_processing.construct(type, args);
+            }
+            if ("com.codename1.properties".equals(candidate)) {
+                return GeneratedAccess_com_codename1_properties.construct(type, args);
+            }
+            if ("com.codename1.push".equals(candidate)) {
+                return GeneratedAccess_com_codename1_push.construct(type, args);
+            }
+            if ("com.codename1.router".equals(candidate)) {
+                return GeneratedAccess_com_codename1_router.construct(type, args);
+            }
+            if ("com.codename1.security".equals(candidate)) {
+                return GeneratedAccess_com_codename1_security.construct(type, args);
+            }
+            if ("com.codename1.share".equals(candidate)) {
+                return GeneratedAccess_com_codename1_share.construct(type, args);
+            }
+            if ("com.codename1.social".equals(candidate)) {
+                return GeneratedAccess_com_codename1_social.construct(type, args);
+            }
+            if ("com.codename1.system".equals(candidate)) {
+                return GeneratedAccess_com_codename1_system.construct(type, args);
+            }
+            if ("com.codename1.testing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_testing.construct(type, args);
+            }
+            if ("com.codename1.ui".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui.construct(type, args);
+            }
+            if ("com.codename1.ui.animations".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_animations.construct(type, args);
+            }
+            if ("com.codename1.ui.css".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_css.construct(type, args);
+            }
+            if ("com.codename1.ui.events".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_events.construct(type, args);
+            }
+            if ("com.codename1.ui.geom".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_geom.construct(type, args);
+            }
+            if ("com.codename1.ui.html".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_html.construct(type, args);
+            }
+            if ("com.codename1.ui.layouts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_layouts.construct(type, args);
+            }
+            if ("com.codename1.ui.layouts.mig".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_layouts_mig.construct(type, args);
+            }
+            if ("com.codename1.ui.list".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_list.construct(type, args);
+            }
+            if ("com.codename1.ui.painter".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_painter.construct(type, args);
+            }
+            if ("com.codename1.ui.plaf".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_plaf.construct(type, args);
+            }
+            if ("com.codename1.ui.scene".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_scene.construct(type, args);
+            }
+            if ("com.codename1.ui.spinner".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_spinner.construct(type, args);
+            }
+            if ("com.codename1.ui.table".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_table.construct(type, args);
+            }
+            if ("com.codename1.ui.tree".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_tree.construct(type, args);
+            }
+            if ("com.codename1.ui.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_util.construct(type, args);
+            }
+            if ("com.codename1.ui.validation".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_validation.construct(type, args);
+            }
+            if ("com.codename1.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util.construct(type, args);
+            }
+            if ("com.codename1.util.promise".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util_promise.construct(type, args);
+            }
+            if ("com.codename1.util.regex".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util_regex.construct(type, args);
+            }
+            if ("com.codename1.xml".equals(candidate)) {
+                return GeneratedAccess_com_codename1_xml.construct(type, args);
+            }
+            if ("com.codenameone.playground".equals(candidate)) {
+                return GeneratedAccess_com_codenameone_playground.construct(type, args);
+            }
+            if ("java.io".equals(candidate)) {
+                return GeneratedAccess_java_io.construct(type, args);
+            }
+            if ("java.lang".equals(candidate)) {
+                return GeneratedAccess_java_lang.construct(type, args);
+            }
+            if ("java.lang.ref".equals(candidate)) {
+                return GeneratedAccess_java_lang_ref.construct(type, args);
+            }
+            if ("java.lang.reflect".equals(candidate)) {
+                return GeneratedAccess_java_lang_reflect.construct(type, args);
+            }
+            if ("java.net".equals(candidate)) {
+                return GeneratedAccess_java_net.construct(type, args);
+            }
+            if ("java.nio.charset".equals(candidate)) {
+                return GeneratedAccess_java_nio_charset.construct(type, args);
+            }
+            if ("java.text".equals(candidate)) {
+                return GeneratedAccess_java_text.construct(type, args);
+            }
+            if ("java.time".equals(candidate)) {
+                return GeneratedAccess_java_time.construct(type, args);
+            }
+            if ("java.time.format".equals(candidate)) {
+                return GeneratedAccess_java_time_format.construct(type, args);
+            }
+            if ("java.time.temporal".equals(candidate)) {
+                return GeneratedAccess_java_time_temporal.construct(type, args);
+            }
+            if ("java.util".equals(candidate)) {
+                return GeneratedAccess_java_util.construct(type, args);
+            }
+            if ("java.util.concurrent".equals(candidate)) {
+                return GeneratedAccess_java_util_concurrent.construct(type, args);
+            }
+            if ("java.util.concurrent.atomic".equals(candidate)) {
+                return GeneratedAccess_java_util_concurrent_atomic.construct(type, args);
+            }
+            if ("java.util.function".equals(candidate)) {
+                return GeneratedAccess_java_util_function.construct(type, args);
+            }
+            if ("java.util.stream".equals(candidate)) {
+                return GeneratedAccess_java_util_stream.construct(type, args);
+            }
+            int __d = candidate.lastIndexOf('.');
+            candidate = __d < 0 ? null : candidate.substring(0, __d);
         }
         throw unsupportedConstruct(type, args);
     }
 
     @Override
     public Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
-        String packageName = packageName(type);
-        if ("com.codename1.ads".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ads.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ads.spi".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ads_spi.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ai".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ai.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.analytics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_analytics.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.annotations".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.annotations.graphql".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_graphql.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.annotations.grpc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_grpc.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.annotations.rest".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_rest.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.background".equals(packageName)) {
-            return GeneratedAccess_com_codename1_background.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.binding".equals(packageName)) {
-            return GeneratedAccess_com_codename1_binding.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.camera".equals(packageName)) {
-            return GeneratedAccess_com_codename1_camera.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.capture".equals(packageName)) {
-            return GeneratedAccess_com_codename1_capture.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.charts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.charts.compat".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_compat.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.charts.models".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_models.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.charts.renderers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_renderers.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.charts.transitions".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_transitions.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.charts.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_util.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.charts.views".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_views.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.cloud".equals(packageName)) {
-            return GeneratedAccess_com_codename1_cloud.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.codescan".equals(packageName)) {
-            return GeneratedAccess_com_codename1_codescan.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.compat.java.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_compat_java_util.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.components".equals(packageName)) {
-            return GeneratedAccess_com_codename1_components.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.contacts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_contacts.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.db".equals(packageName)) {
-            return GeneratedAccess_com_codename1_db.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.facebook".equals(packageName)) {
-            return GeneratedAccess_com_codename1_facebook.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.facebook.ui".equals(packageName)) {
-            return GeneratedAccess_com_codename1_facebook_ui.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.callbacks".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.common".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_common.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.gpu".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gpu.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.bonjour".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_bonjour.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.graphql".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_graphql.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.grpc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_grpc.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.gzip".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_gzip.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.oidc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_oidc.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.rest".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_rest.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.services".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_services.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.tar".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_tar.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.usb".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_usb.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.webauthn".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_webauthn.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.io.wifi".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_wifi.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.javascript".equals(packageName)) {
-            return GeneratedAccess_com_codename1_javascript.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.l10n".equals(packageName)) {
-            return GeneratedAccess_com_codename1_l10n.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.location".equals(packageName)) {
-            return GeneratedAccess_com_codename1_location.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.mapping".equals(packageName)) {
-            return GeneratedAccess_com_codename1_mapping.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.maps".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.maps.layers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps_layers.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.maps.providers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps_providers.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.media".equals(packageName)) {
-            return GeneratedAccess_com_codename1_media.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.messaging".equals(packageName)) {
-            return GeneratedAccess_com_codename1_messaging.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.nfc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_nfc.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.notifications".equals(packageName)) {
-            return GeneratedAccess_com_codename1_notifications.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.orm".equals(packageName)) {
-            return GeneratedAccess_com_codename1_orm.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.payment".equals(packageName)) {
-            return GeneratedAccess_com_codename1_payment.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.plugin".equals(packageName)) {
-            return GeneratedAccess_com_codename1_plugin.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.plugin.event".equals(packageName)) {
-            return GeneratedAccess_com_codename1_plugin_event.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.printing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_printing.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.processing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_processing.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.properties".equals(packageName)) {
-            return GeneratedAccess_com_codename1_properties.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.push".equals(packageName)) {
-            return GeneratedAccess_com_codename1_push.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.router".equals(packageName)) {
-            return GeneratedAccess_com_codename1_router.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.security".equals(packageName)) {
-            return GeneratedAccess_com_codename1_security.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.share".equals(packageName)) {
-            return GeneratedAccess_com_codename1_share.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.social".equals(packageName)) {
-            return GeneratedAccess_com_codename1_social.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.system".equals(packageName)) {
-            return GeneratedAccess_com_codename1_system.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.testing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_testing.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.animations".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_animations.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.css".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_css.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.events".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_events.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.geom".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_geom.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.html".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_html.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.layouts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_layouts.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.layouts.mig".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_layouts_mig.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.list".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_list.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.painter".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_painter.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.plaf".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_plaf.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.scene".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_scene.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.spinner".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_spinner.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.table".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_table.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.tree".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_tree.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_util.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.ui.validation".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_validation.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.util.promise".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util_promise.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.util.regex".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util_regex.invokeStatic(type, name, args);
-        }
-        if ("com.codename1.xml".equals(packageName)) {
-            return GeneratedAccess_com_codename1_xml.invokeStatic(type, name, args);
-        }
-        if ("com.codenameone.playground".equals(packageName)) {
-            return GeneratedAccess_com_codenameone_playground.invokeStatic(type, name, args);
-        }
-        if ("java.io".equals(packageName)) {
-            return GeneratedAccess_java_io.invokeStatic(type, name, args);
-        }
-        if ("java.lang".equals(packageName)) {
-            return GeneratedAccess_java_lang.invokeStatic(type, name, args);
-        }
-        if ("java.lang.ref".equals(packageName)) {
-            return GeneratedAccess_java_lang_ref.invokeStatic(type, name, args);
-        }
-        if ("java.lang.reflect".equals(packageName)) {
-            return GeneratedAccess_java_lang_reflect.invokeStatic(type, name, args);
-        }
-        if ("java.net".equals(packageName)) {
-            return GeneratedAccess_java_net.invokeStatic(type, name, args);
-        }
-        if ("java.nio.charset".equals(packageName)) {
-            return GeneratedAccess_java_nio_charset.invokeStatic(type, name, args);
-        }
-        if ("java.text".equals(packageName)) {
-            return GeneratedAccess_java_text.invokeStatic(type, name, args);
-        }
-        if ("java.time".equals(packageName)) {
-            return GeneratedAccess_java_time.invokeStatic(type, name, args);
-        }
-        if ("java.time.format".equals(packageName)) {
-            return GeneratedAccess_java_time_format.invokeStatic(type, name, args);
-        }
-        if ("java.time.temporal".equals(packageName)) {
-            return GeneratedAccess_java_time_temporal.invokeStatic(type, name, args);
-        }
-        if ("java.util".equals(packageName)) {
-            return GeneratedAccess_java_util.invokeStatic(type, name, args);
-        }
-        if ("java.util.concurrent".equals(packageName)) {
-            return GeneratedAccess_java_util_concurrent.invokeStatic(type, name, args);
-        }
-        if ("java.util.concurrent.atomic".equals(packageName)) {
-            return GeneratedAccess_java_util_concurrent_atomic.invokeStatic(type, name, args);
-        }
-        if ("java.util.function".equals(packageName)) {
-            return GeneratedAccess_java_util_function.invokeStatic(type, name, args);
-        }
-        if ("java.util.stream".equals(packageName)) {
-            return GeneratedAccess_java_util_stream.invokeStatic(type, name, args);
+        String candidate = packageName(type);
+        while (candidate != null) {
+            if ("com.codename1.ads".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ads.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ads.spi".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ads_spi.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ai".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ai.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.analytics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_analytics.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.annotations".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.annotations.graphql".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_graphql.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.annotations.grpc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_grpc.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.annotations.rest".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_rest.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.background".equals(candidate)) {
+                return GeneratedAccess_com_codename1_background.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.binding".equals(candidate)) {
+                return GeneratedAccess_com_codename1_binding.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.camera".equals(candidate)) {
+                return GeneratedAccess_com_codename1_camera.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.capture".equals(candidate)) {
+                return GeneratedAccess_com_codename1_capture.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.charts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.charts.compat".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_compat.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.charts.models".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_models.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.charts.renderers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_renderers.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.charts.transitions".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_transitions.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.charts.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_util.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.charts.views".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_views.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.cloud".equals(candidate)) {
+                return GeneratedAccess_com_codename1_cloud.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.codescan".equals(candidate)) {
+                return GeneratedAccess_com_codename1_codescan.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.compat.java.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_compat_java_util.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.components".equals(candidate)) {
+                return GeneratedAccess_com_codename1_components.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.contacts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_contacts.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.db".equals(candidate)) {
+                return GeneratedAccess_com_codename1_db.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.facebook".equals(candidate)) {
+                return GeneratedAccess_com_codename1_facebook.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.facebook.ui".equals(candidate)) {
+                return GeneratedAccess_com_codename1_facebook_ui.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.callbacks".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.common".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_common.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.gpu".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gpu.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.bonjour".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_bonjour.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.graphql".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_graphql.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.grpc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_grpc.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.gzip".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_gzip.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.oidc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_oidc.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.rest".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_rest.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.services".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_services.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.tar".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_tar.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.usb".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_usb.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.webauthn".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_webauthn.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.io.wifi".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_wifi.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.javascript".equals(candidate)) {
+                return GeneratedAccess_com_codename1_javascript.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.l10n".equals(candidate)) {
+                return GeneratedAccess_com_codename1_l10n.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.location".equals(candidate)) {
+                return GeneratedAccess_com_codename1_location.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.mapping".equals(candidate)) {
+                return GeneratedAccess_com_codename1_mapping.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.maps".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.maps.layers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps_layers.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.maps.providers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps_providers.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.media".equals(candidate)) {
+                return GeneratedAccess_com_codename1_media.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.messaging".equals(candidate)) {
+                return GeneratedAccess_com_codename1_messaging.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.nfc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_nfc.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.notifications".equals(candidate)) {
+                return GeneratedAccess_com_codename1_notifications.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.orm".equals(candidate)) {
+                return GeneratedAccess_com_codename1_orm.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.payment".equals(candidate)) {
+                return GeneratedAccess_com_codename1_payment.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.plugin".equals(candidate)) {
+                return GeneratedAccess_com_codename1_plugin.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.plugin.event".equals(candidate)) {
+                return GeneratedAccess_com_codename1_plugin_event.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.printing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_printing.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.processing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_processing.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.properties".equals(candidate)) {
+                return GeneratedAccess_com_codename1_properties.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.push".equals(candidate)) {
+                return GeneratedAccess_com_codename1_push.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.router".equals(candidate)) {
+                return GeneratedAccess_com_codename1_router.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.security".equals(candidate)) {
+                return GeneratedAccess_com_codename1_security.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.share".equals(candidate)) {
+                return GeneratedAccess_com_codename1_share.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.social".equals(candidate)) {
+                return GeneratedAccess_com_codename1_social.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.system".equals(candidate)) {
+                return GeneratedAccess_com_codename1_system.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.testing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_testing.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.animations".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_animations.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.css".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_css.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.events".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_events.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.geom".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_geom.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.html".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_html.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.layouts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_layouts.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.layouts.mig".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_layouts_mig.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.list".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_list.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.painter".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_painter.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.plaf".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_plaf.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.scene".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_scene.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.spinner".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_spinner.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.table".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_table.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.tree".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_tree.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_util.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.ui.validation".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_validation.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.util.promise".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util_promise.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.util.regex".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util_regex.invokeStatic(type, name, args);
+            }
+            if ("com.codename1.xml".equals(candidate)) {
+                return GeneratedAccess_com_codename1_xml.invokeStatic(type, name, args);
+            }
+            if ("com.codenameone.playground".equals(candidate)) {
+                return GeneratedAccess_com_codenameone_playground.invokeStatic(type, name, args);
+            }
+            if ("java.io".equals(candidate)) {
+                return GeneratedAccess_java_io.invokeStatic(type, name, args);
+            }
+            if ("java.lang".equals(candidate)) {
+                return GeneratedAccess_java_lang.invokeStatic(type, name, args);
+            }
+            if ("java.lang.ref".equals(candidate)) {
+                return GeneratedAccess_java_lang_ref.invokeStatic(type, name, args);
+            }
+            if ("java.lang.reflect".equals(candidate)) {
+                return GeneratedAccess_java_lang_reflect.invokeStatic(type, name, args);
+            }
+            if ("java.net".equals(candidate)) {
+                return GeneratedAccess_java_net.invokeStatic(type, name, args);
+            }
+            if ("java.nio.charset".equals(candidate)) {
+                return GeneratedAccess_java_nio_charset.invokeStatic(type, name, args);
+            }
+            if ("java.text".equals(candidate)) {
+                return GeneratedAccess_java_text.invokeStatic(type, name, args);
+            }
+            if ("java.time".equals(candidate)) {
+                return GeneratedAccess_java_time.invokeStatic(type, name, args);
+            }
+            if ("java.time.format".equals(candidate)) {
+                return GeneratedAccess_java_time_format.invokeStatic(type, name, args);
+            }
+            if ("java.time.temporal".equals(candidate)) {
+                return GeneratedAccess_java_time_temporal.invokeStatic(type, name, args);
+            }
+            if ("java.util".equals(candidate)) {
+                return GeneratedAccess_java_util.invokeStatic(type, name, args);
+            }
+            if ("java.util.concurrent".equals(candidate)) {
+                return GeneratedAccess_java_util_concurrent.invokeStatic(type, name, args);
+            }
+            if ("java.util.concurrent.atomic".equals(candidate)) {
+                return GeneratedAccess_java_util_concurrent_atomic.invokeStatic(type, name, args);
+            }
+            if ("java.util.function".equals(candidate)) {
+                return GeneratedAccess_java_util_function.invokeStatic(type, name, args);
+            }
+            if ("java.util.stream".equals(candidate)) {
+                return GeneratedAccess_java_util_stream.invokeStatic(type, name, args);
+            }
+            int __d = candidate.lastIndexOf('.');
+            candidate = __d < 0 ? null : candidate.substring(0, __d);
         }
         throw unsupportedStatic(type, name, args);
     }
@@ -5900,354 +5914,358 @@ public final class GeneratedCN1Access implements CN1Access {
 
     @Override
     public Object getStaticField(Class<?> type, String name) throws Exception {
-        String packageName = packageName(type);
-        if ("com.codename1.ads".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ads.getStaticField(type, name);
-        }
-        if ("com.codename1.ads.spi".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ads_spi.getStaticField(type, name);
-        }
-        if ("com.codename1.ai".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ai.getStaticField(type, name);
-        }
-        if ("com.codename1.analytics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_analytics.getStaticField(type, name);
-        }
-        if ("com.codename1.annotations".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations.getStaticField(type, name);
-        }
-        if ("com.codename1.annotations.graphql".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_graphql.getStaticField(type, name);
-        }
-        if ("com.codename1.annotations.grpc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_grpc.getStaticField(type, name);
-        }
-        if ("com.codename1.annotations.rest".equals(packageName)) {
-            return GeneratedAccess_com_codename1_annotations_rest.getStaticField(type, name);
-        }
-        if ("com.codename1.background".equals(packageName)) {
-            return GeneratedAccess_com_codename1_background.getStaticField(type, name);
-        }
-        if ("com.codename1.binding".equals(packageName)) {
-            return GeneratedAccess_com_codename1_binding.getStaticField(type, name);
-        }
-        if ("com.codename1.camera".equals(packageName)) {
-            return GeneratedAccess_com_codename1_camera.getStaticField(type, name);
-        }
-        if ("com.codename1.capture".equals(packageName)) {
-            return GeneratedAccess_com_codename1_capture.getStaticField(type, name);
-        }
-        if ("com.codename1.charts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts.getStaticField(type, name);
-        }
-        if ("com.codename1.charts.compat".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_compat.getStaticField(type, name);
-        }
-        if ("com.codename1.charts.models".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_models.getStaticField(type, name);
-        }
-        if ("com.codename1.charts.renderers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_renderers.getStaticField(type, name);
-        }
-        if ("com.codename1.charts.transitions".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_transitions.getStaticField(type, name);
-        }
-        if ("com.codename1.charts.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_util.getStaticField(type, name);
-        }
-        if ("com.codename1.charts.views".equals(packageName)) {
-            return GeneratedAccess_com_codename1_charts_views.getStaticField(type, name);
-        }
-        if ("com.codename1.cloud".equals(packageName)) {
-            return GeneratedAccess_com_codename1_cloud.getStaticField(type, name);
-        }
-        if ("com.codename1.codescan".equals(packageName)) {
-            return GeneratedAccess_com_codename1_codescan.getStaticField(type, name);
-        }
-        if ("com.codename1.compat.java.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_compat_java_util.getStaticField(type, name);
-        }
-        if ("com.codename1.components".equals(packageName)) {
-            return GeneratedAccess_com_codename1_components.getStaticField(type, name);
-        }
-        if ("com.codename1.contacts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_contacts.getStaticField(type, name);
-        }
-        if ("com.codename1.db".equals(packageName)) {
-            return GeneratedAccess_com_codename1_db.getStaticField(type, name);
-        }
-        if ("com.codename1.facebook".equals(packageName)) {
-            return GeneratedAccess_com_codename1_facebook.getStaticField(type, name);
-        }
-        if ("com.codename1.facebook.ui".equals(packageName)) {
-            return GeneratedAccess_com_codename1_facebook_ui.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.callbacks".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.common".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_common.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.getStaticField(type, name);
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.getStaticField(type, name);
-        }
-        if ("com.codename1.gpu".equals(packageName)) {
-            return GeneratedAccess_com_codename1_gpu.getStaticField(type, name);
-        }
-        if ("com.codename1.io".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io.getStaticField(type, name);
-        }
-        if ("com.codename1.io.bonjour".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_bonjour.getStaticField(type, name);
-        }
-        if ("com.codename1.io.graphql".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_graphql.getStaticField(type, name);
-        }
-        if ("com.codename1.io.grpc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_grpc.getStaticField(type, name);
-        }
-        if ("com.codename1.io.gzip".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_gzip.getStaticField(type, name);
-        }
-        if ("com.codename1.io.oidc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_oidc.getStaticField(type, name);
-        }
-        if ("com.codename1.io.rest".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_rest.getStaticField(type, name);
-        }
-        if ("com.codename1.io.services".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_services.getStaticField(type, name);
-        }
-        if ("com.codename1.io.tar".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_tar.getStaticField(type, name);
-        }
-        if ("com.codename1.io.usb".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_usb.getStaticField(type, name);
-        }
-        if ("com.codename1.io.webauthn".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_webauthn.getStaticField(type, name);
-        }
-        if ("com.codename1.io.wifi".equals(packageName)) {
-            return GeneratedAccess_com_codename1_io_wifi.getStaticField(type, name);
-        }
-        if ("com.codename1.javascript".equals(packageName)) {
-            return GeneratedAccess_com_codename1_javascript.getStaticField(type, name);
-        }
-        if ("com.codename1.l10n".equals(packageName)) {
-            return GeneratedAccess_com_codename1_l10n.getStaticField(type, name);
-        }
-        if ("com.codename1.location".equals(packageName)) {
-            return GeneratedAccess_com_codename1_location.getStaticField(type, name);
-        }
-        if ("com.codename1.mapping".equals(packageName)) {
-            return GeneratedAccess_com_codename1_mapping.getStaticField(type, name);
-        }
-        if ("com.codename1.maps".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps.getStaticField(type, name);
-        }
-        if ("com.codename1.maps.layers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps_layers.getStaticField(type, name);
-        }
-        if ("com.codename1.maps.providers".equals(packageName)) {
-            return GeneratedAccess_com_codename1_maps_providers.getStaticField(type, name);
-        }
-        if ("com.codename1.media".equals(packageName)) {
-            return GeneratedAccess_com_codename1_media.getStaticField(type, name);
-        }
-        if ("com.codename1.messaging".equals(packageName)) {
-            return GeneratedAccess_com_codename1_messaging.getStaticField(type, name);
-        }
-        if ("com.codename1.nfc".equals(packageName)) {
-            return GeneratedAccess_com_codename1_nfc.getStaticField(type, name);
-        }
-        if ("com.codename1.notifications".equals(packageName)) {
-            return GeneratedAccess_com_codename1_notifications.getStaticField(type, name);
-        }
-        if ("com.codename1.orm".equals(packageName)) {
-            return GeneratedAccess_com_codename1_orm.getStaticField(type, name);
-        }
-        if ("com.codename1.payment".equals(packageName)) {
-            return GeneratedAccess_com_codename1_payment.getStaticField(type, name);
-        }
-        if ("com.codename1.plugin".equals(packageName)) {
-            return GeneratedAccess_com_codename1_plugin.getStaticField(type, name);
-        }
-        if ("com.codename1.plugin.event".equals(packageName)) {
-            return GeneratedAccess_com_codename1_plugin_event.getStaticField(type, name);
-        }
-        if ("com.codename1.printing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_printing.getStaticField(type, name);
-        }
-        if ("com.codename1.processing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_processing.getStaticField(type, name);
-        }
-        if ("com.codename1.properties".equals(packageName)) {
-            return GeneratedAccess_com_codename1_properties.getStaticField(type, name);
-        }
-        if ("com.codename1.push".equals(packageName)) {
-            return GeneratedAccess_com_codename1_push.getStaticField(type, name);
-        }
-        if ("com.codename1.router".equals(packageName)) {
-            return GeneratedAccess_com_codename1_router.getStaticField(type, name);
-        }
-        if ("com.codename1.security".equals(packageName)) {
-            return GeneratedAccess_com_codename1_security.getStaticField(type, name);
-        }
-        if ("com.codename1.share".equals(packageName)) {
-            return GeneratedAccess_com_codename1_share.getStaticField(type, name);
-        }
-        if ("com.codename1.social".equals(packageName)) {
-            return GeneratedAccess_com_codename1_social.getStaticField(type, name);
-        }
-        if ("com.codename1.system".equals(packageName)) {
-            return GeneratedAccess_com_codename1_system.getStaticField(type, name);
-        }
-        if ("com.codename1.testing".equals(packageName)) {
-            return GeneratedAccess_com_codename1_testing.getStaticField(type, name);
-        }
-        if ("com.codename1.ui".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.animations".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_animations.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.css".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_css.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.events".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_events.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.geom".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_geom.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.html".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_html.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.layouts".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_layouts.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.layouts.mig".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_layouts_mig.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.list".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_list.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.painter".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_painter.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.plaf".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_plaf.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.scene".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_scene.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.spinner".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_spinner.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.table".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_table.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.tree".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_tree.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_util.getStaticField(type, name);
-        }
-        if ("com.codename1.ui.validation".equals(packageName)) {
-            return GeneratedAccess_com_codename1_ui_validation.getStaticField(type, name);
-        }
-        if ("com.codename1.util".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util.getStaticField(type, name);
-        }
-        if ("com.codename1.util.promise".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util_promise.getStaticField(type, name);
-        }
-        if ("com.codename1.util.regex".equals(packageName)) {
-            return GeneratedAccess_com_codename1_util_regex.getStaticField(type, name);
-        }
-        if ("com.codename1.xml".equals(packageName)) {
-            return GeneratedAccess_com_codename1_xml.getStaticField(type, name);
-        }
-        if ("com.codenameone.playground".equals(packageName)) {
-            return GeneratedAccess_com_codenameone_playground.getStaticField(type, name);
-        }
-        if ("java.io".equals(packageName)) {
-            return GeneratedAccess_java_io.getStaticField(type, name);
-        }
-        if ("java.lang".equals(packageName)) {
-            return GeneratedAccess_java_lang.getStaticField(type, name);
-        }
-        if ("java.lang.ref".equals(packageName)) {
-            return GeneratedAccess_java_lang_ref.getStaticField(type, name);
-        }
-        if ("java.lang.reflect".equals(packageName)) {
-            return GeneratedAccess_java_lang_reflect.getStaticField(type, name);
-        }
-        if ("java.net".equals(packageName)) {
-            return GeneratedAccess_java_net.getStaticField(type, name);
-        }
-        if ("java.nio.charset".equals(packageName)) {
-            return GeneratedAccess_java_nio_charset.getStaticField(type, name);
-        }
-        if ("java.text".equals(packageName)) {
-            return GeneratedAccess_java_text.getStaticField(type, name);
-        }
-        if ("java.time".equals(packageName)) {
-            return GeneratedAccess_java_time.getStaticField(type, name);
-        }
-        if ("java.time.format".equals(packageName)) {
-            return GeneratedAccess_java_time_format.getStaticField(type, name);
-        }
-        if ("java.time.temporal".equals(packageName)) {
-            return GeneratedAccess_java_time_temporal.getStaticField(type, name);
-        }
-        if ("java.util".equals(packageName)) {
-            return GeneratedAccess_java_util.getStaticField(type, name);
-        }
-        if ("java.util.concurrent".equals(packageName)) {
-            return GeneratedAccess_java_util_concurrent.getStaticField(type, name);
-        }
-        if ("java.util.concurrent.atomic".equals(packageName)) {
-            return GeneratedAccess_java_util_concurrent_atomic.getStaticField(type, name);
-        }
-        if ("java.util.function".equals(packageName)) {
-            return GeneratedAccess_java_util_function.getStaticField(type, name);
-        }
-        if ("java.util.stream".equals(packageName)) {
-            return GeneratedAccess_java_util_stream.getStaticField(type, name);
+        String candidate = packageName(type);
+        while (candidate != null) {
+            if ("com.codename1.ads".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ads.getStaticField(type, name);
+            }
+            if ("com.codename1.ads.spi".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ads_spi.getStaticField(type, name);
+            }
+            if ("com.codename1.ai".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ai.getStaticField(type, name);
+            }
+            if ("com.codename1.analytics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_analytics.getStaticField(type, name);
+            }
+            if ("com.codename1.annotations".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations.getStaticField(type, name);
+            }
+            if ("com.codename1.annotations.graphql".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_graphql.getStaticField(type, name);
+            }
+            if ("com.codename1.annotations.grpc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_grpc.getStaticField(type, name);
+            }
+            if ("com.codename1.annotations.rest".equals(candidate)) {
+                return GeneratedAccess_com_codename1_annotations_rest.getStaticField(type, name);
+            }
+            if ("com.codename1.background".equals(candidate)) {
+                return GeneratedAccess_com_codename1_background.getStaticField(type, name);
+            }
+            if ("com.codename1.binding".equals(candidate)) {
+                return GeneratedAccess_com_codename1_binding.getStaticField(type, name);
+            }
+            if ("com.codename1.camera".equals(candidate)) {
+                return GeneratedAccess_com_codename1_camera.getStaticField(type, name);
+            }
+            if ("com.codename1.capture".equals(candidate)) {
+                return GeneratedAccess_com_codename1_capture.getStaticField(type, name);
+            }
+            if ("com.codename1.charts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts.getStaticField(type, name);
+            }
+            if ("com.codename1.charts.compat".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_compat.getStaticField(type, name);
+            }
+            if ("com.codename1.charts.models".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_models.getStaticField(type, name);
+            }
+            if ("com.codename1.charts.renderers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_renderers.getStaticField(type, name);
+            }
+            if ("com.codename1.charts.transitions".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_transitions.getStaticField(type, name);
+            }
+            if ("com.codename1.charts.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_util.getStaticField(type, name);
+            }
+            if ("com.codename1.charts.views".equals(candidate)) {
+                return GeneratedAccess_com_codename1_charts_views.getStaticField(type, name);
+            }
+            if ("com.codename1.cloud".equals(candidate)) {
+                return GeneratedAccess_com_codename1_cloud.getStaticField(type, name);
+            }
+            if ("com.codename1.codescan".equals(candidate)) {
+                return GeneratedAccess_com_codename1_codescan.getStaticField(type, name);
+            }
+            if ("com.codename1.compat.java.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_compat_java_util.getStaticField(type, name);
+            }
+            if ("com.codename1.components".equals(candidate)) {
+                return GeneratedAccess_com_codename1_components.getStaticField(type, name);
+            }
+            if ("com.codename1.contacts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_contacts.getStaticField(type, name);
+            }
+            if ("com.codename1.db".equals(candidate)) {
+                return GeneratedAccess_com_codename1_db.getStaticField(type, name);
+            }
+            if ("com.codename1.facebook".equals(candidate)) {
+                return GeneratedAccess_com_codename1_facebook.getStaticField(type, name);
+            }
+            if ("com.codename1.facebook.ui".equals(candidate)) {
+                return GeneratedAccess_com_codename1_facebook_ui.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.callbacks".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.common".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_common.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.getStaticField(type, name);
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.getStaticField(type, name);
+            }
+            if ("com.codename1.gpu".equals(candidate)) {
+                return GeneratedAccess_com_codename1_gpu.getStaticField(type, name);
+            }
+            if ("com.codename1.io".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io.getStaticField(type, name);
+            }
+            if ("com.codename1.io.bonjour".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_bonjour.getStaticField(type, name);
+            }
+            if ("com.codename1.io.graphql".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_graphql.getStaticField(type, name);
+            }
+            if ("com.codename1.io.grpc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_grpc.getStaticField(type, name);
+            }
+            if ("com.codename1.io.gzip".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_gzip.getStaticField(type, name);
+            }
+            if ("com.codename1.io.oidc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_oidc.getStaticField(type, name);
+            }
+            if ("com.codename1.io.rest".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_rest.getStaticField(type, name);
+            }
+            if ("com.codename1.io.services".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_services.getStaticField(type, name);
+            }
+            if ("com.codename1.io.tar".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_tar.getStaticField(type, name);
+            }
+            if ("com.codename1.io.usb".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_usb.getStaticField(type, name);
+            }
+            if ("com.codename1.io.webauthn".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_webauthn.getStaticField(type, name);
+            }
+            if ("com.codename1.io.wifi".equals(candidate)) {
+                return GeneratedAccess_com_codename1_io_wifi.getStaticField(type, name);
+            }
+            if ("com.codename1.javascript".equals(candidate)) {
+                return GeneratedAccess_com_codename1_javascript.getStaticField(type, name);
+            }
+            if ("com.codename1.l10n".equals(candidate)) {
+                return GeneratedAccess_com_codename1_l10n.getStaticField(type, name);
+            }
+            if ("com.codename1.location".equals(candidate)) {
+                return GeneratedAccess_com_codename1_location.getStaticField(type, name);
+            }
+            if ("com.codename1.mapping".equals(candidate)) {
+                return GeneratedAccess_com_codename1_mapping.getStaticField(type, name);
+            }
+            if ("com.codename1.maps".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps.getStaticField(type, name);
+            }
+            if ("com.codename1.maps.layers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps_layers.getStaticField(type, name);
+            }
+            if ("com.codename1.maps.providers".equals(candidate)) {
+                return GeneratedAccess_com_codename1_maps_providers.getStaticField(type, name);
+            }
+            if ("com.codename1.media".equals(candidate)) {
+                return GeneratedAccess_com_codename1_media.getStaticField(type, name);
+            }
+            if ("com.codename1.messaging".equals(candidate)) {
+                return GeneratedAccess_com_codename1_messaging.getStaticField(type, name);
+            }
+            if ("com.codename1.nfc".equals(candidate)) {
+                return GeneratedAccess_com_codename1_nfc.getStaticField(type, name);
+            }
+            if ("com.codename1.notifications".equals(candidate)) {
+                return GeneratedAccess_com_codename1_notifications.getStaticField(type, name);
+            }
+            if ("com.codename1.orm".equals(candidate)) {
+                return GeneratedAccess_com_codename1_orm.getStaticField(type, name);
+            }
+            if ("com.codename1.payment".equals(candidate)) {
+                return GeneratedAccess_com_codename1_payment.getStaticField(type, name);
+            }
+            if ("com.codename1.plugin".equals(candidate)) {
+                return GeneratedAccess_com_codename1_plugin.getStaticField(type, name);
+            }
+            if ("com.codename1.plugin.event".equals(candidate)) {
+                return GeneratedAccess_com_codename1_plugin_event.getStaticField(type, name);
+            }
+            if ("com.codename1.printing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_printing.getStaticField(type, name);
+            }
+            if ("com.codename1.processing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_processing.getStaticField(type, name);
+            }
+            if ("com.codename1.properties".equals(candidate)) {
+                return GeneratedAccess_com_codename1_properties.getStaticField(type, name);
+            }
+            if ("com.codename1.push".equals(candidate)) {
+                return GeneratedAccess_com_codename1_push.getStaticField(type, name);
+            }
+            if ("com.codename1.router".equals(candidate)) {
+                return GeneratedAccess_com_codename1_router.getStaticField(type, name);
+            }
+            if ("com.codename1.security".equals(candidate)) {
+                return GeneratedAccess_com_codename1_security.getStaticField(type, name);
+            }
+            if ("com.codename1.share".equals(candidate)) {
+                return GeneratedAccess_com_codename1_share.getStaticField(type, name);
+            }
+            if ("com.codename1.social".equals(candidate)) {
+                return GeneratedAccess_com_codename1_social.getStaticField(type, name);
+            }
+            if ("com.codename1.system".equals(candidate)) {
+                return GeneratedAccess_com_codename1_system.getStaticField(type, name);
+            }
+            if ("com.codename1.testing".equals(candidate)) {
+                return GeneratedAccess_com_codename1_testing.getStaticField(type, name);
+            }
+            if ("com.codename1.ui".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.animations".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_animations.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.css".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_css.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.events".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_events.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.geom".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_geom.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.html".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_html.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.layouts".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_layouts.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.layouts.mig".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_layouts_mig.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.list".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_list.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.painter".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_painter.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.plaf".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_plaf.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.scene".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_scene.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.spinner".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_spinner.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.table".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_table.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.tree".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_tree.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_util.getStaticField(type, name);
+            }
+            if ("com.codename1.ui.validation".equals(candidate)) {
+                return GeneratedAccess_com_codename1_ui_validation.getStaticField(type, name);
+            }
+            if ("com.codename1.util".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util.getStaticField(type, name);
+            }
+            if ("com.codename1.util.promise".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util_promise.getStaticField(type, name);
+            }
+            if ("com.codename1.util.regex".equals(candidate)) {
+                return GeneratedAccess_com_codename1_util_regex.getStaticField(type, name);
+            }
+            if ("com.codename1.xml".equals(candidate)) {
+                return GeneratedAccess_com_codename1_xml.getStaticField(type, name);
+            }
+            if ("com.codenameone.playground".equals(candidate)) {
+                return GeneratedAccess_com_codenameone_playground.getStaticField(type, name);
+            }
+            if ("java.io".equals(candidate)) {
+                return GeneratedAccess_java_io.getStaticField(type, name);
+            }
+            if ("java.lang".equals(candidate)) {
+                return GeneratedAccess_java_lang.getStaticField(type, name);
+            }
+            if ("java.lang.ref".equals(candidate)) {
+                return GeneratedAccess_java_lang_ref.getStaticField(type, name);
+            }
+            if ("java.lang.reflect".equals(candidate)) {
+                return GeneratedAccess_java_lang_reflect.getStaticField(type, name);
+            }
+            if ("java.net".equals(candidate)) {
+                return GeneratedAccess_java_net.getStaticField(type, name);
+            }
+            if ("java.nio.charset".equals(candidate)) {
+                return GeneratedAccess_java_nio_charset.getStaticField(type, name);
+            }
+            if ("java.text".equals(candidate)) {
+                return GeneratedAccess_java_text.getStaticField(type, name);
+            }
+            if ("java.time".equals(candidate)) {
+                return GeneratedAccess_java_time.getStaticField(type, name);
+            }
+            if ("java.time.format".equals(candidate)) {
+                return GeneratedAccess_java_time_format.getStaticField(type, name);
+            }
+            if ("java.time.temporal".equals(candidate)) {
+                return GeneratedAccess_java_time_temporal.getStaticField(type, name);
+            }
+            if ("java.util".equals(candidate)) {
+                return GeneratedAccess_java_util.getStaticField(type, name);
+            }
+            if ("java.util.concurrent".equals(candidate)) {
+                return GeneratedAccess_java_util_concurrent.getStaticField(type, name);
+            }
+            if ("java.util.concurrent.atomic".equals(candidate)) {
+                return GeneratedAccess_java_util_concurrent_atomic.getStaticField(type, name);
+            }
+            if ("java.util.function".equals(candidate)) {
+                return GeneratedAccess_java_util_function.getStaticField(type, name);
+            }
+            if ("java.util.stream".equals(candidate)) {
+                return GeneratedAccess_java_util_stream.getStaticField(type, name);
+            }
+            int __d = candidate.lastIndexOf('.');
+            candidate = __d < 0 ? null : candidate.substring(0, __d);
         }
         throw unsupportedStaticField(type, name);
     }
@@ -6843,470 +6861,474 @@ public final class GeneratedCN1Access implements CN1Access {
 
     @Override
     public void setStaticField(Class<?> type, String name, Object value) throws Exception {
-        String packageName = packageName(type);
-        if ("com.codename1.ads".equals(packageName)) {
-            GeneratedAccess_com_codename1_ads.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ads.spi".equals(packageName)) {
-            GeneratedAccess_com_codename1_ads_spi.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ai".equals(packageName)) {
-            GeneratedAccess_com_codename1_ai.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.analytics".equals(packageName)) {
-            GeneratedAccess_com_codename1_analytics.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.annotations".equals(packageName)) {
-            GeneratedAccess_com_codename1_annotations.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.annotations.graphql".equals(packageName)) {
-            GeneratedAccess_com_codename1_annotations_graphql.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.annotations.grpc".equals(packageName)) {
-            GeneratedAccess_com_codename1_annotations_grpc.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.annotations.rest".equals(packageName)) {
-            GeneratedAccess_com_codename1_annotations_rest.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.background".equals(packageName)) {
-            GeneratedAccess_com_codename1_background.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.binding".equals(packageName)) {
-            GeneratedAccess_com_codename1_binding.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.camera".equals(packageName)) {
-            GeneratedAccess_com_codename1_camera.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.capture".equals(packageName)) {
-            GeneratedAccess_com_codename1_capture.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.charts".equals(packageName)) {
-            GeneratedAccess_com_codename1_charts.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.charts.compat".equals(packageName)) {
-            GeneratedAccess_com_codename1_charts_compat.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.charts.models".equals(packageName)) {
-            GeneratedAccess_com_codename1_charts_models.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.charts.renderers".equals(packageName)) {
-            GeneratedAccess_com_codename1_charts_renderers.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.charts.transitions".equals(packageName)) {
-            GeneratedAccess_com_codename1_charts_transitions.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.charts.util".equals(packageName)) {
-            GeneratedAccess_com_codename1_charts_util.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.charts.views".equals(packageName)) {
-            GeneratedAccess_com_codename1_charts_views.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.cloud".equals(packageName)) {
-            GeneratedAccess_com_codename1_cloud.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.codescan".equals(packageName)) {
-            GeneratedAccess_com_codename1_codescan.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.compat.java.util".equals(packageName)) {
-            GeneratedAccess_com_codename1_compat_java_util.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.components".equals(packageName)) {
-            GeneratedAccess_com_codename1_components.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.contacts".equals(packageName)) {
-            GeneratedAccess_com_codename1_contacts.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.db".equals(packageName)) {
-            GeneratedAccess_com_codename1_db.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.facebook".equals(packageName)) {
-            GeneratedAccess_com_codename1_facebook.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.facebook.ui".equals(packageName)) {
-            GeneratedAccess_com_codename1_facebook_ui.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.callbacks".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.collision".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_collision.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.common".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_common.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(packageName)) {
-            GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.gpu".equals(packageName)) {
-            GeneratedAccess_com_codename1_gpu.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io".equals(packageName)) {
-            GeneratedAccess_com_codename1_io.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.bonjour".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_bonjour.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.graphql".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_graphql.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.grpc".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_grpc.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.gzip".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_gzip.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.oidc".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_oidc.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.rest".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_rest.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.services".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_services.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.tar".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_tar.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.usb".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_usb.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.webauthn".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_webauthn.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.io.wifi".equals(packageName)) {
-            GeneratedAccess_com_codename1_io_wifi.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.javascript".equals(packageName)) {
-            GeneratedAccess_com_codename1_javascript.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.l10n".equals(packageName)) {
-            GeneratedAccess_com_codename1_l10n.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.location".equals(packageName)) {
-            GeneratedAccess_com_codename1_location.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.mapping".equals(packageName)) {
-            GeneratedAccess_com_codename1_mapping.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.maps".equals(packageName)) {
-            GeneratedAccess_com_codename1_maps.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.maps.layers".equals(packageName)) {
-            GeneratedAccess_com_codename1_maps_layers.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.maps.providers".equals(packageName)) {
-            GeneratedAccess_com_codename1_maps_providers.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.media".equals(packageName)) {
-            GeneratedAccess_com_codename1_media.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.messaging".equals(packageName)) {
-            GeneratedAccess_com_codename1_messaging.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.nfc".equals(packageName)) {
-            GeneratedAccess_com_codename1_nfc.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.notifications".equals(packageName)) {
-            GeneratedAccess_com_codename1_notifications.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.orm".equals(packageName)) {
-            GeneratedAccess_com_codename1_orm.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.payment".equals(packageName)) {
-            GeneratedAccess_com_codename1_payment.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.plugin".equals(packageName)) {
-            GeneratedAccess_com_codename1_plugin.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.plugin.event".equals(packageName)) {
-            GeneratedAccess_com_codename1_plugin_event.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.printing".equals(packageName)) {
-            GeneratedAccess_com_codename1_printing.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.processing".equals(packageName)) {
-            GeneratedAccess_com_codename1_processing.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.properties".equals(packageName)) {
-            GeneratedAccess_com_codename1_properties.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.push".equals(packageName)) {
-            GeneratedAccess_com_codename1_push.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.router".equals(packageName)) {
-            GeneratedAccess_com_codename1_router.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.security".equals(packageName)) {
-            GeneratedAccess_com_codename1_security.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.share".equals(packageName)) {
-            GeneratedAccess_com_codename1_share.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.social".equals(packageName)) {
-            GeneratedAccess_com_codename1_social.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.system".equals(packageName)) {
-            GeneratedAccess_com_codename1_system.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.testing".equals(packageName)) {
-            GeneratedAccess_com_codename1_testing.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.animations".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_animations.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.css".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_css.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.events".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_events.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.geom".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_geom.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.html".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_html.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.layouts".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_layouts.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.layouts.mig".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_layouts_mig.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.list".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_list.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.painter".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_painter.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.plaf".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_plaf.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.scene".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_scene.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.spinner".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_spinner.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.table".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_table.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.tree".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_tree.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.util".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_util.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.ui.validation".equals(packageName)) {
-            GeneratedAccess_com_codename1_ui_validation.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.util".equals(packageName)) {
-            GeneratedAccess_com_codename1_util.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.util.promise".equals(packageName)) {
-            GeneratedAccess_com_codename1_util_promise.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.util.regex".equals(packageName)) {
-            GeneratedAccess_com_codename1_util_regex.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codename1.xml".equals(packageName)) {
-            GeneratedAccess_com_codename1_xml.setStaticField(type, name, value);
-            return;
-        }
-        if ("com.codenameone.playground".equals(packageName)) {
-            GeneratedAccess_com_codenameone_playground.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.io".equals(packageName)) {
-            GeneratedAccess_java_io.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.lang".equals(packageName)) {
-            GeneratedAccess_java_lang.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.lang.ref".equals(packageName)) {
-            GeneratedAccess_java_lang_ref.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.lang.reflect".equals(packageName)) {
-            GeneratedAccess_java_lang_reflect.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.net".equals(packageName)) {
-            GeneratedAccess_java_net.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.nio.charset".equals(packageName)) {
-            GeneratedAccess_java_nio_charset.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.text".equals(packageName)) {
-            GeneratedAccess_java_text.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.time".equals(packageName)) {
-            GeneratedAccess_java_time.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.time.format".equals(packageName)) {
-            GeneratedAccess_java_time_format.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.time.temporal".equals(packageName)) {
-            GeneratedAccess_java_time_temporal.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.util".equals(packageName)) {
-            GeneratedAccess_java_util.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.util.concurrent".equals(packageName)) {
-            GeneratedAccess_java_util_concurrent.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.util.concurrent.atomic".equals(packageName)) {
-            GeneratedAccess_java_util_concurrent_atomic.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.util.function".equals(packageName)) {
-            GeneratedAccess_java_util_function.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.util.stream".equals(packageName)) {
-            GeneratedAccess_java_util_stream.setStaticField(type, name, value);
-            return;
+        String candidate = packageName(type);
+        while (candidate != null) {
+            if ("com.codename1.ads".equals(candidate)) {
+                GeneratedAccess_com_codename1_ads.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ads.spi".equals(candidate)) {
+                GeneratedAccess_com_codename1_ads_spi.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ai".equals(candidate)) {
+                GeneratedAccess_com_codename1_ai.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.analytics".equals(candidate)) {
+                GeneratedAccess_com_codename1_analytics.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.annotations".equals(candidate)) {
+                GeneratedAccess_com_codename1_annotations.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.annotations.graphql".equals(candidate)) {
+                GeneratedAccess_com_codename1_annotations_graphql.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.annotations.grpc".equals(candidate)) {
+                GeneratedAccess_com_codename1_annotations_grpc.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.annotations.rest".equals(candidate)) {
+                GeneratedAccess_com_codename1_annotations_rest.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.background".equals(candidate)) {
+                GeneratedAccess_com_codename1_background.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.binding".equals(candidate)) {
+                GeneratedAccess_com_codename1_binding.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.camera".equals(candidate)) {
+                GeneratedAccess_com_codename1_camera.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.capture".equals(candidate)) {
+                GeneratedAccess_com_codename1_capture.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.charts".equals(candidate)) {
+                GeneratedAccess_com_codename1_charts.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.charts.compat".equals(candidate)) {
+                GeneratedAccess_com_codename1_charts_compat.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.charts.models".equals(candidate)) {
+                GeneratedAccess_com_codename1_charts_models.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.charts.renderers".equals(candidate)) {
+                GeneratedAccess_com_codename1_charts_renderers.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.charts.transitions".equals(candidate)) {
+                GeneratedAccess_com_codename1_charts_transitions.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.charts.util".equals(candidate)) {
+                GeneratedAccess_com_codename1_charts_util.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.charts.views".equals(candidate)) {
+                GeneratedAccess_com_codename1_charts_views.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.cloud".equals(candidate)) {
+                GeneratedAccess_com_codename1_cloud.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.codescan".equals(candidate)) {
+                GeneratedAccess_com_codename1_codescan.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.compat.java.util".equals(candidate)) {
+                GeneratedAccess_com_codename1_compat_java_util.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.components".equals(candidate)) {
+                GeneratedAccess_com_codename1_components.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.contacts".equals(candidate)) {
+                GeneratedAccess_com_codename1_contacts.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.db".equals(candidate)) {
+                GeneratedAccess_com_codename1_db.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.facebook".equals(candidate)) {
+                GeneratedAccess_com_codename1_facebook.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.facebook.ui".equals(candidate)) {
+                GeneratedAccess_com_codename1_facebook_ui.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.callbacks".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.collision".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_collision.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.broadphase".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.collision.shapes".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.common".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_common.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.contacts".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.dynamics.joints".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.arrays".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.normal".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gaming.physics.box2d.pooling.stacks".equals(candidate)) {
+                GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.gpu".equals(candidate)) {
+                GeneratedAccess_com_codename1_gpu.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io".equals(candidate)) {
+                GeneratedAccess_com_codename1_io.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.bonjour".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_bonjour.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.graphql".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_graphql.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.grpc".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_grpc.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.gzip".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_gzip.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.oidc".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_oidc.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.rest".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_rest.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.services".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_services.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.tar".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_tar.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.usb".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_usb.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.webauthn".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_webauthn.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.io.wifi".equals(candidate)) {
+                GeneratedAccess_com_codename1_io_wifi.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.javascript".equals(candidate)) {
+                GeneratedAccess_com_codename1_javascript.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.l10n".equals(candidate)) {
+                GeneratedAccess_com_codename1_l10n.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.location".equals(candidate)) {
+                GeneratedAccess_com_codename1_location.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.mapping".equals(candidate)) {
+                GeneratedAccess_com_codename1_mapping.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.maps".equals(candidate)) {
+                GeneratedAccess_com_codename1_maps.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.maps.layers".equals(candidate)) {
+                GeneratedAccess_com_codename1_maps_layers.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.maps.providers".equals(candidate)) {
+                GeneratedAccess_com_codename1_maps_providers.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.media".equals(candidate)) {
+                GeneratedAccess_com_codename1_media.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.messaging".equals(candidate)) {
+                GeneratedAccess_com_codename1_messaging.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.nfc".equals(candidate)) {
+                GeneratedAccess_com_codename1_nfc.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.notifications".equals(candidate)) {
+                GeneratedAccess_com_codename1_notifications.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.orm".equals(candidate)) {
+                GeneratedAccess_com_codename1_orm.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.payment".equals(candidate)) {
+                GeneratedAccess_com_codename1_payment.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.plugin".equals(candidate)) {
+                GeneratedAccess_com_codename1_plugin.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.plugin.event".equals(candidate)) {
+                GeneratedAccess_com_codename1_plugin_event.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.printing".equals(candidate)) {
+                GeneratedAccess_com_codename1_printing.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.processing".equals(candidate)) {
+                GeneratedAccess_com_codename1_processing.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.properties".equals(candidate)) {
+                GeneratedAccess_com_codename1_properties.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.push".equals(candidate)) {
+                GeneratedAccess_com_codename1_push.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.router".equals(candidate)) {
+                GeneratedAccess_com_codename1_router.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.security".equals(candidate)) {
+                GeneratedAccess_com_codename1_security.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.share".equals(candidate)) {
+                GeneratedAccess_com_codename1_share.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.social".equals(candidate)) {
+                GeneratedAccess_com_codename1_social.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.system".equals(candidate)) {
+                GeneratedAccess_com_codename1_system.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.testing".equals(candidate)) {
+                GeneratedAccess_com_codename1_testing.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.animations".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_animations.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.css".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_css.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.events".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_events.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.geom".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_geom.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.html".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_html.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.layouts".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_layouts.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.layouts.mig".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_layouts_mig.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.list".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_list.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.painter".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_painter.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.plaf".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_plaf.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.scene".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_scene.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.spinner".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_spinner.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.table".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_table.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.tree".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_tree.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.util".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_util.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.ui.validation".equals(candidate)) {
+                GeneratedAccess_com_codename1_ui_validation.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.util".equals(candidate)) {
+                GeneratedAccess_com_codename1_util.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.util.promise".equals(candidate)) {
+                GeneratedAccess_com_codename1_util_promise.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.util.regex".equals(candidate)) {
+                GeneratedAccess_com_codename1_util_regex.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codename1.xml".equals(candidate)) {
+                GeneratedAccess_com_codename1_xml.setStaticField(type, name, value);
+                return;
+            }
+            if ("com.codenameone.playground".equals(candidate)) {
+                GeneratedAccess_com_codenameone_playground.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.io".equals(candidate)) {
+                GeneratedAccess_java_io.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.lang".equals(candidate)) {
+                GeneratedAccess_java_lang.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.lang.ref".equals(candidate)) {
+                GeneratedAccess_java_lang_ref.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.lang.reflect".equals(candidate)) {
+                GeneratedAccess_java_lang_reflect.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.net".equals(candidate)) {
+                GeneratedAccess_java_net.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.nio.charset".equals(candidate)) {
+                GeneratedAccess_java_nio_charset.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.text".equals(candidate)) {
+                GeneratedAccess_java_text.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.time".equals(candidate)) {
+                GeneratedAccess_java_time.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.time.format".equals(candidate)) {
+                GeneratedAccess_java_time_format.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.time.temporal".equals(candidate)) {
+                GeneratedAccess_java_time_temporal.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.util".equals(candidate)) {
+                GeneratedAccess_java_util.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.util.concurrent".equals(candidate)) {
+                GeneratedAccess_java_util_concurrent.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.util.concurrent.atomic".equals(candidate)) {
+                GeneratedAccess_java_util_concurrent_atomic.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.util.function".equals(candidate)) {
+                GeneratedAccess_java_util_function.setStaticField(type, name, value);
+                return;
+            }
+            if ("java.util.stream".equals(candidate)) {
+                GeneratedAccess_java_util_stream.setStaticField(type, name, value);
+                return;
+            }
+            int __d = candidate.lastIndexOf('.');
+            candidate = __d < 0 ? null : candidate.substring(0, __d);
         }
         throw unsupportedStaticFieldWrite(type, name, value);
     }

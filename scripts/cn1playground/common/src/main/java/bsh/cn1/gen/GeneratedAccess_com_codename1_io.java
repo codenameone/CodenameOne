@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_io {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -240,6 +245,18 @@ public final class GeneratedAccess_com_codename1_io {
                 return new com.codename1.io.ConnectionRequest((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
+        if (type == com.codename1.io.ConnectionRequest.SSLCertificate.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.ConnectionRequest.SSLCertificate();
+            }
+        }
+        if (type == com.codename1.io.Cookie.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.Cookie();
+            }
+        }
         if (type == com.codename1.io.File.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -252,6 +269,12 @@ public final class GeneratedAccess_com_codename1_io {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 return new com.codename1.io.File((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if (type == com.codename1.io.JSONParser.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.JSONParser();
             }
         }
         if (type == com.codename1.io.MalformedURLException.class) {
@@ -288,6 +311,12 @@ public final class GeneratedAccess_com_codename1_io {
                 return new com.codename1.io.NetworkEvent((com.codename1.io.ConnectionRequest) adaptedArgs[0], toIntValue(adaptedArgs[1]), (java.lang.String) adaptedArgs[2]);
             }
         }
+        if (type == com.codename1.io.NetworkTypePlatform.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.NetworkTypePlatform();
+            }
+        }
         if (type == com.codename1.io.Oauth2.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
@@ -306,6 +335,12 @@ public final class GeneratedAccess_com_codename1_io {
                 return new com.codename1.io.Oauth2((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], (java.util.Hashtable) adaptedArgs[6]);
             }
         }
+        if (type == com.codename1.io.Oauth2.RefreshTokenRequest.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.Oauth2.RefreshTokenRequest();
+            }
+        }
         if (type == com.codename1.io.Properties.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
@@ -316,10 +351,22 @@ public final class GeneratedAccess_com_codename1_io {
                 return new com.codename1.io.Properties((com.codename1.io.Properties) adaptedArgs[0]);
             }
         }
+        if (type == com.codename1.io.Storage.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.Storage();
+            }
+        }
         if (type == com.codename1.io.URL.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return new com.codename1.io.URL((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.io.WebServiceProxyCall.WSDefinition.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.WebServiceProxyCall.WSDefinition();
             }
         }
         throw unsupportedConstruct(type, safeArgs);

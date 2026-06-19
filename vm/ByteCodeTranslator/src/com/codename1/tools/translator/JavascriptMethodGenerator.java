@@ -4860,6 +4860,38 @@ final class JavascriptMethodGenerator {
         }
     }
 
+    /**
+     * Primitive class literals ({@code int.class}, {@code double.class}, ...)
+     * compile to {@code getstatic <Wrapper>.TYPE}. The wrapper {@code TYPE}
+     * fields are declared in the JavaAPI as {@code TYPE = int.class}, which is
+     * self-referential -- so on the JavaScript backend the field initialises to
+     * null and {@code int.class} comes back null (and any primitive {@code Class}
+     * a caller does reach has {@code isPrimitive()==false}). Map any read of a
+     * wrapper {@code TYPE} field directly to the runtime's interned primitive
+     * {@code Class} object, which carries {@code isPrimitive=true}. This also
+     * fixes the wrapper's own clinit ({@code TYPE = int.class}) so the field
+     * itself ends up holding the correct primitive class. Returns the JS
+     * expression, or null when (owner, field) is not a wrapper {@code TYPE}.
+     */
+    private static String primitiveTypeClassExpression(String owner, String fieldName) {
+        if (!"TYPE".equals(fieldName)) {
+            return null;
+        }
+        String token;
+        switch (owner) {
+            case "java_lang_Integer":   token = "JAVA_INT"; break;
+            case "java_lang_Long":      token = "JAVA_LONG"; break;
+            case "java_lang_Double":    token = "JAVA_DOUBLE"; break;
+            case "java_lang_Float":     token = "JAVA_FLOAT"; break;
+            case "java_lang_Byte":      token = "JAVA_BYTE"; break;
+            case "java_lang_Short":     token = "JAVA_SHORT"; break;
+            case "java_lang_Character": token = "JAVA_CHAR"; break;
+            case "java_lang_Boolean":   token = "JAVA_BOOLEAN"; break;
+            default: return null;
+        }
+        return "_primClass(\"" + token + "\")";
+    }
+
     private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx) {
         String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
@@ -4875,10 +4907,16 @@ final class JavascriptMethodGenerator {
         String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
-            case Opcodes.GETSTATIC:
+            case Opcodes.GETSTATIC: {
+                String primExpr = primitiveTypeClassExpression(owner, fieldName);
+                if (primExpr != null) {
+                    out.append("  ").append(ctx.push(primExpr)).append(";\n");
+                    return true;
+                }
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 out.append("  ").append(ctx.push("_S[\"" + owner + "\"][\"" + fieldName + "\"]")).append(";\n");
                 return true;
+            }
             case Opcodes.PUTSTATIC: {
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 String value = ctx.pop();
@@ -6715,7 +6753,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
-            case Opcodes.GETSTATIC:
+            case Opcodes.GETSTATIC: {
+                String primExpr = primitiveTypeClassExpression(owner, fieldName);
+                if (primExpr != null) {
+                    out.append("        stack.p(").append(primExpr).append("); pc = ")
+                            .append(index + 1).append("; break;\n");
+                    return;
+                }
                 appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
                 // ``_S["owner"]["fieldName"]`` (runtime-maintained
                 // per-class staticFields map) is ~18 chars shorter per
@@ -6725,6 +6769,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        stack.p(_S[\"").append(owner).append("\"][\"")
                         .append(fieldName).append("\"]); pc = ").append(index + 1).append("; break;\n");
                 return;
+            }
             case Opcodes.PUTSTATIC:
                 appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
                 out.append("        _S[\"").append(owner).append("\"][\"").append(fieldName)

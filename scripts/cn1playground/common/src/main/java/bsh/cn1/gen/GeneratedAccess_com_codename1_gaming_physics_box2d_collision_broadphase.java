@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_collision_
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -53,6 +58,12 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_collision_
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.gaming.physics.box2d.collision.broadphase.DynamicTree();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.collision.broadphase.Pair.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.collision.broadphase.Pair();
             }
         }
         throw unsupportedConstruct(type, safeArgs);

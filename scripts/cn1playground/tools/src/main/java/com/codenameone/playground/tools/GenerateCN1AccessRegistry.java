@@ -422,11 +422,18 @@ public final class GenerateCN1AccessRegistry {
                 || sourceClass.classTree.getKind() == Tree.Kind.ANNOTATION_TYPE;
         boolean isEnum = sourceClass.classTree.getKind() == Tree.Kind.ENUM;
         boolean isAbstract = isInterface || sourceClass.classTree.getModifiers().getFlags().contains(Modifier.ABSTRACT);
+        boolean isPublicClass = sourceClass.classTree.getModifiers().getFlags().contains(Modifier.PUBLIC);
+        // Track whether the source declares ANY constructor (even private /
+        // protected / parameterized). Only when none is declared does javac
+        // synthesize an implicit default constructor whose access matches the
+        // class -- the only case where we may safely add a no-arg constructor.
+        boolean declaresAnyConstructor = false;
 
         for (Tree member : sourceClass.classTree.getMembers()) {
             if (member instanceof MethodTree) {
                 MethodTree methodTree = (MethodTree) member;
                 if (methodTree.getReturnType() == null) {
+                    declaresAnyConstructor = true;
                     ApiConstructor constructor = parseConstructor(sourceClass, methodTree, resolver);
                     if (constructor != null) {
                         constructors.add(constructor);
@@ -455,6 +462,19 @@ public final class GenerateCN1AccessRegistry {
                     instanceFields.add(field);
                 }
             }
+        }
+
+        // A class that declares no constructor still has an implicit public
+        // default constructor (when the class itself is public). The source AST
+        // has no node for it, so the member loop above finds nothing and bean-
+        // shell's ``new Foo()`` would dispatch to a missing branch and yield
+        // null (e.g. ``com.codename1.gpu.Camera``). Synthesize the no-arg
+        // constructor here; runtime validation (hasRuntimeConstructor, which
+        // uses getConstructor() + isPublic) drops it again for any class that
+        // doesn't actually expose a public no-arg constructor (private ctor,
+        // factory-only, etc.), so this never registers an uninstantiable type.
+        if (!declaresAnyConstructor && isPublicClass && !isInterface && !isAbstract && !isEnum) {
+            constructors.add(new ApiConstructor(new ArrayList<ApiType>(), false));
         }
 
         sortConstructors(constructors);
@@ -1536,12 +1556,21 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootConstruct(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Object construct(Class<?> type, Object[] args) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // Walk the package prefix back a segment at a time. A nested type's
+        // getName() is dotted on the JavaScript port (``Outer.Inner`` rather
+        // than the JVM's ``Outer$Inner``), so packageName(type) yields
+        // ``pkg.Outer`` -- not a real package. Dropping segments recovers the
+        // true package (``pkg``) so the per-type dispatch still resolves.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".construct(type, args);\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                return " + generatedPackage.helperClassName + ".construct(type, args);\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedConstruct(type, args);\n");
         writer.write("    }\n\n");
     }
@@ -1549,12 +1578,18 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootInvokeStatic(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // See construct() -- walk the package prefix back so nested types
+        // (dotted getName() on the JavaScript port) still route correctly.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".invokeStatic(type, name, args);\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                return " + generatedPackage.helperClassName + ".invokeStatic(type, name, args);\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedStatic(type, name, args);\n");
         writer.write("    }\n\n");
     }
@@ -1594,12 +1629,20 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootGetStaticField(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Object getStaticField(Class<?> type, String name) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // See construct() -- walk the package prefix back so nested types
+        // (dotted getName() on the JavaScript port) still route correctly. This
+        // is what makes enum-constant access such as ``Material.Type.PHONG``
+        // resolve: Material.Type's getName() is ``...Material.Type``.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".getStaticField(type, name);\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                return " + generatedPackage.helperClassName + ".getStaticField(type, name);\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedStaticField(type, name);\n");
         writer.write("    }\n\n");
     }
@@ -1625,13 +1668,19 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootSetStaticField(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public void setStaticField(Class<?> type, String name, Object value) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // See construct() -- walk the package prefix back so nested types
+        // (dotted getName() on the JavaScript port) still route correctly.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            " + generatedPackage.helperClassName + ".setStaticField(type, name, value);\n");
-            writer.write("            return;\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                " + generatedPackage.helperClassName + ".setStaticField(type, name, value);\n");
+            writer.write("                return;\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedStaticFieldWrite(type, name, value);\n");
         writer.write("    }\n\n");
     }
@@ -1725,11 +1774,22 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
 
     private static void writeFindClass(Writer writer, List<ApiClass> classes) throws IOException {
         writer.write("    public static Class<?> findClass(String name) {\n");
-        writer.write("        int lastDot = name == null ? -1 : name.lastIndexOf('.');\n");
-        writer.write("        if (lastDot < 0 || lastDot == name.length() - 1) {\n");
+        writer.write("        if (name == null) {\n");
         writer.write("            return null;\n");
         writer.write("        }\n");
-        writer.write("        return findClassBySimpleName(name.substring(lastDot + 1));\n");
+        // A nested type arrives as ``Outer$Inner`` -- bsh's Name resolution builds
+        // the binary name via ``Class.getName() + \"$\" + field`` when reaching an
+        // inner class (e.g. ``Material.Type`` -> ``...Material$Type``). Split on the
+        // last '.' OR '$' so the inner type resolves by its simple name (``Type``);
+        // otherwise the registry never finds it and enum-constant access such as
+        // ``Material.Type.PHONG`` silently fails on the JavaScript port.
+        writer.write("        int dot = name.lastIndexOf('.');\n");
+        writer.write("        int dollar = name.lastIndexOf('$');\n");
+        writer.write("        int sep = dot > dollar ? dot : dollar;\n");
+        writer.write("        if (sep < 0 || sep == name.length() - 1) {\n");
+        writer.write("            return null;\n");
+        writer.write("        }\n");
+        writer.write("        return findClassBySimpleName(name.substring(sep + 1));\n");
         writer.write("    }\n\n");
         writer.write("    public static Class<?> findClassBySimpleName(String simpleName) {\n");
         writeFindClassStatements(writer, classes, "findClassChunk", "        ", "simpleName");

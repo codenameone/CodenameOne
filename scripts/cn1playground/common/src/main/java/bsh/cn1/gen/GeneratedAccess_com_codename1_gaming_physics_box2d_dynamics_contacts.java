@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_c
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -100,10 +105,22 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_c
                 return new com.codename1.gaming.physics.box2d.dynamics.contacts.CircleContact((com.codename1.gaming.physics.box2d.pooling.IWorldPool) adaptedArgs[0]);
             }
         }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge();
+            }
+        }
         if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.ContactPositionConstraint.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.gaming.physics.box2d.dynamics.contacts.ContactPositionConstraint();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.ContactRegister.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.contacts.ContactRegister();
             }
         }
         if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.ContactSolver.class) {
@@ -112,10 +129,22 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_c
                 return new com.codename1.gaming.physics.box2d.dynamics.contacts.ContactSolver();
             }
         }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.ContactSolver.ContactSolverDef.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.contacts.ContactSolver.ContactSolverDef();
+            }
+        }
         if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.ContactVelocityConstraint.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.gaming.physics.box2d.dynamics.contacts.ContactVelocityConstraint();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.ContactVelocityConstraint.VelocityConstraintPoint.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.contacts.ContactVelocityConstraint.VelocityConstraintPoint();
             }
         }
         if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.EdgeAndCircleContact.class) {
@@ -140,6 +169,18 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_c
             if (matches(safeArgs, new Class<?>[]{com.codename1.gaming.physics.box2d.pooling.IWorldPool.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.gaming.physics.box2d.pooling.IWorldPool.class}, false);
                 return new com.codename1.gaming.physics.box2d.dynamics.contacts.PolygonContact((com.codename1.gaming.physics.box2d.pooling.IWorldPool) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.Position.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.contacts.Position();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.dynamics.contacts.Velocity.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.dynamics.contacts.Velocity();
             }
         }
         throw unsupportedConstruct(type, safeArgs);

@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -127,10 +132,22 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return new com.codename1.ui.plaf.Style(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (com.codename1.ui.Font) adaptedArgs[2], (byte) toIntValue(adaptedArgs[3]), (com.codename1.ui.Image) adaptedArgs[4], (byte) toIntValue(adaptedArgs[5]));
             }
         }
+        if (type == com.codename1.ui.plaf.StyleParser.BorderInfo.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.plaf.StyleParser.BorderInfo();
+            }
+        }
         if (type == com.codename1.ui.plaf.StyleParser.BoxInfo.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.StyleParser.ScalarValue[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.StyleParser.ScalarValue[].class}, false);
                 return new com.codename1.ui.plaf.StyleParser.BoxInfo((com.codename1.ui.plaf.StyleParser.ScalarValue[]) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.ui.plaf.StyleParser.FontInfo.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.plaf.StyleParser.FontInfo();
             }
         }
         if (type == com.codename1.ui.plaf.StyleParser.ImageInfo.class) {

@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_common {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -104,10 +109,28 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_common {
                 return new com.codename1.gaming.physics.box2d.common.Mat33((com.codename1.gaming.physics.box2d.common.Vec3) adaptedArgs[0], (com.codename1.gaming.physics.box2d.common.Vec3) adaptedArgs[1], (com.codename1.gaming.physics.box2d.common.Vec3) adaptedArgs[2]);
             }
         }
+        if (type == com.codename1.gaming.physics.box2d.common.MathUtils.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.common.MathUtils();
+            }
+        }
         if (type == com.codename1.gaming.physics.box2d.common.OBBViewportTransform.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.gaming.physics.box2d.common.OBBViewportTransform();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.common.OBBViewportTransform.OBB.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.common.OBBViewportTransform.OBB();
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.common.RaycastResult.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.common.RaycastResult();
             }
         }
         if (type == com.codename1.gaming.physics.box2d.common.Rot.class) {
@@ -118,6 +141,12 @@ public final class GeneratedAccess_com_codename1_gaming_physics_box2d_common {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return new com.codename1.gaming.physics.box2d.common.Rot(((Number) adaptedArgs[0]).floatValue());
+            }
+        }
+        if (type == com.codename1.gaming.physics.box2d.common.Settings.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.gaming.physics.box2d.common.Settings();
             }
         }
         if (type == com.codename1.gaming.physics.box2d.common.Sweep.class) {
