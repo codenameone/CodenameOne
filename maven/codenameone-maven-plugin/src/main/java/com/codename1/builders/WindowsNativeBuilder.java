@@ -182,6 +182,18 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("Failed to unzip the application sources", ex);
         }
 
+        // The JDK class set the translator emits as java_lang_*.c/.h /
+        // java_util_*.c/.h is shipped as a separate classpath resource inside
+        // the codenameone-parparvm bundle. Unzipping it into classesDir adds
+        // those classes to the translator source roots; without this step the
+        // translator emits cn1_globals.c referencing java_lang_Class.h but
+        // never produces the header (iOS uses the same wire-up).
+        try {
+            unzip(getResourceAsStream("/parparvm-java-api.jar"), classesDir, classesDir, classesDir);
+        } catch (Exception ex) {
+            throw new BuildException("Failed to load JavaAPI.jar", ex);
+        }
+
         // ParparVM translator + the WindowsPort native layer (translated platform
         // classes and the C/C++ nativeSources) are bundled with the build.
         File parparVMCompilerJar;
@@ -231,7 +243,13 @@ public class WindowsNativeBuilder extends Executor {
         // copy the port's nativeSources (incl. the C++ COM layer) into srcRoot.
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
-        parparCmd.add("-Xmx768m");
+        // 2g: the clean target's readNativeFiles loads both .m and .c (clean's
+        // extension), so the in-memory native-source set is ~2x what the iOS
+        // target loads, and the markDependencies/NativeSymbolIndex pass needs
+        // headroom on top of that. Without the JavaAPI in classesDir the
+        // translator never reaches that stage at scale; once JavaAPI is added
+        // the older 768m cap GC-thrashes.
+        parparCmd.add("-Xmx2g");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         // Output type: the portable "clean" C target. The "windows" app type
@@ -507,7 +525,16 @@ public class WindowsNativeBuilder extends Executor {
             javacPath = "javac";
         }
         String[] st = stubCompileSourceTarget(javacPath);
-        String cp = classesDir.getAbsolutePath() + File.pathSeparator + portClasses.getAbsolutePath();
+        // Classpath = app classes + Windows port classes + every JAR
+        // on the maven plugin's own classloader (which includes
+        // codenameone-core via the plugin's pom dependency on it).
+        // System.getProperty("java.class.path") only sees Maven's
+        // launcher jar -- not the plugin's resolved deps -- so we
+        // have to walk the plugin classloader explicitly. Without
+        // core on cp the stub compile fails with "cannot access
+        // CodenameOneImplementation" / "package com.codename1.ui
+        // does not exist".
+        String cp = buildStubCompileClasspath(classesDir, portClasses);
         if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", st[0], "-target", st[1],
                 "-classpath", cp, "-d", classesDir.getAbsolutePath())) {
             throw new BuildException("Failed to compile the generated native interface / bootstrap stubs");
@@ -865,5 +892,42 @@ public class WindowsNativeBuilder extends Executor {
             r.close();
         }
         return lines;
+    }
+
+    /**
+     * Build the classpath used to compile the generated stub .java files.
+     * Includes the app classes, the Windows port classes, and every JAR on
+     * this maven plugin's own classloader -- the latter is how
+     * codenameone-core (which provides the abstract
+     * com.codename1.impl.CodenameOneImplementation base class) lands on cp.
+     * The plugin declares core as a direct dependency in its pom.xml, so
+     * its classloader has it; {@code System.getProperty("java.class.path")}
+     * sees only Maven's launcher jar and is useless here.
+     */
+    private String buildStubCompileClasspath(File classesDir, File portClasses) {
+        StringBuilder cp = new StringBuilder();
+        cp.append(classesDir.getAbsolutePath())
+          .append(File.pathSeparator)
+          .append(portClasses.getAbsolutePath());
+        ClassLoader cl = getClass().getClassLoader();
+        java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+        while (cl != null) {
+            if (cl instanceof java.net.URLClassLoader) {
+                for (java.net.URL u : ((java.net.URLClassLoader) cl).getURLs()) {
+                    if ("file".equalsIgnoreCase(u.getProtocol())) {
+                        try {
+                            seen.add(new File(u.toURI()).getAbsolutePath());
+                        } catch (Throwable ignored) {
+                            /* malformed URL -- skip */
+                        }
+                    }
+                }
+            }
+            cl = cl.getParent();
+        }
+        for (String p : seen) {
+            cp.append(File.pathSeparator).append(p);
+        }
+        return cp.toString();
     }
 }

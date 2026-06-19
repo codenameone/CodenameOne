@@ -170,6 +170,7 @@ def common_pom(artifact: str) -> str:
 
             <artifactId>{artifact}-common</artifactId>
             <packaging>jar</packaging>
+            <name>Codename One AI: {artifact}-common</name>
 
             <properties>
                 <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -261,6 +262,7 @@ def platform_pom(parent_artifact: str, suffix: str, extra_deps: str = "", extra_
 
             <artifactId>{parent_artifact}-{suffix}</artifactId>
             <packaging>jar</packaging>
+            <name>Codename One AI: {parent_artifact}-{suffix}</name>
 
             <properties>
                 <maven.compiler.source>1.8</maven.compiler.source>
@@ -330,6 +332,7 @@ def resource_only_pom(parent_artifact: str, suffix: str, source_dir: str) -> str
 
             <artifactId>{parent_artifact}-{suffix}</artifactId>
             <packaging>jar</packaging>
+            <name>Codename One AI: {parent_artifact}-{suffix}</name>
 
             <build>
                 <sourceDirectory>src/main/dummy</sourceDirectory>
@@ -388,6 +391,7 @@ def ios_pom(artifact: str) -> str:
 
             <artifactId>{artifact}-ios</artifactId>
             <packaging>jar</packaging>
+            <name>Codename One AI: {artifact}-ios</name>
 
             <build>
                 <sourceDirectory>src/main/dummy</sourceDirectory>
@@ -445,6 +449,7 @@ def lib_pom(artifact: str) -> str:
 
             <artifactId>{artifact}-lib</artifactId>
             <packaging>pom</packaging>
+            <name>Codename One AI: {artifact}-lib</name>
 
             <dependencies>
                 <dependency>

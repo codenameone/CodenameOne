@@ -50,6 +50,24 @@
         </resources>
         <plugins>
             <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
                     <!-- The port has no built-in native look, so its native theme is
@@ -87,7 +105,21 @@
                                 <zip destfile="${project.build.directory}/codenameone/windowsport-bundle/nativewindows.jar">
                                     <fileset dir="${codename1.nativewindows.dir}"/>
                                 </zip>
-                                <copy file="${project.build.directory}/${project.build.finalName}.jar" tofile="${project.build.directory}/codenameone/windowsport-bundle/WindowsPort.jar" overwrite="true"/>
+                                <!--
+                                  WindowsPort.jar inside the bundle is the
+                                  fat jar: port classes plus every
+                                  transitive dep including codenameone-core.
+                                  The ParparVM translator scans this jar to
+                                  find every class it needs to translate;
+                                  without core inside, it cannot resolve
+                                  symbols like
+                                  com.codename1.ui.events.ActionListener
+                                  referenced from an app lambda body and
+                                  aborts mid-translation with empty output.
+                                  Mirrors the iOSPort.jar layout, which has
+                                  always shipped jar-with-dependencies.
+                                -->
+                                <copy file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar" tofile="${project.build.directory}/codenameone/windowsport-bundle/WindowsPort.jar" overwrite="true"/>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
                                     <fileset dir="${project.build.directory}/codenameone/windowsport-bundle"/>
                                 </zip>

@@ -120,6 +120,9 @@ Yes. Native interfaces and plugins let you access platform-specific APIs where r
 ### Can I build and ship multiple production apps?
 Yes. There is no per-app licensing cap; plans are tied to developer seats and service usage tiers.
 
+### Does Codename One catch crashes in shipped apps?
+Yes, via the *Crash Protection* service on Pro and Enterprise plans. Uncaught exceptions in your release build are captured, symbolicated server-side, and filed as deduplicated issues on a GitHub repository you own. There is no separate dashboard -- you triage from GitHub Issues. See the Crash Protection chapter of the Developer Guide and the [pricing page](/pricing/) for storage quotas (Pro: 100 MB / 3 weeks; Enterprise: 500 MB / 6 weeks). Crash Protection is opt-in -- the build server only uploads symbols when you flip the build property or call the `CrashProtection` API.
+
 ## Support & Community
 
 ### Where should I ask questions?

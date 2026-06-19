@@ -2381,6 +2381,32 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return "linux";
     }
 
+    @Override
+    public String getNativeLogSnapshot() {
+        try {
+            return LinuxNative.crashProtectionLogSnapshot();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    public void installNativeCrashHandler() {
+        try {
+            LinuxNative.crashProtectionInstall();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Override
+    public String consumePendingNativeCrash() {
+        try {
+            return LinuxNative.crashProtectionConsumePending();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     /**
      * Plays audio (and decodes video) through Media Foundation. The stream is
      * read into memory and handed to the native engine, which spools it to a

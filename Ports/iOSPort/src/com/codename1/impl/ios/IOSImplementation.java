@@ -9370,6 +9370,32 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public String getNativeLogSnapshot() {
+        try {
+            return nativeInstance.crashProtectionLogSnapshot();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    public void installNativeCrashHandler() {
+        try {
+            nativeInstance.crashProtectionInstall();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Override
+    public String consumePendingNativeCrash() {
+        try {
+            return nativeInstance.crashProtectionConsumePending();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Override
     public Simd createSimd() {
         return new IOSSimd();
     }
