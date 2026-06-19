@@ -15,7 +15,19 @@
 #include "cn1_linux_crash_protection.h"
 
 #include <dlfcn.h>
+/* execinfo.h (backtrace + backtrace_symbols_fd) is a glibc extension;
+ * musl libc does not ship the header. Detect glibc explicitly and fall
+ * back to a no-op stack capture on Alpine / musl builds -- the signal
+ * handler still runs, persists signal + SLIDE + FAULT, and reports
+ * zero frames. CN1 picks symbolication back up server-side via the
+ * uploaded ELF debug info, so the missing on-device unwind is a
+ * graceful degradation rather than a feature regression. */
+#if defined(__GLIBC__)
 #include <execinfo.h>
+#define CN1_CP_HAVE_BACKTRACE 1
+#else
+#define CN1_CP_HAVE_BACKTRACE 0
+#endif
 #include <fcntl.h>
 #include <pthread.h>
 #include <pwd.h>
@@ -208,6 +220,7 @@ static void cn1_cp_signal_handler(int sig, siginfo_t *info, void *ctx) {
                 cn1_cp_write_hex(fd, (uintptr_t)info->si_addr);
                 CN1_CP_W_STR(fd, "\n");
             }
+#if CN1_CP_HAVE_BACKTRACE
             void *frames[64];
             int n = backtrace(frames, 64);
             CN1_CP_W_STR(fd, "FRAMES ");
@@ -220,6 +233,13 @@ static void cn1_cp_signal_handler(int sig, siginfo_t *info, void *ctx) {
             }
             CN1_CP_W_STR(fd, "SYMBOLS\n");
             backtrace_symbols_fd(frames, n, fd);
+#else
+            /* musl libc has no backtrace(); persist a zero-frame
+             * record so the BuildCloud ingest still recognises the
+             * payload as a valid CN1NATIVECRASH v1 and groups it
+             * with the other unwind-less native crashes. */
+            CN1_CP_W_STR(fd, "FRAMES 0\nSYMBOLS\n");
+#endif
             CN1_CP_W_STR(fd, "END\n");
             close(fd);
         }
