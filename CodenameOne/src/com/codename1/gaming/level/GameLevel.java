@@ -153,27 +153,33 @@ public class GameLevel {
 
     // ---- simple accessors ----------------------------------------------------
 
+    /// The id of the `AssetPack` this level's elements draw from.
     public String getAssetPack() {
         return assetPack;
     }
 
+    /// Sets the asset-pack id (see `#getAssetPack()`).
     public GameLevel setAssetPack(String assetPack) {
         this.assetPack = assetPack;
         return this;
     }
 
+    /// The grid width in cells.
     public int getCols() {
         return cols;
     }
 
+    /// The grid height in cells.
     public int getRows() {
         return rows;
     }
 
+    /// The size of one grid cell -- pixels per tile in 2D / board, world units per cell in 3D.
     public int getTileSize() {
         return tileSize;
     }
 
+    /// Sets the grid dimensions and cell size in one call.
     public GameLevel setGrid(int cols, int rows, int tileSize) {
         this.cols = cols;
         this.rows = rows;
@@ -186,14 +192,17 @@ public class GameLevel {
         return props;
     }
 
+    /// A level property as a double, coerced from a `Number`/numeric `String`, else `def`.
     public double getDouble(String key, double def) {
         return Json.num(props.get(key), def);
     }
 
+    /// A level property as an int, coerced from a `Number`/numeric `String`, else `def`.
     public int getInt(String key, int def) {
         return Json.intval(props.get(key), def);
     }
 
+    /// A level property as a String (any value's `toString()`), or `def` if absent.
     public String getString(String key, String def) {
         Object v = props.get(key);
         return v == null ? def : v.toString();
@@ -201,15 +210,18 @@ public class GameLevel {
 
     // ---- layers & elements ---------------------------------------------------
 
+    /// The ordered `Layer` stack (low band first); mutable.
     public List<Layer> layers() {
         return layers;
     }
 
+    /// Appends a layer to the stack.
     public GameLevel addLayer(Layer layer) {
         layers.add(layer);
         return this;
     }
 
+    /// The layer with the given name, or `null` if there is none.
     public Layer getLayer(String name) {
         for (Layer l : layers) {
             if (name == null ? l.getName() == null : name.equals(l.getName())) {
@@ -219,10 +231,12 @@ public class GameLevel {
         return null;
     }
 
+    /// The placed `GameElement`s, across all layers; mutable.
     public List<GameElement> elements() {
         return elements;
     }
 
+    /// Adds a placed element to the level.
     public GameLevel addElement(GameElement element) {
         elements.add(element);
         return this;

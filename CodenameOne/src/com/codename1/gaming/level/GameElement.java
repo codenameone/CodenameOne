@@ -75,15 +75,19 @@ public class GameElement {
         return id;
     }
 
+    /// Sets this element's stable id (unique within a level; the editor assigns one).
     public GameElement setId(String id) {
         this.id = id;
         return this;
     }
 
+    /// The optional display name typed in the editor's Inspector. A *named* element becomes a
+    /// generated field in the companion class; may be `null`.
     public String getName() {
         return name;
     }
 
+    /// Sets the display name (see `#getName()`).
     public GameElement setName(String name) {
         this.name = name;
         return this;
@@ -94,6 +98,7 @@ public class GameElement {
         return assetId;
     }
 
+    /// Points this element at a different catalog asset (and clears the cached `#resolveDef`).
     public GameElement setAssetId(String assetId) {
         this.assetId = assetId;
         this.resolvedDef = null;   // invalidate the cached resolution
@@ -117,15 +122,18 @@ public class GameElement {
         return layer;
     }
 
+    /// Moves this element to the named `Layer`.
     public GameElement setLayer(String layer) {
         this.layer = layer;
         return this;
     }
 
+    /// The x position -- pixels in a 2D / board level, a world-space coordinate in 3D.
     public double getX() {
         return x;
     }
 
+    /// The y position -- pixels in a 2D / board level, a world-space coordinate in 3D.
     public double getY() {
         return y;
     }
@@ -135,12 +143,14 @@ public class GameElement {
         return z;
     }
 
+    /// Sets the x and y position (see `#getX()`).
     public GameElement setPosition(double x, double y) {
         this.x = x;
         this.y = y;
         return this;
     }
 
+    /// Sets the x, y and z position (z is the 3D depth).
     public GameElement setPosition(double x, double y, double z) {
         this.x = x;
         this.y = y;
@@ -148,16 +158,19 @@ public class GameElement {
         return this;
     }
 
+    /// Sets the x position.
     public GameElement setX(double x) {
         this.x = x;
         return this;
     }
 
+    /// Sets the y position.
     public GameElement setY(double y) {
         this.y = y;
         return this;
     }
 
+    /// Sets the z (3D) depth.
     public GameElement setZ(double z) {
         this.z = z;
         return this;
@@ -168,23 +181,28 @@ public class GameElement {
         return rotation;
     }
 
+    /// Sets the rotation in degrees (see `#getRotation()`).
     public GameElement setRotation(float rotation) {
         this.rotation = rotation;
         return this;
     }
 
+    /// The per-instance x scale (`1` = the asset's natural size).
     public float getScaleX() {
         return scaleX;
     }
 
+    /// The per-instance y scale (`1` = the asset's natural size).
     public float getScaleY() {
         return scaleY;
     }
 
+    /// The per-instance z scale, used in 3D (`1` = the asset's natural size).
     public float getScaleZ() {
         return scaleZ;
     }
 
+    /// Sets a uniform scale on all three axes.
     public GameElement setScale(float scale) {
         this.scaleX = scale;
         this.scaleY = scale;
@@ -192,6 +210,7 @@ public class GameElement {
         return this;
     }
 
+    /// Sets the per-axis scale (z applies in 3D).
     public GameElement setScale(float scaleX, float scaleY, float scaleZ) {
         this.scaleX = scaleX;
         this.scaleY = scaleY;
@@ -266,15 +285,19 @@ public class GameElement {
         return el;
     }
 
+    /// Whether an authoring property with the given key is set.
     public boolean hasProperty(String key) {
         return properties.containsKey(key);
     }
 
+    /// Sets an authoring property (a coin's `value`, an enemy's `speed`, ...). Store
+    /// `Double` / `String` / `Boolean` so the value survives a JSON round-trip.
     public GameElement setProperty(String key, Object value) {
         properties.put(key, value);
         return this;
     }
 
+    /// The raw value of an authoring property, or `null` if unset. Prefer the typed getters.
     public Object getProperty(String key) {
         return properties.get(key);
     }
@@ -301,6 +324,7 @@ public class GameElement {
         return defaultValue;
     }
 
+    /// Reads a property as a String (any value's `toString()`), or `defaultValue` if absent.
     public String getString(String key, String defaultValue) {
         Object v = properties.get(key);
         return v == null ? defaultValue : v.toString();
