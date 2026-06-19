@@ -67,7 +67,15 @@ public class Log {
     public static final int REPORTING_DEBUG = 1;
     /// Indicates that log reporting to the cloud should occur only if an error occurred
     public static final int REPORTING_PRODUCTION = 3;
-    private static boolean crashBound;
+    // Legacy crash-protection state. Once bindCrashProtection() backed an
+    // upload-to-codenameone.com flow that toggled this flag on. Both the
+    // bind and the field are deprecated -- the new com.codename1.crash
+    // path handles capture + upload directly. The constant `false` here
+    // keeps isCrashBound() returning a stable answer for legacy callers
+    // (CodenameOneThread.handleException + a couple of Storage hooks) so
+    // they take the same "no legacy crash binding" branch they would
+    // have if nobody had ever called bindCrashProtection.
+    private static final boolean crashBound = false;
     private static Log instance = new Log();
     private static boolean initialized;
     private final long zeroTime = System.currentTimeMillis();
