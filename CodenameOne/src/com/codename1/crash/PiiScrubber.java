@@ -125,16 +125,28 @@ public class PiiScrubber {
     }
 
     private static boolean isEmailLocalChar(char c) {
-        if (c >= 'a' && c <= 'z') return true;
-        if (c >= 'A' && c <= 'Z') return true;
-        if (c >= '0' && c <= '9') return true;
+        if (c >= 'a' && c <= 'z') {
+            return true;
+        }
+        if (c >= 'A' && c <= 'Z') {
+            return true;
+        }
+        if (c >= '0' && c <= '9') {
+            return true;
+        }
         return c == '.' || c == '_' || c == '+' || c == '-';
     }
 
     private static boolean isEmailDomainChar(char c) {
-        if (c >= 'a' && c <= 'z') return true;
-        if (c >= 'A' && c <= 'Z') return true;
-        if (c >= '0' && c <= '9') return true;
+        if (c >= 'a' && c <= 'z') {
+            return true;
+        }
+        if (c >= 'A' && c <= 'Z') {
+            return true;
+        }
+        if (c >= '0' && c <= '9') {
+            return true;
+        }
         return c == '.' || c == '-';
     }
 
@@ -162,7 +174,9 @@ public class PiiScrubber {
                 int j = i + 1;
                 while (j < len) {
                     char d = s.charAt(j);
-                    if (d < '0' || d > '9') break;
+                    if (d < '0' || d > '9') {
+                        break;
+                    }
                     j++;
                 }
                 if (j - i >= 6) {
