@@ -63,11 +63,6 @@
   // Uint8Array -- so the read path (which checks `instanceof Uint8Array`) failed
   // with "Unknown object type" and all saved state was unreadable. Encode bytes
   // as base64 under a distinct "b:" prefix and revive them as a real Uint8Array.
-  function isBytes(v) {
-    return v instanceof Uint8Array
-        || (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView && ArrayBuffer.isView(v) && !(v instanceof DataView))
-        || (v && v.constructor && v.constructor.name === "Uint8Array");
-  }
   // The Storage layer only ever stores Strings or a byte array, but the
   // ParparVM<->JS boundary can deliver that byte array as a real Uint8Array OR
   // as a plain array-like object ({0:..,1:..}); normalise both to a Uint8Array.
