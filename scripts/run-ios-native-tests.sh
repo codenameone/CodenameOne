@@ -142,7 +142,7 @@ xcodebuild \
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" \
   -scheme "$TEST_SCHEME" \
   -destination "$DESTINATION" \
-  "${DERIVED_ARGS[@]}" \
+  ${DERIVED_ARGS[@]+"${DERIVED_ARGS[@]}"} \
   test | tee "$TEST_LOG"
 RC=${PIPESTATUS[0]}
 set -e
