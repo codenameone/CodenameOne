@@ -5308,589 +5308,832 @@ public final class GeneratedCN1Access implements CN1Access {
         throw unsupportedStatic(type, name, args);
     }
 
+    private static final java.util.Map<Class<?>, Integer> INSTANCE_HANDLER_CACHE = new java.util.Hashtable<Class<?>, Integer>();
+
     @Override
     public Object invoke(Object target, String name, Object[] args) throws Exception {
         if (interceptShownForm(target, name, args)) {
             return null;
         }
+        Class<?> __tc = target.getClass();
+        Integer __ci = INSTANCE_HANDLER_CACHE.get(__tc);
+        if (__ci != null) {
+            try {
+                return dispatchInstance(__ci.intValue(), target, name, args);
+            } catch (CN1AccessException __miss) {
+                // method resolves in another package for this class; fall back
+            }
+        }
         CN1AccessException unsupported = null;
         try {
-            return GeneratedAccess_com_codename1_ads.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ads.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(0));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ads_spi.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ads_spi.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(1));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ai.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ai.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(2));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_analytics.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_analytics.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(3));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_annotations.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_annotations.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(4));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_annotations_graphql.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_annotations_graphql.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(5));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_annotations_grpc.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_annotations_grpc.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(6));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_annotations_rest.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_annotations_rest.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(7));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_background.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_background.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(8));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_binding.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_binding.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(9));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_camera.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_camera.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(10));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_capture.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_capture.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(11));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_charts.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_charts.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(12));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_charts_compat.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_charts_compat.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(13));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_charts_models.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_charts_models.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(14));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_charts_renderers.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_charts_renderers.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(15));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_charts_transitions.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_charts_transitions.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(16));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_charts_util.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_charts_util.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(17));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_charts_views.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_charts_views.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(18));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_cloud.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_cloud.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(19));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_codescan.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_codescan.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(20));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_compat_java_util.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_compat_java_util.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(21));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_components.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_components.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(22));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_contacts.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_contacts.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(23));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_db.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_db.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(24));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_facebook.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_facebook.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(25));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_facebook_ui.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_facebook_ui.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(26));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(27));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(28));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(29));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_collision.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(30));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(31));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(32));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_common.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_common.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(33));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(34));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(35));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(36));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(37));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(38));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(39));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(40));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_gpu.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_gpu.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(41));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(42));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_bonjour.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_bonjour.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(43));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_graphql.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_graphql.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(44));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_grpc.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_grpc.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(45));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_gzip.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_gzip.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(46));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_oidc.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_oidc.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(47));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_rest.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_rest.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(48));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_services.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_services.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(49));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_tar.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_tar.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(50));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_usb.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_usb.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(51));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_webauthn.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_webauthn.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(52));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_io_wifi.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_io_wifi.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(53));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_javascript.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_javascript.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(54));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_l10n.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_l10n.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(55));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_location.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_location.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(56));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_mapping.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_mapping.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(57));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_maps.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_maps.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(58));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_maps_layers.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_maps_layers.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(59));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_maps_providers.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_maps_providers.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(60));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_media.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_media.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(61));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_messaging.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_messaging.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(62));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_nfc.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_nfc.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(63));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_notifications.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_notifications.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(64));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_orm.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_orm.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(65));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_payment.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_payment.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(66));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_plugin.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_plugin.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(67));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_plugin_event.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_plugin_event.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(68));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_printing.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_printing.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(69));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_processing.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_processing.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(70));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_properties.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_properties.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(71));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_push.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_push.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(72));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_router.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_router.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(73));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_security.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_security.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(74));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_share.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_share.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(75));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_social.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_social.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(76));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_system.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_system.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(77));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_testing.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_testing.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(78));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(79));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_animations.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_animations.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(80));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_css.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_css.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(81));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_events.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_events.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(82));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_geom.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_geom.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(83));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_html.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_html.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(84));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_layouts.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_layouts.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(85));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_layouts_mig.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_layouts_mig.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(86));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_list.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_list.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(87));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_painter.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_painter.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(88));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_plaf.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_plaf.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(89));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_scene.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_scene.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(90));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_spinner.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_spinner.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(91));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_table.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_table.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(92));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_tree.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_tree.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(93));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_util.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_util.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(94));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_ui_validation.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_ui_validation.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(95));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_util.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_util.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(96));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_util_promise.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_util_promise.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(97));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_util_regex.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_util_regex.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(98));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codename1_xml.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codename1_xml.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(99));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_com_codenameone_playground.invoke(target, name, args);
+            Object __r = GeneratedAccess_com_codenameone_playground.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(100));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_io.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_io.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(101));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_lang.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_lang.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(102));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_lang_ref.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_lang_ref.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(103));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_lang_reflect.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_lang_reflect.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(104));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_net.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_net.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(105));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_nio_charset.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_nio_charset.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(106));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_text.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_text.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(107));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_time.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_time.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(108));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_time_format.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_time_format.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(109));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_time_temporal.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_time_temporal.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(110));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_util.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_util.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(111));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_util_concurrent.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_util_concurrent.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(112));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_util_concurrent_atomic.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_util_concurrent_atomic.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(113));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_util_function.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_util_function.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(114));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_util_stream.invoke(target, name, args);
+            Object __r = GeneratedAccess_java_util_stream.invoke(target, name, args);
+            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(115));
+            return __r;
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
@@ -5898,6 +6141,128 @@ public final class GeneratedCN1Access implements CN1Access {
             throw unsupported;
         }
         throw unsupportedInstance(target, name, args);
+    }
+
+    private static Object dispatchInstance(int __idx, Object target, String name, Object[] args) throws Exception {
+        switch (__idx) {
+            case 0: return GeneratedAccess_com_codename1_ads.invoke(target, name, args);
+            case 1: return GeneratedAccess_com_codename1_ads_spi.invoke(target, name, args);
+            case 2: return GeneratedAccess_com_codename1_ai.invoke(target, name, args);
+            case 3: return GeneratedAccess_com_codename1_analytics.invoke(target, name, args);
+            case 4: return GeneratedAccess_com_codename1_annotations.invoke(target, name, args);
+            case 5: return GeneratedAccess_com_codename1_annotations_graphql.invoke(target, name, args);
+            case 6: return GeneratedAccess_com_codename1_annotations_grpc.invoke(target, name, args);
+            case 7: return GeneratedAccess_com_codename1_annotations_rest.invoke(target, name, args);
+            case 8: return GeneratedAccess_com_codename1_background.invoke(target, name, args);
+            case 9: return GeneratedAccess_com_codename1_binding.invoke(target, name, args);
+            case 10: return GeneratedAccess_com_codename1_camera.invoke(target, name, args);
+            case 11: return GeneratedAccess_com_codename1_capture.invoke(target, name, args);
+            case 12: return GeneratedAccess_com_codename1_charts.invoke(target, name, args);
+            case 13: return GeneratedAccess_com_codename1_charts_compat.invoke(target, name, args);
+            case 14: return GeneratedAccess_com_codename1_charts_models.invoke(target, name, args);
+            case 15: return GeneratedAccess_com_codename1_charts_renderers.invoke(target, name, args);
+            case 16: return GeneratedAccess_com_codename1_charts_transitions.invoke(target, name, args);
+            case 17: return GeneratedAccess_com_codename1_charts_util.invoke(target, name, args);
+            case 18: return GeneratedAccess_com_codename1_charts_views.invoke(target, name, args);
+            case 19: return GeneratedAccess_com_codename1_cloud.invoke(target, name, args);
+            case 20: return GeneratedAccess_com_codename1_codescan.invoke(target, name, args);
+            case 21: return GeneratedAccess_com_codename1_compat_java_util.invoke(target, name, args);
+            case 22: return GeneratedAccess_com_codename1_components.invoke(target, name, args);
+            case 23: return GeneratedAccess_com_codename1_contacts.invoke(target, name, args);
+            case 24: return GeneratedAccess_com_codename1_db.invoke(target, name, args);
+            case 25: return GeneratedAccess_com_codename1_facebook.invoke(target, name, args);
+            case 26: return GeneratedAccess_com_codename1_facebook_ui.invoke(target, name, args);
+            case 27: return GeneratedAccess_com_codename1_gaming.invoke(target, name, args);
+            case 28: return GeneratedAccess_com_codename1_gaming_physics.invoke(target, name, args);
+            case 29: return GeneratedAccess_com_codename1_gaming_physics_box2d_callbacks.invoke(target, name, args);
+            case 30: return GeneratedAccess_com_codename1_gaming_physics_box2d_collision.invoke(target, name, args);
+            case 31: return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_broadphase.invoke(target, name, args);
+            case 32: return GeneratedAccess_com_codename1_gaming_physics_box2d_collision_shapes.invoke(target, name, args);
+            case 33: return GeneratedAccess_com_codename1_gaming_physics_box2d_common.invoke(target, name, args);
+            case 34: return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics.invoke(target, name, args);
+            case 35: return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_contacts.invoke(target, name, args);
+            case 36: return GeneratedAccess_com_codename1_gaming_physics_box2d_dynamics_joints.invoke(target, name, args);
+            case 37: return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling.invoke(target, name, args);
+            case 38: return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_arrays.invoke(target, name, args);
+            case 39: return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_normal.invoke(target, name, args);
+            case 40: return GeneratedAccess_com_codename1_gaming_physics_box2d_pooling_stacks.invoke(target, name, args);
+            case 41: return GeneratedAccess_com_codename1_gpu.invoke(target, name, args);
+            case 42: return GeneratedAccess_com_codename1_io.invoke(target, name, args);
+            case 43: return GeneratedAccess_com_codename1_io_bonjour.invoke(target, name, args);
+            case 44: return GeneratedAccess_com_codename1_io_graphql.invoke(target, name, args);
+            case 45: return GeneratedAccess_com_codename1_io_grpc.invoke(target, name, args);
+            case 46: return GeneratedAccess_com_codename1_io_gzip.invoke(target, name, args);
+            case 47: return GeneratedAccess_com_codename1_io_oidc.invoke(target, name, args);
+            case 48: return GeneratedAccess_com_codename1_io_rest.invoke(target, name, args);
+            case 49: return GeneratedAccess_com_codename1_io_services.invoke(target, name, args);
+            case 50: return GeneratedAccess_com_codename1_io_tar.invoke(target, name, args);
+            case 51: return GeneratedAccess_com_codename1_io_usb.invoke(target, name, args);
+            case 52: return GeneratedAccess_com_codename1_io_webauthn.invoke(target, name, args);
+            case 53: return GeneratedAccess_com_codename1_io_wifi.invoke(target, name, args);
+            case 54: return GeneratedAccess_com_codename1_javascript.invoke(target, name, args);
+            case 55: return GeneratedAccess_com_codename1_l10n.invoke(target, name, args);
+            case 56: return GeneratedAccess_com_codename1_location.invoke(target, name, args);
+            case 57: return GeneratedAccess_com_codename1_mapping.invoke(target, name, args);
+            case 58: return GeneratedAccess_com_codename1_maps.invoke(target, name, args);
+            case 59: return GeneratedAccess_com_codename1_maps_layers.invoke(target, name, args);
+            case 60: return GeneratedAccess_com_codename1_maps_providers.invoke(target, name, args);
+            case 61: return GeneratedAccess_com_codename1_media.invoke(target, name, args);
+            case 62: return GeneratedAccess_com_codename1_messaging.invoke(target, name, args);
+            case 63: return GeneratedAccess_com_codename1_nfc.invoke(target, name, args);
+            case 64: return GeneratedAccess_com_codename1_notifications.invoke(target, name, args);
+            case 65: return GeneratedAccess_com_codename1_orm.invoke(target, name, args);
+            case 66: return GeneratedAccess_com_codename1_payment.invoke(target, name, args);
+            case 67: return GeneratedAccess_com_codename1_plugin.invoke(target, name, args);
+            case 68: return GeneratedAccess_com_codename1_plugin_event.invoke(target, name, args);
+            case 69: return GeneratedAccess_com_codename1_printing.invoke(target, name, args);
+            case 70: return GeneratedAccess_com_codename1_processing.invoke(target, name, args);
+            case 71: return GeneratedAccess_com_codename1_properties.invoke(target, name, args);
+            case 72: return GeneratedAccess_com_codename1_push.invoke(target, name, args);
+            case 73: return GeneratedAccess_com_codename1_router.invoke(target, name, args);
+            case 74: return GeneratedAccess_com_codename1_security.invoke(target, name, args);
+            case 75: return GeneratedAccess_com_codename1_share.invoke(target, name, args);
+            case 76: return GeneratedAccess_com_codename1_social.invoke(target, name, args);
+            case 77: return GeneratedAccess_com_codename1_system.invoke(target, name, args);
+            case 78: return GeneratedAccess_com_codename1_testing.invoke(target, name, args);
+            case 79: return GeneratedAccess_com_codename1_ui.invoke(target, name, args);
+            case 80: return GeneratedAccess_com_codename1_ui_animations.invoke(target, name, args);
+            case 81: return GeneratedAccess_com_codename1_ui_css.invoke(target, name, args);
+            case 82: return GeneratedAccess_com_codename1_ui_events.invoke(target, name, args);
+            case 83: return GeneratedAccess_com_codename1_ui_geom.invoke(target, name, args);
+            case 84: return GeneratedAccess_com_codename1_ui_html.invoke(target, name, args);
+            case 85: return GeneratedAccess_com_codename1_ui_layouts.invoke(target, name, args);
+            case 86: return GeneratedAccess_com_codename1_ui_layouts_mig.invoke(target, name, args);
+            case 87: return GeneratedAccess_com_codename1_ui_list.invoke(target, name, args);
+            case 88: return GeneratedAccess_com_codename1_ui_painter.invoke(target, name, args);
+            case 89: return GeneratedAccess_com_codename1_ui_plaf.invoke(target, name, args);
+            case 90: return GeneratedAccess_com_codename1_ui_scene.invoke(target, name, args);
+            case 91: return GeneratedAccess_com_codename1_ui_spinner.invoke(target, name, args);
+            case 92: return GeneratedAccess_com_codename1_ui_table.invoke(target, name, args);
+            case 93: return GeneratedAccess_com_codename1_ui_tree.invoke(target, name, args);
+            case 94: return GeneratedAccess_com_codename1_ui_util.invoke(target, name, args);
+            case 95: return GeneratedAccess_com_codename1_ui_validation.invoke(target, name, args);
+            case 96: return GeneratedAccess_com_codename1_util.invoke(target, name, args);
+            case 97: return GeneratedAccess_com_codename1_util_promise.invoke(target, name, args);
+            case 98: return GeneratedAccess_com_codename1_util_regex.invoke(target, name, args);
+            case 99: return GeneratedAccess_com_codename1_xml.invoke(target, name, args);
+            case 100: return GeneratedAccess_com_codenameone_playground.invoke(target, name, args);
+            case 101: return GeneratedAccess_java_io.invoke(target, name, args);
+            case 102: return GeneratedAccess_java_lang.invoke(target, name, args);
+            case 103: return GeneratedAccess_java_lang_ref.invoke(target, name, args);
+            case 104: return GeneratedAccess_java_lang_reflect.invoke(target, name, args);
+            case 105: return GeneratedAccess_java_net.invoke(target, name, args);
+            case 106: return GeneratedAccess_java_nio_charset.invoke(target, name, args);
+            case 107: return GeneratedAccess_java_text.invoke(target, name, args);
+            case 108: return GeneratedAccess_java_time.invoke(target, name, args);
+            case 109: return GeneratedAccess_java_time_format.invoke(target, name, args);
+            case 110: return GeneratedAccess_java_time_temporal.invoke(target, name, args);
+            case 111: return GeneratedAccess_java_util.invoke(target, name, args);
+            case 112: return GeneratedAccess_java_util_concurrent.invoke(target, name, args);
+            case 113: return GeneratedAccess_java_util_concurrent_atomic.invoke(target, name, args);
+            case 114: return GeneratedAccess_java_util_function.invoke(target, name, args);
+            case 115: return GeneratedAccess_java_util_stream.invoke(target, name, args);
+            default: throw new CN1AccessException("no instance handler for index " + __idx);
+        }
     }
 
     private static boolean interceptShownForm(Object target, String name, Object[] args) {

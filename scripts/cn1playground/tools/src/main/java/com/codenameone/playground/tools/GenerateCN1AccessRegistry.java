@@ -1595,23 +1595,60 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     }
 
     private static void writeRootInvoke(Writer writer, List<GeneratedPackage> packages) throws IOException {
+        // Instance method dispatch used to be a linear chain of ~116 per-package
+        // ``try { Handler.invoke(...) } catch (CN1AccessException)`` blocks. Every
+        // call to a class late in that chain (``com.codename1.ui`` is #80) threw
+        // and caught dozens of exceptions before reaching its handler -- and on the
+        // ParparVM JavaScript port, where each method is a generator, unwinding
+        // those exceptions dominated per-edit latency in the Playground. We cache,
+        // per concrete class, the index of the package handler that resolved it,
+        // and try that handler first. The full linear scan remains as a fallback
+        // (and repopulates the cache), so behaviour is identical -- the rare case
+        // where a class's methods resolve across multiple packages just doesn't
+        // benefit from the cache, it is never wrong.
+        writer.write("    private static final java.util.Map<Class<?>, Integer> INSTANCE_HANDLER_CACHE = "
+                + "new java.util.Hashtable<Class<?>, Integer>();\n\n");
         writer.write("    @Override\n");
         writer.write("    public Object invoke(Object target, String name, Object[] args) throws Exception {\n");
         writer.write("        if (interceptShownForm(target, name, args)) {\n");
         writer.write("            return null;\n");
         writer.write("        }\n");
+        writer.write("        Class<?> __tc = target.getClass();\n");
+        writer.write("        Integer __ci = INSTANCE_HANDLER_CACHE.get(__tc);\n");
+        writer.write("        if (__ci != null) {\n");
+        writer.write("            try {\n");
+        writer.write("                return dispatchInstance(__ci.intValue(), target, name, args);\n");
+        writer.write("            } catch (CN1AccessException __miss) {\n");
+        writer.write("                // method resolves in another package for this class; fall back\n");
+        writer.write("            }\n");
+        writer.write("        }\n");
         writer.write("        CN1AccessException unsupported = null;\n");
+        int idx = 0;
         for (GeneratedPackage generatedPackage : packages) {
             writer.write("        try {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".invoke(target, name, args);\n");
+            writer.write("            Object __r = " + generatedPackage.helperClassName + ".invoke(target, name, args);\n");
+            writer.write("            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(" + idx + "));\n");
+            writer.write("            return __r;\n");
             writer.write("        } catch (CN1AccessException ex) {\n");
             writer.write("            unsupported = ex;\n");
             writer.write("        }\n");
+            idx++;
         }
         writer.write("        if (unsupported != null) {\n");
         writer.write("            throw unsupported;\n");
         writer.write("        }\n");
         writer.write("        throw unsupportedInstance(target, name, args);\n");
+        writer.write("    }\n\n");
+        // Direct dispatch to a single package handler by its cached index.
+        writer.write("    private static Object dispatchInstance(int __idx, Object target, String name, Object[] args) throws Exception {\n");
+        writer.write("        switch (__idx) {\n");
+        idx = 0;
+        for (GeneratedPackage generatedPackage : packages) {
+            writer.write("            case " + idx + ": return " + generatedPackage.helperClassName + ".invoke(target, name, args);\n");
+            idx++;
+        }
+        writer.write("            default: throw new CN1AccessException(\"no instance handler for index \" + __idx);\n");
+        writer.write("        }\n");
         writer.write("    }\n\n");
         writer.write("    private static boolean interceptShownForm(Object target, String name, Object[] args) {\n");
         writer.write("        PlaygroundContext context = PlaygroundContext.getCurrent();\n");
