@@ -64,6 +64,12 @@ public class IPhoneBuilder extends Executor {
     // watchNative.enabled hint is set, keeping the iOS build unchanged.
     private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
 
+    // tvNative.* delegate: adds an Apple TV (tvOS) target. tvOS is handled like
+    // the Mac Catalyst slice (Metal + GL stub headers + GL-only sources excluded)
+    // but as a separate appletvos target. Inert unless tvNative.enabled (or
+    // codename1.tvMain) is set, keeping the iOS build unchanged.
+    private final TvNativeBuilder tvNativeBuilder = new TvNativeBuilder(this);
+
     private boolean enableGalleryMultiselect;
     private boolean usePhotoKitForMultigallery;
     private boolean enableWKWebView, disableUIWebView;
@@ -334,6 +340,15 @@ public class IPhoneBuilder extends Executor {
         // need the xcodeproj gem to add and wire the target post-generate.
         watchNativeBuilder.parseHints(request);
         if (watchNativeBuilder.isEnabled()) {
+            ensureXcodeprojInstalled();
+        }
+
+        // tvNative: parse + prep. tvOS has no OpenGL ES, so (like Mac Catalyst)
+        // force Metal on; the tvOS app is a separate appletvos target wired via
+        // the xcodeproj gem post-generate.
+        tvNativeBuilder.parseHints(request);
+        if (tvNativeBuilder.isEnabled()) {
+            useMetal = true;
             ensureXcodeprojInstalled();
         }
 
@@ -2332,6 +2347,11 @@ public class IPhoneBuilder extends Executor {
                     // sources link on both the iOS app target and the watch
                     // target. (macNative already widens the set when both apply.)
                     parparCmd.add(watchNativeBuilder.parparvmOptionalFrameworksArg());
+                } else if (tvNativeBuilder.isEnabled()) {
+                    // Weak-link the tvOS-incompatible frameworks (OpenGL ES, GLKit,
+                    // WebKit, MessageUI, AddressBook) so the shared sources link on
+                    // both the iOS app target and the tvOS target.
+                    parparCmd.add(tvNativeBuilder.parparvmOptionalFrameworksArg());
                 }
                 parparCmd.add("-Xmx384m");
                 parparCmd.add("-jar");
@@ -3000,6 +3020,12 @@ public class IPhoneBuilder extends Executor {
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
                     watchNativeBuilder.writeStubHeaders(appSrcDir);
                     watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
+                }
+
+                if (tvNativeBuilder.isEnabled()) {
+                    File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    tvNativeBuilder.writeTvInfoPlist(request, appSrcDir);
+                    tvNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                 }
 
             } catch (Exception ex) {

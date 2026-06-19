@@ -157,6 +157,11 @@ public final class IOSNative {
     // returning false with zero runtime cost.
     native boolean isRunningOnWatch();
 
+    // Returns true when the binary is running on the tvOS slice. Implemented
+    // natively via the TARGET_OS_TV compile-time check so the iOS slice keeps
+    // returning false with zero runtime cost.
+    native boolean isRunningOnTV();
+
     // Mac native (Catalyst): set the host window title bar text from the current form title.
     native void setWindowTitle(String title);
 

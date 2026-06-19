@@ -139,6 +139,8 @@ include::Working-With-Linux.asciidoc[]
 
 include::Wearables.asciidoc[]
 
+include::TVPlatforms.asciidoc[]
+
 include::Working-With-CodenameOne-Sources.asciidoc[]
 
 include::Skin-Designer.asciidoc[]

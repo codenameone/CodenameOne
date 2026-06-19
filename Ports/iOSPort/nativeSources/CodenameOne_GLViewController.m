@@ -4914,7 +4914,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 
 }
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
 	[self dismissModalViewControllerAnimated:YES];
 }
@@ -4922,7 +4922,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 -(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result {
 	[self dismissModalViewControllerAnimated:YES];
 }
-#endif // !TARGET_OS_WATCH (MessageUI delegates)
+#endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MessageUI delegates)
 
 extern JAVA_OBJECT productsArrayPending;
 

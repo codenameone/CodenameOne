@@ -165,5 +165,10 @@
                 <path path="${run.test.classpath}"/>
             </classpath>
         </java>
+        <java classname="com.codename1.designer.css.CSSDeviceFormFactorMediaQueryTest" fork="true" failonerror="true">
+            <classpath>
+                <path path="${run.test.classpath}"/>
+            </classpath>
+        </java>
     </target>
 </project>

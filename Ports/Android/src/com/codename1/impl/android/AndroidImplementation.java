@@ -5683,6 +5683,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return watchCache;
     }
 
+    private Boolean tvCache;
+
+    @Override
+    public boolean isTV() {
+        if(tvCache == null) {
+            // PackageManager.FEATURE_TELEVISION ("android.hardware.type.television")
+            // and FEATURE_LEANBACK ("android.software.leanback") are the canonical
+            // Android TV / Google TV markers; use the string literals so this
+            // compiles regardless of the configured minimum SDK level.
+            android.content.pm.PackageManager pm = getContext().getPackageManager();
+            boolean tv = pm.hasSystemFeature("android.hardware.type.television")
+                    || pm.hasSystemFeature("android.software.leanback");
+            if(!tv) {
+                // Fall back to the runtime UI mode (covers emulators/devices that
+                // expose the TV ui-mode without declaring the hardware feature).
+                android.app.UiModeManager um = (android.app.UiModeManager)
+                        getContext().getSystemService(Context.UI_MODE_SERVICE);
+                tv = um != null && um.getCurrentModeType()
+                        == Configuration.UI_MODE_TYPE_TELEVISION;
+            }
+            tvCache = tv;
+        }
+        return tvCache;
+    }
+
     /**
      * Executes r on the UI thread and blocks the EDT to completion
      * @param r runnable to execute
@@ -8282,6 +8307,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String[] getPlatformOverrides() {
         if (isWatch()) {
             return new String[]{"watch", "android", "android-watch"};
+        }
+        if (isTV()) {
+            return new String[]{"tv", "android", "android-tv"};
         }
         if (isTablet()) {
             return new String[]{"tablet", "android", "android-tab"};

@@ -1,0 +1,104 @@
+== Television (Apple TV and Android TV)
+
+Codename One can build and run your application UI on the living-room TV
+platforms: Apple TV (tvOS) and Android TV / Google TV. As with the phone and
+wearable targets, the same Java/Kotlin code base drives the TV app -- you write
+Codename One UI as usual and the build pipeline produces the appropriate TV
+artifact for each platform.
+
+The two platforms reach the TV through different mechanisms:
+
+* *Android TV / Google TV is Android.* An Android TV app is an ordinary Android
+  app (the *same APK*) that adds a small amount of manifest metadata: a Leanback
+  launcher category so the app appears on the TV home screen, the
+  `android.software.leanback` feature, and an optional banner. The existing
+  Codename One Android port renders the UI through exactly the same pipeline it
+  uses on phones and tablets.
+* *Apple TV runs tvOS.* tvOS is a UIKit relative of iOS reached through the same
+  ParparVM (Java bytecode -> C -> native) pipeline used for iPhone/iPad, built
+  against the `appletvos` SDK with a tvOS application target. tvOS has no
+  touchscreen -- navigation is driven by the Siri remote and the focus engine.
+
+In both cases the build is *additive*: with the TV hints turned off your
+phone/tablet build is unchanged.
+
+=== Detecting the TV Form Factor
+
+Use `CN.isTV()` (or `Display.getInstance().isTV()`) to branch your UI for the
+TV at runtime. This is the living-room analog of the existing `isTablet()`,
+`isDesktop()` and `isWatch()` checks:
+
+[source,java]
+----
+Form f = new Form(BoxLayout.y());
+if (CN.isTV()) {
+    // 10-foot UI: larger fonts, generous spacing, focus-driven navigation
+    f.add(new Label("Hello TV"));
+} else {
+    // Full phone/tablet layout
+    f.add(new Label("Hello"));
+}
+f.show();
+----
+
+Codename One's existing D-pad/arrow focus traversal (the same mechanism that
+powers `GAME_UP`/`GAME_DOWN`/`GAME_LEFT`/`GAME_RIGHT` and component focus) drives
+remote navigation on the TV, so focusable components such as `Button` are
+navigable with the remote out of the box.
+
+=== Adapting Styling with CSS Media Queries
+
+The TV (and watch) form factors integrate with the CSS `@media` device-type
+mechanism. Rules inside a `device-tv` (or `device-watch`) media block are
+selected at runtime when `Display.isTV()` (respectively `isWatch()`) returns
+`true` -- exactly the way `device-tablet` / `device-desktop` already work:
+
+[source,css]
+----
+Label {
+    color: black;
+}
+
+@media device-tv {
+    Label {
+        /* Larger type for the 10-foot UI */
+        font-size: 3mm;
+        color: white;
+    }
+}
+----
+
+=== Building for Android TV / Google TV
+
+Enable the Android TV manifest metadata with a single build hint in
+`codenameone_settings.properties`:
+
+[source,properties]
+----
+codename1.arg.android.tv=true
+----
+
+This makes the build:
+
+* add `<category android:name="android.intent.category.LEANBACK_LAUNCHER"/>`
+  to the launcher activity so the app appears on the Android TV home screen;
+* declare `<uses-feature android:name="android.software.leanback"
+  android:required="false"/>` and make `android.hardware.touchscreen` optional
+  so the app installs on touchless TVs;
+* generate a 320x180 launcher banner (`@drawable/tv_banner`) from the app icon.
+
+The resulting APK still installs and runs on phones and tablets.
+
+=== Building for Apple TV (tvOS)
+
+Enable the tvOS application target with the `tvNative.*` build hints (analogous
+to the `watchNative.*` hints used for Apple Watch):
+
+[source,properties]
+----
+codename1.arg.tvNative.enabled=true
+----
+
+The tvOS build produces a standalone Apple TV app. Because tvOS uses a separate
+App ID and provisioning profile from your iOS app, you supply tvOS signing
+material the same way you do for the other Apple targets.

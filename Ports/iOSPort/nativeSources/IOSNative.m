@@ -84,17 +84,19 @@
 #include <SystemConfiguration/SCNetworkReachability.h>
 #endif
 // MessageUI + AddressBookUI are unavailable on watchOS (and AddressBookUI on Mac
-// Catalyst). The native methods that use them are guarded to no-ops on watch.
-#if !TARGET_OS_WATCH
+// Catalyst); on tvOS MessageUI ships only a link stub with no composer headers
+// and AddressBookUI is absent. The native methods that use them are guarded to
+// no-ops on those slices.
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <MessageUI/MFMailComposeViewController.h>
 #endif
-#if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH
+#if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH && !TARGET_OS_TV
 // AddressBookUI and the legacy AddressBook C API are unavailable on Mac
-// Catalyst. Skip the import; the contacts path falls back to Contacts.framework
-// (handled via INCLUDE_CONTACTS_USAGE undef below).
+// Catalyst and tvOS. Skip the import; the contacts path falls back to
+// Contacts.framework (handled via INCLUDE_CONTACTS_USAGE undef below).
 #import <AddressBookUI/AddressBookUI.h>
 #endif
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <MessageUI/MFMessageComposeViewController.h>
 #endif
 
@@ -1670,6 +1672,18 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnWatch__(CN1_THREAD_STAT
     // other slice (iOS, Mac Catalyst, simulator) returns false so behaviour is
     // byte-for-byte identical on iOS.
 #if TARGET_OS_WATCH
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnTV__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+    // Resolved entirely at compile time: the tvOS slice returns true, every
+    // other slice (iOS, Mac Catalyst, watchOS, simulator) returns false so
+    // behaviour is byte-for-byte identical on iOS.
+#if TARGET_OS_TV
     return JAVA_TRUE;
 #else
     return JAVA_FALSE;
@@ -4358,7 +4372,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
 #endif
 }
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
     // Recipient.
     NSMutableArray * recipientsArray = [[NSMutableArray alloc] init];
@@ -4384,11 +4398,11 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
     });
 
 }
-#endif // !TARGET_OS_WATCH (launchMailAppOnDevice)
+#endif // !TARGET_OS_WATCH && !TARGET_OS_TV (launchMailAppOnDevice)
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                                                                                                            JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     // No MessageUI on watchOS; email composition is a no-op.
     return;
 #else
@@ -7246,7 +7260,7 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
-#if TARGET_OS_MACCATALYST || TARGET_OS_WATCH
+#if TARGET_OS_MACCATALYST || TARGET_OS_WATCH || TARGET_OS_TV
     // SMS hardware is absent on Mac / watchOS (no MessageUI on watch);
     // MFMessageComposeViewController canSendText returns NO. Short-circuit.
     return;
@@ -10940,6 +10954,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnMac___R_boolean(CN1_THR
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnWatch___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_isRunningOnWatch__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnTV___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_isRunningOnTV__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {

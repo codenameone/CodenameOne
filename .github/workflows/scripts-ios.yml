@@ -10,6 +10,7 @@ on:
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-watch-ui-tests.sh'
+      - 'scripts/run-tv-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/notification-tests/native-tests/**'
       - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
@@ -19,6 +20,7 @@ on:
       - 'scripts/ios/screenshots/**'
       - 'scripts/ios/screenshots-metal/**'
       - 'scripts/ios/screenshots-watch/**'
+      - 'scripts/ios/screenshots-tv/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -44,6 +46,7 @@ on:
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-watch-ui-tests.sh'
+      - 'scripts/run-tv-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/notification-tests/native-tests/**'
       - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
@@ -53,6 +56,7 @@ on:
       - 'scripts/ios/screenshots/**'
       - 'scripts/ios/screenshots-metal/**'
       - 'scripts/ios/screenshots-watch/**'
+      - 'scripts/ios/screenshots-tv/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -650,6 +654,154 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: watch-ui-tests
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+  build-ios-tv:
+    # Native Apple TV (tvOS) screenshot pipeline. The tvOS slice auto-enables
+    # from codename1.tvMain in the sample, so build-ios-app.sh generates the
+    # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain
+    # entry and the Metal renderer (no OpenGL ES on tvOS); this job builds the TV
+    # target for the appletvsimulator, renders the cn1ss suite and streams frames
+    # to the same Cn1ssScreenshotServer the iOS/watch jobs use, comparing against
+    # scripts/ios/screenshots-tv.
+    #
+    # NON-BLOCKING (continue-on-error) until the tvOS native slice compiles
+    # end-to-end and the golden set is seeded -- see
+    # Ports/iOSPort/nativeSources/TVOS_PORT.md. Flip continue-on-error off (and
+    # drop CN1SS_ALLOWED_MISSING) once the goldens land, matching build-ios-watch.
+    needs: build-port
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: macos-15
+    timeout-minutes: 60
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-tv-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Restore built CN1 + iOS port artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
+          fail-on-cache-miss: true
+
+      - name: Build sample iOS app (generates the tvOS target)
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Ensure tvOS simulator runtime
+        run: |
+          set -euo pipefail
+          if ! xcrun simctl list runtimes available 2>/dev/null | grep -qi tvOS; then
+            echo "No tvOS runtime found; attempting download"
+            xcodebuild -downloadPlatform tvOS || true
+          fi
+          xcrun simctl list runtimes available 2>/dev/null | grep -i tvOS || true
+          xcrun simctl list devices available 2>/dev/null | grep -i "Apple TV" || true
+
+      - name: Run tvOS UI screenshot tests
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/tv-ui-tests
+          SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-tv
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_IOS_TV_COMMENT -->'
+          CN1SS_PREVIEW_SUBDIR: ios-tv
+          CN1SS_REPORT_TITLE: 'Apple TV (tvOS) screenshot updates'
+          CN1SS_SUCCESS_MESSAGE: '✅ Native Apple TV (tvOS, Metal) screenshot tests passed.'
+          CN1SS_COMMENT_LOG_PREFIX: '[run-tv-ui-tests]'
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # Tolerate a missing golden set while the tvOS native slice is being
+          # brought up; tighten to match build-ios-watch once goldens are seeded.
+          CN1SS_ALLOWED_MISSING: '9999'
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          ./scripts/run-tv-ui-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        timeout-minutes: 45
+
+      - name: Upload tv artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tv-ui-tests
           path: artifacts
           if-no-files-found: warn
           retention-days: 14

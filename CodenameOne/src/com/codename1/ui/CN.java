@@ -902,6 +902,17 @@ public class CN extends CN1Constants {
         return Display.impl.isWatch();
     }
 
+    /// Indicates whether the application is running on a television form factor
+    /// (Apple TV / Android TV / Google TV). Notice that this is often a guess
+    /// derived from the device metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a TV
+    public static boolean isTV() {
+        return Display.impl.isTV();
+    }
+
     /// Returns the size of the desktop hosting the application window when running on a desktop platform.
     ///
     /// #### Returns

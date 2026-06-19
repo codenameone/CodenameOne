@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# Run the Codename One UI screenshot suite on the tvOS simulator and compare the
+# captured frames to the Apple TV golden set (scripts/ios/screenshots-tv).
+#
+# Apple TV reuses the iOS UIApplicationMain entry and the Metal renderer (tvOS
+# has UIKit + Metal, just no OpenGL ES), so the <Main>TV target is built like a
+# regular iOS app for the appletvsimulator SDK and launched via simctl. It
+# streams each screenshot to the host-side Cn1ssScreenshotServer over
+# ws://127.0.0.1:8765 -- the same transport the iOS / watch jobs use -- so the
+# comparison/report tooling in scripts/lib/cn1ss.sh is reused verbatim.
+#
+# Usage: run-tv-ui-tests.sh <workspace_or_project> [scheme]
+set -euo pipefail
+
+rt_log() { printf '%s %s\n' "[run-tv-ui-tests]" "$*" >&2; }
+
+WORKSPACE_PATH="${1:?Usage: $0 <workspace_or_project> [scheme]}"
+SCHEME="${2:-}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
+CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
+source "$SCRIPT_DIR/lib/cn1ss.sh"
+
+: "${ARTIFACTS_DIR:=$REPO_ROOT/artifacts/tv-ui-tests}"
+mkdir -p "$ARTIFACTS_DIR"
+
+# --- Xcode / project resolution -------------------------------------------
+if [ -z "${XCODE_APP:-}" ]; then
+  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+fi
+if [ ! -x "${XCODE_APP:-}/Contents/Developer/usr/bin/xcodebuild" ]; then
+  XCODE_APP="/Applications/Xcode.app"
+fi
+export DEVELOPER_DIR="${DEVELOPER_DIR:-$XCODE_APP/Contents/Developer}"
+rt_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
+if ! command -v xcodebuild >/dev/null 2>&1; then
+  rt_log "xcodebuild not found (DEVELOPER_DIR=$DEVELOPER_DIR)"; exit 3
+fi
+
+# The tvOS target builds via -project (its target carries no CocoaPods deps).
+if [[ "$WORKSPACE_PATH" == *.xcodeproj ]]; then
+  PROJECT_PATH="$WORKSPACE_PATH"
+else
+  PROJECT_DIR="$(dirname "$WORKSPACE_PATH")"
+  base="$(basename "$WORKSPACE_PATH" .xcworkspace)"
+  PROJECT_PATH="$PROJECT_DIR/$base.xcodeproj"
+fi
+if [ ! -d "$PROJECT_PATH" ]; then
+  rt_log "Could not resolve .xcodeproj from '$WORKSPACE_PATH' (looked for $PROJECT_PATH)"; exit 3
+fi
+[ -z "$SCHEME" ] && SCHEME="$(basename "$PROJECT_PATH" .xcodeproj)"
+TV_TARGET="${SCHEME}TV"
+rt_log "Project=$PROJECT_PATH tvTarget=$TV_TARGET"
+
+# --- Pick an Apple TV simulator --------------------------------------------
+# Screenshots are pixel-compared, so the device must match the one the goldens
+# were captured on: Apple TV renders at 1920x1080. Prefer "Apple TV 4K"; fall
+# back to any Apple TV (override with CN1SS_TV_UDID / CN1SS_TV_MODEL).
+TV_MODEL_PREF="${CN1SS_TV_MODEL:-Apple TV 4K}"
+TV_UDID="${CN1SS_TV_UDID:-}"
+DEVLIST="$(xcrun simctl list devices available 2>/dev/null | grep -iE 'Apple TV')"
+if [ -z "$TV_UDID" ]; then
+  TV_UDID="$(printf '%s\n' "$DEVLIST" | grep -i "$TV_MODEL_PREF" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+fi
+if [ -z "$TV_UDID" ]; then
+  rt_log "No '$TV_MODEL_PREF' simulator found; falling back to any available Apple TV"
+  TV_UDID="$(printf '%s\n' "$DEVLIST" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+fi
+if [ -z "$TV_UDID" ]; then
+  rt_log "No Apple TV simulator available. Install a tvOS runtime in Xcode."; exit 4
+fi
+rt_log "Apple TV simulators available:"; printf '%s\n' "$DEVLIST" | sed 's/^/  /' >&2
+rt_log "Using Apple TV simulator $TV_UDID (pref '$TV_MODEL_PREF')"
+xcrun simctl boot "$TV_UDID" 2>/dev/null || true
+xcrun simctl bootstatus "$TV_UDID" -b 2>/dev/null || true
+
+# --- Build the tvOS target --------------------------------------------------
+BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/cn1-tv-build-XXXXXX")"
+rt_log "Building $TV_TARGET for appletvsimulator -> $BUILD_ROOT"
+xcodebuild -project "$PROJECT_PATH" -target "$TV_TARGET" \
+  -sdk appletvsimulator -configuration Debug \
+  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO SYMROOT="$BUILD_ROOT" build \
+  > "$ARTIFACTS_DIR/tv-build.log" 2>&1 || {
+    rt_log "tvOS build FAILED (see $ARTIFACTS_DIR/tv-build.log)"; tail -40 "$ARTIFACTS_DIR/tv-build.log" >&2; exit 5; }
+
+APP_PATH="$(/usr/bin/find "$BUILD_ROOT" -name "${TV_TARGET}.app" -maxdepth 3 | head -1)"
+[ -z "$APP_PATH" ] && { rt_log "Built tvOS .app not found under $BUILD_ROOT"; exit 5; }
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist" 2>/dev/null)"
+[ -z "$BUNDLE_ID" ] && { rt_log "Could not read CFBundleIdentifier from $APP_PATH"; exit 5; }
+rt_log "Built $APP_PATH (bundle $BUNDLE_ID)"
+
+# --- Screenshot capture: host WS sink + the streaming tvOS app --------------
+JAVA_BIN="${JAVA17_BIN:-$(command -v java)}"
+cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
+
+SS_TMP="$(mktemp -d "${TMPDIR:-/tmp}/cn1-tv-ss-XXXXXX")"
+WS_RAW_DIR="$SS_TMP/ws"; PREVIEW_DIR="$SS_TMP/previews"
+mkdir -p "$WS_RAW_DIR" "$PREVIEW_DIR"
+
+cleanup() { cn1ss_stop_ws_server 2>/dev/null || true; xcrun simctl terminate "$TV_UDID" "$BUNDLE_ID" 2>/dev/null || true; }
+trap cleanup EXIT
+
+cn1ss_start_ws_server "$WS_RAW_DIR" || { rt_log "Failed to start Cn1ssScreenshotServer"; exit 6; }
+rt_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
+
+xcrun simctl terminate "$TV_UDID" "$BUNDLE_ID" 2>/dev/null || true
+xcrun simctl install "$TV_UDID" "$APP_PATH"
+xcrun simctl launch "$TV_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rt_log "launch failed"; exit 6; }
+rt_log "Launched tvOS app; waiting for the suite to stream screenshots..."
+
+MAX_WAIT="${CN1SS_TV_TIMEOUT:-1200}"
+TV_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-tv}"
+EXPECTED="$(/usr/bin/find "$TV_REF_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+rt_log "Expecting $EXPECTED screenshots (golden set)"
+prev=-1; stable=0; waited=0
+while [ "$waited" -lt "$MAX_WAIT" ]; do
+  sleep 8; waited=$((waited+8))
+  cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "$EXPECTED" -gt 0 ] && [ "$cur" -ge "$EXPECTED" ]; then
+    stable=$((stable+1)); [ "$stable" -ge 2 ] && break
+    continue
+  fi
+  if [ "$cur" = "$prev" ] && [ "$cur" -gt 0 ]; then
+    stable=$((stable+1)); [ "$stable" -ge 10 ] && break
+  else stable=0; fi
+  prev="$cur"
+done
+rt_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
+
+# --- Compare against the tvOS golden set + emit report ----------------------
+REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-tv}"
+REF_DIR="$(cd "$REF_DIR" && pwd)"
+declare -a ACTUAL=()
+while IFS= read -r png; do
+  name="$(basename "$png" .png)"
+  ACTUAL+=("$name=$png")
+done < <(/usr/bin/find "$WS_RAW_DIR" -name '*.png' | sort)
+
+cp -f "$WS_RAW_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
+
+COMPARE_JSON="$SS_TMP/compare.json"; SUMMARY_OUT="$SS_TMP/summary.txt"; COMMENT_OUT="$SS_TMP/comment.md"
+
+export CN1SS_FAIL_ON_MISMATCH="${CN1SS_FAIL_ON_MISMATCH:-1}"
+export CN1SS_ALLOWED_MISSING="${CN1SS_ALLOWED_MISSING:-0}"
+set +e
+CN1SS_SUCCESS_MESSAGE="${CN1SS_SUCCESS_MESSAGE:-Apple TV (tvOS, Metal) screenshots match the goldens.}" \
+cn1ss_process_and_report \
+  "Apple TV (tvOS / Metal)" \
+  "$COMPARE_JSON" "$SUMMARY_OUT" "$COMMENT_OUT" \
+  "$REF_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" \
+  "${ACTUAL[@]}"
+gate_rc=$?
+set -e
+
+cp -f "$COMPARE_JSON" "$SUMMARY_OUT" "$COMMENT_OUT" "$ARTIFACTS_DIR/" 2>/dev/null || true
+cn1ss_post_pr_comment "$COMMENT_OUT" "$PREVIEW_DIR" || true
+
+rc="$gate_rc"
+if [ -f "$SUMMARY_OUT" ] && grep -q "^missing_expected|" "$SUMMARY_OUT"; then
+  me="$(grep -c "^missing_expected|" "$SUMMARY_OUT" 2>/dev/null || echo 0)"
+  rt_log "FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to scripts/ios/screenshots-tv."
+  [ "$rc" -eq 0 ] && rc=17
+fi
+[ "${#ACTUAL[@]}" -gt 0 ] || rc=1
+rt_log "exit rc=$rc (gate_rc=$gate_rc, mismatch_fail=${CN1SS_FAIL_ON_MISMATCH}, allowed_missing=${CN1SS_ALLOWED_MISSING})"
+exit "$rc"
