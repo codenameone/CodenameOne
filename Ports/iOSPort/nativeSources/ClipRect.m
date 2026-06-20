@@ -112,7 +112,10 @@ static CGRect drawingRect;
             CN1CGSetClipRect(sx, sy, sw, sh);
             clipApplied = YES;
         } else {
-            CN1CGResetClip();
+            // Empty clip -- cull everything (issue #5263). CN1CGResetClip
+            // would REMOVE clipping and let a fully clipped-out draw flood
+            // the whole screen; an empty CGRect clips out all drawing.
+            CN1CGSetClipRect(0, 0, 0, 0);
             clipApplied = NO;
         }
     }
