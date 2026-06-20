@@ -59,3 +59,25 @@ Catto
 
 # Game-development vocabulary.
 [Ss]tarfields?
+
+# Native desktop / watch port libraries and frameworks (this week's Linux,
+# Apple Watch and Windows ports). The shared guide list already carries the
+# GTK/Cairo/Pango/libc/Direct3D/ParparVM terms; these are the ones it lacks.
+GdkPixbuf
+WebKitGTK
+GeoClue
+GStreamer
+EGL
+Direct2D
+DirectWrite
+watchOS
+SwiftUI
+UIKit
+StoreKit
+dSYM
+
+# Symbolication verb forms beyond the guide list's symbolicate/symbolicated.
+[Ss]ymbolicat(e|es|ed|ing|ion)
+
+# Deobfuscation of Android stack traces via the mapping file.
+[Dd]eobfuscat(e|es|ed|ing|ion)

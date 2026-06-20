@@ -274,12 +274,17 @@ void CN1MetalRotate(float angle, float x, float y, float z) {
 void CN1MetalSetScissor(int x, int y, int width, int height) {
     if (activeEncoder == nil) return;
     if (width <= 0 || height <= 0) {
-        // Disable clipping: set scissor to full framebuffer.
-        [activeEncoder setScissorRect:(MTLScissorRect){
-            0, 0,
-            (NSUInteger)currentFramebufferWidth,
-            (NSUInteger)currentFramebufferHeight
-        }];
+        // Empty clip -- this MUST cull everything, it does NOT mean
+        // "disable clipping". A 0/negative-size rect arrives here when the
+        // framework intersected two non-overlapping clip rectangles (e.g.
+        // clipRect after setClip lands fully outside the prior clip), which
+        // NativeGraphics collapses to bounds (0,0,0,0). Issue #5263: the old
+        // code opened the scissor to the full framebuffer here, so a fully
+        // clipped-out fillRect/drawImage painted over the entire screen on
+        // the (now default) Metal backend. Callers that genuinely want to
+        // disable clipping pass explicit full-framebuffer dimensions (see
+        // CN1MetalApplyPolygonStencilClip), which take the normal path below.
+        [activeEncoder setScissorRect:(MTLScissorRect){0, 0, 1, 1}];
         return;
     }
     // Clamp to framebuffer; Metal requires scissor to be within the
@@ -289,7 +294,7 @@ void CN1MetalSetScissor(int x, int y, int width, int height) {
     int fw = MIN(width, currentFramebufferWidth - fx);
     int fh = MIN(height, currentFramebufferHeight - fy);
     if (fw <= 0 || fh <= 0) {
-        // Clip is entirely outside — set a zero-size scissor to cull everything.
+        // Clip is entirely outside — cull everything (zero-size scissor).
         [activeEncoder setScissorRect:(MTLScissorRect){0, 0, 1, 1}];
         return;
     }

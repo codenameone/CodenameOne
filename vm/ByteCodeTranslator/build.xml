@@ -80,6 +80,12 @@
         <unzip src="../../../cn1-binaries/vm/asm-9.8.jar" dest="build/classes"  />
         <unzip src="../../../cn1-binaries/vm/asm-commons-9.8.jar" dest="build/classes"  />
         <unzip src="../../../cn1-binaries/vm/asm-tree-9.8.jar" dest="build/classes"  />
+        <!-- asm-analysis (org.objectweb.asm.tree.analysis.*) — Parser.java now uses
+             Analyzer/BasicInterpreter/BasicValue/Frame. It must be fat-packed into the
+             jar here too (not just on the compile classpath): the translator is launched
+             as `java -jar ByteCodeTranslator.jar` which ignores -cp, so a missing class
+             here is a runtime NoClassDefFoundError: .../tree/analysis/Interpreter. -->
+        <unzip src="../../../cn1-binaries/vm/asm-analysis-9.8.jar" dest="build/classes"  />
     </target>
             
         <!-- /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project TestApp.xcodeproj/ -target TestApp -configuration release -sdk iphoneos7.0 build -->

@@ -82,11 +82,23 @@ public class HTML5Graphics {
     private GeneralPath clipShape = new GeneralPath();
     
     private boolean isClipShape;
+    // True when the current clip encloses no area (e.g. clipRect intersected two
+    // non-overlapping rectangles). Tracked reliably at clip-computation time --
+    // the projected clip bounds (getClipWidth/Height) are unreliable for an empty
+    // clip on the screen path: an empty GeneralPath's getBounds() returns
+    // uninitialised (often negative) extents, and a degenerate clip path does not
+    // reliably cull image blits on the host. Issue #5263.
+    private boolean clipEmpty;
     private Transform transform, clipTransform;
     private boolean transformApplied = false;
    
     
     private final Rectangle clipRect = new Rectangle();
+    // Reliable user-space clip bounds, intersected (and clamped to >= 0) on every
+    // clipRect/setClip regardless of whether the clip is tracked as a rect or a
+    // shape. Used to compute clipEmpty -- the shape-path projection bounds are
+    // unreliable for an empty clip (see clipEmpty). Issue #5263.
+    private final Rectangle clipBoundsTracker = new Rectangle();
     private final JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp> primitiveRenderAdapter =
             new JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp>(renderState,
                     new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
@@ -128,6 +140,7 @@ public class HTML5Graphics {
         this.canvasHeight = height;
         this.clipRect.setWidth(width);
         this.clipRect.setHeight(height);
+        this.clipBoundsTracker.setBounds(0, 0, width, height);
     }
 
     // Single chokepoint for every drawing op: record it into the surface command
@@ -235,11 +248,17 @@ public class HTML5Graphics {
 
 
     public void drawImage(Object img, int x, int y) {
+        // An empty clip must cull every draw. fillRect/text honor this through
+        // the recorded canvas clip, but a surface blit (mutable image) leaks
+        // through a degenerate empty-clip path on the host, so cull it here.
+        // Issue #5263.
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
     }
-    
+
     
     public void tileImage(Object img, int x, int y, int w, int h) {
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
@@ -344,6 +363,7 @@ public class HTML5Graphics {
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
@@ -439,13 +459,13 @@ public class HTML5Graphics {
         return clipBounds.getHeight();
     }
 
-    
+
     public int getClipWidth() {
         calculateClipBounds();
         return clipBounds.getWidth();
     }
 
-    
+
     public int getClipX() {
         calculateClipBounds();
         return clipBounds.getX();
@@ -489,6 +509,19 @@ public class HTML5Graphics {
     
  
     public void setClip(Shape shape) {
+        // Sync the reliable user-space clip tracker from the shape's bounds.
+        // clipShape() (the clipRect path) intentionally bypasses this via
+        // setClipShapeInternal so it doesn't clobber the clipEmpty/tracker that
+        // clipRect already computed from the exact rect intersection. Issue #5263.
+        Rectangle b = shape.getBounds();
+        int bw = Math.max(0, b.getWidth());
+        int bh = Math.max(0, b.getHeight());
+        clipBoundsTracker.setBounds(b.getX(), b.getY(), bw, bh);
+        clipEmpty = bw <= 0 || bh <= 0;
+        setClipShapeInternal(shape);
+    }
+
+    private void setClipShapeInternal(Shape shape) {
         clipShape.reset();
         clipShape.setShape(shape, null);
         isClipShape = true;
@@ -568,7 +601,21 @@ public class HTML5Graphics {
         }
         GeneralPath p = (GeneralPath)getCurrentClipProjection();
         p.intersect(shape);
-        setClip(p);
+        if (clipEmpty) {
+            // The intersection is empty (clipRect computed this reliably from the
+            // exact rect intersection). The rect-clip path records a clamped
+            // zero-area rect here, which the canvas culls correctly; the shape
+            // path instead produced a degenerate path that leaks fills AND image
+            // blits on the host. Record the same zero-area rect clip so the
+            // canvas culls every draw. Issue #5263.
+            clipBoundsDirty = true;
+            primitiveRenderAdapter.setClipRect(0, 0, 0, 0);
+            return;
+        }
+        // Record the clip path for the canvas, but do NOT recompute
+        // clipEmpty/clipBoundsTracker from p's bounds -- they are unreliable for
+        // an empty intersection. clipRect already set them. Issue #5263.
+        setClipShapeInternal(p);
     }
     
     public void setClip(int x, int y, int width, int height) {
@@ -578,20 +625,27 @@ public class HTML5Graphics {
         }
         isClipShape = false;
         clipRect.setBounds(x, y, width, height);
+        clipBoundsTracker.setBounds(x, y, width, height);
+        clipEmpty = width <= 0 || height <= 0;
         clipBoundsDirty = true;
         primitiveRenderAdapter.setClipRect(x, y, width, height);
-        
+
     }
     
    
 
     public void clipRect(int x, int y, int width, int height) {
         Rectangle rect = new Rectangle(x, y, width, height);
+        // Track the running clip bounds in user space, clamped to >= 0, so an
+        // empty intersection (two non-overlapping rects) is detected reliably
+        // whether the clip ends up tracked as a rect or a shape. Issue #5263.
+        clipBoundsTracker.intersection(rect, clipBoundsTracker);
+        clipEmpty = clipBoundsTracker.getWidth() <= 0 || clipBoundsTracker.getHeight() <= 0;
         if (isClipShape || transform != null && !transform.isIdentity()) {
             clipShape(rect);
             return;
         }
-        
+
         if (rect.contains(clipRect)) {
             return;
         }
