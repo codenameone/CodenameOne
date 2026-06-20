@@ -234,9 +234,10 @@ public class GoogleAnalyticsProvider extends AbstractAnalyticsProvider {
         if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_')) {
             b.insert(0, '_');
         }
-        if (b.length() > 40) {
-            return b.substring(0, 40);
+        String result = b.toString();
+        if (result.length() > 40) {
+            return result.substring(0, 40);
         }
-        return b.toString();
+        return result;
     }
 }
