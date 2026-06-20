@@ -806,45 +806,18 @@ public class CN1Playground extends Lifecycle {
         markEmbeddedPreviewRoles(component);
         applyWebsiteTheme(component, websiteDarkMode);
 
+        // The 3D/WebGL surface (RenderView/GameView) renders as an ordinary
+        // in-order component: it keeps an offscreen GL canvas and blits it into
+        // the display during paint(), so it stays nested in the preview form --
+        // inside the device bezel and correctly layered with the rest of the UI.
+        // (It used to be re-hosted into a stage overlay so its DOM-overlay peer
+        // would initialise; that's no longer needed and pulled it out of the bezel.)
         previewColumn.setPreview(component);
-        // A GameView / RenderView only creates its GL surface peer in
-        // initComponent(), which fires when it's part of a SHOWN form. The preview
-        // Form is embedded but never Display.show()n, so a GPU view inside it stays
-        // blank. Re-host it in the always-shown stage overlay so it initialises and
-        // renders (the same reason the editor's BrowserComponent peer works).
-        previewColumn.hostGpuPeer(findRenderView(component));
         // Feed the Inspector the user's script result directly rather than the
         // preview wrapper chain (stage / bezel / screen / mask) - otherwise the
         // tree's root shows inspector-internal skin chrome rather than the
         // user's actual root Component.
         inspector.setPreviewRoot(component);
-    }
-
-    /// Depth-first search for a GPU view (`com.codename1.gpu.RenderView`, the base
-    /// of `GameView`) anywhere in the preview tree. Returns the first one found, or
-    /// null. Used to re-host GPU peers in the shown stage overlay (see replacePreview).
-    private static Component findRenderView(Component component) {
-        if (component instanceof com.codename1.gpu.RenderView) {
-            return component;
-        }
-        // A Form's add(...) goes to its content pane, which isn't reached by the
-        // Form's own getComponentAt(); walk it explicitly.
-        if (component instanceof Form) {
-            Component hit = findRenderView(((Form) component).getContentPane());
-            if (hit != null) {
-                return hit;
-            }
-        }
-        if (component instanceof Container) {
-            Container c = (Container) component;
-            for (int i = 0; i < c.getComponentCount(); i++) {
-                Component hit = findRenderView(c.getComponentAt(i));
-                if (hit != null) {
-                    return hit;
-                }
-            }
-        }
-        return null;
     }
 
     private void detachForPreview(Component component) {

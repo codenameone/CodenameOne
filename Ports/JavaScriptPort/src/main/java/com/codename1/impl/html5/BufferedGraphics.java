@@ -98,6 +98,18 @@ public class BufferedGraphics extends HTML5Graphics {
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
+    /// Buffers a blit of a raw canvas (an offscreen WebGL render target) into the
+    /// display op stream. Used by the GPU compositing path so a RenderView's 3D
+    /// frame is drawn onto the display surface in flushGraphics(), layering with
+    /// the rest of the UI -- unlike {@link #drawImage} this takes a live canvas,
+    /// not a NativeImage.
+    public void drawCanvas(com.codename1.html5.js.dom.HTMLCanvasElement canvas, int x, int y, int w, int h) {
+        if (canvas == null || w <= 0 || h <= 0) {
+            return;
+        }
+        upcoming.add(new com.codename1.impl.html5.graphics.DrawCanvas(canvas, x, y, w, h, 255));
+    }
+
     @Override
     public void tileImage(Object img, int x, int y, int w, int h) {
         imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);

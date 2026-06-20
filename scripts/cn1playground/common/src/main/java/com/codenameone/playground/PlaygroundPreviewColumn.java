@@ -32,14 +32,6 @@ final class PlaygroundPreviewColumn extends Container {
 
     private final Container stageWrapper;
     private final Container contentHost;
-    // Overlay layer in the (always-shown) stage for GPU peers. A GameView's GL
-    // surface peer is only created in RenderView.initComponent(), which fires when
-    // the component is part of a SHOWN form. The user's preview Form is embedded as
-    // a component and never Display.show()n, so a GameView inside it never inits.
-    // We host the RenderView directly in this overlay (a child of the shown
-    // stageWrapper) so it initialises and renders -- the editor's BrowserComponent
-    // peer works for the same reason (it lives in the playground's own shown form).
-    private final Container gpuOverlay;
     private final Label stalePill;
 
     private String device;
@@ -130,9 +122,6 @@ final class PlaygroundPreviewColumn extends Container {
         stalePill.setVisible(false);
 
         stageWrapper.add(contentHost);
-        gpuOverlay = new Container(new BorderLayout());
-        gpuOverlay.getAllStyles().setBgTransparency(0);
-        stageWrapper.add(gpuOverlay);
         Container pillWrap = new Container(new FlowLayout(Component.CENTER, Component.TOP));
         pillWrap.getAllStyles().setBgTransparency(0);
         pillWrap.add(stalePill);
@@ -174,25 +163,6 @@ final class PlaygroundPreviewColumn extends Container {
         return contentHost;
     }
 
-    /// Hosts a GPU peer component (a `com.codename1.gpu.RenderView` / `GameView`)
-    /// directly in the always-shown stage overlay so its native GL surface peer
-    /// initialises and renders -- it cannot when left inside the embedded, never-
-    /// shown preview Form. Pass null to clear. The overlay sits above the device
-    /// screen and fills the stage (best with the no-skin device or a full-screen
-    /// 3D view); the component is reparented out of the preview Form into the overlay.
-    void hostGpuPeer(Component renderView) {
-        gpuOverlay.removeAll();
-        if (renderView != null) {
-            Container p = renderView.getParent();
-            if (p != null) {
-                p.removeComponent(renderView);
-            }
-            gpuOverlay.add(BorderLayout.CENTER, renderView);
-        }
-        if (getComponentForm() != null) {
-            stageWrapper.revalidate();
-        }
-    }
 
     /// Refreshes theme styles only on the user's preview content. Skips the bezel,
     /// screen, and corner-mask overlay so their programmatic borders / transparency

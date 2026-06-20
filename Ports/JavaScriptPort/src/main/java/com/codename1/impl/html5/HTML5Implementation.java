@@ -163,6 +163,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static HTML5Implementation instance;
     private boolean shiftKeyDown;
     private BufferedGraphics graphics;
+
+    /// The display's buffered graphics. Exposed so a WebGL peer can blit its
+    /// offscreen frame into the display op stream during its own paint() (in
+    /// z-order), instead of compositing on top after the whole frame is painted.
+    BufferedGraphics displayGraphics() {
+        return graphics;
+    }
     Window window;
     // The document is a stable singleton for the life of the page. Resolve it
     // ONCE (at __init, with no concurrent barrier traffic) and reuse the cached
