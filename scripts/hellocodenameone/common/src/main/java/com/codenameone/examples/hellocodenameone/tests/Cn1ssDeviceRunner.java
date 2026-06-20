@@ -11,6 +11,7 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.ClipUnderRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
+import com.codenameone.examples.hellocodenameone.tests.graphics.EmptyClip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradientStops;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawImage;
@@ -152,6 +153,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StrokeTest(),
             new Clip(),
             new ClipUnderRotation(),
+            // Regression guard for issue #5263: an empty clip (two
+            // non-overlapping clipRects) must cull everything. The iOS Metal
+            // backend used to open the whole framebuffer instead, flooding the
+            // screen with the fully-clipped-out draws.
+            new EmptyClip(),
             new TileImage(),
             new Rotate(),
             new TransformTranslation(),
