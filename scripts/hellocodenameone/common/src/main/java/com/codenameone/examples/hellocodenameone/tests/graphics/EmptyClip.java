@@ -18,6 +18,12 @@ import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreensho
  * framebuffer. A fully clipped-out {@code fillRect}/{@code drawImage} then
  * painted over the entire screen.
  *
+ * <p>The same empty-clip bug class was found and fixed in more backends after
+ * this test exposed them: the iOS Metal scissor, and the JavaScript port (whose
+ * on-screen {@code BufferedGraphics} leaked fills and image blits through a
+ * degenerate empty clip). The watchOS Core Graphics backend has a related
+ * still-open issue, so this test is skipped on watch (see {@code runTest}).
+ *
  * <p>The correct output is therefore a solid green cell. If the bug returns the
  * cell is flooded by the white fill and the red marker image drawn below the
  * empty clip.
