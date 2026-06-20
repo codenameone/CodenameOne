@@ -55,6 +55,15 @@ public class BufferedGraphics extends HTML5Graphics {
     private GeneralPath clipShape = new GeneralPath();
 
     private boolean isClipShape;
+    // True when the current clip encloses no area. Tracked reliably via
+    // clipBoundsTracker (a clamped user-space rect intersection) because the
+    // projected clip bounds are unreliable for an empty clip on the shape path
+    // (an empty GeneralPath's getBounds() returns uninitialised extents, and a
+    // degenerate clip path does not cull image blits/fills on the host). This is
+    // the DISPLAY/screen graphics class (BufferedGraphics extends HTML5Graphics
+    // and overrides the clip/draw methods); the same fix lives in both. #5263.
+    private boolean clipEmpty;
+    private final Rectangle clipBoundsTracker = new Rectangle();
     private Transform transform, clipTransform;
     private boolean transformApplied=false;
     private final JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp> primitiveRenderAdapter =
@@ -86,20 +95,26 @@ public class BufferedGraphics extends HTML5Graphics {
         // The display draws onto the well-known display surface; the host binds
         // it lazily to the output canvas. No worker-side canvas/context proxy.
         super(impl, HTML5Implementation.DISPLAY_SURFACE_ID, width, height);
+        clipBoundsTracker.setBounds(0, 0, width, height);
     }
 
     @Override
     public void drawImage(Object img, int x, int y) {
+        // An empty clip must cull every draw; a degenerate empty-clip path on
+        // the host leaks image blits, so cull here. Issue #5263.
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
     }
 
     @Override
     public void drawImage(Object img, int x, int y, int w, int h) {
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
     @Override
     public void tileImage(Object img, int x, int y, int w, int h) {
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
@@ -348,6 +363,18 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void setClip(Shape shape) {
+        // Sync the reliable user-space clip tracker; clipShape() bypasses this via
+        // setClipShapeInternal so it doesn't clobber the clipEmpty/tracker that
+        // clipRect computed from the exact rect intersection. Issue #5263.
+        Rectangle b = shape.getBounds();
+        int bw = Math.max(0, b.getWidth());
+        int bh = Math.max(0, b.getHeight());
+        clipBoundsTracker.setBounds(b.getX(), b.getY(), bw, bh);
+        clipEmpty = bw <= 0 || bh <= 0;
+        setClipShapeInternal(shape);
+    }
+
+    private void setClipShapeInternal(Shape shape) {
         clipShape.reset();
         clipShape.setShape(shape, null);
         isClipShape = true;
@@ -413,9 +440,17 @@ public class BufferedGraphics extends HTML5Graphics {
         }
         GeneralPath p = (GeneralPath)getCurrentClipProjection();
         p.intersect(shape);
-        setClip(p);
+        if (clipEmpty) {
+            // Empty intersection (computed reliably by clipRect): record a
+            // zero-area rect clip so the canvas culls every draw. The degenerate
+            // shape path leaks fills AND image blits on the host. Issue #5263.
+            clipBoundsDirty = true;
+            primitiveRenderAdapter.setClipRect(0, 0, 0, 0);
+            return;
+        }
+        setClipShapeInternal(p);
     }
-    
+
 
     @Override
     public void setClip(int x, int y, int width, int height) {
@@ -425,6 +460,8 @@ public class BufferedGraphics extends HTML5Graphics {
         }
         isClipShape = false;
         clip.setBounds(x, y, width, height);
+        clipBoundsTracker.setBounds(x, y, width, height);
+        clipEmpty = width <= 0 || height <= 0;
         clipBoundsDirty = true;
         primitiveRenderAdapter.setClipRect(x, y, width, height);
     }
@@ -432,11 +469,16 @@ public class BufferedGraphics extends HTML5Graphics {
     @Override
     public void clipRect(int x, int y, int width, int height) {
         Rectangle rect = new Rectangle(x, y, width, height);
+        // Track the running clip bounds in user space, clamped to >= 0, so an
+        // empty intersection is detected reliably whether the clip is tracked as
+        // a rect or a shape. Issue #5263.
+        clipBoundsTracker.intersection(rect, clipBoundsTracker);
+        clipEmpty = clipBoundsTracker.getWidth() <= 0 || clipBoundsTracker.getHeight() <= 0;
         if (isClipShape || transform != null && !transform.isIdentity()) {
             clipShape(rect);
             return;
         }
-        
+
         if (rect.contains(clip)) {
             return;
         }

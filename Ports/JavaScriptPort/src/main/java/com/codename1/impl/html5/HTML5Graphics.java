@@ -89,9 +89,6 @@ public class HTML5Graphics {
     // uninitialised (often negative) extents, and a degenerate clip path does not
     // reliably cull image blits on the host. Issue #5263.
     private boolean clipEmpty;
-    // DIAGNOSTIC (#5263, temporary): when true, getClipX/Width/Height return
-    // clipEmpty/tracker values so the screenshot test can render them.
-    static final boolean DBG_5263 = true;
     private Transform transform, clipTransform;
     private boolean transformApplied = false;
    
@@ -458,21 +455,18 @@ public class HTML5Graphics {
     
     
     public int getClipHeight() {
-        if (DBG_5263) { return clipBoundsTracker.getHeight(); }
         calculateClipBounds();
         return clipBounds.getHeight();
     }
 
 
     public int getClipWidth() {
-        if (DBG_5263) { return clipBoundsTracker.getWidth(); }
         calculateClipBounds();
         return clipBounds.getWidth();
     }
 
 
     public int getClipX() {
-        if (DBG_5263) { return clipEmpty ? 999 : 0; }
         calculateClipBounds();
         return clipBounds.getX();
     }
