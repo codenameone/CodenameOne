@@ -136,7 +136,11 @@ void CN1ShowLaunchPlaceholder(UIWindow *window) {
     placeholder.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     placeholder.userInteractionEnabled = NO;
     if (@available(iOS 13.0, *)) {
+#if TARGET_OS_TV
+        placeholder.backgroundColor = [UIColor whiteColor];
+#else
         placeholder.backgroundColor = [UIColor systemBackgroundColor];
+#endif
     } else {
         placeholder.backgroundColor = [UIColor whiteColor];
     }
@@ -661,7 +665,7 @@ BOOL isVKBAlwaysOpen() {
         if(isIOS8() && !isIPad() && displayWidth > displayHeight) {
             return NO;
         }
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
         else if (!isIOS8() && !isIPad() && ([[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeLeft || [[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeRight)) {
             // iOS 7 needs a more specific check to find out if we are in landscape mode
             return NO;
@@ -859,6 +863,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                  || utf.keyboardType == UIKeyboardTypeNumberPad
                  || (utf.returnKeyType == UIReturnKeyNext && isVKBAlwaysOpen())) && !isIPad()) {
                 //add navigation toolbar to the top of the keyboard
+#if !TARGET_OS_TV
                 if(showToolbar) {
 #ifndef CN1_USE_ARC
                     UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
@@ -930,6 +935,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                     [toolbar setItems:itemsArray];
                     [utf setInputAccessoryView:toolbar];
                 }
+#endif
             }
         } else {
             CN1UITextView* utv = [[CN1UITextView alloc] initWithFrame:rect];
@@ -940,7 +946,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             // scrollViewShouldScrollToTop: when exactly one scroll view has
             // scrollsToTop=YES, and UITextView's internal scroll view defaults
             // to YES.
+            #if !TARGET_OS_TV
+            #if !TARGET_OS_TV
             utv.scrollsToTop = NO;
+            #endif
+            #endif
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
@@ -1037,6 +1047,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 }
             }
             
+#if !TARGET_OS_TV
             if(showToolbar) {
                 //add navigation toolbar to the top of the keyboard
 #ifndef CN1_USE_ARC
@@ -1090,6 +1101,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 [toolbar setItems:itemsArray];
                 [utv setInputAccessoryView:toolbar];
             }
+#endif
         }
         editingComponent.opaque = NO;
         [[CodenameOne_GLViewController instance].view addSubview:editingComponent];
@@ -1894,7 +1906,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
     if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
     return (int)[s sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
-    return (int)[s sizeWithFont:f].width;
+    return (int)[s sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #endif
 }
 
@@ -1902,11 +1914,11 @@ int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
 int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 (void* peer, int chr) {
     UIFont* f = (BRIDGE_CAST UIFont*)peer;
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
     return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
-    return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithFont:f].width;
+    return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #endif
 }
 
@@ -2811,7 +2823,11 @@ static CodenameOne_GLViewController *sharedSingleton;
     cn1StatusBarTapProxy = [[CN1StatusBarTapProxyView alloc] initWithFrame:window.bounds];
     cn1StatusBarTapProxy.delegate = self;
     cn1StatusBarTapProxy.backgroundColor = [UIColor clearColor];
+    #if !TARGET_OS_TV
+    #if !TARGET_OS_TV
     cn1StatusBarTapProxy.scrollsToTop = YES;
+    #endif
+    #endif
     // userInteractionEnabled must remain YES; iOS skips the
     // scrollViewShouldScrollToTop: dispatch for views that have it disabled.
     // Touches in the rest of the screen pass through naturally because the
@@ -2859,7 +2875,11 @@ static CodenameOne_GLViewController *sharedSingleton;
     if (statusBarHeight <= 0) {
         // Pre-iOS 11, or safe-area insets not yet populated, fall back to
         // the legacy status-bar frame.
+        #if TARGET_OS_TV
+        statusBarHeight = 0;
+        #else
         statusBarHeight = [UIApplication sharedApplication].statusBarFrame.size.height;
+        #endif
     }
     // Floor of 1pt keeps the proxy non-empty so iOS still routes
     // UIStatusBarTapAction to it when the status bar is hidden. Cap at 80pt
@@ -3121,6 +3141,7 @@ bool lockDrawing;
 // once viewDidLoad has run; only attaches on iOS 13.0+ where
 // UIHoverGestureRecognizer exists.
 - (void)cn1InstallHoverRecognizer {
+#if !TARGET_OS_TV
     if (@available(iOS 13.0, *)) {
         UIHoverGestureRecognizer *hover = [[UIHoverGestureRecognizer alloc]
                                            initWithTarget:self
@@ -3137,9 +3158,10 @@ bool lockDrawing;
         [hover release];
 #endif
     }
+#endif
 }
 
-- (void)cn1HandleHover:(UIHoverGestureRecognizer *)recognizer API_AVAILABLE(ios(13.0)) {
+- (void)cn1HandleHover:(UIGestureRecognizer *)recognizer API_AVAILABLE(ios(13.0)) {
     CGPoint p = [recognizer locationInView:self.view];
     int x = (int)(p.x * scaleValue);
     int y = (int)(p.y * scaleValue);
@@ -3167,6 +3189,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
 #endif
 
 -(UIImage*)createSplashImage {
+#if !TARGET_OS_TV
     UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
     bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
     
@@ -3234,6 +3257,9 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
         }
     }
     return img;
+#else
+    return nil;
+#endif
 }
 
 EAGLView* lastFoundEaglView;
@@ -3359,6 +3385,8 @@ EAGLView* lastFoundEaglView;
 #endif
     //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
     
+#if !TARGET_OS_TV
+#if !TARGET_OS_TV
     // register for keyboard notifications
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(keyboardWillShow:)
@@ -3369,17 +3397,23 @@ EAGLView* lastFoundEaglView;
                                              selector:@selector(keyboardWillHide:)
                                                  name:UIKeyboardWillHideNotification
                                                object:self.view.window];
+#endif
     
     //detect orientation by statusBarOrientation
     UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
     bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+#else
+    bool isPortrait = NO;
+#endif
 #ifdef CN1_USE_SPLASH_SCREEN
     UIImage *img = [self createSplashImage];
 #else
     UIImage* img = nil;
 #endif
     
+    #if !TARGET_OS_TV
     [self.view setMultipleTouchEnabled:YES];
+    #endif
     if(img != nil) {
         float scale = scaleValue;
         DrawImage* dr;
@@ -3536,7 +3570,9 @@ int keyboardHeight;
 #ifdef __IPHONE_7_0
         if (isIOS7()) {
             prefersStatusBarHidden = NO;
+            #if !TARGET_OS_TV
             [self setNeedsStatusBarAppearanceUpdate];
+            #endif
         }
 #endif
         [UIView beginAnimations:nil context:NULL];
@@ -3572,7 +3608,9 @@ BOOL prefersStatusBarHidden = NO;
     
     // get the size of the keyboard
     CGRect keyboardEndFrame;
+    #if !TARGET_OS_TV
     [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
+    #endif
     CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame fromView:nil];
     
     keyboardHeight = keyboardFrame.size.height;
@@ -3609,7 +3647,9 @@ BOOL prefersStatusBarHidden = NO;
 #ifdef __IPHONE_7_0
             if (isIOS7()) {
                 prefersStatusBarHidden = YES;
+                #if !TARGET_OS_TV
                 [self setNeedsStatusBarAppearanceUpdate];
+                #endif
             }
 #endif
             viewFrame = setOriginY(keyboardSlideOffset, viewFrame);
@@ -4387,7 +4427,7 @@ BOOL prefersStatusBarHidden = NO;
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
-	[str drawAtPoint:CGPointMake(x, y) withFont:font];
+	[str drawAtPoint:CGPointMake(x, y) withAttributes:@{NSFontAttributeName: font}];
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
@@ -4629,7 +4669,7 @@ BOOL prefersStatusBarHidden = NO;
     com_codename1_impl_ios_IOSImplementation_onGeofenceExit___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [region identifier]));
 }
 
-extern UIPopoverController* popoverController;
+extern id popoverController;
 extern int popoverSupported();
 
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
@@ -4841,6 +4881,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 #endif
 #endif
 
+#if !TARGET_OS_TV
 -(void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
     //[self dismissModalViewControllerAnimated:YES];
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
@@ -4912,6 +4953,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 }
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif // !TARGET_OS_TV (UIImagePickerController delegates)
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
 	[self dismissModalViewControllerAnimated:YES];
 }
@@ -5080,7 +5122,7 @@ extern SKPayment *paymentInstance;
 #endif
 
 
-- (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
+- (void) popoverControllerDidDismissPopover:(id) popoverController {
     if(datepickerPopover) {
         if(currentDatePickerDate != nil) {
 #ifndef CN1_USE_ARC
@@ -5099,6 +5141,12 @@ extern SKPayment *paymentInstance;
     }
 }
 
+// These picker-state globals are defined (unguarded) in IOSNative.m; declare
+// them above the tvOS guard so the non-guarded picker-dismiss code still links.
+extern int stringPickerSelection;
+extern JAVA_OBJECT pickerStringArray;
+extern JAVA_LONG defaultDatePickerDate;
+#if !TARGET_OS_TV
 - (void)datePickerChangeDate:(UIDatePicker *)sender {
     if (sender.datePickerMode == UIDatePickerModeCountDownTimer) {
         currentDatePickerDuration = sender.countDownDuration * 1000;
@@ -5221,8 +5269,9 @@ extern JAVA_LONG defaultDatePickerDate;
         currentDatePickerDate = nil;
     }
 }
+#endif // !TARGET_OS_TV (UIDatePicker / UIActionSheet)
 
-UIPopoverController* popoverControllerInstance;
+id popoverControllerInstance;
 - (void)pickerComponentDismiss {
     if(popoverControllerInstance != nil) {
         [popoverControllerInstance dismissPopoverAnimated:YES];
@@ -5262,6 +5311,7 @@ UIPopoverController* popoverControllerInstance;
 //-(void)actionSheetCancel:(UIActionSheet *)actionSheet {
 //}
 
+#if !TARGET_OS_TV
 - (void)pickerView:(UIPickerView *)pickerView didSelectRow: (NSInteger)row inComponent:(NSInteger)component {
     stringPickerSelection = row;
 }
@@ -5313,5 +5363,6 @@ UIPopoverController* popoverControllerInstance;
 }
 
 
+#endif // !TARGET_OS_TV (UIPickerView / UIDocumentInteractionController)
 @end
 #endif

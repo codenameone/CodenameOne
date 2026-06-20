@@ -77,7 +77,24 @@ Done so far (compile clean): the builder/target generation, `IOSNative.m`,
   `TARGET_OS_TV`. NOTE: this also disables a few features tvOS *does* support
   (e.g. `UITextField`/`UITextView`, AudioToolbox) — re-enabling those surgically
   is a follow-up; the broad guard gets the slice compiling + rendering first.
-* **`CodenameOne_GLViewController.m`** — the remaining compile blocker (~63 sites).
+**Correction to the earlier IOSNative.m note:** treating tvOS like watchOS for
+IOSNative.m was wrong — tvOS *supports* most of what watchOS lacks (CIFilter,
+vImage/Accelerate, UIView capture, UITextField, audio, UNUserNotificationCenter).
+The correct model is **tvOS ≈ iOS**: follow the iOS code path and guard only the
+genuinely tvOS-absent APIs with `#if !TARGET_OS_TV`. The blanket guard-broadening
+was reverted. The genuine IOSNative.m remainder is ~6 localized features:
+`UIWebView` (legacy browser peer — guard like UIWebViewEventDelegate),
+`MPMoviePlayerController`/`MPMoviePlayerViewController` (deprecated media player),
+`UIPasteboard` (no clipboard), device orientation
+(`UIInterfaceOrientation*`/`statusBarOrientation`/`attemptRotationToDeviceOrientation`),
+`UIDocumentInteractionController`, and `scrollsToTop`. Plus `LAContext`
+(LocalAuthentication) and the `UNNotificationAction`/`UNNotificationCategory`
+push-action registration are tvOS-absent.
+
+* **`CodenameOne_GLViewController.m`** — COMPILES on tvOS (the ~63 surgical guards
+  landed: orientation, status bar, toolbar input-accessory, keyboard, hover,
+  pickers/datePicker/imagePicker/actionSheet/documentInteraction delegates,
+  legacy text -> `sizeWithAttributes:`, `UIPopoverController` -> `id`).
   Unlike IOSNative, this file must follow the **iOS** path (tvOS has UIView/Metal),
   so the guards are surgical `#if !TARGET_OS_TV`, NOT the watch broadening. The
   sites cluster as: device orientation (`UIInterfaceOrientation*`,
