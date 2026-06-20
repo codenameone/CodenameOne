@@ -61,9 +61,11 @@ public class EmptyClip extends AbstractGraphicsScreenshotTest {
 
         // Clip to a centered rectangle...
         g.clipRect(x + w / 4, y + h / 4, w / 2, h / 2);
+        int c1w = g.getClipWidth(), c1h = g.getClipHeight();
         // ...then intersect with a rectangle in the far bottom-right corner that
         // lies completely outside it. The intersection is empty.
         g.clipRect(x + w - 12, y + h - 12, 8, 8);
+        int c2x = g.getClipX(), c2y = g.getClipY(), c2w = g.getClipWidth(), c2h = g.getClipHeight();
 
         // Both draws are entirely outside the (empty) clip and must be culled.
         g.setColor(0xffffff);
@@ -71,6 +73,15 @@ public class EmptyClip extends AbstractGraphicsScreenshotTest {
         g.drawImage(marker(), x, y, w, h);
 
         g.popClip();
+
+        // DIAGNOSTIC (JS only): the screenshot harness can't surface logs, so
+        // render the projected clip bounds into the image to read them back.
+        // JS-only guard keeps every other platform's golden untouched.
+        if ("HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
+            g.setColor(0x000000);
+            g.drawString("c1=" + c1w + "x" + c1h, x + 4, y + 4);
+            g.drawString("c2=" + c2w + "x" + c2h + "@" + c2x + "," + c2y, x + 4, y + 24);
+        }
     }
 
     private Image marker() {
