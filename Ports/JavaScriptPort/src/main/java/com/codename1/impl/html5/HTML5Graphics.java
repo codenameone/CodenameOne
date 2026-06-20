@@ -235,11 +235,13 @@ public class HTML5Graphics {
 
 
     public void drawImage(Object img, int x, int y) {
+        if (isClipEmpty()) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
     }
-    
-    
+
+
     public void tileImage(Object img, int x, int y, int w, int h) {
+        if (isClipEmpty()) { return; }
         imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
@@ -344,6 +346,7 @@ public class HTML5Graphics {
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
+        if (isClipEmpty()) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
@@ -598,6 +601,18 @@ public class HTML5Graphics {
         clipRect.intersection(rect, clipRect);
         clipBoundsDirty = true;
         primitiveRenderAdapter.setClipRect(clipRect.getX(), clipRect.getY(), clipRect.getWidth(), clipRect.getHeight());
+    }
+
+    // An empty clip -- e.g. clipRect intersecting two non-overlapping rectangles,
+    // which Rectangle.intersection clamps to a zero-size rect -- must cull every
+    // draw. fillRect/drawRect/etc. honor this through the recorded canvas clip,
+    // but the host image-blit path (surface blit / drawImage) does NOT cull on a
+    // zero-size clip, so a fully clipped-out image leaks through (issue #5263).
+    // Skip image blits while the rect clip is empty. Shape clips (isClipShape)
+    // and the non-identity-transform path fall through unchanged -- they are not
+    // affected by this bug and their emptiness isn't tracked in clipRect.
+    private boolean isClipEmpty() {
+        return !isClipShape && (clipRect.getWidth() <= 0 || clipRect.getHeight() <= 0);
     }
 
     public int getColor() {
