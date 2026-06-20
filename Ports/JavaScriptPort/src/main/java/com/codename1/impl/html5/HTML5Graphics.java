@@ -344,6 +344,13 @@ public class HTML5Graphics {
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
+        if (getClipWidth() <= 20 || getClipHeight() <= 20) {
+            com.codename1.io.Log.p("CN1DBG drawImage dst=" + x + "," + y + "," + w + "," + h
+                + " isClipShape=" + isClipShape
+                + " clipRect=" + clipRect.getX() + "," + clipRect.getY() + "," + clipRect.getWidth() + "," + clipRect.getHeight()
+                + " clipBounds=" + getClipX() + "," + getClipY() + "," + getClipWidth() + "," + getClipHeight()
+                + " tform=" + (transform == null ? "null" : (transform.isIdentity() ? "identity" : "NONIDENTITY")));
+        }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
