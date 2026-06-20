@@ -2,15 +2,19 @@
  * Codename One maps provider -- Apple MapKit (iOS).
  *
  * BUILD TEMPLATE. Copied into the generated Xcode project's native sources as
- * com_codename1_maps_MapProviderImpl.m when maps.provider=apple. Implements the
- * native methods declared by the injected com.codename1.maps.MapProviderImpl
- * (ParparVM binds them by the symbol names below) and forwards taps,
- * long-presses and camera changes back into Java via the static callbacks on
+ * CN1AppleMapKit.m when maps.provider=apple. Implements the native methods
+ * declared by the injected com.codename1.maps.MapProviderImpl (ParparVM binds
+ * them by the symbol names below) and forwards taps, long-presses and camera
+ * changes back into Java via the static callbacks on
  * com.codename1.maps.NativeMap. MapKit is a free iOS system framework.
+ *
+ * watchOS note: MKMapView and the overlay renderers are unavailable on
+ * watchOS, so on that platform we compile a set of no-op stubs that keep the
+ * translated provider linkable. nativeCreate returns 0 there, which makes
+ * MapProviderImpl.createPeer return null and NativeMap fall back to the
+ * pure-vector MapView.
  */
 #import <Foundation/Foundation.h>
-#import <MapKit/MapKit.h>
-#import <CoreLocation/CoreLocation.h>
 
 #ifndef BRIDGE_CAST
 #if __has_feature(objc_arc)
@@ -19,6 +23,38 @@
 #define BRIDGE_CAST
 #endif
 #endif
+
+#if TARGET_OS_WATCH
+
+// ---- watchOS stubs ---------------------------------------------------------
+// MapKit map views are unavailable on watchOS. These keep the symbols the
+// translated MapProviderImpl references resolvable; the map degrades to the
+// vector MapView at runtime because nativeCreate returns 0.
+
+JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) { return 0; }
+void com_codename1_maps_MapProviderImpl_nativeDeinit___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {}
+void com_codename1_maps_MapProviderImpl_nativeSetCamera___int_double_double_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {}
+JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLat___int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) { return 0; }
+JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLon___int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) { return 0; }
+JAVA_FLOAT com_codename1_maps_MapProviderImpl_nativeGetZoom___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) { return 0; }
+JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddMarker___int_double_double_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_OBJECT title) { return 0; }
+JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddPolyline___int_double_1ARRAY_double_1ARRAY_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_OBJECT lats, JAVA_OBJECT lons, JAVA_INT color, JAVA_INT width) { return 0; }
+JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddPolygon___int_double_1ARRAY_double_1ARRAY_int_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_OBJECT lats, JAVA_OBJECT lons, JAVA_INT fill, JAVA_INT stroke, JAVA_INT width) { return 0; }
+JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddCircle___int_double_double_double_int_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_DOUBLE radius, JAVA_INT fill, JAVA_INT stroke, JAVA_INT width) { return 0; }
+void com_codename1_maps_MapProviderImpl_nativeRemove___int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_LONG elementId) {}
+void com_codename1_maps_MapProviderImpl_nativeRemoveAll___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {}
+JAVA_INT com_codename1_maps_MapProviderImpl_nativeScreenX___int_double_double_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon) { return 0; }
+JAVA_INT com_codename1_maps_MapProviderImpl_nativeScreenY___int_double_double_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon) { return 0; }
+JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeLat___int_int_int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_INT x, JAVA_INT y) { return 0; }
+JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeLon___int_int_int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_INT x, JAVA_INT y) { return 0; }
+void com_codename1_maps_MapProviderImpl_nativeSetShowMyLocation___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_BOOLEAN show) {}
+void com_codename1_maps_MapProviderImpl_nativeSetRotateEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_BOOLEAN enabled) {}
+void com_codename1_maps_MapProviderImpl_nativeSetMapType___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_INT type) {}
+
+#else
+
+#import <MapKit/MapKit.h>
+#import <CoreLocation/CoreLocation.h>
 
 extern NSString* toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 
@@ -120,10 +156,18 @@ static double zoomToSpan(float zoom) {
 
 JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     __block CN1AppleMap *m = nil;
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    void (^createBlock)(void) = ^{
         m = [[CN1AppleMap alloc] initWithMapId:(int)mapId];
         [cn1AppleMaps() setObject:m forKey:[NSNumber numberWithInt:(int)mapId]];
-    });
+    };
+    // The Codename One iOS EDT runs on the main thread, so a dispatch_sync to
+    // the main queue from here would deadlock. Create inline when already on
+    // the main thread; only marshal when invoked from a background thread.
+    if ([NSThread isMainThread]) {
+        createBlock();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), createBlock);
+    }
     return (JAVA_LONG)((BRIDGE_CAST void*)m.mapView);
 }
 
@@ -293,3 +337,5 @@ void com_codename1_maps_MapProviderImpl_nativeSetMapType___int_int(CN1_THREAD_ST
     else if (type == 2) { t = MKMapTypeHybrid; }
     dispatch_async(dispatch_get_main_queue(), ^{ m.mapView.mapType = t; });
 }
+
+#endif

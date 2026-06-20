@@ -106,7 +106,7 @@ final class LabelEngine {
             bucket = 2;
             sizeConst = Font.SIZE_LARGE;
         }
-        Integer k = new Integer(bucket);
+        Integer k = Integer.valueOf(bucket);
         Font f = (Font) fontCache.get(k);
         if (f == null) {
             f = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_PLAIN, sizeConst);

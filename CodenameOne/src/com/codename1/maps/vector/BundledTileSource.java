@@ -99,7 +99,8 @@ public final class BundledTileSource implements TileSource {
             public void run() {
                 byte[] data = null;
                 try {
-                    InputStream is = Display.getInstance().getResourceAsStream(getClass(), path);
+                    InputStream is = Display.getInstance().getResourceAsStream(
+                            BundledTileSource.this.getClass(), path);
                     if (is != null) {
                         try {
                             data = TileUtil.maybeGunzip(Util.readInputStream(is));

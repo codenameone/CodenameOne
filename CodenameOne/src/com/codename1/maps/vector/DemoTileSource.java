@@ -131,8 +131,8 @@ public final class DemoTileSource implements TileSource {
         ByteArrayOutputStream fb = new ByteArrayOutputStream();
         ProtoWriter f = new ProtoWriter(fb);
         List tags = new ArrayList();
-        tags.add(new Integer(0));
-        tags.add(new Integer(0));
+        tags.add(Integer.valueOf(0));
+        tags.add(Integer.valueOf(0));
         f.writePackedInt32(2, tags);
         f.writeInt32(3, VectorFeature.GEOM_POINT);
         f.writePackedInt32(4, pointGeometry(x, y));
@@ -169,33 +169,33 @@ public final class DemoTileSource implements TileSource {
         int cx = 0;
         int cy = 0;
         // MoveTo first point.
-        g.add(new Integer(command(1, 1)));
-        g.add(new Integer(ProtoWriter.zigZag32(xs[0] - cx)));
-        g.add(new Integer(ProtoWriter.zigZag32(ys[0] - cy)));
+        g.add(Integer.valueOf(command(1, 1)));
+        g.add(Integer.valueOf(ProtoWriter.zigZag32(xs[0] - cx)));
+        g.add(Integer.valueOf(ProtoWriter.zigZag32(ys[0] - cy)));
         cx = xs[0];
         cy = ys[0];
         // LineTo remaining points.
         int n = xs.length - 1;
         if (n > 0) {
-            g.add(new Integer(command(2, n)));
+            g.add(Integer.valueOf(command(2, n)));
             for (int i = 1; i < xs.length; i++) {
-                g.add(new Integer(ProtoWriter.zigZag32(xs[i] - cx)));
-                g.add(new Integer(ProtoWriter.zigZag32(ys[i] - cy)));
+                g.add(Integer.valueOf(ProtoWriter.zigZag32(xs[i] - cx)));
+                g.add(Integer.valueOf(ProtoWriter.zigZag32(ys[i] - cy)));
                 cx = xs[i];
                 cy = ys[i];
             }
         }
         if (close) {
-            g.add(new Integer(command(7, 1)));
+            g.add(Integer.valueOf(command(7, 1)));
         }
         return g;
     }
 
     private static List pointGeometry(int x, int y) {
         List g = new ArrayList();
-        g.add(new Integer(command(1, 1)));
-        g.add(new Integer(ProtoWriter.zigZag32(x)));
-        g.add(new Integer(ProtoWriter.zigZag32(y)));
+        g.add(Integer.valueOf(command(1, 1)));
+        g.add(Integer.valueOf(ProtoWriter.zigZag32(x)));
+        g.add(Integer.valueOf(ProtoWriter.zigZag32(y)));
         return g;
     }
 

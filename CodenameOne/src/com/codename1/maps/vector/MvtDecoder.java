@@ -130,17 +130,17 @@ public final class MvtDecoder {
                     result = in.readString();
                     break;
                 case 2:
-                    result = new Float(in.readFloat());
+                    result = Float.valueOf(in.readFloat());
                     break;
                 case 3:
-                    result = new Double(in.readDouble());
+                    result = Double.valueOf(in.readDouble());
                     break;
                 case 4:
                 case 5:
-                    result = new Long(in.readVarint64());
+                    result = Long.valueOf(in.readVarint64());
                     break;
                 case 6:
-                    result = new Long(in.readSInt64());
+                    result = Long.valueOf(in.readSInt64());
                     break;
                 case 7:
                     result = in.readBool() ? Boolean.TRUE : Boolean.FALSE;

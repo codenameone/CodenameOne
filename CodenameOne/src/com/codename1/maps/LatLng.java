@@ -52,11 +52,8 @@ public final class LatLng {
         } else if (latitude < -90) {
             latitude = -90;
         }
-        while (longitude > 180) {
-            longitude -= 360;
-        }
-        while (longitude < -180) {
-            longitude += 360;
+        if (longitude > 180 || longitude < -180) {
+            longitude = ((longitude + 180) % 360 + 360) % 360 - 180;
         }
         this.latitude = latitude;
         this.longitude = longitude;

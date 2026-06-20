@@ -87,7 +87,7 @@ public class NativeMap extends Container implements MapSurface {
         synchronized (NativeMap.class) {
             mapId = idCounter++;
         }
-        INSTANCES.put(new Integer(mapId), this);
+        INSTANCES.put(Integer.valueOf(mapId), this);
         this.initialCenter = center;
         this.initialZoom = zoom;
         this.fallbackSource = fallbackSource;
@@ -239,7 +239,7 @@ public class NativeMap extends Container implements MapSurface {
         long key = provider.addMarker(mapId, iconData, m.getPosition().getLatitude(),
                 m.getPosition().getLongitude(), m.getTitle(), m.getSnippet(),
                 m.getAnchorU(), m.getAnchorV());
-        m.providerKey = new Long(key);
+        m.providerKey = Long.valueOf(key);
         markers.add(m);
         return m;
     }
@@ -269,7 +269,7 @@ public class NativeMap extends Container implements MapSurface {
         }
         long key = provider.finishPolyline(mapId, pathId, polyline.getStrokeColor(),
                 polyline.getStrokeWidth());
-        polyline.providerKey = new Long(key);
+        polyline.providerKey = Long.valueOf(key);
         return polyline;
     }
 
@@ -295,7 +295,7 @@ public class NativeMap extends Container implements MapSurface {
         }
         long key = provider.finishPolygon(mapId, pathId, polygon.getFillColor(),
                 polygon.getStrokeColor(), polygon.getStrokeWidth());
-        polygon.providerKey = new Long(key);
+        polygon.providerKey = Long.valueOf(key);
         return polygon;
     }
 
@@ -316,7 +316,7 @@ public class NativeMap extends Container implements MapSurface {
         long key = provider.addCircle(mapId, circle.getCenter().getLatitude(),
                 circle.getCenter().getLongitude(), circle.getRadiusMeters(),
                 circle.getFillColor(), circle.getStrokeColor(), circle.getStrokeWidth());
-        circle.providerKey = new Long(key);
+        circle.providerKey = Long.valueOf(key);
         return circle;
     }
 
@@ -486,6 +486,6 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     private static NativeMap lookup(int mapId) {
-        return (NativeMap) INSTANCES.get(new Integer(mapId));
+        return (NativeMap) INSTANCES.get(Integer.valueOf(mapId));
     }
 }

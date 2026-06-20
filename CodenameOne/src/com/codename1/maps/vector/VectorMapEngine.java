@@ -45,7 +45,7 @@ import java.util.Map;
 /// is no native peer.
 public final class VectorMapEngine {
 
-    private final int tileSize = WebMercator.TILE_SIZE;
+    private static final int tileSize = WebMercator.TILE_SIZE;
     private TileSource source;
     private MapStyle style;
 

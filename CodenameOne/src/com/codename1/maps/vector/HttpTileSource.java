@@ -124,8 +124,8 @@ public class HttpTileSource implements TileSource {
         if (needsTileJson()) {
             synchronized (this) {
                 if (resolvedTemplate == null) {
-                    pendingRequests.add(new Object[]{new Integer(z), new Integer(x),
-                            new Integer(y), callback});
+                    pendingRequests.add(new Object[]{Integer.valueOf(z), Integer.valueOf(x),
+                            Integer.valueOf(y), callback});
                     if (!resolving) {
                         resolving = true;
                         resolveTileJson();

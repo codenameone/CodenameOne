@@ -3,7 +3,7 @@
 Codename One ships a modern mapping API in the `com.codename1.maps` package built around two components:
 
 * `MapView` -- a *pure-vector* map drawn entirely through the Codename One `Graphics` pipeline. It never embeds a native peer, so it composes cleanly with the rest of your UI (dialogs, lists and overlays draw over it) and behaves identically on every platform, including the simulator and the web.
-* `NativeMap` -- a map backed by a *native provider* (Apple MapKit, Google Maps, ...) when one is wired into the build, and which transparently *falls back to a `MapView`* when no provider is available (the simulator, devices without the selected provider, or builds that did not opt in).
+* `NativeMap` -- a map backed by a *native provider* (Apple MapKit, Google Maps, ...) when one is wired into the build, and which transparently *falls back to a `MapView`* when no provider is available (the simulator, devices without the selected provider, or builds that didn't opt in).
 
 Both components implement the same `MapSurface` interface, so application code is identical regardless of which one -- or which provider -- is backing the map.
 
@@ -106,7 +106,7 @@ codename1.arg.ios.maps.provider=apple
 codename1.arg.android.maps.provider=google
 ----
 
-When a provider is selected the build server injects that provider's implementation into your app and wires it in; with no provider selected (or when the provider is unavailable at runtime, e.g. Google Play Services is missing) `NativeMap` simply renders the vector `MapView` fallback. You can configure the fallback basemap explicitly:
+When a provider is selected the build server injects that provider's implementation into your app and wires it in; with no provider selected (or when the provider is unavailable at runtime, for example when Google Play Services is missing) `NativeMap` simply renders the vector `MapView` fallback. You can configure the fallback basemap explicitly:
 
 [source,java]
 ----
@@ -125,4 +125,4 @@ codename1.arg.ios.afterFinishLaunching=[GMSServices provideAPIKey:@"YOUR_IOS_API
 
 === Choosing between MapView and NativeMap
 
-Use `MapView` when you want a lightweight, dependency-free map that looks the same everywhere and composes freely with CN1 components. Use `NativeMap` when you want the platform's native map look, gestures and performance, and are willing to opt a provider in through build hints -- with the guarantee that it still works (as a vector map) where the provider is unavailable.
+Use `MapView` when you want a lightweight, dependency-free map that looks the same everywhere and composes with CN1 components. Use `NativeMap` when you want the platform's native map look, gestures and performance, and are willing to opt a provider in through build hints -- with the guarantee that it still works (as a vector map) where the provider is unavailable.
