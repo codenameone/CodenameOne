@@ -65,12 +65,22 @@ public class EmptyClip extends AbstractGraphicsScreenshotTest {
         // lies completely outside it. The intersection is empty.
         g.clipRect(x + w - 12, y + h - 12, 8, 8);
 
+        // DIAGNOSTIC (#5263): capture clipEmpty (getClipX==999) + tracker bounds.
+        int dEmpty = g.getClipX();
+        int dtw = g.getClipWidth();
+        int dth = g.getClipHeight();
+
         // Both draws are entirely outside the (empty) clip and must be culled.
         g.setColor(0xffffff);
         g.fillRect(x, y, w, h);
         g.drawImage(marker(), x, y, w, h);
 
         g.popClip();
+
+        if ("HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
+            g.setColor(0x000000);
+            g.drawString("empty=" + dEmpty + " trk=" + dtw + "x" + dth, x + 4, y + 4);
+        }
     }
 
     private Image marker() {
