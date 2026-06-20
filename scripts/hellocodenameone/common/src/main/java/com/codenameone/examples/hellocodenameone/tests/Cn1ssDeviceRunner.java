@@ -241,6 +241,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VectorMapMarkersScreenshotTest(),
             new VectorMapShapesScreenshotTest(),
             new NativeMapFallbackScreenshotTest(),
+            new NativeMapProviderScreenshotTest(),
             // Build-time SVG transcoder coverage: the static test renders
             // shapes / gradients / paths, the animated test pins
             // AnimationTime so the captured frame is deterministic.

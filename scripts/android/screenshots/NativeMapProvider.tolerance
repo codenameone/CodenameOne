@@ -1,0 +1,6 @@
+# Live native map (MapKit / Google): tiles + labels load from the provider's
+# servers and vary slightly run-to-run, so use a lenient tolerance. This still
+# fails loudly on a blank / blocked map (which differs from a real render across
+# essentially the whole frame), which is the regression this test guards.
+maxChannelDelta=20
+maxMismatchPercent=12.0
