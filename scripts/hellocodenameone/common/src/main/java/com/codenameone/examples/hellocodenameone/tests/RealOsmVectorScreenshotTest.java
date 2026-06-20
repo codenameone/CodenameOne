@@ -26,7 +26,7 @@ public class RealOsmVectorScreenshotTest extends BaseTest {
         }
         Form form = createForm("Real OSM Vector", new BorderLayout(), "RealOsmVector");
         MapView map = new MapView(
-                new BundledTileSource("/maptiles/{z}/{x}/{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
+                new BundledTileSource("/maptiles/mt_{z}_{x}_{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
                 MapStyle.light());
         map.moveCamera(new LatLng(37.814, -122.413), 13);
         form.add(BorderLayout.CENTER, map);

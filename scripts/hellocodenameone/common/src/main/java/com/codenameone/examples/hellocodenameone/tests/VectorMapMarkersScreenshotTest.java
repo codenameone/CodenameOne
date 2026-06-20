@@ -24,7 +24,7 @@ public class VectorMapMarkersScreenshotTest extends BaseTest {
         }
         Form form = createForm("Vector Map Markers", new BorderLayout(), "VectorMapMarkers");
         MapView map = new MapView(
-                new BundledTileSource("/maptiles/{z}/{x}/{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
+                new BundledTileSource("/maptiles/mt_{z}_{x}_{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
                 MapStyle.light());
         map.moveCamera(new LatLng(37.808, -122.412), 13);
         map.addMarker(new MarkerOptions(new LatLng(37.8087, -122.4098)).title("Pier 39"));

@@ -31,7 +31,7 @@ public class NativeMapFallbackScreenshotTest extends BaseTest {
             return true;
         }
         NativeMap map = new NativeMap(new LatLng(37.808, -122.412), 13,
-                new BundledTileSource("/maptiles/{z}/{x}/{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
+                new BundledTileSource("/maptiles/mt_{z}_{x}_{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
                 MapStyle.light());
         if (map.isNativeMap()) {
             System.out.println(

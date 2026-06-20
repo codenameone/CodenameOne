@@ -24,7 +24,7 @@ public class VectorMapDarkStyleScreenshotTest extends BaseTest {
         }
         Form form = createForm("Vector Map Dark", new BorderLayout(), "VectorMapDarkStyle");
         MapView map = new MapView(
-                new BundledTileSource("/maptiles/{z}/{x}/{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
+                new BundledTileSource("/maptiles/mt_{z}_{x}_{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
                 MapStyle.dark());
         map.moveCamera(new LatLng(37.808, -122.412), 13);
         form.add(BorderLayout.CENTER, map);

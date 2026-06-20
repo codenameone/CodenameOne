@@ -27,7 +27,7 @@ public class VectorMapShapesScreenshotTest extends BaseTest {
         }
         Form form = createForm("Vector Map Shapes", new BorderLayout(), "VectorMapShapes");
         MapView map = new MapView(
-                new BundledTileSource("/maptiles/{z}/{x}/{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
+                new BundledTileSource("/maptiles/mt_{z}_{x}_{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
                 MapStyle.light());
         map.moveCamera(new LatLng(37.806, -122.412), 13);
 
