@@ -23,7 +23,7 @@
 package com.codename1.maps;
 
 import com.codename1.maps.vector.MapStyle;
-import com.codename1.maps.vector.RasterTileSource;
+import com.codename1.maps.vector.MvtTileSource;
 import com.codename1.maps.vector.TileSource;
 import com.codename1.maps.vector.VectorMapEngine;
 import com.codename1.ui.Component;
@@ -47,10 +47,13 @@ import java.util.List;
 /// overlays draw over it without the clipping limitations of a native view.
 ///
 /// `MapView` works identically on every platform including the simulator and
-/// the web. By default it shows the keyless OpenStreetMap raster basemap so it
-/// renders with zero configuration; point it at an [com.codename1.maps.vector.MvtTileSource]
-/// (or a bundled tileset) for true vector tiles. For a native-rendered map
-/// (Apple MapKit, Google Maps, ...) use [NativeMap], which falls back to this
+/// the web. By default it shows the free, keyless **OpenFreeMap** vector
+/// basemap (real OpenStreetMap data) so it renders real maps with zero
+/// configuration and no API key; point it at any other
+/// [com.codename1.maps.vector.TileSource] (a keyed MVT endpoint, a raster
+/// source such as [com.codename1.maps.vector.RasterTileSource#openStreetMap()],
+/// or a bundled offline tileset) as needed. For a native-rendered map (Apple
+/// MapKit, Google Maps, ...) use [NativeMap], which falls back to this
 /// component when no native provider is wired in.
 public class MapView extends Container implements MapSurface {
 
@@ -74,10 +77,10 @@ public class MapView extends Container implements MapSurface {
     private int lastTapX;
     private int lastTapY;
 
-    /// Creates a map showing the keyless OpenStreetMap basemap centered on the
-    /// equator at a low zoom.
+    /// Creates a map showing the free, keyless OpenFreeMap vector basemap (real
+    /// OpenStreetMap data) centered on the equator at a low zoom.
     public MapView() {
-        this(RasterTileSource.openStreetMap(), MapStyle.light());
+        this(MvtTileSource.openFreeMap(), MapStyle.light());
     }
 
     /// Creates a map backed by `source` with the default light style.

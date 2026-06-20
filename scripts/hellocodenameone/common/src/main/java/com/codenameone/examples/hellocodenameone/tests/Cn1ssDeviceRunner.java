@@ -236,6 +236,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // rendered against the deterministic offline DemoTileSource so the
             // baselines are network-free and reproducible.
             new VectorMapBasemapScreenshotTest(),
+            new RealOsmVectorScreenshotTest(),
             new VectorMapDarkStyleScreenshotTest(),
             new VectorMapMarkersScreenshotTest(),
             new VectorMapShapesScreenshotTest(),

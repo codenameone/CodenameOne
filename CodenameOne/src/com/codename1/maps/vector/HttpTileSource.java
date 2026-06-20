@@ -22,18 +22,29 @@
  */
 package com.codename1.maps.vector;
 
+import com.codename1.io.CharArrayReader;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /// A [TileSource] that fetches tiles over HTTPS from a slippy-map URL
 /// template. The template contains `{z}`/`{x}`/`{y}` tokens and, optionally,
 /// a `{key}` token substituted with the configured API key. Downloads run on
 /// the Codename One network thread and deliver results on the EDT, with
 /// transparent gunzip for vector payloads.
+///
+/// When the URL has no `{z}` token it is treated as a *TileJSON* endpoint: on
+/// first use the source fetches that document, reads its `tiles` template and
+/// then serves tiles from it. This is how the keyless OpenFreeMap basemap
+/// (whose tile URLs are versioned) is supported -- see
+/// [MvtTileSource#openFreeMap()].
 ///
 /// This is the shared base for [MvtTileSource] (vector) and
 /// [RasterTileSource] (raster).
@@ -45,6 +56,13 @@ public class HttpTileSource implements TileSource {
     private final int maxZoom;
     private String apiKey = "";
     private String attribution = "";
+
+    // TileJSON resolution: when urlTemplate carries no {z} token it is a
+    // TileJSON document URL whose `tiles` template we resolve once, queueing
+    // any tile requests that arrive while resolution is in flight.
+    private volatile String resolvedTemplate;
+    private boolean resolving;
+    private final List pendingRequests = new ArrayList();
 
     /// Creates an HTTP tile source.
     ///
@@ -103,6 +121,27 @@ public class HttpTileSource implements TileSource {
 
     /// {@inheritDoc}
     public void fetchTile(int z, int x, int y, TileCallback callback) {
+        if (needsTileJson()) {
+            synchronized (this) {
+                if (resolvedTemplate == null) {
+                    pendingRequests.add(new Object[]{new Integer(z), new Integer(x),
+                            new Integer(y), callback});
+                    if (!resolving) {
+                        resolving = true;
+                        resolveTileJson();
+                    }
+                    return;
+                }
+            }
+        }
+        doFetch(z, x, y, callback);
+    }
+
+    private boolean needsTileJson() {
+        return urlTemplate.indexOf("{z}") < 0;
+    }
+
+    private void doFetch(int z, int x, int y, TileCallback callback) {
         TileRequest req = new TileRequest(z, x, y, callback);
         req.setUrl(resolve(z, x, y));
         req.setPost(false);
@@ -111,12 +150,83 @@ public class HttpTileSource implements TileSource {
     }
 
     private String resolve(int z, int x, int y) {
-        String s = urlTemplate;
+        String s = resolvedTemplate != null ? resolvedTemplate : urlTemplate;
         s = replace(s, "{z}", Integer.toString(z));
         s = replace(s, "{x}", Integer.toString(x));
         s = replace(s, "{y}", Integer.toString(y));
         s = replace(s, "{key}", apiKey);
         return s;
+    }
+
+    private void resolveTileJson() {
+        ConnectionRequest req = new ConnectionRequest() {
+            private byte[] body;
+
+            protected void readResponse(InputStream input) throws IOException {
+                body = Util.readInputStream(input);
+            }
+
+            protected void postResponse() {
+                String tiles = body == null ? null : parseTileJsonTemplate(body);
+                List drain;
+                synchronized (HttpTileSource.this) {
+                    resolvedTemplate = tiles;
+                    resolving = false;
+                    drain = new ArrayList(pendingRequests);
+                    pendingRequests.clear();
+                }
+                for (int i = 0; i < drain.size(); i++) {
+                    Object[] r = (Object[]) drain.get(i);
+                    TileCallback cb = (TileCallback) r[3];
+                    if (tiles == null) {
+                        cb.tileFailed(((Integer) r[0]).intValue(),
+                                ((Integer) r[1]).intValue(), ((Integer) r[2]).intValue());
+                    } else {
+                        doFetch(((Integer) r[0]).intValue(), ((Integer) r[1]).intValue(),
+                                ((Integer) r[2]).intValue(), cb);
+                    }
+                }
+            }
+
+            protected void handleException(Exception err) {
+                failAllPending();
+            }
+
+            protected void handleErrorResponseCode(int code, String message) {
+                failAllPending();
+            }
+        };
+        req.setUrl(replace(urlTemplate, "{key}", apiKey));
+        req.setPost(false);
+        req.setFailSilently(true);
+        NetworkManager.getInstance().addToQueue(req);
+    }
+
+    private void failAllPending() {
+        List drain;
+        synchronized (this) {
+            resolving = false;
+            drain = new ArrayList(pendingRequests);
+            pendingRequests.clear();
+        }
+        for (int i = 0; i < drain.size(); i++) {
+            Object[] r = (Object[]) drain.get(i);
+            ((TileCallback) r[3]).tileFailed(((Integer) r[0]).intValue(),
+                    ((Integer) r[1]).intValue(), ((Integer) r[2]).intValue());
+        }
+    }
+
+    private static String parseTileJsonTemplate(byte[] json) {
+        try {
+            Map root = new JSONParser().parseJSON(new CharArrayReader(new String(json, "UTF-8").toCharArray()));
+            Object tiles = root.get("tiles");
+            if (tiles instanceof List && !((List) tiles).isEmpty()) {
+                return String.valueOf(((List) tiles).get(0));
+            }
+        } catch (Throwable t) {
+            // Malformed TileJSON -> treat as unresolved.
+        }
+        return null;
     }
 
     private static String replace(String src, String token, String value) {

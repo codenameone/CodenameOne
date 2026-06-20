@@ -35,4 +35,16 @@ public final class MvtTileSource extends HttpTileSource {
     public MvtTileSource(String urlTemplate, int minZoom, int maxZoom) {
         super(urlTemplate, true, minZoom, maxZoom);
     }
+
+    /// The free, keyless [OpenFreeMap](https://openfreemap.org) vector basemap,
+    /// built from OpenStreetMap data. No API key or sign-up is required. Its
+    /// tile URLs are versioned, so the source is given OpenFreeMap's TileJSON
+    /// URL (no `{z}` token) and resolves the current tile template from it on
+    /// first use. Works out of the box with [MapStyle#light()] / [MapStyle#dark()].
+    public static MvtTileSource openFreeMap() {
+        MvtTileSource s = new MvtTileSource("https://tiles.openfreemap.org/planet", 0, 14);
+        s.setAttribution("(c) OpenStreetMap contributors, (c) OpenFreeMap");
+        return s;
+    }
 }
+

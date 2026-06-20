@@ -153,6 +153,26 @@ class MapsVectorInternalsTest {
         assertEquals(123, ColorParser.parse("hsl(1,2,3)", 123));
     }
 
+    // ---- Tile sources -----------------------------------------------------
+
+    @Test
+    void openFreeMapSourceIsKeylessVector() {
+        MvtTileSource s = MvtTileSource.openFreeMap();
+        assertTrue(s.isVector());
+        assertEquals(0, s.getMinZoom());
+        assertEquals(14, s.getMaxZoom());
+        assertEquals(WebMercator.TILE_SIZE, s.getTileSize());
+        assertTrue(s.getAttribution().contains("OpenStreetMap"));
+    }
+
+    @Test
+    void rasterOpenStreetMapSourceIsKeylessRaster() {
+        RasterTileSource s = RasterTileSource.openStreetMap();
+        assertFalse(s.isVector());
+        assertTrue(s.getMaxZoom() >= 18);
+        assertTrue(s.getAttribution().contains("OpenStreetMap"));
+    }
+
     // ---- WebMercator ------------------------------------------------------
 
     @Test

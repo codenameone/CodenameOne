@@ -11,7 +11,7 @@ NOTE: The legacy tile-based `MapComponent` and the external `codenameone-google-
 
 === A first map
 
-The pure-vector `MapView` renders with zero configuration -- by default it shows the keyless OpenStreetMap raster basemap:
+The pure-vector `MapView` renders real maps with zero configuration and no API key -- by default it shows the free, keyless https://openfreemap.org[OpenFreeMap] vector basemap (real OpenStreetMap data):
 
 [source,java]
 ----
@@ -65,8 +65,8 @@ Marker icons are supplied as `EncodedImage` and anchored in normalized `(u, v)` 
 
 `MapView` pulls its tiles from a pluggable `com.codename1.maps.vector.TileSource`:
 
-* `RasterTileSource` -- networked XYZ image tiles. `RasterTileSource.openStreetMap()` is the keyless zero-config default.
-* `MvtTileSource` -- networked Mapbox Vector Tiles (`.pbf`/`.mvt`). Most hosted vector basemaps require an API key supplied via `setApiKey(...)` and referenced as `{key}` in the URL template.
+* `MvtTileSource` -- networked Mapbox Vector Tiles (`.pbf`/`.mvt`). `MvtTileSource.openFreeMap()` is the free, keyless OpenStreetMap-based default (its tile URLs are versioned, so it resolves them from OpenFreeMap's TileJSON automatically). Most other hosted vector basemaps require an API key supplied via `setApiKey(...)` and referenced as `{key}` in the URL template; a TileJSON endpoint (a URL with no `{z}` token) is resolved automatically.
+* `RasterTileSource` -- networked XYZ image tiles. `RasterTileSource.openStreetMap()` is a keyless raster alternative.
 * `BundledTileSource` -- tiles bundled into the app as resources, for fully offline maps.
 * `DemoTileSource` -- a self-contained synthetic tile set (no network), handy for demos and deterministic tests.
 
