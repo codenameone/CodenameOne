@@ -31,7 +31,7 @@
 // translated MapProviderImpl references resolvable; the map degrades to the
 // vector MapView at runtime because nativeCreate returns 0.
 
-JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) { return 0; }
+JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_double_double_float_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) { return 0; }
 void com_codename1_maps_MapProviderImpl_nativeDeinit___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {}
 void com_codename1_maps_MapProviderImpl_nativeSetCamera___int_double_double_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {}
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLat___int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) { return 0; }
@@ -154,10 +154,14 @@ static double zoomToSpan(float zoom) {
     return 360.0 / pow(2.0, zoom);
 }
 
-JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
+JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_double_double_float_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {
     __block CN1AppleMap *m = nil;
+    double span = zoomToSpan((float)zoom);
     void (^createBlock)(void) = ^{
         m = [[CN1AppleMap alloc] initWithMapId:(int)mapId];
+        MKCoordinateRegion region = MKCoordinateRegionMake(
+            CLLocationCoordinate2DMake(lat, lon), MKCoordinateSpanMake(span, span));
+        [m.mapView setRegion:region animated:NO];
         [cn1AppleMaps() setObject:m forKey:[NSNumber numberWithInt:(int)mapId]];
     };
     // The Codename One iOS EDT runs on the main thread, so a dispatch_sync to

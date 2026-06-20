@@ -40,7 +40,9 @@ public class MapProviderImpl implements MapProvider {
     }
 
     public PeerComponent createPeer(NativeMap host, int mapId) {
-        long peer = nativeCreate(mapId);
+        LatLng center = host.getInitialCenter();
+        long peer = nativeCreate(mapId, center.getLatitude(), center.getLongitude(),
+                (float) host.getInitialZoom());
         if (peer == 0) {
             return null;
         }
@@ -168,7 +170,7 @@ public class MapProviderImpl implements MapProvider {
 
     // ---- Native bridge (implemented in com_codename1_maps_MapProviderImpl.m)
 
-    private native long nativeCreate(int mapId);
+    private native long nativeCreate(int mapId, double lat, double lon, float zoom);
 
     private native void nativeDeinit(int mapId);
 

@@ -138,16 +138,33 @@ public class NativeMap extends Container implements MapSurface {
         } catch (Throwable t) {
             peer = null;
         }
-        if (peer != null) {
-            addComponent(BorderLayout.CENTER, peer);
-            provider.setCamera(mapId, initialCenter.getLatitude(), initialCenter.getLongitude(),
-                    (float) initialZoom, 0, 0);
-            replayMarkers();
-        } else {
+        if (peer == null) {
             // The provider could not create a peer at runtime -> vector fallback.
             provider = null;
             createFallback();
+            revalidateForm();
+            return;
         }
+        addComponent(BorderLayout.CENTER, peer);
+        // Lay the peer out (give it a non-zero frame) so the native view is on
+        // screen. The provider positions the camera at creation from the
+        // initial center/zoom (see getInitialCenter/getInitialZoom).
+        revalidateForm();
+        replayMarkers();
+    }
+
+    /// The initial camera center. Package-private: build-injected providers
+    /// read it to position the native map when its peer is created.
+    LatLng getInitialCenter() {
+        return initialCenter;
+    }
+
+    /// The initial camera zoom. Package-private (see [#getInitialCenter()]).
+    double getInitialZoom() {
+        return initialZoom;
+    }
+
+    private void revalidateForm() {
         Form form = getComponentForm();
         if (form != null) {
             form.revalidate();
