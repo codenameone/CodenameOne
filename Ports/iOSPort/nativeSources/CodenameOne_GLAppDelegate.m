@@ -537,7 +537,12 @@ static void installSignalHandlers() {
 
 - (BOOL)application:(UIApplication *)application handleOpenURL:(NSURL *)url
 {
+#if TARGET_OS_TV
+  // The legacy openURL:sourceApplication:annotation: delegate is unavailable on tvOS.
+  return NO;
+#else
   return [self application:application openURL:url sourceApplication:nil annotation:nil];
+#endif
 }
 
 - (void)applicationWillResignActive:(UIApplication *)application
@@ -632,6 +637,8 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 }
 
 
+// UNNotificationResponse (notification action responses) is unavailable on tvOS.
+#if !TARGET_OS_TV
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)(void))completionHandler {
     if (@available(iOS 10, *)) {
         if( [response.notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
@@ -660,12 +667,15 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 #endif
 
 }
+#endif // !TARGET_OS_TV (didReceiveNotificationResponse)
 
 
 #endif
 
 #ifdef INCLUDE_CN1_PUSH
-UNNotificationResponse* currentNotificationResponse = nil;
+// UNNotificationResponse type is unavailable on tvOS; hold it as id so the push
+// content plumbing compiles (the tvOS-specific text-response branch is guarded).
+id currentNotificationResponse = nil;
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
     const unsigned *tokenBytes = [deviceToken bytes];
     NSString *tokenAsString = [NSString stringWithFormat:@"%08x%08x%08x%08x%08x%08x%08x%08x",
@@ -722,12 +732,15 @@ int pushReceivedCount=0;
     }
     if (actionId != nil) {
         com_codename1_push_PushContent_setActionId___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG actionId));
+#if !TARGET_OS_TV
+        // UNTextInputNotificationResponse (text-input notification actions) is unavailable on tvOS.
         if (currentNotificationResponse != nil && [currentNotificationResponse isKindOfClass:[UNTextInputNotificationResponse class]]) {
             UNTextInputNotificationResponse* textResponse = (UNTextInputNotificationResponse*)currentNotificationResponse;
             if (textResponse.userText != nil) {
                 com_codename1_push_PushContent_setTextResponse___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG textResponse.userText));
             }
         }
+#endif
     }
     pushReceivedCount=0;
     if( [apsInfo valueForKey:@"alert"] != NULL)

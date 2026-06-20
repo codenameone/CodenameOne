@@ -28,7 +28,7 @@
 #include "xmlvm.h"
 #include "java_lang_String.h"
 #import "CN1ES2compat.h"
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
 #import "CN1CGGraphics.h"
 #import "CN1WatchHost.h"
 #import "CN1WatchRenderingView.h"
@@ -79,7 +79,7 @@
 #include <netinet/in.h>
 // SystemConfiguration (SCNetworkReachability) is unavailable on watchOS; the
 // network-type + WiFi-listener natives degrade to no-ops there (guarded below).
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #include <SystemConfiguration/SystemConfiguration.h>
 #include <SystemConfiguration/SCNetworkReachability.h>
 #endif
@@ -90,7 +90,7 @@
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <MessageUI/MFMailComposeViewController.h>
 #endif
-#if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH && !TARGET_OS_TV
+#if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_TV
 // AddressBookUI and the legacy AddressBook C API are unavailable on Mac
 // Catalyst and tvOS. Skip the import; the contacts path falls back to
 // Contacts.framework (handled via INCLUDE_CONTACTS_USAGE undef below).
@@ -149,7 +149,7 @@
 // AVKit / AVPlayerViewController are unavailable on watchOS. IPhoneBuilder
 // uncomments the define above for all targets; undo it on the watch slice so
 // the AVKit video paths compile out (the watch video stubs return defaults).
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
 #undef CN1_USE_AVKIT
 #endif
 #ifdef CN1_USE_AVKIT
@@ -168,7 +168,7 @@ extern int popoverSupported();
 #ifdef CN1_INCLUDE_NOTIFICATIONS2
 #import <UserNotifications/UserNotifications.h>
 #endif
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <BackgroundTasks/BackgroundTasks.h>
 #endif
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
@@ -183,7 +183,7 @@ extern int popoverSupported();
 // that tells us when the screen is being captured (recorded or mirrored). We
 // use that signal to temporarily cover the app view with a black overlay.
 static BOOL cn1_disableScreenshots = NO;
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 static UIView *cn1ScreenCaptureView = nil;
 static id cn1ScreenCaptureObserver = nil;
 
@@ -272,7 +272,7 @@ static void cn1_updateScreenCaptureBlocker() {}
  return s;
  }*/
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 extern UIView *editingComponent;
 #endif // !TARGET_OS_WATCH
 
@@ -499,7 +499,7 @@ const char* stringToUTF8(JAVA_OBJECT str) {
 
 void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     int retVal = UIApplicationMain(0, nil, nil, @"CodenameOne_GLAppDelegate");
     POOL_END();
@@ -570,7 +570,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(CN1_THREAD_STATE_MU
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
     JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG pasteboard.string);
@@ -583,7 +583,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_St
 }
 
 void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG str);
     UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
@@ -673,7 +673,7 @@ extern float scaleValue;
 extern int editComponentPadTop, editComponentPadLeft;
 extern float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
 void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT padTop, JAVA_INT padRight, JAVA_INT padBottom, JAVA_INT padLeft) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -879,7 +879,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_FLOAT radius) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
 
     GLUIImage* glu = (BRIDGE_CAST GLUIImage*)n1;
@@ -1230,7 +1230,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_
     (void)lineWidth; (void)capStyle; (void)joinStyle; (void)mitreLimit;
 #else
     POOL_BEGIN();
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
         CGContextSaveGState(UIGraphicsGetCurrentContext());
         CGContextConcatCTM(UIGraphicsGetCurrentContext(), [CodenameOne_GLViewController currentMutableTransform]);
@@ -1281,7 +1281,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_
     
     CGContextStrokePath(context);
     CGContextRestoreGState(context);
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
         CGContextRestoreGState(context);
     }
@@ -1483,7 +1483,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__(CN1_THREAD_STA
 
 void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
 {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     // The watch slice currently leaks native image/peer handles rather than
     // releasing them here. Under the concurrent GC the finalizer can hand back
     // a peer pointer whose backing was already reclaimed, and the resulting
@@ -1671,7 +1671,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnWatch__(CN1_THREAD_STAT
     // Resolved entirely at compile time: the watchOS slice returns true, every
     // other slice (iOS, Mac Catalyst, simulator) returns false so behaviour is
     // byte-for-byte identical on iOS.
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     return JAVA_TRUE;
 #else
     return JAVA_FALSE;
@@ -2333,7 +2333,7 @@ void com_codename1_impl_ios_IOSNative_closeConnection___long(CN1_THREAD_STATE_MU
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block JAVA_BOOLEAN result;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2354,7 +2354,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
 
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG n1);
 #ifdef CN1_USE_ARC
     [ns retain];
@@ -2422,7 +2422,7 @@ extern int orientationLock;
 void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN n1)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_lockOrientation___boolean]
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if(n1) {
         orientationLock = 1;
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -2458,7 +2458,7 @@ void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI
 
 void com_codename1_impl_ios_IOSNative_lockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication sharedApplication].idleTimerDisabled = YES;
     });
@@ -2467,7 +2467,7 @@ void com_codename1_impl_ios_IOSNative_lockScreen__(CN1_THREAD_STATE_MULTI_ARG JA
 
 void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication sharedApplication].idleTimerDisabled = NO;
     });
@@ -2477,7 +2477,7 @@ void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG 
 void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN disable)
 {
     BOOL shouldDisable = disable ? YES : NO;
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     // No screen-capture overlay on watchOS (no UIView/UIScreen capture APIs).
     cn1_disableScreenshots = shouldDisable;
 #else
@@ -2518,7 +2518,7 @@ void com_codename1_impl_ios_IOSNative_vibrate___int(CN1_THREAD_STATE_MULTI_ARG J
 // Peer Component methods
 
 void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
@@ -2541,7 +2541,7 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
 extern float scaleValue;
 
 void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
@@ -2560,7 +2560,7 @@ void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_
 }
 
 void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN b) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
@@ -2581,7 +2581,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = arr;
     __block JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -2613,7 +2613,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
 }
 
 void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
@@ -2657,7 +2657,7 @@ void repaintUI() {
 }
 
 void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
@@ -3220,7 +3220,7 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(CN1_THREAD_STATE_MULTI_A
     });
 #endif
 }
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
 // watchOS has neither UIWebView nor WKWebView. Disabling the UIWebView path
 // here lets every browser function below compile to its existing fallback
 // (the WKWebView path is already gated on supportsWKWebKit, which is not
@@ -3395,7 +3395,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean
 // default backgrounds / form controls, so a page that adapts to dark mode can be
 // kept light (or dark) regardless of the user's system appearance.
 void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT style) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (@available(iOS 13.0, *)) {
@@ -3819,7 +3819,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STA
     return returnString;
 }
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *moviePlayer, JAVA_INT callbackId) {
     id observer = [[NSNotificationCenter defaultCenter] addObserverForName:MPMoviePlayerPlaybackDidFinishNotification object:moviePlayer
     queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
@@ -3905,7 +3905,7 @@ BOOL useAVKit() {
     return NO;
 }
 JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
      __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -3996,7 +3996,7 @@ void com_codename1_impl_ios_IOSNative_removeNotificationCenterObserver___long(CN
 
 
 JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN()
@@ -4057,7 +4057,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lan
 }
 
 JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -4176,7 +4176,7 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
 #endif
 }
 JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -4226,7 +4226,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1AR
 }
 
 JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -4302,7 +4302,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int
 }
 
 JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
@@ -4495,7 +4495,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
 #endif // !TARGET_OS_WATCH (sendEmailMessage)
 }
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 MPMoviePlayerController* getMPPlayer(JAVA_LONG peer) {
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     MPMoviePlayerController* m = nil;;
@@ -4563,7 +4563,7 @@ void startVideoComponentAV(JAVA_LONG peer) {
 }
 #endif // !TARGET_OS_WATCH (MPMoviePlayerController / AVKit video helpers)
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     if (useAVKit()) {
         startVideoComponentAV(peer);
@@ -4993,7 +4993,7 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
 #endif // !TARGET_OS_WATCH (MPMoviePlayer / AVKit video peer functions)
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 13.0, *)) {
         return [UIScreen mainScreen].traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
     } else {
@@ -5083,7 +5083,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVPNActive___R_boolean(CN1_THREAD
 // App Store review process.
 //#define CN1_INCLUDE_BONJOUR
 
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
 // watchOS: no SystemConfiguration. Provide no-op network-type + listener natives
 // so the translated runtime links; reachability is handled at the CN1 layer.
 JAVA_INT com_codename1_impl_ios_IOSNative_wifiNetworkType___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) { return 1; }
@@ -5472,7 +5472,7 @@ void com_codename1_impl_ios_IOSNative_bonjourPublishStop___long(CN1_THREAD_STATE
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [UIFont systemFontSize];
         UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
@@ -5487,7 +5487,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [UIFont systemFontSize];
         UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
@@ -5619,7 +5619,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREA
 #endif
 }
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 UIPopoverController* popoverController;
 #endif // !TARGET_OS_WATCH
 void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie, JAVA_INT quality, JAVA_INT duration) {
@@ -5869,7 +5869,7 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
 }
 int popoverSupported()
 {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     return ( NSClassFromString(@"UIPopoverController") != nil) &&  (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 #else
     // watchOS has no UIPopoverController / interface idiom.
@@ -5882,7 +5882,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_AR
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] systemVersion]);
 #else
     return JAVA_NULL;
@@ -5890,7 +5890,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MUL
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] name]);
 #else
     return JAVA_NULL;
@@ -5950,7 +5950,7 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long_int(CN1_THREA
         case 0 : // HIGH PRIORITY
             l.desiredAccuracy = kCLLocationAccuracyBest;
             l.distanceFilter = kCLDistanceFilterNone;
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
             if (isIOS7()) {
                 l.pausesLocationUpdatesAutomatically = NO;
             }
@@ -5959,7 +5959,7 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long_int(CN1_THREA
         case 1: // MEDIUM PRIORITY
             l.desiredAccuracy = kCLLocationAccuracyHundredMeters;
             l.distanceFilter = 100;
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
             if (isIOS7()) {
                 l.pausesLocationUpdatesAutomatically = YES;
             }
@@ -5968,7 +5968,7 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long_int(CN1_THREA
         case 2 : // LOW PRIORITY
             l.desiredAccuracy = kCLLocationAccuracyThreeKilometers;
             l.distanceFilter = 3000;
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
             if (isIOS7()) {
                 l.pausesLocationUpdatesAutomatically = YES;
             }
@@ -5978,7 +5978,7 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long_int(CN1_THREA
         default :
             l.desiredAccuracy = kCLLocationAccuracyHundredMeters;
             l.distanceFilter = kCLDistanceFilterNone;
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
             if (isIOS7()) {
                 l.pausesLocationUpdatesAutomatically = NO;
             }
@@ -6018,7 +6018,7 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(CN1_THREAD_STA
 }
 
 void com_codename1_impl_ios_IOSNative_startUpdatingBackgroundLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
 
@@ -6027,7 +6027,7 @@ void com_codename1_impl_ios_IOSNative_startUpdatingBackgroundLocation___long(CN1
 }
 
 void com_codename1_impl_ios_IOSNative_stopUpdatingBackgroundLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     [l stopMonitoringSignificantLocationChanges];
 #endif // !TARGET_OS_WATCH
@@ -6036,7 +6036,7 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingBackgroundLocation___long(CN1_
 
 //native void addGeofencing(long peer, double lat, double lng, double radius, long expiration, String id);
 void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObj, JAVA_LONG peer, JAVA_DOUBLE lat, JAVA_DOUBLE lng, JAVA_DOUBLE radius, JAVA_LONG expires, JAVA_OBJECT geoId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
     CLLocationCoordinate2D center = CLLocationCoordinate2DMake(lat, lng);
@@ -6053,7 +6053,7 @@ void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_
 
 //    native void removeGeofencing(String id);
 void com_codename1_impl_ios_IOSNative_removeGeofencing___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT geoId) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     for (CLRegion *region in [l monitoredRegions]) {
         if ([[region identifier] isEqualToString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG geoId)]) {
@@ -6747,7 +6747,7 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
 }
 #endif
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
     if (renderView == nil || rootView == nil || ctx == NULL) {
         return NO;
@@ -7049,7 +7049,7 @@ static UIImage* cn1_captureView(UIView *view) {
 #endif // !TARGET_OS_WATCH (UIView screen-capture helpers)
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
     [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
@@ -7249,7 +7249,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkNFCReaderUsage___R_boolean(CN
 }
 
 void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT phone) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG phone)] options:@{} completionHandler:nil];
     POOL_END();
@@ -7260,7 +7260,7 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
-#if TARGET_OS_MACCATALYST || TARGET_OS_WATCH || TARGET_OS_TV
+#if TARGET_OS_MACCATALYST || TARGET_OS_WATCH || TARGET_OS_TV || TARGET_OS_TV
     // SMS hardware is absent on Mac / watchOS (no MessageUI on watch);
     // MFMessageComposeViewController canSendText returns NO. Short-circuit.
     return;
@@ -7374,7 +7374,7 @@ void com_codename1_impl_ios_IOSNative_deregisterPush__(CN1_THREAD_STATE_MULTI_AR
 void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT number) {
 // Removed this ifdef because we may need to badge the application even if push isn't supported.
 //#ifdef INCLUDE_CN1_PUSH2
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_async(dispatch_get_main_queue(), ^{
         if(number == 0) {
             // Removed this because there could be repeating notifications
@@ -7690,7 +7690,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_in
 
 
 void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
@@ -7705,14 +7705,14 @@ void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MUL
 
 
 void com_codename1_impl_ios_IOSNative_stopAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
     [audioUnit stop];
 #endif // !TARGET_OS_WATCH
 }
 
 void com_codename1_impl_ios_IOSNative_destroyAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
     [audioUnit release];
 #endif // !TARGET_OS_WATCH
@@ -9043,7 +9043,7 @@ JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long(CN1_THREAD
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT callbackId) {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     // watchOS has neither UIWebView nor WKWebView to query a user agent from.
     return JAVA_NULL;
 #else
@@ -9093,13 +9093,13 @@ JAVA_OBJECT pickerStringArray = JAVA_NULL;
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
 JAVA_LONG currentDatePickerDuration=-1;
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 extern UIPopoverController* popoverControllerInstance;
 extern UIView *currentActionSheet;
 #endif // !TARGET_OS_WATCH
 JAVA_LONG defaultDatePickerDate;
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
     int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
@@ -9759,7 +9759,7 @@ void com_codename1_impl_ios_IOSNative_setAsyncEditMode___boolean(CN1_THREAD_STAT
     vkbAlwaysOpen = b;
 }
 
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 void com_codename1_impl_ios_IOSNative_foldVKB__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if(editingComponent != nil) {
@@ -10150,7 +10150,7 @@ void com_codename1_impl_ios_IOSNative_drawTextureAlphaMask___long_int_int_int_in
 void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName)
 {
     if (textureName == 0) return;
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     // The "texture" is a CN1CGAlphaMask carrying the coverage bytes.
     CN1CGAlphaMask *mask = (CN1CGAlphaMask *)(uintptr_t)textureName;
     if (mask->alphas != NULL) { free(mask->alphas); }
@@ -10240,7 +10240,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long(JAVA_OBJECT instanceObject, JAVA_LONG renderer)
 {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     {
         JAVA_INT outputBounds[4];
         Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
@@ -11807,7 +11807,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         if (alertSound != NULL) {
             NSString *soundName = toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
             if (soundName != nil && [soundName length] > 0) {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
                 // UNNotificationSound soundNamed: is unavailable on watchOS.
                 content.sound = [UNNotificationSound defaultSound];
 #else
@@ -11917,7 +11917,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification2___java_lang_St
         if (alertSound != NULL) {
             NSString *soundName = toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
             if (soundName != nil && [soundName length] > 0) {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
                 // UNNotificationSound soundNamed: is unavailable on watchOS.
                 content.sound = [UNNotificationSound defaultSound];
 #else
@@ -12007,7 +12007,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_requestNotificationPermission___int(C
                 if (@available(iOS 12.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusProvisional) { level = 3; }
                 }
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
                 // UNAuthorizationStatusEphemeral is unavailable on watchOS.
                 if (@available(iOS 14.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusEphemeral) { level = 4; }
@@ -12023,7 +12023,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_requestNotificationPermission___int(C
     com_codename1_impl_ios_IOSImplementation_notificationPermissionResult___boolean_int(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, 2);
 }
 
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
 // BackgroundTasks (BGTaskScheduler) is unavailable on watchOS; the background
 // processing natives are no-ops there.
 JAVA_VOID com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {}
@@ -12864,7 +12864,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
    
 JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)
 {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block UIBackgroundTaskIdentifier bgTask = UIBackgroundTaskInvalid;
     bgTask = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
         // Clean up any unfinished task business by marking where you
@@ -12888,7 +12888,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask___R_long(CN1_THRE
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bgTask)
 {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     [[UIApplication sharedApplication] endBackgroundTask:(UIBackgroundTaskIdentifier)bgTask];
 #endif // !TARGET_OS_WATCH
 }
@@ -12944,7 +12944,7 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
     if (text == JAVA_NULL) {
         return;
     }
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSString *nsText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, nsText);
@@ -13125,7 +13125,7 @@ static void cn1_resetContext(void) {
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (NSClassFromString(@"LAContext") == NULL) {
         return JAVA_FALSE;
     }
@@ -13144,7 +13144,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canAuthenticateBiometric__(CN1_THR
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (NSClassFromString(@"LAContext") == NULL) {
         return 0;
     }
@@ -13172,7 +13172,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes__(CN1_THREA
 }
 
 void com_codename1_impl_ios_IOSNative_authenticateBiometric___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
     // Each authenticate call gets a fresh context so a prior stopAuthentication

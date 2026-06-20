@@ -52,8 +52,13 @@ static NSMutableArray* pendingDeleteStrings = nil;
 
 -(int)stringWidth {
     if (stringWidth == -1) {
-       
+#if TARGET_OS_TV
+        // -[NSString sizeWithFont:] was removed on tvOS; use the modern
+        // attributed-string measurement (equivalent for a plain font).
+        stringWidth = [str sizeWithAttributes:@{NSFontAttributeName: font}].width;
+#else
         stringWidth = [str sizeWithFont:font].width;
+#endif
     }
     return stringWidth;
 }

@@ -23,9 +23,9 @@
 
 #import <Foundation/Foundation.h>
 #include "TargetConditionals.h"
-// UIWebViewDelegate / WebKit are unavailable on watchOS; the browser peer is
-// excluded from the watch slice and this header is empty there.
-#if !TARGET_OS_WATCH
+// UIWebViewDelegate / WebKit are unavailable on watchOS and tvOS; the browser
+// peer is dropped on those slices and this header is empty there.
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #ifdef ENABLE_WKWEBVIEW

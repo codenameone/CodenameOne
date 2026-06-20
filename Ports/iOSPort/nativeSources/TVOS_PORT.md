@@ -63,16 +63,57 @@ Verified absent on the `appletvos`/`appletvsimulator` 26.x SDK:
 - **Status bar / device orientation / `UIApplication openURL`** — to guard
   (no status bar or orientation on tvOS; the remote replaces touch).
 
-The remaining guards are mechanical and are driven to convergence by the
-`build-ios-tv` CI job (`scripts/run-tv-ui-tests.sh`) building the `<Main>TV`
-scheme against the tvOS simulator, the same way the watch port converged. Run it
-locally with:
+### Native compile status (verified locally against tvOS 26 simulator SDK)
+
+Building the `HelloCodenameOneTV` target surfaces the tvOS-absent APIs in waves.
+Done so far (compile clean): the builder/target generation, `IOSNative.m`,
+`CodenameOne_GLAppDelegate.m`, `NetworkConnectionImpl.m`, `UIWebViewEventDelegate.*`,
+`DrawStringTextureCache.m`, and the sample's `LocalNotificationNativeImpl.m`.
+
+* **`IOSNative.m`** (was 144 errors): the tvOS-absent native features there
+  (CLLocation region monitoring, `MPMoviePlayer*`, `UIPasteboard`, orientation,
+  `statusBar*`, telephony) overlap almost exactly with what watchOS lacks, so the
+  `!TARGET_OS_WATCH` / `TARGET_OS_WATCH` guards were broadened to also fire on
+  `TARGET_OS_TV`. NOTE: this also disables a few features tvOS *does* support
+  (e.g. `UITextField`/`UITextView`, AudioToolbox) — re-enabling those surgically
+  is a follow-up; the broad guard gets the slice compiling + rendering first.
+* **`CodenameOne_GLViewController.m`** — the remaining compile blocker (~63 sites).
+  Unlike IOSNative, this file must follow the **iOS** path (tvOS has UIView/Metal),
+  so the guards are surgical `#if !TARGET_OS_TV`, NOT the watch broadening. The
+  sites cluster as: device orientation (`UIInterfaceOrientation*`,
+  `statusBarOrientation`), status bar (`statusBarFrame`,
+  `setNeedsStatusBarAppearanceUpdate`), `UIToolbar`/`UIBarStyleBlackTranslucent`
+  input-accessory, on-screen keyboard notifications (`UIKeyboard*`),
+  `scrollsToTop`, `setMultipleTouchEnabled`, `UIHoverGestureRecognizer`, legacy
+  `sizeWithFont:` / `drawAtPoint:withFont:` (use `sizeWithAttributes:` /
+  `drawAtPoint:withAttributes:`), `systemBackgroundColor` (fall back to
+  `whiteColor`), and the `UIImagePickerController` / `UIDatePicker` /
+  `UIPickerView` / `UIActionSheet` delegate methods. IMPORTANT: `UIPopoverController`
+  (`popoverController` / `popoverControllerInstance`) is unavailable on tvOS and
+  is referenced file-wide — change its type to `id` rather than block-guarding,
+  or the picker delegate guards cascade into "undeclared identifier" errors.
+
+### Build recipe (local, no `~/.m2` collision)
+
+The `ios-source` build bundles the *installed* `codenameone-ios` artifact's
+`nativeSources`, so edits under `Ports/iOSPort/nativeSources/` only reach the
+generated project after the iOS port is rebuilt+installed (use an isolated repo:
+`-Dmaven.repo.local=/path/to/iso -nsu`). For a fast edit loop, sync edited
+sources straight into the generated `<Main>-src/` (but do NOT overwrite the
+generated `CN1ES2compat.h` — the builder uncomments `#define CN1_USE_METAL` there;
+clobbering it drops the slice to the legacy GL text path). Build with arm64
+(Apple-silicon tvOS sim) and a high error limit to see the full wave:
 
 ```
 ./scripts/build-ios-app.sh          # generates the <Main>TV target
 xcodebuild -project <...>/HelloCodenameOne.xcodeproj -target HelloCodenameOneTV \
-  -sdk appletvsimulator CODE_SIGNING_ALLOWED=NO build
+  -sdk appletvsimulator -arch arm64 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES \
+  OTHER_CFLAGS="-ferror-limit=0" build
 ```
+
+Once it compiles + links, run it via simctl on an "Apple TV 4K" simulator and
+seed `scripts/ios/screenshots-tv/` from the captured frames (the `build-ios-tv`
+CI job is non-blocking until then).
 
 ## Input
 

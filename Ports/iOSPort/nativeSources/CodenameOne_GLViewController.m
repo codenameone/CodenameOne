@@ -293,12 +293,9 @@ static void updateDisplayMetricsFromView(UIView *view) {
 #if !TARGET_OS_WATCH
 static CGSize cn1OrientationCorrectSize(UIView *view) {
     CGSize size = view.bounds.size;
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_MACCATALYST || TARGET_OS_TV
     // Mac Catalyst windows are user-resizable and don't have a true device
-    // orientation; the scene's interfaceOrientation is hard-coded to portrait
-    // even when the window is landscape, which would trip the swap logic
-    // below and publish the swapped size to the EDT. Trust the view bounds
-    // as-is on Mac.
+    // orientation; tvOS likewise has no device orientation. Trust the view bounds.
     return size;
 #else
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
