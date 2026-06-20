@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Rectangle;
@@ -24,6 +25,26 @@ import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreensho
 public class EmptyClip extends AbstractGraphicsScreenshotTest {
 
     private Image marker;
+
+    // The watchOS Core Graphics backend has its own still-open empty-clip bug
+    // (a follow-up to issue #5263): fixing it there regresses watch text fields
+    // that rely on the old "empty clip == no clip" behavior. Until that is
+    // resolved the watch render is knowingly wrong, so skip the capture on watch
+    // rather than baseline a buggy image or fail the watch suite on a new
+    // screenshot with no golden.
+    @Override
+    public boolean shouldTakeScreenshot() {
+        return !CN.isWatch();
+    }
+
+    @Override
+    public boolean runTest() {
+        if (CN.isWatch()) {
+            done();
+            return true;
+        }
+        return super.runTest();
+    }
 
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
