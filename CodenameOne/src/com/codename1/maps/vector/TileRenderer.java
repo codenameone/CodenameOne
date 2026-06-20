@@ -152,7 +152,8 @@ final class TileRenderer {
             if (vl == null) {
                 continue;
             }
-            double scale = (double) tileSize / vl.getExtent();
+            int extent = vl.getExtent();
+            double scale = (double) tileSize / extent;
             double originX = (double) tileX * tileSize;
             double originY = (double) tileY * tileSize;
             List features = vl.getFeatures();
@@ -167,6 +168,12 @@ final class TileRenderer {
                 }
                 double[] anchor = anchorOf(f);
                 if (anchor == null) {
+                    continue;
+                }
+                // Drop labels whose anchor falls in the tile's buffer (outside
+                // 0..extent): those belong to a neighbouring tile and would
+                // otherwise float in empty space past the loaded coverage.
+                if (anchor[0] < 0 || anchor[0] > extent || anchor[1] < 0 || anchor[1] > extent) {
                     continue;
                 }
                 double worldX = originX + anchor[0] * scale;
