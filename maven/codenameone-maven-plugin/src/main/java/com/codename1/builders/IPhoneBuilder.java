@@ -415,6 +415,20 @@ public class IPhoneBuilder extends Executor {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "Firebase/Core,Firebase/AdMob");
             addMinDeploymentTarget("7.0");
         }
+
+        // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
+        // delegates to the NativeFirebaseAnalytics native peer). Enabled with
+        // the build hint ios.firebaseAnalytics=true; requires a
+        // GoogleService-Info.plist in the project resources. Adds the
+        // Firebase/Analytics pod (skipped if Firebase/Core was already pulled
+        // in by AdMob, which carries Analytics transitively).
+        boolean useFirebaseAnalytics = "true".equals(request.getArg("ios.firebaseAnalytics", "false"));
+        if (useFirebaseAnalytics && !iosPods.contains("Firebase/")) {
+            String fbAnalyticsVersion = request.getArg("ios.firebaseAnalyticsVersion", "");
+            iosPods += (((iosPods.length() > 0) ? ",":"") + "Firebase/Analytics"
+                    + (fbAnalyticsVersion.length() > 0 ? " " + fbAnalyticsVersion : ""));
+            addMinDeploymentTarget("10.0");
+        }
         if (enableGalleryMultiselect && photoLibraryUsage) {
             addMinDeploymentTarget("8.0");
         }

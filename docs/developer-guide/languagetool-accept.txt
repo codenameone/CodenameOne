@@ -622,3 +622,10 @@ transcoder
 # in the crash-reporting space talks. Shows up in CrashReportPayload
 # field descriptions.
 dedup
+Matomo
+GA4
+CCPA
+SPI
+pseudonymous
+Plausible
+PostHog

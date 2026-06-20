@@ -1670,6 +1670,38 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
+        // delegates to the NativeFirebaseAnalytics native peer). Enabled with
+        // the build hint android.firebaseAnalytics=true, which -- like FCM --
+        // requires a google-services.json in native/android. Reuses the
+        // google-services Gradle plugin + buildscript classpath if FCM already
+        // added them (the contains() guards keep the lines idempotent).
+        boolean useFirebaseAnalytics = "true".equals(request.getArg("android.firebaseAnalytics", "false"));
+        if (useFirebaseAnalytics) {
+            if (!googleServicesJson.exists()) {
+                error("google-services.json not found.  android.firebaseAnalytics=true requires a valid google-services.json in the native/android directory (download it from the Firebase console: https://console.firebase.google.com/).", new RuntimeException());
+                return false;
+            }
+            if (!request.getArg("android.topDependency", "").contains("com.google.gms:google-services")) {
+                if (gradleVersionInt >= 8) {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+                } else {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.0.1'\n");
+                }
+            }
+            if (!request.getArg("android.xgradle", "").contains("apply plugin: 'com.google.gms.google-services'")) {
+                request.putArgument("android.xgradle", request.getArg("android.xgradle", "") + "\napply plugin: 'com.google.gms.google-services'\n");
+            }
+            if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-analytics")) {
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.google.firebase:firebase-analytics:" +
+                                request.getArg("android.firebaseAnalyticsVersion", "21.5.0") + "\"\n"
+                );
+            }
+        }
+
 
 
         // if a flag is declared we don't want the default play flag to be true

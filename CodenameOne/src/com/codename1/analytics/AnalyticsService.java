@@ -23,23 +23,29 @@
 package com.codename1.analytics;
 
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.Log;
-import com.codename1.io.NetworkManager;
-import com.codename1.ui.Display;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 
-/// The analytics service allows an application to report its usage, it is seamlessly
-/// invoked by GUI builder applications if analytics is enabled for your application but can
-/// work just as well for handcoded apps!
+/// The legacy analytics entry point, retained for backward compatibility. New
+/// code should use the {@link Analytics} facade together with one or more
+/// {@link AnalyticsProvider} implementations, which adds a generic provider SPI,
+/// GDPR/CCPA consent handling and modern backends (GA4, Matomo, Firebase and
+/// the first-party Codename One service).
 ///
-/// To enable analytics just use the `java.lang.String)`
-/// method of the analytics service. For most typical usage you should also invoke the
-/// `#setAppsMode(boolean)` method with `true`. If you are
-/// not using the GUI builder invoke the visit method whenever you would like to log a
-/// page view event.
+/// This class now delegates to {@link Analytics}: {@link #init(String, String)}
+/// registers a {@link GoogleAnalyticsProvider} (Google Analytics 4, replacing
+/// the retired Measurement Protocol v1 that this class used to target) and
+/// {@link #visit(String, String)} / {@link #sendCrashReport(Throwable, String,
+/// boolean)} route through the facade.
+///
+/// To preserve the historical "always on" behaviour of this deprecated API --
+/// which predates the consent model -- {@link #init(String, String)} and
+/// {@link #init(AnalyticsService)} switch the facade to
+/// {@link ConsentMode#OPT_OUT}. Applications that need opt-in / GDPR behaviour
+/// should migrate to the {@link Analytics} API and call
+/// {@link Analytics#setConsent(AnalyticsConsent)}.
 ///
 /// @author Shai Almog
+/// @deprecated use {@link Analytics} and an {@link AnalyticsProvider}
+@Deprecated
 public class AnalyticsService {
     private static final Object INSTANCE_LOCK = new Object();
     private static AnalyticsService instance;
@@ -49,13 +55,15 @@ public class AnalyticsService {
     private static int readTimeout;
     private String agent;
     private String domain;
-    private ConnectionRequest lastRequest;
 
     /// Indicates whether analytics server failures should brodcast an error event
     ///
     /// #### Returns
     ///
     /// the failSilently
+    ///
+    /// @deprecated use {@link Analytics}
+    @Deprecated
     public static boolean isFailSilently() {
         return failSilently;
     }
@@ -65,6 +73,9 @@ public class AnalyticsService {
     /// #### Parameters
     ///
     /// - `aFailSilently`: the failSilently to set
+    ///
+    /// @deprecated use {@link Analytics}
+    @Deprecated
     public static void setFailSilently(boolean aFailSilently) {
         failSilently = aFailSilently;
     }
@@ -74,42 +85,47 @@ public class AnalyticsService {
     /// #### Returns
     ///
     /// the appsMode
+    ///
+    /// @deprecated use {@link Analytics}
+    @Deprecated
     public static boolean isAppsMode() {
         return appsMode;
     }
 
     /// Apps mode allows improved analytics using the newer google analytics API designed for apps.
-    /// Most developers should invoke this method with `true`.
+    /// This setting is retained for source compatibility but no longer affects behaviour; the
+    /// modern GA4 protocol is always used.
     ///
     /// #### Parameters
     ///
     /// - `aAppsMode`: the appsMode to set
+    ///
+    /// @deprecated use {@link Analytics}
+    @Deprecated
     public static void setAppsMode(boolean aAppsMode) {
         appsMode = aAppsMode;
     }
 
-    /// Sets timeout for HTTP requests to Google Analytics service.
+    /// Retained for source compatibility; no longer affects behaviour.
     ///
     /// #### Parameters
     ///
     /// - `ms`: Milliseconds timeout.
     ///
-    /// #### Since
-    ///
-    /// 7.0
+    /// @deprecated use {@link Analytics}
+    @Deprecated
     public static void setTimeout(int ms) {
         timeout = ms;
     }
 
-    /// Sets read timeout for  HTTP requests to Google Analytics services.
+    /// Retained for source compatibility; no longer affects behaviour.
     ///
     /// #### Parameters
     ///
     /// - `ms`: Milliseconds read timeout.
     ///
-    /// #### Since
-    ///
-    /// 7.0
+    /// @deprecated use {@link Analytics}
+    @Deprecated
     public static void setReadTimeout(int ms) {
         readTimeout = ms;
     }
@@ -119,18 +135,25 @@ public class AnalyticsService {
     /// #### Returns
     ///
     /// true if analytics is enabled
+    ///
+    /// @deprecated use {@link Analytics}
+    @Deprecated
     public static boolean isEnabled() {
         return instance != null && instance.isAnalyticsEnabled();
     }
 
-    /// Initializes google analytics for this application
+    /// Initializes analytics for this application using the modern Google
+    /// Analytics 4 protocol. The `agent` is used as the GA4 measurement id.
     ///
     /// #### Parameters
     ///
-    /// - `agent`: the google analytics tracking agent
+    /// - `agent`: the google analytics tracking agent / measurement id
     ///
-    /// - `domain`: @param domain a domain to represent your application, commonly you should use your package name as a URL (e.g.
-    /// com.mycompany.myapp should become: myapp.mycompany.com)
+    /// - `domain`: a domain to represent your application, commonly your package name as a URL
+    /// (e.g. com.mycompany.myapp should become: myapp.mycompany.com)
+    ///
+    /// @deprecated use {@link Analytics} with a {@link GoogleAnalyticsProvider}
+    @Deprecated
     public static void init(String agent, String domain) {
         synchronized (INSTANCE_LOCK) {
             if (instance == null) {
@@ -138,33 +161,46 @@ public class AnalyticsService {
             }
             instance.agent = agent;
             instance.domain = domain;
+            Analytics.setConsentMode(ConsentMode.OPT_OUT);
+            Analytics.clearProviders();
+            Analytics.addProvider(new GoogleAnalyticsProvider(agent, ""));
         }
     }
 
-    /// Allows installing an analytics service other than the default
+    /// Allows installing an analytics service other than the default. The custom
+    /// implementation's {@code visitPage} hook is invoked for page views.
     ///
     /// #### Parameters
     ///
     /// - `i`: the analytics service implementation.
+    ///
+    /// @deprecated use {@link Analytics} and a custom {@link AnalyticsProvider}
+    @Deprecated
     public static void init(AnalyticsService i) {
         synchronized (INSTANCE_LOCK) {
             instance = i;
+            Analytics.setConsentMode(ConsentMode.OPT_OUT);
         }
     }
 
-    /// Sends an asynchronous notice to the server regarding a page in the application being viewed, notice that
-    /// you don't need to append the URL prefix to the page string.
+    /// Sends an asynchronous notice to the server regarding a page in the application being viewed,
+    /// notice that you don't need to append the URL prefix to the page string.
     ///
     /// #### Parameters
     ///
     /// - `page`: the page viewed
     ///
     /// - `referer`: the source page
+    ///
+    /// @deprecated use {@link Analytics#screen(String, String)}
+    @Deprecated
     public static void visit(String page, String referer) {
-        instance.visitPage(page, referer);
+        if (instance != null) {
+            instance.visitPage(page, referer);
+        }
     }
 
-    /// In apps mode we can send information about an exception to the analytics server
+    /// Reports information about an exception to the analytics server.
     ///
     /// #### Parameters
     ///
@@ -173,37 +209,11 @@ public class AnalyticsService {
     /// - `message`: up to 150 character message,
     ///
     /// - `fatal`: is the exception fatal
+    ///
+    /// @deprecated use {@link Analytics#crash(Throwable, String, boolean)}
+    @Deprecated
     public static void sendCrashReport(Throwable t, String message, boolean fatal) {
-        // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#exception
-        ConnectionRequest req = getGaRequest();
-        req.addArgument("t", "exception");
-        System.out.println(message);
-        req.addArgument("exd", message.substring(0, Math.min(message.length(), 150) - 1));
-        if (fatal) {
-            req.addArgument("exf", "1");
-        } else {
-            req.addArgument("exf", "0");
-        }
-
-        NetworkManager.getInstance().addToQueue(req);
-    }
-
-    private static ConnectionRequest getGaRequest() {
-        ConnectionRequest req = new ConnectionRequest();
-        req.setUrl("https://www.google-analytics.com/collect");
-        req.setPost(true);
-        req.setFailSilently(true);
-        req.addArgument("v", "1");
-        req.addArgument("tid", instance.agent);
-        if (timeout > 0) {
-            req.setTimeout(timeout);
-        }
-        if (readTimeout > 0) {
-            req.setReadTimeout(readTimeout);
-        }
-        long uniqueId = Log.getUniqueDeviceId();
-        req.addArgument("cid", String.valueOf(uniqueId));
-        return req;
+        Analytics.crash(t, message, fatal);
     }
 
     /// Indicates if the analytics is enabled, subclasses must override this method to process their information
@@ -212,15 +222,12 @@ public class AnalyticsService {
     ///
     /// true if analytics is enabled
     protected boolean isAnalyticsEnabled() {
-        return agent != null;
+        return agent != null || !Analytics.getProviders().isEmpty();
     }
 
-    /// Decorates the ConnectionRequest to be sent to the server before the request is sent.
-    /// This can be overridden to add additional request parameters to the service, and hence provide
-    /// additional analytics data.
-    ///
-    /// If using Google Analytics, the current you can see the available POST parameters that
-    /// the server accepts [here](https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters).
+    /// Retained for source compatibility with subclasses written against the
+    /// previous Google Analytics v1 implementation. It is no longer invoked by
+    /// the default page-view path, which now delegates to {@link Analytics}.
     ///
     /// #### Parameters
     ///
@@ -230,14 +237,13 @@ public class AnalyticsService {
     ///
     /// - `request`: The ConnectionRequest
     ///
-    /// #### Since
-    ///
-    /// 7.0
+    /// @deprecated decorate the request inside a custom {@link AnalyticsProvider}
+    @Deprecated
     protected void decorateVisitPageRequest(String page, String referer, ConnectionRequest request) {
-
     }
 
-    /// Subclasses should override this method to track page visits
+    /// Subclasses may override this method to track page visits. The default
+    /// implementation routes the visit to the {@link Analytics} facade.
     ///
     /// #### Parameters
     ///
@@ -245,81 +251,6 @@ public class AnalyticsService {
     ///
     /// - `referer`: the page from which the user came
     protected void visitPage(String page, String referer) {
-        if (lastRequest != null) {
-            final String fPage = page;
-            final String fReferer = referer;
-            ActionListener onComplete = new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    visitPage(fPage, fReferer);
-                }
-            };
-            lastRequest.addResponseListener(onComplete);
-            lastRequest.addResponseCodeListener(onComplete);
-            lastRequest.addExceptionListener(onComplete);
-            return;
-        }
-        if (appsMode) {
-            // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#apptracking
-            final ConnectionRequest req = getGaRequest();
-            req.addArgument("t", "appview");
-            req.addArgument("an", Display.getInstance().getProperty("AppName", "Codename One App"));
-            String version = Display.getInstance().getProperty("AppVersion", "1.0");
-            req.addArgument("av", version);
-            req.addArgument("cd", page);
-            ActionListener onComplete = new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    if (req == lastRequest) { //NOPMD CompareObjectsWithEquals
-                        lastRequest = null;
-                    }
-                }
-            };
-            req.addResponseListener(onComplete);
-            req.addResponseCodeListener(onComplete);
-            req.addExceptionListener(onComplete);
-            lastRequest = req;
-            decorateVisitPageRequest(page, referer, req);
-            NetworkManager.getInstance().addToQueue(req);
-        } else {
-            String url = Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "anal";
-            final ConnectionRequest r = new ConnectionRequest();
-            r.setUrl(url);
-            r.setPost(false);
-            r.setFailSilently(failSilently);
-            r.addArgument("guid", "ON");
-            r.addArgument("utmac", instance.agent);
-            r.addArgument("utmn", Integer.toString((int) (System.currentTimeMillis() % 0x7fffffff)));
-            if (page == null || page.length() == 0) {
-                page = "-";
-            }
-            r.addArgument("utmp", page);
-            if (referer == null || referer.length() == 0) {
-                referer = "-";
-            }
-            r.addArgument("utmr", referer);
-            r.addArgument("d", instance.domain);
-            r.setPriority(ConnectionRequest.PRIORITY_LOW);
-            if (timeout > 0) {
-                r.setTimeout(timeout);
-            }
-            if (readTimeout > 0) {
-                r.setReadTimeout(readTimeout);
-            }
-            ActionListener onComplete = new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    if (r == lastRequest) { //NOPMD CompareObjectsWithEquals
-                        lastRequest = null;
-                    }
-                }
-            };
-            r.addResponseListener(onComplete);
-            r.addResponseCodeListener(onComplete);
-            r.addExceptionListener(onComplete);
-            lastRequest = r;
-            decorateVisitPageRequest(page, referer, r);
-            NetworkManager.getInstance().addToQueue(r);
-        }
+        Analytics.screen(page, referer);
     }
 }

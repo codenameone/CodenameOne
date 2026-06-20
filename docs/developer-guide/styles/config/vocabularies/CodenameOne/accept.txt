@@ -12,3 +12,10 @@ Java ME
 Java SE
 Java EE
 [Bb]ackend
+Matomo
+GA4
+CCPA
+SPI
+pseudonymous
+Plausible
+PostHog
