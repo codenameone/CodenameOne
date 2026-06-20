@@ -80,9 +80,13 @@ xcrun simctl bootstatus "$TV_UDID" -b 2>/dev/null || true
 # --- Build the tvOS target --------------------------------------------------
 BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/cn1-tv-build-XXXXXX")"
 rt_log "Building $TV_TARGET for appletvsimulator -> $BUILD_ROOT"
+# Build for arm64 explicitly: the macos-15 runner is Apple Silicon and its
+# tvOS simulator is arm64, so the app must be arm64 to launch. It also keeps
+# the NEON-only IOSSimd.m off the x86_64 slice (a destination-less simulator
+# `build` otherwise resolves the active arch to x86_64 and fails to compile).
 xcodebuild -project "$PROJECT_PATH" -target "$TV_TARGET" \
   -sdk appletvsimulator -configuration Debug \
-  ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO SYMROOT="$BUILD_ROOT" build \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO SYMROOT="$BUILD_ROOT" build \
   > "$ARTIFACTS_DIR/tv-build.log" 2>&1 || {
     rt_log "tvOS build FAILED (see $ARTIFACTS_DIR/tv-build.log)"; tail -40 "$ARTIFACTS_DIR/tv-build.log" >&2; exit 5; }
 

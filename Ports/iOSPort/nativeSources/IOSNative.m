@@ -133,9 +133,10 @@
 #include "permission_apis.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
-// WebKit is unavailable on watchOS; gate the WKWebView path off there (this
-// also leaves supportsWKWebKit undefined, disabling the WK usage block below).
-#if defined(ENABLE_WKWEBVIEW) && !TARGET_OS_WATCH
+// WebKit is unavailable on watchOS and tvOS; gate the WKWebView path off there
+// (this also leaves supportsWKWebKit undefined, disabling the WK usage block
+// below). tvOS ships neither UIWebView nor WKWebView, so it has no web view.
+#if defined(ENABLE_WKWEBVIEW) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <WebKit/WebKit.h>
 #define supportsWKWebKit
