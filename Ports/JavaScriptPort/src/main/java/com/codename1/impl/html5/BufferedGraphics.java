@@ -55,6 +55,15 @@ public class BufferedGraphics extends HTML5Graphics {
     private GeneralPath clipShape = new GeneralPath();
 
     private boolean isClipShape;
+    // True when the current clip encloses no area. Tracked reliably via
+    // clipBoundsTracker (a clamped user-space rect intersection) because the
+    // projected clip bounds are unreliable for an empty clip on the shape path
+    // (an empty GeneralPath's getBounds() returns uninitialised extents, and a
+    // degenerate clip path does not cull image blits/fills on the host). This is
+    // the DISPLAY/screen graphics class (BufferedGraphics extends HTML5Graphics
+    // and overrides the clip/draw methods); the same fix lives in both. #5263.
+    private boolean clipEmpty;
+    private final Rectangle clipBoundsTracker = new Rectangle();
     private Transform transform, clipTransform;
     private boolean transformApplied=false;
     private final JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp> primitiveRenderAdapter =
@@ -62,7 +71,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            upcoming.add(operation);
+                            addOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp> imageTransformRenderAdapter =
@@ -70,7 +79,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            upcoming.add(operation);
+                            addOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp> shapeGradientRenderAdapter =
@@ -78,7 +87,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            upcoming.add(operation);
+                            addOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     
@@ -86,20 +95,42 @@ public class BufferedGraphics extends HTML5Graphics {
         // The display draws onto the well-known display surface; the host binds
         // it lazily to the output canvas. No worker-side canvas/context proxy.
         super(impl, HTML5Implementation.DISPLAY_SURFACE_ID, width, height);
+        clipBoundsTracker.setBounds(0, 0, width, height);
+    }
+
+    // Single chokepoint for buffered ops. When the clip is empty, drop every
+    // DRAW op -- nothing may render -- but still record clip and transform ops so
+    // a later (non-empty) clip restores drawing. This is the reliable cull: a
+    // degenerate empty-clip path does not cull fills or image blits on the host
+    // canvas, so we must not emit the draws at all. Mirrors the GL clipBlock
+    // mechanism. Issue #5263.
+    private void addOp(ExecutableOp operation) {
+        if (clipEmpty
+                && !(operation instanceof ClipRect)
+                && !(operation instanceof ClipShape)
+                && !(operation instanceof SetTransform)) {
+            return;
+        }
+        upcoming.add(operation);
     }
 
     @Override
     public void drawImage(Object img, int x, int y) {
+        // An empty clip must cull every draw; a degenerate empty-clip path on
+        // the host leaks image blits, so cull here. Issue #5263.
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
     }
 
     @Override
     public void drawImage(Object img, int x, int y, int w, int h) {
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
     @Override
     public void tileImage(Object img, int x, int y, int w, int h) {
+        if (clipEmpty) { return; }
         imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
@@ -107,7 +138,7 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
+        addOp(new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
     @Override
@@ -134,22 +165,22 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        upcoming.add(new DrawRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
+        addOp(new DrawRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
     @Override
     public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        upcoming.add(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
+        addOp(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
     @Override
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        upcoming.add(new DrawPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
+        addOp(new DrawPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
     @Override
     public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        upcoming.add(new FillPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
+        addOp(new FillPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
     @Override
@@ -269,7 +300,7 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
+        addOp(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
     @Override
@@ -348,6 +379,18 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void setClip(Shape shape) {
+        // Sync the reliable user-space clip tracker; clipShape() bypasses this via
+        // setClipShapeInternal so it doesn't clobber the clipEmpty/tracker that
+        // clipRect computed from the exact rect intersection. Issue #5263.
+        Rectangle b = shape.getBounds();
+        int bw = Math.max(0, b.getWidth());
+        int bh = Math.max(0, b.getHeight());
+        clipBoundsTracker.setBounds(b.getX(), b.getY(), bw, bh);
+        clipEmpty = bw <= 0 || bh <= 0;
+        setClipShapeInternal(shape);
+    }
+
+    private void setClipShapeInternal(Shape shape) {
         clipShape.reset();
         clipShape.setShape(shape, null);
         isClipShape = true;
@@ -413,9 +456,17 @@ public class BufferedGraphics extends HTML5Graphics {
         }
         GeneralPath p = (GeneralPath)getCurrentClipProjection();
         p.intersect(shape);
-        setClip(p);
+        if (clipEmpty) {
+            // Empty intersection (computed reliably by clipRect): record a
+            // zero-area rect clip so the canvas culls every draw. The degenerate
+            // shape path leaks fills AND image blits on the host. Issue #5263.
+            clipBoundsDirty = true;
+            primitiveRenderAdapter.setClipRect(0, 0, 0, 0);
+            return;
+        }
+        setClipShapeInternal(p);
     }
-    
+
 
     @Override
     public void setClip(int x, int y, int width, int height) {
@@ -425,6 +476,8 @@ public class BufferedGraphics extends HTML5Graphics {
         }
         isClipShape = false;
         clip.setBounds(x, y, width, height);
+        clipBoundsTracker.setBounds(x, y, width, height);
+        clipEmpty = width <= 0 || height <= 0;
         clipBoundsDirty = true;
         primitiveRenderAdapter.setClipRect(x, y, width, height);
     }
@@ -432,11 +485,16 @@ public class BufferedGraphics extends HTML5Graphics {
     @Override
     public void clipRect(int x, int y, int width, int height) {
         Rectangle rect = new Rectangle(x, y, width, height);
+        // Track the running clip bounds in user space, clamped to >= 0, so an
+        // empty intersection is detected reliably whether the clip is tracked as
+        // a rect or a shape. Issue #5263.
+        clipBoundsTracker.intersection(rect, clipBoundsTracker);
+        clipEmpty = clipBoundsTracker.getWidth() <= 0 || clipBoundsTracker.getHeight() <= 0;
         if (isClipShape || transform != null && !transform.isIdentity()) {
             clipShape(rect);
             return;
         }
-        
+
         if (rect.contains(clip)) {
             return;
         }
