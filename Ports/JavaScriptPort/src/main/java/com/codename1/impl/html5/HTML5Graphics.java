@@ -235,13 +235,11 @@ public class HTML5Graphics {
 
 
     public void drawImage(Object img, int x, int y) {
-        if (isClipEmpty()) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
     }
-
-
+    
+    
     public void tileImage(Object img, int x, int y, int w, int h) {
-        if (isClipEmpty()) { return; }
         imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
@@ -346,7 +344,6 @@ public class HTML5Graphics {
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
-        if (isClipEmpty()) { return; }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
@@ -601,18 +598,6 @@ public class HTML5Graphics {
         clipRect.intersection(rect, clipRect);
         clipBoundsDirty = true;
         primitiveRenderAdapter.setClipRect(clipRect.getX(), clipRect.getY(), clipRect.getWidth(), clipRect.getHeight());
-    }
-
-    // An empty clip -- e.g. clipRect intersecting two non-overlapping rectangles,
-    // which collapses to a zero-area clip -- must cull every draw. fillRect/
-    // drawRect/text honor this through the recorded canvas clip, but the host
-    // image-blit path (surface blit / drawImage) does NOT cull on a zero-area
-    // clip, so a fully clipped-out image leaks through (issue #5263). Skip image
-    // blits while the clip is empty. Uses the projected clip bounds so it covers
-    // BOTH the rect clip and the shape-clip path (the on-screen graphics runs
-    // under a high-DPI transform, which routes clipRect through clipShape()).
-    private boolean isClipEmpty() {
-        return getClipWidth() <= 0 || getClipHeight() <= 0;
     }
 
     public int getColor() {
