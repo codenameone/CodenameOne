@@ -131,6 +131,7 @@ public class NativeMap extends Container implements MapSurface {
     // ---- MapSurface: camera ----------------------------------------------
 
     /// {@inheritDoc}
+    @Override
     public CameraPosition getCameraPosition() {
         if (isFallback()) {
             return fallback.getCameraPosition();
@@ -139,6 +140,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void setCameraPosition(CameraPosition position) {
         if (isFallback()) {
             fallback.setCameraPosition(position);
@@ -150,6 +152,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void moveCamera(LatLng target, double zoom) {
         if (isFallback()) {
             fallback.moveCamera(target, zoom);
@@ -159,11 +162,13 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public double getZoom() {
         return isFallback() ? fallback.getZoom() : provider.getZoom(mapId);
     }
 
     /// {@inheritDoc}
+    @Override
     public void setZoom(double zoom) {
         if (isFallback()) {
             fallback.setZoom(zoom);
@@ -174,16 +179,19 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public double getMinZoom() {
         return isFallback() ? fallback.getMinZoom() : provider.getMinZoom(mapId);
     }
 
     /// {@inheritDoc}
+    @Override
     public double getMaxZoom() {
         return isFallback() ? fallback.getMaxZoom() : provider.getMaxZoom(mapId);
     }
 
     /// {@inheritDoc}
+    @Override
     public LatLng getCenter() {
         if (isFallback()) {
             return fallback.getCenter();
@@ -192,6 +200,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void setCenter(LatLng center) {
         if (isFallback()) {
             fallback.setCenter(center);
@@ -202,6 +211,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public MapBounds getVisibleRegion() {
         if (isFallback()) {
             return fallback.getVisibleRegion();
@@ -213,6 +223,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void fitBounds(MapBounds bounds, int paddingPixels) {
         if (isFallback()) {
             fallback.fitBounds(bounds, paddingPixels);
@@ -226,6 +237,7 @@ public class NativeMap extends Container implements MapSurface {
     // ---- MapSurface: map objects -----------------------------------------
 
     /// {@inheritDoc}
+    @Override
     public Marker addMarker(MarkerOptions options) {
         Marker m = options.build();
         if (isFallback()) {
@@ -245,6 +257,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeMarker(Marker marker) {
         if (isFallback()) {
             fallback.removeMarker(marker);
@@ -257,14 +270,15 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public Polyline addPolyline(Polyline polyline) {
         if (isFallback()) {
             return fallback.addPolyline(polyline);
         }
         long pathId = provider.beginPath(mapId);
         List pts = polyline.getPoints();
-        for (int i = 0; i < pts.size(); i++) {
-            LatLng p = (LatLng) pts.get(i);
+        for (Object ptObj : pts) {
+            LatLng p = (LatLng) ptObj;
             provider.addToPath(mapId, pathId, p.getLatitude(), p.getLongitude());
         }
         long key = provider.finishPolyline(mapId, pathId, polyline.getStrokeColor(),
@@ -274,6 +288,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removePolyline(Polyline polyline) {
         if (isFallback()) {
             fallback.removePolyline(polyline);
@@ -283,14 +298,15 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public Polygon addPolygon(Polygon polygon) {
         if (isFallback()) {
             return fallback.addPolygon(polygon);
         }
         long pathId = provider.beginPath(mapId);
         List pts = polygon.getPoints();
-        for (int i = 0; i < pts.size(); i++) {
-            LatLng p = (LatLng) pts.get(i);
+        for (Object ptObj : pts) {
+            LatLng p = (LatLng) ptObj;
             provider.addToPath(mapId, pathId, p.getLatitude(), p.getLongitude());
         }
         long key = provider.finishPolygon(mapId, pathId, polygon.getFillColor(),
@@ -300,6 +316,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removePolygon(Polygon polygon) {
         if (isFallback()) {
             fallback.removePolygon(polygon);
@@ -309,6 +326,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public Circle addCircle(Circle circle) {
         if (isFallback()) {
             return fallback.addCircle(circle);
@@ -321,6 +339,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeCircle(Circle circle) {
         if (isFallback()) {
             fallback.removeCircle(circle);
@@ -330,6 +349,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void clearMapObjects() {
         if (isFallback()) {
             fallback.clearMapObjects();
@@ -348,6 +368,7 @@ public class NativeMap extends Container implements MapSurface {
     // ---- MapSurface: conversion + listeners ------------------------------
 
     /// {@inheritDoc}
+    @Override
     public Point latLngToScreen(LatLng coord) {
         if (isFallback()) {
             return fallback.latLngToScreen(coord);
@@ -357,6 +378,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public LatLng screenToLatLng(int x, int y) {
         if (isFallback()) {
             return fallback.screenToLatLng(x, y);
@@ -366,6 +388,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void addTapListener(MapTapListener l) {
         if (isFallback()) {
             fallback.addTapListener(l);
@@ -375,6 +398,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeTapListener(MapTapListener l) {
         if (isFallback()) {
             fallback.removeTapListener(l);
@@ -384,6 +408,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void addLongPressListener(MapTapListener l) {
         if (isFallback()) {
             fallback.addLongPressListener(l);
@@ -393,6 +418,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeLongPressListener(MapTapListener l) {
         if (isFallback()) {
             fallback.removeLongPressListener(l);
@@ -402,6 +428,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void addCameraChangeListener(CameraChangeListener l) {
         if (isFallback()) {
             fallback.addCameraChangeListener(l);
@@ -411,6 +438,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeCameraChangeListener(CameraChangeListener l) {
         if (isFallback()) {
             fallback.removeCameraChangeListener(l);
@@ -420,11 +448,13 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public boolean isNativeMap() {
         return !isFallback();
     }
 
     /// {@inheritDoc}
+    @Override
     public Component asComponent() {
         return this;
     }

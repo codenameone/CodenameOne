@@ -46,8 +46,8 @@ public final class Polygon extends MapObject {
     public Polygon(LatLng[] pts) {
         points = new ArrayList();
         if (pts != null) {
-            for (int i = 0; i < pts.length; i++) {
-                points.add(pts[i]);
+            for (LatLng pt : pts) {
+                points.add(pt);
             }
         }
     }

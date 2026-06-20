@@ -44,8 +44,8 @@ public final class Polyline extends MapObject {
     public Polyline(LatLng[] pts) {
         points = new ArrayList();
         if (pts != null) {
-            for (int i = 0; i < pts.length; i++) {
-                points.add(pts[i]);
+            for (LatLng pt : pts) {
+                points.add(pt);
             }
         }
     }

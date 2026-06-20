@@ -53,11 +53,13 @@ public abstract class MapObject {
     }
 
     /// {@inheritDoc}
+    @Override
     public int hashCode() {
         return id;
     }
 
     /// {@inheritDoc}
+    @Override
     public boolean equals(Object o) {
         return o instanceof MapObject && ((MapObject) o).id == id;
     }

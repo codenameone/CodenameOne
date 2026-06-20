@@ -99,6 +99,7 @@ public final class LatLng {
     }
 
     /// {@inheritDoc}
+    @Override
     public boolean equals(Object o) {
         if (!(o instanceof LatLng)) {
             return false;
@@ -109,6 +110,7 @@ public final class LatLng {
     }
 
     /// {@inheritDoc}
+    @Override
     public int hashCode() {
         long lat = Double.doubleToLongBits(latitude);
         long lon = Double.doubleToLongBits(longitude);
@@ -119,6 +121,7 @@ public final class LatLng {
     }
 
     /// {@inheritDoc}
+    @Override
     public String toString() {
         return "LatLng{" + latitude + ", " + longitude + "}";
     }

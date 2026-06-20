@@ -114,8 +114,8 @@ public final class MvtDecoder {
             }
         }
         List features = new ArrayList(rawFeatures.size());
-        for (int i = 0; i < rawFeatures.size(); i++) {
-            features.add(decodeFeature((byte[]) rawFeatures.get(i), keys, values));
+        for (Object rf : rawFeatures) {
+            features.add(decodeFeature((byte[]) rf, keys, values));
         }
         return new VectorLayer(name, extent, features);
     }
@@ -188,7 +188,7 @@ public final class MvtDecoder {
                 attributes.put(keys.get(keyIndex), values.get(valIndex));
             }
         }
-        return new VectorFeature(id, type, attributes, decodeGeometry(geometry, type));
+        return new VectorFeature(id, type, attributes, decodeGeometry(geometry));
     }
 
     private static void readPackedUint32(ProtoReader in, int wire, IntArray target) throws IOException {
@@ -203,7 +203,7 @@ public final class MvtDecoder {
         }
     }
 
-    private static List decodeGeometry(IntArray geom, int type) {
+    private static List decodeGeometry(IntArray geom) {
         List parts = new ArrayList();
         int i = 0;
         int cx = 0;
@@ -247,8 +247,8 @@ public final class MvtDecoder {
             }
         }
         List out = new ArrayList(parts.size());
-        for (int p = 0; p < parts.size(); p++) {
-            out.add(((IntArray) parts.get(p)).toArray());
+        for (Object part : parts) {
+            out.add(((IntArray) part).toArray());
         }
         return out;
     }

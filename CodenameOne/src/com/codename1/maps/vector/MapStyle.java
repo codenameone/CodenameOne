@@ -139,8 +139,7 @@ public final class MapStyle {
                 return style;
             }
             List layers = (List) layersObj;
-            for (int i = 0; i < layers.size(); i++) {
-                Object lo = layers.get(i);
+            for (Object lo : layers) {
                 if (!(lo instanceof Map)) {
                     continue;
                 }
@@ -151,6 +150,7 @@ public final class MapStyle {
             }
         } catch (Throwable t) {
             // Malformed style: fall back to whatever parsed so far.
+            return style;
         }
         return style;
     }

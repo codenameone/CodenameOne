@@ -46,8 +46,8 @@ final class TileRenderer {
     static void renderTile(Graphics g, VectorTile tile, MapStyle style, int zoom, int tileSize) {
         g.setAntiAliased(true);
         List styleLayers = style.getLayers();
-        for (int s = 0; s < styleLayers.size(); s++) {
-            StyleLayer sl = (StyleLayer) styleLayers.get(s);
+        for (Object slObj : styleLayers) {
+            StyleLayer sl = (StyleLayer) slObj;
             if (sl.getType() == StyleLayer.TYPE_SYMBOL || sl.getType() == StyleLayer.TYPE_BACKGROUND) {
                 continue;
             }
@@ -71,8 +71,8 @@ final class TileRenderer {
     private static void renderFills(Graphics g, List features, StyleLayer sl, double scale) {
         int argb = sl.getFillColor();
         applyColor(g, argb);
-        for (int i = 0; i < features.size(); i++) {
-            VectorFeature f = (VectorFeature) features.get(i);
+        for (Object featureObj : features) {
+            VectorFeature f = (VectorFeature) featureObj;
             if (f.getGeometryType() != VectorFeature.GEOM_POLYGON || !sl.accepts(f)) {
                 continue;
             }
@@ -81,8 +81,8 @@ final class TileRenderer {
                 continue;
             }
             GeneralPath path = new GeneralPath();
-            for (int p = 0; p < parts.size(); p++) {
-                int[] ring = (int[]) parts.get(p);
+            for (Object partObj : parts) {
+                int[] ring = (int[]) partObj;
                 appendRing(path, ring, scale, true);
             }
             g.fillShape(path);
@@ -96,15 +96,15 @@ final class TileRenderer {
             width = 0.5f;
         }
         Stroke stroke = new Stroke(width, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 4f);
-        for (int i = 0; i < features.size(); i++) {
-            VectorFeature f = (VectorFeature) features.get(i);
+        for (Object featureObj : features) {
+            VectorFeature f = (VectorFeature) featureObj;
             int gt = f.getGeometryType();
             if ((gt != VectorFeature.GEOM_LINESTRING && gt != VectorFeature.GEOM_POLYGON) || !sl.accepts(f)) {
                 continue;
             }
             List parts = f.getParts();
-            for (int p = 0; p < parts.size(); p++) {
-                int[] line = (int[]) parts.get(p);
+            for (Object partObj : parts) {
+                int[] line = (int[]) partObj;
                 GeneralPath path = new GeneralPath();
                 appendRing(path, line, scale, false);
                 g.drawShape(path, stroke);
@@ -140,8 +140,8 @@ final class TileRenderer {
                               int tileX, int tileY, int tileSize) {
         List out = new ArrayList();
         List styleLayers = style.getLayers();
-        for (int s = 0; s < styleLayers.size(); s++) {
-            StyleLayer sl = (StyleLayer) styleLayers.get(s);
+        for (Object slObj : styleLayers) {
+            StyleLayer sl = (StyleLayer) slObj;
             if (sl.getType() != StyleLayer.TYPE_SYMBOL || sl.getSourceLayer() == null) {
                 continue;
             }
@@ -156,8 +156,8 @@ final class TileRenderer {
             double originX = (double) tileX * tileSize;
             double originY = (double) tileY * tileSize;
             List features = vl.getFeatures();
-            for (int i = 0; i < features.size(); i++) {
-                VectorFeature f = (VectorFeature) features.get(i);
+            for (Object featureObj : features) {
+                VectorFeature f = (VectorFeature) featureObj;
                 if (!sl.accepts(f)) {
                     continue;
                 }

@@ -60,8 +60,8 @@ final class LabelEngine {
         int by = y - 2;
         int bw = w + 4;
         int bh = h + 4;
-        for (int i = 0; i < occupied.size(); i++) {
-            int[] o = (int[]) occupied.get(i);
+        for (Object occItem : occupied) {
+            int[] o = (int[]) occItem;
             if (intersects(bx, by, bw, bh, o[0], o[1], o[2], o[3])) {
                 return false;
             }

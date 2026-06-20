@@ -41,33 +41,40 @@ public final class DemoTileSource implements TileSource {
     private byte[] cachedTile;
 
     /// {@inheritDoc}
+    @Override
     public boolean isVector() {
         return true;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getTileSize() {
         return WebMercator.TILE_SIZE;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getMinZoom() {
         return 0;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getMaxZoom() {
         return 18;
     }
 
     /// {@inheritDoc}
+    @Override
     public String getAttribution() {
         return "Codename One demo tiles";
     }
 
     /// {@inheritDoc}
+    @Override
     public void fetchTile(final int z, final int x, final int y, final TileCallback callback) {
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 try {
                     callback.tileLoaded(z, x, y, tileBytes());

@@ -41,8 +41,8 @@ public final class VectorTile {
 
     /// The layer with the given name, or `null` if the tile has none.
     public VectorLayer getLayer(String name) {
-        for (int i = 0; i < layers.size(); i++) {
-            VectorLayer l = (VectorLayer) layers.get(i);
+        for (Object layerObj : layers) {
+            VectorLayer l = (VectorLayer) layerObj;
             if (l.getName().equals(name)) {
                 return l;
             }

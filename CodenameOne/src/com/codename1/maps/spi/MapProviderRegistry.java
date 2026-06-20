@@ -68,15 +68,15 @@ public final class MapProviderRegistry {
     /// provider, or `null` when none can render right now.
     public static synchronized MapProvider getProvider() {
         if (preferredId != null) {
-            for (int i = 0; i < PROVIDERS.size(); i++) {
-                MapProvider p = (MapProvider) PROVIDERS.get(i);
+            for (Object prov : PROVIDERS) {
+                MapProvider p = (MapProvider) prov;
                 if (preferredId.equals(p.getId()) && safeAvailable(p)) {
                     return p;
                 }
             }
         }
-        for (int i = 0; i < PROVIDERS.size(); i++) {
-            MapProvider p = (MapProvider) PROVIDERS.get(i);
+        for (Object prov : PROVIDERS) {
+            MapProvider p = (MapProvider) prov;
             if (safeAvailable(p)) {
                 return p;
             }

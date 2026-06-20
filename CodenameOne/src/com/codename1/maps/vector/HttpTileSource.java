@@ -60,7 +60,7 @@ public class HttpTileSource implements TileSource {
     // TileJSON resolution: when urlTemplate carries no {z} token it is a
     // TileJSON document URL whose `tiles` template we resolve once, queueing
     // any tile requests that arrive while resolution is in flight.
-    private volatile String resolvedTemplate;
+    private String resolvedTemplate;
     private boolean resolving;
     private final List pendingRequests = new ArrayList();
 
@@ -95,31 +95,37 @@ public class HttpTileSource implements TileSource {
     }
 
     /// {@inheritDoc}
+    @Override
     public boolean isVector() {
         return vector;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getTileSize() {
         return WebMercator.TILE_SIZE;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getMinZoom() {
         return minZoom;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getMaxZoom() {
         return maxZoom;
     }
 
     /// {@inheritDoc}
+    @Override
     public String getAttribution() {
         return attribution;
     }
 
     /// {@inheritDoc}
+    @Override
     public void fetchTile(int z, int x, int y, TileCallback callback) {
         if (needsTileJson()) {
             synchronized (this) {
@@ -150,7 +156,11 @@ public class HttpTileSource implements TileSource {
     }
 
     private String resolve(int z, int x, int y) {
-        String s = resolvedTemplate != null ? resolvedTemplate : urlTemplate;
+        String resolved;
+        synchronized (this) {
+            resolved = resolvedTemplate;
+        }
+        String s = resolved != null ? resolved : urlTemplate;
         s = replace(s, "{z}", Integer.toString(z));
         s = replace(s, "{x}", Integer.toString(x));
         s = replace(s, "{y}", Integer.toString(y));
@@ -162,10 +172,12 @@ public class HttpTileSource implements TileSource {
         ConnectionRequest req = new ConnectionRequest() {
             private byte[] body;
 
+            @Override
             protected void readResponse(InputStream input) throws IOException {
                 body = Util.readInputStream(input);
             }
 
+            @Override
             protected void postResponse() {
                 String tiles = body == null ? null : parseTileJsonTemplate(body);
                 List drain;
@@ -175,8 +187,8 @@ public class HttpTileSource implements TileSource {
                     drain = new ArrayList(pendingRequests);
                     pendingRequests.clear();
                 }
-                for (int i = 0; i < drain.size(); i++) {
-                    Object[] r = (Object[]) drain.get(i);
+                for (Object drainItem : drain) {
+                    Object[] r = (Object[]) drainItem;
                     TileCallback cb = (TileCallback) r[3];
                     if (tiles == null) {
                         cb.tileFailed(((Integer) r[0]).intValue(),
@@ -188,10 +200,12 @@ public class HttpTileSource implements TileSource {
                 }
             }
 
+            @Override
             protected void handleException(Exception err) {
                 failAllPending();
             }
 
+            @Override
             protected void handleErrorResponseCode(int code, String message) {
                 failAllPending();
             }
@@ -209,8 +223,8 @@ public class HttpTileSource implements TileSource {
             drain = new ArrayList(pendingRequests);
             pendingRequests.clear();
         }
-        for (int i = 0; i < drain.size(); i++) {
-            Object[] r = (Object[]) drain.get(i);
+        for (Object drainItem : drain) {
+            Object[] r = (Object[]) drainItem;
             ((TileCallback) r[3]).tileFailed(((Integer) r[0]).intValue(),
                     ((Integer) r[1]).intValue(), ((Integer) r[2]).intValue());
         }
@@ -225,6 +239,7 @@ public class HttpTileSource implements TileSource {
             }
         } catch (Throwable t) {
             // Malformed TileJSON -> treat as unresolved.
+            return null;
         }
         return null;
     }
@@ -251,10 +266,12 @@ public class HttpTileSource implements TileSource {
             this.callback = callback;
         }
 
+        @Override
         protected void readResponse(InputStream input) throws IOException {
             result = Util.readInputStream(input);
         }
 
+        @Override
         protected void postResponse() {
             if (result == null || result.length == 0) {
                 callback.tileFailed(z, x, y);
@@ -267,10 +284,12 @@ public class HttpTileSource implements TileSource {
             }
         }
 
+        @Override
         protected void handleException(Exception err) {
             callback.tileFailed(z, x, y);
         }
 
+        @Override
         protected void handleErrorResponseCode(int code, String message) {
             callback.tileFailed(z, x, y);
         }

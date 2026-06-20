@@ -112,6 +112,7 @@ public final class MapBounds {
     }
 
     /// {@inheritDoc}
+    @Override
     public String toString() {
         return "MapBounds{" + southWest + " -> " + northEast + "}";
     }

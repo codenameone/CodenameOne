@@ -92,6 +92,7 @@ public final class CameraPosition {
     }
 
     /// {@inheritDoc}
+    @Override
     public String toString() {
         return "CameraPosition{target=" + target + ", zoom=" + zoom
                 + ", bearing=" + bearing + ", tilt=" + tilt + "}";

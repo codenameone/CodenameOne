@@ -68,34 +68,41 @@ public final class BundledTileSource implements TileSource {
     }
 
     /// {@inheritDoc}
+    @Override
     public boolean isVector() {
         return vector;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getTileSize() {
         return WebMercator.TILE_SIZE;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getMinZoom() {
         return minZoom;
     }
 
     /// {@inheritDoc}
+    @Override
     public int getMaxZoom() {
         return maxZoom;
     }
 
     /// {@inheritDoc}
+    @Override
     public String getAttribution() {
         return attribution;
     }
 
     /// {@inheritDoc}
+    @Override
     public void fetchTile(final int z, final int x, final int y, final TileCallback callback) {
         final String path = resolve(z, x, y);
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 byte[] data = null;
                 try {

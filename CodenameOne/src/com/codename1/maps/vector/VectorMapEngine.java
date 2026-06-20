@@ -305,8 +305,8 @@ public final class VectorMapEngine {
     private void drawLabels(Graphics g, List candidates, double s, double cwx, double cwy,
                             int originX, int originY, int width, int height, int z) {
         labelEngine.reset();
-        for (int i = 0; i < candidates.size(); i++) {
-            LabelCandidate c = (LabelCandidate) candidates.get(i);
+        for (Object cand : candidates) {
+            LabelCandidate c = (LabelCandidate) cand;
             // Candidate world coords are at its own tile zoom; rescale to this z.
             double factor = MathUtil.pow(2, z - c.tileZoom);
             double wzx = c.worldX * factor;
@@ -360,6 +360,7 @@ public final class VectorMapEngine {
         }
         pending.put(key, Boolean.TRUE);
         source.fetchTile(z, x, y, new TileCallback() {
+            @Override
             public void tileLoaded(int tz, int tx, int ty, byte[] data) {
                 pending.remove(key);
                 try {
@@ -376,6 +377,7 @@ public final class VectorMapEngine {
                 }
             }
 
+            @Override
             public void tileFailed(int tz, int tx, int ty) {
                 pending.remove(key);
                 failed.put(key, Boolean.TRUE);

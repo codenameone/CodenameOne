@@ -33,7 +33,6 @@ import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Point;
 import com.codename1.util.MathUtil;
@@ -95,6 +94,7 @@ public class MapView extends Container implements MapSurface {
         engine.setCenter(new LatLng(0, 0));
         engine.setZoom(2);
         engine.setRepaintCallback(new Runnable() {
+            @Override
             public void run() {
                 repaint();
             }
@@ -126,11 +126,13 @@ public class MapView extends Container implements MapSurface {
     // ---- MapSurface: camera ----------------------------------------------
 
     /// {@inheritDoc}
+    @Override
     public CameraPosition getCameraPosition() {
         return new CameraPosition(engine.getCenter(), engine.getZoom());
     }
 
     /// {@inheritDoc}
+    @Override
     public void setCameraPosition(CameraPosition position) {
         engine.setCenter(position.getTarget());
         engine.setZoom(position.getZoom());
@@ -139,6 +141,7 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void moveCamera(LatLng target, double zoom) {
         engine.setCenter(target);
         engine.setZoom(zoom);
@@ -147,11 +150,13 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public double getZoom() {
         return engine.getZoom();
     }
 
     /// {@inheritDoc}
+    @Override
     public void setZoom(double zoom) {
         engine.setZoom(zoom);
         repaint();
@@ -159,21 +164,25 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public double getMinZoom() {
         return engine.getMinZoom();
     }
 
     /// {@inheritDoc}
+    @Override
     public double getMaxZoom() {
         return engine.getMaxZoom();
     }
 
     /// {@inheritDoc}
+    @Override
     public LatLng getCenter() {
         return engine.getCenter();
     }
 
     /// {@inheritDoc}
+    @Override
     public void setCenter(LatLng center) {
         engine.setCenter(center);
         repaint();
@@ -181,11 +190,13 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public MapBounds getVisibleRegion() {
         return engine.getVisibleBounds();
     }
 
     /// {@inheritDoc}
+    @Override
     public void fitBounds(MapBounds bounds, int paddingPixels) {
         engine.setViewport(getWidth(), getHeight());
         engine.fitBounds(bounds, paddingPixels);
@@ -196,6 +207,7 @@ public class MapView extends Container implements MapSurface {
     // ---- MapSurface: map objects -----------------------------------------
 
     /// {@inheritDoc}
+    @Override
     public Marker addMarker(MarkerOptions options) {
         Marker m = options.build();
         markers.add(m);
@@ -204,12 +216,14 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeMarker(Marker marker) {
         markers.remove(marker);
         repaint();
     }
 
     /// {@inheritDoc}
+    @Override
     public Polyline addPolyline(Polyline polyline) {
         polylines.add(polyline);
         repaint();
@@ -217,12 +231,14 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removePolyline(Polyline polyline) {
         polylines.remove(polyline);
         repaint();
     }
 
     /// {@inheritDoc}
+    @Override
     public Polygon addPolygon(Polygon polygon) {
         polygons.add(polygon);
         repaint();
@@ -230,12 +246,14 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removePolygon(Polygon polygon) {
         polygons.remove(polygon);
         repaint();
     }
 
     /// {@inheritDoc}
+    @Override
     public Circle addCircle(Circle circle) {
         circles.add(circle);
         repaint();
@@ -243,12 +261,14 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeCircle(Circle circle) {
         circles.remove(circle);
         repaint();
     }
 
     /// {@inheritDoc}
+    @Override
     public void clearMapObjects() {
         markers.clear();
         polylines.clear();
@@ -260,59 +280,70 @@ public class MapView extends Container implements MapSurface {
     // ---- MapSurface: conversion + listeners ------------------------------
 
     /// {@inheritDoc}
+    @Override
     public Point latLngToScreen(LatLng coord) {
         engine.setViewport(getWidth(), getHeight());
         return engine.latLngToScreen(coord);
     }
 
     /// {@inheritDoc}
+    @Override
     public LatLng screenToLatLng(int x, int y) {
         engine.setViewport(getWidth(), getHeight());
         return engine.screenToLatLng(x, y);
     }
 
     /// {@inheritDoc}
+    @Override
     public void addTapListener(MapTapListener l) {
         tapListeners.add(l);
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeTapListener(MapTapListener l) {
         tapListeners.remove(l);
     }
 
     /// {@inheritDoc}
+    @Override
     public void addLongPressListener(MapTapListener l) {
         longPressListeners.add(l);
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeLongPressListener(MapTapListener l) {
         longPressListeners.remove(l);
     }
 
     /// {@inheritDoc}
+    @Override
     public void addCameraChangeListener(CameraChangeListener l) {
         cameraListeners.add(l);
     }
 
     /// {@inheritDoc}
+    @Override
     public void removeCameraChangeListener(CameraChangeListener l) {
         cameraListeners.remove(l);
     }
 
     /// {@inheritDoc}
+    @Override
     public boolean isNativeMap() {
         return false;
     }
 
     /// {@inheritDoc}
+    @Override
     public Component asComponent() {
         return this;
     }
 
     // ---- Painting --------------------------------------------------------
 
+    @Override
     protected void paintBackground(Graphics g) {
         engine.setViewport(getWidth(), getHeight());
         g.translate(getX(), getY());
@@ -323,17 +354,17 @@ public class MapView extends Container implements MapSurface {
 
     private void drawOverlays(Graphics g) {
         g.setAntiAliased(true);
-        for (int i = 0; i < polygons.size(); i++) {
-            drawPolygon(g, (Polygon) polygons.get(i));
+        for (Object polygonObj : polygons) {
+            drawPolygon(g, (Polygon) polygonObj);
         }
-        for (int i = 0; i < circles.size(); i++) {
-            drawCircle(g, (Circle) circles.get(i));
+        for (Object circleObj : circles) {
+            drawCircle(g, (Circle) circleObj);
         }
-        for (int i = 0; i < polylines.size(); i++) {
-            drawPolyline(g, (Polyline) polylines.get(i));
+        for (Object polylineObj : polylines) {
+            drawPolyline(g, (Polyline) polylineObj);
         }
-        for (int i = 0; i < markers.size(); i++) {
-            drawMarker(g, (Marker) markers.get(i));
+        for (Object markerObj : markers) {
+            drawMarker(g, (Marker) markerObj);
         }
     }
 
@@ -432,6 +463,7 @@ public class MapView extends Container implements MapSurface {
     // ---- Gestures --------------------------------------------------------
 
     /// {@inheritDoc}
+    @Override
     public void pointerPressed(int x, int y) {
         lastX = x;
         lastY = y;
@@ -439,6 +471,7 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void pointerDragged(int x, int y) {
         int dx = x - lastX;
         int dy = y - lastY;
@@ -450,6 +483,7 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void pointerReleased(int x, int y) {
         if (pinching) {
             pinching = false;
@@ -477,15 +511,17 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    @Override
     public void longPointerPress(int x, int y) {
         int lx = x - getAbsoluteX();
         int ly = y - getAbsoluteY();
         LatLng geo = engine.screenToLatLng(lx, ly);
-        for (int i = 0; i < longPressListeners.size(); i++) {
-            ((MapTapListener) longPressListeners.get(i)).mapTapped(this, geo, lx, ly);
+        for (Object lpListener : longPressListeners) {
+            ((MapTapListener) lpListener).mapTapped(this, geo, lx, ly);
         }
     }
 
+    @Override
     protected boolean pinch(float scale) {
         if (!pinching) {
             pinching = true;
@@ -515,8 +551,8 @@ public class MapView extends Container implements MapSurface {
             }
         }
         LatLng geo = engine.screenToLatLng(lx, ly);
-        for (int i = 0; i < tapListeners.size(); i++) {
-            ((MapTapListener) tapListeners.get(i)).mapTapped(this, geo, lx, ly);
+        for (Object tapListener : tapListeners) {
+            ((MapTapListener) tapListener).mapTapped(this, geo, lx, ly);
         }
     }
 
@@ -525,11 +561,12 @@ public class MapView extends Container implements MapSurface {
             return;
         }
         CameraPosition pos = getCameraPosition();
-        for (int i = 0; i < cameraListeners.size(); i++) {
-            ((CameraChangeListener) cameraListeners.get(i)).cameraChanged(this, pos);
+        for (Object camListener : cameraListeners) {
+            ((CameraChangeListener) camListener).cameraChanged(this, pos);
         }
     }
 
+    @Override
     protected com.codename1.ui.geom.Dimension calcPreferredSize() {
         int w = Display.getInstance().getDisplayWidth();
         int h = Display.getInstance().getDisplayHeight();
