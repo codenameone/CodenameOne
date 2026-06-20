@@ -59,7 +59,7 @@ import java.util.Random;
 /// {@link Preferences} so they survive restarts. The client id is not derived
 /// from any hardware identifier and can be cleared with {@link #resetClientId()}
 /// to honour an erasure request.
-public class Analytics {
+public final class Analytics {
     private static final String PREF_CLIENT_ID = "cn1$analyticsClientId";
     private static final String PREF_CONSENT_SET = "cn1$analyticsConsentSet";
     private static final String PREF_CONSENT_ANALYTICS = "cn1$analyticsConsentAnalytics";

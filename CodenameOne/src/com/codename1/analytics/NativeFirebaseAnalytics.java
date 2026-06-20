@@ -48,21 +48,21 @@ public interface NativeFirebaseAnalytics extends NativeInterface {
     /// - `name`: the event name
     ///
     /// - `paramsJson`: a JSON object of parameters, may be empty
-    public void logEvent(String name, String paramsJson);
+    void logEvent(String name, String paramsJson);
 
     /// Logs a screen view.
     ///
     /// #### Parameters
     ///
     /// - `screenName`: the screen name
-    public void logScreen(String screenName);
+    void logScreen(String screenName);
 
     /// Sets the Firebase user id.
     ///
     /// #### Parameters
     ///
     /// - `id`: the user id, or null to clear
-    public void setUserId(String id);
+    void setUserId(String id);
 
     /// Sets a Firebase user property.
     ///
@@ -71,5 +71,5 @@ public interface NativeFirebaseAnalytics extends NativeInterface {
     /// - `key`: the property name
     ///
     /// - `value`: the property value
-    public void setUserProperty(String key, String value);
+    void setUserProperty(String key, String value);
 }
