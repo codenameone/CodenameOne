@@ -51,10 +51,7 @@ public class AnalyticsService {
     private static AnalyticsService instance;
     private static boolean appsMode = true;
     private static boolean failSilently = true;
-    private static int timeout;
-    private static int readTimeout;
     private String agent;
-    private String domain;
 
     /// Indicates whether analytics server failures should brodcast an error event
     ///
@@ -115,7 +112,8 @@ public class AnalyticsService {
     /// @deprecated use {@link Analytics}
     @Deprecated
     public static void setTimeout(int ms) {
-        timeout = ms;
+        // No-op: retained for source compatibility. Timeouts are now managed
+        // per-provider; configure them on your AnalyticsProvider instead.
     }
 
     /// Retained for source compatibility; no longer affects behaviour.
@@ -127,7 +125,8 @@ public class AnalyticsService {
     /// @deprecated use {@link Analytics}
     @Deprecated
     public static void setReadTimeout(int ms) {
-        readTimeout = ms;
+        // No-op: retained for source compatibility. Timeouts are now managed
+        // per-provider; configure them on your AnalyticsProvider instead.
     }
 
     /// Indicates whether analytics is enabled for this application
@@ -160,7 +159,9 @@ public class AnalyticsService {
                 instance = new AnalyticsService();
             }
             instance.agent = agent;
-            instance.domain = domain;
+            // The legacy `domain` parameter is retained in the signature for
+            // source compatibility but is no longer used -- GA4 identifies the
+            // app by measurement id, not by a UTM-style domain.
             Analytics.setConsentMode(ConsentMode.OPT_OUT);
             Analytics.clearProviders();
             Analytics.addProvider(new GoogleAnalyticsProvider(agent, ""));
