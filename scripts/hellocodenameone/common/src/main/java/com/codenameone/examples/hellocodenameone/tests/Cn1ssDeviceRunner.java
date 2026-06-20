@@ -231,6 +231,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new PaletteOverrideThemeScreenshotTest(),
             new CssGradientsScreenshotTest(),
             new CssFilterBlurScreenshotTest(),
+            // Modern maps API: the pure-vector MapView (light/dark styles,
+            // marker + shape overlays) and the NativeMap vector fallback, all
+            // rendered against the deterministic offline DemoTileSource so the
+            // baselines are network-free and reproducible.
+            new VectorMapBasemapScreenshotTest(),
+            new VectorMapDarkStyleScreenshotTest(),
+            new VectorMapMarkersScreenshotTest(),
+            new VectorMapShapesScreenshotTest(),
+            new NativeMapFallbackScreenshotTest(),
             // Build-time SVG transcoder coverage: the static test renders
             // shapes / gradients / paths, the animated test pins
             // AnimationTime so the captured frame is deterministic.

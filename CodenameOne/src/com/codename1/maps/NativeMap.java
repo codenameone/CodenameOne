@@ -1,0 +1,491 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maps;
+
+import com.codename1.maps.spi.MapProvider;
+import com.codename1.maps.spi.MapProviderRegistry;
+import com.codename1.maps.vector.MapStyle;
+import com.codename1.maps.vector.TileSource;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.PeerComponent;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.geom.Point;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A native-rendered map. When the build wired in a native provider (Apple
+/// MapKit, Google Maps, Bing, Huawei, ... selected via the `maps.provider`
+/// build hint) and it is available on the device, `NativeMap` embeds that
+/// provider's native view as a [PeerComponent]. Otherwise -- on the simulator,
+/// on devices without the selected provider, or when no provider was wired in
+/// at all -- it transparently falls back to an embedded pure-vector
+/// [MapView]. Either way it exposes the same [MapSurface] API, so application
+/// code is identical.
+///
+/// The public API never names a provider; which one (if any) backs a given
+/// build is decided entirely by build hints through [MapProviderRegistry].
+public class NativeMap extends Container implements MapSurface {
+
+    private static final Map INSTANCES = new HashMap();
+    private static int idCounter = 1;
+
+    private final int mapId;
+    private MapProvider provider;
+    private MapView fallback;
+
+    private LatLng initialCenter = new LatLng(0, 0);
+    private double initialZoom = 2;
+    private TileSource fallbackSource;
+    private MapStyle fallbackStyle;
+
+    private final List markers = new ArrayList();
+    private final List tapListeners = new ArrayList();
+    private final List longPressListeners = new ArrayList();
+    private final List cameraListeners = new ArrayList();
+
+    /// Creates a native map centered on the equator at a low zoom.
+    public NativeMap() {
+        this(new LatLng(0, 0), 2);
+    }
+
+    /// Creates a native map at the given initial camera.
+    public NativeMap(LatLng center, double zoom) {
+        this(center, zoom, null, null);
+    }
+
+    /// Creates a native map at the given initial camera, specifying the tile
+    /// source and style used by the pure-vector [MapView] when no native
+    /// provider is available. Useful for an offline or branded fallback
+    /// basemap (and for deterministic tests).
+    public NativeMap(LatLng center, double zoom, TileSource fallbackSource, MapStyle fallbackStyle) {
+        synchronized (NativeMap.class) {
+            mapId = idCounter++;
+        }
+        INSTANCES.put(new Integer(mapId), this);
+        this.initialCenter = center;
+        this.initialZoom = zoom;
+        this.fallbackSource = fallbackSource;
+        this.fallbackStyle = fallbackStyle;
+        setLayout(new BorderLayout());
+        setupBackend();
+    }
+
+    private void setupBackend() {
+        provider = MapProviderRegistry.getProvider();
+        if (provider != null) {
+            PeerComponent peer = null;
+            try {
+                peer = provider.createPeer(this, mapId);
+            } catch (Throwable t) {
+                peer = null;
+            }
+            if (peer != null) {
+                addComponent(BorderLayout.CENTER, peer);
+                provider.setCamera(mapId, initialCenter.getLatitude(), initialCenter.getLongitude(),
+                        (float) initialZoom, 0, 0);
+                return;
+            }
+            provider = null;
+        }
+        // Fallback: behave as a pure-vector MapView.
+        if (fallbackSource != null) {
+            fallback = new MapView(fallbackSource, fallbackStyle == null ? MapStyle.light() : fallbackStyle);
+        } else {
+            fallback = new MapView();
+        }
+        fallback.setCenter(initialCenter);
+        fallback.setZoom(initialZoom);
+        addComponent(BorderLayout.CENTER, fallback);
+    }
+
+    private boolean isFallback() {
+        return fallback != null;
+    }
+
+    // ---- MapSurface: camera ----------------------------------------------
+
+    /// {@inheritDoc}
+    public CameraPosition getCameraPosition() {
+        if (isFallback()) {
+            return fallback.getCameraPosition();
+        }
+        return new CameraPosition(getCenter(), getZoom());
+    }
+
+    /// {@inheritDoc}
+    public void setCameraPosition(CameraPosition position) {
+        if (isFallback()) {
+            fallback.setCameraPosition(position);
+            return;
+        }
+        provider.setCamera(mapId, position.getTarget().getLatitude(),
+                position.getTarget().getLongitude(), (float) position.getZoom(),
+                (float) position.getBearing(), (float) position.getTilt());
+    }
+
+    /// {@inheritDoc}
+    public void moveCamera(LatLng target, double zoom) {
+        if (isFallback()) {
+            fallback.moveCamera(target, zoom);
+            return;
+        }
+        provider.setCamera(mapId, target.getLatitude(), target.getLongitude(), (float) zoom, 0, 0);
+    }
+
+    /// {@inheritDoc}
+    public double getZoom() {
+        return isFallback() ? fallback.getZoom() : provider.getZoom(mapId);
+    }
+
+    /// {@inheritDoc}
+    public void setZoom(double zoom) {
+        if (isFallback()) {
+            fallback.setZoom(zoom);
+            return;
+        }
+        provider.setCamera(mapId, provider.getLatitude(mapId), provider.getLongitude(mapId),
+                (float) zoom, 0, 0);
+    }
+
+    /// {@inheritDoc}
+    public double getMinZoom() {
+        return isFallback() ? fallback.getMinZoom() : provider.getMinZoom(mapId);
+    }
+
+    /// {@inheritDoc}
+    public double getMaxZoom() {
+        return isFallback() ? fallback.getMaxZoom() : provider.getMaxZoom(mapId);
+    }
+
+    /// {@inheritDoc}
+    public LatLng getCenter() {
+        if (isFallback()) {
+            return fallback.getCenter();
+        }
+        return new LatLng(provider.getLatitude(mapId), provider.getLongitude(mapId));
+    }
+
+    /// {@inheritDoc}
+    public void setCenter(LatLng center) {
+        if (isFallback()) {
+            fallback.setCenter(center);
+            return;
+        }
+        provider.setCamera(mapId, center.getLatitude(), center.getLongitude(),
+                provider.getZoom(mapId), 0, 0);
+    }
+
+    /// {@inheritDoc}
+    public MapBounds getVisibleRegion() {
+        if (isFallback()) {
+            return fallback.getVisibleRegion();
+        }
+        LatLng nw = screenToLatLng(0, 0);
+        LatLng se = screenToLatLng(getWidth(), getHeight());
+        return new MapBounds(new LatLng(se.getLatitude(), nw.getLongitude()),
+                new LatLng(nw.getLatitude(), se.getLongitude()));
+    }
+
+    /// {@inheritDoc}
+    public void fitBounds(MapBounds bounds, int paddingPixels) {
+        if (isFallback()) {
+            fallback.fitBounds(bounds, paddingPixels);
+            return;
+        }
+        // Native providers center on the bounds; precise fit is provider work.
+        provider.setCamera(mapId, bounds.getCenter().getLatitude(),
+                bounds.getCenter().getLongitude(), provider.getZoom(mapId), 0, 0);
+    }
+
+    // ---- MapSurface: map objects -----------------------------------------
+
+    /// {@inheritDoc}
+    public Marker addMarker(MarkerOptions options) {
+        Marker m = options.build();
+        if (isFallback()) {
+            return fallback.addMarker(options);
+        }
+        byte[] iconData = null;
+        EncodedImage icon = m.getIcon();
+        if (icon != null) {
+            iconData = icon.getImageData();
+        }
+        long key = provider.addMarker(mapId, iconData, m.getPosition().getLatitude(),
+                m.getPosition().getLongitude(), m.getTitle(), m.getSnippet(),
+                m.getAnchorU(), m.getAnchorV());
+        m.providerKey = new Long(key);
+        markers.add(m);
+        return m;
+    }
+
+    /// {@inheritDoc}
+    public void removeMarker(Marker marker) {
+        if (isFallback()) {
+            fallback.removeMarker(marker);
+            return;
+        }
+        if (marker.providerKey instanceof Long) {
+            provider.removeElement(mapId, ((Long) marker.providerKey).longValue());
+        }
+        markers.remove(marker);
+    }
+
+    /// {@inheritDoc}
+    public Polyline addPolyline(Polyline polyline) {
+        if (isFallback()) {
+            return fallback.addPolyline(polyline);
+        }
+        long pathId = provider.beginPath(mapId);
+        List pts = polyline.getPoints();
+        for (int i = 0; i < pts.size(); i++) {
+            LatLng p = (LatLng) pts.get(i);
+            provider.addToPath(mapId, pathId, p.getLatitude(), p.getLongitude());
+        }
+        long key = provider.finishPolyline(mapId, pathId, polyline.getStrokeColor(),
+                polyline.getStrokeWidth());
+        polyline.providerKey = new Long(key);
+        return polyline;
+    }
+
+    /// {@inheritDoc}
+    public void removePolyline(Polyline polyline) {
+        if (isFallback()) {
+            fallback.removePolyline(polyline);
+            return;
+        }
+        removeElement(polyline.providerKey);
+    }
+
+    /// {@inheritDoc}
+    public Polygon addPolygon(Polygon polygon) {
+        if (isFallback()) {
+            return fallback.addPolygon(polygon);
+        }
+        long pathId = provider.beginPath(mapId);
+        List pts = polygon.getPoints();
+        for (int i = 0; i < pts.size(); i++) {
+            LatLng p = (LatLng) pts.get(i);
+            provider.addToPath(mapId, pathId, p.getLatitude(), p.getLongitude());
+        }
+        long key = provider.finishPolygon(mapId, pathId, polygon.getFillColor(),
+                polygon.getStrokeColor(), polygon.getStrokeWidth());
+        polygon.providerKey = new Long(key);
+        return polygon;
+    }
+
+    /// {@inheritDoc}
+    public void removePolygon(Polygon polygon) {
+        if (isFallback()) {
+            fallback.removePolygon(polygon);
+            return;
+        }
+        removeElement(polygon.providerKey);
+    }
+
+    /// {@inheritDoc}
+    public Circle addCircle(Circle circle) {
+        if (isFallback()) {
+            return fallback.addCircle(circle);
+        }
+        long key = provider.addCircle(mapId, circle.getCenter().getLatitude(),
+                circle.getCenter().getLongitude(), circle.getRadiusMeters(),
+                circle.getFillColor(), circle.getStrokeColor(), circle.getStrokeWidth());
+        circle.providerKey = new Long(key);
+        return circle;
+    }
+
+    /// {@inheritDoc}
+    public void removeCircle(Circle circle) {
+        if (isFallback()) {
+            fallback.removeCircle(circle);
+            return;
+        }
+        removeElement(circle.providerKey);
+    }
+
+    /// {@inheritDoc}
+    public void clearMapObjects() {
+        if (isFallback()) {
+            fallback.clearMapObjects();
+            return;
+        }
+        provider.removeAllElements(mapId);
+        markers.clear();
+    }
+
+    private void removeElement(Object providerKey) {
+        if (providerKey instanceof Long) {
+            provider.removeElement(mapId, ((Long) providerKey).longValue());
+        }
+    }
+
+    // ---- MapSurface: conversion + listeners ------------------------------
+
+    /// {@inheritDoc}
+    public Point latLngToScreen(LatLng coord) {
+        if (isFallback()) {
+            return fallback.latLngToScreen(coord);
+        }
+        provider.calcScreenPosition(mapId, coord.getLatitude(), coord.getLongitude());
+        return new Point(provider.getScreenX(mapId), provider.getScreenY(mapId));
+    }
+
+    /// {@inheritDoc}
+    public LatLng screenToLatLng(int x, int y) {
+        if (isFallback()) {
+            return fallback.screenToLatLng(x, y);
+        }
+        provider.calcLatLongPosition(mapId, x, y);
+        return new LatLng(provider.getScreenLat(mapId), provider.getScreenLon(mapId));
+    }
+
+    /// {@inheritDoc}
+    public void addTapListener(MapTapListener l) {
+        if (isFallback()) {
+            fallback.addTapListener(l);
+            return;
+        }
+        tapListeners.add(l);
+    }
+
+    /// {@inheritDoc}
+    public void removeTapListener(MapTapListener l) {
+        if (isFallback()) {
+            fallback.removeTapListener(l);
+            return;
+        }
+        tapListeners.remove(l);
+    }
+
+    /// {@inheritDoc}
+    public void addLongPressListener(MapTapListener l) {
+        if (isFallback()) {
+            fallback.addLongPressListener(l);
+            return;
+        }
+        longPressListeners.add(l);
+    }
+
+    /// {@inheritDoc}
+    public void removeLongPressListener(MapTapListener l) {
+        if (isFallback()) {
+            fallback.removeLongPressListener(l);
+            return;
+        }
+        longPressListeners.remove(l);
+    }
+
+    /// {@inheritDoc}
+    public void addCameraChangeListener(CameraChangeListener l) {
+        if (isFallback()) {
+            fallback.addCameraChangeListener(l);
+            return;
+        }
+        cameraListeners.add(l);
+    }
+
+    /// {@inheritDoc}
+    public void removeCameraChangeListener(CameraChangeListener l) {
+        if (isFallback()) {
+            fallback.removeCameraChangeListener(l);
+            return;
+        }
+        cameraListeners.remove(l);
+    }
+
+    /// {@inheritDoc}
+    public boolean isNativeMap() {
+        return !isFallback();
+    }
+
+    /// {@inheritDoc}
+    public Component asComponent() {
+        return this;
+    }
+
+    // ---- Native callbacks (invoked by build-injected provider code) ------
+
+    /// Invoked from native code when the map is tapped.
+    public static void fireTap(int mapId, int x, int y) {
+        NativeMap map = lookup(mapId);
+        if (map == null) {
+            return;
+        }
+        LatLng geo = map.screenToLatLng(x, y);
+        for (int i = 0; i < map.tapListeners.size(); i++) {
+            ((MapTapListener) map.tapListeners.get(i)).mapTapped(map, geo, x, y);
+        }
+    }
+
+    /// Invoked from native code when the map is long-pressed.
+    public static void fireLongPress(int mapId, int x, int y) {
+        NativeMap map = lookup(mapId);
+        if (map == null) {
+            return;
+        }
+        LatLng geo = map.screenToLatLng(x, y);
+        for (int i = 0; i < map.longPressListeners.size(); i++) {
+            ((MapTapListener) map.longPressListeners.get(i)).mapTapped(map, geo, x, y);
+        }
+    }
+
+    /// Invoked from native code when a marker is tapped (`markerKey` is the
+    /// value returned by [MapProvider#addMarker]).
+    public static void fireMarkerClick(int mapId, long markerKey) {
+        NativeMap map = lookup(mapId);
+        if (map == null) {
+            return;
+        }
+        for (int i = 0; i < map.markers.size(); i++) {
+            Marker m = (Marker) map.markers.get(i);
+            if (m.providerKey instanceof Long && ((Long) m.providerKey).longValue() == markerKey) {
+                if (m.getOnClick() != null) {
+                    m.getOnClick().actionPerformed(new ActionEvent(m));
+                }
+                return;
+            }
+        }
+    }
+
+    /// Invoked from native code when the camera settles after movement.
+    public static void fireCameraChange(int mapId) {
+        NativeMap map = lookup(mapId);
+        if (map == null || map.cameraListeners.isEmpty()) {
+            return;
+        }
+        CameraPosition pos = map.getCameraPosition();
+        for (int i = 0; i < map.cameraListeners.size(); i++) {
+            ((CameraChangeListener) map.cameraListeners.get(i)).cameraChanged(map, pos);
+        }
+    }
+
+    private static NativeMap lookup(int mapId) {
+        return (NativeMap) INSTANCES.get(new Integer(mapId));
+    }
+}
