@@ -56,6 +56,8 @@ public final class StyleLayer {
 
     private String filterKey;
     private String filterValue;
+    private String excludeKey;
+    private String excludeValue;
 
     StyleLayer(int type) {
         this.type = type;
@@ -153,8 +155,22 @@ public final class StyleLayer {
         return this;
     }
 
-    /// Whether `feature` passes this layer's optional equality filter.
+    /// Drops features whose `key` attribute equals `value` (e.g. excluding
+    /// `class=ferry` so ferry routes are not drawn as roads across the water).
+    StyleLayer excludeFilter(String key, String value) {
+        this.excludeKey = key;
+        this.excludeValue = value;
+        return this;
+    }
+
+    /// Whether `feature` passes this layer's optional equality / exclusion filters.
     boolean accepts(VectorFeature feature) {
+        if (excludeKey != null) {
+            Object ev = feature.getAttribute(excludeKey);
+            if (ev != null && excludeValue != null && excludeValue.equals(String.valueOf(ev))) {
+                return false;
+            }
+        }
         if (filterKey == null) {
             return true;
         }

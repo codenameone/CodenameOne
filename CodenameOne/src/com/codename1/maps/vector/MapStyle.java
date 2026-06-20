@@ -78,7 +78,7 @@ public final class MapStyle {
         addPolygonRule(s, "park", 0xffc8e0b0);
         addLineRule(s, "waterway", 0xffa0c8f0, 6, 1.0, 16, 4.0);
         addLineRule(s, "road", 0xffffffff, 6, 1.0, 18, 8.0);
-        addLineRule(s, "transportation", 0xffffffff, 6, 1.0, 18, 8.0);
+        addLineRule(s, "transportation", 0xffffffff, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
         addPolygonRule(s, "building", 0xffd9d0c9);
         addPolygonRule(s, "buildings", 0xffd9d0c9);
         addSymbolRule(s, "place", "name", 0xff333333, 0xffffffff);
@@ -96,7 +96,7 @@ public final class MapStyle {
         addPolygonRule(s, "park", 0xff17251a);
         addLineRule(s, "waterway", 0xff1b2733, 6, 1.0, 16, 4.0);
         addLineRule(s, "road", 0xff3a4048, 6, 1.0, 18, 8.0);
-        addLineRule(s, "transportation", 0xff3a4048, 6, 1.0, 18, 8.0);
+        addLineRule(s, "transportation", 0xff3a4048, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
         addPolygonRule(s, "building", 0xff20242a);
         addPolygonRule(s, "buildings", 0xff20242a);
         addSymbolRule(s, "place", "name", 0xffe8e8e8, 0xff000000);
@@ -108,10 +108,12 @@ public final class MapStyle {
         s.add(new StyleLayer(StyleLayer.TYPE_FILL).sourceLayer(sourceLayer).fillColor(color));
     }
 
-    private static void addLineRule(MapStyle s, String sourceLayer, int color,
-                                    double z0, double w0, double z1, double w1) {
-        s.add(new StyleLayer(StyleLayer.TYPE_LINE).sourceLayer(sourceLayer).lineColor(color)
-                .lineWidth(ZoomValue.stops(new double[]{z0, z1}, new double[]{w0, w1})));
+    private static StyleLayer addLineRule(MapStyle s, String sourceLayer, int color,
+                                          double z0, double w0, double z1, double w1) {
+        StyleLayer sl = new StyleLayer(StyleLayer.TYPE_LINE).sourceLayer(sourceLayer).lineColor(color)
+                .lineWidth(ZoomValue.stops(new double[]{z0, z1}, new double[]{w0, w1}));
+        s.add(sl);
+        return sl;
     }
 
     private static void addSymbolRule(MapStyle s, String sourceLayer, String field,

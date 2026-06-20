@@ -26,10 +26,13 @@ import com.codename1.maps.vector.MapStyle;
 import com.codename1.maps.vector.MvtTileSource;
 import com.codename1.maps.vector.TileSource;
 import com.codename1.maps.vector.VectorMapEngine;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Font;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.events.ActionEvent;
@@ -57,6 +60,7 @@ import java.util.List;
 public class MapView extends Container implements MapSurface {
 
     private final VectorMapEngine engine;
+    private Font markerFont;
 
     private final List markers = new ArrayList();
     private final List polylines = new ArrayList();
@@ -434,14 +438,38 @@ public class MapView extends Container implements MapSurface {
             int dx = p.getX() - (int) (w * m.getAnchorU());
             int dy = p.getY() - (int) (h * m.getAnchorV());
             g.drawImage(icon, dx, dy);
-        } else {
-            int r = 7;
-            g.setColor(0xffffff);
-            g.setAlpha(255);
-            g.fillArc(p.getX() - r - 1, p.getY() - r - 1, (r + 1) * 2, (r + 1) * 2, 0, 360);
-            g.setColor(0xe53935);
-            g.fillArc(p.getX() - r, p.getY() - r, r * 2, r * 2, 0, 360);
+            return;
         }
+        // Default marker: the standard Material Design map pin glyph, anchored
+        // at the marker's tip (anchor defaults to 0.5, 1.0 -- bottom center).
+        Font pin = markerFont();
+        String glyph = String.valueOf(FontImage.MATERIAL_PLACE);
+        int gw = pin.stringWidth(glyph);
+        int gh = pin.getHeight();
+        int gx = p.getX() - (int) (gw * m.getAnchorU());
+        int gy = p.getY() - (int) (gh * m.getAnchorV());
+        int prevAlpha = g.getAlpha();
+        g.setFont(pin);
+        g.setAlpha(255);
+        g.setColor(0x8e1c16);
+        g.drawString(glyph, gx - 1, gy);
+        g.drawString(glyph, gx + 1, gy);
+        g.drawString(glyph, gx, gy - 1);
+        g.drawString(glyph, gx, gy + 1);
+        g.setColor(0xe53935);
+        g.drawString(glyph, gx, gy);
+        g.setAlpha(prevAlpha);
+    }
+
+    private Font markerFont() {
+        if (markerFont == null) {
+            float size = CN.convertToPixels(7f);
+            if (size < 24) {
+                size = 24;
+            }
+            markerFont = FontImage.getMaterialDesignFont().derive(size, Font.STYLE_PLAIN);
+        }
+        return markerFont;
     }
 
     private GeneralPath buildPath(List points, boolean close) {
