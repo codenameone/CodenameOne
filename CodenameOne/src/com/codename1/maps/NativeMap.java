@@ -26,9 +26,11 @@ import com.codename1.maps.spi.MapProvider;
 import com.codename1.maps.spi.MapProviderRegistry;
 import com.codename1.maps.vector.MapStyle;
 import com.codename1.maps.vector.TileSource;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Point;
@@ -58,6 +60,7 @@ public class NativeMap extends Container implements MapSurface {
     private final int mapId;
     private MapProvider provider;
     private MapView fallback;
+    private boolean peerInitialized;
 
     private LatLng initialCenter = new LatLng(0, 0);
     private double initialZoom = 2;
@@ -93,27 +96,65 @@ public class NativeMap extends Container implements MapSurface {
         this.fallbackSource = fallbackSource;
         this.fallbackStyle = fallbackStyle;
         setLayout(new BorderLayout());
-        setupBackend();
-    }
-
-    private void setupBackend() {
         provider = MapProviderRegistry.getProvider();
-        if (provider != null) {
-            PeerComponent peer = null;
-            try {
-                peer = provider.createPeer(this, mapId);
-            } catch (Throwable t) {
-                peer = null;
-            }
-            if (peer != null) {
-                addComponent(BorderLayout.CENTER, peer);
-                provider.setCamera(mapId, initialCenter.getLatitude(), initialCenter.getLongitude(),
-                        (float) initialZoom, 0, 0);
-                return;
-            }
+        if (provider != null && !safeAvailable(provider)) {
             provider = null;
         }
-        // Fallback: behave as a pure-vector MapView.
+        if (provider == null) {
+            // No native provider wired in (or unavailable at runtime) -> behave
+            // as a pure-vector MapView immediately so the API works before the
+            // component is ever shown.
+            createFallback();
+        }
+        // When a provider IS present the native peer is created lazily in
+        // initComponent() -- the standard Codename One peer lifecycle. Building
+        // the peer here (detached from any form) and laying it out on show is
+        // what crashed UIKit/MapKit, so we defer it until we are attached.
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        if (peerInitialized || provider == null) {
+            return;
+        }
+        peerInitialized = true;
+        // Create the native peer once the form is fully shown, not inline here:
+        // building/laying it out during initComponent re-enters layout before the
+        // component is wired to its form, which crashed the native peer on iOS.
+        CN.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                installPeer();
+            }
+        });
+    }
+
+    private void installPeer() {
+        PeerComponent peer = null;
+        try {
+            peer = provider.createPeer(this, mapId);
+        } catch (Throwable t) {
+            peer = null;
+        }
+        if (peer != null) {
+            addComponent(BorderLayout.CENTER, peer);
+            provider.setCamera(mapId, initialCenter.getLatitude(), initialCenter.getLongitude(),
+                    (float) initialZoom, 0, 0);
+            replayMarkers();
+        } else {
+            // The provider could not create a peer at runtime -> vector fallback.
+            provider = null;
+            createFallback();
+        }
+        Form form = getComponentForm();
+        if (form != null) {
+            form.revalidate();
+        }
+    }
+
+    private void createFallback() {
         if (fallbackSource != null) {
             fallback = new MapView(fallbackSource, fallbackStyle == null ? MapStyle.light() : fallbackStyle);
         } else {
@@ -122,6 +163,31 @@ public class NativeMap extends Container implements MapSurface {
         fallback.setCenter(initialCenter);
         fallback.setZoom(initialZoom);
         addComponent(BorderLayout.CENTER, fallback);
+    }
+
+    /// Re-issues markers that were added before the native peer existed so they
+    /// appear once the peer is created on attach.
+    private void replayMarkers() {
+        for (Object markerObj : markers) {
+            Marker m = (Marker) markerObj;
+            byte[] iconData = null;
+            EncodedImage icon = m.getIcon();
+            if (icon != null) {
+                iconData = icon.getImageData();
+            }
+            long key = provider.addMarker(mapId, iconData, m.getPosition().getLatitude(),
+                    m.getPosition().getLongitude(), m.getTitle(), m.getSnippet(),
+                    m.getAnchorU(), m.getAnchorV());
+            m.providerKey = Long.valueOf(key);
+        }
+    }
+
+    private static boolean safeAvailable(MapProvider p) {
+        try {
+            return p.isAvailable();
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private boolean isFallback() {
