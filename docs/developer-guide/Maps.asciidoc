@@ -22,6 +22,8 @@ form.add(BorderLayout.CENTER, map);
 
 `LatLng` is the immutable WGS84 coordinate value type used throughout the API. The camera is described by a center `LatLng` and a fractional zoom level (the standard slippy-map scale where each whole increment doubles the scale).
 
+image::img/maps-vector.png[The pure-vector MapView rendering OpenStreetMap data,scaledwidth=40%]
+
 === The MapSurface API
 
 Every map -- vector or native -- exposes the same operations through `MapSurface`:
@@ -59,7 +61,9 @@ map.addLongPressListener((surface, location, x, y) -> contextMenu(location));
 map.addCameraChangeListener((surface, camera) -> persist(camera));
 ----
 
-Marker icons are supplied as `EncodedImage` and anchored in normalized `(u, v)` image space (`0.5, 1.0` puts the pin tip on the location). Polygon and circle fills accept an `0xAARRGGBB` color so you can make them translucent.
+Marker icons are supplied as `EncodedImage` and anchored in normalized `(u, v)` image space (`0.5, 1.0` puts the pin tip on the location). When no icon is given, a marker draws the standard Material Design map pin. Polygon and circle fills accept an `0xAARRGGBB` color so you can make them translucent.
+
+image::img/maps-markers.png[Markers drawn with the default Material map pin,scaledwidth=40%]
 
 === Tile sources and styles (MapView)
 
@@ -80,6 +84,8 @@ MapView vector = new MapView(
 
 Vector tiles are painted according to a `MapStyle`. The built-in `MapStyle.light()` and `MapStyle.dark()` cover a usable basemap; `MapStyle.fromJson(json)` parses a subset of the MapLibre GL style specification (`background`/`fill`/`line`/`symbol` layers, zoom-stop interpolation, simple `["==", key, value]` filters).
 
+image::img/maps-dark.png[The same vector data rendered with the built-in dark style,scaledwidth=40%]
+
 === Native maps and providers
 
 `NativeMap` renders through a native map SDK when the build wires one in:
@@ -94,6 +100,8 @@ if (!map.isNativeMap()) {
     // Running on the simulator (or a build without a provider) -> vector fallback.
 }
 ----
+
+image::img/maps-native.png[NativeMap backed by Apple MapKit (ios.maps.provider=apple),scaledwidth=40%]
 
 Which provider (if any) backs the map is decided entirely by *build hints* -- the public API never names a provider, so unused providers add nothing to your app's size. Select one with the `maps.provider` build hint (or the per-platform `ios.maps.provider` / `android.maps.provider`):
 

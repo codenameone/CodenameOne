@@ -1,0 +1,3 @@
+# Deterministic vector tiles; small tolerance for backend AA/font variance.
+maxChannelDelta=24
+maxMismatchPercent=5.0
