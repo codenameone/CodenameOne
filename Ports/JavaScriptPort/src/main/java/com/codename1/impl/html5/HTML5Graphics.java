@@ -604,15 +604,15 @@ public class HTML5Graphics {
     }
 
     // An empty clip -- e.g. clipRect intersecting two non-overlapping rectangles,
-    // which Rectangle.intersection clamps to a zero-size rect -- must cull every
-    // draw. fillRect/drawRect/etc. honor this through the recorded canvas clip,
-    // but the host image-blit path (surface blit / drawImage) does NOT cull on a
-    // zero-size clip, so a fully clipped-out image leaks through (issue #5263).
-    // Skip image blits while the rect clip is empty. Shape clips (isClipShape)
-    // and the non-identity-transform path fall through unchanged -- they are not
-    // affected by this bug and their emptiness isn't tracked in clipRect.
+    // which collapses to a zero-area clip -- must cull every draw. fillRect/
+    // drawRect/text honor this through the recorded canvas clip, but the host
+    // image-blit path (surface blit / drawImage) does NOT cull on a zero-area
+    // clip, so a fully clipped-out image leaks through (issue #5263). Skip image
+    // blits while the clip is empty. Uses the projected clip bounds so it covers
+    // BOTH the rect clip and the shape-clip path (the on-screen graphics runs
+    // under a high-DPI transform, which routes clipRect through clipShape()).
     private boolean isClipEmpty() {
-        return !isClipShape && (clipRect.getWidth() <= 0 || clipRect.getHeight() <= 0);
+        return getClipWidth() <= 0 || getClipHeight() <= 0;
     }
 
     public int getColor() {
