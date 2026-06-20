@@ -456,6 +456,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-19T15:03:50+00:00"
       }
+    },
+    "portable-3d-graphics-api": {
+      "devto": {
+        "id": 3949315,
+        "url": "https://dev.to/codenameone/3d-graphics-without-writing-shaders-the-portable-gpu-api-3ach",
+        "syndicated_at": "2026-06-20T13:33:27+00:00"
+      }
     }
   }
 }
