@@ -85,7 +85,7 @@ This makes the build:
 * declare `<uses-feature android:name="android.software.leanback"
   android:required="false"/>` and make `android.hardware.touchscreen` optional
   so the app installs on touchless TVs;
-* generate a 320x180 launcher banner (`@drawable/tv_banner`) from the app icon.
+* generate a 320×180 launcher banner (`@drawable/tv_banner`) from the app icon.
 
 The resulting APK still installs and runs on phones and tablets.
 

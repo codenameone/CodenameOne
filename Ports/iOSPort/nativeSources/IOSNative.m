@@ -5620,8 +5620,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREA
 }
 
 #if !TARGET_OS_WATCH
-// id (not UIPopoverController*) so the tvOS slice — which lacks UIPopoverController — still provides the symbol GLViewController references.
+#if TARGET_OS_TV
+// UIPopoverController is unavailable on tvOS; hold it as id (the pickers/popovers it backs are tvOS-absent).
 id popoverController;
+#else
+UIPopoverController* popoverController;
+#endif
 #endif // !TARGET_OS_WATCH
 void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie, JAVA_INT quality, JAVA_INT duration) {
 // UIImagePickerController / UIPopoverController / presentModalViewController are

@@ -1901,12 +1901,12 @@ int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
     //CN1Log(@"String is %@", s);
     //CN1Log(@"Font is %i", (int)f);
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl finished");
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     if (s == nil) { return 0; }
     if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
     return (int)[s sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
-    return (int)[s sizeWithAttributes:@{NSFontAttributeName: f}].width;
+    return (int)[s sizeWithFont:f].width;
 #endif
 }
 
@@ -1918,7 +1918,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
     if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
     return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
-    return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithAttributes:@{NSFontAttributeName: f}].width;
+    return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithFont:f].width;
 #endif
 }
 
@@ -4427,7 +4427,11 @@ BOOL prefersStatusBarHidden = NO;
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
+#if TARGET_OS_TV
 	[str drawAtPoint:CGPointMake(x, y) withAttributes:@{NSFontAttributeName: font}];
+#else
+	[str drawAtPoint:CGPointMake(x, y) withFont:font];
+#endif
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
@@ -4669,7 +4673,11 @@ BOOL prefersStatusBarHidden = NO;
     com_codename1_impl_ios_IOSImplementation_onGeofenceExit___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [region identifier]));
 }
 
+#if TARGET_OS_TV
 extern id popoverController;
+#else
+extern UIPopoverController* popoverController;
+#endif
 extern int popoverSupported();
 
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
@@ -5122,7 +5130,11 @@ extern SKPayment *paymentInstance;
 #endif
 
 
+#if TARGET_OS_TV
 - (void) popoverControllerDidDismissPopover:(id) popoverController {
+#else
+- (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
+#endif
     if(datepickerPopover) {
         if(currentDatePickerDate != nil) {
 #ifndef CN1_USE_ARC
@@ -5271,7 +5283,11 @@ extern JAVA_LONG defaultDatePickerDate;
 }
 #endif // !TARGET_OS_TV (UIDatePicker / UIActionSheet)
 
+#if TARGET_OS_TV
 id popoverControllerInstance;
+#else
+UIPopoverController* popoverControllerInstance;
+#endif
 - (void)pickerComponentDismiss {
     if(popoverControllerInstance != nil) {
         [popoverControllerInstance dismissPopoverAnimated:YES];
