@@ -26,6 +26,14 @@ public class NativeMapProviderScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        if (com.codename1.ui.CN.isWatch()) {
+            // No committed watch golden, and the watch has no native map (the
+            // provider falls back to vector there). Phone/tablet cover this.
+            System.out.println(
+                    "CN1SS:INFO:test=NativeMapProvider status=SKIPPED reason=watch-form-factor");
+            done();
+            return true;
+        }
         NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
         if (!map.isNativeMap()) {
             System.out.println(
