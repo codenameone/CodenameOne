@@ -629,3 +629,4 @@ SPI
 pseudonymous
 Plausible
 PostHog
+Piwik

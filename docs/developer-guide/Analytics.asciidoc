@@ -45,7 +45,7 @@ The API is designed to help you comply with privacy regulations such as GDPR and
 Analytics.setConsent(AnalyticsConsent.granted());
 ----
 
-Consent is broken down by category, so you can honour granular choices -- for example allowing crash reporting while declining behavioural analytics:
+Consent is broken down by category, so you can honor granular choices -- for example allowing crash reporting while declining behavioral analytics:
 
 [source,java]
 ----
@@ -67,7 +67,7 @@ Analytics.setConsentMode(ConsentMode.OPT_OUT);
 
 ==== Client identity and erasure
 
-Each device is identified by a pseudonymous client id. It's generated on first use and stored locally -- it isn't derived from any hardware identifier. To honour an erasure request ("right to be forgotten"), reset it:
+Each device is identified by a pseudonymous client id. It's generated on first use and stored locally -- it isn't derived from any hardware identifier. To honor an erasure request ("right to be forgotten"), reset it:
 
 [source,java]
 ----
@@ -102,7 +102,7 @@ Screen views are sent as the GA4 `screen_view` event and crashes as `app_excepti
 
 ==== Matomo
 
-`MatomoAnalyticsProvider` targets Matomo (formerly Piwik) through its HTTP tracking API. Matomo can be self-hosted and supports IP anonymisation, which makes it a good fit for privacy-sensitive deployments:
+`MatomoAnalyticsProvider` targets Matomo (formerly Piwik) through its HTTP tracking API. Matomo can be self-hosted and supports IP anonymization, which makes it a good fit for privacy-sensitive deployments:
 
 [source,java]
 ----
@@ -166,7 +166,7 @@ The `init(AnalyticsContext)` callback hands you the app name, version, platform,
 [[analytics-migration]]
 === Migrating from AnalyticsService
 
-The deprecated `AnalyticsService` continues to compile and now routes through this API. To preserve its historical always-on behaviour -- which predates the consent model -- `AnalyticsService.init` switches the default consent mode to `OPT_OUT`. New code should migrate to `Analytics` and manage consent explicitly:
+The deprecated `AnalyticsService` continues to compile and now routes through this API. To preserve its historical always-on behavior -- which predates the consent model -- `AnalyticsService.init` switches the default consent mode to `OPT_OUT`. New code should migrate to `Analytics` and manage consent explicitly:
 
 [options="header",cols="1,1"]
 |===
