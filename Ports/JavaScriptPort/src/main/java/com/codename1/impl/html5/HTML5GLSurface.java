@@ -40,6 +40,16 @@ class HTML5GLSurface extends HTML5Peer {
         public void onAnimationFrame(double timestamp) {
             animationFrameId = -1;
             framePending = false;
+            // Stop the animation loop once this surface is no longer part of the
+            // shown UI -- e.g. the user switched samples, replacing the preview
+            // Form. deinitialize() does not reliably fire for a RenderView nested
+            // in the embedded (re-parented) preview Form, so without this the rAF
+            // keeps firing and flushing the display forever, degrading the whole
+            // playground (and stacking up if several samples were run).
+            if (!isLive()) {
+                continuous = false;
+                return;
+            }
             // Repaint; the actual GL render + blit happens in paint() so the 3D
             // surface composites in z-order with the rest of the UI.
             repaint();
@@ -48,6 +58,27 @@ class HTML5GLSurface extends HTML5Peer {
             }
         }
     };
+
+    /// True while this surface is still part of the currently shown UI (its
+    /// parent chain reaches the on-screen Form). Once the preview is replaced the
+    /// chain no longer reaches Display.getCurrent(), so the animation loop stops.
+    private boolean isLive() {
+        if (contextLost) {
+            return false;
+        }
+        com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
+        if (current == null) {
+            return false;
+        }
+        com.codename1.ui.Component c = this;
+        while (c != null) {
+            if (c == current) {
+                return true;
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
 
     private HTML5GLSurface(HTMLCanvasElement canvas, RenderView view) {
         super(canvas);
