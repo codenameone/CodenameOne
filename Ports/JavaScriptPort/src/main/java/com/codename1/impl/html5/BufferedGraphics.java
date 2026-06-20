@@ -71,7 +71,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            upcoming.add(operation);
+                            addOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp> imageTransformRenderAdapter =
@@ -79,7 +79,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            upcoming.add(operation);
+                            addOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp> shapeGradientRenderAdapter =
@@ -87,7 +87,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            upcoming.add(operation);
+                            addOp(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     
@@ -96,6 +96,22 @@ public class BufferedGraphics extends HTML5Graphics {
         // it lazily to the output canvas. No worker-side canvas/context proxy.
         super(impl, HTML5Implementation.DISPLAY_SURFACE_ID, width, height);
         clipBoundsTracker.setBounds(0, 0, width, height);
+    }
+
+    // Single chokepoint for buffered ops. When the clip is empty, drop every
+    // DRAW op -- nothing may render -- but still record clip and transform ops so
+    // a later (non-empty) clip restores drawing. This is the reliable cull: a
+    // degenerate empty-clip path does not cull fills or image blits on the host
+    // canvas, so we must not emit the draws at all. Mirrors the GL clipBlock
+    // mechanism. Issue #5263.
+    private void addOp(ExecutableOp operation) {
+        if (clipEmpty
+                && !(operation instanceof ClipRect)
+                && !(operation instanceof ClipShape)
+                && !(operation instanceof SetTransform)) {
+            return;
+        }
+        upcoming.add(operation);
     }
 
     @Override
@@ -122,7 +138,7 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
+        addOp(new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
     @Override
@@ -149,22 +165,22 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        upcoming.add(new DrawRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
+        addOp(new DrawRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
     @Override
     public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        upcoming.add(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
+        addOp(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
     @Override
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        upcoming.add(new DrawPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
+        addOp(new DrawPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
     @Override
     public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        upcoming.add(new FillPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
+        addOp(new FillPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
     @Override
@@ -284,7 +300,7 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
+        addOp(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
     @Override
