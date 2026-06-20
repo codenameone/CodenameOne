@@ -112,10 +112,13 @@ static CGRect drawingRect;
             CN1CGSetClipRect(sx, sy, sw, sh);
             clipApplied = YES;
         } else {
-            // Empty clip -- cull everything (issue #5263). CN1CGResetClip
-            // would REMOVE clipping and let a fully clipped-out draw flood
-            // the whole screen; an empty CGRect clips out all drawing.
-            CN1CGSetClipRect(0, 0, 0, 0);
+            // NOTE (issue #5263): an empty clip on the watch CG backend
+            // should cull everything, but watch text fields / pickers
+            // currently compute a degenerate clip and rely on this reset to
+            // stay visible. Culling here regresses ChatInput/ChatView/the
+            // lightweight picker, so the watch empty-clip fix is deferred to
+            // a follow-up that also fixes the underlying clip computation.
+            CN1CGResetClip();
             clipApplied = NO;
         }
     }
