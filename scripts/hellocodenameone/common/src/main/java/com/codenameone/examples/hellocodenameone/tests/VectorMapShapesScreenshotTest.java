@@ -15,6 +15,14 @@ public class VectorMapShapesScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        if (com.codename1.ui.CN.isWatch()) {
+            // The watch form factor has no committed map goldens; the map
+            // coverage runs on phone/tablet form factors instead.
+            System.out.println(
+                    "CN1SS:INFO:test=VectorMapShapes status=SKIPPED reason=watch-form-factor");
+            done();
+            return true;
+        }
         Form form = createForm("Vector Map Shapes", new BorderLayout(), "VectorMapShapes");
         MapView map = new MapView(new DemoTileSource(), MapStyle.light());
         map.moveCamera(new LatLng(0, 0), 5);

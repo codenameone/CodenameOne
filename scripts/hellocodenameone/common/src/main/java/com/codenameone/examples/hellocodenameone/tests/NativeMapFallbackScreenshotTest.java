@@ -22,6 +22,14 @@ public class NativeMapFallbackScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        if (com.codename1.ui.CN.isWatch()) {
+            // The watch form factor has no committed map goldens; the map
+            // coverage runs on phone/tablet form factors instead.
+            System.out.println(
+                    "CN1SS:INFO:test=NativeMapFallback status=SKIPPED reason=watch-form-factor");
+            done();
+            return true;
+        }
         NativeMap map = new NativeMap(new LatLng(0, 0), 4, new DemoTileSource(), MapStyle.light());
         if (map.isNativeMap()) {
             System.out.println(

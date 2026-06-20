@@ -16,6 +16,14 @@ public class RealOsmVectorScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        if (com.codename1.ui.CN.isWatch()) {
+            // The watch form factor has no committed map goldens; the map
+            // coverage runs on phone/tablet form factors instead.
+            System.out.println(
+                    "CN1SS:INFO:test=RealOsmVector status=SKIPPED reason=watch-form-factor");
+            done();
+            return true;
+        }
         Form form = createForm("Real OSM Vector", new BorderLayout(), "RealOsmVector");
         MapView map = new MapView(
                 new BundledTileSource("/maptiles/{z}/{x}/{y}.mvt", true, 13, 13).setAttribution("(c) OSM"),
