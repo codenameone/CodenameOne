@@ -938,7 +938,8 @@ def main() -> None:
             "SA_FIELD_SELF_COMPARISON",
             "SR_NOT_CHECKED",
             "SWL_SLEEP_WITH_LOCK_HELD",
-            "UC_USELESS_CONDITION_TYPE"
+            "UC_USELESS_CONDITION_TYPE",
+            "BX_UNBOXING_IMMEDIATELY_REBOXED"
         }
 
         def _is_exempt(f: Finding) -> bool:
