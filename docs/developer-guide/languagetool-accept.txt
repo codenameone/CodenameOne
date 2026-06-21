@@ -609,3 +609,16 @@ syscall
 dlopen
 # The zig toolchain (zig cc), used to pin an old glibc for the Linux port.
 zig
+transcoder
+
+# Crash protection terminology.
+# "Symbolicated" / "symbolicate" is the term of art for resolving raw
+# stack frame addresses back to file:line via a build's symbols. Used
+# throughout the Crash Protection chapter and standard in the field.
+[Ss]ymbolicated
+[Ss]ymbolicate
+[Ss]ymbolication
+# Short for "deduplication" -- "dedup the same crash" is how everyone
+# in the crash-reporting space talks. Shows up in CrashReportPayload
+# field descriptions.
+dedup

@@ -50,6 +50,24 @@
         </resources>
         <plugins>
             <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
                     <!-- The port has no built-in native look, so its native theme is
@@ -87,7 +105,18 @@
                                 <zip destfile="${project.build.directory}/codenameone/linuxport-bundle/nativelinux.jar">
                                     <fileset dir="${codename1.nativelinux.dir}"/>
                                 </zip>
-                                <copy file="${project.build.directory}/${project.build.finalName}.jar" tofile="${project.build.directory}/codenameone/linuxport-bundle/LinuxPort.jar" overwrite="true"/>
+                                <!--
+                                  LinuxPort.jar inside the bundle is the
+                                  fat jar: port classes plus every
+                                  transitive dep including codenameone-core,
+                                  matching the iOS port bundle. Without
+                                  core inside, the ParparVM translator
+                                  silently emits an empty C output because
+                                  it cannot resolve classes like
+                                  com.codename1.ui.events.ActionListener
+                                  referenced by an app lambda body.
+                                -->
+                                <copy file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar" tofile="${project.build.directory}/codenameone/linuxport-bundle/LinuxPort.jar" overwrite="true"/>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
                                     <fileset dir="${project.build.directory}/codenameone/linuxport-bundle"/>
                                 </zip>

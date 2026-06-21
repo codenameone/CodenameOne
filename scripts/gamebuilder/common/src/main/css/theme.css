@@ -1,0 +1,120 @@
+/*
+ * Codename One Game Builder theme — faithful to the GameForge dark design.
+ * Sizes are in mm (density-independent) so text is physically the right size on a
+ * retina desktop as well as the test harness. Labels use MainBold (plain weight
+ * renders thin/faint on the desktop renderer).
+ *   bg-app #061634  panel #0E2552  subtle #143169  input #0B2150  border #2E4D86
+ *   text #EAF1FF  muted #AEC0E6  accent #4D86FF  build #B8D532  live #38D27A
+ */
+
+Form, GBForm { background-color: #061634; color: #EAF1FF; font-family: "native:MainBold"; font-size: 2.7mm; }
+GBChrome { background-color: #061634; }
+Label, Button, CheckBox, TextField { color: #EAF1FF; font-family: "native:MainBold"; font-size: 2.7mm; }
+
+/* ---------- top bar ---------- */
+GBTopBar { background-color: #0B2150; padding: 1.6mm 2.6mm 1.6mm 2.6mm; border-bottom: 0.3mm solid #2E4D86; }
+GBLogoMark { background-color: #4D86FF; color: #FFFFFF; padding: 1.4mm 1.8mm 1.4mm 1.8mm; margin: 0.5mm 1mm 0.5mm 0; border-radius: 2mm; }
+GBProject { background: cn1-pill-border; background-color: #143169; color: #FFFFFF; padding: 1.4mm 3mm 1.4mm 3mm; margin: 0.5mm 1.2mm 0.5mm 0; font-size: 2.6mm; }
+GBChromeBtn { background-color: #0E2552; color: #DCE6FB; padding: 1.1mm; margin: 0.35mm; border-radius: 2.4mm; }
+GBToggleOn { background-color: #4D86FF; color: #FFFFFF; padding: 1.1mm; margin: 0.35mm; border-radius: 2.4mm; }
+GBZoom { background-color: transparent; color: #FFFFFF; font-size: 2.8mm; padding: 0 1.5mm 0 1.5mm; }
+GBLive { background: cn1-pill-border; background-color: #143169; color: #38D27A; padding: 1.4mm 3.4mm 1.4mm 3mm; margin: 0.5mm 1mm 0.5mm 1mm; font-size: 2.7mm; }
+GBLiveActive { background: cn1-pill-border; background-color: #38D27A; color: #06270F; padding: 1.4mm 3.4mm 1.4mm 3mm; margin: 0.5mm 1mm 0.5mm 1mm; font-size: 2.7mm; }
+GBBuild { background: cn1-pill-border; background-color: #B8D532; color: #0A1A0A; padding: 1.4mm 3.8mm 1.4mm 3.8mm; margin: 0.5mm; font-size: 2.7mm; }
+
+/* ---------- left rail (icon only) ---------- */
+GBSidebar { background-color: #061634; }
+GBRail { background-color: #0B2150; padding: 1.2mm; border-right: 0.3mm solid #2E4D86; }
+GBTool { background-color: #0B2150; color: #DCE6FB; padding: 1.3mm; margin: 0.8mm 0.4mm 0.8mm 0.4mm; border-radius: 2mm; }
+GBToolActive { background-color: #4D86FF; color: #FFFFFF; padding: 1.3mm; margin: 0.8mm 0.4mm 0.8mm 0.4mm; border-radius: 2mm; }
+
+/* ---------- panels ---------- */
+GBPanel { background-color: #0E2552; margin: 1mm; border-radius: 2.5mm; border: 0.3mm solid #2E4D86; }
+GBPanelHeaderRow { background-color: #0E2552; padding: 1.2mm 1.2mm 1.2mm 2.4mm; border-bottom: 0.3mm solid #2E4D86; }
+GBPanelHeader { background-color: transparent; color: #DCE6FB; padding: 1.2mm 0 1.2mm 0; font-size: 2.6mm; }
+
+/* scene card (a Button) */
+GBSceneCard { background-color: #0E2552; color: #EAF1FF; padding: 1.8mm 2mm 1.8mm 2mm; margin: 1mm; border-radius: 1.8mm; }
+GBSceneCardActive { background-color: #143169; color: #FFFFFF; padding: 1.8mm 2mm 1.8mm 2mm; margin: 1mm; border-radius: 1.8mm; border: 0.3mm solid #4D86FF; }
+
+/* layer rows */
+GBLayer { background-color: #0E2552; padding: 1.2mm 1.6mm 1.2mm 0.8mm; }
+GBLayerActive { background-color: #143169; padding: 1.2mm 1.6mm 1.2mm 0.8mm; border-left: 0.7mm solid #4D86FF; }
+GBLayerName { background-color: transparent; color: #EAF1FF; font-size: 2.9mm; padding: 1mm 0.5mm 1mm 0.5mm; }
+GBLayerNameOff { background-color: transparent; color: #5E739B; font-size: 2.9mm; padding: 1mm 0.5mm 1mm 0.5mm; }
+GBChevron { background-color: transparent; color: #AEC0E6; padding: 0.5mm; }
+GBCount { background-color: transparent; color: #AEC0E6; font-size: 2.5mm; padding: 0 0.8mm 0 0.8mm; }
+GBRowIcon { background-color: transparent; color: #AEC0E6; padding: 0.5mm; margin: 0; }
+
+/* entity rows (Buttons) */
+GBEntity { background-color: #0E2552; color: #EAF1FF; padding: 1mm 1.6mm 1mm 5mm; font-size: 2.7mm; }
+GBEntityActive { background-color: #0B2150; color: #FFFFFF; padding: 1mm 1.6mm 1mm 5mm; border-left: 0.7mm solid #4D86FF; font-size: 2.7mm; }
+GBBadge { background-color: #3A2E12; color: #F0B84B; font-size: 2.1mm; padding: 0.6mm 1.4mm 0.6mm 1.4mm; border-radius: 1.2mm; }
+
+/* ---------- asset library (center bottom) ---------- */
+GBTabs { background-color: transparent; padding: 0.8mm; }
+GBTab { background: cn1-pill-border; background-color: #143169; color: #C7D6F5; padding: 1mm 3mm 1mm 3mm; margin: 0.4mm; font-size: 2.1mm; }
+GBTabActive { background: cn1-pill-border; background-color: #4D86FF; color: #FFFFFF; padding: 1mm 3mm 1mm 3mm; margin: 0.4mm; font-size: 2.1mm; }
+GBAssetCount { background-color: transparent; color: #C7D6F5; font-size: 2.5mm; padding: 1.4mm 2mm 1.4mm 2mm; }
+GBAsset { background-color: #143169; color: #EAF1FF; padding: 1.2mm; margin: 1mm; border-radius: 2mm; font-size: 2.3mm; }
+GBAssetSel { background-color: #0B2150; color: #FFFFFF; padding: 1.2mm; margin: 1mm; border-radius: 2mm; border: 0.5mm solid #4D86FF; font-size: 2.3mm; }
+
+/* ---------- inspector ---------- */
+GBHintBox { background-color: transparent; padding: 2mm 2.4mm 2mm 2.4mm; }
+GBHint { background-color: transparent; color: #AEC0E6; font-size: 2.6mm; }
+GBSection { background-color: #0B2150; padding: 1.8mm 1.6mm 1.8mm 1.6mm; margin: 1mm 0 0 0; }
+GBSectionChev { background-color: transparent; color: #AEC0E6; padding: 0.5mm 1.2mm 0.5mm 0.8mm; }
+GBSectionTitle { background-color: transparent; color: #EAF1FF; font-size: 2.9mm; }
+GBInspectorTitleRow { background-color: #143169; padding: 1.8mm 2.4mm 1.8mm 2.4mm; }
+GBInspectorTitle { background-color: transparent; color: #EAF1FF; font-size: 3.1mm; }
+GBPropRow { background-color: #0E2552; padding: 1.6mm 2.4mm 1.6mm 2.4mm; }
+GBPropLabel { background-color: transparent; color: #BCC9E8; font-size: 2.8mm; padding-right: 2mm; }
+GBPropValue { background-color: transparent; color: #EAF1FF; font-size: 2.8mm; }
+GBField { background-color: #0B2150; color: #FFFFFF; border: 0.3mm solid #466CAE; border-radius: 1.4mm; padding: 1.4mm; font-size: 2.8mm; }
+GBCheck { background-color: transparent; color: #EAF1FF; font-size: 2.8mm; padding: 1.2mm 0 1.2mm 0; }
+/* custom compact dialog (InteractionDialog) — does NOT touch the global Dialog UIID so
+   the spinner Picker's own dialog keeps its native styling */
+GBDialog { background-color: #0E2552; border: 0.3mm solid #4D86FF; border-radius: 2.5mm; padding: 2.4mm; }
+GBDialogTitle { background-color: transparent; color: #EAF1FF; padding: 0 0 1.6mm 0; font-size: 3mm; }
+/* draggable splitter between side panels */
+GBDivider { background-color: #2E4D86; margin: 0 0.3mm 0 0.3mm; }
+/* inline layer rename/delete editor */
+GBLayerEditor { background-color: #0B2150; padding: 1.4mm; margin: 0 1mm 1mm 1mm; border-radius: 1.8mm; border: 0.3mm solid #4D86FF; }
+GBMini { background: cn1-pill-border; background-color: #143169; color: #DCE6FB; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0.5mm 0.4mm 0 0.4mm; font-size: 2.3mm; text-align: center; }
+GBMiniPrimary { background: cn1-pill-border; background-color: #B8D532; color: #0A1A0A; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0.5mm 0.4mm 0 0.4mm; font-size: 2.3mm; text-align: center; }
+GBMiniDanger { background: cn1-pill-border; background-color: #FF6B6B; color: #2A0A0A; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0.5mm 0.4mm 0 0.4mm; font-size: 2.3mm; text-align: center; }
+/* a picker (looks like a field but the accent border + dropdown icon signal it is clickable) */
+GBPicker { background-color: #143169; color: #FFFFFF; border: 0.3mm solid #4D86FF; border-radius: 1.4mm; padding: 1.4mm; font-size: 2.8mm; }
+GBStepper { background-color: #143169; color: #DCE6FB; padding: 1mm 1.6mm 1mm 1.6mm; margin: 0.5mm; border-radius: 1.4mm; }
+GBDanger { background-color: #FF6B6B; color: #2A0A0A; padding: 1.6mm 3.4mm 1.6mm 3.4mm; margin: 2mm; border-radius: 1.8mm; }
+GBCode { background-color: #04102A; color: #C7D6F5; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 2mm; }
+
+/* ---- spinner Picker popup: theme its real UIIDs so it matches the dark UI ----
+   The string Picker opens an InteractionDialog (PickerDialog) holding a 3D spinner. The
+   spinner's background is painted from Spinner3DOverlay.bgColor (opaque) and the option rows
+   use Spinner3DRow. Everything is SOLID dark with light text — an earlier `transparent` row
+   bg rendered white-on-white (the centre/selected row forced it opaque). */
+PickerDialog { background-color: #0E2552; border: 0.4mm solid #4D86FF; border-radius: 2.5mm; padding: 1mm; }
+PickerDialogContent { background-color: #0E2552; padding: 0.5mm; }
+PickerButtonBar { background-color: #0B2150; padding: 0.8mm; }
+PickerButton { background-color: #2E4D86; color: #FFFFFF; border: 0; padding: 1.6mm 5mm 1.6mm 5mm; margin: 0.8mm; border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.8mm; }
+PickerButton.selected { background-color: #4D86FF; color: #FFFFFF; border: 0; }
+PickerButton.pressed { background-color: #4D86FF; color: #FFFFFF; border: 0; }
+Spinner3DOverlay { background-color: #0E2552; }
+Spinner3DRow { background-color: #0E2552; color: #FFFFFF; border: 0; font-family: "native:MainBold"; font-size: 3.1mm; padding: 1.4mm 3mm 1.4mm 3mm; text-align: center; }
+Spinner3DRow.selected { background-color: #143169; color: #FFFFFF; border: 0; }
+SpinnerSeparator { background-color: #4D86FF; }
+/* the desktop runs as a tablet (Stub calls setTablet(true)), so the Picker uses the *Tablet
+   UIID variants — they MUST be themed too or the popup/buttons render as white slabs. */
+PickerDialogTablet { background-color: #0E2552; border: 0.4mm solid #4D86FF; border-radius: 2.5mm; padding: 1mm; }
+PickerDialogContentTablet { background-color: #0E2552; padding: 0.5mm; }
+PickerButtonBarTablet { background-color: #0B2150; padding: 0.8mm; }
+PickerButtonTablet { background-color: #2E4D86; color: #FFFFFF; border: 0; padding: 1.6mm 5mm 1.6mm 5mm; margin: 0.8mm; border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.8mm; }
+PickerButtonTablet.selected { background-color: #4D86FF; color: #FFFFFF; border: 0; }
+PickerButtonTablet.pressed { background-color: #4D86FF; color: #FFFFFF; border: 0; }
+
+/* tooltip bubble — keep it a small dark pill so it can never render as a big white slab */
+TooltipDialog { background-color: #1B2740; border: 0.3mm solid #4D86FF; border-radius: 1.6mm; padding: 0; margin: 0; }
+Tooltip { background-color: #1B2740; color: #EAF1FF; border: 0; padding: 1.2mm 2.2mm 1.2mm 2.2mm; font-size: 2.4mm; }
+
+EditorCanvas { background-color: #04102A; }

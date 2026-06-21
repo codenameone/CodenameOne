@@ -22,6 +22,10 @@
  */
 
 #import <Foundation/Foundation.h>
+#include "TargetConditionals.h"
+// UIWebViewDelegate / WebKit are unavailable on watchOS; the browser peer is
+// excluded from the watch slice and this header is empty there.
+#if !TARGET_OS_WATCH
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #ifdef ENABLE_WKWEBVIEW
@@ -48,3 +52,4 @@ UIWebViewDelegate
 - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message;
 #endif
 @end
+#endif // !TARGET_OS_WATCH

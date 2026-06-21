@@ -25,12 +25,15 @@
 #import "PaintOp.h"
 #import "RadialGradientPaint.h"
 #import "CodenameOne_GLViewController.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
 
 #ifdef USE_ES2
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -331,7 +334,17 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
 #endif
 }
 #endif
-#ifdef USE_ES2
+#if TARGET_OS_WATCH
+-(void)execute
+{
+    if (textureName == 0) { return; }
+    CN1CGAlphaMask *mask = (CN1CGAlphaMask *)(uintptr_t)textureName;
+    if (mask == NULL || mask->alphas == NULL || mask->width <= 0 || mask->height <= 0) { return; }
+    // Draw the coverage mask at the op's position using the mask's own
+    // dimensions (they match the bounds captured at texture-create time).
+    CN1CGFillAlphaMask(color, alpha, x, y, mask->width, mask->height, mask->alphas);
+}
+#elif defined(USE_ES2)
 -(void)execute
 {
 #ifdef CN1_USE_METAL

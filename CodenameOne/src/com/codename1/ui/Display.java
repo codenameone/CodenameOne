@@ -1149,8 +1149,15 @@ public final class Display extends CN1Constants {
                 }
                 Log.e(err);
                 if (crashReporter != null) {
-                    CodenameOneThread.handleException(err);
+                    // Hand the actual throwable to the registered reporter
+                    // BEFORE impl.handleEDTException gets a chance to short
+                    // circuit (legacy AndroidImplementation returns true
+                    // after showing its own AlertDialog, which used to
+                    // silently lose the exception for anyone hooking via
+                    // setCrashReporter -- including CrashProtection).
+                    crashReporter.exception(err);
                 }
+                CodenameOneThread.handleException(err);
                 if (!impl.handleEDTException(err)) {
                     if (errorHandler != null) {
                         errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
@@ -3284,6 +3291,36 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `e`: listener receiving the errors
+    /// Returns a snapshot of recent platform log output (e.g. logcat
+    /// tail on Android). Used by [com.codename1.crash.CrashProtection]
+    /// to attach device-log context to a crash report. Returns `null`
+    /// on platforms that have no readable process log (`javase`,
+    /// `javascript`).
+    public String getNativeLogSnapshot() {
+        return impl.getNativeLogSnapshot();
+    }
+
+    /// Installs the platform native crash handler used by crash
+    /// protection. On platforms where a native crash (a signal, an
+    /// uncaught Objective-C exception, a segfault in JNI code) cannot
+    /// reach the JVM error path, the handler writes a structured
+    /// record to disk before the process dies. The record is replayed
+    /// on the next launch via [#consumePendingNativeCrash()].
+    /// Idempotent.
+    public void installNativeCrashHandler() {
+        impl.installNativeCrashHandler();
+    }
+
+    /// Returns the captured native crash evidence (raw backtrace +
+    /// signal info as a text blob) from [#installNativeCrashHandler()],
+    /// or `null` if none. The implementation deletes the underlying
+    /// record before returning so the same crash isn't replayed on
+    /// subsequent launches. Crash protection wraps the returned blob
+    /// in a synthetic report payload.
+    public String consumePendingNativeCrash() {
+        return impl.consumePendingNativeCrash();
+    }
+
     public void removeEdtErrorHandler(ActionListener e) {
         if (errorHandler != null) {
             errorHandler.removeListener(e);
@@ -4341,6 +4378,17 @@ public final class Display extends CN1Constants {
     /// true if this is a desktop application
     public boolean isDesktop() {
         return impl.isDesktop();
+    }
+
+    /// Indicates whether the application is running on a smartwatch form factor
+    /// (Apple Watch / Wear OS). Notice that this is often a guess derived from
+    /// the device metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a smartwatch
+    public boolean isWatch() {
+        return impl.isWatch();
     }
 
     /// Returns true if the device has dialing capabilities

@@ -61,6 +61,9 @@ public class Sprite implements PhysicsLinkable {
     private boolean visible = true;
     private int zOrder;
     private Object userData;
+    /// parallax scroll factors (1 = scrolls with the world); see #getParallaxX().
+    private float parallaxX = 1;
+    private float parallaxY = 1;
 
     /// Creates an empty sprite with no image.
     public Sprite() {
@@ -263,5 +266,25 @@ public class Sprite implements PhysicsLinkable {
 
     public void setUserData(Object userData) {
         this.userData = userData;
+    }
+
+    /// The horizontal parallax factor (default `1`): the fraction of the scene camera's
+    /// x-offset this sprite scrolls by. `1` scrolls with the world; a value below `1`
+    /// scrolls slower so the sprite reads as more distant (clouds, far mountains); `0`
+    /// pins it to the screen (a HUD-like backdrop).
+    public float getParallaxX() {
+        return parallaxX;
+    }
+
+    /// The vertical parallax factor (default `1`); see `#getParallaxX()`.
+    public float getParallaxY() {
+        return parallaxY;
+    }
+
+    /// Sets the parallax factors. A background layer typically uses a small factor
+    /// (e.g. `0.2`-`0.5`) so it drifts behind the foreground as the camera scrolls.
+    public void setParallax(float x, float y) {
+        this.parallaxX = x;
+        this.parallaxY = y;
     }
 }

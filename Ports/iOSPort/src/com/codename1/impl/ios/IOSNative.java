@@ -152,6 +152,11 @@ public final class IOSNative {
     native boolean isIOS7();
     native boolean isRunningOnMac();
 
+    // Returns true when the binary is running on the watchOS slice. Implemented
+    // natively via the TARGET_OS_WATCH compile-time check so the iOS slice keeps
+    // returning false with zero runtime cost.
+    native boolean isRunningOnWatch();
+
     // Mac native (Catalyst): set the host window title bar text from the current form title.
     native void setWindowTitle(String title);
 
@@ -652,6 +657,18 @@ public final class IOSNative {
     public native String appleSignIn(String scopes, String nonce);
     public native boolean appleSignInIsLoggedIn();
     public native void appleSignInSignOut();
+
+    // Crash protection -- see nativeSources/CN1CrashProtection.m.
+    // crashProtectionInstall() is idempotent; hooks SIGSEGV/SIGABRT/
+    // SIGBUS/SIGILL/SIGFPE/SIGPIPE/SIGTRAP plus
+    // NSSetUncaughtExceptionHandler, writes a JSON record to the
+    // documents directory before the process dies.
+    // crashProtectionLogSnapshot() returns the recent stderr/NSLog
+    // ring buffer (~32 KB cap). crashProtectionConsumePending() reads
+    // and deletes the pending-crash JSON written on a prior launch.
+    public native void crashProtectionInstall();
+    public native String crashProtectionLogSnapshot();
+    public native String crashProtectionConsumePending();
 
     // WebAuthn / passkeys --
     // ASAuthorizationPlatformPublicKeyCredentialProvider (iOS 16+).

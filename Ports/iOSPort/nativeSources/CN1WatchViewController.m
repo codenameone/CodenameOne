@@ -1,0 +1,164 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+/*
+ * watchOS render-driver. Replaces CodenameOne_GLViewController (a
+ * UIViewController, which watchOS marks API_UNAVAILABLE) on the watch slice.
+ * It is a plain NSObject that owns the same ExecutableOp queue and drains it
+ * into the Core Graphics surface (CN1WatchRenderingView via CN1CGGraphics),
+ * keeping the same class name + selector surface so the ~10 callers and the
+ * translated runtime resolve unchanged. Modeled on the non-view-controller
+ * native renderer in Ports/LinuxPort.
+ */
+#include "TargetConditionals.h"
+#if TARGET_OS_WATCH
+#import "CodenameOne_GLViewController.h"
+#import "CN1WatchHost.h"
+#import "CN1WatchRenderingView.h"
+#import "CN1CGGraphics.h"
+#import "DrawString.h"
+#import "GLUIImage.h"
+
+extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(void);
+extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(void);
+
+static CodenameOne_GLViewController *singletonInstance = nil;
+
+@implementation CodenameOne_GLViewController
+
+@synthesize animationFrameInterval;
+@synthesize currentMutableImage;
+
++ (CodenameOne_GLViewController *)instance {
+    if (singletonInstance == nil) {
+        singletonInstance = [[CodenameOne_GLViewController alloc] init];
+        [singletonInstance initVars];
+    }
+    return singletonInstance;
+}
+
+- (void)initVars {
+    if (currentTarget == nil) {
+        currentTarget = [[NSMutableArray alloc] init];
+        upcomingTarget = [[NSMutableArray alloc] init];
+    }
+}
+
+// The watch render surface (a CN1WatchRenderingView) lives on CN1WatchHost.
+- (id)view {
+    return [CN1WatchHost sharedHost].renderingView;
+}
+
+- (id)eaglView {
+    return [CN1WatchHost sharedHost].renderingView;
+}
+
++ (void)upcoming:(ExecutableOp *)op {
+    [[CodenameOne_GLViewController instance] upcomingAdd:op];
+}
+
+- (void)upcomingAdd:(ExecutableOp *)op {
+    @synchronized (self) {
+        [upcomingTarget addObject:op];
+    }
+}
+
+- (void)upcomingAddClip:(ExecutableOp *)op {
+    [self upcomingAdd:op];
+}
+
+- (BOOL)isPaintFinished {
+    @synchronized (self) {
+        return [upcomingTarget count] == 0;
+    }
+}
+
++ (BOOL)isDrawTextureSupported {
+    return NO;
+}
+
+- (void)startAnimation {}
+- (void)stopAnimation {}
+
+- (void)drawString:(int)color alpha:(int)alpha font:(UIFont *)font str:(NSString *)str x:(int)x y:(int)y {
+    DrawString *op = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:font];
+    [self upcomingAdd:op];
+#ifndef CN1_USE_ARC
+    [op release];
+#endif
+}
+
+// flushBuffer swaps the upcoming queue into the current one and requests a
+// paint; the actual rasterization happens in drawFrame (driven by CN1WatchHost).
+- (void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
+    @synchronized (self) {
+        if ([upcomingTarget count] > 0) {
+            NSMutableArray *tmp = currentTarget;
+            currentTarget = upcomingTarget;
+            upcomingTarget = tmp;
+            [upcomingTarget removeAllObjects];
+        }
+    }
+    [[CN1WatchHost sharedHost] setNeedsDisplay];
+}
+
+- (void)drawScreen {
+    [self drawFrame:CGRectZero];
+}
+
+// Drain the current op queue into the Core Graphics surface.
+- (void)drawFrame:(CGRect)rect {
+    CN1WatchRenderingView *v = [CN1WatchHost sharedHost].renderingView;
+    if (v == nil) {
+        return;
+    }
+    NSArray *ops;
+    @synchronized (self) {
+        ops = [currentTarget copy];
+    }
+    [v setFramebuffer];
+    for (ExecutableOp *op in ops) {
+        @try {
+            [op executeWithClipping];
+        } @catch (NSException *e) {
+            // Keep draining; a single failing op shouldn't blank the frame.
+        }
+    }
+    [v presentFramebuffer];
+    painted = YES;
+#ifndef CN1_USE_ARC
+    [ops release];
+#endif
+}
+
+#ifndef CN1_USE_ARC
+- (void)dealloc {
+    [currentTarget release];
+    [upcomingTarget release];
+    [super dealloc];
+}
+#endif
+
+@end
+
+#endif // TARGET_OS_WATCH

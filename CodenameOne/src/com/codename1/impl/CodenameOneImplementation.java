@@ -5601,6 +5601,17 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Indicates whether the application is running on a smartwatch form factor
+    /// (Apple Watch / Wear OS). Notice that this is often a guess derived from
+    /// the device/skin metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a smartwatch
+    public boolean isWatch() {
+        return false;
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns
@@ -10896,5 +10907,47 @@ public abstract class CodenameOneImplementation {
         byte[] out = new byte[bytes];
         secureRandomBytes(out);
         return out;
+    }
+
+    // -------------------------------------------------------------------
+    // Crash protection (com.codename1.crash.CrashProtection) -- platform
+    // hooks that let the framework attach native log context and
+    // off-EDT / native-layer crash data to uploaded crash reports.
+    // Default no-op implementations keep platforms that don't yet
+    // support a given hook completely silent.
+    // -------------------------------------------------------------------
+
+    /// Snapshot of recent platform-log output to attach to a crash
+    /// payload. Used by [com.codename1.crash.CrashProtection] when
+    /// building a report so the developer sees the device log around
+    /// the failure, not just the Java stack frame. Platforms without a
+    /// readable process log (`javase`, `javascript`) return `null`.
+    ///
+    /// Implementations should cap the returned string (e.g. ~32 KB),
+    /// strip sensitive prefixes, and never block.
+    public String getNativeLogSnapshot() {
+        return null;
+    }
+
+    /// Installs the platform native crash handler. On platforms where a
+    /// native crash (a signal, an uncaught Objective-C exception, a
+    /// segfault in JNI code) cannot reach the JVM error path,
+    /// implementations write a structured record to disk in a
+    /// signal-safe way before the process dies. The record is read
+    /// back on the next launch via [#consumePendingNativeCrash()].
+    ///
+    /// Must be idempotent. Default: no-op.
+    public void installNativeCrashHandler() {
+    }
+
+    /// Returns the captured native crash evidence (raw backtrace +
+    /// signal info as a text blob) from [#installNativeCrashHandler()],
+    /// or `null` if none. The implementation MUST delete the
+    /// underlying record before returning so the same crash isn't
+    /// replayed on every launch. The framework wraps the returned
+    /// string in a synthetic {@code NativeCrash} report and hands it
+    /// to the upload queue.
+    public String consumePendingNativeCrash() {
+        return null;
     }
 }

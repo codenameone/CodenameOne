@@ -11,6 +11,7 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.ClipUnderRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
+import com.codenameone.examples.hellocodenameone.tests.graphics.EmptyClip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradientStops;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawImage;
@@ -152,6 +153,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StrokeTest(),
             new Clip(),
             new ClipUnderRotation(),
+            // Regression guard for issue #5263: an empty clip (two
+            // non-overlapping clipRects) must cull everything. The iOS Metal
+            // backend used to open the whole framebuffer instead, flooding the
+            // screen with the fully-clipped-out draws.
+            new EmptyClip(),
             new TileImage(),
             new Rotate(),
             new TransformTranslation(),
@@ -333,6 +339,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         }
         BaseTest testClass = (offset == 1 && index == 0) ? prependedTest : DEFAULT_TEST_CLASSES[index - offset];
         String testName = testClass.getClass().getSimpleName();
+        if (!matchesFilter(testName)) {
+            // Optional subset run: -Dcn1ss.filter=<substr> or CN1SS_FILTER=<substr>
+            // runs only tests whose class simple name contains the (case-
+            // insensitive) substring. Lets a targeted run (e.g. a single
+            // form-factor or graphics subset) skip the full ~120-test suite.
+            log("CN1SS:INFO:suite skipping test=" + testName + " (filter)");
+            runNextTest(index + 1);
+            return;
+        }
         CN.callSerially(() -> {
             log("CN1SS:INFO:suite starting test=" + testName);
             if (shouldForceTimeoutInHtml5(testName)) {
@@ -560,6 +575,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         if (CN.isSimulator()) {
             Display.getInstance().exitApplication();
         }
+    }
+
+    /// True when the test should run under the optional cn1ss.filter subset
+    /// selector (system property cn1ss.filter). Empty/unset runs everything.
+    /// Read at call time (no static field) to avoid the static-init
+    /// class-loading pitfalls noted above. System.getenv is intentionally NOT
+    /// used - it is outside the Codename One runtime API and trips the build's
+    /// bytecode-compliance check.
+    private static boolean matchesFilter(String testName) {
+        String filter = System.getProperty("cn1ss.filter");
+        if (filter == null || filter.length() == 0) {
+            return true;
+        }
+        return testName != null
+                && testName.toLowerCase().indexOf(filter.toLowerCase()) >= 0;
     }
 
     private static void log(String msg) {

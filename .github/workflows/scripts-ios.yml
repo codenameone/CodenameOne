@@ -9,6 +9,7 @@ on:
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/notification-tests/native-tests/**'
       - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
@@ -17,6 +18,7 @@ on:
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots/**'
       - 'scripts/ios/screenshots-metal/**'
+      - 'scripts/ios/screenshots-watch/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -41,6 +43,7 @@ on:
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/notification-tests/native-tests/**'
       - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
@@ -49,6 +52,7 @@ on:
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots/**'
       - 'scripts/ios/screenshots-metal/**'
+      - 'scripts/ios/screenshots-watch/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -503,6 +507,149 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests-metal
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+  build-ios-watch:
+    # Native Apple Watch (watchOS) screenshot pipeline. The watch slice
+    # auto-enables from codename1.watchMain in the sample, so build-ios-app.sh
+    # generates the <Main>Watch target alongside the iOS app. This job renders
+    # the cn1ss suite on the watch simulator through the Core Graphics backend
+    # (no GL/Metal on watchOS), streams frames to the same Cn1ssScreenshotServer
+    # WS sink the iOS jobs use, and compares against scripts/ios/screenshots-watch.
+    # Isolated in its own job (like build-ios-metal) so the watch result is a
+    # distinct check and a regression there doesn't mask the iOS path.
+    needs: build-port
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: macos-15
+    timeout-minutes: 60
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-watch-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Restore built CN1 + iOS port artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
+          fail-on-cache-miss: true
+
+      - name: Build sample iOS app (generates the watch target)
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Ensure watchOS simulator runtime
+        run: |
+          set -euo pipefail
+          if ! xcrun simctl list runtimes available 2>/dev/null | grep -qi watchOS; then
+            echo "No watchOS runtime found; attempting download"
+            xcodebuild -downloadPlatform watchOS || true
+          fi
+          xcrun simctl list runtimes available 2>/dev/null | grep -i watchOS || true
+          xcrun simctl list devices available 2>/dev/null | grep -i "Apple Watch" || true
+
+      - name: Run watchOS UI screenshot tests
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/watch-ui-tests
+          SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-watch
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_IOS_WATCH_COMMENT -->'
+          CN1SS_PREVIEW_SUBDIR: ios-watch
+          CN1SS_REPORT_TITLE: 'Apple Watch (watchOS) screenshot updates'
+          CN1SS_SUCCESS_MESSAGE: '✅ Native Apple Watch (watchOS, Core Graphics) screenshot tests passed.'
+          CN1SS_COMMENT_LOG_PREFIX: '[run-watch-ui-tests]'
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # The watch form factor splits the iOS 2x2 graphics grid into separate
+          # full-screen captures; tolerate a small tail drop, matching the GL job.
+          CN1SS_ALLOWED_MISSING: '4'
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          ./scripts/run-watch-ui-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        timeout-minutes: 45
+
+      - name: Upload watch artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: watch-ui-tests
           path: artifacts
           if-no-files-found: warn
           retention-days: 14

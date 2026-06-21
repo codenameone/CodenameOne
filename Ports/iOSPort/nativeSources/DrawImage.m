@@ -1,12 +1,15 @@
 #import "DrawImage.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#if TARGET_OS_WATCH
+#import "CN1CGGraphics.h"
+#endif
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
 
 #ifdef USE_ES2
-#ifndef CN1_USE_METAL
+#if !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -107,7 +110,15 @@ static GLuint getOGLProgram(){
 #endif
     return self;
 }
-#ifdef USE_ES2
+#if TARGET_OS_WATCH
+-(void)execute {
+    UIImage *src = [img getImage];
+    if (src == nil || src.CGImage == NULL) {
+        return;
+    }
+    CN1CGDrawImage(src.CGImage, alpha, x, y, width, height);
+}
+#elif defined(USE_ES2)
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);

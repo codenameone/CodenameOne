@@ -2348,6 +2348,32 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return "win";
     }
 
+    @Override
+    public String getNativeLogSnapshot() {
+        try {
+            return WindowsNative.crashProtectionLogSnapshot();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    public void installNativeCrashHandler() {
+        try {
+            WindowsNative.crashProtectionInstall();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Override
+    public String consumePendingNativeCrash() {
+        try {
+            return WindowsNative.crashProtectionConsumePending();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     /**
      * Plays audio (and decodes video) through Media Foundation. The stream is
      * read into memory and handed to the native engine, which spools it to a

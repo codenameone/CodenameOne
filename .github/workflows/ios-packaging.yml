@@ -46,7 +46,9 @@ jobs:
     permissions:
       contents: read
     runs-on: macos-15
-    timeout-minutes: 45
+    # Headroom for the single native xcodebuild compile of the translated app, which grew with
+    # the gaming runtime added to core and is slower on the Xcode 26.3 / iOS 26.2 toolchain.
+    timeout-minutes: 75
     # Exercises both CocoaPods and SPM in a single Xcode project. Catches
     # regressions in either dependency manager (each pathway runs end to end)
     # and additionally validates that they coexist correctly. Also turns on
@@ -159,9 +161,29 @@ jobs:
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
+      - name: Cache iOS derived data
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/cn1-ios-derived
+          # Keyed on the CN1 source hash so a re-run of the same commit (and any unchanged-source
+          # run) restores the compiled objects and builds incrementally; a source change misses
+          # and does a full (headroom-covered) build.
+          key: ${{ runner.os }}-ios-derived-${{ steps.src_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-ios-derived-
+
       - name: Run iOS UI smoke
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-packaging
+          # The packaging smoke only needs the app to build, launch and screenshot -- it is not
+          # the SIMD benchmark, so compile the translated C at -O1 instead of the default -O2.
+          # That roughly halves the native compile time (the step's dominant cost), keeping it
+          # within budget after the gaming runtime enlarged core. The benchmark/metal pipeline
+          # keeps the -O2 default.
+          CN1_TEST_OPT_LEVEL: "1"
+          # Shared, cached derived-data dir: the native-test step reuses these compiled objects,
+          # and a re-run restores them, instead of recompiling the whole translated core.
+          CN1_IOS_DERIVED_DATA: ${{ runner.temp }}/cn1-ios-derived
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -169,11 +191,15 @@ jobs:
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 30
+        timeout-minutes: 45
 
       - name: Run native iOS notification tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-packaging-native
+          # Reuse the app + core already compiled by the UI-smoke step (same shared derived data)
+          # so this test build does not recompile the whole translated core a second time.
+          CN1_IOS_DERIVED_DATA: ${{ runner.temp }}/cn1-ios-derived
+          CN1_TEST_OPT_LEVEL: "1"
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"

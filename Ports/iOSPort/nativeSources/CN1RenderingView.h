@@ -23,16 +23,28 @@
 #ifndef CN1RenderingView_h
 #define CN1RenderingView_h
 #import <UIKit/UIKit.h>
+#include "TargetConditionals.h"
 
-// Shared method surface implemented by both EAGLView (OpenGL ES 2 backend)
-// and METALView (Metal backend). CodenameOne_GLViewController calls through
-// this protocol so it can drive either backend under the CN1_USE_METAL ifdef.
+// Shared method surface implemented by the rendering backends:
+//   - EAGLView          (OpenGL ES 2, iOS)
+//   - METALView         (Metal, iOS)
+//   - CN1WatchRenderingView (Core Graphics, watchOS)
+// CodenameOne_GLViewController calls through this protocol so it can drive any
+// backend behind the CN1_USE_METAL / TARGET_OS_WATCH ifdefs.
+//
+// addPeerComponent takes a UIView* on iOS. watchOS has no UIView hierarchy and
+// no native peer components, so the argument degrades to id there (callers on
+// the watch slice pass nil; the watch backend ignores it).
 @protocol CN1RenderingView <NSObject>
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
 - (void)deleteFramebuffer;
 - (void)updateFrameBufferSize:(int)w h:(int)h;
+#if TARGET_OS_WATCH
+- (void)addPeerComponent:(id)view;
+#else
 - (void)addPeerComponent:(UIView *)view;
+#endif
 - (void)keyboardDoneClicked;
 - (void)keyboardNextClicked;
 - (void)textFieldDidChange;

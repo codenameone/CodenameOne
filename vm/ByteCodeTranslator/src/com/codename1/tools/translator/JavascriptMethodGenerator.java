@@ -3796,7 +3796,7 @@ final class JavascriptMethodGenerator {
             Instruction instruction = instructions.get(i);
             if (instruction instanceof Jump) {
                 Integer t = labelToIndex.get(((Jump) instruction).getLabel());
-                Integer tb = t == null ? null : startToBlock.get((int) t);
+                Integer tb = t == null ? null : startToBlock.get(t);
                 if (tb == null) {
                     return _sb(method, instructions, "L3100");
                 }
@@ -3824,7 +3824,7 @@ final class JavascriptMethodGenerator {
                 }
                 for (Label l : swLabels) {
                     Integer t = l == null ? null : labelToIndex.get(l);
-                    Integer tb = t == null ? null : startToBlock.get((int) t);
+                    Integer tb = t == null ? null : startToBlock.get(t);
                     if (tb == null) {
                         return _sb(method, instructions, "L3116");
                     }
@@ -4016,7 +4016,7 @@ final class JavascriptMethodGenerator {
                 if (instruction instanceof Jump) {
                     Jump jump = (Jump) instruction;
                     Integer t = labelToIndex.get(jump.getLabel());
-                    int tb = startToBlock.get((int) t);
+                    int tb = startToBlock.get(t);
                     String cond = structuredJumpCondition(jump.getOpcode(), ctx);
                     if (cond == null && jump.getOpcode() != Opcodes.GOTO) {
                         return _sb(method, instructions, "L3263");
@@ -4049,7 +4049,7 @@ final class JavascriptMethodGenerator {
                     Label[] swl = sw.getLabels();
                     for (int ki = 0; swl != null && ki < swl.length; ki++) {
                         Integer t = swl[ki] == null ? null : labelToIndex.get(swl[ki]);
-                        int tb = startToBlock.get((int) t);
+                        int tb = startToBlock.get(t);
                         if (entrySp[tb] < 0) {
                             entrySp[tb] = ctx.sp;
                         } else if (entrySp[tb] != ctx.sp) {
@@ -4060,7 +4060,7 @@ final class JavascriptMethodGenerator {
                                .append(structuredGoto(tb, b, loopEnd, tryStarts)).append(";\n");
                     }
                     Integer dT = sw.getDefaultLabel() == null ? null : labelToIndex.get(sw.getDefaultLabel());
-                    int db = startToBlock.get((int) dT);
+                    int db = startToBlock.get(dT);
                     if (entrySp[db] < 0) {
                         entrySp[db] = ctx.sp;
                     } else if (entrySp[db] != ctx.sp) {
@@ -5928,12 +5928,12 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 SwitchInstruction sw = (SwitchInstruction) last;
                 if (sw.getDefaultLabel() != null) {
                     Integer d = labelToIndex.get(sw.getDefaultLabel());
-                    if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                    if (d != null && startToBlock.containsKey(d)) { b.succs.add(startToBlock.get(d)); }
                 }
                 if (sw.getLabels() != null) {
                     for (Label l : sw.getLabels()) {
                         Integer d = l == null ? null : labelToIndex.get(l);
-                        if (d != null && startToBlock.containsKey((int) d)) { b.succs.add(startToBlock.get((int) d)); }
+                        if (d != null && startToBlock.containsKey(d)) { b.succs.add(startToBlock.get(d)); }
                     }
                 }
                 addFallThrough = false;

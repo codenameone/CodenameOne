@@ -338,7 +338,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     public boolean isDesktop() {
         return nativeInstance.isRunningOnMac();
     }
-    
+
+    @Override
+    public boolean isWatch() {
+        return nativeInstance.isRunningOnWatch();
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {
@@ -9365,6 +9370,32 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public String getNativeLogSnapshot() {
+        try {
+            return nativeInstance.crashProtectionLogSnapshot();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    public void installNativeCrashHandler() {
+        try {
+            nativeInstance.crashProtectionInstall();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Override
+    public String consumePendingNativeCrash() {
+        try {
+            return nativeInstance.crashProtectionConsumePending();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Override
     public Simd createSimd() {
         return new IOSSimd();
     }
@@ -9373,6 +9404,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
+        if(isWatch()) {
+            return new String[] {"watch", "ios", "applewatch"};
+        }
         if(isTablet()) {
             return new String[] {"tablet", "ios", "ipad"};
         } else {

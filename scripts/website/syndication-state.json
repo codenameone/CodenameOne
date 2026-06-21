@@ -398,6 +398,85 @@
         "url": "https://dzone.com/content/3659578/edit.html",
         "syndicated_at": "2026-06-15T17:02:34+00:00"
       }
+    },
+    "background-execution-and-push": {
+      "devto": {
+        "id": 3916765,
+        "url": "https://dev.to/codenameone/background-work-push-topics-and-richer-notifications-2gah",
+        "syndicated_at": "2026-06-16T14:37:12+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/5f7082083581/edit",
+        "syndicated_at": "2026-06-16T15:01:17+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmqgru52a00000ajjbnudgtu6",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a301385a7aa7f6b9fbf63d9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-16T15:02:51+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3659702/edit.html",
+        "syndicated_at": "2026-06-16T17:01:10+00:00"
+      }
+    },
+    "native-java-win32-3d-gaming-printing-and-wallet": {
+      "devto": {
+        "id": 3941182,
+        "url": "https://dev.to/codenameone/native-java-win32-3d-gaming-printing-and-wallet-3chd",
+        "syndicated_at": "2026-06-19T14:02:25+00:00"
+      },
+      "foojay": {
+        "id": 124288,
+        "url": "https://foojay.io/wp-admin/post.php?post=124288&action=edit",
+        "preview_url": "https://foojay.io/?p=124288",
+        "featured_media_id": 124287,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-19T14:03:17+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/2022b8c584cc/edit",
+        "syndicated_at": "2026-06-19T15:01:37+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3660925/edit.html",
+        "syndicated_at": "2026-06-19T15:02:42+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmql26z7b00010cj70fr4dhpw",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a355a1d60ca9562960803dc",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-19T15:03:50+00:00"
+      }
+    },
+    "portable-3d-graphics-api": {
+      "devto": {
+        "id": 3949315,
+        "url": "https://dev.to/codenameone/3d-graphics-without-writing-shaders-the-portable-gpu-api-3ach",
+        "syndicated_at": "2026-06-20T13:33:27+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/82f824ca9ce8/edit",
+        "syndicated_at": "2026-06-20T15:01:28+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/draft/6a36ab52f3d6ad5d6df0a163",
+        "published": false,
+        "draft_url": "https://hashnode.com/draft/6a36ab52f3d6ad5d6df0a163",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": false,
+        "canonical_set": false,
+        "syndicated_at": "2026-06-20T15:03:14+00:00"
+      }
     }
   }
 }
