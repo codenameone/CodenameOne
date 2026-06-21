@@ -21,9 +21,6 @@
  * need additional information or have any questions.
  */
 #import "CodenameOne_GLAppDelegate.h"
-#if TARGET_OS_TV
-#include <execinfo.h>
-#endif
 #ifdef CN1_USE_UI_SCENE
 #import "CodenameOne_GLSceneDelegate.h"
 #endif
@@ -93,16 +90,6 @@ extern UIView *editingComponent;
 // NOTE: This handler WILL NOT WORK while using the debugger
 static void SignalHandler(int sig)
 {
-#if TARGET_OS_TV
-    {
-        static int cn1TvSigCount = 0;
-        if (cn1TvSigCount++ < 2) {
-            void *cn1f[64]; int cn1n = backtrace(cn1f, 64); char **cn1s = backtrace_symbols(cn1f, cn1n);
-            NSLog(@"CN1TVCRASH: signal=%d frames=%d", sig, cn1n);
-            if (cn1s) { for (int ci=0; ci<cn1n; ci++) NSLog(@"CN1TVCRASH:  %s", cn1s[ci]); free(cn1s); }
-        }
-    }
-#endif
     if (sig == 11) {
         // We received an EXEC_BAD_ACCESS.  This generally happens if we try to use an object
         // that is null, so let's convert it into a null pointer exception.
