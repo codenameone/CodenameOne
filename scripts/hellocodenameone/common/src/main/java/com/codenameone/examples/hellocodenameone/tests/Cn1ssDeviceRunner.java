@@ -76,6 +76,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
+    // The index of the test the suite is currently running. Read by
+    // Cn1ssDeviceRunnerHelper to drop a screenshot whose callback fires after
+    // the runner has moved on (see the set-site in runNextTest).
+    static volatile int sCurrentTestSeq = -1;
+
     private static int testTimeoutMs(BaseTest testClass) {
         // DualAppearanceBaseTest needs more wall time on HTML5 (light + dark
         // phases serially, each paying registerReadyCallback's 1500ms + settle
@@ -349,6 +354,16 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             return;
         }
         CN.callSerially(() -> {
+            // Mark which test the suite is currently on. A screenshot whose
+            // async callback fires after the runner has advanced (the heavy 4K
+            // graphics tests can be GPU-bound long enough to time out at
+            // capture-requested) would otherwise grab the NEXT test's frame and
+            // save it under this test's name (visible symptom: FillRoundRect.png
+            // carrying a later test's title bar). Cn1ssDeviceRunnerHelper checks
+            // this seq in the capture callback and drops such late frames, so a
+            // timed-out test is recorded as missing (tolerated) rather than
+            // mislabeled.
+            sCurrentTestSeq = index;
             log("CN1SS:INFO:suite starting test=" + testName);
             if (shouldForceTimeoutInHtml5(testName)) {
                 log("CN1SS:ERR:suite test=" + testName + " forced timeout (HTML5 fallback)");

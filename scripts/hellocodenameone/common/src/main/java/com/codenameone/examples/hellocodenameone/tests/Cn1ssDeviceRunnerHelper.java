@@ -78,7 +78,20 @@ interface Cn1ssDeviceRunnerHelper {
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
+        final int seqAtRequest = Cn1ssDeviceRunner.sCurrentTestSeq;
         Display.getInstance().screenshot(screen -> {
+            // Drop a late capture: if the runner already advanced past the test
+            // that requested this screenshot (e.g. a heavy 4K graphics test that
+            // timed out at capture-requested), the frame now on screen belongs
+            // to a later test. Saving it under safeName would mislabel it (wrong
+            // title bar / content). Discarding leaves the test without a capture
+            // -- recorded as missing (tolerated by CN1SS_ALLOWED_MISSING) rather
+            // than a false mismatch.
+            if (Cn1ssDeviceRunner.sCurrentTestSeq != seqAtRequest) {
+                println("CN1SS:WARN:test=" + safeName + " discarding late screenshot (runner advanced)");
+                complete(onComplete);
+                return;
+            }
             if (screen == null) {
                 println("CN1SS:ERR:test=" + safeName + " message=Screenshot callback returned null");
                 emitPlaceholderScreenshot(safeName);
