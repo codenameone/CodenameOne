@@ -114,6 +114,22 @@ class MapsVectorTest {
     }
 
     @Test
+    void mapStyleJsonAcceptsNamedAndRgbColors() {
+        // fromJson routes colours through the shared CSSColor parser, so the
+        // MapLibre named-colour and rgb()/percent forms work, not just hex.
+        String json =
+                "{\"layers\":["
+                        + "{\"type\":\"background\",\"paint\":{\"background-color\":\"navy\"}},"
+                        + "{\"type\":\"fill\",\"source-layer\":\"park\","
+                        + "\"paint\":{\"fill-color\":\"rgb(0,128,0)\"}}"
+                        + "]}";
+        MapStyle style = MapStyle.fromJson(json);
+        assertEquals(0xff000080, style.getBackgroundColor());
+        assertEquals(0xff008000,
+                ((StyleLayer) style.getLayers().get(0)).getFillColor());
+    }
+
+    @Test
     void colorParserHandlesCommonForms() {
         assertEquals(0xff0000ff, CSSColor.parse("#0000ff", 0));
         assertEquals(0xffffffff, CSSColor.parse("#fff", 0));

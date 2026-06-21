@@ -41,6 +41,13 @@ public final class MapProviderRegistry {
     private MapProviderRegistry() {
     }
 
+    /// Clears all registered providers and the preferred order. Package-private
+    /// hook so unit tests can isolate the global registry state between runs.
+    static synchronized void resetForTest() {
+        PROVIDERS.clear();
+        preferredOrder = null;
+    }
+
     /// Registers a provider. Called by build-injected startup code. Repeated
     /// registration of the same provider id replaces the earlier instance.
     public static synchronized void register(MapProvider provider) {

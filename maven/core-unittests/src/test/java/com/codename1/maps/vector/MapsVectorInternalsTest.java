@@ -221,6 +221,26 @@ class MapsVectorInternalsTest {
         assertEquals(20, geom[1]);
     }
 
+    @Test
+    void webMercatorIsInvertibleAcrossZooms() {
+        double[] lons = {-179.9, -122.4194, -13.0, 0.0, 13.4050, 122.4194, 179.9};
+        double[] lats = {-85.0, -37.8136, -33.9, 0.0, 37.8136, 51.5, 85.0};
+        for (int z = 0; z <= 18; z += 3) {
+            for (double lon : lons) {
+                double wx = WebMercator.lonToWorldX(lon, z);
+                assertEquals(lon, WebMercator.worldXToLon(wx, z), 1e-6);
+            }
+            for (double lat : lats) {
+                double wy = WebMercator.latToWorldY(lat, z);
+                assertEquals(lat, WebMercator.worldYToLat(wy, z), 1e-6);
+            }
+        }
+        // World doubles each zoom; the equator/prime-meridian sit at the centre.
+        assertEquals(256.0 * (1 << 7), WebMercator.worldSize(7), 1e-3);
+        assertEquals(WebMercator.worldSize(9) / 2, WebMercator.lonToWorldX(0, 9), 1e-6);
+        assertEquals(WebMercator.worldSize(9) / 2, WebMercator.latToWorldY(0, 9), 1e-6);
+    }
+
     // ---- Pixel ratio (high-DPI scaling) ----------------------------------
 
     @Test
