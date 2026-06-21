@@ -23,7 +23,7 @@
 package com.codename1.maps.spi;
 
 import com.codename1.maps.NativeMap;
-import com.codename1.ui.PeerComponent;
+import com.codename1.ui.Component;
 
 /// The service-provider interface a native map backend implements so the
 /// core [NativeMap] component can drive it without knowing which provider
@@ -65,10 +65,12 @@ public interface MapProvider {
     /// false `NativeMap` falls back to the vector engine.
     boolean isAvailable();
 
-    /// Creates the native peer view for the map identified by `mapId` and
-    /// returns it wrapped as a Codename One [PeerComponent]. Returning `null`
-    /// triggers the vector fallback.
-    PeerComponent createPeer(NativeMap host, int mapId);
+    /// Creates the view for the map identified by `mapId`. Native providers
+    /// return a [com.codename1.ui.PeerComponent] wrapping the native map view;
+    /// a web-SDK provider returns a [com.codename1.ui.BrowserComponent]. Either
+    /// way it is a [Component] the [NativeMap] adds to its layout. Returning
+    /// `null` triggers the vector fallback.
+    Component createPeer(NativeMap host, int mapId);
 
     /// Releases native resources for `mapId` when the map is no longer used.
     void deinitialize(int mapId);

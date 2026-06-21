@@ -247,6 +247,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VectorMapShapesScreenshotTest(),
             new NativeMapFallbackScreenshotTest(),
             new NativeMapProviderScreenshotTest(),
+            // Cross-platform Google Maps via the web provider (BrowserComponent
+            // + Maps JS). Gated on the GOOGLE_MAPS_API_KEY secret -- skips when
+            // the key resource is absent, so it is a no-op on forks/local.
+            new GoogleWebMapScreenshotTest(),
             // Build-time SVG transcoder coverage: the static test renders
             // shapes / gradients / paths, the animated test pins
             // AnimationTime so the captured frame is deterministic.

@@ -31,7 +31,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Point;
 import com.codename1.ui.layouts.BorderLayout;
@@ -44,7 +43,7 @@ import java.util.Map;
 /// A native-rendered map. When the build wired in a native provider (Apple
 /// MapKit, Google Maps, Bing, Huawei, ... selected via the `maps.provider`
 /// build hint) and it is available on the device, `NativeMap` embeds that
-/// provider's native view as a [PeerComponent]. Otherwise -- on the simulator,
+/// provider's native view as a [com.codename1.ui.PeerComponent]. Otherwise -- on the simulator,
 /// on devices without the selected provider, or when no provider was wired in
 /// at all -- it transparently falls back to an embedded pure-vector
 /// [MapView]. Either way it exposes the same [MapSurface] API, so application
@@ -132,7 +131,7 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     private void installPeer() {
-        PeerComponent peer = null;
+        Component peer = null;
         try {
             peer = provider.createPeer(this, mapId);
         } catch (Throwable t) {
