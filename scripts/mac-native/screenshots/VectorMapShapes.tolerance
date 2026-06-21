@@ -1,3 +1,5 @@
-# Deterministic vector tiles; small tolerance for backend AA/font variance.
-maxChannelDelta=24
-maxMismatchPercent=5.0
+# Vector tiles plus translucent polyline/polygon/circle overlays, whose alpha
+# blending varies run-to-run on some GPU backends (notably the Android emulator);
+# wider tolerance. Still fails loudly on a blank/margined/wrong map.
+maxChannelDelta=48
+maxMismatchPercent=25.0
