@@ -667,12 +667,10 @@ jobs:
     # to the same Cn1ssScreenshotServer the iOS/watch jobs use, comparing against
     # scripts/ios/screenshots-tv.
     #
-    # NON-BLOCKING (continue-on-error) until the tvOS native slice compiles
-    # end-to-end and the golden set is seeded -- see
-    # Ports/iOSPort/nativeSources/TVOS_PORT.md. Flip continue-on-error off (and
-    # drop CN1SS_ALLOWED_MISSING) once the goldens land, matching build-ios-watch.
+    # BLOCKING (a hard golden gate, like build-ios-watch): the tvOS slice
+    # compiles end-to-end and the golden set is seeded from a CI capture (see
+    # Ports/iOSPort/nativeSources/TVOS_PORT.md). A mismatch fails the job.
     needs: build-port
-    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
@@ -786,7 +784,7 @@ jobs:
           CN1SS_FAIL_ON_MISMATCH: '1'
           # Tolerate a missing golden set while the tvOS native slice is being
           # brought up; tighten to match build-ios-watch once goldens are seeded.
-          CN1SS_ALLOWED_MISSING: '9999'
+          CN1SS_ALLOWED_MISSING: '4'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
