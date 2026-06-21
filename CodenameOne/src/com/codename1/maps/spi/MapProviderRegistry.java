@@ -36,7 +36,7 @@ import java.util.List;
 public final class MapProviderRegistry {
 
     private static final List PROVIDERS = new ArrayList();
-    private static String preferredId;
+    private static List preferredOrder;
 
     private MapProviderRegistry() {
     }
@@ -57,20 +57,47 @@ public final class MapProviderRegistry {
         PROVIDERS.add(provider);
     }
 
-    /// Hints which provider id to prefer when several are registered. May be
-    /// set from a display/build property; ignored if that provider is absent.
-    public static synchronized void setPreferredProvider(String id) {
-        preferredId = id;
+    /// Sets the ordered provider fallback chain by id, e.g.
+    /// `setProviderOrder("google", "huawei", "web")` to try Google Maps, then
+    /// Huawei Map Kit, then a web-SDK map, before the pure-vector fallback. The
+    /// special ids `"vector"`/`"none"` terminate the chain (force the vector
+    /// fallback even if a later provider is available). Any provider not named
+    /// in a non-terminated chain is still used as a last resort if available.
+    /// Build hints (`maps.providers` / per-platform `<platform>.maps.providers`)
+    /// set this at startup; call it from app code to override.
+    public static synchronized void setProviderOrder(String[] ids) {
+        if (ids == null || ids.length == 0) {
+            preferredOrder = null;
+            return;
+        }
+        List order = new ArrayList();
+        for (String id : ids) {
+            if (id != null && id.length() > 0) {
+                order.add(id);
+            }
+        }
+        preferredOrder = order.isEmpty() ? null : order;
     }
 
-    /// Returns the provider that should back a new native map: the preferred
-    /// one if registered and available, otherwise the first available
-    /// provider, or `null` when none can render right now.
+    /// Hints which single provider id to prefer (then any available). Kept for
+    /// convenience; equivalent to a one-element [#setProviderOrder(String[])].
+    public static synchronized void setPreferredProvider(String id) {
+        setProviderOrder(new String[]{id});
+    }
+
+    /// Returns the provider that should back a new native map by walking the
+    /// configured fallback chain (preferred ids first, honoring a `vector`
+    /// terminator), then any remaining available provider, or `null` when none
+    /// can render right now (the caller then uses the vector fallback).
     public static synchronized MapProvider getProvider() {
-        if (preferredId != null) {
-            for (Object prov : PROVIDERS) {
-                MapProvider p = (MapProvider) prov;
-                if (preferredId.equals(p.getId()) && safeAvailable(p)) {
+        if (preferredOrder != null) {
+            for (Object idObj : preferredOrder) {
+                String id = (String) idObj;
+                if ("vector".equals(id) || "none".equals(id)) {
+                    return null;
+                }
+                MapProvider p = availableById(id);
+                if (p != null) {
                     return p;
                 }
             }
@@ -78,6 +105,16 @@ public final class MapProviderRegistry {
         for (Object prov : PROVIDERS) {
             MapProvider p = (MapProvider) prov;
             if (safeAvailable(p)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private static MapProvider availableById(String id) {
+        for (Object prov : PROVIDERS) {
+            MapProvider p = (MapProvider) prov;
+            if (id != null && id.equals(p.getId()) && safeAvailable(p)) {
                 return p;
             }
         }
