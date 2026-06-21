@@ -25,6 +25,7 @@ package com.codename1.maps.vector;
 import com.codename1.io.CharArrayReader;
 import com.codename1.io.JSONParser;
 import com.codename1.ui.CSSColor;
+import com.codename1.ui.plaf.UIManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,39 +71,76 @@ public final class MapStyle {
     // ---- Built-in styles --------------------------------------------------
 
     /// A clean light basemap (sensible default for most apps).
+    ///
+    /// Every colour falls back to the value baked in here but is overridable
+    /// through a theme constant (a CSS color string) so an app can recolour the
+    /// map without supplying a whole style: `mapLightWaterColor`,
+    /// `mapLightLandcoverColor`, `mapLightLanduseColor`, `mapLightParkColor`,
+    /// `mapLightRoadColor`, `mapLightBuildingColor`, `mapLightBackgroundColor`,
+    /// `mapLightLabelColor`, `mapLightLabelHaloColor`. e.g. a theme constant
+    /// `mapLightWaterColor=#1e88e5`.
     public static MapStyle light() {
-        MapStyle s = new MapStyle("light", 0xfff2efe9);
-        addPolygonRule(s, "water", 0xffa0c8f0);
-        addPolygonRule(s, "ocean", 0xffa0c8f0);
-        addPolygonRule(s, "landcover", 0xffd8e8c8);
-        addPolygonRule(s, "landuse", 0xffe8f0d8);
-        addPolygonRule(s, "park", 0xffc8e0b0);
-        addLineRule(s, "waterway", 0xffa0c8f0, 6, 1.0, 16, 4.0);
-        addLineRule(s, "road", 0xffffffff, 6, 1.0, 18, 8.0);
-        addLineRule(s, "transportation", 0xffffffff, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
-        addPolygonRule(s, "building", 0xffd9d0c9);
-        addPolygonRule(s, "buildings", 0xffd9d0c9);
-        addSymbolRule(s, "place", "name", 0xff333333, 0xffffffff);
-        addSymbolRule(s, "place_label", "name", 0xff333333, 0xffffffff);
+        int water = themeColor("mapLightWaterColor", 0xffa0c8f0);
+        int road = themeColor("mapLightRoadColor", 0xffffffff);
+        int building = themeColor("mapLightBuildingColor", 0xffd9d0c9);
+        MapStyle s = new MapStyle("light", themeColor("mapLightBackgroundColor", 0xfff2efe9));
+        addPolygonRule(s, "water", water);
+        addPolygonRule(s, "ocean", water);
+        addPolygonRule(s, "landcover", themeColor("mapLightLandcoverColor", 0xffd8e8c8));
+        addPolygonRule(s, "landuse", themeColor("mapLightLanduseColor", 0xffe8f0d8));
+        addPolygonRule(s, "park", themeColor("mapLightParkColor", 0xffc8e0b0));
+        addLineRule(s, "waterway", water, 6, 1.0, 16, 4.0);
+        addLineRule(s, "road", road, 6, 1.0, 18, 8.0);
+        addLineRule(s, "transportation", road, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
+        addPolygonRule(s, "building", building);
+        addPolygonRule(s, "buildings", building);
+        int label = themeColor("mapLightLabelColor", 0xff333333);
+        int halo = themeColor("mapLightLabelHaloColor", 0xffffffff);
+        addSymbolRule(s, "place", "name", label, halo);
+        addSymbolRule(s, "place_label", "name", label, halo);
         return s;
     }
 
-    /// A dark basemap suited to night mode.
+    /// A dark basemap suited to night mode. Mirrors [#light()]: each colour is
+    /// overridable via a theme constant (`mapDarkWaterColor`,
+    /// `mapDarkLandcoverColor`, `mapDarkLanduseColor`, `mapDarkParkColor`,
+    /// `mapDarkRoadColor`, `mapDarkBuildingColor`, `mapDarkBackgroundColor`,
+    /// `mapDarkLabelColor`, `mapDarkLabelHaloColor`).
     public static MapStyle dark() {
-        MapStyle s = new MapStyle("dark", 0xff121417);
-        addPolygonRule(s, "water", 0xff1b2733);
-        addPolygonRule(s, "ocean", 0xff1b2733);
-        addPolygonRule(s, "landcover", 0xff1a1d20);
-        addPolygonRule(s, "landuse", 0xff1d2024);
-        addPolygonRule(s, "park", 0xff17251a);
-        addLineRule(s, "waterway", 0xff1b2733, 6, 1.0, 16, 4.0);
-        addLineRule(s, "road", 0xff3a4048, 6, 1.0, 18, 8.0);
-        addLineRule(s, "transportation", 0xff3a4048, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
-        addPolygonRule(s, "building", 0xff20242a);
-        addPolygonRule(s, "buildings", 0xff20242a);
-        addSymbolRule(s, "place", "name", 0xffe8e8e8, 0xff000000);
-        addSymbolRule(s, "place_label", "name", 0xffe8e8e8, 0xff000000);
+        int water = themeColor("mapDarkWaterColor", 0xff1b2733);
+        int road = themeColor("mapDarkRoadColor", 0xff3a4048);
+        int building = themeColor("mapDarkBuildingColor", 0xff20242a);
+        MapStyle s = new MapStyle("dark", themeColor("mapDarkBackgroundColor", 0xff121417));
+        addPolygonRule(s, "water", water);
+        addPolygonRule(s, "ocean", water);
+        addPolygonRule(s, "landcover", themeColor("mapDarkLandcoverColor", 0xff1a1d20));
+        addPolygonRule(s, "landuse", themeColor("mapDarkLanduseColor", 0xff1d2024));
+        addPolygonRule(s, "park", themeColor("mapDarkParkColor", 0xff17251a));
+        addLineRule(s, "waterway", water, 6, 1.0, 16, 4.0);
+        addLineRule(s, "road", road, 6, 1.0, 18, 8.0);
+        addLineRule(s, "transportation", road, 6, 1.0, 18, 8.0).excludeFilter("class", "ferry");
+        addPolygonRule(s, "building", building);
+        addPolygonRule(s, "buildings", building);
+        int label = themeColor("mapDarkLabelColor", 0xffe8e8e8);
+        int halo = themeColor("mapDarkLabelHaloColor", 0xff000000);
+        addSymbolRule(s, "place", "name", label, halo);
+        addSymbolRule(s, "place_label", "name", label, halo);
         return s;
+    }
+
+    /// Resolves a map colour from a theme constant (a CSS color string parsed
+    /// by [CSSColor]) so apps can recolour the built-in styles from their
+    /// theme, falling back to `defaultArgb` when the constant is absent.
+    private static int themeColor(String constant, int defaultArgb) {
+        try {
+            UIManager m = UIManager.getInstance();
+            String v = m == null ? null : m.getThemeConstant(constant, null);
+            return v == null ? defaultArgb : CSSColor.parse(v, defaultArgb);
+        } catch (Throwable t) {
+            // No theme context yet (very early startup / headless) -> built-in
+            // default; the style must never fail to build over a missing theme.
+            return defaultArgb;
+        }
     }
 
     private static void addPolygonRule(MapStyle s, String sourceLayer, int color) {

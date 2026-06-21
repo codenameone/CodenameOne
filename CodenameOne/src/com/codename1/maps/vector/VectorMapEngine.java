@@ -155,7 +155,7 @@ public final class VectorMapEngine {
     /// ignored. Changing it discards rendered tiles so they re-rasterize at the
     /// new resolution.
     public void setPixelRatio(double ratio) {
-        if (ratio > 0 && ratio != pixelRatio) {
+        if (ratio > 0 && Math.abs(ratio - pixelRatio) > 1e-9) {
             pixelRatio = ratio;
             rendered.clear();
             labels.clear();
