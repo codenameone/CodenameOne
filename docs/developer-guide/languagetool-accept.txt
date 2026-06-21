@@ -628,3 +628,9 @@ dedup
 # the vendor whose Mapbox Vector Tiles (MVT) format the engine decodes.
 [Bb]asemaps?
 Mapbox
+# Vector tile providers / formats referenced in the maps chapter.
+OpenFreeMap
+MapTiler
+Protomaps
+TileServer
+TileJSON
