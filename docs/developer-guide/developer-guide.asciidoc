@@ -93,6 +93,8 @@ include::Crash-Protection.asciidoc[]
 
 include::Monetization.asciidoc[]
 
+include::App-Review.asciidoc[]
+
 include::Apple-Wallet-Extension.asciidoc[]
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]

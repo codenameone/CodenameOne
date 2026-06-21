@@ -7841,6 +7841,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isNativeInAppReviewSupported() {
+        // True only when the Play In-App Review library was bundled, which the
+        // AndroidGradleBuilder does when the app references the app-review API.
+        return getActivity() != null && AppReviewSupport.isSupported();
+    }
+
+    @Override
+    public void requestNativeInAppReview(final SuccessCallback<Boolean> done) {
+        final CodenameOneActivity activity = getActivity();
+        if (activity == null || !AppReviewSupport.isSupported()) {
+            if (done != null) {
+                done.onSucess(Boolean.FALSE);
+            }
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            public void run() {
+                AppReviewSupport.requestReview(activity, done);
+            }
+        });
+    }
+
+    @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){
         share(text, image, mimeType, sourceRect, null);
     }

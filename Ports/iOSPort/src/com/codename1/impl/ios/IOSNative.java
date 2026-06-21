@@ -546,6 +546,7 @@ public final class IOSNative {
     native boolean deleteContact(int id);
     
     native void dial(String phone);
+    native void requestAppStoreReview();
     native void sendSMS(String phone, String text);
 
     native void registerPush();
