@@ -21,6 +21,9 @@
  * need additional information or have any questions.
  */
 #import "CodenameOne_GLAppDelegate.h"
+#if TARGET_OS_TV
+#include <execinfo.h>
+#endif
 #ifdef CN1_USE_UI_SCENE
 #import "CodenameOne_GLSceneDelegate.h"
 #endif
@@ -90,6 +93,26 @@ extern UIView *editingComponent;
 // NOTE: This handler WILL NOT WORK while using the debugger
 static void SignalHandler(int sig)
 {
+#if TARGET_OS_TV
+    // tvOS instrumentation: dump the faulting backtrace the first few times so a
+    // CI crash (e.g. DrawRoundRect SIGBUS) is locatable. Capped to avoid spamming
+    // when the handler returns into the same fault repeatedly.
+    {
+        static int cn1TvSigCount = 0;
+        if (cn1TvSigCount++ < 3) {
+            void *cn1TvFrames[64];
+            int cn1TvN = backtrace(cn1TvFrames, 64);
+            char **cn1TvSyms = backtrace_symbols(cn1TvFrames, cn1TvN);
+            NSLog(@"CN1TVCRASH: signal=%d frames=%d", sig, cn1TvN);
+            if (cn1TvSyms != NULL) {
+                for (int cn1i = 0; cn1i < cn1TvN; cn1i++) {
+                    NSLog(@"CN1TVCRASH:  %s", cn1TvSyms[cn1i]);
+                }
+                free(cn1TvSyms);
+            }
+        }
+    }
+#endif
     if (sig == 11) {
         // We received an EXEC_BAD_ACCESS.  This generally happens if we try to use an object
         // that is null, so let's convert it into a null pointer exception.
