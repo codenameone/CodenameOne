@@ -296,7 +296,7 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
 
     private File[] getWinPaths() {
         return new File[]{
-                new File(getModuleProject("win"), path("src", "main", "csharp")),
+                new File(getModuleProject("win"), path("src", "main", "c")),
                 new File(getModuleProject("win"), path("src", "main", "resources"))
         };
     }

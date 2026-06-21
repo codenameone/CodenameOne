@@ -29,12 +29,6 @@ goto :EOF
 !MVNW! package -DskipTests -Dcodename1.platform^=win -Dcodename1.buildTarget^=windows-device -U -e
 
 goto :EOF
-:uwp
-set /a _0_%~2=^(1 + %~2^)
-call :windows_device _1_%~2 !_0_%~2!
-echo | set /p ^=!_1_%~2!
-
-goto :EOF
 :linux_device
 !MVNW! package -DskipTests -Dcodename1.platform^=linux -Dcodename1.buildTarget^=linux-device -U -e
 
@@ -108,7 +102,7 @@ echo   windows_desktop
 echo     Builds Windows desktop app.
 echo     *Windows Desktop builds are a Pro user feature.
 echo   windows_device
-echo     Builds UWP Windows app.
+echo     Builds a native Windows app ^(no JVM^).
 echo   linux_device
 echo     Builds a native Linux app ^(ELF^, no JVM^).
 echo   javascript

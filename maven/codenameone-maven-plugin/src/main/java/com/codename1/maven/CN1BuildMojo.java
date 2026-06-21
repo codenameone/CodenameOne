@@ -401,11 +401,15 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
     private boolean isLocalBuildTarget(String buildTarget) {
+        // windows-device (BUILD_TARGET_WINDOWS_NATIVE) is a *cloud* build: it sends
+        // a "win32" build to the server (see the windows-device target in
+        // buildxml-template.xml), mirroring linux-device. Only the explicit
+        // local-windows-device cross-compile and the windows-source project
+        // generation are local.
         return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
-                || BUILD_TARGET_WINDOWS_NATIVE.equals(buildTarget));
+                || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget));
     }
 
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException, MojoFailureException {
@@ -689,10 +693,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (isLocalBuildTarget(buildTarget)) {
                 automated = false;
-                if (BUILD_TARGET_WINDOWS_NATIVE.equals(buildTarget) || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
+                if (BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
                         || "local-windows-device".equals(buildTarget)) {
-                    // Native ParparVM Windows build (clang-cl). Distinct from the
-                    // JVM-bundled "windows-desktop" (javase) target.
+                    // Local native ParparVM Windows cross-compile (clang-cl) and the
+                    // windows-source project generation. The cloud win32 build
+                    // (windows-device) is NOT local -- it falls through to the
+                    // server submission below. Distinct from the JVM-bundled
+                    // "windows-desktop" (javase) target.
                     doWindowsNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if ("local-linux-device".equals(buildTarget)) {
                     // Native ParparVM Linux build (GTK3/Cairo, CMake/Ninja). Distinct

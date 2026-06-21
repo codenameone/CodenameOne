@@ -369,7 +369,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
     private void copyWinFiles() {
         if (sourceNativeDir("win").exists()) {
-            File srcDir = new File(targetWinDir(), path("src", "main", "csharp"));
+            File srcDir = new File(targetWinDir(), path("src", "main", "c"));
             File resDir = new File(targetWinDir(), path("src", "main", "resources"));
             {
                 Copy copy = (Copy) antProject().createTask("copy");
@@ -378,7 +378,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("win"));
-                files.setIncludes("**/*.cs, *.cs");
+                files.setIncludes("**/*.c, *.c, **/*.h, *.h");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -391,7 +391,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("win"));
-                files.setExcludes("**/*.cs, *.cs");
+                files.setExcludes("**/*.c, *.c, **/*.h, *.h");
                 copy.addFileset(files);
 
                 copy.execute();
