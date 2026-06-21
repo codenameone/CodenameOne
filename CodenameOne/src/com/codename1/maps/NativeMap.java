@@ -166,7 +166,8 @@ public class NativeMap extends Container implements MapSurface {
                 provider.deinitialize(mapId);
             } catch (Throwable t) {
                 // Best effort: a provider that fails to tear down must not
-                // propagate out of dispose().
+                // propagate out of dispose(), but surface it rather than hide it.
+                t.printStackTrace();
             }
             removeComponent(peer);
             peer = null;
