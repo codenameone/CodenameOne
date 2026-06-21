@@ -33,7 +33,15 @@ import static com.codename1.maven.PathUtil.path;
  */
 @Mojo(name="build", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
-@Execute(phase = LifecyclePhase.PACKAGE)
+// NOTE: deliberately NOT @Execute(phase = PACKAGE). The build goal is always
+// bound to the package phase by the project poms (see the desktop_build / win /
+// ios / android / javascript profiles), so package runs before this goal within
+// the normal lifecycle. Adding @Execute here additionally forked a *second*
+// package lifecycle, which on Maven 3.9+ re-ran jar:jar against the already
+// attached (empty) per-module artifact and aborted the build with "You have to
+// use a classifier to attach supplemental artifacts...". The fork was redundant
+// for the only supported invocation (mvn package), so it is removed. Invoking
+// the goal bare (mvn cn1:build) without a prior package is not a supported flow.
 public class CN1BuildMojo extends AbstractCN1Mojo {
 
     public static final String BUILD_TARGET_XCODE_PROJECT = Executor.BUILD_TARGET_XCODE_PROJECT;
@@ -393,11 +401,15 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
     private boolean isLocalBuildTarget(String buildTarget) {
+        // windows-device (BUILD_TARGET_WINDOWS_NATIVE) is a *cloud* build: it sends
+        // a "win32" build to the server (see the windows-device target in
+        // buildxml-template.xml), mirroring linux-device. Only the explicit
+        // local-windows-device cross-compile and the windows-source project
+        // generation are local.
         return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
-                || BUILD_TARGET_WINDOWS_NATIVE.equals(buildTarget));
+                || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget));
     }
 
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException, MojoFailureException {
@@ -681,10 +693,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (isLocalBuildTarget(buildTarget)) {
                 automated = false;
-                if (BUILD_TARGET_WINDOWS_NATIVE.equals(buildTarget) || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
+                if (BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
                         || "local-windows-device".equals(buildTarget)) {
-                    // Native ParparVM Windows build (clang-cl). Distinct from the
-                    // JVM-bundled "windows-desktop" (javase) target.
+                    // Local native ParparVM Windows cross-compile (clang-cl) and the
+                    // windows-source project generation. The cloud win32 build
+                    // (windows-device) is NOT local -- it falls through to the
+                    // server submission below. Distinct from the JVM-bundled
+                    // "windows-desktop" (javase) target.
                     doWindowsNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if ("local-linux-device".equals(buildTarget)) {
                     // Native ParparVM Linux build (GTK3/Cairo, CMake/Ninja). Distinct

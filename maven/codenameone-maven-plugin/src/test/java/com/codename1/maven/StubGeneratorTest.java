@@ -42,10 +42,10 @@ class StubGeneratorTest {
             generator.generateCode(tempDir, false);
 
             StubGenerator checker = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, true, true);
-            // android(.java + .kt) + ios(.h + .m + .swift) + win(.cs C# UWP + .c native
-            // win32) + linux(.c native) + javase(.java) + javascript(.js) = 10.
+            // android(.java + .kt) + ios(.h + .m + .swift) + win(.c native
+            // win32) + linux(.c native) + javase(.java) + javascript(.js) = 9.
             List<File> existing = checker.getExistingFiles(tempDir);
-            assertEquals(10, existing.size());
+            assertEquals(9, existing.size());
             assertTrue(checker.isFilesExist(tempDir));
         } finally {
             deleteTree(tempDir);

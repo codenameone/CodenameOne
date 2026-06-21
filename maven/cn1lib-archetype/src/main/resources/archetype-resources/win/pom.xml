@@ -14,7 +14,7 @@
   <build>
           <resources>
               <resource>
-                  <directory>src/main/csharp</directory>
+                  <directory>src/main/c</directory>
               </resource>
               <resource>
                   <directory>src/main/resources</directory>
