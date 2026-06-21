@@ -71,16 +71,32 @@ image::img/maps-markers.png[Markers drawn with the default Material map pin,scal
 
 * `MvtTileSource` -- networked Mapbox Vector Tiles (`.pbf`/`.mvt`). `MvtTileSource.openFreeMap()` is the free, keyless OpenStreetMap-based default (its tile URLs are versioned, so it resolves them from OpenFreeMap's TileJSON automatically). Most other hosted vector basemaps require an API key supplied via `setApiKey(...)` and referenced as `{key}` in the URL template; a TileJSON endpoint (a URL with no `{z}` token) is resolved automatically.
 * `RasterTileSource` -- networked XYZ image tiles. `RasterTileSource.openStreetMap()` is a keyless raster alternative.
-* `BundledTileSource` -- tiles bundled into the app as resources, for fully offline maps.
+* `BundledTileSource` -- tiles bundled into the app as resources, for fully offline maps. The screenshot tests in this repo use this against a small fixture set so the renders are deterministic and network-free; it's not how you ship a real map.
 * `DemoTileSource` -- a self-contained synthetic tile set (no network), handy for demos and deterministic tests.
+
+==== Connecting to real map data
+
+For a real app you point `MapView` at a hosted tile service. The simplest keyless option is OpenFreeMap (OpenStreetMap-based vector tiles); for branded styles or higher quotas use a keyed provider such as MapTiler or your own self-hosted Protomaps/TileServer GL endpoint:
 
 [source,java]
 ----
-MapView vector = new MapView(
-        new MvtTileSource("https://tiles.example.com/{z}/{x}/{y}.pbf?key={key}", 0, 16)
+// Keyless, zero-config vector basemap (OpenStreetMap data via OpenFreeMap):
+MapView vector = new MapView(MvtTileSource.openFreeMap(), MapStyle.light());
+
+// A keyed hosted provider (e.g. MapTiler). {z}/{x}/{y} are the XYZ tile
+// coordinates and {key} is substituted from setApiKey(...):
+MapView branded = new MapView(
+        new MvtTileSource("https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key={key}", 0, 14)
                 .setApiKey(apiKey),
         MapStyle.dark());
+
+// A keyless raster (image-tile) basemap, if you don't need vector styling:
+MapView raster = new MapView(RasterTileSource.openStreetMap());
 ----
+
+If the URL has no `{z}` token it's treated as a TileJSON document and the real tile-URL template (and min/max zoom) are resolved from it automatically, so you can paste a provider's TileJSON URL directly.
+
+To bundle your own offline tiles instead, drop `.mvt`/`.pbf` files into the app's resources under a `{z}/{x}/{y}` layout and point `BundledTileSource` at them -- that's exactly what the test fixtures do.
 
 Vector tiles are painted according to a `MapStyle`. The built-in `MapStyle.light()` and `MapStyle.dark()` cover a usable basemap; `MapStyle.fromJson(json)` parses a subset of the MapLibre GL style specification (`background`/`fill`/`line`/`symbol` layers, zoom-stop interpolation, simple `["==", key, value]` filters).
 
@@ -112,7 +128,14 @@ codename1.arg.ios.maps.provider=apple
 
 # Android uses Google Maps (pulls Google Play Services Maps):
 codename1.arg.android.maps.provider=google
+
+# ...or Huawei Map Kit, for devices without Google Play Services (HMS Core).
+# The build pulls com.huawei.hms:maps from Huawei's Maven repo automatically;
+# your app still needs the usual HMS onboarding (agconnect-services.json / key):
+codename1.arg.android.maps.provider=huawei
 ----
+
+The built-in providers are Apple MapKit (iOS), Google Maps (Android) and Huawei Map Kit (Android). Huawei Map Kit runs on any Android device with HMS Core installed -- not only Huawei hardware -- so it's the natural choice for the Android market without Google Play Services. Each reports `isAvailable()` at runtime (Google checks Play Services, Huawei checks HMS Core), and when the selected provider is unavailable `NativeMap` falls back to the pure-vector `MapView`.
 
 When a provider is selected the build server injects that provider's implementation into your app and wires it in; with no provider selected (or when the provider is unavailable at runtime, for example when Google Play Services is missing) `NativeMap` simply renders the vector `MapView` fallback. You can configure the fallback basemap explicitly:
 

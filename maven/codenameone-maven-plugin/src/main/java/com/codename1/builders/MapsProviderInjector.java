@@ -95,6 +95,8 @@ public final class MapsProviderInjector {
             addGradleDependency(request, "com.google.android.gms:play-services-maps:18.2.0");
         } else if ("huawei".equals(provider)) {
             addGradleDependency(request, "com.huawei.hms:maps:6.11.0.300");
+            // Huawei Map Kit is published on Huawei's own Maven repo, not Central.
+            addGradleRepository(request, "maven { url 'https://developer.huawei.com/repo/' }");
         }
         return REGISTER_CALL;
     }
@@ -168,6 +170,17 @@ public final class MapsProviderInjector {
         }
         request.putArgument("gradleDependencies",
                 existing + "\n    implementation '" + gav + "'\n");
+    }
+
+    private static void addGradleRepository(BuildRequest request, String repo) {
+        // android.repositories is a ';'-separated list folded into the gradle
+        // repositories blocks (see AndroidGradleBuilder).
+        String existing = request.getArg("android.repositories", "");
+        if (existing.contains(repo)) {
+            return;
+        }
+        request.putArgument("android.repositories",
+                existing.length() == 0 ? repo : existing + ";" + repo);
     }
 
     private static void copyResource(Executor exec, String resource, File out) throws Exception {
