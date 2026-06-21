@@ -1,5 +1,0 @@
-# Live Apple MapKit map (Mac native, signed-in runner): tiles/labels load from
-# Apple and vary run-to-run, so the tolerance is wide. Still fails loudly on a
-# blank/blocked map.
-maxChannelDelta=40
-maxMismatchPercent=30.0
