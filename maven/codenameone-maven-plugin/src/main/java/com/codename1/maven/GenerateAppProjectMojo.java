@@ -391,7 +391,10 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 FileSet files = new FileSet();
                 files.setProject(antProject());
                 files.setDir(sourceNativeDir("win"));
-                files.setExcludes("**/*.c, *.c, **/*.h, *.h");
+                // The win module is a native C target now; the legacy UWP C#
+                // port is retired, so never carry .cs sources over into the
+                // migrated project (not even as stray resources).
+                files.setExcludes("**/*.c, *.c, **/*.h, *.h, **/*.cs, *.cs");
                 copy.addFileset(files);
 
                 copy.execute();
