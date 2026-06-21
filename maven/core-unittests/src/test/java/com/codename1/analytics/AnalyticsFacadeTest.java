@@ -1,9 +1,11 @@
 package com.codename1.analytics;
 
+import com.codename1.io.Preferences;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -79,6 +81,39 @@ class AnalyticsFacadeTest extends UITestBase {
 
         Analytics.clearProviders();
         Analytics.setConsent(null);
+    }
+
+    @FormTest
+    void dimensionsRoundTripAndPersist() {
+        Analytics.clearDimensions();
+        assertTrue(Analytics.getDimensions().isEmpty());
+
+        Analytics.setDimension("plan", "pro");
+        Analytics.setDimension("role", "admin");
+        Map<String, String> dims = Analytics.getDimensions();
+        assertEquals(2, dims.size());
+        assertEquals("pro", dims.get("plan"));
+        assertEquals("admin", dims.get("role"));
+
+        // Defensive copy: mutating the returned map must not affect storage.
+        dims.put("hacked", "x");
+        assertFalse(Analytics.getDimensions().containsKey("hacked"));
+
+        // Null value removes the key; null/empty key is ignored.
+        Analytics.setDimension("plan", null);
+        assertFalse(Analytics.getDimensions().containsKey("plan"));
+        Analytics.setDimension(null, "y");
+        Analytics.setDimension("", "y");
+        assertEquals(1, Analytics.getDimensions().size());
+
+        // Persistence: the raw preference must hold the surviving dimension.
+        String stored = Preferences.get("cn1$analyticsDimensions", "");
+        assertTrue(stored.contains("role"), "dimensions not persisted: " + stored);
+        assertTrue(stored.contains("admin"), "dimension value not persisted: " + stored);
+
+        Analytics.clearDimension("role");
+        assertTrue(Analytics.getDimensions().isEmpty());
+        Analytics.clearDimensions();
     }
 
     @FormTest

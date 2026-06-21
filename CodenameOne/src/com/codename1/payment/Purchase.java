@@ -22,6 +22,7 @@
  */
 package com.codename1.payment;
 
+import com.codename1.analytics.Analytics;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
@@ -112,6 +113,14 @@ public abstract class Purchase {
             r.setPurchaseDate(new Date());
         }
         Purchase.getInAppPurchase().postReceipt(r);
+
+        // Analytics auto-instrumentation: every successful native purchase
+        // routes a receipt through here, so this is the canonical completion
+        // point. The autoEvent path is consent-gated and a no-op when no
+        // provider is registered, and it never throws into the caller.
+        java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("sku", sku);
+        Analytics.autoEvent("purchase", "commerce", params);
 
     }
 

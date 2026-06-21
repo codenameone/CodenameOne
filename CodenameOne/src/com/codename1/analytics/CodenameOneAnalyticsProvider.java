@@ -206,6 +206,19 @@ public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {
         // row. None of it is a hardware identifier: the model is the public
         // marketing/hardware string, never the user-assigned device name.
         appendDeviceMetadata(b, d, locale);
+        // The desktop OS name (JavaSE exposes os.name; harmless empty on mobile
+        // ports). The platform field above already carries the coarse platform.
+        String osName = d == null ? "" : d.getProperty("os.name", "");
+        if (osName != null) {
+            osName = osName.trim();
+        }
+        AnalyticsJson.appendString(b, "osName", osName == null ? "" : osName, false);
+        // A coarse browser label on the JavaScript port (empty elsewhere).
+        AnalyticsJson.appendString(b, "browser", browserName(d), false);
+        // The app-scoped custom dimensions the console segments by. Always
+        // emitted, as an empty object when none are set.
+        b.append(",\"dimensions\":");
+        appendDimensions(b);
         // Reaching here means the Analytics facade already satisfied the
         // analytics consent gate; the flag tells the server consent was
         // granted (consent travels with the data).
@@ -306,6 +319,60 @@ public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {
             case NetworkManager.NETWORK_TYPE_NONE: return "none";
             default: return "";
         }
+    }
+
+    /// Derives a coarse browser label from the user agent on the JavaScript
+    /// port. Returns the empty string on every non-web platform (where the
+    /// user agent property is absent). The order of the checks matters: Edge
+    /// and Opera advertise a Chrome token, so they are tested first.
+    private static String browserName(Display d) {
+        if (d == null) {
+            return "";
+        }
+        String ua = d.getProperty("User-Agent", "");
+        if (ua == null || ua.length() == 0) {
+            return "";
+        }
+        ua = ua.toLowerCase();
+        if (ua.indexOf("edg") >= 0) {
+            return "Edge";
+        }
+        if (ua.indexOf("opr") >= 0 || ua.indexOf("opera") >= 0) {
+            return "Opera";
+        }
+        if (ua.indexOf("firefox") >= 0) {
+            return "Firefox";
+        }
+        if (ua.indexOf("chrome") >= 0 || ua.indexOf("crios") >= 0) {
+            return "Chrome";
+        }
+        if (ua.indexOf("safari") >= 0) {
+            return "Safari";
+        }
+        return "other";
+    }
+
+    /// Appends the custom dimensions as a nested JSON object built from
+    /// {@link Analytics#getDimensions()}. Emits {@code {}} when empty.
+    private static void appendDimensions(StringBuilder b) {
+        Map<String, String> dimensions = Analytics.getDimensions();
+        if (dimensions == null || dimensions.isEmpty()) {
+            b.append("{}");
+            return;
+        }
+        b.append('{');
+        boolean first = true;
+        for (Map.Entry<String, String> e : dimensions.entrySet()) {
+            if (!first) {
+                b.append(',');
+            }
+            b.append('"');
+            AnalyticsJson.escape(b, e.getKey());
+            b.append("\":");
+            AnalyticsJson.appendValue(b, e.getValue());
+            first = false;
+        }
+        b.append('}');
     }
 
     private String sessionId() {

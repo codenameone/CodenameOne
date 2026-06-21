@@ -27,8 +27,10 @@ import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 /// The application-facing entry point for analytics. {@code Analytics} holds the
@@ -66,9 +68,15 @@ public final class Analytics {
     private static final String PREF_CONSENT_CRASH = "cn1$analyticsConsentCrash";
     private static final String PREF_CONSENT_PERSONALIZATION = "cn1$analyticsConsentPersonalization";
     private static final String PREF_CONSENT_AD = "cn1$analyticsConsentAdStorage";
+    private static final String PREF_DIMENSIONS = "cn1$analyticsDimensions";
 
     private static final Object LOCK = new Object();
     private static final List<AnalyticsProvider> PROVIDERS = new ArrayList<AnalyticsProvider>();
+    // App-scoped segmentation dimensions ("plan", "role", ...) that the cloud
+    // console segments by. Insertion-ordered, guarded by LOCK, loaded lazily
+    // from Preferences and persisted on every mutation so they survive restarts.
+    private static final Map<String, String> DIMENSIONS = new LinkedHashMap<String, String>();
+    private static boolean dimensionsLoaded;
     private static ConsentMode consentMode = ConsentMode.OPT_IN;
     private static AnalyticsConsent consent;
     private static boolean consentLoaded;
@@ -238,6 +246,47 @@ public final class Analytics {
         }
     }
 
+    /// Internal hook used by the framework to auto-instrument built-in APIs
+    /// (purchases, sharing, ...). It builds an {@link AnalyticsEvent} and routes
+    /// it through the normal consent-gated {@link #event(AnalyticsEvent)} path,
+    /// so it is automatically a no-op when consent has not been granted. As a
+    /// fast path it does nothing at all when no provider is registered, which
+    /// keeps the cost of the framework call sites negligible when analytics is
+    /// not in use. Never throws into the caller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the event name
+    ///
+    /// - `category`: the event category, may be null
+    ///
+    /// - `params`: optional event parameters, may be null
+    ///
+    /// #### Deprecated
+    ///
+    /// Internal framework auto-instrumentation hook; not intended for app use.
+    public static void autoEvent(String name, String category, Map<String, Object> params) {
+        try {
+            synchronized (LOCK) {
+                if (PROVIDERS.isEmpty()) {
+                    return;
+                }
+            }
+            AnalyticsEvent.Builder builder = AnalyticsEvent.create(name);
+            if (category != null) {
+                builder.category(category);
+            }
+            if (params != null) {
+                for (Map.Entry<String, Object> e : params.entrySet()) {
+                    builder.param(e.getKey(), e.getValue());
+                }
+            }
+            event(builder.build());
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     /// Associates subsequent activity with a user id. No-op unless the
     /// personalization consent category is satisfied.
     ///
@@ -275,6 +324,62 @@ public final class Analytics {
             } catch (Throwable t) {
                 Log.e(t);
             }
+        }
+    }
+
+    /// Sets an app-scoped custom dimension used by the cloud console to segment
+    /// reports (for example {@code "plan"} or {@code "role"}). Dimensions are
+    /// persisted in {@link Preferences} so they survive restarts and are sent
+    /// with every first-party batch. Passing a null value removes the key.
+    /// Null or empty keys are ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the dimension key
+    ///
+    /// - `value`: the dimension value, or null to remove the key
+    public static void setDimension(String key, String value) {
+        if (key == null || key.length() == 0) {
+            return;
+        }
+        synchronized (LOCK) {
+            loadDimensions();
+            if (value == null) {
+                DIMENSIONS.remove(key);
+            } else {
+                DIMENSIONS.put(key, value);
+            }
+            persistDimensions();
+        }
+    }
+
+    /// Removes a single custom dimension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the dimension key
+    public static void clearDimension(String key) {
+        setDimension(key, null);
+    }
+
+    /// Removes every custom dimension.
+    public static void clearDimensions() {
+        synchronized (LOCK) {
+            loadDimensions();
+            DIMENSIONS.clear();
+            persistDimensions();
+        }
+    }
+
+    /// The current custom dimensions.
+    ///
+    /// #### Returns
+    ///
+    /// a defensive, insertion-ordered copy of the dimension map
+    public static Map<String, String> getDimensions() {
+        synchronized (LOCK) {
+            loadDimensions();
+            return new LinkedHashMap<String, String>(DIMENSIONS);
         }
     }
 
@@ -366,6 +471,77 @@ public final class Analytics {
             }
         }
         return clientId;
+    }
+
+    // Must be called while holding LOCK. Lazily loads the persisted dimensions
+    // from a tab/newline delimited string: rows are newline separated, key and
+    // value within a row are tab separated. Values had tabs/newlines replaced
+    // with spaces on the way in, so the parse is unambiguous.
+    private static void loadDimensions() {
+        if (dimensionsLoaded) {
+            return;
+        }
+        dimensionsLoaded = true;
+        String stored = Preferences.get(PREF_DIMENSIONS, "");
+        if (stored == null || stored.length() == 0) {
+            return;
+        }
+        String[] rows = split(stored, '\n');
+        for (String row : rows) {
+            if (row.length() == 0) {
+                continue;
+            }
+            int tab = row.indexOf('\t');
+            if (tab < 0) {
+                continue;
+            }
+            String key = row.substring(0, tab);
+            String value = row.substring(tab + 1);
+            if (key.length() > 0) {
+                DIMENSIONS.put(key, value);
+            }
+        }
+    }
+
+    // Must be called while holding LOCK.
+    private static void persistDimensions() {
+        if (DIMENSIONS.isEmpty()) {
+            Preferences.set(PREF_DIMENSIONS, "");
+            return;
+        }
+        StringBuilder b = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, String> e : DIMENSIONS.entrySet()) {
+            if (!first) {
+                b.append('\n');
+            }
+            b.append(sanitize(e.getKey())).append('\t').append(sanitize(e.getValue()));
+            first = false;
+        }
+        Preferences.set(PREF_DIMENSIONS, b.toString());
+    }
+
+    // Replaces the delimiter characters so the persisted form parses back
+    // unambiguously. Dimension keys/values are simple labels, so this is safe.
+    private static String sanitize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
+    }
+
+    // CLDC-safe split (String.split is not available); never returns null.
+    private static String[] split(String value, char delim) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        int idx = value.indexOf(delim);
+        while (idx >= 0) {
+            out.add(value.substring(start, idx));
+            start = idx + 1;
+            idx = value.indexOf(delim, start);
+        }
+        out.add(value.substring(start));
+        return out.toArray(new String[out.size()]);
     }
 
     private static List<AnalyticsProvider> snapshot() {

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.analytics.Analytics;
 import com.codename1.annotations.Async;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -5329,6 +5330,13 @@ public final class Display extends CN1Constants {
     ///
     /// - `listener`: callback for the share outcome. May be null.
     public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
+        // Analytics auto-instrumentation: this 5-arg overload is the chokepoint
+        // that every share(...) variant funnels into. The autoEvent path is
+        // consent-gated, a no-op when no provider is registered, and never
+        // throws into the caller. "type" is the coarse share content type.
+        Map<String, Object> shareParams = new HashMap<String, Object>();
+        shareParams.put("type", image != null ? "image" : "text");
+        Analytics.autoEvent("share", "engagement", shareParams);
         if (listener == null) {
             impl.share(textOrPath, image, mimeType, sourceRect);
             return;

@@ -107,6 +107,98 @@ class CodenameOneAnalyticsProviderTest extends UITestBase {
     }
 
     @FormTest
+    void batchCarriesDimensionsAndBrowser() {
+        implementation.clearQueuedRequests();
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+        Analytics.setConsent(null);
+        Analytics.setDimension("plan", "pro");
+        Analytics.setDimension("role", "admin");
+        CodenameOneAnalyticsProvider provider = new CodenameOneAnalyticsProvider();
+        Analytics.addProvider(provider);
+
+        Analytics.screen("Home", null);
+        Analytics.flush();
+
+        String body = implementation.getQueuedRequests().get(0).getRequestBody();
+        // The browser field is always present (empty on non-web platforms).
+        assertTrue(body.contains("\"browser\":"), "browser missing: " + body);
+        // osName field is always present.
+        assertTrue(body.contains("\"osName\":"), "osName missing: " + body);
+        // The dimensions object carries the set keys/values.
+        assertTrue(body.contains("\"dimensions\":{"), "dimensions object missing: " + body);
+        assertTrue(body.contains("\"plan\":\"pro\""), "plan dimension missing: " + body);
+        assertTrue(body.contains("\"role\":\"admin\""), "role dimension missing: " + body);
+
+        Analytics.clearDimensions();
+        Analytics.clearProviders();
+        Analytics.setConsent(null);
+    }
+
+    @FormTest
+    void emptyDimensionsEmitEmptyObject() {
+        implementation.clearQueuedRequests();
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+        Analytics.setConsent(null);
+        CodenameOneAnalyticsProvider provider = new CodenameOneAnalyticsProvider();
+        Analytics.addProvider(provider);
+
+        Analytics.screen("Home", null);
+        Analytics.flush();
+
+        String body = implementation.getQueuedRequests().get(0).getRequestBody();
+        assertTrue(body.contains("\"dimensions\":{}"), "empty dimensions object missing: " + body);
+
+        Analytics.clearProviders();
+        Analytics.setConsent(null);
+    }
+
+    @FormTest
+    void autoEventFiresThroughToProvider() {
+        implementation.clearQueuedRequests();
+        Analytics.clearProviders();
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+        Analytics.setConsent(null);
+        CodenameOneAnalyticsProvider provider = new CodenameOneAnalyticsProvider();
+        provider.setBatchSize(1);
+        Analytics.addProvider(provider);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("sku", "abc-123");
+        Analytics.autoEvent("purchase", "commerce", params);
+
+        List<ConnectionRequest> reqs = implementation.getQueuedRequests();
+        assertEquals(1, reqs.size(), "autoEvent must flush through to the provider");
+        String body = reqs.get(0).getRequestBody();
+        assertTrue(body.contains("\"name\":\"purchase\""), "event name missing: " + body);
+        assertTrue(body.contains("\"category\":\"commerce\""), "category missing: " + body);
+        assertTrue(body.contains("\"sku\":\"abc-123\""), "sku param missing: " + body);
+
+        Analytics.clearProviders();
+        Analytics.setConsent(null);
+    }
+
+    @FormTest
+    void autoEventIsNoOpWithoutProviders() {
+        implementation.clearQueuedRequests();
+        Analytics.clearProviders();
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+        Analytics.setConsent(null);
+
+        java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("sku", "abc-123");
+        Analytics.autoEvent("purchase", "commerce", params);
+
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "autoEvent must be a no-op when no provider is registered");
+
+        Analytics.setConsent(null);
+    }
+
+    @FormTest
     void autoFlushesWhenBatchFills() {
         implementation.clearQueuedRequests();
         Analytics.clearProviders();
