@@ -1,6 +1,5 @@
-# Live native map (Apple MapKit / Google): tiles, labels and shading load
-# from the provider servers and vary run-to-run, so the tolerance is wide. It
-# still fails loudly on a blank / blocked map (which differs across essentially
-# the whole frame) -- the regression this test guards against.
+# Live Apple MapKit map (Mac native, signed-in runner): tiles/labels load from
+# Apple and vary run-to-run, so the tolerance is wide. Still fails loudly on a
+# blank/blocked map.
 maxChannelDelta=40
 maxMismatchPercent=30.0
