@@ -477,6 +477,13 @@
         "canonical_set": false,
         "syndicated_at": "2026-06-20T15:03:14+00:00"
       }
+    },
+    "game-development-api-box2d": {
+      "devto": {
+        "id": 3955953,
+        "url": "https://dev.to/codenameone/build-games-in-java-sprites-box2d-physics-and-low-latency-sound-341i",
+        "syndicated_at": "2026-06-21T13:33:41+00:00"
+      }
     }
   }
 }
