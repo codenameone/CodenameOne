@@ -10198,11 +10198,21 @@ void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STAT
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
 #define abs(x) ((x)>0?(x):-(x))
+
+// Upper bound (in pixels) on a path alpha-mask's width/height. 8192 is the
+// MTLTextureDescriptor max-2D-dimension enforced by the tvOS simulator (and a
+// safe cap on every Apple GPU -- it dwarfs any real framebuffer). A shape whose
+// bounding box runs further than this is, by definition, almost entirely
+// off-screen; clamping the mask to this extent is lossless for visible pixels.
+#define CN1_PATH_MASK_MAX_DIM 8192
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int(JAVA_OBJECT instanceObject, JAVA_LONG renderer, JAVA_INT color)
 {
     Renderer *r = (Renderer*)renderer;
+    // Cap the extent so a far-off-screen shape can't request a multi-gigabyte
+    // ARGB buffer / over-max texture (see CN1_PATH_MASK_MAX_DIM).
+    Renderer_clampOutputExtent(r, CN1_PATH_MASK_MAX_DIM, CN1_PATH_MASK_MAX_DIM);
     JAVA_INT outputBounds[4];
-    
+
     Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
     // outputBounds is { minX, minY, maxX, maxY }; maxX / maxY can be
     // legitimately negative for shapes drawn at negative coordinates
@@ -10267,6 +10277,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 {
 #if TARGET_OS_WATCH
     {
+        Renderer_clampOutputExtent((Renderer*)renderer, CN1_PATH_MASK_MAX_DIM, CN1_PATH_MASK_MAX_DIM);
         JAVA_INT outputBounds[4];
         Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
         JAVA_INT x = min(outputBounds[0], outputBounds[2]);
@@ -10290,6 +10301,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 #ifdef CN1_USE_METAL
     {
         Renderer *r = (Renderer*)renderer;
+        // Cap the mask extent so an off-screen-extending shape (e.g. the
+        // graphics-draw-round-rect / graphics-draw-arc tests at 4K, whose
+        // stroked paths span ~15584px) doesn't ask Metal for a texture wider
+        // than the device max (8192 on the tvOS simulator) and abort the app in
+        // -[MTLTextureDescriptor validateWithDevice:]. Lossless: anything past
+        // the cap is far outside the framebuffer and clipped by the scissor.
+        Renderer_clampOutputExtent(r, CN1_PATH_MASK_MAX_DIM, CN1_PATH_MASK_MAX_DIM);
         JAVA_INT outputBounds[4];
         Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
         // outputBounds is { minX, minY, maxX, maxY } in renderer pixel
@@ -10353,6 +10371,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         }
         
         Renderer *r = (Renderer*)renderer;
+        Renderer_clampOutputExtent(r, CN1_PATH_MASK_MAX_DIM, CN1_PATH_MASK_MAX_DIM);
         JAVA_INT outputBounds[4];
 
         Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
