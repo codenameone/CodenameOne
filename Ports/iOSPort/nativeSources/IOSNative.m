@@ -6669,7 +6669,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
 // Reads the Metal renderer's persistent screenTexture back into a CGImage.
 // screenTexture is exactly the frame presentFramebuffer blits into the
 // CAMetalLayer drawable, so it IS the genuine on-screen pixel content. Unlike
@@ -6707,7 +6707,15 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                            width:w height:h mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
+#if TARGET_OS_TV
+    // tvOS is unified-memory only (like iOS): MTLStorageModeManaged and
+    // -synchronizeResource: are unavailable. Stage into a Shared texture, which
+    // the CPU can getBytes from directly once the blit completes -- no
+    // synchronize step is needed.
+    desc.storageMode = MTLStorageModeShared;
+#else
     desc.storageMode = MTLStorageModeManaged;
+#endif
     id<MTLTexture> staging = [device newTextureWithDescriptor:desc];
     if (staging == nil) {
         return NULL;
@@ -6721,7 +6729,11 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
                 toTexture:staging
          destinationSlice:0 destinationLevel:0
         destinationOrigin:MTLOriginMake(0, 0, 0)];
+#if !TARGET_OS_TV
+    // Managed storage (Catalyst) must be synchronized to become CPU-visible;
+    // Shared storage (tvOS) is already CPU-visible, so this would be invalid.
     [blit synchronizeResource:staging];
+#endif
     [blit endEncoding];
     [cb commit];
     [cb waitUntilCompleted];
@@ -6866,7 +6878,7 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
     }
 #endif
-#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
     // The Metal screen view: capture from the renderer's screenTexture, the
     // exact pixels presented to the drawable. On headless Mac Catalyst the
     // display link never presents, so -drawViewHierarchyInRect: below would

@@ -2682,8 +2682,10 @@ static CodenameOne_GLViewController *sharedSingleton;
     return currentMutableTransform;
 }
 
-#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
 // On Mac Catalyst the iOS XIB never compiles (IBAgent-macOS-UIKit crashes
+// on it under Xcode 26) and on tvOS the iOS XIBs are excluded from the bundle
+// entirely (TvNativeBuilder), so both pass nil to initWithNibName: and the
 // on it under Xcode 26), so CodenameOne_GLAppDelegate.m passes nil to
 // initWithNibName: and the default loadView would hand us a plain
 // UIView. The rendering pipeline expects [eaglView] to find a METALView
