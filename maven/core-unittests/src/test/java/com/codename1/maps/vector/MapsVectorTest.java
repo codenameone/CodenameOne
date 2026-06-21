@@ -9,6 +9,8 @@
  */
 package com.codename1.maps.vector;
 
+import com.codename1.ui.CSSColor;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -113,9 +115,9 @@ class MapsVectorTest {
 
     @Test
     void colorParserHandlesCommonForms() {
-        assertEquals(0xff0000ff, ColorParser.parse("#0000ff", 0));
-        assertEquals(0xffffffff, ColorParser.parse("#fff", 0));
-        assertEquals(0x80ff0000, ColorParser.parse("rgba(255,0,0,0.5)", 0));
-        assertEquals(0xff112233, ColorParser.parse("#112233", 0));
+        assertEquals(0xff0000ff, CSSColor.parse("#0000ff", 0));
+        assertEquals(0xffffffff, CSSColor.parse("#fff", 0));
+        assertEquals(0x80ff0000, CSSColor.parse("rgba(255,0,0,0.5)", 0));
+        assertEquals(0xff112233, CSSColor.parse("#112233", 0));
     }
 }

@@ -9,6 +9,8 @@
  */
 package com.codename1.maps.vector;
 
+import com.codename1.ui.CSSColor;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -139,18 +141,27 @@ class MapsVectorInternalsTest {
         return false;
     }
 
-    // ---- ColorParser ------------------------------------------------------
+    // ---- CSSColor ---------------------------------------------------------
 
     @Test
     void colorParserForms() {
-        assertEquals(0xffaabbcc, ColorParser.parse("#aabbcc", 0));
-        assertEquals(0xffaabbcc, ColorParser.parse("#abc", 0));
-        assertEquals(0x80ffffff, ColorParser.parse("#ffffff80", 0));
-        assertEquals(0xff010203, ColorParser.parse("rgb(1,2,3)", 0));
-        assertEquals(0xff0a0b0c, ColorParser.parse("  #0A0B0C  ", 0));
-        assertEquals(123, ColorParser.parse("not-a-color", 123));
-        assertEquals(123, ColorParser.parse(null, 123));
-        assertEquals(123, ColorParser.parse("hsl(1,2,3)", 123));
+        assertEquals(0xffaabbcc, CSSColor.parse("#aabbcc", 0));
+        assertEquals(0xffaabbcc, CSSColor.parse("#abc", 0));
+        assertEquals(0x80ffffff, CSSColor.parse("#ffffff80", 0));
+        assertEquals(0xff010203, CSSColor.parse("rgb(1,2,3)", 0));
+        assertEquals(0xff0a0b0c, CSSColor.parse("  #0A0B0C  ", 0));
+        assertEquals(123, CSSColor.parse("not-a-color", 123));
+        assertEquals(123, CSSColor.parse(null, 123));
+        assertEquals(123, CSSColor.parse("hsl(1,2,3)", 123));
+    }
+
+    @Test
+    void cssColorSupportsNamedPercentAndShortAlpha() {
+        // Forms the old maps-local ColorParser could not handle, now available
+        // to the map style engine because it shares the canonical CSS parser.
+        assertEquals(0xff0000ff, CSSColor.parse("blue", 0));
+        assertEquals(0xffff0000, CSSColor.parse("#f00f", 0));
+        assertEquals(0xff00ff00, CSSColor.parse("rgb(0%,100%,0%)", 0));
     }
 
     // ---- Tile sources -----------------------------------------------------

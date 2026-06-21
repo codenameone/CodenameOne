@@ -24,6 +24,7 @@ package com.codename1.maps.vector;
 
 import com.codename1.io.CharArrayReader;
 import com.codename1.io.JSONParser;
+import com.codename1.ui.CSSColor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -241,6 +242,6 @@ public final class MapStyle {
         if (!(o instanceof String)) {
             return def;
         }
-        return ColorParser.parse((String) o, def);
+        return CSSColor.parse((String) o, def);
     }
 }
