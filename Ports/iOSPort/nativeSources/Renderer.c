@@ -607,9 +607,11 @@ void Renderer_produceAlphas(Renderer *pRenderer, AlphaConsumer *pAC) {
 }
 
 //@Override
+static jint sMaxAlpha = 0;
 static void setMaxAlpha(jint maxalpha) {
     jint i;
 
+    sMaxAlpha = maxalpha;
     alphaMap = malloc(maxalpha+1);
     for (i = 0; i <= maxalpha; i++) {
         alphaMap[i] = (jbyte) ((i*255 + maxalpha/2)/maxalpha);
@@ -638,7 +640,16 @@ static void setAndClearRelativeAlphas(AlphaConsumer *pAC,
         a += alphaRow[i];
         alphaRow[i] = 0;
         if (inBuffer) {
-            out[off+i] = alphaMap[a];
+            // Clamp the accumulated coverage to the alphaMap range. For a
+            // balanced (closed) winding `a` already lands in [0, sMaxAlpha], so
+            // this is a no-op on the common path -- but bounding the mask extent
+            // (Renderer_setOutputClip) can pull the left edge inward through an
+            // edge whose matching crossing was clipped away, leaving the running
+            // sum momentarily unbalanced. Indexing alphaMap[a] with an
+            // out-of-range a was an out-of-bounds read (intermittent SIGBUS on
+            // the tvOS 4K theme tests). Clamp instead of fault.
+            jint ai = a < 0 ? 0 : (a > sMaxAlpha ? sMaxAlpha : a);
+            out[off+i] = alphaMap[ai];
         }
     }
 }
