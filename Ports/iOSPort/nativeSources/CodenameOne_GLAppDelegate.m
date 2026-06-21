@@ -606,7 +606,11 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 
 
 #ifdef CN1_INCLUDE_NOTIFICATIONS
-- (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler __API_AVAILABLE(macos(10.14), ios(10.0), watchos(3.0), tvos(10.0)) 
+// UNNotificationContent.userInfo is unavailable on tvOS, so the foreground
+// presentation handler (which reads userInfo to route local/push payloads) is
+// omitted there -- it is an optional UNUserNotificationCenterDelegate method.
+#if !TARGET_OS_TV
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler __API_AVAILABLE(macos(10.14), ios(10.0), watchos(3.0), tvos(10.0))
 {
     if (@available(iOS 10, *)) {
         if( [notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
@@ -633,8 +637,9 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
     [self cn1RoutePush:userInfo];
 #endif
 
-   
+
 }
+#endif // !TARGET_OS_TV (willPresentNotification)
 
 
 // UNNotificationResponse (notification action responses) is unavailable on tvOS.
