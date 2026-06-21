@@ -27,19 +27,20 @@ import com.codename1.components.SpanLabel;
 import com.codename1.messaging.Message;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
-import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
 
 /// The Codename One drawn rating widget shown by [AppReview] when no native
-/// review prompt is available. It presents a row of stars; a high rating routes
-/// the user to the store while a low rating opens a private feedback step.
+/// review prompt is available. It is presented as a bottom [Sheet] so the user
+/// can dismiss it with a swipe rather than a blocking modal: a row of stars,
+/// then a high rating routes to the store while a low rating opens a private
+/// feedback step.
 ///
 /// This class is intentionally package private -- apps interact with it
 /// exclusively through [AppReview].
@@ -50,68 +51,53 @@ class RatingDialog {
     }
 
     static void show(final AppReview config) {
-        int rating = showStars(config);
-        if (rating <= 0) {
-            // Dismissed without rating. We leave the "completed" flag alone so
-            // the scheduler may try again after daysBetweenPrompts, unless the
-            // user explicitly opted out (handled inside showStars).
-            return;
+        String appName = CN.getProperty("AppName", "this app");
+        final Sheet sheet = new Sheet(null, "Enjoying " + appName + "?");
+        Container content = sheet.getContentPane();
+        content.setLayout(BoxLayout.y());
+
+        SpanLabel prompt = new SpanLabel("Tap a star to rate your experience.");
+        prompt.setUIID("DialogBody");
+        content.add(prompt);
+
+        // A fixed grid keeps the stars on a single row on narrow screens
+        // instead of wrapping the way a flow layout would.
+        Container stars = new Container(new GridLayout(1, MAX_STARS));
+        for (int i = 1; i <= MAX_STARS; i++) {
+            final int value = i;
+            Button star = new Button();
+            star.setUIID("Label");
+            FontImage.setMaterialIcon(star, FontImage.MATERIAL_STAR_BORDER, 5);
+            star.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    sheet.back();
+                    onRating(config, value);
+                }
+            });
+            stars.add(star);
         }
+        content.add(stars);
+
+        Button never = new Button("Don't ask again");
+        never.setUIID("DialogCommandText");
+        never.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                config.markCompleted();
+                sheet.back();
+            }
+        });
+        content.add(never);
+
+        sheet.show();
+    }
+
+    private static void onRating(AppReview config, int rating) {
         if (rating >= config.getHighRatingThreshold()) {
             config.markCompleted();
             openStore(config);
         } else {
             collectFeedback(config, rating);
         }
-    }
-
-    private static int showStars(final AppReview config) {
-        String appName = CN.getProperty("AppName", "this app");
-        final Dialog dialog = new Dialog("Enjoying " + appName + "?");
-        dialog.setLayout(BoxLayout.y());
-
-        SpanLabel prompt = new SpanLabel("Tap a star to rate your experience.");
-        prompt.setUIID("DialogBody");
-        dialog.add(prompt);
-
-        final int[] result = new int[]{0};
-        Container stars = new Container(new FlowLayout(Component.CENTER));
-        for (int i = 1; i <= MAX_STARS; i++) {
-            final int value = i;
-            Button star = new Button();
-            FontImage.setMaterialIcon(star, FontImage.MATERIAL_STAR_BORDER, 5);
-            star.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    result[0] = value;
-                    dialog.dispose();
-                }
-            });
-            stars.add(star);
-        }
-        dialog.add(stars);
-
-        Button notNow = new Button("Not now");
-        notNow.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                result[0] = 0;
-                dialog.dispose();
-            }
-        });
-        Button never = new Button("Don't ask again");
-        never.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                result[0] = 0;
-                config.markCompleted();
-                dialog.dispose();
-            }
-        });
-        Container actions = new Container(new FlowLayout(Component.CENTER));
-        actions.add(notNow);
-        actions.add(never);
-        dialog.add(actions);
-
-        dialog.show();
-        return result[0];
     }
 
     private static void openStore(AppReview config) {
@@ -142,15 +128,16 @@ class RatingDialog {
             return;
         }
 
-        final Dialog dialog = new Dialog("Help us improve");
-        dialog.setLayout(BoxLayout.y());
+        final Sheet sheet = new Sheet(null, "Help us improve");
+        Container content = sheet.getContentPane();
+        content.setLayout(BoxLayout.y());
         SpanLabel prompt = new SpanLabel("Sorry to hear it wasn't great. What can we do better?");
         prompt.setUIID("DialogBody");
-        dialog.add(prompt);
+        content.add(prompt);
 
         final TextArea feedback = new TextArea("", 4, 20);
         feedback.setHint("Your feedback");
-        dialog.add(feedback);
+        content.add(feedback);
 
         Button send = new Button("Send");
         send.addActionListener(new ActionListener() {
@@ -160,22 +147,13 @@ class RatingDialog {
                     text = "";
                 }
                 config.markCompleted();
-                dialog.dispose();
+                sheet.back();
                 deliverFeedback(config, rating, text);
             }
         });
-        Button cancel = new Button("Cancel");
-        cancel.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                dialog.dispose();
-            }
-        });
-        Container actions = new Container(new FlowLayout(Component.CENTER));
-        actions.add(cancel);
-        actions.add(send);
-        dialog.add(actions);
+        content.add(send);
 
-        dialog.show();
+        sheet.show();
     }
 
     private static void deliverFeedback(AppReview config, int rating, String text) {

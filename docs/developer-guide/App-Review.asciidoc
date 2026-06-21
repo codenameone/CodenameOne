@@ -1,8 +1,8 @@
 == App Review &amp; Feedback
 
-Both Apple and Google provide an in-app review prompt that lets the user rate your app without leaving it. Asking for a review at the right moment is one of the most effective ways to improve your store rating and engagement. Codename One exposes this through the `com.codename1.appreview.AppReview` API, which uses the native review sheet (`SKStoreReviewController` on iOS, the Play In-App Review API on Android) when it is available and transparently falls back to a Codename One drawn rating widget everywhere else (the simulator, desktop, the web target and older OS versions).
+Both Apple and Google provide an in-app review prompt that lets the user rate your app without leaving it. Asking for a review at the right moment is one of the most effective ways to improve your store rating. Codename One exposes this through the `com.codename1.appreview.AppReview` API, which uses the native review sheet (`SKStoreReviewController` on iOS, the Play In-App Review API on Android) when it's available and falls back to a Codename One drawn rating widget everywhere else (the simulator, desktop, the web target and older OS versions).
 
-The native prompt is the store-sanctioned way to ask for a review, so prefer it over a hand-rolled dialog: the operating system controls how often it is shown and silently throttles excessive prompts, which keeps your app compliant with store policies.
+The native prompt is the store-sanctioned way to ask for a review, so prefer it over a hand-rolled dialog: the operating system controls how often it appears and throttles excessive prompts, which keeps your app within store policy.
 
 === Asking for a review
 
@@ -13,7 +13,7 @@ The simplest usage is a single call at a moment that makes sense in your app -- 
 AppReview.getInstance().requestReview();
 ----
 
-`requestReview()` shows the native review sheet when the platform supports it. On platforms without a native prompt it shows the built-in rating widget instead. You decide the timing entirely.
+`requestReview()` shows the native review sheet when the platform supports it. On platforms without a native prompt it shows the built-in rating widget instead. You decide the timing.
 
 === The engagement scheduler
 
@@ -30,15 +30,15 @@ AppReview.getInstance()
         .registerSession();
 ----
 
-`registerSession()` records the launch and, once the thresholds are met and the user has not already rated or opted out, prompts automatically. The bookkeeping (launch count, install date, last-prompt time and a "completed" flag) is stored in https://www.codenameone.com/javadoc/com/codename1/io/Preferences.html[Preferences] so it survives restarts. Once the user rates the app or chooses "don't ask again", `AppReview` stops prompting permanently. Call `reset()` to clear this state.
+`registerSession()` records the launch and, once the thresholds are met and the user hasn't already rated or opted out, prompts. The bookkeeping (launch count, install date, last-prompt time and a completion flag) is stored in https://www.codenameone.com/javadoc/com/codename1/io/Preferences.html[Preferences] so it survives restarts. Once the user rates the app or chooses to stop, `AppReview` stops prompting. Call `reset()` to clear this state.
 
-TIP: You can combine both styles -- use `registerSession()` for the automatic cadence and still call `requestReview()` directly from a "Rate this app" menu item.
+TIP: You can combine both styles -- use `registerSession()` for the automatic cadence and still call `requestReview()` from a "Rate this app" menu item.
 
 === Smart feedback split
 
-When the native prompt is unavailable, the fallback widget asks the user for a star rating and then routes them based on the result. A high rating (at or above the threshold set by `setHighRatingThreshold(int)`, four stars by default) sends the user to your store listing. A low rating instead opens a private feedback path, so unhappy users reach you directly rather than posting a one-star public review.
+The fallback widget is presented as a bottom sheet, so the user can swipe it away instead of dismissing a blocking dialog. It asks for a star rating and then routes the user based on the result. A high rating (at or above the threshold set by `setHighRatingThreshold(int)`, four stars by default) sends the user to your store listing. A low rating opens a private feedback step instead, so unhappy users reach you directly rather than posting a one-star public review.
 
-By default the low-rating feedback is collected through an e-mail to the address passed to `setSupportEmail(String)`. To deliver feedback through your own backend instead, register a `FeedbackListener`:
+By default the low-rating feedback is collected through an e-mail to the address passed to `setSupportEmail(String)`. To deliver feedback through your own backend, register a `FeedbackListener`:
 
 [source,java]
 ----
@@ -58,6 +58,6 @@ AppReview.getInstance().setFeedbackListener(new FeedbackListener() {
 
 === How the platform decides
 
-`AppReview` checks `CN.isNativeInAppReviewSupported()` to decide between the native sheet and the fallback widget. On Android the native path is only active when the app actually references the app-review API -- the build automatically adds the Play In-App Review library in that case, so apps that never ask for a review carry no extra dependency. On iOS the StoreKit review controller is linked the same way, only when the API is used.
+`AppReview` checks `CN.isNativeInAppReviewSupported()` to choose between the native sheet and the fallback widget. On Android the native path is active only when the app references the app-review API -- the build adds the Play In-App Review library in that case, so apps that never ask for a review carry no extra dependency. On iOS the StoreKit review controller is linked the same way, only when the API is used.
 
-NOTE: The native review controllers deliberately hide whether the user actually submitted a rating, and may decline to show the prompt at all based on their own quotas. Treat a review request as best-effort; never block your UI waiting for a result.
+NOTE: The native review controllers hide whether the user submitted a rating, and may decline to show the prompt at all based on their own quotas. Treat a review request as best-effort; never block your UI waiting for a result.

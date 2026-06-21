@@ -66,7 +66,7 @@ public class AppReview {
 
     private static final long DAY_MILLIS = 24L * 60L * 60L * 1000L;
 
-    private static AppReview instance;
+    private static final AppReview instance = new AppReview();
 
     private int minimumLaunches = 5;
     private int minimumDaysInstalled = 3;
@@ -85,9 +85,6 @@ public class AppReview {
     ///
     /// the singleton used by the whole application.
     public static AppReview getInstance() {
-        if (instance == null) {
-            instance = new AppReview();
-        }
         return instance;
     }
 
