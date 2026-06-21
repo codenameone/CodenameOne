@@ -220,10 +220,7 @@ public class AppReview {
             return false;
         }
         long lastPrompt = Preferences.get(PREF_LAST_PROMPT, 0L);
-        if (lastPrompt > 0L && now - lastPrompt < ((long) daysBetweenPrompts) * DAY_MILLIS) {
-            return false;
-        }
-        return true;
+        return lastPrompt <= 0L || now - lastPrompt >= ((long) daysBetweenPrompts) * DAY_MILLIS;
     }
 
     /// Immediately asks the user for a review. Uses the native store review
@@ -237,6 +234,7 @@ public class AppReview {
             requestReviewImpl();
         } else {
             CN.callSerially(new Runnable() {
+                @Override
                 public void run() {
                     requestReviewImpl();
                 }
@@ -247,6 +245,7 @@ public class AppReview {
     private void requestReviewImpl() {
         if (CN.isNativeInAppReviewSupported()) {
             CN.requestNativeInAppReview(new SuccessCallback<Boolean>() {
+                @Override
                 public void onSucess(Boolean handled) {
                     if (handled != null && handled.booleanValue()) {
                         // The OS now owns the rate-limiting / cadence of review

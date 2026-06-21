@@ -44,7 +44,7 @@ import com.codename1.ui.layouts.GridLayout;
 ///
 /// This class is intentionally package private -- apps interact with it
 /// exclusively through [AppReview].
-class RatingDialog {
+final class RatingDialog {
     private static final int MAX_STARS = 5;
 
     private RatingDialog() {
@@ -69,6 +69,7 @@ class RatingDialog {
             star.setUIID("Label");
             FontImage.setMaterialIcon(star, FontImage.MATERIAL_STAR_BORDER, 5);
             star.addActionListener(new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     sheet.back();
                     onRating(config, value);
@@ -81,6 +82,7 @@ class RatingDialog {
         Button never = new Button("Don't ask again");
         never.setUIID("DialogCommandText");
         never.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 config.markCompleted();
                 sheet.back();
@@ -141,6 +143,7 @@ class RatingDialog {
 
         Button send = new Button("Send");
         send.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 String text = feedback.getText();
                 if (text == null) {
