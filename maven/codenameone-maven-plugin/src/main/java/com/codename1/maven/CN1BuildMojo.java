@@ -33,7 +33,15 @@ import static com.codename1.maven.PathUtil.path;
  */
 @Mojo(name="build", requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
-@Execute(phase = LifecyclePhase.PACKAGE)
+// NOTE: deliberately NOT @Execute(phase = PACKAGE). The build goal is always
+// bound to the package phase by the project poms (see the desktop_build / win /
+// ios / android / javascript profiles), so package runs before this goal within
+// the normal lifecycle. Adding @Execute here additionally forked a *second*
+// package lifecycle, which on Maven 3.9+ re-ran jar:jar against the already
+// attached (empty) per-module artifact and aborted the build with "You have to
+// use a classifier to attach supplemental artifacts...". The fork was redundant
+// for the only supported invocation (mvn package), so it is removed. Invoking
+// the goal bare (mvn cn1:build) without a prior package is not a supported flow.
 public class CN1BuildMojo extends AbstractCN1Mojo {
 
     public static final String BUILD_TARGET_XCODE_PROJECT = Executor.BUILD_TARGET_XCODE_PROJECT;
