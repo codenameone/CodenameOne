@@ -34,6 +34,19 @@ public class NativeMapProviderScreenshotTest extends BaseTest {
             done();
             return true;
         }
+        // Apple MapKit only fetches tiles in an authorized environment. The Mac
+        // native (Catalyst) CI runner is signed in and renders a real map; the
+        // iOS simulator is not and shows only the blank grid placeholder (Apple
+        // logo + "Legal"), useless as a golden. Restrict the captured baseline
+        // to the desktop runner where it actually renders; the vector-fallback
+        // path is covered by NativeMapFallbackScreenshotTest and a real
+        // cross-platform provider render by GoogleWebMapScreenshotTest.
+        if (!com.codename1.ui.CN.isDesktop()) {
+            System.out.println(
+                    "CN1SS:INFO:test=NativeMapProvider status=SKIPPED reason=native-tiles-need-signed-in-device");
+            done();
+            return true;
+        }
         NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
         if (!map.isNativeMap()) {
             System.out.println(
