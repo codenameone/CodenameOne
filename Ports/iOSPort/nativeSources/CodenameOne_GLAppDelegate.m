@@ -131,7 +131,12 @@ static void installSignalHandlers() {
         // the NIB name on Mac so UIViewController synthesises a plain
         // UIView; the Metal layer is attached programmatically further
         // down the init chain, so the XIB's IBOutlet wiring isn't needed.
-#if TARGET_OS_MACCATALYST
+        // tvOS excludes the iOS XIBs from its bundle too (TvNativeBuilder's
+        // EXCLUDED_SOURCE_FILE_NAMES), so loading 'CodenameOne_GLViewController'
+        // as a NIB crashes at launch ("Could not load NIB in bundle"). Pass nil
+        // there as well -- the Metal layer is attached programmatically, so the
+        // XIB's IBOutlet wiring isn't needed.
+#if TARGET_OS_MACCATALYST || TARGET_OS_TV
         NSString *cn1NibName = nil;
 #else
         NSString *cn1NibName = @"CodenameOne_GLViewController";

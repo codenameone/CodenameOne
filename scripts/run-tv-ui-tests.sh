@@ -112,8 +112,13 @@ rt_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
 
 xcrun simctl terminate "$TV_UDID" "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl install "$TV_UDID" "$APP_PATH"
-xcrun simctl launch "$TV_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rt_log "launch failed"; exit 6; }
-rt_log "Launched tvOS app; waiting for the suite to stream screenshots..."
+# Capture the app's stdout/stderr (the CN1SS:* suite markers and any native
+# exception / crash) so a no-screenshot run is diagnosable instead of silent.
+APP_CONSOLE="$ARTIFACTS_DIR/tv-app-console.log"
+: > "$APP_CONSOLE"
+( xcrun simctl launch --console-pty "$TV_UDID" "$BUNDLE_ID" >>"$APP_CONSOLE" 2>&1 ) &
+APP_CONSOLE_PID=$!
+rt_log "Launched tvOS app (console -> $APP_CONSOLE); waiting for the suite to stream screenshots..."
 
 MAX_WAIT="${CN1SS_TV_TIMEOUT:-1200}"
 TV_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-tv}"
@@ -131,8 +136,32 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
     stable=$((stable+1)); [ "$stable" -ge 10 ] && break
   else stable=0; fi
   prev="$cur"
+  # The suite emits CN1SS:SUITE:FINISHED when done; bail early on that (covers
+  # the seed run where EXPECTED=0) or on an obvious native crash, instead of
+  # blocking the full MAX_WAIT.
+  if grep -qa "CN1SS:SUITE:FINISHED" "$APP_CONSOLE" 2>/dev/null; then
+    rt_log "Suite reported FINISHED after ${waited}s"; break
+  fi
+  if grep -qaE "Fatal|Terminating app due to uncaught exception|EXC_BAD|did crash|libsystem_kernel" "$APP_CONSOLE" 2>/dev/null; then
+    rt_log "Detected app crash/fatal in console after ${waited}s"; break
+  fi
 done
 rt_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
+
+# Always surface the app console + any crash report so a zero-screenshot run is
+# diagnosable from the uploaded artifacts.
+rt_log "----- tvOS app console (tail) -----"
+tail -60 "$APP_CONSOLE" 2>/dev/null | sed 's/^/[tv-app] /' || true
+rt_log "----- end app console -----"
+CRASH_DIR="$HOME/Library/Logs/DiagnosticReports"
+SIM_CRASH_DIR="$HOME/Library/Developer/CoreSimulator/Devices/$TV_UDID/data/Library/Logs/DiagnosticReports"
+for d in "$SIM_CRASH_DIR" "$CRASH_DIR"; do
+  [ -d "$d" ] || continue
+  /usr/bin/find "$d" -name 'HelloCodenameOneTV*' -newermt '-10 minutes' 2>/dev/null | while IFS= read -r cr; do
+    rt_log "----- crash report: $cr -----"; sed -n '1,40p' "$cr" | sed 's/^/[crash] /'
+    cp "$cr" "$ARTIFACTS_DIR/" 2>/dev/null || true
+  done
+done
 
 # --- Compare against the tvOS golden set + emit report ----------------------
 REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-tv}"
