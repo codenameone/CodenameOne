@@ -24,12 +24,14 @@ package com.codename1.analytics;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 
 /// The Codename One first-party analytics provider. It batches events and
 /// posts them as JSON to the Codename One cloud
@@ -58,6 +60,11 @@ public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {
     private final List<PendingEvent> buffer = new ArrayList<PendingEvent>();
     private int batchSize = DEFAULT_BATCH_SIZE;
     private String endpoint;
+    // A pseudonymous session id, generated once per app run (per provider
+    // instance). It is not persisted, so it naturally resets when the app is
+    // relaunched -- the server uses it to group events into sessions and to
+    // reconstruct screen-to-screen flows without needing any hardware id.
+    private String sessionId;
 
     /// Overrides the ingest endpoint URL. By default the provider posts to the
     /// Codename One cloud (honouring the `cloudServerURL` display property).
@@ -183,9 +190,10 @@ public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {
             locale = loc == null ? "" : loc.toString();
         }
 
-        StringBuilder b = new StringBuilder(256);
+        StringBuilder b = new StringBuilder(384);
         b.append('{');
         AnalyticsJson.appendString(b, "clientId", clientId, true);
+        AnalyticsJson.appendString(b, "sessionId", sessionId(), false);
         AnalyticsJson.appendString(b, "buildKey", buildKey, false);
         AnalyticsJson.appendString(b, "packageName", packageName, false);
         AnalyticsJson.appendString(b, "appName", appName, false);
@@ -193,6 +201,11 @@ public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {
         AnalyticsJson.appendString(b, "platform", platform, false);
         AnalyticsJson.appendString(b, "osVersion", osVersion, false);
         AnalyticsJson.appendString(b, "locale", locale, false);
+        // Device segmentation metadata (first-party only). Shared by every
+        // event in the batch, so the server denormalises it onto each stored
+        // row. None of it is a hardware identifier: the model is the public
+        // marketing/hardware string, never the user-assigned device name.
+        appendDeviceMetadata(b, d, locale);
         // Reaching here means the Analytics facade already satisfied the
         // analytics consent gate; the flag tells the server consent was
         // granted (consent travels with the data).
@@ -206,6 +219,108 @@ public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {
         }
         b.append("]}");
         return b.toString();
+    }
+
+    /// Appends the shared device-segmentation fields to the batch JSON. Every
+    /// value is read defensively so a single unavailable property never aborts
+    /// a flush. The device model is the public hardware/marketing string
+    /// (`iPhone15,2`, `Pixel 8`) -- never the user-assigned device name, which
+    /// would be personally identifying.
+    private void appendDeviceMetadata(StringBuilder b, Display d, String locale) {
+        String deviceModel = "";
+        String manufacturer = "";
+        String formFactor = "phone";
+        String density = "";
+        int screenWidth = 0;
+        int screenHeight = 0;
+        String network = "";
+        String language = "";
+        if (d != null) {
+            // DeviceHardwareModel is the privacy-safe hardware identifier added
+            // to the iOS/Android ports; DeviceName is the fallback for ports
+            // that don't implement it (on Android it is already Build.MODEL).
+            deviceModel = d.getProperty("DeviceHardwareModel", d.getProperty("DeviceName", ""));
+            manufacturer = d.getProperty("DeviceManufacturer", "");
+            formFactor = formFactor(d);
+            density = densityName(d.getDeviceDensity());
+            screenWidth = d.getDisplayWidth();
+            screenHeight = d.getDisplayHeight();
+        }
+        try {
+            network = networkName(NetworkManager.getInstance().getCurrentNetworkType());
+        } catch (Throwable t) {
+            network = "";
+        }
+        Locale loc = Locale.getDefault();
+        if (loc != null) {
+            language = loc.getLanguage();
+        }
+        if ((language == null || language.length() == 0) && locale != null) {
+            int us = locale.indexOf('_');
+            language = us > 0 ? locale.substring(0, us) : locale;
+        }
+        AnalyticsJson.appendString(b, "deviceModel", deviceModel, false);
+        AnalyticsJson.appendString(b, "deviceManufacturer", manufacturer, false);
+        AnalyticsJson.appendString(b, "formFactor", formFactor, false);
+        AnalyticsJson.appendString(b, "density", density, false);
+        AnalyticsJson.appendLong(b, "screenWidth", screenWidth, false);
+        AnalyticsJson.appendLong(b, "screenHeight", screenHeight, false);
+        AnalyticsJson.appendString(b, "network", network, false);
+        AnalyticsJson.appendString(b, "language", language == null ? "" : language, false);
+    }
+
+    private static String formFactor(Display d) {
+        if (CN.isWatch()) {
+            return "watch";
+        }
+        if (d.isDesktop()) {
+            return "desktop";
+        }
+        if (d.isTablet()) {
+            return "tablet";
+        }
+        return "phone";
+    }
+
+    private static String densityName(int density) {
+        switch (density) {
+            case Display.DENSITY_VERY_LOW: return "very_low";
+            case Display.DENSITY_LOW: return "low";
+            case Display.DENSITY_MEDIUM: return "medium";
+            case Display.DENSITY_HIGH: return "high";
+            case Display.DENSITY_VERY_HIGH: return "very_high";
+            case Display.DENSITY_HD: return "hd";
+            case Display.DENSITY_560: return "xhd";
+            case Display.DENSITY_2HD: return "2hd";
+            case Display.DENSITY_4K: return "4k";
+            default: return "";
+        }
+    }
+
+    private static String networkName(int type) {
+        switch (type) {
+            case NetworkManager.NETWORK_TYPE_WIFI: return "wifi";
+            case NetworkManager.NETWORK_TYPE_CELLULAR: return "cellular";
+            case NetworkManager.NETWORK_TYPE_ETHERNET: return "ethernet";
+            case NetworkManager.NETWORK_TYPE_BLUETOOTH: return "bluetooth";
+            case NetworkManager.NETWORK_TYPE_NONE: return "none";
+            default: return "";
+        }
+    }
+
+    private String sessionId() {
+        synchronized (lock) {
+            if (sessionId == null) {
+                Random r = new Random();
+                char[] hex = "0123456789abcdef".toCharArray();
+                StringBuilder s = new StringBuilder(16);
+                for (int i = 0; i < 16; i++) {
+                    s.append(hex[r.nextInt(16)]);
+                }
+                sessionId = s.toString();
+            }
+            return sessionId;
+        }
     }
 
     private static void appendEvent(StringBuilder b, PendingEvent e) {

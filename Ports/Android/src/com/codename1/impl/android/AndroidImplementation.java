@@ -3267,6 +3267,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
         }
+        if("DeviceHardwareModel".equals(key)) {
+            return "" + android.os.Build.MODEL;
+        }
+        if("DeviceManufacturer".equals(key)) {
+            return "" + android.os.Build.MANUFACTURER;
+        }
         if("Emulator".equals(key)) {
             return "" + isEmulator();
         }
