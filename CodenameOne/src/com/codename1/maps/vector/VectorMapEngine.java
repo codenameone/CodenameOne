@@ -56,6 +56,12 @@ public final class VectorMapEngine {
     private int viewWidth;
     private int viewHeight;
 
+    // Physical pixels per logical (256px) map pixel. On a high-density screen a
+    // z13 tile must occupy more device pixels or the map shows far too much area
+    // (the viewport spans many tiles) and floats in the background. 1 == no
+    // scaling (desktop / mdpi). Set by the host from the device density.
+    private double pixelRatio = 1.0;
+
     private final TileCache rendered;
     private final Map labels = new HashMap();
     private final Map pending = new HashMap();
@@ -143,6 +149,31 @@ public final class VectorMapEngine {
         this.viewHeight = height;
     }
 
+    /// Sets the device pixel ratio: physical pixels per logical (256px) map
+    /// pixel. On a 3x retina screen pass 3 so a tile spans 768 device pixels
+    /// and the map shows the same area it would on a 1x screen. Values <= 0 are
+    /// ignored. Changing it discards rendered tiles so they re-rasterize at the
+    /// new resolution.
+    public void setPixelRatio(double ratio) {
+        if (ratio > 0 && ratio != pixelRatio) {
+            pixelRatio = ratio;
+            rendered.clear();
+            labels.clear();
+            pending.clear();
+            failed.clear();
+        }
+    }
+
+    /// The current device pixel ratio (see [#setPixelRatio(double)]).
+    public double getPixelRatio() {
+        return pixelRatio;
+    }
+
+    private int rasterTileSize() {
+        int rs = (int) Math.round(tileSize * pixelRatio);
+        return rs < 1 ? 1 : rs;
+    }
+
     private double clampZoom(double z) {
         double min = source.getMinZoom();
         double max = source.getMaxZoom();
@@ -163,16 +194,17 @@ public final class VectorMapEngine {
         double cwy = WebMercator.latToWorldY(centerLat, zoom);
         double wx = WebMercator.lonToWorldX(coord.getLongitude(), zoom);
         double wy = WebMercator.latToWorldY(coord.getLatitude(), zoom);
-        int sx = (int) Math.floor(wx - cwx + viewWidth / 2.0 + 0.5);
-        int sy = (int) Math.floor(wy - cwy + viewHeight / 2.0 + 0.5);
+        int sx = (int) Math.floor((wx - cwx) * pixelRatio + viewWidth / 2.0 + 0.5);
+        int sy = (int) Math.floor((wy - cwy) * pixelRatio + viewHeight / 2.0 + 0.5);
         return new Point(sx, sy);
     }
 
     /// Pans the camera by a pixel delta (used for drag gestures). A positive
     /// `dx` moves the map content to the right.
     public void panPixels(double dx, double dy) {
-        double cwx = WebMercator.lonToWorldX(centerLon, zoom) - dx;
-        double cwy = WebMercator.latToWorldY(centerLat, zoom) - dy;
+        // dx/dy are device pixels; convert to logical map pixels before applying.
+        double cwx = WebMercator.lonToWorldX(centerLon, zoom) - dx / pixelRatio;
+        double cwy = WebMercator.latToWorldY(centerLat, zoom) - dy / pixelRatio;
         centerLon = WebMercator.worldXToLon(cwx, zoom);
         double lat = WebMercator.worldYToLat(cwy, zoom);
         if (lat > 85.05112878) {
@@ -196,8 +228,8 @@ public final class VectorMapEngine {
     public LatLng screenToLatLng(int x, int y) {
         double cwx = WebMercator.lonToWorldX(centerLon, zoom);
         double cwy = WebMercator.latToWorldY(centerLat, zoom);
-        double wx = x - viewWidth / 2.0 + cwx;
-        double wy = y - viewHeight / 2.0 + cwy;
+        double wx = (x - viewWidth / 2.0) / pixelRatio + cwx;
+        double wy = (y - viewHeight / 2.0) / pixelRatio + cwy;
         return new LatLng(WebMercator.worldYToLat(wy, zoom), WebMercator.worldXToLon(wx, zoom));
     }
 
@@ -217,8 +249,10 @@ public final class VectorMapEngine {
         if (bounds == null || viewWidth <= 0 || viewHeight <= 0) {
             return;
         }
-        double usableW = Math.max(1, viewWidth - 2 * padding);
-        double usableH = Math.max(1, viewHeight - 2 * padding);
+        // Convert the usable device-pixel viewport to logical map pixels (the
+        // unit worldSpanX/Y are in) before solving for the zoom that fits.
+        double usableW = Math.max(1, viewWidth - 2 * padding) / pixelRatio;
+        double usableH = Math.max(1, viewHeight - 2 * padding) / pixelRatio;
         double worldW = worldSpanX(bounds);
         double worldH = worldSpanY(bounds);
         double zx = worldW <= 0 ? getMaxZoom() : log2(usableW / worldW);
@@ -263,10 +297,15 @@ public final class VectorMapEngine {
         double cwy = WebMercator.latToWorldY(centerLat, zoom);
 
         int tiles = 1 << z;
-        double wzLeft = (cwx - width / 2.0) / s;
-        double wzRight = (cwx + width / 2.0) / s;
-        double wzTop = (cwy - height / 2.0) / s;
-        double wzBottom = (cwy + height / 2.0) / s;
+        // The viewport spans width/pixelRatio logical map pixels (the world unit
+        // tiles are measured in); a 3x screen therefore shows a third of the
+        // raw-pixel area, matching a 1x screen at the same zoom.
+        double halfW = width / 2.0 / pixelRatio;
+        double halfH = height / 2.0 / pixelRatio;
+        double wzLeft = (cwx - halfW) / s;
+        double wzRight = (cwx + halfW) / s;
+        double wzTop = (cwy - halfH) / s;
+        double wzBottom = (cwy + halfH) / s;
 
         int txMin = floorDiv((int) Math.floor(wzLeft), tileSize);
         int txMax = floorDiv((int) Math.floor(wzRight), tileSize);
@@ -311,22 +350,23 @@ public final class VectorMapEngine {
             double factor = MathUtil.pow(2, z - c.tileZoom);
             double wzx = c.worldX * factor;
             double wzy = c.worldY * factor;
-            int sx = (int) Math.floor(originX + wzx * s - cwx + width / 2.0 + 0.5);
-            int sy = (int) Math.floor(originY + wzy * s - cwy + height / 2.0 + 0.5);
+            int sx = (int) Math.floor(originX + (wzx * s - cwx) * pixelRatio + width / 2.0 + 0.5);
+            int sy = (int) Math.floor(originY + (wzy * s - cwy) * pixelRatio + height / 2.0 + 0.5);
             if (sx < originX - 64 || sx > originX + width + 64
                     || sy < originY - 32 || sy > originY + height + 32) {
                 continue;
             }
-            labelEngine.place(g, c.text, c.sizePx, c.textColor, c.haloColor, sx, sy);
+            int sizePx = (int) Math.round(c.sizePx * pixelRatio);
+            labelEngine.place(g, c.text, sizePx, c.textColor, c.haloColor, sx, sy);
         }
     }
 
     private int screenX(double worldZ, double s, double cwx, int originX, int width) {
-        return (int) Math.floor(originX + worldZ * s - cwx + width / 2.0 + 0.5);
+        return (int) Math.floor(originX + (worldZ * s - cwx) * pixelRatio + width / 2.0 + 0.5);
     }
 
     private int screenY(double worldZ, double s, double cwy, int originY, int height) {
-        return (int) Math.floor(originY + worldZ * s - cwy + height / 2.0 + 0.5);
+        return (int) Math.floor(originY + (worldZ * s - cwy) * pixelRatio + height / 2.0 + 0.5);
     }
 
     private int integerZoom() {
@@ -386,9 +426,13 @@ public final class VectorMapEngine {
     }
 
     private Image rasterize(VectorTile tile, int z) {
-        Image buffer = Image.createImage(tileSize, tileSize, 0);
+        // Rasterize at the device resolution (256 * pixelRatio) so the vector
+        // geometry stays crisp when the tile is drawn into its scaled-up screen
+        // rect, instead of upscaling a 256px buffer.
+        int rs = rasterTileSize();
+        Image buffer = Image.createImage(rs, rs, 0);
         Graphics g = buffer.getGraphics();
-        TileRenderer.renderTile(g, tile, style, z, tileSize);
+        TileRenderer.renderTile(g, tile, style, z, rs);
         return buffer;
     }
 

@@ -97,6 +97,7 @@ public class MapView extends Container implements MapSurface {
         engine = new VectorMapEngine(source, style);
         engine.setCenter(new LatLng(0, 0));
         engine.setZoom(2);
+        engine.setPixelRatio(devicePixelRatio());
         engine.setRepaintCallback(new Runnable() {
             @Override
             public void run() {
@@ -105,6 +106,31 @@ public class MapView extends Container implements MapSurface {
         });
         setFocusable(true);
         getAllStyles().setBgTransparency(255);
+    }
+
+    /// The device pixel ratio used to scale tile rendering, derived from the
+    /// display density. A z-level tile is 256 logical pixels; on a high-density
+    /// screen it must cover proportionally more physical pixels (the standard
+    /// slippy-map convention: mdpi = 1, hdpi = 1.5, xhdpi = 2, xxhdpi = 3, ...)
+    /// otherwise the viewport spans many tiles and the map shows too much area.
+    private static double devicePixelRatio() {
+        switch (Display.getInstance().getDeviceDensity()) {
+            case Display.DENSITY_HIGH:
+                return 1.5;
+            case Display.DENSITY_VERY_HIGH:
+                return 2.0;
+            case Display.DENSITY_HD:
+                return 3.0;
+            case Display.DENSITY_560:
+                return 3.5;
+            case Display.DENSITY_2HD:
+                return 4.0;
+            case Display.DENSITY_4K:
+                return 4.0;
+            default:
+                // very-low / low / medium / desktop -> no scaling.
+                return 1.0;
+        }
     }
 
     /// The underlying vector engine, for advanced configuration (tile cache,

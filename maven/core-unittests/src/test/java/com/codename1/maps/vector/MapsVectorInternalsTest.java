@@ -17,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codename1.io.grpc.ProtoWriter;
+import com.codename1.maps.LatLng;
+import com.codename1.maps.MapBounds;
+import com.codename1.ui.geom.Point;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -216,6 +219,41 @@ class MapsVectorInternalsTest {
         int[] geom = (int[]) f.getParts().get(0);
         assertEquals(10, geom[0]);
         assertEquals(20, geom[1]);
+    }
+
+    // ---- Pixel ratio (high-DPI scaling) ----------------------------------
+
+    @Test
+    void pixelRatioScalesViewportSpanAndKeepsCenter() {
+        VectorMapEngine e = new VectorMapEngine(MvtTileSource.openFreeMap(), MapStyle.light());
+        e.setCenter(new LatLng(37.806, -122.412));
+        e.setZoom(13);
+        e.setViewport(768, 768);
+
+        e.setPixelRatio(1.0);
+        MapBounds b1 = e.getVisibleBounds();
+        double span1 = b1.getNorthEast().getLongitude() - b1.getSouthWest().getLongitude();
+
+        e.setPixelRatio(3.0);
+        MapBounds b3 = e.getVisibleBounds();
+        double span3 = b3.getNorthEast().getLongitude() - b3.getSouthWest().getLongitude();
+
+        // 3x the pixel ratio shows a third of the geographic span at the same
+        // zoom (this is what stops a retina map from spanning the whole grid
+        // and floating in the background).
+        assertEquals(span1 / 3.0, span3, span1 * 0.02);
+
+        // The camera target always projects to the viewport centre regardless
+        // of pixel ratio.
+        Point c = e.latLngToScreen(new LatLng(37.806, -122.412));
+        assertEquals(384, c.getX());
+        assertEquals(384, c.getY());
+
+        // screenToLatLng is the inverse of latLngToScreen under scaling.
+        LatLng back = e.screenToLatLng(600, 200);
+        Point round = e.latLngToScreen(back);
+        assertEquals(600, round.getX(), 1);
+        assertEquals(200, round.getY(), 1);
     }
 
     @Test
