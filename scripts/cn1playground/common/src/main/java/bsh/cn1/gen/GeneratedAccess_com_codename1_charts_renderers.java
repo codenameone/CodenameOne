@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -64,6 +69,24 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
                 return new com.codename1.charts.renderers.BasicStroke(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Number) adaptedArgs[2]).floatValue(), (float[]) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue());
             }
         }
+        if (type == com.codename1.charts.renderers.DefaultRenderer.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.renderers.DefaultRenderer();
+            }
+        }
+        if (type == com.codename1.charts.renderers.DialRenderer.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.renderers.DialRenderer();
+            }
+        }
+        if (type == com.codename1.charts.renderers.SimpleSeriesRenderer.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.renderers.SimpleSeriesRenderer();
+            }
+        }
         if (type == com.codename1.charts.renderers.XYMultipleSeriesRenderer.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
@@ -72,6 +95,12 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return new com.codename1.charts.renderers.XYMultipleSeriesRenderer(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if (type == com.codename1.charts.renderers.XYSeriesRenderer.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.charts.renderers.XYSeriesRenderer();
             }
         }
         if (type == com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.class) {

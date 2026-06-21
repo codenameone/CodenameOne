@@ -806,6 +806,12 @@ public class CN1Playground extends Lifecycle {
         markEmbeddedPreviewRoles(component);
         applyWebsiteTheme(component, websiteDarkMode);
 
+        // The 3D/WebGL surface (RenderView/GameView) renders as an ordinary
+        // in-order component: it keeps an offscreen GL canvas and blits it into
+        // the display during paint(), so it stays nested in the preview form --
+        // inside the device bezel and correctly layered with the rest of the UI.
+        // (It used to be re-hosted into a stage overlay so its DOM-overlay peer
+        // would initialise; that's no longer needed and pulled it out of the bezel.)
         previewColumn.setPreview(component);
         // Feed the Inspector the user's script result directly rather than the
         // preview wrapper chain (stage / bezel / screen / mask) - otherwise the
@@ -846,13 +852,36 @@ public class CN1Playground extends Lifecycle {
         return PlaygroundStateStore.loadCurrentScript();
     }
 
+    /// Resolves the host-page URL. ``CN.getProperty("browser.window.location.href")``
+    /// is unreliable on the JavaScript port (the call devirtualises past
+    /// ``HTML5Implementation.getProperty`` so deep-link params are never seen), so
+    /// we go through the ``WebsiteThemeNative`` bridge when it's available and only
+    /// fall back to the portable property when it isn't (other ports / off-browser).
+    private String browserHref() {
+        try {
+            WebsiteThemeNative nt = websiteThemeNative;
+            if (nt == null) {
+                nt = NativeLookup.create(WebsiteThemeNative.class);
+            }
+            if (nt != null && nt.isSupported()) {
+                String h = nt.locationHref();
+                if (h != null && !h.isEmpty()) {
+                    return h;
+                }
+            }
+        } catch (Throwable ignored) {
+            // Native bridge unavailable -- fall back to the portable property.
+        }
+        return CN.getProperty("browser.window.location.href", null);
+    }
+
     private String resolveInitialCss() {
         String sharedCss = cssFromUrl();
         return sharedCss == null ? PlaygroundStateStore.loadCurrentCss() : sharedCss;
     }
 
     private String scriptFromUrl() {
-        String href = CN.getProperty("browser.window.location.href", null);
+        String href = browserHref();
         if (href == null || href.isEmpty()) {
             return null;
         }
@@ -871,7 +900,7 @@ public class CN1Playground extends Lifecycle {
     }
 
     private String cssFromUrl() {
-        String href = CN.getProperty("browser.window.location.href", null);
+        String href = browserHref();
         if (href == null || href.isEmpty()) {
             return null;
         }
@@ -923,7 +952,7 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void copyCurrentSourceUrl() {
-        String base = CN.getProperty("browser.window.location.href", null);
+        String base = browserHref();
         if (base == null || base.isEmpty()) {
             return;
         }
@@ -1203,7 +1232,7 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         final int runTicket = ++autoRunSequence;
-        UITimer.timer(850, false, appForm, () -> {
+        UITimer.timer(300, false, appForm, () -> {
             if (runTicket == autoRunSequence) {
                 runScript(appForm);
             }

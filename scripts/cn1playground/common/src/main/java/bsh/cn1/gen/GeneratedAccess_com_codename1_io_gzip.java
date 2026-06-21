@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_io_gzip {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -76,6 +81,18 @@ public final class GeneratedAccess_com_codename1_io_gzip {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.io.gzip.Adler32.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.gzip.Adler32();
+            }
+        }
+        if (type == com.codename1.io.gzip.CRC32.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.gzip.CRC32();
+            }
+        }
         if (type == com.codename1.io.gzip.Deflater.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
@@ -102,6 +119,12 @@ public final class GeneratedAccess_com_codename1_io_gzip {
                 return new com.codename1.io.gzip.Deflater(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
+        if (type == com.codename1.io.gzip.GZConnectionRequest.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.gzip.GZConnectionRequest();
+            }
+        }
         if (type == com.codename1.io.gzip.GZIPException.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
@@ -110,6 +133,12 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return new com.codename1.io.gzip.GZIPException((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.io.gzip.GZIPHeader.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.io.gzip.GZIPHeader();
             }
         }
         if (type == com.codename1.io.gzip.Inflater.class) {

@@ -149,6 +149,12 @@ final class PlaygroundRunner {
             return failure("Evaluation error: " + safeMessage(ex), ex.getErrorLineNumber(), 1, inlineMessages);
         } catch (RuntimeException ex) {
             return failure("Unexpected error: " + safeMessage(ex), 1, 1, inlineMessages);
+        } catch (Throwable t) {
+            // Errors (e.g. an Error raised deep in a translated runtime path on
+            // the JavaScript port) would otherwise escape every catch above and
+            // silently abort the run, leaving the preview stale with no message.
+            String m = t.getMessage();
+            return failure("Unexpected error: " + (m == null ? t.toString() : m), 1, 1, inlineMessages);
         }
     }
 
@@ -177,6 +183,24 @@ final class PlaygroundRunner {
         namespace.importPackage("com.codename1.ui.geom");
         namespace.importClass("com.codename1.ui.Component");
         namespace.importClass("com.codenameone.playground.PlaygroundContext");
+        // Lets the 3D / GPU sample reach the compiled Renderer-from-lambdas bridge
+        // (bsh can't build a multi-method Renderer itself on the AOT JS port).
+        namespace.importClass("com.codenameone.playground.GpuScripting");
+        // Same idea for custom 2D drawing (Physics / gaming): bsh can't subclass
+        // Component to override paint() on the AOT JS port, so a compiled adapter
+        // turns a (Graphics, Component) lambda into a paintable Component.
+        namespace.importClass("com.codenameone.playground.GameScripting");
+        // The bsh default-imports (java.lang/java.util/java.io) are not reliably
+        // applied to this eval namespace on the ParparVM JS port, so the runner's
+        // own `Object build(ctx)` wrapper and lifecycle `void init(Object)` failed
+        // to resolve `Object` ("Class: Object not found in namespace"), the method
+        // declaration was skipped, and no previewable component was ever captured.
+        // Import the core JRE packages explicitly so script methods install.
+        namespace.importPackage("java.lang");
+        namespace.importPackage("java.util");
+        namespace.importPackage("java.io");
+        namespace.importClass("java.lang.Object");
+        namespace.importClass("java.lang.String");
     }
 
     /// Returns the Display singleton, or the Display class itself when no

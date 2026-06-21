@@ -715,6 +715,16 @@ build_playground_for_site() {
       playground_workspace_args+=(-Dcn1.localWorkspace=true)
     fi
 
+    # The Playground builds the JavaScript app with the local ParparVM target
+    # (codename1.buildTarget=local-javascript, the module default). Its
+    # bean-shell registry keeps nearly the whole Codename One API reachable, so
+    # the JS Rapid Type Analysis tree-shaking pass cannot prune much yet runs
+    # for over an hour -- disable it (parparvm.js.rta.off). The un-pruned bundle
+    # is large, so raise the translator heap above the 512m default to avoid an
+    # OutOfMemoryError mid-emit. CN1_TRANSLATOR_OPTS reaches the forked
+    # translator JVM (the Maven process's -D properties do not).
+    export CN1_TRANSLATOR_OPTS="${CN1_TRANSLATOR_OPTS:--Dparparvm.js.rta.off -Xmx6g}"
+
     run_playground_mvn -q -U -pl javascript -am \
       "${playground_workspace_args[@]}" \
       -DskipTests \
@@ -738,9 +748,29 @@ build_playground_for_site() {
   mkdir -p "${output_dir}"
   unzip -q -o "${result_zip}" -d "${output_dir}"
 
+  # The local ParparVM build (codename1.buildTarget=local-javascript) wraps the
+  # bundle in a single top-level directory (e.g. CN1Playground-js/). Flatten
+  # that wrapper so index.html lands at the served root, matching the old flat
+  # cloud bundle. (Same handling as build_initializr_for_site.)
+  if [ ! -f "${output_dir}/index.html" ]; then
+    local inner_dir
+    inner_dir="$(find "${output_dir}" -mindepth 1 -maxdepth 1 -type d | head -n1 || true)"
+    if [ -n "${inner_dir}" ] && [ -f "${inner_dir}/index.html" ]; then
+      ( cd "${inner_dir}" && tar cf - . ) | ( cd "${output_dir}" && tar xf - )
+      rm -rf "${inner_dir}"
+    fi
+  fi
+
   if [ ! -f "${output_dir}/index.html" ]; then
     echo "Playground website bundle is missing index.html after extraction." >&2
     exit 1
+  fi
+
+  # The Playground page references /playground-app/icon.png. The cloud bundle
+  # shipped that icon; the local ParparVM bundle does not, so copy the project
+  # icon in when it is absent (same handling as build_initializr_for_site).
+  if [ ! -f "${output_dir}/icon.png" ] && [ -f "${REPO_ROOT}/scripts/cn1playground/common/icon.png" ]; then
+    cp "${REPO_ROOT}/scripts/cn1playground/common/icon.png" "${output_dir}/icon.png"
   fi
 }
 

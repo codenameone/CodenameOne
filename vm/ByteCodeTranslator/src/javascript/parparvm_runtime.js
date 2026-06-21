@@ -3671,6 +3671,12 @@ global._Yv = _Yv;
 // run yet.
 global._I = (n) => jvm.ensureClassInitialized(n);
 global._L = (v) => jvm.createStringLiteral(v);
+// Primitive class literals (``int.class`` etc.) -> interned primitive
+// ``Class`` object (carries ``isPrimitive=true``). Emitted by the translator
+// for ``getstatic <Wrapper>.TYPE`` (see JavascriptMethodGenerator
+// .primitiveTypeClassExpression); the JavaAPI's self-referential
+// ``TYPE = int.class`` would otherwise leave the field null.
+global._primClass = (n) => classObjectForName(n);
 global._O = (c) => jvm.newObject(c);
 global._C = jvm.cC;
 global._D = jvm.iO;

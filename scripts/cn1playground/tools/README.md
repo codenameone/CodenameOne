@@ -3,15 +3,23 @@
 This directory contains local build-time helpers used to prepare the
 playground runtime.
 
-`generate-cn1-access-registry.sh` scans **release source jars** for the
-configured `cn1.version` in `scripts/cn1playground/pom.xml` by default, then
-runs a Java tool that scans those sources and emits a hardcoded CN1 access
-registry for BeanShell.
+`generate-cn1-access-registry.sh` runs a Java tool that scans Codename One
+sources and emits a hardcoded CN1 access registry for BeanShell. By default it
+scans **release source jars** for the configured `cn1.version` in
+`scripts/cn1playground/pom.xml`. The registry is no longer pinned one release
+behind — the playground now ships the local ParparVM `local-javascript` build,
+so the registry tracks the current API directly.
 
 You can force behavior with:
 
 - `CN1_ACCESS_USE_LOCAL_SOURCES=true`  (scan local repo sources instead)
 - `CN1_ACCESS_USE_LOCAL_SOURCES=false` (default; scan release source jars)
+
+When the build runs against the local workspace (`-Dcn1.localWorkspace=true`),
+the `cn1-local-workspace` Maven profile sets `cn1.accessRegistry.useLocalSources`
+to `true`, which the `common` module passes through as
+`CN1_ACCESS_USE_LOCAL_SOURCES=true` so the registry is generated from the repo's
+own CN1 sources (the 8.0-SNAPSHOT has no source jars on Maven Central).
 
 `run-playground-smoke-tests.sh` now regenerates the registry in release mode
 and asserts a key set of `com.codename1.ui.*` classes (including `Component`,

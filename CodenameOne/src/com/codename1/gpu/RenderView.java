@@ -147,6 +147,16 @@ public class RenderView extends Container {
                 } else {
                     revalidate();
                 }
+            } else if (placeholder.getComponentCount() == 0) {
+                // The platform reports GPU support but the peer could not be
+                // created at runtime -- e.g. a browser where WebGL is disabled,
+                // the GPU/driver is on the browser's WebGL blocklist, or
+                // privacy hardening (resistFingerprinting) blocks it. Without
+                // this the placeholder stays empty and the view is a silent
+                // blank with no hint as to why; show a message instead.
+                placeholder.setLayout(new BorderLayout());
+                placeholder.add(BorderLayout.CENTER, new Label("3D unavailable (WebGL blocked or disabled)"));
+                revalidate();
             }
         }
     }

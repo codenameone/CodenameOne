@@ -48,75 +48,43 @@ public final class GenerateCN1AccessRegistry {
     private static final int FIND_CLASS_CHUNK_SIZE = 64;
     private static final char MEMBER_SEPARATOR = '\u001f';
     private static final Map<String, Boolean> RUNTIME_PUBLIC_TYPE_CACHE = new HashMap<String, Boolean>();
+    // Types that must never appear in the bean-shell registry.
+    //
+    // The earlier one-release exclusions for the security/nfc APIs are gone:
+    // they were workarounds for the legacy JavaScript cloud build (TeaVM)
+    // lagging the release channel. The playground now builds with the local
+    // ParparVM `local-javascript` target against the current sources, so those
+    // APIs are available again.
+    //
+    // The remaining entries are structural, not version-driven:
+    //  - Accessor / IOAccessor are package-private accessor shims that exist
+    //    only so sibling packages can reach internal state; they are not part
+    //    of the public API.
+    //  - Simd's allocaByte/allocaInt/allocaFloat (+ the *Zeroed/*Filled
+    //    variants) return method-local scratch arrays that ParparVM may place
+    //    on the C stack. The bytecode-compliance check (enforced by the
+    //    local-javascript target too, not just iOS) forbids letting such an
+    //    array escape its allocating method, and the generated reflection
+    //    bridge inherently escapes it by returning it from invokeN. Simd is a
+    //    low-level SIMD primitives API that playground scripts are extremely
+    //    unlikely to need, so exclude the whole class.
     private static final Set<String> INTERNAL_CN1_TYPES = new HashSet<String>(Arrays.asList(
             "com.codename1.ui.Accessor",
             "com.codename1.io.IOAccessor",
-            // Simd's allocaByte/allocaInt/allocaFloat (+ the *Zeroed/*Filled
-            // variants) return method-local scratch arrays that the ParparVM
-            // lowering may place on the C stack. CN1's compliance check
-            // forbids letting such an array escape the method that allocated
-            // it, and the generated reflection bridge inherently does escape
-            // it by returning it from invokeN. Exclude the whole class from
-            // the bean-shell registry - Simd is a low-level SIMD primitives
-            // API that playground scripts are extremely unlikely to need.
-            "com.codename1.util.Simd",
-            // com.codename1.security.* is a newly-introduced API
-            // (Biometrics, SecureStorage and friends). Until the cloud build
-            // server / TeaVM backend that compiles the playground catches up
-            // with the new classes the bridge generation trips the TeaVM
-            // RMI daemon. Exclude the new types from the registry for one
-            // release; the API is still usable in real apps, just not in the
-            // playground sandbox.
-            "com.codename1.security.Biometrics",
-            "com.codename1.security.SecureStorage",
-            "com.codename1.security.AuthenticationOptions",
-            "com.codename1.security.BiometricType",
-            "com.codename1.security.BiometricError",
-            "com.codename1.security.BiometricException",
-            // Crypto primitives (Hash, Hmac, Cipher, ...) ride the same
-            // one-release exclusion: the playground's TeaVM bridge needs to
-            // catch up with the new package before these can be reflected
-            // from beanshell.
-            "com.codename1.security.Hash",
-            "com.codename1.security.Hmac",
-            "com.codename1.security.Cipher",
-            "com.codename1.security.Signature",
-            "com.codename1.security.SecureRandom",
-            "com.codename1.security.KeyGenerator",
-            "com.codename1.security.KeyPair",
-            "com.codename1.security.SecretKey",
-            "com.codename1.security.PublicKey",
-            "com.codename1.security.PrivateKey",
-            "com.codename1.security.Jwt",
-            "com.codename1.security.Otp",
-            "com.codename1.security.Base32",
-            "com.codename1.security.Base64Url",
-            "com.codename1.security.CryptoException",
-            // com.codename1.nfc.* is a newly-introduced API (Nfc, NdefMessage,
-            // tag-technology classes, HostCardEmulationService). Same TeaVM
-            // backend cloud-build limitation as the security package above --
-            // exclude until the playground server is updated. Real apps still
-            // use the API, just not playground scripts.
-            "com.codename1.nfc.Nfc",
-            "com.codename1.nfc.NfcException",
-            "com.codename1.nfc.NfcError",
-            "com.codename1.nfc.NfcReadOptions",
-            "com.codename1.nfc.NfcListener",
-            "com.codename1.nfc.NdefMessage",
-            "com.codename1.nfc.NdefRecord",
-            "com.codename1.nfc.Tag",
-            "com.codename1.nfc.TagType",
-            "com.codename1.nfc.TagTechnology",
-            "com.codename1.nfc.IsoDep",
-            "com.codename1.nfc.MifareClassic",
-            "com.codename1.nfc.MifareUltralight",
-            "com.codename1.nfc.NfcA",
-            "com.codename1.nfc.NfcB",
-            "com.codename1.nfc.NfcF",
-            "com.codename1.nfc.NfcV",
-            "com.codename1.nfc.HostCardEmulationService",
-            "com.codename1.nfc.ApduResponse"
+            "com.codename1.util.Simd"
     ));
+
+    // Package prefixes excluded wholesale from the registry.
+    //  - com.codename1.testing.junit is the JavaSE-port JUnit 5 test-extension
+    //    API (CodenameOneExtension, @Theme, @DarkMode, @RTL, ...). It is desktop
+    //    test tooling, not a runtime API a playground bean-shell script can use,
+    //    and it is not on the playground-common compile classpath in every
+    //    release (it lives in the JavaSE port, not the core). Including it broke
+    //    the registry compile ("package com.codename1.testing.junit does not
+    //    exist") once the cn1.registry.version pin was removed.
+    private static final String[] INTERNAL_CN1_PACKAGE_PREFIXES = new String[]{
+            "com.codename1.testing.junit."
+    };
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
             "com.codename1.",
@@ -454,11 +422,18 @@ public final class GenerateCN1AccessRegistry {
                 || sourceClass.classTree.getKind() == Tree.Kind.ANNOTATION_TYPE;
         boolean isEnum = sourceClass.classTree.getKind() == Tree.Kind.ENUM;
         boolean isAbstract = isInterface || sourceClass.classTree.getModifiers().getFlags().contains(Modifier.ABSTRACT);
+        boolean isPublicClass = sourceClass.classTree.getModifiers().getFlags().contains(Modifier.PUBLIC);
+        // Track whether the source declares ANY constructor (even private /
+        // protected / parameterized). Only when none is declared does javac
+        // synthesize an implicit default constructor whose access matches the
+        // class -- the only case where we may safely add a no-arg constructor.
+        boolean declaresAnyConstructor = false;
 
         for (Tree member : sourceClass.classTree.getMembers()) {
             if (member instanceof MethodTree) {
                 MethodTree methodTree = (MethodTree) member;
                 if (methodTree.getReturnType() == null) {
+                    declaresAnyConstructor = true;
                     ApiConstructor constructor = parseConstructor(sourceClass, methodTree, resolver);
                     if (constructor != null) {
                         constructors.add(constructor);
@@ -487,6 +462,19 @@ public final class GenerateCN1AccessRegistry {
                     instanceFields.add(field);
                 }
             }
+        }
+
+        // A class that declares no constructor still has an implicit public
+        // default constructor (when the class itself is public). The source AST
+        // has no node for it, so the member loop above finds nothing and bean-
+        // shell's ``new Foo()`` would dispatch to a missing branch and yield
+        // null (e.g. ``com.codename1.gpu.Camera``). Synthesize the no-arg
+        // constructor here; runtime validation (hasRuntimeConstructor, which
+        // uses getConstructor() + isPublic) drops it again for any class that
+        // doesn't actually expose a public no-arg constructor (private ctor,
+        // factory-only, etc.), so this never registers an uninstantiable type.
+        if (!declaresAnyConstructor && isPublicClass && !isInterface && !isAbstract && !isEnum) {
+            constructors.add(new ApiConstructor(new ArrayList<ApiType>(), false));
         }
 
         sortConstructors(constructors);
@@ -1241,6 +1229,11 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         if (INTERNAL_CN1_TYPES.contains(className)) {
             return false;
         }
+        for (String prefix : INTERNAL_CN1_PACKAGE_PREFIXES) {
+            if (className.startsWith(prefix)) {
+                return false;
+            }
+        }
         Boolean cached = RUNTIME_PUBLIC_TYPE_CACHE.get(className);
         if (cached != null) {
             return cached.booleanValue();
@@ -1563,12 +1556,21 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootConstruct(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Object construct(Class<?> type, Object[] args) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // Walk the package prefix back a segment at a time. A nested type's
+        // getName() is dotted on the JavaScript port (``Outer.Inner`` rather
+        // than the JVM's ``Outer$Inner``), so packageName(type) yields
+        // ``pkg.Outer`` -- not a real package. Dropping segments recovers the
+        // true package (``pkg``) so the per-type dispatch still resolves.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".construct(type, args);\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                return " + generatedPackage.helperClassName + ".construct(type, args);\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedConstruct(type, args);\n");
         writer.write("    }\n\n");
     }
@@ -1576,34 +1578,77 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootInvokeStatic(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // See construct() -- walk the package prefix back so nested types
+        // (dotted getName() on the JavaScript port) still route correctly.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".invokeStatic(type, name, args);\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                return " + generatedPackage.helperClassName + ".invokeStatic(type, name, args);\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedStatic(type, name, args);\n");
         writer.write("    }\n\n");
     }
 
     private static void writeRootInvoke(Writer writer, List<GeneratedPackage> packages) throws IOException {
+        // Instance method dispatch used to be a linear chain of ~116 per-package
+        // ``try { Handler.invoke(...) } catch (CN1AccessException)`` blocks. Every
+        // call to a class late in that chain (``com.codename1.ui`` is #80) threw
+        // and caught dozens of exceptions before reaching its handler -- and on the
+        // ParparVM JavaScript port, where each method is a generator, unwinding
+        // those exceptions dominated per-edit latency in the Playground. We cache,
+        // per concrete class, the index of the package handler that resolved it,
+        // and try that handler first. The full linear scan remains as a fallback
+        // (and repopulates the cache), so behaviour is identical -- the rare case
+        // where a class's methods resolve across multiple packages just doesn't
+        // benefit from the cache, it is never wrong.
+        writer.write("    private static final java.util.Map<Class<?>, Integer> INSTANCE_HANDLER_CACHE = "
+                + "new java.util.Hashtable<Class<?>, Integer>();\n\n");
         writer.write("    @Override\n");
         writer.write("    public Object invoke(Object target, String name, Object[] args) throws Exception {\n");
         writer.write("        if (interceptShownForm(target, name, args)) {\n");
         writer.write("            return null;\n");
         writer.write("        }\n");
+        writer.write("        Class<?> __tc = target.getClass();\n");
+        writer.write("        Integer __ci = INSTANCE_HANDLER_CACHE.get(__tc);\n");
+        writer.write("        if (__ci != null) {\n");
+        writer.write("            try {\n");
+        writer.write("                return dispatchInstance(__ci.intValue(), target, name, args);\n");
+        writer.write("            } catch (CN1AccessException __miss) {\n");
+        writer.write("                // method resolves in another package for this class; fall back\n");
+        writer.write("            }\n");
+        writer.write("        }\n");
         writer.write("        CN1AccessException unsupported = null;\n");
+        int idx = 0;
         for (GeneratedPackage generatedPackage : packages) {
             writer.write("        try {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".invoke(target, name, args);\n");
+            writer.write("            Object __r = " + generatedPackage.helperClassName + ".invoke(target, name, args);\n");
+            writer.write("            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(" + idx + "));\n");
+            writer.write("            return __r;\n");
             writer.write("        } catch (CN1AccessException ex) {\n");
             writer.write("            unsupported = ex;\n");
             writer.write("        }\n");
+            idx++;
         }
         writer.write("        if (unsupported != null) {\n");
         writer.write("            throw unsupported;\n");
         writer.write("        }\n");
         writer.write("        throw unsupportedInstance(target, name, args);\n");
+        writer.write("    }\n\n");
+        // Direct dispatch to a single package handler by its cached index.
+        writer.write("    private static Object dispatchInstance(int __idx, Object target, String name, Object[] args) throws Exception {\n");
+        writer.write("        switch (__idx) {\n");
+        idx = 0;
+        for (GeneratedPackage generatedPackage : packages) {
+            writer.write("            case " + idx + ": return " + generatedPackage.helperClassName + ".invoke(target, name, args);\n");
+            idx++;
+        }
+        writer.write("            default: throw new CN1AccessException(\"no instance handler for index \" + __idx);\n");
+        writer.write("        }\n");
         writer.write("    }\n\n");
         writer.write("    private static boolean interceptShownForm(Object target, String name, Object[] args) {\n");
         writer.write("        PlaygroundContext context = PlaygroundContext.getCurrent();\n");
@@ -1621,12 +1666,20 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootGetStaticField(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Object getStaticField(Class<?> type, String name) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // See construct() -- walk the package prefix back so nested types
+        // (dotted getName() on the JavaScript port) still route correctly. This
+        // is what makes enum-constant access such as ``Material.Type.PHONG``
+        // resolve: Material.Type's getName() is ``...Material.Type``.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            return " + generatedPackage.helperClassName + ".getStaticField(type, name);\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                return " + generatedPackage.helperClassName + ".getStaticField(type, name);\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedStaticField(type, name);\n");
         writer.write("    }\n\n");
     }
@@ -1652,13 +1705,19 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootSetStaticField(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public void setStaticField(Class<?> type, String name, Object value) throws Exception {\n");
-        writer.write("        String packageName = packageName(type);\n");
+        // See construct() -- walk the package prefix back so nested types
+        // (dotted getName() on the JavaScript port) still route correctly.
+        writer.write("        String candidate = packageName(type);\n");
+        writer.write("        while (candidate != null) {\n");
         for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
-            writer.write("            " + generatedPackage.helperClassName + ".setStaticField(type, name, value);\n");
-            writer.write("            return;\n");
-            writer.write("        }\n");
+            writer.write("            if (\"" + generatedPackage.packageName + "\".equals(candidate)) {\n");
+            writer.write("                " + generatedPackage.helperClassName + ".setStaticField(type, name, value);\n");
+            writer.write("                return;\n");
+            writer.write("            }\n");
         }
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
         writer.write("        throw unsupportedStaticFieldWrite(type, name, value);\n");
         writer.write("    }\n\n");
     }
@@ -1752,11 +1811,22 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
 
     private static void writeFindClass(Writer writer, List<ApiClass> classes) throws IOException {
         writer.write("    public static Class<?> findClass(String name) {\n");
-        writer.write("        int lastDot = name == null ? -1 : name.lastIndexOf('.');\n");
-        writer.write("        if (lastDot < 0 || lastDot == name.length() - 1) {\n");
+        writer.write("        if (name == null) {\n");
         writer.write("            return null;\n");
         writer.write("        }\n");
-        writer.write("        return findClassBySimpleName(name.substring(lastDot + 1));\n");
+        // A nested type arrives as ``Outer$Inner`` -- bsh's Name resolution builds
+        // the binary name via ``Class.getName() + \"$\" + field`` when reaching an
+        // inner class (e.g. ``Material.Type`` -> ``...Material$Type``). Split on the
+        // last '.' OR '$' so the inner type resolves by its simple name (``Type``);
+        // otherwise the registry never finds it and enum-constant access such as
+        // ``Material.Type.PHONG`` silently fails on the JavaScript port.
+        writer.write("        int dot = name.lastIndexOf('.');\n");
+        writer.write("        int dollar = name.lastIndexOf('$');\n");
+        writer.write("        int sep = dot > dollar ? dot : dollar;\n");
+        writer.write("        if (sep < 0 || sep == name.length() - 1) {\n");
+        writer.write("            return null;\n");
+        writer.write("        }\n");
+        writer.write("        return findClassBySimpleName(name.substring(sep + 1));\n");
         writer.write("    }\n\n");
         writer.write("    public static Class<?> findClassBySimpleName(String simpleName) {\n");
         writeFindClassStatements(writer, classes, "findClassChunk", "        ", "simpleName");
@@ -2546,8 +2616,17 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             throws IOException {
         int fixedCount = paramTypes.size() - 1;
         ApiType componentType = paramTypes.get(paramTypes.size() - 1).componentType();
-        writer.write(indent + componentType.canonicalName() + "[] varArgs = new " + componentType.canonicalName()
-                + "[adaptedArgs.length - " + fixedCount + "];\n");
+        // The allocated array's first dimension carries the element count. When
+        // the varargs element type is itself an array (e.g. byte[]... -> the
+        // component type is byte[]), the size must sit in the leading bracket
+        // and the element's own array dimensions trail it: "new byte[N][]", not
+        // the malformed "new byte[][N]".
+        StringBuilder trailingDims = new StringBuilder();
+        for (int i = 0; i < componentType.arrayDepth; i++) {
+            trailingDims.append("[]");
+        }
+        writer.write(indent + componentType.canonicalName() + "[] varArgs = new " + componentType.baseName
+                + "[adaptedArgs.length - " + fixedCount + "]" + trailingDims + ";\n");
         writer.write(indent + "for (int i = " + fixedCount + "; i < adaptedArgs.length; i++) {\n");
         writer.write(indent + "    varArgs[i - " + fixedCount + "] = " + castValue("adaptedArgs[i]", componentType) + ";\n");
         writer.write(indent + "}\n");

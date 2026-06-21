@@ -310,18 +310,26 @@ public class HTML5Peer extends PeerComponent {
         
     }
 
-    @JSBody(
-            params={"el"},
-            script="var doc = el ? el.ownerDocument : null;"
-                    + "if (!doc) { return false; }"
-                    + "if (doc.documentElement && typeof doc.documentElement.contains === 'function') {"
-                    + "  return doc.documentElement.contains(el);"
-                    + "}"
-                    + "if (doc.body && typeof doc.body.contains === 'function') {"
-                    + "  return doc.body.contains(el);"
-                    + "}"
-                    + "return !!el.isConnected;")
-    private native static boolean documentContains(HTMLElement el);
+    // NOTE: must NOT be an @JSBody. On the ParparVM worker model an @JSBody script
+    // runs in the worker, where ``el`` is a host-ref proxy with no live DOM, so
+    // ``doc.documentElement.contains(el)`` compares the worker's doc proxy against
+    // the el proxy and ALWAYS returns false. initComponent() then re-appends the
+    // peer on every call -- and appendChild() of an element that is already a child
+    // MOVES it, which RELOADS an iframe peer. For the Playground's Monaco editor that
+    // reload re-bootstraps the editor and wipes the user's edits on every interaction
+    // (the editor only started receiving events once the pointer-events toggle
+    // landed, which is why this surfaced as "typed character erased immediately").
+    // Probe through the JSO bridge instead: getParentNode() runs on the MAIN thread
+    // and reliably reports null (detached) vs a real parent, and a live peer's only
+    // parent is the in-document peers container. Same class of worker-proxy bug as
+    // HTML5BrowserComponent.isCORSRestricted().
+    private static boolean documentContains(HTMLElement el) {
+        try {
+            return el != null && el.getParentNode() != null;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
     
     @Override
     protected void initComponent() {

@@ -7,11 +7,16 @@ public final class GeneratedAccess_java_lang {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -1488,6 +1493,11 @@ public final class GeneratedAccess_java_lang {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return java.lang.System.identityHashCode((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("nanoTime".equals(name)) {
+            if (safeArgs.length == 0) {
+                return java.lang.System.nanoTime();
             }
         }
         throw unsupportedStatic(java.lang.System.class, name, safeArgs);
@@ -4439,6 +4449,10 @@ public final class GeneratedAccess_java_lang {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class, java.lang.Character.class}, false);
                 return typedTarget.replace(((Character) adaptedArgs[0]).charValue(), ((Character) adaptedArgs[1]).charValue());
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.CharSequence.class, java.lang.CharSequence.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.CharSequence.class, java.lang.CharSequence.class}, false);
+                return typedTarget.replace((java.lang.CharSequence) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1]);
+            }
         }
         if ("startsWith".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
@@ -4929,6 +4943,12 @@ public final class GeneratedAccess_java_lang {
     }
 
     private static Object invoke54(java.lang.Iterable typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("forEach".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.function.Consumer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.function.Consumer.class}, false);
+                typedTarget.forEach((java.util.function.Consumer) adaptedArgs[0]); return null;
+            }
+        }
         if ("iterator".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.iterator();

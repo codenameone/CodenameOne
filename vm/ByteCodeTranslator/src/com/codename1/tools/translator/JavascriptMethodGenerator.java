@@ -4782,8 +4782,56 @@ final class JavascriptMethodGenerator {
                 out.append("  ").append(ctx.push("jvm.getClassObject(\"" + JavascriptNameUtil.sanitizeClassName(type.getInternalName()) + "\")")).append(";\n");
                 return true;
             }
+            if (type.getSort() == Type.ARRAY) {
+                out.append("  ").append(ctx.push(arrayClassObjectExpression(type))).append(";\n");
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * Expression yielding the {@code java.lang.Class} object for an array
+     * class literal (e.g. {@code byte[].class}, {@code String[].class}). The
+     * bytecode is {@code ldc} of an {@code ARRAY}-sort {@link Type}, which the
+     * OBJECT-only path above does not cover. {@code jvm.getArrayClass} lazily
+     * creates and caches the array class under the same name array instances
+     * use ({@code JAVA_BYTE[]}, {@code java_lang_String[]}), so the literal and
+     * {@code someArray.getClass()} resolve to the identical class object.
+     */
+    private static String arrayClassObjectExpression(Type type) {
+        Type element = type.getElementType();
+        String componentToken;
+        if (element.getSort() == Type.OBJECT) {
+            componentToken = JavascriptNameUtil.sanitizeClassName(element.getInternalName());
+        } else {
+            componentToken = primitiveComponentToken(element);
+        }
+        return "jvm.getArrayClass(\"" + componentToken + "\", " + type.getDimensions() + ").classObject";
+    }
+
+    /** Maps a primitive array element {@link Type} to its runtime {@code JAVA_*} token. */
+    private static String primitiveComponentToken(Type element) {
+        switch (element.getSort()) {
+            case Type.BOOLEAN:
+                return "JAVA_BOOLEAN";
+            case Type.CHAR:
+                return "JAVA_CHAR";
+            case Type.BYTE:
+                return "JAVA_BYTE";
+            case Type.SHORT:
+                return "JAVA_SHORT";
+            case Type.INT:
+                return "JAVA_INT";
+            case Type.LONG:
+                return "JAVA_LONG";
+            case Type.FLOAT:
+                return "JAVA_FLOAT";
+            case Type.DOUBLE:
+                return "JAVA_DOUBLE";
+            default:
+                throw new IllegalArgumentException("Unsupported primitive array element type " + element);
+        }
     }
 
     private static boolean appendStraightLineTypeInstruction(StringBuilder out, TypeInstruction instruction, StraightLineContext ctx) {
@@ -4812,6 +4860,38 @@ final class JavascriptMethodGenerator {
         }
     }
 
+    /**
+     * Primitive class literals ({@code int.class}, {@code double.class}, ...)
+     * compile to {@code getstatic <Wrapper>.TYPE}. The wrapper {@code TYPE}
+     * fields are declared in the JavaAPI as {@code TYPE = int.class}, which is
+     * self-referential -- so on the JavaScript backend the field initialises to
+     * null and {@code int.class} comes back null (and any primitive {@code Class}
+     * a caller does reach has {@code isPrimitive()==false}). Map any read of a
+     * wrapper {@code TYPE} field directly to the runtime's interned primitive
+     * {@code Class} object, which carries {@code isPrimitive=true}. This also
+     * fixes the wrapper's own clinit ({@code TYPE = int.class}) so the field
+     * itself ends up holding the correct primitive class. Returns the JS
+     * expression, or null when (owner, field) is not a wrapper {@code TYPE}.
+     */
+    private static String primitiveTypeClassExpression(String owner, String fieldName) {
+        if (!"TYPE".equals(fieldName)) {
+            return null;
+        }
+        String token;
+        switch (owner) {
+            case "java_lang_Integer":   token = "JAVA_INT"; break;
+            case "java_lang_Long":      token = "JAVA_LONG"; break;
+            case "java_lang_Double":    token = "JAVA_DOUBLE"; break;
+            case "java_lang_Float":     token = "JAVA_FLOAT"; break;
+            case "java_lang_Byte":      token = "JAVA_BYTE"; break;
+            case "java_lang_Short":     token = "JAVA_SHORT"; break;
+            case "java_lang_Character": token = "JAVA_CHAR"; break;
+            case "java_lang_Boolean":   token = "JAVA_BOOLEAN"; break;
+            default: return null;
+        }
+        return "_primClass(\"" + token + "\")";
+    }
+
     private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx) {
         String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
@@ -4827,10 +4907,16 @@ final class JavascriptMethodGenerator {
         String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
-            case Opcodes.GETSTATIC:
+            case Opcodes.GETSTATIC: {
+                String primExpr = primitiveTypeClassExpression(owner, fieldName);
+                if (primExpr != null) {
+                    out.append("  ").append(ctx.push(primExpr)).append(";\n");
+                    return true;
+                }
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 out.append("  ").append(ctx.push("_S[\"" + owner + "\"][\"" + fieldName + "\"]")).append(";\n");
                 return true;
+            }
             case Opcodes.PUTSTATIC: {
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 String value = ctx.pop();
@@ -6581,6 +6667,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                         .append("\")); pc = ").append(index + 1).append("; break;\n");
                 return;
             }
+            if (type.getSort() == Type.ARRAY) {
+                out.append("        stack.p(").append(arrayClassObjectExpression(type))
+                        .append("); pc = ").append(index + 1).append("; break;\n");
+                return;
+            }
         }
         throw new IllegalArgumentException("Unsupported ldc constant in javascript backend: " + value);
     }
@@ -6662,7 +6753,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String owner = resolveStaticFieldOwner(rawOwner, fieldName);
         String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
-            case Opcodes.GETSTATIC:
+            case Opcodes.GETSTATIC: {
+                String primExpr = primitiveTypeClassExpression(owner, fieldName);
+                if (primExpr != null) {
+                    out.append("        stack.p(").append(primExpr).append("); pc = ")
+                            .append(index + 1).append("; break;\n");
+                    return;
+                }
                 appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
                 // ``_S["owner"]["fieldName"]`` (runtime-maintained
                 // per-class staticFields map) is ~18 chars shorter per
@@ -6672,6 +6769,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        stack.p(_S[\"").append(owner).append("\"][\"")
                         .append(fieldName).append("\"]); pc = ").append(index + 1).append("; break;\n");
                 return;
+            }
             case Opcodes.PUTSTATIC:
                 appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
                 out.append("        _S[\"").append(owner).append("\"][\"").append(fieldName)
@@ -8142,6 +8240,20 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String prefix = body.substring(0, swOpen + 1);
         String region = body.substring(swOpen + 1, swClose);
         String suffix = body.substring(swClose);
+        // PERF: this inline-goto fold is a pure SIZE optimization and is
+        // super-linear -- each pass calls findSimpleGotoSource() (a full O(regionLen)
+        // scan) for every unique-source case, and the whole region string is rebuilt
+        // per fold, so cost is ~O(folds * cases * regionLen). On the largest generated
+        // state-machine methods this single peephole dominated JS codegen (profiled:
+        // ~1266s of a ~1310s translation -> ~21 of 22 min). It never affects
+        // correctness, only bundle size, so skip it once a method's switch body grows
+        // past a budget: the few huge methods stay slightly larger but the translation
+        // is an order of magnitude faster. Tunable via -Dparparvm.js.inlineFold.maxRegion
+        // (chars; <=0 disables the cap and restores unconditional folding).
+        int foldMaxRegion = Integer.getInteger("parparvm.js.inlineFold.maxRegion", 4000);
+        if (foldMaxRegion > 0 && region.length() > foldMaxRegion) {
+            return prefix + region + suffix;
+        }
         int iter = 0;
         while (iter++ < 200) {
             String next = applyOneInlineFold(region);

@@ -323,6 +323,9 @@
                         <configuration>
                             <executable>sh</executable>
                             <workingDirectory>${project.parent.basedir}</workingDirectory>
+                            <environmentVariables>
+                                <CN1_ACCESS_USE_LOCAL_SOURCES>${cn1.accessRegistry.useLocalSources}</CN1_ACCESS_USE_LOCAL_SOURCES>
+                            </environmentVariables>
                             <arguments>
                                 <argument>${project.parent.basedir}/tools/generate-cn1-access-registry.sh</argument>
                             </arguments>
