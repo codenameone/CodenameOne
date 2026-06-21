@@ -49,7 +49,7 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         // restoring the default order right after leaves later tests (e.g. the
         // native Apple provider test) untouched.
         MapProviderRegistry.register(WebMapProvider.google(key));
-        MapProviderRegistry.setProviderOrder(new String[]{"google"});
+        MapProviderRegistry.setProviderOrder(new String[]{"web"});
         NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
         MapProviderRegistry.setProviderOrder(null);
         if (!map.isNativeMap()) {

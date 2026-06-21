@@ -131,6 +131,26 @@ codename1.arg.android.xapplication=<meta-data android:name="com.google.android.m
 codename1.arg.ios.afterFinishLaunching=[GMSServices provideAPIKey:@"YOUR_IOS_API_KEY"];
 ----
 
+==== Cross-platform web maps
+
+A native provider only renders on the platforms that ship its SDK. To show a provider's map *everywhere* -- including platforms with no native SDK for it -- register a `WebMapProvider`, which hosts the provider's JavaScript SDK inside a `BrowserComponent`:
+
+[source,java]
+----
+// Render Google Maps through its JavaScript SDK on any platform with a browser:
+MapProviderRegistry.register(WebMapProvider.google("YOUR_MAPS_JS_API_KEY"));
+NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
+----
+
+Because it needs only a web view, the web provider (id `web`) is the natural last step before the pure-vector fallback in a provider chain. The order is fully customizable from code, so you can express per-platform preferences -- for example "try the native Google SDK, then the web map, then the vector `MapView`":
+
+[source,java]
+----
+MapProviderRegistry.setProviderOrder(new String[]{"google", "web", "vector"});
+----
+
+image::img/maps-web.png[Google Maps rendered cross-platform through WebMapProvider,scaledwidth=40%]
+
 === Choosing between MapView and NativeMap
 
 Use `MapView` when you want a lightweight, dependency-free map that looks the same everywhere and composes with CN1 components. Use `NativeMap` when you want the platform's native map look, gestures and performance, and are willing to opt a provider in through build hints -- with the guarantee that it still works (as a vector map) where the provider is unavailable.

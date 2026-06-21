@@ -63,10 +63,14 @@ public class WebMapProvider implements MapProvider {
         this.htmlTemplate = htmlTemplate;
     }
 
-    /// A Google Maps JavaScript SDK provider (id `"google"`) for the given API
-    /// key (the key must have the *Maps JavaScript API* enabled).
+    /// A Google Maps JavaScript SDK provider for the given API key (the key
+    /// must have the *Maps JavaScript API* enabled). Its id is `"web"` -- not
+    /// `"google"` -- so it slots in as the cross-platform *web* fallback after
+    /// the native `"google"` provider in a chain such as
+    /// `setProviderOrder("google", "web", "vector")`, rather than colliding
+    /// with it.
     public static WebMapProvider google(String apiKey) {
-        return new WebMapProvider("google", apiKey, GOOGLE_HTML);
+        return new WebMapProvider("web", apiKey, GOOGLE_HTML);
     }
 
     /// {@inheritDoc}
