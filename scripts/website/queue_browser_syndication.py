@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -59,23 +60,41 @@ DEFAULT_PLATFORMS = "medium,dzone"
 WEEKLY_FRIDAY_PLATFORMS = {"dzone"}
 
 
+def _forced_platforms(post: Post) -> set[str]:
+    """Platforms a post opts into regardless of the weekly-Friday gate, via
+    ``syndicate_force: [dzone, foojay]`` in its front matter. Lets the
+    occasional experimental deep dive join the rotation on a non-Friday."""
+    raw = post.front_matter.get("syndicate_force") or []
+    if isinstance(raw, str):
+        # The blog's lightweight front-matter parser is scalar-only, so it
+        # hands list syntax back as a raw string (e.g. '["dzone", "foojay"]').
+        # Pull the bare platform tokens out so either form works.
+        raw = re.findall(r"[A-Za-z0-9_-]+", raw)
+    return {str(p).strip().lower() for p in raw}
+
+
 def _platform_accepts(platform: str, post: Post) -> bool:
     """Whether ``platform`` wants ``post`` at all. Friday-only platforms take
-    just the weekly digest post; everyone else takes every eligible post."""
+    just the weekly digest post (plus any post that force-opts in); everyone
+    else takes every eligible post."""
     if platform in WEEKLY_FRIDAY_PLATFORMS:
-        return post.date.weekday() == 4
+        return post.date.weekday() == 4 or platform in _forced_platforms(post)
     return True
 
 
-def _task_is_allowed(task: dict, dates_by_slug: dict[str, dt.date]) -> bool:
+def _task_is_allowed(task: dict, dates_by_slug: dict[str, dt.date],
+                     forced_by_slug: dict[str, set[str]]) -> bool:
     """Whether an existing queue task is still permitted under the per-platform
     rules. Used to prune tasks that were queued before the Friday-only filter
     existed (or added by hand): the drain tool submits whatever is in the
     queue, so a disallowed task left here would still reach moderation. A task
     whose post date is unknown is kept — we never silently drop something we
-    cannot evaluate."""
+    cannot evaluate. A post that force-opts in via ``syndicate_force`` is kept
+    regardless of weekday."""
     platform = task.get("site")
     if platform not in WEEKLY_FRIDAY_PLATFORMS:
+        return True
+    if platform in forced_by_slug.get(task.get("slug"), set()):
         return True
     post_date = dates_by_slug.get(task.get("slug"))
     if post_date is None:
@@ -136,9 +155,12 @@ def main(argv: list[str]) -> int:
     state = State.load(Path(args.state_file))
     blog_dir = Path(args.blog_dir)
     posts = _eligible_posts(today, floor, args.min_age_days, blog_dir)
-    # Slug -> publish date for *every* post, so existing queue tasks can be
-    # re-checked against the per-platform rules regardless of eligibility.
-    dates_by_slug = {p.slug: p.date for p in discover_posts(blog_dir)}
+    # Slug -> publish date (and forced-platform set) for *every* post, so
+    # existing queue tasks can be re-checked against the per-platform rules
+    # regardless of eligibility.
+    all_posts = discover_posts(blog_dir)
+    dates_by_slug = {p.slug: p.date for p in all_posts}
+    forced_by_slug = {p.slug: _forced_platforms(p) for p in all_posts}
 
     queue_path = Path(args.queue_file)
     if queue_path.exists():
@@ -152,7 +174,7 @@ def main(argv: list[str]) -> int:
     # sits in the queue, so this prune is what actually stops a stray task
     # from reaching moderation.
     original_tasks = queue.get("tasks", [])
-    kept_tasks = [t for t in original_tasks if _task_is_allowed(t, dates_by_slug)]
+    kept_tasks = [t for t in original_tasks if _task_is_allowed(t, dates_by_slug, forced_by_slug)]
     pruned = [t for t in original_tasks if t not in kept_tasks]
     if pruned:
         print(f"Pruning {len(pruned)} disallowed task(s) from the queue:")
