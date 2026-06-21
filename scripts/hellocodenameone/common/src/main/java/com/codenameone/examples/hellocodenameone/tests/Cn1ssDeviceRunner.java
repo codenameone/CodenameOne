@@ -74,15 +74,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // share the JS port's canvas-hang failure mode.
     private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
-    // tvOS renders the 10-foot UI at 4K (3840x2160). The dense graphics tests
-    // (DrawArc / Draw|FillRoundRect iterate ~bounds.width/2 stroked paths) plus
-    // the 4K screenshot readback+PNG-encode push render+capture past the 30s
-    // native budget, so the capture lands AFTER the runner has advanced to the
-    // next test -- the late frame then carries the next test's title bar (the
-    // body matches, only the title strip differs). A wider tvOS budget lets the
-    // capture finish before the runner advances. Only slow tests ever consume
-    // it; fast tests finish well under 30s regardless.
-    private static final int TEST_TIMEOUT_MS_TV = 90000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
     private static int testTimeoutMs(BaseTest testClass) {
@@ -94,13 +85,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && testClass instanceof DualAppearanceBaseTest) {
             return TEST_TIMEOUT_MS_NATIVE;
         }
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            return TEST_TIMEOUT_MS_HTML5;
-        }
-        if (CN.isTV()) {
-            return TEST_TIMEOUT_MS_TV;
-        }
-        return TEST_TIMEOUT_MS_NATIVE;
+        return "HTML5".equals(Display.getInstance().getPlatformName())
+                ? TEST_TIMEOUT_MS_HTML5
+                : TEST_TIMEOUT_MS_NATIVE;
     }
 
     // Calling Display.getInstance() at static-init time was tripping the iOS
