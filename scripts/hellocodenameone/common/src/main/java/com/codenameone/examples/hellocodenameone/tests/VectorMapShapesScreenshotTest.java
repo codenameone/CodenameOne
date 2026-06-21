@@ -14,7 +14,7 @@ import com.codename1.ui.layouts.BorderLayout;
 /// Exercises polyline, polygon and circle overlays on the real San Francisco
 /// basemap: a walking route along the waterfront, a highlighted area and a
 /// radius circle around a point of interest.
-public class VectorMapShapesScreenshotTest extends BaseTest {
+public class VectorMapShapesScreenshotTest extends VectorMapScreenshotBaseTest {
 
     @Override
     public boolean runTest() {
@@ -51,6 +51,7 @@ public class VectorMapShapesScreenshotTest extends BaseTest {
         map.addCircle(circle);
 
         form.add(BorderLayout.CENTER, map);
+        mapUnderTest = map;
         form.show();
         return true;
     }

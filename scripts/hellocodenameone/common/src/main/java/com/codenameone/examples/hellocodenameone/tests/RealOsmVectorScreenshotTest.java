@@ -12,7 +12,7 @@ import com.codename1.ui.layouts.BorderLayout;
 /// OpenFreeMap basemap), proving the engine maps real OSM data -- streets,
 /// water, parks, buildings and place labels. Deterministic and offline (the
 /// tiles are shipped as resources), so it produces a stable screenshot baseline.
-public class RealOsmVectorScreenshotTest extends BaseTest {
+public class RealOsmVectorScreenshotTest extends VectorMapScreenshotBaseTest {
 
     @Override
     public boolean runTest() {
@@ -30,6 +30,7 @@ public class RealOsmVectorScreenshotTest extends BaseTest {
                 MapStyle.light());
         map.moveCamera(new LatLng(37.814, -122.413), 13);
         form.add(BorderLayout.CENTER, map);
+        mapUnderTest = map;
         form.show();
         return true;
     }

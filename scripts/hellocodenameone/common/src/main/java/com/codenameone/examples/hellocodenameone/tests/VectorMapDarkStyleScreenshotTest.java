@@ -11,7 +11,7 @@ import com.codename1.ui.layouts.BorderLayout;
 /// Renders the bundled real San Francisco OSM tiles with the built-in dark
 /// style, exercising the style engine (background + per-layer colors) on real
 /// data so it is distinct from the light basemap.
-public class VectorMapDarkStyleScreenshotTest extends BaseTest {
+public class VectorMapDarkStyleScreenshotTest extends VectorMapScreenshotBaseTest {
 
     @Override
     public boolean runTest() {
@@ -28,6 +28,7 @@ public class VectorMapDarkStyleScreenshotTest extends BaseTest {
                 MapStyle.dark());
         map.moveCamera(new LatLng(37.808, -122.412), 13);
         form.add(BorderLayout.CENTER, map);
+        mapUnderTest = map;
         form.show();
         return true;
     }

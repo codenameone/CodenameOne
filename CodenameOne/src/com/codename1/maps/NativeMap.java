@@ -559,6 +559,13 @@ public class NativeMap extends Container implements MapSurface {
         return !isFallback();
     }
 
+    /// {@inheritDoc} Delegates to the embedded vector map when this `NativeMap`
+    /// fell back to it; a real native provider loads its own tiles, so false.
+    @Override
+    public boolean isLoadingTiles() {
+        return isFallback() && fallback.isLoadingTiles();
+    }
+
     /// {@inheritDoc}
     @Override
     public Component asComponent() {

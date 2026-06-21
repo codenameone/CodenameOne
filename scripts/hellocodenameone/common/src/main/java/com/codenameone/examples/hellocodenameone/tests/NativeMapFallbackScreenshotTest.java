@@ -19,7 +19,7 @@ import com.codename1.ui.layouts.BorderLayout;
 /// native provider *is* active (e.g. an iOS build with
 /// `ios.maps.provider=apple`) the fallback path is not exercised, so this test
 /// skips and the provider test captures the native render instead.
-public class NativeMapFallbackScreenshotTest extends BaseTest {
+public class NativeMapFallbackScreenshotTest extends VectorMapScreenshotBaseTest {
 
     @Override
     public boolean runTest() {
@@ -42,6 +42,7 @@ public class NativeMapFallbackScreenshotTest extends BaseTest {
         Form form = createForm("Native Map Fallback", new BorderLayout(), "NativeMapFallback");
         map.addMarker(new MarkerOptions(new LatLng(37.8087, -122.4098)).title("Pier 39"));
         form.add(BorderLayout.CENTER, map);
+        mapUnderTest = map;
         form.show();
         return true;
     }

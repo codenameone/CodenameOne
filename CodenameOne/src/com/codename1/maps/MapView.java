@@ -133,6 +133,12 @@ public class MapView extends Container implements MapSurface {
         }
     }
 
+    /// {@inheritDoc}
+    @Override
+    public boolean isLoadingTiles() {
+        return engine.hasPendingTiles();
+    }
+
     /// The underlying vector engine, for advanced configuration (tile cache,
     /// source and style swapping).
     public VectorMapEngine getEngine() {

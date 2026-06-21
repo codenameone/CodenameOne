@@ -142,6 +142,12 @@ public interface MapSurface {
     /// pure-vector map or a [NativeMap] that fell back to the vector engine.
     boolean isNativeMap();
 
+    /// Whether the vector engine still has tiles in flight for the current
+    /// view. Useful to defer a screenshot (or hide a spinner) until the basemap
+    /// has finished loading. Always false for a native-provider-backed surface,
+    /// which loads its own tiles outside the engine's knowledge.
+    boolean isLoadingTiles();
+
     /// This surface as a Codename One [Component] for layout purposes.
     Component asComponent();
 }

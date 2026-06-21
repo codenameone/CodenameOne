@@ -174,6 +174,14 @@ public final class VectorMapEngine {
         return rs < 1 ? 1 : rs;
     }
 
+    /// Whether any tile requested for the current view is still loading (i.e.
+    /// the basemap is not yet fully rendered). Goes true after the first paint
+    /// that needs uncached tiles and back to false once they have all arrived.
+    /// Best-effort readiness signal (tile bookkeeping happens on the EDT).
+    public boolean hasPendingTiles() {
+        return !pending.isEmpty();
+    }
+
     private double clampZoom(double z) {
         double min = source.getMinZoom();
         double max = source.getMaxZoom();

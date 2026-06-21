@@ -11,7 +11,7 @@ import com.codename1.ui.layouts.BorderLayout;
 
 /// Exercises marker overlays (the default Material map-pin rendering) on the
 /// real San Francisco basemap at a few well-known waterfront landmarks.
-public class VectorMapMarkersScreenshotTest extends BaseTest {
+public class VectorMapMarkersScreenshotTest extends VectorMapScreenshotBaseTest {
 
     @Override
     public boolean runTest() {
@@ -31,6 +31,7 @@ public class VectorMapMarkersScreenshotTest extends BaseTest {
         map.addMarker(new MarkerOptions(new LatLng(37.8083, -122.4156)).title("Fisherman's Wharf"));
         map.addMarker(new MarkerOptions(new LatLng(37.8024, -122.4058)).title("Coit Tower"));
         form.add(BorderLayout.CENTER, map);
+        mapUnderTest = map;
         form.show();
         return true;
     }
