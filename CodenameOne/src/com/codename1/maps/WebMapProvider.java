@@ -107,7 +107,19 @@ public class WebMapProvider implements MapProvider {
     /// {@inheritDoc}
     @Override
     public void deinitialize(int mapId) {
-        peers.remove(Integer.valueOf(mapId));
+        BrowserComponent bc = (BrowserComponent) peers.remove(Integer.valueOf(mapId));
+        if (bc != null) {
+            try {
+                // Replace the live map page with a blank one so the SDK's
+                // requestAnimationFrame / tile-loading loop stops; otherwise a
+                // disposed web map keeps animating in the background and starves
+                // the main thread.
+                bc.setPage("<!DOCTYPE html><html><body></body></html>", "https://maps.example/");
+            } catch (Throwable t) {
+                // Best effort tear-down.
+                return;
+            }
+        }
     }
 
     /// {@inheritDoc}

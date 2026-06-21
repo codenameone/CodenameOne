@@ -50,7 +50,7 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         // native Apple provider test) untouched.
         MapProviderRegistry.register(WebMapProvider.google(key));
         MapProviderRegistry.setProviderOrder(new String[]{"web"});
-        NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
+        final NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
         MapProviderRegistry.setProviderOrder(null);
         if (!map.isNativeMap()) {
             System.out.println(
@@ -58,7 +58,26 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             done();
             return true;
         }
-        Form form = createForm("Google Web Map", new BorderLayout(), "GoogleWebMap");
+        // Build the form by hand (rather than createForm) so we control what
+        // happens AFTER the capture: the Google Maps JS keeps a continuous
+        // requestAnimationFrame / tile-loading loop alive for the life of the
+        // page. If left running it starves the iOS main thread for the rest of
+        // the suite and desyncs later tests' capture timing (a downstream test
+        // then screenshots a stale form). So once we have our shot we dispose
+        // the web view, which blanks the page and stops that loop.
+        Form form = new Form("Google Web Map", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                final Form self = this;
+                // Let the Google Maps JS load and paint tiles from the network
+                // (well over the native-map settle), capture, then dispose.
+                UITimer.timer(8000, false, self, () ->
+                        captureWhenSettled(self, "GoogleWebMap", () -> {
+                            map.dispose();
+                            done();
+                        }));
+            }
+        };
         form.add(BorderLayout.CENTER, map);
         form.show();
         return true;
@@ -80,13 +99,5 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         } catch (Throwable t) {
             return null;
         }
-    }
-
-    @Override
-    protected void registerReadyCallback(Form parent, Runnable run) {
-        // The page loads the Google Maps JS from the network and then paints
-        // tiles asynchronously; give it well over the native-map settle so the
-        // imagery is present before the capture.
-        UITimer.timer(8000, false, parent, run);
     }
 }

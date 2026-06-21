@@ -59,6 +59,7 @@ public class NativeMap extends Container implements MapSurface {
     private final int mapId;
     private MapProvider provider;
     private MapView fallback;
+    private Component peer;
     private boolean peerInitialized;
 
     private LatLng initialCenter = new LatLng(0, 0);
@@ -144,12 +145,34 @@ public class NativeMap extends Container implements MapSurface {
             revalidateForm();
             return;
         }
+        this.peer = peer;
         addComponent(BorderLayout.CENTER, peer);
         // Lay the peer out (give it a non-zero frame) so the native view is on
         // screen. The provider positions the camera at creation from the
         // initial center/zoom (see getInitialCenter/getInitialZoom).
         revalidateForm();
         replayMarkers();
+    }
+
+    /// Releases the native or web view backing this map and detaches it. Call
+    /// this when you are finished with a `NativeMap` you will not show again so
+    /// a provider that keeps a live view -- in particular the web provider's
+    /// `BrowserComponent`, whose map JavaScript runs a continuous animation
+    /// loop -- stops consuming CPU/GPU in the background instead of being left
+    /// running. After `dispose()` the map should not be reused.
+    public void dispose() {
+        if (provider != null && peer != null) {
+            try {
+                provider.deinitialize(mapId);
+            } catch (Throwable t) {
+                // Best effort: a provider that fails to tear down must not
+                // propagate out of dispose().
+            }
+            removeComponent(peer);
+            peer = null;
+            revalidateForm();
+        }
+        INSTANCES.remove(Integer.valueOf(mapId));
     }
 
     /// The initial camera center. Package-private: build-injected providers
