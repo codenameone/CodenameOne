@@ -10198,6 +10198,13 @@ void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STAT
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
 #define abs(x) ((x)>0?(x):-(x))
+
+// Hard upper bound (in pixels) on a path alpha-mask's width/height. 8192 is the
+// MTLTextureDescriptor max-2D-dimension enforced by the tvOS simulator (and a
+// safe floor across Apple GPUs). The mask is normally bounded by the render
+// target's framebuffer size; this is the backstop so no backend is ever handed
+// an over-max texture descriptor.
+#define CN1_PATH_MASK_MAX_DIM 8192
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int(JAVA_OBJECT instanceObject, JAVA_LONG renderer, JAVA_INT color)
 {
     Renderer *r = (Renderer*)renderer;
@@ -10290,6 +10297,22 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 #ifdef CN1_USE_METAL
     {
         Renderer *r = (Renderer*)renderer;
+        // Bound the mask to the render target. A stroked path that runs far
+        // off-screen (e.g. the graphics-draw-arc / graphics-draw-round-rect
+        // tests at 4K) otherwise yields a mask wider than the Metal device max
+        // (8192 on the tvOS simulator) and aborts the app in
+        // -[MTLTextureDescriptor validateWithDevice:]. The clamped-away region
+        // is outside the framebuffer and clipped by the scissor regardless, so
+        // this is lossless for visible pixels. CN1_PATH_MASK_MAX_DIM is the
+        // texture-size backstop when the framebuffer is unknown (0).
+        {
+            int fbw = CN1MetalFramebufferWidth();
+            int fbh = CN1MetalFramebufferHeight();
+            Renderer_setOutputClip(r,
+                fbw > 0 ? fbw : CN1_PATH_MASK_MAX_DIM,
+                fbh > 0 ? fbh : CN1_PATH_MASK_MAX_DIM,
+                CN1_PATH_MASK_MAX_DIM);
+        }
         JAVA_INT outputBounds[4];
         Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
         // outputBounds is { minX, minY, maxX, maxY } in renderer pixel
