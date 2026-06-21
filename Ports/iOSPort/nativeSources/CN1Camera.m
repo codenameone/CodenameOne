@@ -24,7 +24,7 @@
 #import "CN1Camera.h"
 #import "xmlvm.h"
 
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #import "java_lang_String.h"
 #import "com_codename1_impl_ios_IOSCameraImpl.h"
 
@@ -415,7 +415,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1CameraEnumerate___R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
     NSString *s = [CN1Camera enumerateCameras];
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG s);
 #else
@@ -427,7 +427,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraOpen___java_lang_String_int_
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_OBJECT cameraId, JAVA_INT previewW, JAVA_INT previewH,
         JAVA_BOOLEAN captureAudio) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
     NSString *idStr = toNSString(CN1_THREAD_GET_STATE_PASS_ARG cameraId);
     CN1Camera *cam = [[CN1Camera alloc] init];
     BOOL ok = [cam openWithCameraId:idStr previewW:previewW previewH:previewH
@@ -445,7 +445,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraOpen___java_lang_String_int_
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraCreatePreviewView___long_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -466,7 +466,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraTakePhoto___long_int_int_int_java
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer,
         JAVA_INT width, JAVA_INT height, JAVA_INT quality,
         JAVA_OBJECT filePath, JAVA_INT callbackId) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -483,7 +483,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraTakePhoto___long_int_int_int_java
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1CameraStartVideo___long_java_lang_String_boolean_R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer,
         JAVA_OBJECT filePath, JAVA_BOOLEAN captureAudio) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -503,7 +503,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1CameraStartVideo___long_java_la
 void com_codename1_impl_ios_IOSNative_cn1CameraStopVideo___long_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_LONG sessionPeer, JAVA_INT callbackId) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -518,7 +518,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraStopVideo___long_int(
 void com_codename1_impl_ios_IOSNative_cn1CameraSetFrameDelivery___long_boolean_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_LONG sessionPeer, JAVA_BOOLEAN enabled, JAVA_INT maxFps) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -531,7 +531,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraSetFrameDelivery___long_boolean_i
 void com_codename1_impl_ios_IOSNative_cn1CameraSetFlash___long_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_LONG sessionPeer, JAVA_INT mode) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -544,7 +544,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraSetFlash___long_int(
 void com_codename1_impl_ios_IOSNative_cn1CameraSetZoom___long_float(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_LONG sessionPeer, JAVA_FLOAT ratio) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -557,7 +557,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraSetZoom___long_float(
 void com_codename1_impl_ios_IOSNative_cn1CameraFocus___long_float_float(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_LONG sessionPeer, JAVA_FLOAT xNorm, JAVA_FLOAT yNorm) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -569,7 +569,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraFocus___long_float_float(
 
 void com_codename1_impl_ios_IOSNative_cn1CameraPause___long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -581,7 +581,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraPause___long(
 
 void com_codename1_impl_ios_IOSNative_cn1CameraResume___long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer) {
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
@@ -594,7 +594,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraResume___long(
 void com_codename1_impl_ios_IOSNative_cn1CameraClose___long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer) {
     if (sessionPeer == 0) return;
-#ifdef INCLUDE_CN1_CAMERA
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
     dispatch_async(dispatch_get_main_queue(), ^{
