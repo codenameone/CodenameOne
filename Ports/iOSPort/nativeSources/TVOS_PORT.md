@@ -132,6 +132,53 @@ Once it compiles + links, run it via simctl on an "Apple TV 4K" simulator and
 seed `scripts/ios/screenshots-tv/` from the captured frames (the `build-ios-tv`
 CI job is non-blocking until then).
 
+## Status: compiles, renders, and is screenshot-gated
+
+The tvOS slice now builds end-to-end, boots on the Apple TV simulator, runs the
+`cn1ss` suite, and captures real frames. `build-ios-tv` in `scripts-ios.yml` is a
+**blocking** golden gate (goldens in `scripts/ios/screenshots-tv/`, captured from a
+CI run at 3840×2160). The two non-obvious fixes that made rendering work:
+
+1. **Programmatic METALView (`-loadView`)** and **the `screenTexture` readback**
+   (`cn1_copyMetalScreenTextureImage` + its call site in `cn1_renderViewIntoContext`)
+   were both `#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST`. tvOS uses the
+   same nil-NIB path as Mac Catalyst (its XIBs are excluded from the bundle), so
+   without `loadView` no METALView is created (`EAGLView not found`) and forms
+   render to nothing → blank captures; and on a headless simulator
+   `-drawViewHierarchyInRect:` snapshots a blank CALayer, so the screenTexture
+   readback is required. Both broadened to `(TARGET_OS_MACCATALYST || TARGET_OS_TV)`.
+   tvOS stages the readback into a **Shared** texture (`MTLStorageModeManaged` /
+   `-synchronizeResource:` are macOS-only).
+2. The VC is instantiated with **`cn1NibName = nil`** on tvOS (the iOS XIB is
+   excluded), same as Mac Catalyst — otherwise launch crashes with "Could not load
+   NIB in bundle … CodenameOne_GLViewController".
+
+### Local repro recipe (faithful to CI)
+
+CI compiles the generated sources with the builder's permission/feature `#define`s
+on, which a naive local build leaves off, hiding whole waves of tvOS-absent APIs.
+To reproduce CI exactly, compile with the full define set and arm64:
+
+```
+xcodebuild -project <…>/HelloCodenameOne.xcodeproj -target HelloCodenameOneTV \
+  -sdk appletvsimulator -arch arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO \
+  GCC_PREPROCESSOR_DEFINITIONS='$(inherited) ENABLE_WKWEBVIEW=1 INCLUDE_CAMERA_USAGE=1 \
+    INCLUDE_CN1_CAMERA=1 CN1_INCLUDE_NOTIFICATIONS=1 CN1_INCLUDE_NOTIFICATIONS2=1 \
+    INCLUDE_CN1_PUSH=1 INCLUDE_CN1_PUSH2=1' OTHER_CFLAGS=-ferror-limit=0 build
+```
+
+Sync **all** of `Ports/iOSPort/nativeSources/*` into the generated `<Main>-src/`
+(not just the file under edit) and keep `CN1_USE_METAL` defined in the generated
+`CN1ES2compat.h`. For an end-to-end render check, download the tvOS simulator
+runtime (`xcodebuild -downloadPlatform tvOS`), create an "Apple TV 4K" device, and
+run `scripts/run-tv-ui-tests.sh <project>` with `CN1SS_TV_UDID` + `JAVA17_BIN` set.
+
+**Seed goldens from CI, never local:** a local Apple TV sim rendered at 1080×2206
+(portrait) while CI renders 3840×2160 — 0/127 matched. Download the `tv-ui-tests`
+artifact and seed those. Watch for title-capture races when seeding (a frame can
+catch the *previous* test's title); the 127/128 that match across two independent
+CI runs are reliable, a lone differ usually means a glitched golden.
+
 ## Input
 
 tvOS is remote/focus-driven (no touchscreen). Codename One's existing D-pad focus
