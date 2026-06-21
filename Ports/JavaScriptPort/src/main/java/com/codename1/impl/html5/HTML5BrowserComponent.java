@@ -67,20 +67,22 @@ public class HTML5BrowserComponent extends HTML5Peer {
 
         @Override
         public void handleEvent(final MessageEvent e) {
-            Window win = iframe == null ? Window.current() : iframe.getContentWindow();
-            //HTML5Implementation._log("Received event "+e.getDataAsString());
-            if (getEventSource(e) == win) {
-                //HTML5Implementation._log("From our iframe");
+            // Original code only forwarded the message when
+            // ``getEventSource(e) == iframe.getContentWindow()``. On the worker-
+            // based ParparVM port those are two different worker-side wrappers
+            // for the same window (the comparison is always false), so onMessage
+            // never fired at all. The worker cannot reliably compare window
+            // identity, so instead forward any message that carries a source
+            // (i.e. came from a posting window such as our iframe). Apps that
+            // host multiple frames disambiguate in their own onMessage handler.
+            if (getEventSource(e) != null) {
+                final String data = e.getDataAsString();
                 HTML5Implementation.callSerially(new Runnable() {
                     public void run() {
-                        parent.fireWebEvent(BrowserComponent.onMessage, new ActionEvent(e.getDataAsString()));
-
+                        parent.fireWebEvent(BrowserComponent.onMessage, new ActionEvent(data));
                     }
                 });
-            } else {
-                //HTML5Implementation._log("Not from our iframe");
             }
-
         }
 
     };
@@ -154,7 +156,30 @@ public class HTML5BrowserComponent extends HTML5Peer {
             if (iframe == null) {
                 return;
             }
+            // These listeners live on the iframe's own content window, so they
+            // only fire when a pointer/mouse/touch event actually reaches the
+            // iframe -- i.e. when #codenameone-canvas has been flipped to
+            // pointer-events:none over a transparent ("punched") hole because the
+            // peer is showing through (see browser_bridge.js installPeerPointerToggle).
+            // In that state the event genuinely belongs to the peer (e.g. typing /
+            // clicking in the Playground's Monaco editor), so re-dispatching a
+            // synthetic copy back into CN1 is wrong: CN1 treats it as a press on the
+            // peer component and relayout/refocus churn reloads the iframe, wiping
+            // the editor back to its bootstrap source. When the canvas is opaque the
+            // event never reaches here (the canvas consumes it), so there is nothing
+            // to forward. Hence: if the canvas is "none", let the peer keep the event.
+            HTMLElement oc = HTML5Implementation.getInstance().outputCanvas;
+            if (oc != null && "none".equals(oc.getStyle().getPropertyValue("pointer-events"))) {
+                return;
+            }
             TextRectangle clRect = iframe.getBoundingClientRect();
+            if (clRect == null) {
+                // getBoundingClientRect can come back null when invoked through the
+                // worker JSO bridge (the iframe arg is a host-ref proxy); without a
+                // rect we cannot offset coordinates, and dereferencing it throws an
+                // NPE on every event. Nothing to forward -- leave the event to the peer.
+                return;
+            }
             Event evt;
             if ("MozMousePixelScroll".equals(eventType) || eventType.equals(HTML5Implementation.getWheelEventType())) {
                 evt = copyWheelEvent(event, iframe, clRect.getLeft(), clRect.getTop()); 
@@ -252,8 +277,29 @@ public class HTML5BrowserComponent extends HTML5Peer {
     private static native boolean supportsSrcdocAttribute();
     private boolean supportsSrcdocAttribute;
     
-    @JSBody(params={"iframe"}, script="try{if(iframe.contentWindow.document){return false} else {return true}}catch(e){return true}")
-    private native static boolean isCORSRestricted(HTMLIFrameElement iframe);
+    // NOTE: this must NOT be an @JSBody. On the ParparVM worker model an
+    // @JSBody script runs in the worker, where the ``iframe`` argument is a
+    // host-ref proxy with no live DOM -- ``iframe.contentWindow`` is undefined,
+    // so the old inline probe always threw and reported EVERY BrowserComponent
+    // (even a same-origin one like the Playground editor) as CORS-restricted,
+    // which made execute()/executeAndReturnString() throw and the editor never
+    // bootstrapped. Probe through the JSO bridge instead so contentWindow /
+    // document access runs on the MAIN thread where it is meaningful: a
+    // same-origin iframe yields a non-null document; a genuinely cross-origin
+    // one throws on access (caught here) and is correctly reported restricted.
+    // (TeaVM ran everything on the main thread, so its @JSBody worked -- this
+    // only bit the worker-based ParparVM port.)
+    private static boolean isCORSRestricted(HTMLIFrameElement iframe) {
+        try {
+            Window cw = iframe.getContentWindow();
+            if (cw == null) {
+                return true;
+            }
+            return cw.getDocument() == null;
+        } catch (Throwable t) {
+            return true;
+        }
+    }
     
     private boolean listenersInstalled;
     private List<EventListener> frameListeners;
@@ -534,18 +580,26 @@ public class HTML5BrowserComponent extends HTML5Peer {
         setURL(getURL());
     }
 
-    @JSBody(
-            params={"el"},
-            script="var doc = el ? el.ownerDocument : null;"
-                    + "if (!doc) { return false; }"
-                    + "if (doc.documentElement && typeof doc.documentElement.contains === 'function') {"
-                    + "  return doc.documentElement.contains(el);"
-                    + "}"
-                    + "if (doc.body && typeof doc.body.contains === 'function') {"
-                    + "  return doc.body.contains(el);"
-                    + "}"
-                    + "return !!el.isConnected;")
-    private native static boolean documentContains(HTMLElement el);
+    // NOTE: this must NOT be an @JSBody. On the ParparVM worker model an @JSBody
+    // script runs in the worker, where ``el`` is a host-ref proxy with no live DOM,
+    // so ``doc.documentElement.contains(el)`` compares the worker's doc proxy
+    // against the el proxy and ALWAYS returns false. initComponent() then thinks the
+    // iframe was never added and re-appends it on every call -- and re-inserting an
+    // iframe RELOADS it, which re-runs editor.js / re-bootstraps Monaco and wipes the
+    // user's edits back to the bootstrap source ("typed character erased immediately"
+    // / "no interaction"). Because clicking a peer now actually reaches it (the
+    // pointer-events toggle), initComponent gets driven repeatedly and the editor
+    // reloaded on every interaction. Probe through the JSO bridge instead:
+    // getParentNode() runs on the MAIN thread and reliably reports null (detached)
+    // vs a real parent, and the peer's only parent is the in-document peers
+    // container. Same class of worker-proxy bug as isCORSRestricted() below.
+    private static boolean documentContains(HTMLElement el) {
+        try {
+            return el != null && el.getParentNode() != null;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
     
     
     @Override
@@ -611,7 +665,7 @@ public class HTML5BrowserComponent extends HTML5Peer {
             throw new RuntimeException("Cannot execute javascript in this browser component because it is CORS-restricted. Javascript was "+javascript);
         }
         WindowExt win =  iframe == null ? ((WindowExt)Window.current()) : (WindowExt)iframe.getContentWindow();
-        
+
         win.eval(javascript);
         //Window win = iframe.getContentWindow();
         //win.getLocation().assign("javascript:"+javascript);

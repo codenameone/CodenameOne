@@ -190,14 +190,23 @@ final class JavascriptBundleWriter {
         mangleDispatchIds(chunkStrings, classes);
         mangleInstanceFieldProps(chunkStrings, classes);
 
+        // hoistStringConstants emits top-level ``const _q<alias>="..."`` string
+        // aliases. The chunks are concatenated into one worker scope via
+        // importScripts, so the alias namespace must be GLOBAL across chunks --
+        // resetting the alias counter per chunk made two chunks each declare
+        // e.g. ``const _q0O`` with different values, a SyntaxError ("redeclaration
+        // of const") that only surfaced once a bundle was large enough to split
+        // (the Playground). Thread one shared counter so each chunk gets a
+        // disjoint alias range, exactly as a single un-split chunk would.
+        int[] aliasCounter = new int[]{0};
         int leadCount = chunkStrings.size() - 1;
         for (int i = 0; i < leadCount; i++) {
             String suffix = leadCount >= 10 ? String.format("_%02d", i + 1) : String.format("_%d", i + 1);
             Files.write(new File(outputDirectory, "translated_app" + suffix + ".js").toPath(),
-                    minifyJs(hoistStringConstants(chunkStrings.get(i))).getBytes(StandardCharsets.UTF_8));
+                    minifyJs(hoistStringConstants(chunkStrings.get(i), aliasCounter)).getBytes(StandardCharsets.UTF_8));
         }
         Files.write(new File(outputDirectory, "translated_app.js").toPath(),
-                minifyJs(hoistStringConstants(chunkStrings.get(chunkStrings.size() - 1))).getBytes(StandardCharsets.UTF_8));
+                minifyJs(hoistStringConstants(chunkStrings.get(chunkStrings.size() - 1), aliasCounter)).getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -1133,7 +1142,7 @@ final class JavascriptBundleWriter {
      * {@code _O}, {@code _L}, {@code _Z} in parparvm_runtime.js); the
      * generator names start with {@code $} or a letter.
      */
-    private static String hoistStringConstants(String src) {
+    private static String hoistStringConstants(String src, int[] aliasCounter) {
         // First pass: walk the source, find every "..." literal that is
         // a pure identifier of length >= 4. Skip single-quoted strings
         // and template literals (JS-port currently emits a few of each
@@ -1220,7 +1229,10 @@ final class JavascriptBundleWriter {
         });
         Map<String, String> aliases = new HashMap<String, String>();
         StringBuilder prelude = new StringBuilder();
-        int aliasIdx = 0;
+        // Continue the alias sequence from where prior chunks left off so the
+        // top-level ``const`` names stay unique across the whole (importScripts-
+        // concatenated) bundle, not just within this chunk.
+        int aliasIdx = aliasCounter[0];
         for (Map.Entry<String, Integer> e : sorted) {
             String body = e.getKey();
             int uses = e.getValue();
@@ -1246,6 +1258,9 @@ final class JavascriptBundleWriter {
             prelude.append(alias).append("=\"").append(body).append('"');
             aliasIdx++;
         }
+        // Publish the advanced counter so the next chunk starts past this one's
+        // aliases (keeps the const names unique across the concatenated bundle).
+        aliasCounter[0] = aliasIdx;
         if (aliases.isEmpty()) {
             return src;
         }

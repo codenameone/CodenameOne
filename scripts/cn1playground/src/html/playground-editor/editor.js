@@ -46,10 +46,17 @@
     }
     var vsBasePath = "monaco/min/vs";
     var workerMainUrl = new URL(vsBasePath + "/base/worker/workerMain.js", window.location.href).toString();
+    // The label worker runs from a data: URL, which has no base for resolving
+    // relative URLs. Monaco loads each language worker as baseUrl + "vs/...",
+    // so baseUrl must be the ABSOLUTE parent of the vs/ directory. The old
+    // value ("monaco/min/vs/") was both relative (unparseable in the data:
+    // worker -> "Failed to parse URL") and wrong (produced a duplicated
+    // "vs/vs/" path). Use the absolute monaco/min/ directory instead.
+    var workerBaseUrl = new URL("monaco/min/", window.location.href).toString();
     window.MonacoEnvironment = {
       getWorkerUrl: function() {
         var worker = ""
-          + "self.MonacoEnvironment={baseUrl:'" + vsBasePath + "/'};"
+          + "self.MonacoEnvironment={baseUrl:'" + workerBaseUrl + "'};"
           + "importScripts('" + workerMainUrl + "');";
         return "data:text/javascript;charset=utf-8," + encodeURIComponent(worker);
       }
@@ -92,6 +99,22 @@
       insertSpaces: true
     });
     registerCompletionProviders();
+    // The editor lives in a BrowserComponent iframe that the Codename One peer
+    // creates hidden (display:none, 0x0) and only sizes once it is shown. Monaco
+    // is created against that 0x0 container, and its automaticLayout observer
+    // doesn't reliably catch the later display:none -> visible resize, so it can
+    // stay laid out at ~5x5 (a blank editor pane). Observe the iframe body and
+    // re-layout whenever it resizes so the editor fills the pane once shown.
+    if (typeof ResizeObserver !== "undefined") {
+      try {
+        var ro = new ResizeObserver(function() {
+          if (state.editor) {
+            state.editor.layout();
+          }
+        });
+        ro.observe(document.body);
+      } catch (e) { /* non-fatal: automaticLayout still applies */ }
+    }
     state.editor.onDidChangeModelContent(function() {
       if (state.suppressChange) {
         return;
@@ -581,9 +604,13 @@
       post({
         type: "change",
         text: state.model.getValue(),
-        version: state.version
+        version: state.version,
+        // The host's onMessage now receives messages from every editor iframe
+        // (the JS port can't match a message to a specific iframe), so tag the
+        // language and let the host route this change to the right editor.
+        language: state.language
       });
-    }, 280);
+    }, 350);
   }
 
   function scheduleLocalLint() {
@@ -758,6 +785,16 @@
 
   function bootstrap(metadataJson, source, language, darkMode, markers, messages, uiids) {
     ensureMonaco(function() {
+      // bootstrap() can be invoked more than once: the editor re-signals "ready"
+      // every 400ms until it sees state.bootstrapped, and on the JS port a "ready"
+      // from ANY editor iframe is delivered to every editor's host handler, so the
+      // host calls bootstrap repeatedly while things settle. Re-running setSource()
+      // on those later calls is destructive -- model.setValue() resets the caret to
+      // 1:1 and (within the change debounce window) can re-push stale text, which is
+      // exactly the "type a char, a second later it bounces to 0,0 / can only type at
+      // the start" symptom. So only seed the source on the FIRST bootstrap; later
+      // bootstraps just refresh non-destructive bits (markers/messages/theme).
+      var alreadyBootstrapped = state.bootstrapped;
       state.metadata = normalizeMetadata(JSON.parse(metadataJson));
       state.language = language || "java";
       state.uiids = uiids || [];
@@ -765,11 +802,19 @@
       if (state.model && state.model.getLanguageId && state.model.getLanguageId() !== state.language) {
         monaco.editor.setModelLanguage(state.model, state.language);
       }
-      setSource(source || "");
+      if (!alreadyBootstrapped) {
+        setSource(source || "");
+      }
       setMarkers(markers || []);
       setInlineMessages(messages || []);
       applyTheme(!!darkMode);
       scheduleLocalLint();
+      // Force a layout now that the editor has content and is (about to be)
+      // visible, in case the iframe was sized before Monaco's observer attached.
+      if (state.editor) {
+        state.editor.layout();
+        setTimeout(function() { if (state.editor) { state.editor.layout(); } }, 0);
+      }
     });
   }
 
@@ -856,4 +901,23 @@
     applyTheme: applyTheme,
     setUiids: setUiids
   };
+
+  // The host bootstraps the editor on a one-time BrowserComponent ready event.
+  // That can fire before this script has defined window.PlaygroundEditor (the
+  // host's "PlaygroundEditor && PlaygroundEditor.bootstrap(...)" then no-ops),
+  // or target a recreated peer, leaving the visible editor un-bootstrapped and
+  // blank. Now that PlaygroundEditor exists, signal readiness ourselves and
+  // keep signalling until the host actually bootstraps us.
+  (function () {
+    function signalReady() { post({ type: "ready" }); }
+    signalReady();
+    var attempts = 0;
+    var timer = setInterval(function () {
+      if (state.bootstrapped || attempts++ > 40) {
+        clearInterval(timer);
+        return;
+      }
+      signalReady();
+    }, 400);
+  })();
 })();

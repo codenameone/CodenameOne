@@ -40,8 +40,13 @@ if [ ! -f javase/src/main/java/com/codename1/testnativeinterface/HelloNativeImpl
   echo "JavaSE native implementation missing after migration"
   exit 1
 fi
-if [ ! -f win/src/main/csharp/com/codename1/testnativeinterface/HelloNativeImpl.cs ]; then
-  echo "Win native implementation missing after migration"
+# The legacy UWP/C# Windows port is retired: the win module is now a native C
+# target (win32), so migration must NOT carry over a C# (.cs) implementation.
+# (The win module itself is present for Java 8 projects but stripped for Java 17
+# by the archetype post-generate script, so guard on its existence.)
+if [ -d win ] && find win -name '*.cs' | grep -q .; then
+  echo "Unexpected C# source in win module after migration (UWP/C# port is retired)"
+  find win -name '*.cs'
   exit 1
 fi
 if [ ! -f javascript/src/main/javascript/com_codename1_testnativeinterface_HelloNative.js ]; then

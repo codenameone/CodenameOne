@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_system {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -39,6 +44,9 @@ public final class GeneratedAccess_com_codename1_system {
         if ("NativeLookup".equals(simpleName)) {
             return com.codename1.system.NativeLookup.class;
         }
+        if ("SimulatorHookExecutor".equals(simpleName)) {
+            return com.codename1.system.SimulatorHookExecutor.class;
+        }
         if ("URLCallback".equals(simpleName)) {
             return com.codename1.system.URLCallback.class;
         }
@@ -46,6 +54,12 @@ public final class GeneratedAccess_com_codename1_system {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.system.Lifecycle.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.system.Lifecycle();
+            }
+        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
@@ -53,6 +67,7 @@ public final class GeneratedAccess_com_codename1_system {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.system.DefaultCrashReporter.class) return invokeStatic0(name, safeArgs);
         if (type == com.codename1.system.NativeLookup.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.system.SimulatorHookExecutor.class) return invokeStatic2(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -137,6 +152,33 @@ public final class GeneratedAccess_com_codename1_system {
         throw unsupportedStatic(com.codename1.system.NativeLookup.class, name, safeArgs);
     }
 
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+        if ("execute".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.system.SimulatorHookExecutor.execute((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("isRegistered".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.system.SimulatorHookExecutor.isRegistered((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("register".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
+                com.codename1.system.SimulatorHookExecutor.register((java.util.Map) adaptedArgs[0]); return null;
+            }
+        }
+        if ("registeredIds".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.system.SimulatorHookExecutor.registeredIds();
+            }
+        }
+        throw unsupportedStatic(com.codename1.system.SimulatorHookExecutor.class, name, safeArgs);
+    }
+
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
@@ -206,6 +248,12 @@ public final class GeneratedAccess_com_codename1_system {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 typedTarget.init((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onReceivedSharedContent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.share.SharedContent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.share.SharedContent.class}, false);
+                typedTarget.onReceivedSharedContent((com.codename1.share.SharedContent) adaptedArgs[0]); return null;
             }
         }
         if ("runApp".equals(name)) {

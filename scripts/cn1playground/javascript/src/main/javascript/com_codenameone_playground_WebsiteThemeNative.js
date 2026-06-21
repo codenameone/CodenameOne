@@ -67,6 +67,37 @@ var o = {};
         }
     };
 
+    o.locationHref_ = function(callback) {
+        // This native impl runs on the iframe's main thread, where ``window`` is
+        // the Playground app frame. Deep-link params (?sample= / ?code= / ?css=)
+        // may live either on this frame's URL (when opened directly) or on the
+        // parent page that embeds it (the codenameone.com /playground wrapper).
+        // Prefer whichever carries a query string so sharing works in both cases.
+        try {
+            var loc = window.location;
+            var origin = loc.origin || (loc.protocol + "//" + loc.host);
+            var search = loc.search || "";
+            var hash = loc.hash || "";
+            try {
+                var hasQuery = search && search.length > 1;
+                if (!hasQuery && window.parent && window.parent !== window && window.parent.location) {
+                    var psearch = window.parent.location.search || "";
+                    if (psearch && psearch.length > 1) {
+                        search = psearch;
+                        if (!hash) {
+                            hash = window.parent.location.hash || "";
+                        }
+                    }
+                }
+            } catch (ignoredParent) {
+                // Cross-origin parent (shouldn't happen same-site) -- fall back.
+            }
+            callback.complete(origin + (loc.pathname || "/") + search + hash);
+        } catch (e) {
+            callback.complete("");
+        }
+    };
+
     o.isSupported_ = function(callback) {
         callback.complete(true);
     };

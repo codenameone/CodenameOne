@@ -215,7 +215,20 @@ public class LocalForage {
         public void length(LengthCallback callback);
         public void keys(KeysCallback callback);
         public void iterate(IterateCallback callback, SuccessCallback success);
-        
+
+        // Synchronous, value-returning variants (see localforage-shim.js). These
+        // are BLOCKING JSO host calls: the worker parks on HOST_CALL and resumes
+        // on HOST_CALLBACK with the return value -- no async callback, so no
+        // ``while(!done){Thread.sleep(20);}`` poll that would starve the worker
+        // message pump and freeze the EDT (the input-freeze bug). localStorage
+        // is synchronous on the host, so there is nothing async to await.
+        public JSObject getItemSync(String key);
+        public JSObject setItemSync(String key, JSObject value);
+        public JSObject removeItemSync(String key);
+        public JSObject clearSync();
+        public JSObject lengthSync();
+        public JSArray<JSString> keysSync();
+
         public void config(ConfigOptions opts);
         
         @JSProperty
@@ -292,10 +305,14 @@ public class LocalForage {
             } else if (instanceOf(o, "Uint8Array")) {
                 return ((Uint8Array)o).getByteLength();
             }
+            byte[] bytes = objectBytes(o);
+            if (bytes != null) {
+                return bytes.length;
+            }
         }
         throw new IOException("Failed to open stream.  Unknown object type.");
     }
-    
+
     public InputStream openInputStream(String key) throws IOException {
         JSObject o = getItem(key);
         if (JS.isUndefined(o)) {
@@ -330,6 +347,10 @@ public class LocalForage {
             } else if (instanceOf(o, "Uint8Array")) {
                 return BlobUtil.openInputStream((Uint8Array)o, "application/octet-stream");
             }
+            byte[] bytes = objectBytes(o);
+            if (bytes != null) {
+                return new ByteArrayInputStream(bytes);
+            }
         }
         throw new IOException("Failed to open stream.  Unknown object type.");
     }
@@ -362,69 +383,27 @@ public class LocalForage {
     }
     
     
-    
-    // Poll-based wait helper. Avoids synchronized(done) + done.wait() which
-    // on the JS-port cooperative scheduler strands the waiter (the monitor
-    // isn't released when wait() parks, so the async callback can't enter
-    // synchronized(done) to deliver the result). The worker is single-threaded
-    // so cross-thread visibility from the callback to the waiter is implicit.
-    private static void awaitLocalForageDone(boolean[] done) throws IOException {
-        long deadline = System.currentTimeMillis() + 10_000L;
-        while (!done[0]) {
-            if (System.currentTimeMillis() >= deadline) {
-                throw new IOException("LocalForage callback timed out after 10s");
-            }
-            try {
-                Thread.sleep(20);
-            } catch (InterruptedException e) {
-                throw new IOException("Interrupted", e);
-            }
-        }
-    }
 
     private static JSObject setValue(LocalForageImpl impl, String key, JSObject value) throws IOException {
-        final Object[] result = new Object[1];
-        final IOException[] error = new IOException[1];
-        final boolean[] done = new boolean[1];
-
-        impl.setItem(key, value, new SetItemCallback(){
-            @Override
-            public void callback(JSObject err, JSObject val) {
-                if (err != null && !JS.isUndefined(err)) {
-                    HTML5Implementation._logObj(err);
-                    error[0] = new QuotaExceededException("Failed to set value");
-                } else {
-                    result[0] = val;
-                }
-                done[0] = true;
-            }
-        });
-
-        awaitLocalForageDone(done);
-        if (error[0] != null) {
-            throw error[0];
+        // Blocking host call that returns synchronously (see LocalForageImpl /
+        // localforage-shim.js). No async callback + Thread.sleep poll, so the
+        // worker message pump is never starved and the EDT never freezes.
+        try {
+            return impl.setItemSync(key, value);
+        } catch (Throwable t) {
+            throw new QuotaExceededException("Failed to set value: " + t);
         }
-        return (JSObject) result[0];
     }
 
     private static JSObject getValue(LocalForageImpl impl, String key) throws IOException {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
-        final boolean[] done = new boolean[1];
+        try {
+            result[0] = impl.getItemSync(key);
+        } catch (Throwable t) {
+            error[0] = new IOException("Failed to get value: " + t);
+        }
 
-        impl.getItem(key, new GetItemCallback(){
-            @Override
-            public void callback(JSObject err, JSObject val) {
-                if (err != null && !JS.isUndefined(err)) {
-                    error[0] = new IOException(JS.unwrapString(err));
-                } else {
-                    result[0] = val;
-                }
-                done[0] = true;
-            }
-        });
-
-        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
@@ -432,105 +411,83 @@ public class LocalForage {
     }
 
     private static void removeItem(LocalForageImpl impl, String key) throws IOException {
-        final IOException[] error = new IOException[1];
-        final boolean[] done = new boolean[1];
-
-        impl.removeItem(key, new SuccessCallback(){
-            @Override
-            public void callback(JSObject err) {
-                if (err != null && !JS.isUndefined(err)) {
-                    error[0] = new IOException("Failed to delete value");
-                }
-                done[0] = true;
-            }
-        });
-
-        awaitLocalForageDone(done);
-        if (error[0] != null) {
-            throw error[0];
+        try {
+            impl.removeItemSync(key);
+        } catch (Throwable t) {
+            throw new IOException("Failed to delete value: " + t);
         }
     }
 
     private static void clear(LocalForageImpl impl) throws IOException {
-        final IOException[] error = new IOException[1];
-        final boolean[] done = new boolean[1];
-
-        impl.clear(new SuccessCallback(){
-            @Override
-            public void callback(JSObject err) {
-                if (err != null && !JS.isUndefined(err)) {
-                    error[0] = new IOException("Failed to clear forage");
-                }
-                done[0] = true;
-            }
-        });
-
-        awaitLocalForageDone(done);
-        if (error[0] != null) {
-            throw error[0];
+        try {
+            impl.clearSync();
+        } catch (Throwable t) {
+            throw new IOException("Failed to clear forage: " + t);
         }
     }
     
     private static String[] keys(LocalForageImpl impl) throws IOException {
-        final Object[] result = new Object[1];
-        final IOException[] error = new IOException[1];
-        final boolean[] done = new boolean[1];
-
-        impl.keys(new KeysCallback(){
-            @Override
-            public void callback(JSObject err, JSArray<JSString> k) {
-                if (err != null && !JS.isUndefined(err)) {
-                    error[0] = new IOException("Failed to get keys");
-                } else {
-                    result[0] = JS.unwrapStringArray(k);
-                }
-                done[0] = true;
-            }
-        });
-
         try {
-            awaitLocalForageDone(done);
-        } catch (IOException timeoutEx) {
-            // Cleanup callers treat null/empty as "no files to delete"; better
-            // than a hard failure when the bridge response is delayed.
+            return JS.unwrapStringArray(impl.keysSync());
+        } catch (Throwable t) {
+            // Cleanup callers treat empty as "no files to delete"; better than a
+            // hard failure.
             return new String[0];
         }
-        if (error[0] != null) {
-            throw error[0];
-        }
-        return (String[]) result[0];
     }
-    
+
     private static int length(LocalForageImpl impl) throws IOException {
-        final int[] result = new int[1];
-        final IOException[] error = new IOException[1];
-        final boolean[] done = new boolean[1];
-
-        impl.length(new LengthCallback(){
-            @Override
-            public void callback(JSObject err, JSObject len) {
-                if (err != null && !JS.isUndefined(err)) {
-                    error[0] = new IOException("Failed to get length");
-                } else {
-                    result[0] = JS.unwrapInt(len);
-                }
-                done[0] = true;
-            }
-        });
-
-        awaitLocalForageDone(done);
-        if (error[0] != null) {
-            throw error[0];
+        try {
+            return JS.unwrapInt(impl.lengthSync());
+        } catch (Throwable t) {
+            throw new IOException("Failed to get length: " + t);
         }
-        return result[0];
     }
     
     
     
-    @JSBody(params="type", script="return window[type];")
+    @JSBody(params="type", script="return (typeof globalThis!=='undefined'?globalThis:self)[type];")
     private static native JSObject getJSClassForType(String type);
-    
-    @JSBody(params={"o", "type"}, script="return (o instanceof window[type]);")
+
+    // A byte array round-tripped through localforage (which runs on the main
+    // thread -- workers have no localStorage) loses its Uint8Array type by the
+    // time it returns to the worker: `instanceOf(o,"Uint8Array")` is false and
+    // the value is an opaque array-like object. Rather than depend on the type
+    // surviving the host<->worker bridge, extract the bytes in JS as a base64
+    // string (strings cross the bridge intact) and decode them Java-side.
+    // Returns null when the value is not a byte source.
+    @JSBody(params="o", script=
+        "if (o == null || typeof o !== 'object') { return null; }"
+        + "var u8 = null;"
+        + "if (o instanceof Uint8Array) { u8 = o; }"
+        + "else if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView && ArrayBuffer.isView(o) && !(o instanceof DataView)) { u8 = new Uint8Array(o.buffer, o.byteOffset, o.byteLength); }"
+        + "else if (typeof ArrayBuffer !== 'undefined' && o instanceof ArrayBuffer) { u8 = new Uint8Array(o); }"
+        + "else { var n = (typeof o.length === 'number') ? o.length : Object.keys(o).length; var a = new Uint8Array(n); for (var i=0;i<n;i++){ var b=o[i]; if (typeof b !== 'number') { return null; } a[i]=b & 255; } u8 = a; }"
+        + "var s=''; for (var i=0;i<u8.length;i+=0x8000){ s += String.fromCharCode.apply(null, u8.subarray(i, i+0x8000)); } return btoa(s);")
+    private static native String bytesAsBase64(JSObject o);
+
+    private static byte[] objectBytes(JSObject o) {
+        try {
+            String b64 = bytesAsBase64(o);
+            if (b64 != null && b64.length() > 0) {
+                return com.codename1.util.Base64.decode(b64.getBytes("UTF-8"));
+            }
+            if (b64 != null) {
+                return new byte[0];
+            }
+        } catch (Throwable t) {
+            // fall through to "unsupported"
+        }
+        return null;
+    }
+
+    // The translated app runs in a Web Worker, where `window` is only a partial
+    // shim and does NOT carry built-in constructors like Blob/Uint8Array, so
+    // `window[type]` was undefined and `o instanceof undefined` threw
+    // ("Right-hand side of 'instanceof' is not an object" / "invalid 'instanceof'
+    // operand"). Resolve the constructor off the real worker global (globalThis,
+    // falling back to self) and guard that it is callable before the instanceof.
+    @JSBody(params={"o", "type"}, script="var t=(typeof globalThis!=='undefined'?globalThis:self)[type]; return (typeof t==='function')?(o instanceof t):false;")
     private static native boolean instanceOf(JSObject o, String type);
     
     

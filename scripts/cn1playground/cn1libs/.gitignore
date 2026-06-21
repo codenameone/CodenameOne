@@ -1,0 +1,7 @@
+# Build artifacts synced in from scripts/initializr/cn1libs by
+# tools/sync-zipsupport-from-initializr.sh during the build (validate phase).
+# The canonical copies are tracked under scripts/initializr/cn1libs; these are
+# generated and must not be committed.
+ZipSupport.cn1lib
+ZipSupport.ver
+ZipSupport/jars/

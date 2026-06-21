@@ -162,14 +162,24 @@ final class PlaygroundBrowserEditor {
         if (browser == null) {
             return;
         }
-        browser.execute("window.PlaygroundEditor && window.PlaygroundEditor.bootstrap("
-                + asJsString(metadataJson) + ", "
+        // The BrowserComponent fires ready as soon as the iframe document loads,
+        // which can be BEFORE editor.js has run and defined window.PlaygroundEditor
+        // (loader.js + editor.js load asynchronously). A plain
+        // "PlaygroundEditor && PlaygroundEditor.bootstrap(...)" then silently
+        // no-ops and the editor never initialises -- and the iframe->host message
+        // channel is one-way here, so we can't rely on the editor signalling back.
+        // Inject a self-retrying bootstrap that waits inside the iframe until
+        // PlaygroundEditor exists, so bootstrap runs regardless of load ordering.
+        String bootstrapArgs = asJsString(metadataJson) + ", "
                 + asJsString(pendingSource) + ", "
                 + asJsString(mode.monacoLanguage()) + ", "
                 + (pendingDarkMode ? "true" : "false") + ", "
                 + pendingMarkersJson + ", "
                 + pendingMessagesJson + ", "
-                + pendingUiidsJson + ");");
+                + pendingUiidsJson;
+        browser.execute("(function(){var n=0;function go(){"
+                + "if(window.PlaygroundEditor){window.PlaygroundEditor.bootstrap(" + bootstrapArgs + ");}"
+                + "else if(n++<200){setTimeout(go,25);}}go();})();");
     }
 
     private boolean shouldUseBrowserEditor() {
@@ -235,13 +245,34 @@ final class PlaygroundBrowserEditor {
         }
         String type = asString(payload.get("type"));
         if ("ready".equals(type)) {
+            // The editor re-signals "ready" every 400ms until it's bootstrapped, and
+            // on the JS port a ready from any editor iframe reaches every editor's
+            // handler. Only bootstrap once -- re-flushing re-runs setSource in the
+            // editor and resets the caret / re-pushes stale text while the user types.
+            if (ready) {
+                return;
+            }
             ready = true;
             flush();
             return;
         }
         if ("change".equals(type)) {
+            // On the JS port onMessage is delivered to every editor's handler
+            // (the port can't match a message to a specific iframe), so each
+            // editor only acts on changes tagged with its own language.
+            String language = asString(payload.get("language"));
+            if (language.length() > 0 && !language.equals(mode.monacoLanguage())) {
+                return;
+            }
             String text = asString(payload.get("text"));
             int version = asInt(payload.get("version"));
+            // Keep pendingSource current with what the user has typed. If the
+            // editor iframe is ever reloaded/re-bootstrapped (peer recreation),
+            // flush() re-sends pendingSource -- if that were still the stale
+            // bootstrap source it would wipe the user's edits ("typed char erased
+            // immediately"). Tracking the latest text here makes a re-bootstrap
+            // restore the current content instead.
+            pendingSource = text == null ? "" : text;
             listener.onSourceChanged(text, version);
         }
     }

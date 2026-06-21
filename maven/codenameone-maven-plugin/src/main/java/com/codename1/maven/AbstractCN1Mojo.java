@@ -211,7 +211,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (project == null || project.getBasedir() == null) {
             return null;
         }
-        if (contains(project.getBasedir().getName(), "javase", "javascript", "android", "ios", "win")) {
+        if (contains(project.getBasedir().getName(), "javase", "javascript", "android", "ios", "win", "linux")) {
             File commonSettings = new File(project.getBasedir(), ".." + File.separator + "common" + File.separator + "codenameone_settings.properties");
             if (commonSettings.exists()) {
                 return commonSettings.getParentFile();

@@ -120,8 +120,8 @@ def pickJavaVersionFromCurrentJvm() {
 /**
  * Apply the Java-17-only transforms that the initializr does on its
  * server-rendered templates:
- *   - drop the win/ UWP source tree and the matching <profile id="win"> block
- *     from the root pom (the legacy Windows / UWP cloud target is retired for
+ *   - drop the win/ native source tree and the matching <profile id="win"> block
+ *     from the root pom (the legacy Windows device cloud target is retired for
  *     Java 17 builds)
  *   - keep .claude/skills/codename-one/** (the Codename One authoring skill)
  *
@@ -177,8 +177,8 @@ def setIntellijLanguageLevel(rootDir, resolvedJava) {
 
 /**
  * Mirror of initializr's GeneratorModel.stripWindowsModuleProfile: locate the
- * <profile> block whose <id>win</id> identifies the UWP profile and remove
- * the whole block (and trailing newline) from the root pom. Tolerant of
+ * <profile> block whose <id>win</id> identifies the Windows device profile and
+ * remove the whole block (and trailing newline) from the root pom. Tolerant of
  * indentation. No-op if the profile is not present.
  */
 def stripWindowsModuleProfile(pomFile) {

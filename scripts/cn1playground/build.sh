@@ -27,8 +27,14 @@ function linux_device {
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=linux" "-Dcodename1.buildTarget=linux-device" "-U" "-e"
 }
 function javascript {
-  
-  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
+  # The Playground's bean-shell registry keeps nearly the whole Codename One
+  # API reachable, so the ParparVM JS Rapid Type Analysis (RTA) tree-shaking
+  # pass cannot prune much yet runs for well over an hour. Disable RTA
+  # (parparvm.js.rta.off); the resulting un-pruned bundle is large, so give
+  # the translator a bigger heap than the 512m default to avoid an
+  # OutOfMemoryError mid-emit. See README.md "JavaScript Port".
+  CN1_TRANSLATOR_OPTS="${CN1_TRANSLATOR_OPTS:--Dparparvm.js.rta.off -Xmx6g}" \
+    "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=local-javascript" "-U" "-e"
 }
 function javascript_compare {
   "javascript"

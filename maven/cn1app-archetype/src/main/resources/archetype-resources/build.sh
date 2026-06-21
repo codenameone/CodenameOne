@@ -18,10 +18,6 @@ function windows_device {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=win" "-Dcodename1.buildTarget=windows-device" "-U" "-e"
 }
-function uwp {
-
-  "windows_device"
-}
 function linux_device {
 
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=linux" "-Dcodename1.buildTarget=linux-device" "-U" "-e"
@@ -92,7 +88,7 @@ function help {
   "echo" "-e" "    Builds Windows desktop app."
   "echo" "-e" "    *Windows Desktop builds are a Pro user feature."
   "echo" "-e" "  windows_device"
-  "echo" "-e" "    Builds UWP Windows app."
+  "echo" "-e" "    Builds a native Windows app (no JVM)."
   "echo" "-e" "  linux_device"
   "echo" "-e" "    Builds a native Linux app (ELF, no JVM)."
   "echo" "-e" "  javascript"

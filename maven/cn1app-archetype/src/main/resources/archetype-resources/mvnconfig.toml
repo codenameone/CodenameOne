@@ -45,7 +45,7 @@ group="Cloud"
 
 [windows_device]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=win", "-Dcodename1.buildTarget=windows-device", "-U", "-e"]
-label="Windows Device Build (UWP)"
+label="Windows Device Build"
 group="Cloud"
 
 [linux_device]

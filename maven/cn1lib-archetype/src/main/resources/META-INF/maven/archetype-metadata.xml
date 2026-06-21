@@ -112,9 +112,10 @@
     <module id="${rootArtifactId}-win" dir="win" name="${rootArtifactId}-win">
       <fileSets>
         <fileSet filtered="true" packaged="true" encoding="UTF-8">
-          <directory>src/main/csharp</directory>
+          <directory>src/main/c</directory>
           <includes>
-            <include>**/*.cs</include>
+            <include>**/*.c</include>
+            <include>**/*.h</include>
           </includes>
         </fileSet>
       </fileSets>

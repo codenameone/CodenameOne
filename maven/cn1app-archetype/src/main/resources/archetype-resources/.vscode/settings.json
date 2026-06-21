@@ -48,7 +48,7 @@
     "command": "\"verify\" \"-Prun-desktop\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-e\""
   },
   {
-    "alias": "Cloud > Windows Device Build (UWP)",
+    "alias": "Cloud > Windows Device Build",
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=win\" \"-Dcodename1.buildTarget=windows-device\" \"-U\" \"-e\""
   },
   {

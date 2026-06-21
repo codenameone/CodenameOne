@@ -477,6 +477,27 @@
         "canonical_set": false,
         "syndicated_at": "2026-06-20T15:03:14+00:00"
       }
+    },
+    "game-development-api-box2d": {
+      "devto": {
+        "id": 3955953,
+        "url": "https://dev.to/codenameone/build-games-in-java-sprites-box2d-physics-and-low-latency-sound-341i",
+        "syndicated_at": "2026-06-21T13:33:41+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/c741f26f760e/edit",
+        "syndicated_at": "2026-06-21T15:02:42+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmqnx343k00010aje85p301dm",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a36ab52f3d6ad5d6df0a163",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-21T15:04:09+00:00"
+      }
     }
   }
 }

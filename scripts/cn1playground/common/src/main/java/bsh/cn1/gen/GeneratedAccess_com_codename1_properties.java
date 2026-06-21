@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_properties {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -195,6 +200,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 return new com.codename1.properties.FloatProperty((java.lang.String) adaptedArgs[0], Float.valueOf(((Number) adaptedArgs[1]).floatValue()));
             }
         }
+        if (type == com.codename1.properties.InstantUI.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.InstantUI();
+            }
+        }
         if (type == com.codename1.properties.IntProperty.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -297,6 +308,18 @@ public final class GeneratedAccess_com_codename1_properties {
                 return new com.codename1.properties.SetProperty((java.lang.String) adaptedArgs[0], (java.lang.Class) adaptedArgs[1], varArgs);
             }
         }
+        if (type == com.codename1.properties.UiBinding.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding();
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.BooleanConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.BooleanConverter();
+            }
+        }
         if (type == com.codename1.properties.UiBinding.BoundTableModel.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.CollectionProperty.class, com.codename1.properties.PropertyBusinessObject.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.CollectionProperty.class, com.codename1.properties.PropertyBusinessObject.class}, false);
@@ -313,10 +336,46 @@ public final class GeneratedAccess_com_codename1_properties {
                 return new com.codename1.properties.UiBinding.CheckBoxRadioSelectionAdapter((com.codename1.properties.UiBinding.ObjectConverter) adaptedArgs[0]);
             }
         }
+        if (type == com.codename1.properties.UiBinding.DateConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.DateConverter();
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.DoubleConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.DoubleConverter();
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.FloatConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.FloatConverter();
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.IntegerConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.IntegerConverter();
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.LongConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.LongConverter();
+            }
+        }
         if (type == com.codename1.properties.UiBinding.MappingConverter.class) {
             if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
                 return new com.codename1.properties.UiBinding.MappingConverter((java.util.Map) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.ObjectConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.ObjectConverter();
             }
         }
         if (type == com.codename1.properties.UiBinding.PickerAdapter.class) {
@@ -337,6 +396,12 @@ public final class GeneratedAccess_com_codename1_properties {
                     varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
                 }
                 return new com.codename1.properties.UiBinding.RadioListAdapter((com.codename1.properties.UiBinding.ObjectConverter) adaptedArgs[0], varArgs);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.StringConverter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.StringConverter();
             }
         }
         if (type == com.codename1.properties.UiBinding.TextAreaAdapter.class) {
