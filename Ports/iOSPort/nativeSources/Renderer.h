@@ -110,8 +110,6 @@ extern void Renderer_destroy(Renderer *pRenderer);
 
 extern void Renderer_getOutputBounds(Renderer *pRenderer, jint bounds[]);
 
-extern void Renderer_clampOutputExtent(Renderer *pRenderer, jint maxPixW, jint maxPixH);
-
 extern void Renderer_produceAlphas(Renderer *pRenderer, AlphaConsumer *pAC);
 
 #ifdef __cplusplus

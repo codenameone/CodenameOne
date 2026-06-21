@@ -678,31 +678,3 @@ void Renderer_getOutputBounds(Renderer *pRenderer, jint bounds[]) {
     bounds[2] = getOutpixMaxX(pRenderer);
     bounds[3] = getOutpixMaxY(pRenderer);
 }
-
-// Cap the output extent (in output pixels) so the alpha-mask texture built from
-// these bounds never exceeds a backend texture-size limit. A shape whose
-// bounding box runs far off-screen (e.g. the graphics-draw-round-rect /
-// graphics-draw-arc tests at 4K, where a stroked path legitimately spans
-// ~15584px) would otherwise ask Metal for a texture wider than the device max
-// (8192 on the tvOS simulator) and abort the app in
-// -[MTLTextureDescriptor validateWithDevice:]. Clamping the right/bottom bounds
-// keeps width/height within maxPixW/maxPixH; getSubpixMaxX already clamps the
-// path edge to boundsMaxX, and the scanline fill clamps crossings to the same
-// bounds, so the texture, the produced alphas and getOutputBounds all stay
-// consistent. This is lossless for visible pixels: anything past the clamp is
-// outside the framebuffer (which is far smaller than the limit) and is clipped
-// away by the scissor regardless.
-void Renderer_clampOutputExtent(Renderer *pRenderer, jint maxPixW, jint maxPixH) {
-    if (maxPixW > 0) {
-        jint maxSubX = maxPixW << SUBPIXEL_LG_POSITIONS_X;
-        if (this.boundsMaxX - this.boundsMinX > maxSubX) {
-            this.boundsMaxX = this.boundsMinX + maxSubX;
-        }
-    }
-    if (maxPixH > 0 && this.sampleRowMax > this.sampleRowMin) {
-        jint maxSubY = maxPixH << SUBPIXEL_LG_POSITIONS_Y;
-        if (this.sampleRowMax - this.sampleRowMin > maxSubY) {
-            this.sampleRowMax = this.sampleRowMin + maxSubY;
-        }
-    }
-}
