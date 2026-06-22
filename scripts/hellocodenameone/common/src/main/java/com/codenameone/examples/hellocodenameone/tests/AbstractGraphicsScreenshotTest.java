@@ -37,6 +37,23 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
 
     protected abstract String screenshotName();
 
+    /// Iteration step for the nested-curve sweep the round-rect / arc tests draw
+    /// in {@link #drawContent}. Phone / tablet / desktop draw every line (step 1)
+    /// for a dense gradient of ~bounds.width/2 overlapping curves. At the TV
+    /// gate's 4K resolution that many overlapping anti-aliased edges sample
+    /// slightly differently across the heterogeneous CI runner GPUs, so the TV
+    /// form factor draws the SAME sweep with far fewer, well-separated curves (a
+    /// coarse step). The shape and the round-rect / arc rasterizer coverage are
+    /// preserved and the capture is cross-runner stable -- the graphics analog of
+    /// the watch full-screen variant split in {@link #runTest()}. Subclasses use
+    /// {@code iter += curveStep(bounds)} instead of {@code iter++}.
+    protected int curveStep(Rectangle bounds) {
+        if (CN.isTV()) {
+            return Math.max(1, (int) (bounds.getWidth() / 40));
+        }
+        return 1;
+    }
+
     static abstract class CleanPaintComponent extends Component {
         CleanPaintComponent() {
             setUIID("GraphicsComponent");
