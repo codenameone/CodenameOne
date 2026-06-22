@@ -22,9 +22,10 @@ import com.codename1.ui.util.UITimer;
  * can't be captured here. This test therefore exercises the Codename One drawn
  * fallback sheet, which is what renders on the simulator, desktop and the web
  * target. It builds the same sheet content as the real {@code RatingDialog}
- * (single-row {@link GridLayout} star strip so the stars never wrap) and shows
- * a genuine {@code Sheet.show()} -- following the {@link SheetScreenshotTest}
- * pattern -- so the capture includes the actual sheet chrome.</p>
+ * (a leading-aligned {@link BoxLayout} star strip, so the stars sit together
+ * at the start of the row rather than spread out) and shows a genuine
+ * {@code Sheet.show()} -- following the {@link SheetScreenshotTest} pattern --
+ * so the capture includes the actual sheet chrome.</p>
  */
 public class AppReviewDialogScreenshotTest extends BaseTest {
     private static final int MAX_STARS = 5;
