@@ -89,6 +89,20 @@ This makes the build:
 
 The resulting APK still installs and runs on phones and tablets.
 
+==== Android TV Build Hints
+
+[cols="2,1,4"]
+|===
+|Build hint |Default |Description
+
+|`android.tv`
+|`false`
+|Mark the build as an Android TV / Google TV app: adds the
+`LEANBACK_LAUNCHER` intent category, declares the `android.software.leanback`
+feature, makes `android.hardware.touchscreen` optional, and generates the
+320×180 launcher banner. The same APK still runs on phones and tablets.
+|===
+
 === Building for Apple TV (tvOS)
 
 Enable the tvOS application target with the `tvNative.*` build hints (analogous
@@ -102,3 +116,41 @@ codename1.arg.tvNative.enabled=true
 The tvOS build produces a standalone Apple TV app. Because tvOS uses a separate
 App ID and provisioning profile from your iOS app, you supply tvOS signing
 material the same way you do for the other Apple targets.
+
+NOTE: `codename1.tvMain` (and `tvNative.enabled`) only add the tvOS target; the
+iPhone/iPad build is unchanged. In particular enabling the tvOS target does
+*not* switch the iOS app's renderer -- tvOS runs on Metal (it has no OpenGL ES),
+but the iOS app continues to honor its own `ios.metal` setting.
+
+==== tvOS Build Hints
+
+[cols="2,1,4"]
+|===
+|Build hint |Default |Description
+
+|`tvNative.enabled`
+|`false`
+|Force the tvOS target on even without a distinct `tvMain`.
+
+|`codename1.tvMain` (a.k.a. `tvMain` / `tvNative.mainClass`)
+|_(none)_
+|Fully-qualified tvOS lifecycle entry class. Setting it also turns on the tvOS
+build. When omitted (with `tvNative.enabled=true`) the tvOS app reuses your
+phone main class.
+
+|`tvNative.bundleId`
+|`<package>.tvos`
+|Bundle identifier of the tvOS app.
+
+|`tvNative.minDeploymentTarget`
+|`13.0`
+|`TVOS_DEPLOYMENT_TARGET` for the tvOS target.
+
+|`tvNative.displayName`
+|_(app display name)_
+|The tvOS app name shown on Apple TV.
+
+|`tvNative.teamId`
+|_(falls back to the iOS team id)_
+|Apple Developer Team ID used to sign the tvOS target.
+|===
