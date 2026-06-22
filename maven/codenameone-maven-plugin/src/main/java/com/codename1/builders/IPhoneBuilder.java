@@ -343,12 +343,16 @@ public class IPhoneBuilder extends Executor {
             ensureXcodeprojInstalled();
         }
 
-        // tvNative: parse + prep. tvOS has no OpenGL ES, so (like Mac Catalyst)
-        // force Metal on; the tvOS app is a separate appletvos target wired via
-        // the xcodeproj gem post-generate.
+        // tvNative: parse + prep. The tvOS app is a SEPARATE appletvos target
+        // (like the watch target, not a Catalyst-style slice of the iOS app), so
+        // we must NOT touch the iOS app's renderer here -- forcing useMetal=true
+        // would override an explicit ios.metal=false and make the GL screenshot
+        // job actually render with Metal. tvOS itself has no OpenGL ES and runs
+        // on Metal via the project's default ios.metal=true; the tvOS target's
+        // own Xcode settings are written by tvNativeBuilder.applyXcodeSettings.
+        // We only need the xcodeproj gem to add and wire the target.
         tvNativeBuilder.parseHints(request);
         if (tvNativeBuilder.isEnabled()) {
-            useMetal = true;
             ensureXcodeprojInstalled();
         }
 
