@@ -356,7 +356,7 @@ public class CodenameOneAnalyticsProvider extends AbstractAnalyticsProvider {
     /// {@link Analytics#getDimensions()}. Emits {@code {}} when empty.
     private static void appendDimensions(StringBuilder b) {
         Map<String, String> dimensions = Analytics.getDimensions();
-        if (dimensions == null || dimensions.isEmpty()) {
+        if (dimensions.isEmpty()) {
             b.append("{}");
             return;
         }
