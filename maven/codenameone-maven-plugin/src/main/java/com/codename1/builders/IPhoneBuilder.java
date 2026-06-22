@@ -1285,6 +1285,27 @@ public class IPhoneBuilder extends Executor {
         
         File stubSource = new File(tmpFile, "stub");
         stubSource.mkdirs();
+        // Native map provider injection (no-op unless maps.provider=apple):
+        // writes the MapKit provider's Java into the stub source (compiled by
+        // javac + translated by ParparVM) and its Objective-C into the native
+        // sources, returning the startup snippet that registers it. Keeps the
+        // core framework free of any map SDK.
+        String integrateMaps = MapsProviderInjector.injectIos(this, request, stubSource, buildinRes);
+        if (integrateMaps.length() > 0) {
+            StringBuilder libs = new StringBuilder(request.getArg("ios.add_libs", ""));
+            String[] fw = MapsProviderInjector.iosFrameworks(request);
+            for (int fwi = 0; fwi < fw.length; fwi++) {
+                if (libs.length() > 0) {
+                    libs.append(';');
+                }
+                libs.append(fw[fwi]);
+            }
+            request.putArgument("ios.add_libs", libs.toString());
+            if (request.getArg("ios.NSLocationWhenInUseUsageDescription", null) == null) {
+                request.putArgument("ios.NSLocationWhenInUseUsageDescription",
+                        "Shows your location on the map.");
+            }
+        }
         try {
             generateUnitTestFiles(request, stubSource);
         } catch (Exception ex) {
@@ -1353,6 +1374,7 @@ public class IPhoneBuilder extends Executor {
                     + integrateOidcBrowser
                     + integrateAppleSignIn
                     + integrateWebauthn
+                    + integrateMaps
 
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"

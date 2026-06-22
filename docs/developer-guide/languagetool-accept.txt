@@ -623,3 +623,15 @@ transcoder
 # in the crash-reporting space talks. Shows up in CrashReportPayload
 # field descriptions.
 dedup
+
+# Maps chapter: vector-map terminology. "basemap"/"basemaps" is the standard
+# one-word cartography term for the background reference map, and "Mapbox" is
+# the vendor whose Mapbox Vector Tiles (MVT) format the engine decodes.
+[Bb]asemaps?
+Mapbox
+# Vector tile providers / formats referenced in the maps chapter.
+OpenFreeMap
+MapTiler
+Protomaps
+TileServer
+TileJSON

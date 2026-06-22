@@ -1,0 +1,4 @@
+# Vector tiles plus translucent overlays whose alpha blending varies on some
+# backends; wider tolerance. Still fails loudly on a blank/wrong map.
+maxChannelDelta=48
+maxMismatchPercent=25.0

@@ -1,0 +1,210 @@
+/*
+ * Codename One maps provider -- Apple MapKit (iOS).
+ *
+ * BUILD TEMPLATE. When the build hint maps.provider=apple (the iOS default)
+ * is set, the iOS builder copies this file into the generated stub source dir
+ * as com/codename1/maps/MapProviderImpl.java. It is compiled by the build's
+ * javac (alongside the app stub) and translated to C by ParparVM, so its
+ * native methods bind to the hand-written Objective-C in
+ * com_codename1_maps_MapProviderImpl.m. The builder also weaves a call to
+ * MapProviderImpl.register() into the app startup. No NativeInterface and no
+ * implementation-layer hooks are involved; MapKit is a free system framework.
+ */
+package com.codename1.maps;
+
+import com.codename1.maps.spi.MapProvider;
+import com.codename1.maps.spi.MapProviderRegistry;
+import com.codename1.ui.PeerComponent;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MapProviderImpl implements MapProvider {
+
+    private double calcLat;
+    private double calcLon;
+    private List<double[]> pathPoints;
+
+    /** Invoked by build-injected startup code. */
+    public static void register() {
+        MapProviderRegistry.register(new MapProviderImpl());
+        MapProviderRegistry.setPreferredProvider("apple");
+    }
+
+    public String getId() {
+        return "apple";
+    }
+
+    public boolean isAvailable() {
+        return true;
+    }
+
+    public PeerComponent createPeer(NativeMap host, int mapId) {
+        LatLng center = host.getInitialCenter();
+        long peer = nativeCreate(mapId, center.getLatitude(), center.getLongitude(),
+                (float) host.getInitialZoom());
+        if (peer == 0) {
+            return null;
+        }
+        return PeerComponent.create(new long[]{peer});
+    }
+
+    public void deinitialize(int mapId) {
+        nativeDeinit(mapId);
+    }
+
+    public void setCamera(int mapId, double lat, double lon, float zoom, float bearing, float tilt) {
+        nativeSetCamera(mapId, lat, lon, zoom);
+    }
+
+    public double getLatitude(int mapId) {
+        return nativeGetLat(mapId);
+    }
+
+    public double getLongitude(int mapId) {
+        return nativeGetLon(mapId);
+    }
+
+    public float getZoom(int mapId) {
+        return nativeGetZoom(mapId);
+    }
+
+    public float getMaxZoom(int mapId) {
+        return 20;
+    }
+
+    public float getMinZoom(int mapId) {
+        return 0;
+    }
+
+    public long addMarker(int mapId, byte[] icon, double lat, double lon,
+                          String title, String snippet, float anchorU, float anchorV) {
+        return nativeAddMarker(mapId, lat, lon, title == null ? "" : title);
+    }
+
+    public long beginPath(int mapId) {
+        pathPoints = new ArrayList<double[]>();
+        return 0;
+    }
+
+    public void addToPath(int mapId, long pathId, double lat, double lon) {
+        if (pathPoints != null) {
+            pathPoints.add(new double[]{lat, lon});
+        }
+    }
+
+    public long finishPolyline(int mapId, long pathId, int strokeColor, int strokeWidth) {
+        double[][] arr = drainPath();
+        return nativeAddPolyline(mapId, arr[0], arr[1], strokeColor, strokeWidth);
+    }
+
+    public long finishPolygon(int mapId, long pathId, int fillColor, int strokeColor, int strokeWidth) {
+        double[][] arr = drainPath();
+        return nativeAddPolygon(mapId, arr[0], arr[1], fillColor, strokeColor, strokeWidth);
+    }
+
+    private double[][] drainPath() {
+        List<double[]> pts = pathPoints;
+        pathPoints = null;
+        int n = pts == null ? 0 : pts.size();
+        double[] lats = new double[n];
+        double[] lons = new double[n];
+        for (int i = 0; i < n; i++) {
+            double[] p = pts.get(i);
+            lats[i] = p[0];
+            lons[i] = p[1];
+        }
+        return new double[][]{lats, lons};
+    }
+
+    public long addCircle(int mapId, double lat, double lon, double radiusMeters,
+                          int fillColor, int strokeColor, int strokeWidth) {
+        return nativeAddCircle(mapId, lat, lon, radiusMeters, fillColor, strokeColor, strokeWidth);
+    }
+
+    public void removeElement(int mapId, long elementId) {
+        nativeRemove(mapId, elementId);
+    }
+
+    public void removeAllElements(int mapId) {
+        nativeRemoveAll(mapId);
+    }
+
+    public void calcScreenPosition(int mapId, double lat, double lon) {
+        calcLat = lat;
+        calcLon = lon;
+    }
+
+    public int getScreenX(int mapId) {
+        return nativeScreenX(mapId, calcLat, calcLon);
+    }
+
+    public int getScreenY(int mapId) {
+        return nativeScreenY(mapId, calcLat, calcLon);
+    }
+
+    public void calcLatLongPosition(int mapId, int x, int y) {
+        calcLat = nativeLat(mapId, x, y);
+        calcLon = nativeLon(mapId, x, y);
+    }
+
+    public double getScreenLat(int mapId) {
+        return calcLat;
+    }
+
+    public double getScreenLon(int mapId) {
+        return calcLon;
+    }
+
+    public void setShowMyLocation(int mapId, boolean show) {
+        nativeSetShowMyLocation(mapId, show);
+    }
+
+    public void setRotateGestureEnabled(int mapId, boolean enabled) {
+        nativeSetRotateEnabled(mapId, enabled);
+    }
+
+    public void setMapType(int mapId, int type) {
+        nativeSetMapType(mapId, type);
+    }
+
+    // ---- Native bridge (implemented in com_codename1_maps_MapProviderImpl.m)
+
+    private native long nativeCreate(int mapId, double lat, double lon, float zoom);
+
+    private native void nativeDeinit(int mapId);
+
+    private native void nativeSetCamera(int mapId, double lat, double lon, float zoom);
+
+    private native double nativeGetLat(int mapId);
+
+    private native double nativeGetLon(int mapId);
+
+    private native float nativeGetZoom(int mapId);
+
+    private native long nativeAddMarker(int mapId, double lat, double lon, String title);
+
+    private native long nativeAddPolyline(int mapId, double[] lats, double[] lons, int color, int width);
+
+    private native long nativeAddPolygon(int mapId, double[] lats, double[] lons, int fill, int stroke, int width);
+
+    private native long nativeAddCircle(int mapId, double lat, double lon, double radius, int fill, int stroke, int width);
+
+    private native void nativeRemove(int mapId, long elementId);
+
+    private native void nativeRemoveAll(int mapId);
+
+    private native int nativeScreenX(int mapId, double lat, double lon);
+
+    private native int nativeScreenY(int mapId, double lat, double lon);
+
+    private native double nativeLat(int mapId, int x, int y);
+
+    private native double nativeLon(int mapId, int x, int y);
+
+    private native void nativeSetShowMyLocation(int mapId, boolean show);
+
+    private native void nativeSetRotateEnabled(int mapId, boolean enabled);
+
+    private native void nativeSetMapType(int mapId, int type);
+}

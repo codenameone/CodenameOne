@@ -716,6 +716,11 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
       exit 11
     fi
     INSTALL_END=$(date +%s)
+    # Pre-grant location and pin a fixed coordinate so native maps (Apple
+    # MapKit) render real tiles in CI instead of stalling on a location
+    # permission prompt.
+    xcrun simctl privacy "$SIM_DEVICE_ID" grant location "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    xcrun simctl location "$SIM_DEVICE_ID" set 41.0,13.0 >/dev/null 2>&1 || true
 
     LAUNCH_START=$(date +%s)
     if ! launch_simulator_app "$SIM_DEVICE_ID"; then
@@ -729,6 +734,10 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
       exit 11
     fi
     INSTALL_END=$(date +%s)
+    # Pre-grant location and pin a coordinate (see note above) so native maps
+    # render real tiles in CI rather than blocking on the location prompt.
+    xcrun simctl privacy booted grant location "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    xcrun simctl location booted set 41.0,13.0 >/dev/null 2>&1 || true
 
     LAUNCH_START=$(date +%s)
     if ! launch_simulator_app booted; then

@@ -23,9 +23,7 @@
 package com.codename1.ui;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /// Runtime parser that turns CSS gradient strings (`linear-gradient`,
 /// `radial-gradient`, `conic-gradient`, plus the `repeating-*` variants)
@@ -41,8 +39,6 @@ import java.util.Map;
 final class CSSGradientParser {
     private CSSGradientParser() {
     }
-
-    private static final Map<String, Integer> NAMED_COLORS = buildNamedColors();
 
     /// Parses a single CSS gradient function call. Returns null on
     /// recognised-but-unsupported syntax; throws IllegalArgumentException
@@ -307,7 +303,7 @@ final class CSSGradientParser {
                 colorPart = part.substring(0, splitAt).trim();
                 posPart = part.substring(splitAt).trim();
             }
-            int rgba = parseColor(colorPart);
+            int rgba = CSSColor.parse(colorPart);
             colors.add(Integer.valueOf(rgba));
             if (posPart != null && posPart.endsWith("%")) {
                 positions.add(Float.valueOf(
@@ -380,85 +376,6 @@ final class CSSGradientParser {
         return c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9');
     }
 
-    /// Parses #rgb / #rrggbb / #rgba / #rrggbbaa / rgb(...) / rgba(...) /
-    /// the named color subset.
-    static int parseColor(String s) {
-        String trimmed = s.trim();
-        if (trimmed.length() == 0) {
-            throw new IllegalArgumentException("Empty color");
-        }
-        char c0 = trimmed.charAt(0);
-        if (c0 == '#') {
-            return parseHexColor(trimmed.substring(1));
-        }
-        String lower = trimmed.toLowerCase();
-        if (lower.startsWith("rgba(") || lower.startsWith("rgb(")) {
-            int open = trimmed.indexOf('(');
-            int close = trimmed.lastIndexOf(')');
-            String[] comps = splitTopLevelArray(trimmed.substring(open + 1, close), ',');
-            int r = parseColorComponent(comps[0]);
-            int g = parseColorComponent(comps[1]);
-            int b = parseColorComponent(comps[2]);
-            int a = 255;
-            if (comps.length >= 4) {
-                a = Math.round(parseFloat(comps[3].trim()) * 255f);
-                if (a < 0) {
-                    a = 0;
-                }
-                if (a > 255) {
-                    a = 255;
-                }
-            }
-            return (a << 24) | (r << 16) | (g << 8) | b;
-        }
-        Integer named = NAMED_COLORS.get(lower);
-        if (named != null) {
-            return named.intValue();
-        }
-        throw new IllegalArgumentException("Unrecognised color: " + s);
-    }
-
-    private static int parseColorComponent(String s) {
-        String t = s.trim();
-        if (t.endsWith("%")) {
-            return Math.round(parseFloat(t.substring(0, t.length() - 1)) * 2.55f);
-        }
-        return Integer.parseInt(t);
-    }
-
-    private static int parseHexColor(String hex) {
-        int len = hex.length();
-        int r;
-        int g;
-        int b;
-        int a = 255;
-        if (len == 3) {
-            r = Integer.parseInt(hex.substring(0, 1), 16);
-            g = Integer.parseInt(hex.substring(1, 2), 16);
-            b = Integer.parseInt(hex.substring(2, 3), 16);
-            r = r * 17;
-            g = g * 17;
-            b = b * 17;
-        } else if (len == 4) {
-            r = Integer.parseInt(hex.substring(0, 1), 16) * 17;
-            g = Integer.parseInt(hex.substring(1, 2), 16) * 17;
-            b = Integer.parseInt(hex.substring(2, 3), 16) * 17;
-            a = Integer.parseInt(hex.substring(3, 4), 16) * 17;
-        } else if (len == 6) {
-            r = Integer.parseInt(hex.substring(0, 2), 16);
-            g = Integer.parseInt(hex.substring(2, 4), 16);
-            b = Integer.parseInt(hex.substring(4, 6), 16);
-        } else if (len == 8) {
-            r = Integer.parseInt(hex.substring(0, 2), 16);
-            g = Integer.parseInt(hex.substring(2, 4), 16);
-            b = Integer.parseInt(hex.substring(4, 6), 16);
-            a = Integer.parseInt(hex.substring(6, 8), 16);
-        } else {
-            throw new IllegalArgumentException("Bad hex color: #" + hex);
-        }
-        return (a << 24) | (r << 16) | (g << 8) | b;
-    }
-
     private static float parseFloat(String s) {
         return Float.parseFloat(s.trim());
     }
@@ -481,11 +398,6 @@ final class CSSGradientParser {
         }
         out.add(s.substring(start));
         return out;
-    }
-
-    private static String[] splitTopLevelArray(String s, char delim) {
-        List<String> list = splitTopLevel(s, delim);
-        return list.toArray(new String[list.size()]);
     }
 
     /// Splits a header (the section before the first stop) on whitespace,
@@ -515,32 +427,6 @@ final class CSSGradientParser {
             out.add(sb.toString());
         }
         return out.toArray(new String[out.size()]);
-    }
-
-    private static Map<String, Integer> buildNamedColors() {
-        // CSS named-color subset matching CSSTheme's build-time mapping. Keep
-        // this list in sync if the compiler adds more names.
-        Map<String, Integer> m = new HashMap<String, Integer>();
-        m.put("transparent", Integer.valueOf(0x00000000));
-        m.put("black", Integer.valueOf(0xff000000));
-        m.put("white", Integer.valueOf(0xffffffff));
-        m.put("red", Integer.valueOf(0xffff0000));
-        m.put("green", Integer.valueOf(0xff008000));
-        m.put("blue", Integer.valueOf(0xff0000ff));
-        m.put("yellow", Integer.valueOf(0xffffff00));
-        m.put("cyan", Integer.valueOf(0xff00ffff));
-        m.put("magenta", Integer.valueOf(0xffff00ff));
-        m.put("gray", Integer.valueOf(0xff808080));
-        m.put("grey", Integer.valueOf(0xff808080));
-        m.put("silver", Integer.valueOf(0xffc0c0c0));
-        m.put("maroon", Integer.valueOf(0xff800000));
-        m.put("olive", Integer.valueOf(0xff808000));
-        m.put("purple", Integer.valueOf(0xff800080));
-        m.put("teal", Integer.valueOf(0xff008080));
-        m.put("navy", Integer.valueOf(0xff000080));
-        m.put("orange", Integer.valueOf(0xffffa500));
-        m.put("pink", Integer.valueOf(0xffffc0cb));
-        return m;
     }
 
     static final class Stops {

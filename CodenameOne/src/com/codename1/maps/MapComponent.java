@@ -55,7 +55,10 @@ import java.util.Vector;
 ///
 /// #### Deprecated
 ///
-/// we highly recommend migrating to the native maps cn1lib
+/// Use the modern [MapView] (pure-vector) or [NativeMap] (native provider
+/// with vector fallback) instead. This tile-based component is retained only
+/// for backward compatibility.
+@Deprecated
 public class MapComponent extends Container {
 
     private static final Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
