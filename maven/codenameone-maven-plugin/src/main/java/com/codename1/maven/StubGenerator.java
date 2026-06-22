@@ -46,7 +46,6 @@ public class StubGenerator {
     private StubGenerator() {}
     private File androidFile;
     private File javaseFile;
-    private File csFile;
     private File winCFile;
     private File linuxCFile;
     private File iosHFile;
@@ -149,12 +148,10 @@ public class StubGenerator {
         androidFile.getParentFile().mkdirs();
         javaseFile = new File(path(destination.getAbsolutePath(), "javase", "src", "main", "java", className));
         javaseFile.getParentFile().mkdirs();
-        csFile = new File(path(destination.getAbsolutePath(), "win", "src", "main", "csharp", nativeInterface.getName().replace('.', File.separatorChar) + "Impl.cs"));
-        csFile.getParentFile().mkdirs();
 
         // Native C (ParparVM "clean" target) implementation stubs for the no-JVM
         // desktop ports: native Windows (win32 -> win/src/main/c) and native Linux
-        // (linux/src/main/c). Unlike the UWP C# stub above, these are plain C: the
+        // (linux/src/main/c). These are plain C: the
         // translator emits a C function per native method (the mangled name the
         // generated XxxImplCodenameOne produces) which the developer defines here.
         String cFileName = nativeInterface.getName().replace('.', File.separatorChar) + "ImplCodenameOne.c";
@@ -202,9 +199,6 @@ public class StubGenerator {
         if (iosSwiftFile.exists()) {
             out.add(iosSwiftFile);
         }
-        if (csFile.exists()) {
-            out.add(csFile);
-        }
         if (winCFile.exists()) {
             out.add(winCFile);
         }
@@ -237,26 +231,6 @@ public class StubGenerator {
             generateJavaFile(javaseFile, "com.codename1.ui.PeerComponent", true);
         } else {
             log.debug(javaseFile+" already exists. Skipping");
-        }
-
-        // Only emit the UWP / Windows C# stub if the project actually has a win/
-        // module. Java 17 generated projects no longer ship that module (the
-        // Windows native port is legacy), so omitting the stub avoids leaving
-        // dangling .cs files outside any compiled source set.
-        File winModuleRoot = csFile.getParentFile();
-        while (winModuleRoot != null && !"win".equals(winModuleRoot.getName())) {
-            winModuleRoot = winModuleRoot.getParentFile();
-        }
-        boolean winModulePresent = winModuleRoot != null && winModuleRoot.isDirectory();
-        if (winModulePresent) {
-            if(overwrite || !csFile.exists()) {
-                log.info("Writing "+csFile);
-                generateCSFile(csFile, "FrameworkElement");
-            } else {
-                log.debug(csFile+" already exists. Skipping");
-            }
-        } else {
-            log.debug("No win/ module under destination — skipping C# stub for "+nativeInterface.getName());
         }
 
         // Native C stubs for the no-JVM desktop ports (native Windows / native Linux).
@@ -530,67 +504,6 @@ public class StubGenerator {
     }
 
 
-    private String javaTypeToCSharpType(Class t) {
-        if(t.getName().equals("com.codename1.ui.PeerComponent")) {
-            return "object";
-        }
-        if(t == String.class) {
-            return "string ";
-        }
-        if(t == int.class || t == Integer.class || t == Integer.TYPE) {
-            if(t.isArray()) {
-                return "int[]";
-            }
-            return "int";
-        }
-        if(t == long.class || Long.class == t || Long.TYPE == t) {
-            if(t.isArray()) {
-                return "long[]";
-            }
-            return "long";
-        }
-        if(t == byte.class || Byte.class == t || Byte.TYPE == t) {
-            if(t.isArray()) {
-                return "byte[]";
-            }
-            return "byte";
-        }
-        if(t == short.class || Short.class == t || Short.TYPE == t) {
-            if(t.isArray()) {
-                return "short[]";
-            }
-            return "short";
-        }
-        if(t == char.class || Character.class == t || Character.TYPE == t) {
-            if(t.isArray()) {
-                return "char[]";
-            }
-            return "char";
-        }
-        if(t == boolean.class || Boolean.class == t || Boolean.TYPE == t) {
-            if(t.isArray()) {
-                return "bool[]";
-            }
-            return "bool";
-        }
-        if(t == float.class || Float.class == t || Float.TYPE == t) {
-            if(t.isArray()) {
-                return "float[]";
-            }
-            return "float";
-        }
-        if(t == double.class || Double.class == t || Double.TYPE == t) {
-            if(t.isArray()) {
-                return "double[]";
-            }
-            return "double";
-        }
-        if(Void.class == t || Void.TYPE == t) {
-            return "void";
-        }
-        return t.getSimpleName();
-    }
-
     private void generateJavaFile(File dest, String peerComponentType, boolean impl) throws IOException {
         String t = "package " + nativeInterface.getPackage().getName() + ";\n\n"
                 + "public class " + nativeInterface.getSimpleName() + "Impl ";
@@ -659,73 +572,6 @@ public class StubGenerator {
         try(FileOutputStream fo = new FileOutputStream(dest)) {
             fo.write(t.getBytes(StandardCharsets.UTF_8));
         }
-    }
-
-    private void generateCSFile(File dest, String peerComponentType) throws IOException {
-        String t = "namespace " + nativeInterface.getPackage().getName() + "{\r\n\r\n" +
-                "\r\n" +
-                "public class " + nativeInterface.getSimpleName() + "Impl : I"+ nativeInterface.getSimpleName() + "Impl {\r\n";
-
-        Method[] mtds = nativeInterface.getMethods();
-        for(Method m : mtds) {
-            t += "    public ";
-            Class returnType = m.getReturnType();
-            t += javaTypeToCSharpType(returnType);
-
-            t += " " + m.getName() + "(";
-
-            int offset = 0;
-            for(Class arg : m.getParameterTypes()) {
-                String s = arg.getSimpleName();
-                if(arg.getName().equals("com.codename1.ui.PeerComponent")) {
-                    s = "object";
-                } else {
-                    if(arg == boolean.class || arg == Boolean.class || arg == Boolean.TYPE) {
-                        s = "bool";
-                    }
-                }
-                if(offset == 0) {
-                    t += s + " param";
-                } else {
-                    t += ", " + s + " param" + offset;
-                }
-                offset++;
-            }
-
-            t += ") {\n";
-
-            if(returnType != Void.TYPE && returnType != Void.class) {
-                if(returnType == String.class || returnType.getName().equals("com.codename1.ui.PeerComponent") ||
-                        returnType.isArray()) {
-                    t += "        return null;\n";
-                } else {
-                    if(returnType == Boolean.class || returnType == Boolean.TYPE) {
-                        t += "        return false;\n";
-                    } else {
-                        if(returnType == Character.class || returnType == Character.TYPE) {
-                            t += "        return (char)0;\n";
-                        } else {
-                            if(returnType == Byte.class || returnType == Byte.TYPE) {
-                                t += "        return (byte)0;\n";
-                            } else {
-                                if(returnType == Short.class || returnType == Short.TYPE) {
-                                    t += "        return (short)0;\n";
-                                } else {
-                                    t += "        return 0;\n";
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            t += "    }\n\n";
-        }
-        t += "}\r\n}\r\n";
-        dest.getParentFile().mkdirs();
-        FileOutputStream fo = new FileOutputStream(dest);
-        fo.write(t.getBytes(StandardCharsets.UTF_8));
-        fo.close();
     }
 
     /**

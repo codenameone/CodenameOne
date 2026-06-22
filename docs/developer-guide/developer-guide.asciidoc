@@ -81,6 +81,8 @@ include::Push-Notifications.asciidoc[]
 
 include::Notifications-And-Background-Execution.asciidoc[]
 
+include::Maps.asciidoc[]
+
 include::Miscellaneous-Features.asciidoc[]
 
 include::performance.asciidoc[]

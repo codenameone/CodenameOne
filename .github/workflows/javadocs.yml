@@ -7,6 +7,7 @@ on:
       - 'Ports/**/src/**/*.java'
       - 'maven/**/src/main/java/**/*.java'
       - '.github/scripts/build_javadocs.sh'
+      - 'scripts/check-package-info.sh'
       - '.github/workflows/javadocs.yml'
   push:
     branches:
@@ -34,6 +35,9 @@ jobs:
 
       - name: Capture Java 25 path
         run: echo "JDK_25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Verify every documented package has a package-info.java
+        run: scripts/check-package-info.sh
 
       - name: Build JavaDocs
         run: ./.github/scripts/build_javadocs.sh

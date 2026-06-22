@@ -291,10 +291,10 @@
         </profile>
         <profile>
             <!--
-                For sending Windows UWP builds use:
-                mvn cn:build -P uwp
+                For sending Windows device builds use:
+                mvn cn:build -P win
             -->
-            <id>uwp</id>
+            <id>win</id>
             <properties>
                 <codename1.targetType>windows</codename1.targetType>
                 <codename1.targetPlatform>win</codename1.targetPlatform>

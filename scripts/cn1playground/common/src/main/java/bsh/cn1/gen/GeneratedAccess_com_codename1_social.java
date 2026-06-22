@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_social {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -24,8 +29,29 @@ public final class GeneratedAccess_com_codename1_social {
 
 
     private static Class<?> findClassChunk0(String simpleName) {
+        if ("AppleSignIn".equals(simpleName)) {
+            return com.codename1.social.AppleSignIn.class;
+        }
+        if ("AppleSignInCallback".equals(simpleName)) {
+            return com.codename1.social.AppleSignInCallback.class;
+        }
+        if ("AppleSignInNative".equals(simpleName)) {
+            return com.codename1.social.AppleSignInNative.class;
+        }
+        if ("AppleSignInResult".equals(simpleName)) {
+            return com.codename1.social.AppleSignInResult.class;
+        }
+        if ("Auth0Connect".equals(simpleName)) {
+            return com.codename1.social.Auth0Connect.class;
+        }
         if ("FacebookConnect".equals(simpleName)) {
             return com.codename1.social.FacebookConnect.class;
+        }
+        if ("FirebaseAuth".equals(simpleName)) {
+            return com.codename1.social.FirebaseAuth.class;
+        }
+        if ("FirebaseUser".equals(simpleName)) {
+            return com.codename1.social.FirebaseAuth.FirebaseUser.class;
         }
         if ("GoogleConnect".equals(simpleName)) {
             return com.codename1.social.GoogleConnect.class;
@@ -36,6 +62,9 @@ public final class GeneratedAccess_com_codename1_social {
         if ("LoginCallback".equals(simpleName)) {
             return com.codename1.social.LoginCallback.class;
         }
+        if ("MicrosoftConnect".equals(simpleName)) {
+            return com.codename1.social.MicrosoftConnect.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -45,12 +74,40 @@ public final class GeneratedAccess_com_codename1_social {
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.social.FacebookConnect.class) return invokeStatic0(name, safeArgs);
-        if (type == com.codename1.social.GoogleConnect.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.social.AppleSignIn.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.social.Auth0Connect.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.social.FacebookConnect.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.social.FirebaseAuth.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.social.GoogleConnect.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.social.MicrosoftConnect.class) return invokeStatic5(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("getInstance".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.social.AppleSignIn.getInstance();
+            }
+        }
+        if ("setProvider".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.AppleSignInNative.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.AppleSignInNative.class}, false);
+                com.codename1.social.AppleSignIn.setProvider((com.codename1.social.AppleSignInNative) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.social.AppleSignIn.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("getInstance".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.social.Auth0Connect.getInstance();
+            }
+        }
+        throw unsupportedStatic(com.codename1.social.Auth0Connect.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.social.FacebookConnect.getInstance();
@@ -59,7 +116,22 @@ public final class GeneratedAccess_com_codename1_social {
         throw unsupportedStatic(com.codename1.social.FacebookConnect.class, name, safeArgs);
     }
 
-    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("getInstance".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.social.FirebaseAuth.getInstance();
+            }
+        }
+        if ("requireFirebaseToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.social.FirebaseAuth.requireFirebaseToken((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.social.FirebaseAuth.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.social.GoogleConnect.getInstance();
@@ -68,33 +140,98 @@ public final class GeneratedAccess_com_codename1_social {
         throw unsupportedStatic(com.codename1.social.GoogleConnect.class, name, safeArgs);
     }
 
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+        if ("getInstance".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.social.MicrosoftConnect.getInstance();
+            }
+        }
+        throw unsupportedStatic(com.codename1.social.MicrosoftConnect.class, name, safeArgs);
+    }
+
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.social.AppleSignIn) {
+            try {
+                return invoke0((com.codename1.social.AppleSignIn) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.social.Auth0Connect) {
+            try {
+                return invoke1((com.codename1.social.Auth0Connect) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.social.FacebookConnect) {
             try {
-                return invoke0((com.codename1.social.FacebookConnect) target, name, safeArgs);
+                return invoke2((com.codename1.social.FacebookConnect) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.social.GoogleConnect) {
             try {
-                return invoke1((com.codename1.social.GoogleConnect) target, name, safeArgs);
+                return invoke3((com.codename1.social.GoogleConnect) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.social.MicrosoftConnect) {
+            try {
+                return invoke4((com.codename1.social.MicrosoftConnect) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.social.AppleSignInResult) {
+            try {
+                return invoke5((com.codename1.social.AppleSignInResult) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.social.FirebaseAuth) {
+            try {
+                return invoke6((com.codename1.social.FirebaseAuth) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.social.FirebaseAuth.FirebaseUser) {
+            try {
+                return invoke7((com.codename1.social.FirebaseAuth.FirebaseUser) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.social.Login) {
             try {
-                return invoke2((com.codename1.social.Login) target, name, safeArgs);
+                return invoke8((com.codename1.social.Login) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.social.LoginCallback) {
             try {
-                return invoke3((com.codename1.social.LoginCallback) target, name, safeArgs);
+                return invoke9((com.codename1.social.LoginCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.social.AppleSignInCallback) {
+            try {
+                return invoke10((com.codename1.social.AppleSignInCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.social.AppleSignInNative) {
+            try {
+                return invoke11((com.codename1.social.AppleSignInNative) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -105,7 +242,331 @@ public final class GeneratedAccess_com_codename1_social {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(com.codename1.social.FacebookConnect typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke0(com.codename1.social.AppleSignIn typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addScopes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.addScopes(varArgs);
+            }
+        }
+        if ("connect".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.connect();
+            }
+        }
+        if ("doLogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogin(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.doLogin((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("doLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogout(); return null;
+            }
+        }
+        if ("getAccessToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessToken();
+            }
+        }
+        if ("isNativeLoginSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isNativeLoginSupported();
+            }
+        }
+        if ("isPreferRedirectPrompt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPreferRedirectPrompt();
+            }
+        }
+        if ("isUserLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isUserLoggedIn();
+            }
+        }
+        if ("nativeIsLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.nativeIsLoggedIn();
+            }
+        }
+        if ("nativeLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativeLogout(); return null;
+            }
+        }
+        if ("nativelogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativelogin(); return null;
+            }
+        }
+        if ("setAccessToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false);
+                typedTarget.setAccessToken((com.codename1.io.AccessToken) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCallback".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.setCallback((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientId((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientSecret".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientSecret((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setOauth2URL".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setOauth2URL((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPreferRedirectPrompt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setPreferRedirectPrompt(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setRedirectURI".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setRedirectURI((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setScope".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setScope((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("signIn".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.social.AppleSignInCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.social.AppleSignInCallback.class}, false);
+                typedTarget.signIn((java.lang.String) adaptedArgs[0], (com.codename1.social.AppleSignInCallback) adaptedArgs[1]); return null;
+            }
+        }
+        if ("validateToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.validateToken(); return null;
+            }
+        }
+        if ("withClientSecret".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withClientSecret((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("withDefaultScopes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withDefaultScopes((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("withRedirectUri".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withRedirectUri((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("withServiceId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withServiceId((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.social.Auth0Connect typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addScopes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.addScopes(varArgs);
+            }
+        }
+        if ("connect".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.connect();
+            }
+        }
+        if ("doLogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogin(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.doLogin((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("doLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogout(); return null;
+            }
+        }
+        if ("getAccessToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessToken();
+            }
+        }
+        if ("getAudience".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAudience();
+            }
+        }
+        if ("getDomain".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDomain();
+            }
+        }
+        if ("isNativeLoginSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isNativeLoginSupported();
+            }
+        }
+        if ("isPreferRedirectPrompt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPreferRedirectPrompt();
+            }
+        }
+        if ("isUserLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isUserLoggedIn();
+            }
+        }
+        if ("nativeIsLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.nativeIsLoggedIn();
+            }
+        }
+        if ("nativeLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativeLogout(); return null;
+            }
+        }
+        if ("nativelogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativelogin(); return null;
+            }
+        }
+        if ("registerPasskey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 4];
+                for (int i = 4; i < adaptedArgs.length; i++) {
+                    varArgs[i - 4] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.registerPasskey((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], varArgs);
+            }
+        }
+        if ("setAccessToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false);
+                typedTarget.setAccessToken((com.codename1.io.AccessToken) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCallback".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.setCallback((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientId((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientSecret".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientSecret((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setOauth2URL".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setOauth2URL((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPreferRedirectPrompt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setPreferRedirectPrompt(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setRedirectURI".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setRedirectURI((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setScope".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setScope((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("signIn".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 2];
+                for (int i = 2; i < adaptedArgs.length; i++) {
+                    varArgs[i - 2] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.signIn((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], varArgs);
+            }
+        }
+        if ("signInWithPasskey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 2];
+                for (int i = 2; i < adaptedArgs.length; i++) {
+                    varArgs[i - 2] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.signInWithPasskey((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], varArgs);
+            }
+        }
+        if ("validateToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.validateToken(); return null;
+            }
+        }
+        if ("withAudience".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withAudience((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("withDomain".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withDomain((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.social.FacebookConnect typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addScopes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
@@ -269,6 +730,16 @@ public final class GeneratedAccess_com_codename1_social {
                 typedTarget.setScope((java.lang.String) adaptedArgs[0]); return null;
             }
         }
+        if ("signIn".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 2];
+                for (int i = 2; i < adaptedArgs.length; i++) {
+                    varArgs[i - 2] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.signIn((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], varArgs);
+            }
+        }
         if ("validateToken".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.validateToken(); return null;
@@ -277,7 +748,411 @@ public final class GeneratedAccess_com_codename1_social {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke1(com.codename1.social.GoogleConnect typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(com.codename1.social.GoogleConnect typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addScopes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.addScopes(varArgs);
+            }
+        }
+        if ("connect".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.connect();
+            }
+        }
+        if ("doLogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogin(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.doLogin((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("doLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogout(); return null;
+            }
+        }
+        if ("getAccessToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessToken();
+            }
+        }
+        if ("isNativeLoginSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isNativeLoginSupported();
+            }
+        }
+        if ("isPreferRedirectPrompt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPreferRedirectPrompt();
+            }
+        }
+        if ("isUserLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isUserLoggedIn();
+            }
+        }
+        if ("nativeIsLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.nativeIsLoggedIn();
+            }
+        }
+        if ("nativeLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativeLogout(); return null;
+            }
+        }
+        if ("nativelogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativelogin(); return null;
+            }
+        }
+        if ("setAccessToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false);
+                typedTarget.setAccessToken((com.codename1.io.AccessToken) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCallback".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.setCallback((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientId((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientSecret".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientSecret((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setOauth2URL".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setOauth2URL((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPreferRedirectPrompt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setPreferRedirectPrompt(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setRedirectURI".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setRedirectURI((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setScope".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setScope((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("signIn".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 2];
+                for (int i = 2; i < adaptedArgs.length; i++) {
+                    varArgs[i - 2] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.signIn((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], varArgs);
+            }
+        }
+        if ("validateToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.validateToken(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codename1.social.MicrosoftConnect typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addScopes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.addScopes(varArgs);
+            }
+        }
+        if ("connect".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.connect();
+            }
+        }
+        if ("doLogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogin(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.doLogin((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("doLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.doLogout(); return null;
+            }
+        }
+        if ("getAccessToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessToken();
+            }
+        }
+        if ("getTenant".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTenant();
+            }
+        }
+        if ("isNativeLoginSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isNativeLoginSupported();
+            }
+        }
+        if ("isPreferRedirectPrompt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPreferRedirectPrompt();
+            }
+        }
+        if ("isUserLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isUserLoggedIn();
+            }
+        }
+        if ("nativeIsLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.nativeIsLoggedIn();
+            }
+        }
+        if ("nativeLogout".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativeLogout(); return null;
+            }
+        }
+        if ("nativelogin".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.nativelogin(); return null;
+            }
+        }
+        if ("setAccessToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false);
+                typedTarget.setAccessToken((com.codename1.io.AccessToken) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCallback".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
+                typedTarget.setCallback((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientId((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setClientSecret".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setClientSecret((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setOauth2URL".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setOauth2URL((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPreferRedirectPrompt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setPreferRedirectPrompt(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setRedirectURI".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setRedirectURI((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setScope".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setScope((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("signIn".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 2];
+                for (int i = 2; i < adaptedArgs.length; i++) {
+                    varArgs[i - 2] = (java.lang.String) adaptedArgs[i];
+                }
+                return typedTarget.signIn((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], varArgs);
+            }
+        }
+        if ("validateToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.validateToken(); return null;
+            }
+        }
+        if ("withTenant".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withTenant((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.social.AppleSignInResult typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getAuthorizationCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAuthorizationCode();
+            }
+        }
+        if ("getEmail".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getEmail();
+            }
+        }
+        if ("getFullName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFullName();
+            }
+        }
+        if ("getIdentityToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getIdentityToken();
+            }
+        }
+        if ("getUserId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getUserId();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.social.FirebaseAuth typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getIdToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getIdToken();
+            }
+        }
+        if ("getUid".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getUid();
+            }
+        }
+        if ("isSignedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSignedIn();
+            }
+        }
+        if ("refresh".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.refresh();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.refresh((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("registerPasskey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.registerPasskey((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("signInWithEmailAndPassword".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.signInWithEmailAndPassword((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("signInWithIdpIdToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.signInWithIdpIdToken((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("signInWithPasskey".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.signInWithPasskey();
+            }
+        }
+        if ("signOut".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.signOut(); return null;
+            }
+        }
+        if ("signUp".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.signUp((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("withApiKey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.withApiKey((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke7(com.codename1.social.FirebaseAuth.FirebaseUser typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getEmail".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getEmail();
+            }
+        }
+        if ("getExpiresAt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getExpiresAt();
+            }
+        }
+        if ("getIdToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getIdToken();
+            }
+        }
+        if ("getIdTokenClaims".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getIdTokenClaims();
+            }
+        }
+        if ("getRefreshToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRefreshToken();
+            }
+        }
+        if ("getUid".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getUid();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.social.Login typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addScopes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
@@ -398,128 +1273,7 @@ public final class GeneratedAccess_com_codename1_social {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.social.Login typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("addScopes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
-                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
-                for (int i = 0; i < adaptedArgs.length; i++) {
-                    varArgs[i - 0] = (java.lang.String) adaptedArgs[i];
-                }
-                return typedTarget.addScopes(varArgs);
-            }
-        }
-        if ("connect".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.connect();
-            }
-        }
-        if ("doLogin".equals(name)) {
-            if (safeArgs.length == 0) {
-                typedTarget.doLogin(); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
-                typedTarget.doLogin((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
-            }
-        }
-        if ("doLogout".equals(name)) {
-            if (safeArgs.length == 0) {
-                typedTarget.doLogout(); return null;
-            }
-        }
-        if ("getAccessToken".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.getAccessToken();
-            }
-        }
-        if ("isNativeLoginSupported".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.isNativeLoginSupported();
-            }
-        }
-        if ("isPreferRedirectPrompt".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.isPreferRedirectPrompt();
-            }
-        }
-        if ("isUserLoggedIn".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.isUserLoggedIn();
-            }
-        }
-        if ("nativeIsLoggedIn".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.nativeIsLoggedIn();
-            }
-        }
-        if ("nativeLogout".equals(name)) {
-            if (safeArgs.length == 0) {
-                typedTarget.nativeLogout(); return null;
-            }
-        }
-        if ("nativelogin".equals(name)) {
-            if (safeArgs.length == 0) {
-                typedTarget.nativelogin(); return null;
-            }
-        }
-        if ("setAccessToken".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.AccessToken.class}, false);
-                typedTarget.setAccessToken((com.codename1.io.AccessToken) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setCallback".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.LoginCallback.class}, false);
-                typedTarget.setCallback((com.codename1.social.LoginCallback) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setClientId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                typedTarget.setClientId((java.lang.String) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setClientSecret".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                typedTarget.setClientSecret((java.lang.String) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setOauth2URL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                typedTarget.setOauth2URL((java.lang.String) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setPreferRedirectPrompt".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
-                typedTarget.setPreferRedirectPrompt(((Boolean) adaptedArgs[0]).booleanValue()); return null;
-            }
-        }
-        if ("setRedirectURI".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                typedTarget.setRedirectURI((java.lang.String) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setScope".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                typedTarget.setScope((java.lang.String) adaptedArgs[0]); return null;
-            }
-        }
-        if ("validateToken".equals(name)) {
-            if (safeArgs.length == 0) {
-                typedTarget.validateToken(); return null;
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke3(com.codename1.social.LoginCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.social.LoginCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("loginFailed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -534,8 +1288,72 @@ public final class GeneratedAccess_com_codename1_social {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
+    private static Object invoke10(com.codename1.social.AppleSignInCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("onCancel".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.onCancel(); return null;
+            }
+        }
+        if ("onError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onError((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onSuccess".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.social.AppleSignInResult.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.social.AppleSignInResult.class}, false);
+                typedTarget.onSuccess((com.codename1.social.AppleSignInResult) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke11(com.codename1.social.AppleSignInNative typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("isLoggedIn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isLoggedIn();
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSupported();
+            }
+        }
+        if ("signIn".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.signIn((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("signOut".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.signOut(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.social.AppleSignIn.class) return getStaticField0(name);
+        if (type == com.codename1.social.GoogleConnect.class) return getStaticField1(name);
+        if (type == com.codename1.social.MicrosoftConnect.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("APPLE_ISSUER".equals(name)) return com.codename1.social.AppleSignIn.APPLE_ISSUER;
+        throw unsupportedStaticField(com.codename1.social.AppleSignIn.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("GOOGLE_ISSUER".equals(name)) return com.codename1.social.GoogleConnect.GOOGLE_ISSUER;
+        throw unsupportedStaticField(com.codename1.social.GoogleConnect.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("COMMON_TENANT".equals(name)) return com.codename1.social.MicrosoftConnect.COMMON_TENANT;
+        throw unsupportedStaticField(com.codename1.social.MicrosoftConnect.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

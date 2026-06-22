@@ -1061,6 +1061,11 @@ public class AndroidGradleBuilder extends Executor {
 
         File srcDir = new File(projectDir, "src/main/java");
         srcDir.mkdirs();
+        // Native map provider injection (no-op unless maps.provider is set):
+        // pushes the selected provider's implementation into the app's
+        // com.codename1.maps package and returns the onCreate snippet that
+        // registers it. Keeps the core framework free of any map SDK.
+        String mapsProviderSupport = MapsProviderInjector.injectAndroid(this, request, srcDir);
         File dummyClassesDir = new File(tmpFile, "Classes");
         dummyClassesDir.mkdirs();
         File libsDir = new File(projectDir, "libs");
@@ -3268,6 +3273,7 @@ public class AndroidGradleBuilder extends Executor {
                     + rootCheckCall
                     + facebookHashCode
                     + facebookSupport
+                    + mapsProviderSupport
                     + streamMode
                     + registerNativeImplementationsAndCreateStubs(
                             new URLClassLoader(

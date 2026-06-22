@@ -722,6 +722,15 @@ public class Parser extends ClassVisitor {
             if(t instanceof Exception) {
                 throw (Exception)t;
             }
+            // Errors (notably OutOfMemoryError while emitting a very large
+            // bundle) previously fell through here, so the translator exited
+            // 0 with a half-written dist (e.g. parparvm_runtime.js but no
+            // worker.js / translated_app.js). Rethrow so the caller fails
+            // loudly instead of shipping a truncated app bundle.
+            if(t instanceof Error) {
+                throw (Error)t;
+            }
+            throw new RuntimeException(t);
         }
         finally { cleanup(); }
     }

@@ -155,13 +155,49 @@ final class PlaygroundPreviewColumn extends Container {
     }
 
     void setPreview(Component preview) {
+        // Tear down the OUTGOING preview before swapping the reference.
+        // rebuildStage()'s detachPreview() runs against the NEW currentPreview, so
+        // the previous one is otherwise never explicitly removed -- and a
+        // 3D/GameView inside it keeps its requestAnimationFrame loop running,
+        // flushing the display ~60-120x/s long after the user switched samples
+        // (degrading the whole playground). Stop any RenderView's animation loop
+        // and detach the old preview.
+        if (currentPreview != null && currentPreview != preview) {
+            stopRenderViews(currentPreview);
+            Container previousParent = currentPreview.getParent();
+            if (previousParent != null) {
+                previousParent.removeComponent(currentPreview);
+            }
+        }
         currentPreview = preview;
         rebuildStage();
+    }
+
+    /// Stops the continuous render loop of every RenderView/GameView in a tree
+    /// (so its rAF stops scheduling). A Form's children live in its content pane,
+    /// which getComponentAt() does not traverse, so recurse it explicitly.
+    private static void stopRenderViews(Component c) {
+        if (c == null) {
+            return;
+        }
+        if (c instanceof com.codename1.gpu.RenderView) {
+            ((com.codename1.gpu.RenderView) c).setContinuous(false);
+        }
+        if (c instanceof com.codename1.ui.Form) {
+            stopRenderViews(((com.codename1.ui.Form) c).getContentPane());
+        }
+        if (c instanceof Container) {
+            Container cnt = (Container) c;
+            for (int i = 0; i < cnt.getComponentCount(); i++) {
+                stopRenderViews(cnt.getComponentAt(i));
+            }
+        }
     }
 
     Container getContentHost() {
         return contentHost;
     }
+
 
     /// Refreshes theme styles only on the user's preview content. Skips the bezel,
     /// screen, and corner-mask overlay so their programmatic borders / transparency

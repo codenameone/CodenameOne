@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_io_rest {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -36,6 +41,12 @@ public final class GeneratedAccess_com_codename1_io_rest {
         if ("Rest".equals(simpleName)) {
             return com.codename1.io.rest.Rest.class;
         }
+        if ("RestClients".equals(simpleName)) {
+            return com.codename1.io.rest.RestClients.class;
+        }
+        if ("Factory".equals(simpleName)) {
+            return com.codename1.io.rest.RestClients.Factory.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -46,6 +57,7 @@ public final class GeneratedAccess_com_codename1_io_rest {
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.io.rest.Rest.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.io.rest.RestClients.class) return invokeStatic1(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -95,6 +107,22 @@ public final class GeneratedAccess_com_codename1_io_rest {
         throw unsupportedStatic(com.codename1.io.rest.Rest.class, name, safeArgs);
     }
 
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("create".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.String.class}, false);
+                return com.codename1.io.rest.RestClients.create((java.lang.Class) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("register".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.io.rest.RestClients.Factory.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.io.rest.RestClients.Factory.class}, false);
+                com.codename1.io.rest.RestClients.register((java.lang.Class) adaptedArgs[0], (com.codename1.io.rest.RestClients.Factory) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.io.rest.RestClients.class, name, safeArgs);
+    }
+
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
@@ -115,6 +143,13 @@ public final class GeneratedAccess_com_codename1_io_rest {
         if (target instanceof com.codename1.io.rest.ErrorCodeHandler) {
             try {
                 return invoke2((com.codename1.io.rest.ErrorCodeHandler) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.io.rest.RestClients.Factory) {
+            try {
+                return invoke3((com.codename1.io.rest.RestClients.Factory) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -181,10 +216,28 @@ public final class GeneratedAccess_com_codename1_io_rest {
                 return typedTarget.fetchAsBytes((com.codename1.util.OnComplete) adaptedArgs[0]);
             }
         }
+        if ("fetchAsJsonList".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.OnComplete.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.OnComplete.class}, false);
+                return typedTarget.fetchAsJsonList((com.codename1.util.OnComplete) adaptedArgs[0]);
+            }
+        }
         if ("fetchAsJsonMap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.OnComplete.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.OnComplete.class}, false);
                 return typedTarget.fetchAsJsonMap((com.codename1.util.OnComplete) adaptedArgs[0]);
+            }
+        }
+        if ("fetchAsMapped".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.util.OnComplete.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.util.OnComplete.class}, false);
+                return typedTarget.fetchAsMapped((java.lang.Class) adaptedArgs[0], (com.codename1.util.OnComplete) adaptedArgs[1]);
+            }
+        }
+        if ("fetchAsMappedList".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.util.OnComplete.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.util.OnComplete.class}, false);
+                return typedTarget.fetchAsMappedList((java.lang.Class) adaptedArgs[0], (com.codename1.util.OnComplete) adaptedArgs[1]);
             }
         }
         if ("fetchAsProperties".equals(name)) {
@@ -406,6 +459,16 @@ public final class GeneratedAccess_com_codename1_io_rest {
             if (matches(safeArgs, new Class<?>[]{com.codename1.io.rest.Response.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.rest.Response.class}, false);
                 typedTarget.onError((com.codename1.io.rest.Response) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.io.rest.RestClients.Factory typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("create".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.create((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);

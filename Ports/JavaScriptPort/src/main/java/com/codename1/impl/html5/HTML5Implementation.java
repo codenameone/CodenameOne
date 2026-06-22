@@ -163,6 +163,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static HTML5Implementation instance;
     private boolean shiftKeyDown;
     private BufferedGraphics graphics;
+
+    /// The display's buffered graphics. Exposed so a WebGL peer can blit its
+    /// offscreen frame into the display op stream during its own paint() (in
+    /// z-order), instead of compositing on top after the whole frame is painted.
+    BufferedGraphics displayGraphics() {
+        return graphics;
+    }
     Window window;
     // The document is a stable singleton for the life of the page. Resolve it
     // ONCE (at __init, with no concurrent barrier traffic) and reuse the cached
@@ -2899,6 +2906,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     
     
+    // Host-page URL forwarded into the worker by browser_bridge.js on START.
+    @JSBody(params={}, script="return self.__cn1LocationHref || '';")
+    private static native String mainLocationHref();
+
+    // A part of the host-page URL (search/hash/origin/pathname/protocol/port/
+    // host/hostname) parsed from the forwarded href. Returns null when the href
+    // wasn't forwarded so callers fall back to the worker's own location.
+    @JSBody(params={"part"}, script="try{var h=self.__cn1LocationHref; if(!h){return null;} var u=new URL(h); var v=u[part]; return (v==null)?'':(''+v);}catch(e){return null;}")
+    private static native String mainLocationPart(String part);
+
     @Override
     public String getProperty(String key, String defaultValue) {
         Window win = (Window)Window.current();
@@ -2910,32 +2927,46 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // need to do anything.
             return "true";
         }
+        // The app runs in a Web Worker; ``Window.current().getLocation()`` there
+        // is the WORKER's location (the worker script URL), NOT the host page.
+        // Query params like ?sample= / ?code= / ?css= (share + deep links) live
+        // on the host page URL, which the bridge forwards to the worker on START
+        // (see browser_bridge.js / worker.js __cn1LocationHref). Prefer that.
         if ("browser.window.location.href".equals(key)) {
-            return ((WindowLocation)Window.current().getLocation()).getHref();
+            String h = mainLocationHref();
+            return (h != null && h.length() > 0) ? h : ((WindowLocation)Window.current().getLocation()).getHref();
         }
         if ("browser.window.location.search".equals(key)) {
-            return Window.current().getLocation().getSearch();
+            String v = mainLocationPart("search");
+            return v != null ? v : Window.current().getLocation().getSearch();
         }
         if ("browser.window.location.host".equals(key)) {
-            return Window.current().getLocation().getHost();
+            String v = mainLocationPart("host");
+            return v != null ? v : Window.current().getLocation().getHost();
         }
         if ("browser.window.location.hash".equals(key)) {
-            return Window.current().getLocation().getHash();
+            String v = mainLocationPart("hash");
+            return v != null ? v : Window.current().getLocation().getHash();
         }
         if ("browser.window.location.origin".equals(key)) {
-            return ((WindowLocation)Window.current().getLocation()).getOrigin();
+            String v = mainLocationPart("origin");
+            return v != null ? v : ((WindowLocation)Window.current().getLocation()).getOrigin();
         }
         if ("browser.window.location.pathname".equals(key)) {
-            return ((WindowLocation)Window.current().getLocation()).getPathname();
+            String v = mainLocationPart("pathname");
+            return v != null ? v : ((WindowLocation)Window.current().getLocation()).getPathname();
         }
         if ("browser.window.location.protocol".equals(key)) {
-            return Window.current().getLocation().getProtocol();
+            String v = mainLocationPart("protocol");
+            return v != null ? v : Window.current().getLocation().getProtocol();
         }
         if ("browser.window.location.port".equals(key)) {
-            return Window.current().getLocation().getPort();
+            String v = mainLocationPart("port");
+            return v != null ? v : Window.current().getLocation().getPort();
         }
         if ("browser.window.location.hostname".equals(key)) {
-            return ((WindowLocation)Window.current().getLocation()).getHostname();
+            String v = mainLocationPart("hostname");
+            return v != null ? v : ((WindowLocation)Window.current().getLocation()).getHostname();
         }
         if ("browser.timezone".equals(key)) {
             String tz = detectTimezone();
@@ -7609,7 +7640,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return LocalForage.getInstance().openInputStream(wrapped);
     }
     
-    @JSBody(params={"o", "type"}, script="return (o instanceof window[type]);")
+    // Runs in a Web Worker where `window` is a partial shim without built-in
+    // constructors (Blob/Uint8Array); `window[type]` was undefined and the
+    // instanceof threw. Resolve off the real worker global and guard it.
+    @JSBody(params={"o", "type"}, script="var t=(typeof globalThis!=='undefined'?globalThis:self)[type]; return (typeof t==='function')?(o instanceof t):false;")
     private static native boolean instanceOf(JSObject o, String type);
     
     
@@ -8225,9 +8259,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
         if (url.length() > 0 && url.charAt(0) != '/') {
             url = "/" + url;
-                   
+
         }
-        setBrowserURL(browserPeer, "assets/cn1html"+url);
+        // Build an ABSOLUTE iframe URL rather than the relative "assets/cn1html/..".
+        // A relative iframe src is resolved by the browser against the host
+        // document's base URL at the moment it is set; the Playground mutates its
+        // own location (share links, history.pushState), so a relative src
+        // intermittently resolved against the wrong base and the editor iframe
+        // 404'd ("Nothing matches the given URI"). Anchoring it to origin +
+        // current directory makes the load deterministic.
+        String pathName = window.getLocation().getPathname();
+        String dirPath = pathName == null ? "" : pathName;
+        int lastSlash = dirPath.lastIndexOf("/");
+        if (lastSlash >= 0) {
+            dirPath = dirPath.substring(0, lastSlash);
+        }
+        String absolute = ((WindowLocation) window.getLocation()).getOrigin() + dirPath + "/assets/cn1html" + url;
+        setBrowserURL(browserPeer, absolute);
     }
 
     

@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_annotations {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -33,14 +38,86 @@ public final class GeneratedAccess_com_codename1_annotations {
         if ("Schedule".equals(simpleName)) {
             return com.codename1.annotations.Async.Schedule.class;
         }
+        if ("Bind".equals(simpleName)) {
+            return com.codename1.annotations.Bind.class;
+        }
+        if ("Bindable".equals(simpleName)) {
+            return com.codename1.annotations.Bindable.class;
+        }
+        if ("Column".equals(simpleName)) {
+            return com.codename1.annotations.Column.class;
+        }
         if ("Concrete".equals(simpleName)) {
             return com.codename1.annotations.Concrete.class;
+        }
+        if ("DbTransient".equals(simpleName)) {
+            return com.codename1.annotations.DbTransient.class;
         }
         if ("DisableDebugInfo".equals(simpleName)) {
             return com.codename1.annotations.DisableDebugInfo.class;
         }
         if ("DisableNullChecksAndArrayBoundsChecks".equals(simpleName)) {
             return com.codename1.annotations.DisableNullChecksAndArrayBoundsChecks.class;
+        }
+        if ("Email".equals(simpleName)) {
+            return com.codename1.annotations.Email.class;
+        }
+        if ("Entity".equals(simpleName)) {
+            return com.codename1.annotations.Entity.class;
+        }
+        if ("ExistIn".equals(simpleName)) {
+            return com.codename1.annotations.ExistIn.class;
+        }
+        if ("Id".equals(simpleName)) {
+            return com.codename1.annotations.Id.class;
+        }
+        if ("JsonIgnore".equals(simpleName)) {
+            return com.codename1.annotations.JsonIgnore.class;
+        }
+        if ("JsonProperty".equals(simpleName)) {
+            return com.codename1.annotations.JsonProperty.class;
+        }
+        if ("Length".equals(simpleName)) {
+            return com.codename1.annotations.Length.class;
+        }
+        if ("Mapped".equals(simpleName)) {
+            return com.codename1.annotations.Mapped.class;
+        }
+        if ("Numeric".equals(simpleName)) {
+            return com.codename1.annotations.Numeric.class;
+        }
+        if ("Regex".equals(simpleName)) {
+            return com.codename1.annotations.Regex.class;
+        }
+        if ("Required".equals(simpleName)) {
+            return com.codename1.annotations.Required.class;
+        }
+        if ("Route".equals(simpleName)) {
+            return com.codename1.annotations.Route.class;
+        }
+        if ("Routes".equals(simpleName)) {
+            return com.codename1.annotations.Route.Routes.class;
+        }
+        if ("RouteParam".equals(simpleName)) {
+            return com.codename1.annotations.RouteParam.class;
+        }
+        if ("Url".equals(simpleName)) {
+            return com.codename1.annotations.Url.class;
+        }
+        if ("Validate".equals(simpleName)) {
+            return com.codename1.annotations.Validate.class;
+        }
+        if ("XmlAttribute".equals(simpleName)) {
+            return com.codename1.annotations.XmlAttribute.class;
+        }
+        if ("XmlElement".equals(simpleName)) {
+            return com.codename1.annotations.XmlElement.class;
+        }
+        if ("XmlRoot".equals(simpleName)) {
+            return com.codename1.annotations.XmlRoot.class;
+        }
+        if ("XmlTransient".equals(simpleName)) {
+            return com.codename1.annotations.XmlTransient.class;
         }
         return null;
     }
@@ -57,9 +134,142 @@ public final class GeneratedAccess_com_codename1_annotations {
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.annotations.Bind) {
+            try {
+                return invoke0((com.codename1.annotations.Bind) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Column) {
+            try {
+                return invoke1((com.codename1.annotations.Column) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.annotations.Concrete) {
             try {
-                return invoke0((com.codename1.annotations.Concrete) target, name, safeArgs);
+                return invoke2((com.codename1.annotations.Concrete) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Email) {
+            try {
+                return invoke3((com.codename1.annotations.Email) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Entity) {
+            try {
+                return invoke4((com.codename1.annotations.Entity) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.ExistIn) {
+            try {
+                return invoke5((com.codename1.annotations.ExistIn) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Id) {
+            try {
+                return invoke6((com.codename1.annotations.Id) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.JsonProperty) {
+            try {
+                return invoke7((com.codename1.annotations.JsonProperty) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Length) {
+            try {
+                return invoke8((com.codename1.annotations.Length) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Numeric) {
+            try {
+                return invoke9((com.codename1.annotations.Numeric) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Regex) {
+            try {
+                return invoke10((com.codename1.annotations.Regex) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Required) {
+            try {
+                return invoke11((com.codename1.annotations.Required) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Route) {
+            try {
+                return invoke12((com.codename1.annotations.Route) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Route.Routes) {
+            try {
+                return invoke13((com.codename1.annotations.Route.Routes) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.RouteParam) {
+            try {
+                return invoke14((com.codename1.annotations.RouteParam) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Url) {
+            try {
+                return invoke15((com.codename1.annotations.Url) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.Validate) {
+            try {
+                return invoke16((com.codename1.annotations.Validate) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.XmlAttribute) {
+            try {
+                return invoke17((com.codename1.annotations.XmlAttribute) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.XmlElement) {
+            try {
+                return invoke18((com.codename1.annotations.XmlElement) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.XmlRoot) {
+            try {
+                return invoke19((com.codename1.annotations.XmlRoot) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -70,10 +280,261 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(com.codename1.annotations.Concrete typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke0(com.codename1.annotations.Bind typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("attr".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.attr();
+            }
+        }
+        if ("getter".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getter();
+            }
+        }
         if ("name".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.name();
+            }
+        }
+        if ("setter".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.setter();
+            }
+        }
+        if ("twoWay".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.twoWay();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.annotations.Column typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("name".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.name();
+            }
+        }
+        if ("nullable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.nullable();
+            }
+        }
+        if ("type".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.type();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.annotations.Concrete typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("linux".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.linux();
+            }
+        }
+        if ("name".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.name();
+            }
+        }
+        if ("win".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.win();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.annotations.Email typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("message".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.message();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codename1.annotations.Entity typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("table".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.table();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.annotations.ExistIn typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("caseSensitive".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.caseSensitive();
+            }
+        }
+        if ("message".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.message();
+            }
+        }
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.annotations.Id typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("autoIncrement".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.autoIncrement();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke7(com.codename1.annotations.JsonProperty typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.annotations.Length typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("message".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.message();
+            }
+        }
+        if ("min".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.min();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke9(com.codename1.annotations.Numeric typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("decimal".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.decimal();
+            }
+        }
+        if ("max".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.max();
+            }
+        }
+        if ("message".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.message();
+            }
+        }
+        if ("min".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.min();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke10(com.codename1.annotations.Regex typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("message".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.message();
+            }
+        }
+        if ("pattern".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.pattern();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke11(com.codename1.annotations.Required typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("message".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.message();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke12(com.codename1.annotations.Route typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke13(com.codename1.annotations.Route.Routes typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke14(com.codename1.annotations.RouteParam typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("required".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.required();
+            }
+        }
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke15(com.codename1.annotations.Url typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("message".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.message();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke16(com.codename1.annotations.Validate typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke17(com.codename1.annotations.XmlAttribute typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke18(com.codename1.annotations.XmlElement typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke19(com.codename1.annotations.XmlRoot typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);

@@ -23,9 +23,18 @@
   if (typeof window.createConfigOptions !== "function") {
     window.createConfigOptions = function() { return {}; };
   }
-  // If a real ``localforage`` library is loaded ahead of us, leave it
-  // alone. Otherwise install a localStorage-backed shim.
-  if (window.localforage && typeof window.localforage.setItem === "function") {
+  // This synchronous-callback shim MUST own ``window.localforage`` on the
+  // ParparVM port. The CN1 worker can't pump the async microtask/Promise loop
+  // a real localForage relies on, so its callbacks must fire inline (see the
+  // setItem note below). The catch: ``fontmetrics.js`` bundles a real
+  // localForage 1.7.3 and globally exposes it, and it loads BEFORE us -- left
+  // in place, CN1 Storage hits its Promise-based callback path and the
+  // worker-bridged callback blows up with "b is not a function". So install
+  // unconditionally, overriding any real localForage on the window. The only
+  // thing we skip is re-installing over OURSELVES (idempotent). fontmetrics
+  // keeps its own bundled instance for internal font-metric caching; it
+  // references that through its module closure, not ``window.localforage``.
+  if (window.localforage && window.localforage.__cn1ShimInstalled) {
     return;
   }
   var STORE_PREFIX = "cn1lf:";
@@ -48,14 +57,79 @@
       catch (_e) { /* user callbacks own their errors */ }
     }
   }
+  // Binary helpers. The Codename One Storage layer hands the shim a Uint8Array
+  // of serialised bytes. JSON.stringify(Uint8Array) yields a numeric-keyed
+  // object ({"0":1,"1":0,...}) which JSON.parse revives as a plain object, NOT a
+  // Uint8Array -- so the read path (which checks `instanceof Uint8Array`) failed
+  // with "Unknown object type" and all saved state was unreadable. Encode bytes
+  // as base64 under a distinct "b:" prefix and revive them as a real Uint8Array.
+  // The Storage layer only ever stores Strings or a byte array, but the
+  // ParparVM<->JS boundary can deliver that byte array as a real Uint8Array OR
+  // as a plain array-like object ({0:..,1:..}); normalise both to a Uint8Array.
+  // Returns null when the value is genuinely not a byte array.
+  function toBytes(v) {
+    if (v == null || typeof v !== "object") { return null; }
+    if (v instanceof Uint8Array) { return v; }
+    if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView && ArrayBuffer.isView(v) && !(v instanceof DataView)) {
+      return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+    }
+    if (typeof ArrayBuffer !== "undefined" && v instanceof ArrayBuffer) { return new Uint8Array(v); }
+    var n;
+    if (typeof v.length === "number") { n = v.length; }
+    else {
+      n = Object.keys(v).length;
+      for (var i = 0; i < n; i++) { if (!(String(i) in v)) { return null; } }
+    }
+    if (n === 0 && !Array.isArray(v) && !(typeof v.length === "number")) { return null; }
+    var u8 = new Uint8Array(n);
+    for (var j = 0; j < n; j++) {
+      var b = v[j];
+      if (typeof b !== "number" || b < 0 || b > 255 || (b | 0) !== b) { return null; }
+      u8[j] = b;
+    }
+    return u8;
+  }
+  function bytesToB64(u8) {
+    if (!(u8 instanceof Uint8Array)) { u8 = new Uint8Array(u8.buffer || u8); }
+    var CHUNK = 0x8000, parts = [];
+    for (var i = 0; i < u8.length; i += CHUNK) {
+      parts.push(String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK)));
+    }
+    return btoa(parts.join(""));
+  }
+  function b64ToBytes(b64) {
+    var bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }
+    return u8;
+  }
+  // Recover a Uint8Array from a legacy "j:" numeric-keyed byte map (state saved
+  // before the "b:" encoding existed). The Storage layer only ever stores
+  // Strings or byte arrays, so a parsed object with sequential 0..n-1 byte-value
+  // keys is unambiguously a mis-encoded Uint8Array.
+  function reviveBytes(o) {
+    if (o == null || typeof o !== "object" || Array.isArray(o)) { return o; }
+    var keys = Object.keys(o), n = keys.length;
+    if (n === 0) { return o; }
+    for (var i = 0; i < n; i++) {
+      if (!(String(i) in o)) { return o; }
+      var v = o[i];
+      if (typeof v !== "number" || v < 0 || v > 255 || (v | 0) !== v) { return o; }
+    }
+    var u8 = new Uint8Array(n);
+    for (var j = 0; j < n; j++) { u8[j] = o[j]; }
+    return u8;
+  }
   function setItemImpl(key, value) {
     var serialised;
     var valType = (value == null) ? "null" : (typeof value);
     var valCtor = (value && value.constructor && value.constructor.name) ? value.constructor.name : valType;
+    var asBytes;
     if (value == null) {
       serialised = null;
     } else if (typeof value === "string") {
       serialised = "s:" + value;
+    } else if ((asBytes = toBytes(value)) != null) {
+      serialised = "b:" + bytesToB64(asBytes);
     } else {
       try { serialised = "j:" + JSON.stringify(value); }
       catch (_e) { serialised = "j:" + JSON.stringify(String(value)); }
@@ -94,9 +168,11 @@
     if (raw.indexOf("s:") === 0) {
       return raw.substring(2);
     }
+    if (raw.indexOf("b:") === 0) {
+      try { return b64ToBytes(raw.substring(2)); } catch (_e) { return null; }
+    }
     if (raw.indexOf("j:") === 0) {
-      try { return JSON.parse(raw.substring(2)); }
-      catch (_e) { return null; }
+      try { return reviveBytes(JSON.parse(raw.substring(2))); } catch (_e) { return null; }
     }
     return raw;
   }
@@ -122,6 +198,9 @@
   // callback fired. The empty-result case looked indistinguishable from
   // a non-existent key.)
   window.localforage = {
+    // Marker so a second load of this shim (or a re-check) doesn't reinstall
+    // over itself, while still letting us override a real localForage.
+    __cn1ShimInstalled: true,
     INDEXEDDB: "indexeddb",
     WEBSQL: "websql",
     LOCALSTORAGE: "localstorage",
@@ -178,6 +257,31 @@
       if (!stopped) {
         callBack(successCallback, null);
       }
-    }
+    },
+    // Synchronous, value-returning variants. The ParparVM JS port runs the app
+    // in a Web Worker; the legacy callback methods above hand their result back
+    // to the worker as a ``worker-callback`` message, which the Java side waited
+    // for with a ``while(!done){Thread.sleep(20);}`` poll. That tight timer loop
+    // STARVES the worker's ``self.onmessage`` (it never gets a turn to deliver
+    // the callback), so every storage op hit the 10s poll timeout and the EDT
+    // was permanently blocked -> the whole app froze to input. These *Sync
+    // methods are invoked from Java as ordinary BLOCKING JSO host calls that
+    // RETURN the value directly (the worker parks on HOST_CALL and resumes on
+    // HOST_CALLBACK -- a path that is NOT starved), so no poll/Thread.sleep and
+    // no message starvation. localStorage is itself synchronous, so there is
+    // nothing async to wait for here.
+    getItemSync: function(key) { return getItemImpl(key); },
+    setItemSync: function(key, value) { return setItemImpl(key, value); },
+    removeItemSync: function(key) { window.localStorage.removeItem(namespacedKey(key)); return true; },
+    clearSync: function() {
+      var doomed = [];
+      eachKey(function(k) { doomed.push(k); });
+      for (var i = 0; i < doomed.length; i++) {
+        window.localStorage.removeItem(namespacedKey(doomed[i]));
+      }
+      return true;
+    },
+    lengthSync: function() { var n = 0; eachKey(function() { n++; }); return n; },
+    keysSync: function() { var out = []; eachKey(function(k) { out.push(k); }); return out; }
   };
 })();

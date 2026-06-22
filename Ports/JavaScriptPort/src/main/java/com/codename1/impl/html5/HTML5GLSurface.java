@@ -24,12 +24,6 @@ import static com.codename1.impl.html5.HTML5Implementation.scaleCoord;
 /// renderer lifecycle callbacks (`onInit`, `onResize`, `onFrame`, `onDispose`)
 /// are driven from layout changes and a `requestAnimationFrame` loop.
 class HTML5GLSurface extends HTML5Peer {
-    /// Live WebGL peers, composited into screenshots by HTML5Implementation so
-    /// that 3D scenes (which render to their own canvas, separate from the
-    /// Codename One output canvas) appear in captured images.
-    static final java.util.List<HTML5GLSurface> ACTIVE =
-            java.util.Collections.synchronizedList(new java.util.ArrayList<HTML5GLSurface>());
-
     private final RenderView view;
     private final Renderer renderer;
     private final HTMLCanvasElement canvas;
@@ -46,12 +40,45 @@ class HTML5GLSurface extends HTML5Peer {
         public void onAnimationFrame(double timestamp) {
             animationFrameId = -1;
             framePending = false;
-            renderFrame();
+            // Stop the animation loop once this surface is no longer part of the
+            // shown UI -- e.g. the user switched samples, replacing the preview
+            // Form. deinitialize() does not reliably fire for a RenderView nested
+            // in the embedded (re-parented) preview Form, so without this the rAF
+            // keeps firing and flushing the display forever, degrading the whole
+            // playground (and stacking up if several samples were run).
+            if (!isLive()) {
+                continuous = false;
+                return;
+            }
+            // Repaint; the actual GL render + blit happens in paint() so the 3D
+            // surface composites in z-order with the rest of the UI.
+            repaint();
             if (continuous) {
                 scheduleFrame();
             }
         }
     };
+
+    /// True while this surface is still part of the currently shown UI (its
+    /// parent chain reaches the on-screen Form). Once the preview is replaced the
+    /// chain no longer reaches Display.getCurrent(), so the animation loop stops.
+    private boolean isLive() {
+        if (contextLost) {
+            return false;
+        }
+        com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
+        if (current == null) {
+            return false;
+        }
+        com.codename1.ui.Component c = this;
+        while (c != null) {
+            if (c == current) {
+                return true;
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
 
     private HTML5GLSurface(HTMLCanvasElement canvas, RenderView view) {
         super(canvas);
@@ -65,9 +92,6 @@ class HTML5GLSurface extends HTML5Peer {
     static HTML5GLSurface create(RenderView view) {
         HTMLCanvasElement canvas = (HTMLCanvasElement)
                 Window.current().getDocument().createElement("canvas");
-        // Mark the canvas so the host-side screenshot capture composites it onto
-        // the output canvas (3D peers are DOM overlays, otherwise missed).
-        canvas.setAttribute("data-cn1gl3d", "1");
         // Obtain the WebGL context via the canvas INTERFACE method so the JSO
         // bridge dispatches it against the real DOM canvas on the main thread.
         // (A canvas passed into a @JSBody arrives as an opaque worker-side bridge
@@ -83,10 +107,36 @@ class HTML5GLSurface extends HTML5Peer {
             ctx = canvas.getContext("experimental-webgl", opts); // LINT-ALLOW-CANVAS-BARRIER-READ: one-time legacy context creation
         }
         if (ctx == null) {
+            // Some browsers (notably Firefox configurations where the WebGL 1
+            // path is blocklisted) expose only WebGL 2. A WebGL2RenderingContext
+            // is a superset of WebGLRenderingContext, so every call this device
+            // makes still resolves; try it before giving up.
+            ctx = canvas.getContext("webgl2", opts); // LINT-ALLOW-CANVAS-BARRIER-READ: one-time WebGL2 context creation
+        }
+        if (ctx == null) {
             return null;
         }
         HTML5GLSurface surface = new HTML5GLSurface(canvas, view);
         surface.device = new HTML5GraphicsDevice((WebGLRenderingContext) ctx);
+        // The WebGL canvas is NOT shown as a DOM peer overlay. Native peers sit
+        // BEHIND the output canvas (z-index -1000) and show through a transparent
+        // "hole" punched in it -- but a negative-z WebGL canvas is composited as
+        // its own GPU layer and many real GPUs push that layer behind the page,
+        // so the hole shows the page background: a blank preview (only software
+        // GL / some GPUs composited it, which is why screenshots looked fine).
+        // The hole also covered the device skin, and the peer DOM position is
+        // wrong for a RenderView inside a hosted form. Instead we keep this canvas
+        // OFFSCREEN as a pure render target and blit its pixels into the display
+        // op stream during paint() (see paint()), so the 3D scene composites in
+        // z-order like any other component -- correct position, correct layering,
+        // and no fragile WebGL DOM layer.
+        // `visibility:hidden` (not `display:none`): the element is not painted,
+        // so it never acts as the broken DOM overlay -- but it stays in layout
+        // with a live backing store, so WebGL keeps rendering into it and the
+        // host can read it back via drawImage during the flushGraphics composite.
+        // (`display:none` zeroes the canvas's rendered content, leaving a blank
+        // blit.)
+        canvas.getStyle().setProperty("visibility", "hidden");
         return surface;
     }
 
@@ -106,12 +156,8 @@ class HTML5GLSurface extends HTML5Peer {
         if (continuous) {
             return;
         }
-        // Render synchronously rather than via requestAnimationFrame: the app runs
-        // in a Web Worker and a worker-side callback cannot be handed to the
-        // main-thread rAF ("parameter 1 is not of type 'Function'"). WebGL calls
-        // are synchronous bridge round-trips to the main thread, so an on-demand
-        // frame can simply run inline here.
-        renderFrame();
+        // On-demand: repaint; paint() renders the frame and blits it in z-order.
+        repaint();
     }
 
     private void scheduleFrame() {
@@ -173,60 +219,54 @@ class HTML5GLSurface extends HTML5Peer {
         syncSize();
         try {
             renderer.onFrame(device);
-            // Mark the canvas as freshly rendered for this capture cycle. The
-            // host-side screenshot composite (browser_bridge.js) only draws GL
-            // canvases carrying this flag and clears it afterwards, so a peer left
-            // in the DOM by a torn-down form (which is not re-rendered) cannot
-            // bleed its last frame into a later test's screenshot.
-            canvas.setAttribute("data-cn1gl3d-fresh", "1");
         } catch (Throwable t) {
             t.printStackTrace();
         }
     }
 
     @Override
+    protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+        // Don't let the native canvas's intrinsic size inflate the hosted form's
+        // layout. The RenderView fills its BorderLayout.CENTER slot regardless,
+        // and a large preferred size pushed the playground's device bezel out to
+        // the full preview width -- so the 3D scene covered the skin. A zero
+        // preferred size lets the surrounding bezel keep its real dimensions.
+        return new com.codename1.ui.geom.Dimension(0, 0);
+    }
+
+    @Override
+    public void paint(com.codename1.ui.Graphics g) {
+        if (contextLost || device == null) {
+            return;
+        }
+        int w = scaleCoord(getWidth());
+        int h = scaleCoord(getHeight());
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        // Render the scene into the offscreen WebGL canvas, then blit it into the
+        // display op stream HERE -- in paint order -- so the 3D surface behaves
+        // like any other component: Codename One elements painted after it layer
+        // on top, the device bezel and neighbouring UI render correctly, and it
+        // sits at its real on-screen position (g is translated so our content is
+        // at getX(),getY()). The canvas itself is never shown as a DOM overlay.
+        renderFrame();
+        BufferedGraphics bg = HTML5Implementation.getInstance().displayGraphics();
+        if (bg != null) {
+            bg.drawCanvas(canvas,
+                    scaleCoord(g.getTranslateX() + getX()),
+                    scaleCoord(g.getTranslateY() + getY()), w, h);
+        }
+    }
+
+    @Override
     protected void initComponent() {
         super.initComponent();
-        if (!ACTIVE.contains(this)) {
-            ACTIVE.add(this);
-        }
         if (!initialized) {
             renderFrame();
         }
         if (continuous) {
             scheduleFrame();
-        }
-    }
-
-    /// Composites the current frame of every live WebGL peer onto the supplied
-    /// 2D canvas context (the Codename One output canvas), at each peer's
-    /// absolute on-screen position. Called by the screenshot path so 3D content
-    /// is captured. Each peer is re-rendered first; the contexts are created with
-    /// `preserveDrawingBuffer` so the drawn frame survives the `drawImage` read.
-    static void compositeInto(JSObject context2d) {
-        java.util.List<HTML5GLSurface> peers;
-        synchronized (ACTIVE) {
-            peers = new java.util.ArrayList<HTML5GLSurface>(ACTIVE);
-        }
-        com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
-        for (HTML5GLSurface s : peers) {
-            try {
-                if (s.contextLost || s.device == null) {
-                    continue;
-                }
-                // Only composite peers that belong to the form currently on
-                // screen. A peer left in ACTIVE while its (previous) form is torn
-                // down must not bleed its last frame into a later test's
-                // screenshot -- e.g. the 3D animation showing up in DesktopMode.
-                if (current == null || s.getComponentForm() != current) {
-                    continue;
-                }
-                s.renderFrame();
-                drawCanvasInto(context2d, s.canvas,
-                        scaleCoord(s.getAbsoluteX()), scaleCoord(s.getAbsoluteY()));
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }
         }
     }
 
@@ -246,13 +286,11 @@ class HTML5GLSurface extends HTML5Peer {
     @Override
     protected void deinitialize() {
         cancelFrame();
-        ACTIVE.remove(this);
         super.deinitialize();
     }
 
     void disposeSurface() {
         cancelFrame();
-        ACTIVE.remove(this);
         if (initialized && !contextLost) {
             try {
                 renderer.onDispose(device);
@@ -262,8 +300,4 @@ class HTML5GLSurface extends HTML5Peer {
         }
         initialized = false;
     }
-
-    @JSBody(params = {"ctx", "canvas", "x", "y"},
-            script = "try { ctx.drawImage(canvas, x, y); } catch (e) {}")
-    private static native void drawCanvasInto(JSObject ctx, HTMLCanvasElement canvas, int x, int y);
 }

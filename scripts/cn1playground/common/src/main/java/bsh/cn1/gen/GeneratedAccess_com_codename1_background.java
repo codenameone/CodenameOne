@@ -7,11 +7,16 @@ public final class GeneratedAccess_com_codename1_background {
     }
 
     public static Class<?> findClass(String name) {
-        int lastDot = name == null ? -1 : name.lastIndexOf('.');
-        if (lastDot < 0 || lastDot == name.length() - 1) {
+        if (name == null) {
             return null;
         }
-        return findClassBySimpleName(name.substring(lastDot + 1));
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
     }
 
     public static Class<?> findClassBySimpleName(String simpleName) {
@@ -27,6 +32,27 @@ public final class GeneratedAccess_com_codename1_background {
         if ("BackgroundFetch".equals(simpleName)) {
             return com.codename1.background.BackgroundFetch.class;
         }
+        if ("BackgroundTask".equals(simpleName)) {
+            return com.codename1.background.BackgroundTask.class;
+        }
+        if ("BackgroundWork".equals(simpleName)) {
+            return com.codename1.background.BackgroundWork.class;
+        }
+        if ("BackgroundWorker".equals(simpleName)) {
+            return com.codename1.background.BackgroundWorker.class;
+        }
+        if ("ForegroundService".equals(simpleName)) {
+            return com.codename1.background.ForegroundService.class;
+        }
+        if ("Task".equals(simpleName)) {
+            return com.codename1.background.ForegroundService.Task.class;
+        }
+        if ("WorkRequest".equals(simpleName)) {
+            return com.codename1.background.WorkRequest.class;
+        }
+        if ("Builder".equals(simpleName)) {
+            return com.codename1.background.WorkRequest.Builder.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -36,15 +62,121 @@ public final class GeneratedAccess_com_codename1_background {
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.background.BackgroundTask.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.background.BackgroundWork.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.background.ForegroundService.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.background.WorkRequest.class) return invokeStatic3(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
+    }
+
+    private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("cancel".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.background.BackgroundTask.cancel((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.background.BackgroundTask.isSupported();
+            }
+        }
+        if ("scheduleProcessing".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Date.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Date.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Runnable.class}, false);
+                com.codename1.background.BackgroundTask.scheduleProcessing((java.lang.String) adaptedArgs[0], (java.util.Date) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), ((Boolean) adaptedArgs[3]).booleanValue(), (java.lang.Runnable) adaptedArgs[4]); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.background.BackgroundTask.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("cancel".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.background.BackgroundWork.cancel((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.background.BackgroundWork.isSupported();
+            }
+        }
+        if ("schedule".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.background.WorkRequest.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.background.WorkRequest.class}, false);
+                com.codename1.background.BackgroundWork.schedule((com.codename1.background.WorkRequest) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.background.BackgroundWork.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.background.ForegroundService.isSupported();
+            }
+        }
+        if ("start".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.background.ForegroundService.Task.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.background.ForegroundService.Task.class}, false);
+                return com.codename1.background.ForegroundService.start((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (com.codename1.background.ForegroundService.Task) adaptedArgs[4]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.background.ForegroundService.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("builder".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class}, false);
+                return com.codename1.background.WorkRequest.builder((java.lang.String) adaptedArgs[0], (java.lang.Class) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.background.WorkRequest.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.background.ForegroundService) {
+            try {
+                return invoke0((com.codename1.background.ForegroundService) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.background.WorkRequest) {
+            try {
+                return invoke1((com.codename1.background.WorkRequest) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.background.WorkRequest.Builder) {
+            try {
+                return invoke2((com.codename1.background.WorkRequest.Builder) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.background.BackgroundFetch) {
             try {
-                return invoke0((com.codename1.background.BackgroundFetch) target, name, safeArgs);
+                return invoke3((com.codename1.background.BackgroundFetch) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.background.BackgroundWorker) {
+            try {
+                return invoke4((com.codename1.background.BackgroundWorker) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.background.ForegroundService.Task) {
+            try {
+                return invoke5((com.codename1.background.ForegroundService.Task) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -55,11 +187,167 @@ public final class GeneratedAccess_com_codename1_background {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(com.codename1.background.BackgroundFetch typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke0(com.codename1.background.ForegroundService typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("isRunning".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRunning();
+            }
+        }
+        if ("stop".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.stop(); return null;
+            }
+        }
+        if ("updateNotification".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.updateNotification((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.background.WorkRequest typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getId();
+            }
+        }
+        if ("getInitialDelayMillis".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInitialDelayMillis();
+            }
+        }
+        if ("getInputData".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInputData();
+            }
+        }
+        if ("getMinIntervalMillis".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMinIntervalMillis();
+            }
+        }
+        if ("getWorkerClass".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWorkerClass();
+            }
+        }
+        if ("isPeriodic".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPeriodic();
+            }
+        }
+        if ("isRequiresBatteryNotLow".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRequiresBatteryNotLow();
+            }
+        }
+        if ("isRequiresCharging".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRequiresCharging();
+            }
+        }
+        if ("isRequiresIdle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRequiresIdle();
+            }
+        }
+        if ("isRequiresNetwork".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRequiresNetwork();
+            }
+        }
+        if ("isRequiresUnmeteredNetwork".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRequiresUnmeteredNetwork();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.background.WorkRequest.Builder typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("build".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.build();
+            }
+        }
+        if ("putInputData".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.putInputData((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("setInitialDelay".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.setInitialDelay(((Number) adaptedArgs[0]).longValue());
+            }
+        }
+        if ("setPeriodic".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.setPeriodic(((Number) adaptedArgs[0]).longValue());
+            }
+        }
+        if ("setRequiresBatteryNotLow".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.setRequiresBatteryNotLow(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("setRequiresCharging".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.setRequiresCharging(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("setRequiresIdle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.setRequiresIdle(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("setRequiresNetwork".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.setRequiresNetwork(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("setRequiresUnmeteredNetwork".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.setRequiresUnmeteredNetwork(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.background.BackgroundFetch typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("performBackgroundFetch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, com.codename1.util.Callback.class}, false);
                 typedTarget.performBackgroundFetch(((Number) adaptedArgs[0]).longValue(), (com.codename1.util.Callback) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codename1.background.BackgroundWorker typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("performWork".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Map.class, java.lang.Long.class, com.codename1.util.Callback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Map.class, java.lang.Long.class, com.codename1.util.Callback.class}, false);
+                typedTarget.performWork((java.lang.String) adaptedArgs[0], (java.util.Map) adaptedArgs[1], ((Number) adaptedArgs[2]).longValue(), (com.codename1.util.Callback) adaptedArgs[3]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.background.ForegroundService.Task typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("run".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.background.ForegroundService.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.background.ForegroundService.class}, false);
+                typedTarget.run((com.codename1.background.ForegroundService) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);

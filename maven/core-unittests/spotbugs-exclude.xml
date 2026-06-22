@@ -268,6 +268,18 @@
         <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
     </Match>
 
+    <!--
+    HttpTileSource's one-shot tile/TileJSON requests are short-lived
+    ConnectionRequest subclasses that add per-request fields (z/x/y/callback).
+    They are never compared or used as map keys, so overriding equals()/
+    hashCode() would add noise without changing behavior. This mirrors the
+    framework idiom of anonymous ConnectionRequest subclasses everywhere.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.maps\.vector\.HttpTileSource(\$.*)?" />
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+    </Match>
+
     <!-- The class has too many casts like this to go over -->
     <Match>
         <Class name="~com\.codename1\.facebook\.FaceBookAccess.*" />

@@ -106,6 +106,10 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      # Optional: when set, build-android-app.sh writes it as a bundled resource
+      # so the GoogleWebMap screenshot test renders a live Google map; absent
+      # (e.g. fork PRs with no access to the secret) the test skips.
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
     steps:
       - uses: actions/checkout@v6
       - name: Set TMPDIR

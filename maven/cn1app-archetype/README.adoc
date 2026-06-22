@@ -29,7 +29,7 @@ javascript::
 Your native interface implementations for the javascript platform should be placed inside the src/main/javascript directory of this module.
 
 win::
-Your native interface implementations for the Windows (UWP) platform should be placed inside the src/main/csharp directory of this module.
+Your native interface implementations for the Windows (native) platform should be placed inside the src/main/c directory of this module.
 
 == CSS Files
 
