@@ -229,6 +229,11 @@ public class AppReview {
     /// still respects the "already completed" opt out and records the prompt
     /// time so the scheduler will not pile on.
     public void requestReview() {
+        if (Preferences.get(PREF_COMPLETED, false)) {
+            // The user already rated or opted out -- honour that even for a
+            // manual request, as documented above.
+            return;
+        }
         Preferences.set(PREF_LAST_PROMPT, System.currentTimeMillis());
         if (CN.isEdt()) {
             requestReviewImpl();

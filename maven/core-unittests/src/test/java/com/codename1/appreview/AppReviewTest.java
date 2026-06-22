@@ -141,6 +141,18 @@ class AppReviewTest extends UITestBase {
         assertFalse(r.shouldPrompt(), "shouldPrompt stays false below the (high) launch threshold");
     }
 
+    @EdtTest
+    void requestReviewRespectsCompleted() {
+        AppReview r = AppReview.getInstance();
+        r.markCompleted();
+        Preferences.set(PREF_LAST_PROMPT, 12345L);
+        // Already completed -> requestReview() must no-op (no prompt, no
+        // re-stamp). It returns before any UI, so this is safe to call here.
+        r.requestReview();
+        assertEquals(12345L, Preferences.get(PREF_LAST_PROMPT, 0L),
+                "requestReview must not prompt or re-stamp once completed");
+    }
+
     private static long now() {
         return System.currentTimeMillis();
     }
