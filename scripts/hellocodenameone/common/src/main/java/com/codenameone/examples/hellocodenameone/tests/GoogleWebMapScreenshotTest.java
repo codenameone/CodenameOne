@@ -18,7 +18,7 @@ import java.io.InputStream;
 /// lets *any* platform show Google Maps -- including the ones with no native
 /// Google SDK -- so it doubles as the cross-platform fallback smoke test.
 ///
-/// Like {@link NativeMapProviderScreenshotTest} it frames the Italian peninsula
+/// Like the (now-removed) native Apple provider test it frames the Italian peninsula
 /// at a regional zoom (stable geography, strong land/water contrast, no
 /// street-level churn) and uses a lenient `.tolerance` so live tile/label noise
 /// does not fail CI while a blocked/blank map still does.
@@ -34,6 +34,16 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         if (com.codename1.ui.CN.isWatch()) {
             System.out.println(
                     "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=watch-form-factor");
+            done();
+            return true;
+        }
+        // The Mac native (Catalyst) desktop backend renders into a Core Graphics
+        // bitmap that does not composite the native web view, so the capture is
+        // solid black there. The web map renders + captures fine on the mobile
+        // ports (iOS/Android), which hold the goldens; skip the desktop runner.
+        if (com.codename1.ui.CN.isDesktop()) {
+            System.out.println(
+                    "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=webview-not-captured-on-desktop");
             done();
             return true;
         }

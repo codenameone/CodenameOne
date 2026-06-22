@@ -15,7 +15,7 @@ import com.codename1.ui.layouts.BorderLayout;
 /// capture is deterministic, and a marker is added through the
 /// {@code MapSurface} API to prove it routes to the fallback.
 ///
-/// This is the complement of {@link NativeMapProviderScreenshotTest}: when a
+/// This is the complement of a native-provider map: when a
 /// native provider *is* active (e.g. an iOS build with
 /// `ios.maps.provider=apple`) the fallback path is not exercised, so this test
 /// skips and the provider test captures the native render instead.

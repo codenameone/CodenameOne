@@ -246,7 +246,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VectorMapMarkersScreenshotTest(),
             new VectorMapShapesScreenshotTest(),
             new NativeMapFallbackScreenshotTest(),
-            new NativeMapProviderScreenshotTest(),
+            // (NativeMapProvider/Apple MapKit is intentionally not screenshot-
+            // tested: it only renders in an authorized, signed-in environment
+            // and even on the Mac runner its live tiles load unreliably, so the
+            // capture is a flaky blank grid. The native-context render is
+            // covered deterministically by GoogleWebMap on iOS/Android, and the
+            // developer guide ships a real Apple-map capture.)
             // Cross-platform Google Maps via the web provider (BrowserComponent
             // + Maps JS). Gated on the GOOGLE_MAPS_API_KEY secret -- skips when
             // the key resource is absent, so it is a no-op on forks/local.
