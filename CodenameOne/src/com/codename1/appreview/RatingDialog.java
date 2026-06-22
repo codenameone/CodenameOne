@@ -34,7 +34,6 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.GridLayout;
 
 /// The Codename One drawn rating widget shown by [AppReview] when no native
 /// review prompt is available. It is presented as a bottom [Sheet] so the user
@@ -60,9 +59,10 @@ final class RatingDialog {
         prompt.setUIID("DialogBody");
         content.add(prompt);
 
-        // A fixed grid keeps the stars on a single row on narrow screens
-        // instead of wrapping the way a flow layout would.
-        Container stars = new Container(new GridLayout(1, MAX_STARS));
+        // A horizontal box keeps the stars together at the leading edge
+        // (left, or right under RTL) on a single row -- a grid would space
+        // them across the full width and a flow layout would wrap them.
+        Container stars = new Container(BoxLayout.x());
         for (int i = 1; i <= MAX_STARS; i++) {
             final int value = i;
             Button star = new Button();

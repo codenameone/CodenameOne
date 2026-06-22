@@ -9,7 +9,6 @@ import com.codename1.ui.Label;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.util.UITimer;
 
 /**
@@ -56,7 +55,7 @@ public class AppReviewDialogScreenshotTest extends BaseTest {
         prompt.setUIID("DialogBody");
         content.add(prompt);
 
-        Container stars = new Container(new GridLayout(1, MAX_STARS));
+        Container stars = new Container(BoxLayout.x());
         for (int i = 0; i < MAX_STARS; i++) {
             Button star = new Button();
             star.setUIID("Label");
