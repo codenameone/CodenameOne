@@ -7472,6 +7472,37 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    /// Indicates whether the underlying platform exposes a native in-app
+    /// review/rating prompt (the OS-sanctioned "rate this app" sheet) that
+    /// can be triggered via [#requestNativeInAppReview]. When this returns
+    /// false the higher level API falls back to a Codename One drawn rating
+    /// widget.
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform can present a native review prompt.
+    public boolean isNativeInAppReviewSupported() {
+        return false;
+    }
+
+    /// Requests the native in-app review prompt. This should only be invoked
+    /// when [#isNativeInAppReviewSupported] returns true. The platforms
+    /// deliberately hide whether the user actually submitted a rating and may
+    /// silently ignore the request based on their own quota/throttling
+    /// policies; `done` therefore reports whether the request was handed off
+    /// to the native review controller, not whether a review was written.
+    ///
+    /// #### Parameters
+    ///
+    /// - `done`: invoked with `true` once the native prompt was requested or
+    ///   `false` when the platform did not handle it (in which case the caller
+    ///   may show its own fallback). May be null.
+    public void requestNativeInAppReview(SuccessCallback<Boolean> done) {
+        if (done != null) {
+            done.onSucess(Boolean.FALSE);
+        }
+    }
+
     /// Indicates if the underlying platform can print documents through
     /// [#print(String,String,PrintResultListener)].
     ///

@@ -5244,6 +5244,31 @@ public final class Display extends CN1Constants {
         return impl.isNativeShareSupported();
     }
 
+    /// Indicates whether the platform exposes a native in-app review/rating
+    /// prompt (the OS-sanctioned "rate this app" sheet). When false the
+    /// [com.codename1.appreview.AppReview] API falls back to a Codename One
+    /// drawn rating widget.
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform can present a native review prompt.
+    public boolean isNativeInAppReviewSupported() {
+        return impl.isNativeInAppReviewSupported();
+    }
+
+    /// Requests the native in-app review prompt. Should only be invoked when
+    /// [#isNativeInAppReviewSupported] returns true. The platforms hide whether
+    /// the user actually rated and may throttle the prompt; `done` reports
+    /// whether the request reached the native review controller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `done`: invoked with `true` once the native prompt was requested or
+    ///   `false` when the platform did not handle it. May be null.
+    public void requestNativeInAppReview(SuccessCallback<Boolean> done) {
+        impl.requestNativeInAppReview(done);
+    }
+
     /// Share the required information using the platform sharing services.
     /// a Sharing service can be: mail, sms, facebook, twitter,...
     /// This method is implemented if isNativeShareSupported() returned true for

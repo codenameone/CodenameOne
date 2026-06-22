@@ -38,6 +38,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.util.Simd;
 import com.codename1.util.RunnableWithResultSync;
+import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -1187,6 +1188,31 @@ public class CN extends CN1Constants {
     /// true if the underlying platform handles share.
     public static boolean isNativeShareSupported() {
         return Display.impl.isNativeShareSupported();
+    }
+
+    /// Indicates whether the platform exposes a native in-app review/rating
+    /// prompt (the OS-sanctioned "rate this app" sheet). When false the
+    /// [com.codename1.appreview.AppReview] API falls back to a Codename One
+    /// drawn rating widget.
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform can present a native review prompt.
+    public static boolean isNativeInAppReviewSupported() {
+        return Display.impl.isNativeInAppReviewSupported();
+    }
+
+    /// Requests the native in-app review prompt. Should only be invoked when
+    /// [#isNativeInAppReviewSupported] returns true. The platforms hide whether
+    /// the user actually rated and may throttle the prompt; `done` reports
+    /// whether the request reached the native review controller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `done`: invoked with `true` once the native prompt was requested or
+    ///   `false` when the platform did not handle it. May be null.
+    public static void requestNativeInAppReview(SuccessCallback<Boolean> done) {
+        Display.impl.requestNativeInAppReview(done);
     }
 
     /// Share the required information using the platform sharing services.

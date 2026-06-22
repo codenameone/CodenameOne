@@ -99,6 +99,7 @@ public class IPhoneBuilder extends Executor {
     private String buildVersion;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
+    private boolean usesAppReview;
     private boolean usesWalletApi;
     private boolean usesCryptoAPI;
     private boolean usesCryptoGcm;
@@ -729,6 +730,12 @@ public class IPhoneBuilder extends Executor {
                     if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
                         usesPurchaseAPI = true;
                     }
+                    // App review API (SKStoreReviewController). Gated on actual
+                    // usage so StoreKit.framework + the CN1_USE_APPREVIEW native
+                    // bridge are only linked when the app references the API.
+                    if (!usesAppReview && cls.indexOf("com/codename1/appreview") == 0) {
+                        usesAppReview = true;
+                    }
                     // Wallet issuer-provisioning natives are only compiled in when
                     // the app actually references the API (or enables the extension
                     // via the ios.wallet.extension hint) - see CN1_INCLUDE_WALLET.
@@ -811,6 +818,14 @@ public class IPhoneBuilder extends Executor {
                             && (method.indexOf("connect") > -1
                                 || method.indexOf("disconnect") > -1)) {
                         usesWifiHotspotConfig = true;
+                    }
+                    // Apps that call the low-level CN/Display review entry point
+                    // directly (without the com.codename1.appreview facade) still
+                    // need StoreKit + the native bridge.
+                    if (!usesAppReview
+                            && (cls.equals("com/codename1/ui/CN") || cls.equals("com/codename1/ui/Display"))
+                            && method.indexOf("equestNativeInAppReview") > -1) {
+                        usesAppReview = true;
                     }
                 }
             });
@@ -1852,6 +1867,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_STOREKIT", "#define CN1_USE_STOREKIT");
 
             }
+            if (usesAppReview) {
+                File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
+                replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_APPREVIEW", "#define CN1_USE_APPREVIEW");
+
+            }
         } catch (Exception ex) {
             throw new BuildException("Failure while injecting code from build hints", ex);
         }
@@ -2282,6 +2302,15 @@ public class IPhoneBuilder extends Executor {
 
                 if (usesPurchaseAPI) {
                     addLibs += ";StoreKit.framework";
+                }
+                // App review (SKStoreReviewController) also lives in StoreKit;
+                // link it when detected unless the purchase API already did.
+                if (usesAppReview && (addLibs == null || addLibs.toLowerCase().indexOf("storekit.framework") < 0)) {
+                    if (addLibs == null || addLibs.length() == 0) {
+                        addLibs = "StoreKit.framework";
+                    } else {
+                        addLibs += ";StoreKit.framework";
+                    }
                 }
             } catch (Exception ex) {
                 throw new BuildException("Failed to process build hints", ex);
