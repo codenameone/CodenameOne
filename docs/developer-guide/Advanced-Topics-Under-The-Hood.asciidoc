@@ -50,7 +50,7 @@ Here is the current list of supported arguments. Build hints change over time, s
 |Allows adding an intent filter to the main android activity
 
 |android.tv
-|true/false (defaults to false). Marks the build as an Android TV / Google TV app. Adds the `LEANBACK_LAUNCHER` intent category to the launcher activity (so the app appears on the TV home screen), declares the `android.software.leanback` feature, makes `android.hardware.touchscreen` optional (so it installs on touchless TVs), and generates a 320x180 launcher banner (`@drawable/tv_banner`) from the app icon. The same APK still installs and runs on phones and tablets, and `CN.isTV()` returns true at runtime on a TV.
+|true/false (defaults to false). Marks the build as an Android TV / Google TV app. Adds the `LEANBACK_LAUNCHER` intent category to the launcher activity (so the app appears on the TV home screen), declares the `android.software.leanback` feature, makes `android.hardware.touchscreen` optional (so it installs on touchless TVs), and generates a 320×180 launcher banner (`@drawable/tv_banner`) from the app icon. The same APK still installs and runs on phones and tablets, and `CN.isTV()` returns true at runtime on a TV.
 
 
 |android.activity.launchMode
@@ -626,10 +626,10 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Whetherto use CEF for media or BrowserComponent instead of JavaFX in Mac desktop builds.  true/false. Default value is `false` (Jan 2021), but this will be changed to `true` in a future version.
 
 |tvNative.enabled
-|true/false (defaults to false). Adds an Apple TV (tvOS) application target to the iOS build. The tvOS app is a separate `appletvos` target built from the same Java/Kotlin sources through ParparVM (UIKit + Metal; tvOS has no OpenGL ES). Enabling it does not change the iOS app -- in particular it does not override the iOS app's `ios.metal` setting. Also turned on implicitly by `codename1.tvMain`.
+|true/false (defaults to false). Adds an Apple TV (tvOS) application target to the iOS build. The tvOS app is a separate `appletvos` target built from the same Java/Kotlin sources through ParparVM (UIKit + Metal; tvOS has no OpenGL ES). Enabling it doesn't change the iOS app -- in particular it doesn't override the iOS app's `ios.metal` setting. Also turned on implicitly by `codename1.tvMain`.
 
 |tvNative.mainClass (a.k.a. codename1.tvMain)
-|Fully-qualified tvOS lifecycle entry class. Setting it auto-enables the tvOS target. If omitted while `tvNative.enabled=true`, the tvOS app reuses the phone main class.
+|Fully-qualified tvOS lifecycle entry class. Setting it auto enables the tvOS target. If omitted while `tvNative.enabled=true`, the tvOS app reuses the phone main class.
 
 |tvNative.bundleId
 |Bundle identifier of the tvOS app. Defaults to `<packageName>.tvos`.
