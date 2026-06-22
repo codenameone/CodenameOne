@@ -498,6 +498,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-21T15:04:09+00:00"
       }
+    },
+    "native-windows-port-no-jvm": {
+      "devto": {
+        "id": 3963478,
+        "url": "https://dev.to/codenameone/java-to-a-native-windows-exe-no-jvm-5mb-x64-and-arm-4fel",
+        "syndicated_at": "2026-06-22T14:53:40+00:00"
+      }
     }
   }
 }
