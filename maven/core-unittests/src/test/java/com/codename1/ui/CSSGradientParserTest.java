@@ -76,24 +76,24 @@ class CSSGradientParserTest {
 
     @Test
     void hexColorVariants() {
-        assertEquals(0xffaabbcc, CSSGradientParser.parseColor("#abc"));
-        assertEquals(0xff112233, CSSGradientParser.parseColor("#112233"));
-        assertEquals(0x80112233, CSSGradientParser.parseColor("#11223380"));
+        assertEquals(0xffaabbcc, CSSColor.parse("#abc"));
+        assertEquals(0xff112233, CSSColor.parse("#112233"));
+        assertEquals(0x80112233, CSSColor.parse("#11223380"));
         // #abcd is CSS RGBA shorthand: r=#aa g=#bb b=#cc a=#dd -> ARGB 0xDDAABBCC.
-        assertEquals(0xddaabbcc, CSSGradientParser.parseColor("#abcd"));
+        assertEquals(0xddaabbcc, CSSColor.parse("#abcd"));
     }
 
     @Test
     void rgbAndRgbaSyntax() {
-        assertEquals(0xff112233, CSSGradientParser.parseColor("rgb(17, 34, 51)"));
-        assertEquals(0x80ffffff, CSSGradientParser.parseColor("rgba(255, 255, 255, 0.502)"));
+        assertEquals(0xff112233, CSSColor.parse("rgb(17, 34, 51)"));
+        assertEquals(0x80ffffff, CSSColor.parse("rgba(255, 255, 255, 0.502)"));
     }
 
     @Test
     void namedColors() {
-        assertEquals(0xff0000ff, CSSGradientParser.parseColor("blue"));
-        assertEquals(0x00000000, CSSGradientParser.parseColor("transparent"));
-        assertEquals(0xff808080, CSSGradientParser.parseColor("grey"));
+        assertEquals(0xff0000ff, CSSColor.parse("blue"));
+        assertEquals(0x00000000, CSSColor.parse("transparent"));
+        assertEquals(0xff808080, CSSColor.parse("grey"));
     }
 
     @Test

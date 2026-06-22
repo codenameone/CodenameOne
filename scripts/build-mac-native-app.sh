@@ -28,6 +28,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+# shellcheck source=scripts/lib/inject-maps-key.sh
+. "$SCRIPT_DIR/lib/inject-maps-key.sh"
+inject_google_maps_key "$REPO_ROOT"
+
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"

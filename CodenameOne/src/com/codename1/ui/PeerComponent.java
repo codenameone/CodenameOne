@@ -274,7 +274,10 @@ public class PeerComponent extends Component {
     /// Updates the size of the component from the native widget
     public void invalidate() {
         setShouldCalcPreferredSize(true);
-        getComponentForm().revalidate();
+        Form parentForm = getComponentForm();
+        if (parentForm != null) {
+            parentForm.revalidate();
+        }
     }
 
     /// Callback useful for sublclasses that need to track the change in size/position

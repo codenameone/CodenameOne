@@ -1,0 +1,363 @@
+/*
+ * Codename One maps provider -- Huawei Map Kit (Android, HMS).
+ *
+ * This file is a BUILD TEMPLATE. The Codename One build server copies it into
+ * the generated Android project's com/codename1/maps package as
+ * MapProviderImpl.java when the build hint maps.provider=huawei (or
+ * android.maps.provider=huawei) is set, then weaves a call to
+ * MapProviderImpl.register() into the app's onCreate. It is compiled by the
+ * Android build against the injected Huawei Map Kit dependency
+ * (com.huawei.hms:maps), so the core framework never carries the HMS SDK.
+ *
+ * Huawei Map Kit works on any Android device that has HMS Core installed (not
+ * only Huawei hardware), which makes it the natural map backend for devices
+ * with no Google Play Services. Its API mirrors the Google Maps SDK, so this
+ * implementation is the Google provider with the com.google.android.gms.maps
+ * types swapped for their com.huawei.hms.maps equivalents. It implements the
+ * provider-agnostic SPI com.codename1.maps.spi.MapProvider and reports user
+ * interaction back through the static callbacks on
+ * com.codename1.maps.NativeMap. When HMS Core is absent isAvailable() returns
+ * false and NativeMap falls back to the pure-vector MapView.
+ */
+package com.codename1.maps;
+
+import android.os.Bundle;
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.impl.android.AndroidNativeUtil;
+import com.codename1.maps.spi.MapProvider;
+import com.codename1.maps.spi.MapProviderRegistry;
+import com.codename1.ui.Display;
+import com.codename1.ui.PeerComponent;
+import com.huawei.hms.api.ConnectionResult;
+import com.huawei.hms.api.HuaweiApiAvailability;
+import com.huawei.hms.maps.CameraUpdateFactory;
+import com.huawei.hms.maps.HuaweiMap;
+import com.huawei.hms.maps.MapView;
+import com.huawei.hms.maps.MapsInitializer;
+import com.huawei.hms.maps.Projection;
+import com.huawei.hms.maps.model.CameraPosition;
+import com.huawei.hms.maps.model.Circle;
+import com.huawei.hms.maps.model.CircleOptions;
+import com.huawei.hms.maps.model.LatLng;
+import com.huawei.hms.maps.model.Marker;
+import com.huawei.hms.maps.model.MarkerOptions;
+import com.huawei.hms.maps.model.Polygon;
+import com.huawei.hms.maps.model.PolygonOptions;
+import com.huawei.hms.maps.model.Polyline;
+import com.huawei.hms.maps.model.PolylineOptions;
+import android.graphics.Point;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class MapProviderImpl implements MapProvider {
+
+    private final Map<Integer, MapView> views = new HashMap<Integer, MapView>();
+    private final Map<Integer, HuaweiMap> maps = new HashMap<Integer, HuaweiMap>();
+    private final Map<Long, Object> elements = new HashMap<Long, Object>();
+    private long nextElementId = 1;
+    private int lastScreenX;
+    private int lastScreenY;
+    private double lastLat;
+    private double lastLon;
+    private List<LatLng> pendingPath;
+
+    /** Invoked by build-injected startup code. */
+    public static void register() {
+        MapProviderRegistry.register(new MapProviderImpl());
+        MapProviderRegistry.setPreferredProvider("huawei");
+    }
+
+    public String getId() {
+        return "huawei";
+    }
+
+    public boolean isAvailable() {
+        try {
+            int status = HuaweiApiAvailability.getInstance()
+                    .isHuaweiMobileServicesAvailable(AndroidImplementation.getContext());
+            return status == ConnectionResult.SUCCESS;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    public PeerComponent createPeer(final NativeMap host, final int mapId) {
+        final MapView[] holder = new MapView[1];
+        AndroidImplementation.runOnAndroidUiThreadAndWait(new Runnable() {
+            public void run() {
+                try {
+                    MapsInitializer.initialize(AndroidImplementation.getContext());
+                    final MapView mv = new MapView(AndroidImplementation.getActivity());
+                    mv.onCreate(null);
+                    mv.onResume();
+                    views.put(new Integer(mapId), mv);
+                    mv.getMapAsync(new com.huawei.hms.maps.OnMapReadyCallback() {
+                        public void onMapReady(HuaweiMap map) {
+                            maps.put(new Integer(mapId), map);
+                            attachListeners(host, mapId, map);
+                            NativeMap.fireCameraChange(mapId);
+                        }
+                    });
+                    holder[0] = mv;
+                } catch (Throwable t) {
+                    holder[0] = null;
+                }
+            }
+        });
+        if (holder[0] == null) {
+            return null;
+        }
+        return PeerComponent.create(holder[0]);
+    }
+
+    private void attachListeners(final NativeMap host, final int mapId, HuaweiMap map) {
+        map.setOnMapClickListener(new HuaweiMap.OnMapClickListener() {
+            public void onMapClick(LatLng p) {
+                calcScreenPosition(mapId, p.latitude, p.longitude);
+                NativeMap.fireTap(mapId, lastScreenX, lastScreenY);
+            }
+        });
+        map.setOnMapLongClickListener(new HuaweiMap.OnMapLongClickListener() {
+            public void onMapLongClick(LatLng p) {
+                calcScreenPosition(mapId, p.latitude, p.longitude);
+                NativeMap.fireLongPress(mapId, lastScreenX, lastScreenY);
+            }
+        });
+        map.setOnMarkerClickListener(new HuaweiMap.OnMarkerClickListener() {
+            public boolean onMarkerClick(Marker marker) {
+                Object tag = marker.getTag();
+                if (tag instanceof Long) {
+                    NativeMap.fireMarkerClick(mapId, ((Long) tag).longValue());
+                }
+                return false;
+            }
+        });
+        map.setOnCameraIdleListener(new HuaweiMap.OnCameraIdleListener() {
+            public void onCameraIdle() {
+                NativeMap.fireCameraChange(mapId);
+            }
+        });
+    }
+
+    public void deinitialize(int mapId) {
+        MapView mv = views.remove(new Integer(mapId));
+        maps.remove(new Integer(mapId));
+        if (mv != null) {
+            mv.onPause();
+            mv.onDestroy();
+        }
+    }
+
+    private HuaweiMap map(int mapId) {
+        return maps.get(new Integer(mapId));
+    }
+
+    public void setCamera(int mapId, double lat, double lon, float zoom, float bearing, float tilt) {
+        HuaweiMap m = map(mapId);
+        if (m == null) {
+            return;
+        }
+        CameraPosition pos = new CameraPosition.Builder()
+                .target(new LatLng(lat, lon)).zoom(zoom).bearing(bearing).tilt(tilt).build();
+        m.moveCamera(CameraUpdateFactory.newCameraPosition(pos));
+    }
+
+    public double getLatitude(int mapId) {
+        HuaweiMap m = map(mapId);
+        return m == null ? 0 : m.getCameraPosition().target.latitude;
+    }
+
+    public double getLongitude(int mapId) {
+        HuaweiMap m = map(mapId);
+        return m == null ? 0 : m.getCameraPosition().target.longitude;
+    }
+
+    public float getZoom(int mapId) {
+        HuaweiMap m = map(mapId);
+        return m == null ? 0 : m.getCameraPosition().zoom;
+    }
+
+    public float getMaxZoom(int mapId) {
+        HuaweiMap m = map(mapId);
+        return m == null ? 21 : m.getMaxZoomLevel();
+    }
+
+    public float getMinZoom(int mapId) {
+        HuaweiMap m = map(mapId);
+        return m == null ? 0 : m.getMinZoomLevel();
+    }
+
+    public long addMarker(int mapId, byte[] icon, double lat, double lon,
+                          String title, String snippet, float anchorU, float anchorV) {
+        HuaweiMap m = map(mapId);
+        if (m == null) {
+            return 0;
+        }
+        MarkerOptions opts = new MarkerOptions().position(new LatLng(lat, lon)).anchor(anchorU, anchorV);
+        if (title != null) {
+            opts.title(title);
+        }
+        if (snippet != null) {
+            opts.snippet(snippet);
+        }
+        if (icon != null) {
+            android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(icon, 0, icon.length);
+            if (bmp != null) {
+                opts.icon(com.huawei.hms.maps.model.BitmapDescriptorFactory.fromBitmap(bmp));
+            }
+        }
+        Marker marker = m.addMarker(opts);
+        long id = nextElementId++;
+        marker.setTag(new Long(id));
+        elements.put(new Long(id), marker);
+        return id;
+    }
+
+    public long beginPath(int mapId) {
+        pendingPath = new ArrayList<LatLng>();
+        return 0;
+    }
+
+    public void addToPath(int mapId, long pathId, double lat, double lon) {
+        if (pendingPath != null) {
+            pendingPath.add(new LatLng(lat, lon));
+        }
+    }
+
+    public long finishPolyline(int mapId, long pathId, int strokeColor, int strokeWidth) {
+        HuaweiMap m = map(mapId);
+        if (m == null || pendingPath == null) {
+            return 0;
+        }
+        Polyline p = m.addPolyline(new PolylineOptions().addAll(pendingPath)
+                .color(0xff000000 | strokeColor).width(strokeWidth));
+        pendingPath = null;
+        long id = nextElementId++;
+        elements.put(new Long(id), p);
+        return id;
+    }
+
+    public long finishPolygon(int mapId, long pathId, int fillColor, int strokeColor, int strokeWidth) {
+        HuaweiMap m = map(mapId);
+        if (m == null || pendingPath == null) {
+            return 0;
+        }
+        Polygon p = m.addPolygon(new PolygonOptions().addAll(pendingPath)
+                .fillColor(fillColor).strokeColor(0xff000000 | strokeColor).strokeWidth(strokeWidth));
+        pendingPath = null;
+        long id = nextElementId++;
+        elements.put(new Long(id), p);
+        return id;
+    }
+
+    public long addCircle(int mapId, double lat, double lon, double radiusMeters,
+                          int fillColor, int strokeColor, int strokeWidth) {
+        HuaweiMap m = map(mapId);
+        if (m == null) {
+            return 0;
+        }
+        Circle c = m.addCircle(new CircleOptions().center(new LatLng(lat, lon)).radius(radiusMeters)
+                .fillColor(fillColor).strokeColor(0xff000000 | strokeColor).strokeWidth(strokeWidth));
+        long id = nextElementId++;
+        elements.put(new Long(id), c);
+        return id;
+    }
+
+    public void removeElement(int mapId, long elementId) {
+        Object e = elements.remove(new Long(elementId));
+        if (e instanceof Marker) {
+            ((Marker) e).remove();
+        } else if (e instanceof Polyline) {
+            ((Polyline) e).remove();
+        } else if (e instanceof Polygon) {
+            ((Polygon) e).remove();
+        } else if (e instanceof Circle) {
+            ((Circle) e).remove();
+        }
+    }
+
+    public void removeAllElements(int mapId) {
+        HuaweiMap m = map(mapId);
+        if (m != null) {
+            m.clear();
+        }
+        elements.clear();
+    }
+
+    public void calcScreenPosition(int mapId, double lat, double lon) {
+        HuaweiMap m = map(mapId);
+        if (m == null) {
+            return;
+        }
+        Projection proj = m.getProjection();
+        Point p = proj.toScreenLocation(new LatLng(lat, lon));
+        lastScreenX = p.x;
+        lastScreenY = p.y;
+    }
+
+    public int getScreenX(int mapId) {
+        return lastScreenX;
+    }
+
+    public int getScreenY(int mapId) {
+        return lastScreenY;
+    }
+
+    public void calcLatLongPosition(int mapId, int x, int y) {
+        HuaweiMap m = map(mapId);
+        if (m == null) {
+            return;
+        }
+        LatLng ll = m.getProjection().fromScreenLocation(new Point(x, y));
+        lastLat = ll.latitude;
+        lastLon = ll.longitude;
+    }
+
+    public double getScreenLat(int mapId) {
+        return lastLat;
+    }
+
+    public double getScreenLon(int mapId) {
+        return lastLon;
+    }
+
+    public void setShowMyLocation(int mapId, boolean show) {
+        HuaweiMap m = map(mapId);
+        if (m != null) {
+            try {
+                m.setMyLocationEnabled(show);
+            } catch (SecurityException se) {
+                // Location permission not granted; ignore.
+            }
+        }
+    }
+
+    public void setRotateGestureEnabled(int mapId, boolean enabled) {
+        HuaweiMap m = map(mapId);
+        if (m != null) {
+            m.getUiSettings().setRotateGesturesEnabled(enabled);
+        }
+    }
+
+    public void setMapType(int mapId, int type) {
+        HuaweiMap m = map(mapId);
+        if (m == null) {
+            return;
+        }
+        switch (type) {
+            case MAP_TYPE_SATELLITE:
+                m.setMapType(HuaweiMap.MAP_TYPE_SATELLITE);
+                break;
+            case MAP_TYPE_HYBRID:
+                m.setMapType(HuaweiMap.MAP_TYPE_HYBRID);
+                break;
+            case MAP_TYPE_TERRAIN:
+                m.setMapType(HuaweiMap.MAP_TYPE_TERRAIN);
+                break;
+            default:
+                m.setMapType(HuaweiMap.MAP_TYPE_NORMAL);
+        }
+    }
+}
