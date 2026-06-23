@@ -417,8 +417,8 @@ public class IPhoneBuilder extends Executor {
         }
 
         // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
-        // delegates to the NativeFirebaseAnalytics native peer). Enabled with
-        // the build hint ios.firebaseAnalytics=true; requires a
+        // delegates to a generated FirebaseAnalyticsProvider.Bridge). Enabled
+        // with the build hint ios.firebaseAnalytics=true; requires a
         // GoogleService-Info.plist in the project resources. Adds the
         // Firebase/Analytics pod (skipped if Firebase/Core was already pulled
         // in by AdMob, which carries Analytics transitively).

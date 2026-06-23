@@ -1676,8 +1676,8 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
-        // delegates to the NativeFirebaseAnalytics native peer). Enabled with
-        // the build hint android.firebaseAnalytics=true, which -- like FCM --
+        // delegates to a generated FirebaseAnalyticsProvider.Bridge). Enabled
+        // with the build hint android.firebaseAnalytics=true, which -- like FCM --
         // requires a google-services.json in native/android. Reuses the
         // google-services Gradle plugin + buildscript classpath if FCM already
         // added them (the contains() guards keep the lines idempotent).

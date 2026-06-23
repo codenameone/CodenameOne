@@ -22,26 +22,100 @@
  */
 package com.codename1.analytics;
 
-import com.codename1.system.NativeLookup;
-
 import java.util.Map;
 
-/// A provider that forwards analytics to the native Firebase Analytics
-/// SDK through the {@link NativeFirebaseAnalytics} native interface. On
-/// Android and iOS, with Firebase configured in the build, events flow
-/// to the Firebase console. Where no native peer exists (the simulator,
-/// or a build without Firebase set up) the provider degrades silently to
-/// a no-op, so it is always safe to register.
+/// A provider that forwards analytics to the native Firebase Analytics SDK.
+/// On Android and iOS, with Firebase configured in the build, events flow to
+/// the Firebase console. Where no native implementation is wired (the
+/// simulator, the desktop build, or a build without Firebase set up) the
+/// provider degrades silently to a no-op, so it is always safe to register:
 ///
 /// ```java
 /// Analytics.addProvider(new FirebaseAnalyticsProvider());
 /// ```
 ///
-/// Firebase requires the usual platform configuration:
-/// `google-services.json` (Android) / `GoogleService-Info.plist` (iOS)
-/// plus the Firebase dependencies in the generated native project.
+/// ### How the native call is wired
+///
+/// Unlike a {@code NativeInterface} (which exists for the build server to
+/// generate per-app native peers), this provider talks to the platform through
+/// a small {@link Bridge}. The Codename One build supplies the concrete bridge
+/// for the target and registers it via {@link #registerBridge(Bridge)} before
+/// the app starts:
+///
+/// - **Android**: a bridge that calls
+///   `FirebaseAnalytics.getInstance(context).logEvent(...)` /
+///   `setUserId` / `setUserProperty` directly. Requires
+///   `google-services.json` and the Firebase Gradle plugin in the build.
+/// - **iOS**: a bridge whose methods are declared `native` and implemented in
+///   Objective-C (`FIRAnalytics`). Requires `GoogleService-Info.plist` and the
+///   Firebase pods.
+/// - **Everything else** (simulator, desktop): no bridge is registered, so the
+///   provider is a no-op.
+///
+/// Firebase is enabled with the {@code codename1.arg.android.firebaseAnalytics}
+/// / {@code codename1.arg.ios.firebaseAnalytics} build hints, which is what
+/// makes the build register the bridge.
 public class FirebaseAnalyticsProvider extends AbstractAnalyticsProvider {
-    private NativeFirebaseAnalytics peer;
+
+    /// The platform's connection to the native Firebase SDK. The Codename One
+    /// build implements this for Android (direct SDK calls) and iOS (native
+    /// methods) and hands it to {@link #registerBridge(Bridge)}. Application
+    /// code never implements this directly.
+    public interface Bridge {
+        /// Whether the native Firebase SDK is present and initialised.
+        ///
+        /// #### Returns
+        ///
+        /// true when events can be delivered
+        boolean isSupported();
+
+        /// Logs a named event with a JSON object of parameters.
+        ///
+        /// #### Parameters
+        ///
+        /// - `name`: the event name
+        ///
+        /// - `paramsJson`: a JSON object of parameters, may be empty
+        void logEvent(String name, String paramsJson);
+
+        /// Logs a screen view.
+        ///
+        /// #### Parameters
+        ///
+        /// - `screenName`: the screen name
+        void logScreen(String screenName);
+
+        /// Sets the Firebase user id.
+        ///
+        /// #### Parameters
+        ///
+        /// - `id`: the user id, or null to clear
+        void setUserId(String id);
+
+        /// Sets a Firebase user property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: the property name
+        ///
+        /// - `value`: the property value
+        void setUserProperty(String key, String value);
+    }
+
+    private static Bridge registeredBridge;
+
+    /// Registers the platform bridge. Called by the Codename One build for a
+    /// Firebase-enabled Android / iOS target; never called by application code.
+    /// Passing null clears the registration (the provider becomes a no-op).
+    ///
+    /// #### Parameters
+    ///
+    /// - `bridge`: the platform bridge, or null
+    public static void registerBridge(Bridge bridge) {
+        registeredBridge = bridge;
+    }
+
+    private Bridge bridge;
     private boolean available;
 
     @Override
@@ -52,9 +126,9 @@ public class FirebaseAnalyticsProvider extends AbstractAnalyticsProvider {
     @Override
     public void init(AnalyticsContext context) {
         super.init(context);
+        bridge = registeredBridge;
         try {
-            peer = NativeLookup.create(NativeFirebaseAnalytics.class);
-            available = peer != null && peer.isSupported();
+            available = bridge != null && bridge.isSupported();
         } catch (Throwable t) {
             available = false;
         }
@@ -63,28 +137,28 @@ public class FirebaseAnalyticsProvider extends AbstractAnalyticsProvider {
     @Override
     public void trackScreen(String name, String referrer) {
         if (available) {
-            peer.logScreen(name);
+            bridge.logScreen(name);
         }
     }
 
     @Override
     public void trackEvent(AnalyticsEvent event) {
         if (available) {
-            peer.logEvent(event.getName(), paramsJson(event.getParameters()));
+            bridge.logEvent(event.getName(), paramsJson(event.getParameters()));
         }
     }
 
     @Override
     public void setUserId(String id) {
         if (available) {
-            peer.setUserId(id);
+            bridge.setUserId(id);
         }
     }
 
     @Override
     public void setUserProperty(String key, String value) {
         if (available) {
-            peer.setUserProperty(key, value);
+            bridge.setUserProperty(key, value);
         }
     }
 
@@ -102,7 +176,7 @@ public class FirebaseAnalyticsProvider extends AbstractAnalyticsProvider {
         AnalyticsJson.appendString(b, "description", description == null ? "" : description, true);
         AnalyticsJson.appendBoolean(b, "fatal", report.isFatal(), false);
         b.append('}');
-        peer.logEvent("app_exception", b.toString());
+        bridge.logEvent("app_exception", b.toString());
     }
 
     @Override
