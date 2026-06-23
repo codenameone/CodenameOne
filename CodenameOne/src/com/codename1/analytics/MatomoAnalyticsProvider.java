@@ -27,7 +27,7 @@ import com.codename1.io.NetworkManager;
 
 import java.util.Map;
 
-/// A privacy-first, non-Google provider targeting Matomo (formerly Piwik)
+/// A privacy-first provider targeting Matomo (formerly Piwik)
 /// through its HTTP Tracking API. Matomo can be self-hosted and offers IP
 /// anonymisation and consent-aware tracking, which makes it a natural fit for
 /// GDPR-sensitive deployments. The same SPI shape applies to comparable

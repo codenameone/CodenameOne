@@ -383,8 +383,19 @@ public final class Analytics {
         }
     }
 
-    /// Reports a crash / exception across all providers. No-op unless the crash
-    /// reporting consent category is satisfied.
+    /// Reports a crash / exception to the registered analytics providers as an
+    /// exception signal -- for example GA4's {@code app_exception} or the
+    /// Firebase equivalent -- so exception counts surface alongside your usage
+    /// metrics. No-op unless the crash reporting consent category is satisfied.
+    ///
+    /// This is deliberately separate from Codename One Crash Protection
+    /// ({@link com.codename1.crash.CrashProtection}). Crash Protection is a
+    /// dedicated crash-capture pipeline that records full, symbolicated stack
+    /// traces to the build cloud crash console for debugging. This method only
+    /// emits a lightweight exception event to whichever analytics backends you
+    /// have registered. The two subsystems are independent: use Crash
+    /// Protection to diagnose crashes, use {@code Analytics.crash} when you also
+    /// want exception events in your analytics; you can enable either or both.
     ///
     /// #### Parameters
     ///
