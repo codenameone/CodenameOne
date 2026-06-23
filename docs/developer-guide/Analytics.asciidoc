@@ -42,8 +42,10 @@ The API is designed to help you comply with privacy regulations such as GDPR and
 [source,java]
 ----
 // Nothing is sent until this is called (opt-in is the default).
-Analytics.setConsent(AnalyticsConsent.granted());
+Analytics.setConsent(AnalyticsConsent.all());
 ----
+
+`AnalyticsConsent.all()` grants every category and `AnalyticsConsent.none()` denies every category. The older `granted()` and `denied()` methods remain as aliases.
 
 Consent is broken down by category, so you can honor granular choices -- for example allowing crash reporting while declining behavioral analytics:
 
@@ -58,12 +60,30 @@ Analytics.setConsent(AnalyticsConsent.builder()
 
 The consent choice is persisted, so it survives restarts. Screen views and events require the `analytics` category, crash reports require `crashReporting`, and `setUserId` requires `personalization`. Calls made without the matching consent are dropped.
 
-If your app isn't subject to opt-in regulations you can switch the default:
+==== Consent you already hold
+
+If your application has already obtained consent through its own mechanism -- a custom prompt, a third-party consent-management platform, an enterprise device-management policy, or a jurisdiction where you have determined consent isn't required -- record it once at startup so reporting flows without a second prompt:
+
+[source,java]
+----
+Analytics.setConsent(AnalyticsConsent.all());
+----
+
+You can also seed every category and then revoke just one with the builder, for example to allow analytics but not ad storage:
+
+[source,java]
+----
+Analytics.setConsent(AnalyticsConsent.builder().all().adStorage(false).build());
+----
+
+If you would rather not gate at all, switch the default so collection is active unless the user withdraws it. This places the compliance responsibility on you as the integrator:
 
 [source,java]
 ----
 Analytics.setConsentMode(ConsentMode.OPT_OUT);
 ----
+
+Note that the service records pseudonymous data rather than anonymous data. The client id described below is a persistent identifier stored on the device; it isn't tied to a real-world identity and the server discards full IP addresses, but storing and reading such an identifier for usage tracking is often treated as consent-requiring under GDPR and similar regimes. That's why opt-in is the safe default. Relax it only when you are confident the change fits your use.
 
 ==== Client identity and erasure
 
