@@ -141,7 +141,16 @@ Analytics.addProvider(new MatomoAnalyticsProvider("https://matomo.example.com", 
 Analytics.addProvider(new FirebaseAnalyticsProvider());
 ----
 
-Firebase needs platform configuration and the SDK in the native build. Add the Firebase configuration file to your project (`google-services.json` under `native/android`, `GoogleService-Info.plist` under `native/ios`) and enable the SDK with build hints:
+Firebase reports only from a native Android or iOS build, and only when two things are in place. Without both, `FirebaseAnalyticsProvider` does nothing -- which is why it's always safe to register, including in the Codename One simulator and the desktop build, where it's a no-op.
+
+First, add the Firebase configuration file for your app (downloaded from the Firebase console) to the matching platform module's resources:
+
+* Android: `android/src/main/resources/google-services.json`
+* iOS: `ios/src/main/resources/GoogleService-Info.plist`
+
+These are Maven project paths. The `native/android` and `native/ios` directories from the old Ant projects no longer apply.
+
+Second, enable the SDK with build hints:
 
 [source]
 ----
@@ -149,7 +158,9 @@ codename1.arg.android.firebaseAnalytics=true
 codename1.arg.ios.firebaseAnalytics=true
 ----
 
-These hints tell the build to add the Firebase Analytics Gradle dependency (Android) and the `Firebase/Analytics` pod (iOS). Where Firebase isn't configured -- including the simulator -- the provider degrades to a no-op, so it's always safe to register.
+These hints add the Firebase Analytics Gradle dependency (Android) and the `Firebase/Analytics` pod (iOS), and make the build generate the native bridge that `FirebaseAnalyticsProvider` talks to.
+
+WARNING: You need both the configuration file and the matching build hint. If either is missing the provider stays a no-op and no events are sent. Firebase events never show up in the Codename One simulator or a desktop run -- verify on a real device (or a platform emulator/simulator) with the Firebase project configured for the build.
 
 ==== Logging provider
 
