@@ -25,6 +25,7 @@ package com.codename1.builders;
 import org.apache.tools.ant.BuildException;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -147,7 +148,7 @@ class TvNativeBuilder {
      * require a tvOS Brand Assets set, mirroring how the watch target ships its
      * own minimal plist.
      */
-    void writeTvInfoPlist(BuildRequest request, File appSrcDir) throws IOException {
+    void writeTvInfoPlist(BuildRequest request, File appSrcDir, File resDir) throws IOException {
         appSrcDir.mkdirs();
         StringBuilder sb = new StringBuilder();
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -164,6 +165,27 @@ class TvNativeBuilder {
         plistString(sb, "CFBundleVersion", "1");
         sb.append("    <key>UIRequiredDeviceCapabilities</key>\n    <array>\n")
                 .append("        <string>arm64</string>\n    </array>\n");
+        // Register the bundled TrueType fonts (material-design-font.ttf for the
+        // FontImage glyphs the UI relies on -- tab icons, FAB, toolbar -- plus any
+        // app-supplied fonts) under UIAppFonts. The iOS createTruetypeFont native
+        // loads fonts by name via [UIFont fontWithName:], which only resolves once
+        // the font is registered through UIAppFonts; the .ttf files are already
+        // mirrored into the tvOS target's bundle resources by applyXcodeSettings.
+        // Without this the Material font fails to load on tvOS and the icon glyphs
+        // render blank (e.g. the Tabs demo shows labels but no icons).
+        File[] fontFiles = resDir == null ? null : resDir.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.toLowerCase().endsWith(".ttf");
+            }
+        });
+        if (fontFiles != null && fontFiles.length > 0) {
+            sb.append("    <key>UIAppFonts</key>\n    <array>\n");
+            for (File f : fontFiles) {
+                sb.append("        <string>").append(f.getName()).append("</string>\n");
+            }
+            sb.append("    </array>\n");
+        }
         sb.append("</dict>\n</plist>\n");
         File plist = new File(appSrcDir, request.getMainClass() + "-TV-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));

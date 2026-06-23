@@ -3050,7 +3050,7 @@ public class IPhoneBuilder extends Executor {
 
                 if (tvNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
-                    tvNativeBuilder.writeTvInfoPlist(request, appSrcDir);
+                    tvNativeBuilder.writeTvInfoPlist(request, appSrcDir, resDir);
                     tvNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                 }
 
