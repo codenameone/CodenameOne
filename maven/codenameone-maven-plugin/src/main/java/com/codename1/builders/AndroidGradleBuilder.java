@@ -1201,6 +1201,27 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // Android TV / Google TV support. android.tv=true marks this as an
+        // Android TV app: the Leanback launcher category makes the app appear on
+        // the TV home screen, the leanback software feature plus an optional
+        // touchscreen declaration advertise TV compatibility, and a 320x180
+        // banner is generated from the app icon (see below). The same APK still
+        // runs on phones/tablets and CN.isTV() returns true at runtime via
+        // PackageManager.FEATURE_TELEVISION/leanback. With the hint off the
+        // manifest is unchanged.
+        String tvLeanbackCategory = "";
+        String tvActivityBanner = "";
+        if ("true".equals(request.getArg("android.tv", "false"))) {
+            tvLeanbackCategory = "                <category android:name=\"android.intent.category.LEANBACK_LAUNCHER\" />\n";
+            tvActivityBanner = "                  android:banner=\"@drawable/tv_banner\"\n";
+            if (!xPermissions.contains("android.software.leanback")) {
+                xPermissions += "    <uses-feature android:name=\"android.software.leanback\" android:required=\"false\" />\n";
+            }
+            if (!xPermissions.contains("android.hardware.touchscreen")) {
+                xPermissions += "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n";
+            }
+        }
+
         if (playServicesAds) {
             minSDK = maxInt("21", minSDK);
         }
@@ -2089,6 +2110,23 @@ public class AndroidGradleBuilder extends Executor {
             createIconFile(new File(drawableXXhdpiDir, "icon.png"), iconImage, 144, 144);
             createIconFile(new File(drawableXXXhdpiDir, "icon.png"), iconImage, 192, 192);
 
+            if ("true".equals(request.getArg("android.tv", "false"))) {
+                // Android TV / Google TV launcher banner (320x180, xhdpi). The
+                // app icon is centered (scaled, not stretched) on a solid dark
+                // background so it isn't distorted; the Leanback launcher needs
+                // a banner for the app to appear on the TV home screen.
+                BufferedImage banner = new BufferedImage(320, 180, BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D bannerGraphics = banner.createGraphics();
+                bannerGraphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                bannerGraphics.setColor(new java.awt.Color(0x20, 0x20, 0x20));
+                bannerGraphics.fillRect(0, 0, 320, 180);
+                java.awt.Image scaledIcon = getScaledInstance(iconImage, 144, 144);
+                bannerGraphics.drawImage(scaledIcon, (320 - 144) / 2, (180 - 144) / 2, null);
+                bannerGraphics.dispose();
+                ImageIO.write(banner, "png", new File(drawableXhdpiDir, "tv_banner.png"));
+            }
+
             if (enableAdaptiveIcons) {
                 createIconFile(new File(mipmapMdpiDir, "ic_launcher.png"), iconImage, 48, 48);
                 createIconFile(new File(mipmapHdpiDir, "ic_launcher.png"), iconImage, 72, 72);
@@ -2903,10 +2941,13 @@ public class AndroidGradleBuilder extends Executor {
                 + "                  android:theme=\""+activityTheme+"\"\n"
                 + "                  android:configChanges=\"orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout\"\n"
                 + "                  android:launchMode=\""+launchMode+"\"\n"
-                + "                  android:label=\"" + xmlizedDisplayName + "\" >\n"
+                + "                  android:label=\"" + xmlizedDisplayName + "\"\n"
+                + tvActivityBanner
+                + "                  >\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"android.intent.action.MAIN\" />\n"
                 + "                <category android:name=\"android.intent.category.LAUNCHER\" />\n"
+                + tvLeanbackCategory
                 + "            </intent-filter>\n"
                 + request.getArg("android.xintent_filter", "")
                 + "        </activity>\n"

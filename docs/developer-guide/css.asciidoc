@@ -1145,7 +1145,7 @@ You can use media queries to target styles to specific platforms, devices, and d
 
 . `platform-xxx` - Target a specific platform. For example, `platform-and`, `platform-ios`, `platform-mac`, `platform-win`.
 . `density-xxx` - Target a specific device density. For example, `density--low`, `density-low`, `density-medium`, `density-high`, `density--high`, `density-hd`, `density-2hd`, and `density-560`.
-. `device-xxx` - Target a specific device type. For example, `device-desktop`, `device-tablet`, `device-phone`.
+. `device-xxx` - Target a specific device type. For example, `device-desktop`, `device-tablet`, `device-phone`, `device-tv` (Apple TV / Android TV), and `device-watch` (Apple Watch / Wear OS). The `device-tv` and `device-watch` variants are selected at runtime when `Display.isTV()` / `Display.isWatch()` returns `true`, letting you adapt styling for the 10-foot TV UI or the small wearable screen.
 
 Also to the Codename One specific media tokens above, the CSS compilers also recognize standard dark-mode media queries using `prefers-color-scheme: dark`. Rules inside these blocks are compiled into `$Dark` UIIDs automatically (for example, `Button` becomes `$DarkButton`, `Button.selected` becomes `$DarkButton.selected`).
 

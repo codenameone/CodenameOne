@@ -8,7 +8,7 @@ public class DrawArc extends AbstractGraphicsScreenshotTest {
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         g.setColor(0xffffff);
-        for (int iter = 0 ; iter < bounds.getWidth() / 2 ; iter++) {
+        for (int iter = 0 ; iter < bounds.getWidth() / 2 ; iter += curveStep(bounds)) {
             nextColor(g);
             g.drawArc(bounds.getX() + iter, bounds.getY() + iter, bounds.getWidth() - iter * 2, bounds.getHeight() - iter * 2, iter, 180);
         }

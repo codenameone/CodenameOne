@@ -165,6 +165,55 @@ final class BuildHintSchemaDefaults {
                 + "default so the iOS build is unaffected; enable it for a packaged "
                 + "companion submission.");
 
+        // Apple TV native build (tvOS). tvOS has UIKit + Metal but no OpenGL ES,
+        // so it is handled like the Mac Catalyst slice: Metal renderer + GL stub
+        // headers + GL-only sources excluded, as a separate appletvos target.
+        set("{{@tvNative}}.label", "Apple TV (tvOS)");
+        set("{{@tvNative}}.description",
+                "Builds an Apple TV app from the same project. tvOS reuses the "
+                + "iOS UIKit entry and the Metal renderer (it lacks OpenGL ES), so "
+                + "the tvOS app is a separate appletvos target compiled from the "
+                + "same sources. CN.isTV() returns true at runtime.");
+
+        set("{{#tvNative#tvNative.enabled}}.label", "Enable tvOS target");
+        set("{{#tvNative#tvNative.enabled}}.type", "Select");
+        set("{{#tvNative#tvNative.enabled}}.values", "false,true");
+        set("{{#tvNative#tvNative.enabled}}.description",
+                "When true, adds an Apple TV app target to the generated Xcode "
+                + "project. Also auto-enabled whenever codename1.tvMain is declared "
+                + "in codenameone_settings.properties. Requires the Ruby xcodeproj "
+                + "gem (bundled with CocoaPods).");
+
+        set("{{#tvNative#tvNative.mainClass}}.label", "tvOS lifecycle class");
+        set("{{#tvNative#tvNative.mainClass}}.type", "String");
+        set("{{#tvNative#tvNative.mainClass}}.description",
+                "Fully-qualified tvOS entry/lifecycle class. Normally set via "
+                + "codename1.tvMain; this hint is an override. May equal the phone "
+                + "main class (the tvOS app reuses the shared UIApplicationMain "
+                + "entry). Defaults to the phone main class when tvNative.enabled=true.");
+
+        set("{{#tvNative#tvNative.bundleId}}.label", "tvOS bundle identifier");
+        set("{{#tvNative#tvNative.bundleId}}.type", "String");
+        set("{{#tvNative#tvNative.bundleId}}.description",
+                "Bundle id of the Apple TV app. Defaults to <package>.tvos.");
+
+        set("{{#tvNative#tvNative.minDeploymentTarget}}.label", "Minimum tvOS version");
+        set("{{#tvNative#tvNative.minDeploymentTarget}}.type", "String");
+        set("{{#tvNative#tvNative.minDeploymentTarget}}.description",
+                "TVOS_DEPLOYMENT_TARGET for the tvOS target. Defaults to 13.0.");
+
+        set("{{#tvNative#tvNative.teamId}}.label", "Apple team id");
+        set("{{#tvNative#tvNative.teamId}}.type", "String");
+        set("{{#tvNative#tvNative.teamId}}.description",
+                "Development team for signing the tvOS target. Defaults to the "
+                + "iOS team id (ios.teamId / ios.release.teamId).");
+
+        set("{{#tvNative#tvNative.displayName}}.label", "tvOS app name");
+        set("{{#tvNative#tvNative.displayName}}.type", "String");
+        set("{{#tvNative#tvNative.displayName}}.description",
+                "Name shown under the tvOS app icon. Defaults to the app display "
+                + "name (codename1.displayName), then the main class name.");
+
         // Wear OS native build (Android). A Wear OS app is a regular Android app
         // that declares the watch hardware feature; the CN1 UI renders through
         // the normal Android pipeline (no separate backend, unlike watchOS).
@@ -194,6 +243,27 @@ final class BuildHintSchemaDefaults {
                 + "standalone), so it installs and runs directly on the watch "
                 + "without a companion phone app. Defaults to true. Only applies "
                 + "when android.wear=true.");
+
+        // Android TV / Google TV: the same APK plus manifest metadata (Leanback
+        // launcher category + leanback feature + optional touchscreen) and a
+        // generated 320x180 banner. CN.isTV() returns true at runtime.
+        set("{{@androidTv}}.label", "Android TV / Google TV");
+        set("{{@androidTv}}.description",
+                "Builds the Android app for Android TV / Google TV: adds the "
+                + "Leanback launcher category so the app appears on the TV home "
+                + "screen, declares the android.software.leanback feature, makes "
+                + "the touchscreen optional and generates a 320x180 launcher "
+                + "banner from the app icon. The same APK still runs on phones "
+                + "and tablets; CN.isTV() returns true at runtime.");
+
+        set("{{#androidTv#android.tv}}.label", "Enable Android TV build");
+        set("{{#androidTv#android.tv}}.type", "Select");
+        set("{{#androidTv#android.tv}}.values", "false,true");
+        set("{{#androidTv#android.tv}}.description",
+                "When true, adds Android TV manifest metadata (LEANBACK_LAUNCHER "
+                + "category, android.software.leanback uses-feature, touchscreen "
+                + "required=false) and a generated tv_banner drawable. With the "
+                + "hint off the manifest is unchanged.");
     }
 
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */

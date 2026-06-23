@@ -8,6 +8,9 @@
    if (param == nil) {
         return;
     }
+    // tvOS has no delivered-notification management (removeDelivered*) and a
+    // reduced UserNotifications surface; this maintenance call is a no-op there.
+#if !TARGET_OS_TV
     if (@available(iOS 10.0, *)) {
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
         dispatch_semaphore_t sem = dispatch_semaphore_create(0);
@@ -27,6 +30,7 @@
             [center removeDeliveredNotificationsWithIdentifiers:matches];
         }
     }
+#endif
 }
 
 -(int)getScheduledLocalNotificationCount:(NSString*)param{
@@ -34,6 +38,7 @@
         return 0;
     }
     __block int count = 0;
+#if !TARGET_OS_TV
     if (@available(iOS 10.0, *)) {
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
         dispatch_semaphore_t sem = dispatch_semaphore_create(0);
@@ -48,6 +53,7 @@
         }];
         dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)));
     }
+#endif
     return count;
 }
 

@@ -926,6 +926,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument("watchMain", cn1WatchMain.trim());
             }
         }
+        // tvMain: optional separate lifecycle entry point for the Apple TV
+        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
+        // point at the same class as mainName; a distinct value also auto-enables
+        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
+        {
+            String cn1TvMain = props.getProperty("codename1.tvMain");
+            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
+                r.putArgument("tvMain", cn1TvMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         File iconFile = new File(iconPath);
@@ -1178,6 +1188,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument("watchMain", cn1WatchMain.trim());
             }
         }
+        // tvMain: optional separate lifecycle entry point for the Apple TV
+        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
+        // point at the same class as mainName; a distinct value also auto-enables
+        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
+        {
+            String cn1TvMain = props.getProperty("codename1.tvMain");
+            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
+                r.putArgument("tvMain", cn1TvMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         File iconFile = new File(iconPath);
@@ -1297,6 +1317,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument("watchMain", cn1WatchMain.trim());
             }
         }
+        // tvMain: optional separate lifecycle entry point for the Apple TV
+        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
+        // point at the same class as mainName; a distinct value also auto-enables
+        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
+        {
+            String cn1TvMain = props.getProperty("codename1.tvMain");
+            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
+                r.putArgument("tvMain", cn1TvMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         r.setVendor(props.getProperty("codename1.vendor"));
         r.setType("windows");
@@ -1390,6 +1420,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument("watchMain", cn1WatchMain.trim());
             }
         }
+        // tvMain: optional separate lifecycle entry point for the Apple TV
+        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
+        // point at the same class as mainName; a distinct value also auto-enables
+        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
+        {
+            String cn1TvMain = props.getProperty("codename1.tvMain");
+            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
+                r.putArgument("tvMain", cn1TvMain.trim());
+            }
+        }
         r.setVersion(props.getProperty("codename1.version"));
         r.setVendor(props.getProperty("codename1.vendor"));
         r.setType("linux");
@@ -1457,6 +1497,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             String cn1WatchMain = props.getProperty("codename1.watchMain");
             if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
                 r.putArgument("watchMain", cn1WatchMain.trim());
+            }
+        }
+        // tvMain: optional separate lifecycle entry point for the Apple TV
+        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
+        // point at the same class as mainName; a distinct value also auto-enables
+        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
+        {
+            String cn1TvMain = props.getProperty("codename1.tvMain");
+            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
+                r.putArgument("tvMain", cn1TvMain.trim());
             }
         }
         r.setVersion(props.getProperty("codename1.version"));
