@@ -231,6 +231,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MultiButtonThemeScreenshotTest(),
             new ListThemeScreenshotTest(),
             new DialogThemeScreenshotTest(),
+            new AppReviewDialogScreenshotTest(),
             new FloatingActionButtonThemeScreenshotTest(),
             new SpanLabelThemeScreenshotTest(),
             new DarkLightShowcaseThemeScreenshotTest(),

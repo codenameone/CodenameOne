@@ -7282,6 +7282,24 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 #endif // !TARGET_OS_WATCH
 }
 
+void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    // The symbol is always emitted so ParparVM can link; the StoreKit body is
+    // compiled only when the build detected the app-review API in use (the
+    // IPhoneBuilder flips CN1_USE_APPREVIEW and links StoreKit.framework). When
+    // the macro is off this is a harmless no-op with no StoreKit dependency.
+#ifdef CN1_USE_APPREVIEW
+#if !TARGET_OS_WATCH
+    POOL_BEGIN();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (@available(iOS 10.3, *)) {
+            [SKStoreReviewController requestReview];
+        }
+    });
+    POOL_END();
+#endif // !TARGET_OS_WATCH
+#endif // CN1_USE_APPREVIEW
+}
+
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
 #if TARGET_OS_MACCATALYST || TARGET_OS_WATCH || TARGET_OS_TV

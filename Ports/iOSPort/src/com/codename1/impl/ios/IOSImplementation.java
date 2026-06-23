@@ -10064,8 +10064,41 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return true;
     }
-    
-    
+
+    @Override
+    public boolean isNativeInAppReviewSupported() {
+        // SKStoreReviewController.requestReview is available since iOS 10.3.
+        String ver = nativeInstance.getOSVersion();
+        int dot = ver.indexOf('.');
+        try {
+            int major = Integer.parseInt(dot < 0 ? ver : ver.substring(0, dot));
+            if (major > 10) {
+                return true;
+            }
+            if (major < 10) {
+                return false;
+            }
+            String rest = dot < 0 ? "" : ver.substring(dot + 1);
+            int dot2 = rest.indexOf('.');
+            int minor = Integer.parseInt(dot2 < 0 ? rest : rest.substring(0, dot2));
+            return minor >= 3;
+        } catch (NumberFormatException err) {
+            // Unknown/odd version string -- assume a modern OS supports it.
+            return true;
+        }
+    }
+
+    @Override
+    public void requestNativeInAppReview(SuccessCallback<Boolean> done) {
+        // StoreKit gives no callback and may silently throttle the prompt, so
+        // we simply report that the request was handed off to the controller.
+        nativeInstance.requestAppStoreReview();
+        if (done != null) {
+            done.onSucess(Boolean.TRUE);
+        }
+    }
+
+
     
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){

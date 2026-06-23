@@ -289,6 +289,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
+    private boolean usesAppReview;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -1325,6 +1326,12 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/payment") > -1) {
                         purchasePermissions = true;
                     }
+                    // App review API -> pull in the Play In-App Review library
+                    // (see dependency injection further below). Detected from
+                    // actual usage so apps that never review stay lean.
+                    if (!usesAppReview && cls.indexOf("com/codename1/appreview") == 0) {
+                        usesAppReview = true;
+                    }
                     if (cls.indexOf("com/codename1/location/Geofence") > -1) {
                         if (!"true".equals(playServicesValue)) {
                             // If play services are not currently "blanket" enabled
@@ -1411,6 +1418,14 @@ public class AndroidGradleBuilder extends Executor {
                 public void usesClassMethod(String cls, String method) {
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && (method.indexOf("vibrate") > -1 || method.indexOf("notifyStatusBar") > -1)) {
                         vibratePermission = true;
+                    }
+
+                    // Apps that call the low-level CN/Display review entry point
+                    // directly (without the com.codename1.appreview facade).
+                    if (!usesAppReview
+                            && (cls.indexOf("com/codename1/ui/CN") == 0 || cls.indexOf("com/codename1/ui/Display") == 0)
+                            && method.indexOf("equestNativeInAppReview") > -1) {
+                        usesAppReview = true;
                     }
 
                     if ((cls.indexOf("com/codename1/media/MediaManager") == 0 && method.indexOf("createBackgroundMedia") > -1)) {
@@ -4101,6 +4116,13 @@ public class AndroidGradleBuilder extends Executor {
         if (purchasePermissions) {
             String billingClientVersion = request.getArg("android.billingclient.version", "4.0.0");
             additionalDependencies += " implementation 'com.android.billingclient:billing:"+billingClientVersion+"'\n";
+        }
+
+        // Play In-App Review library, added only when the app references the
+        // app-review API (detected during the class scan above).
+        if (usesAppReview) {
+            String reviewVersion = request.getArg("android.appReview.version", "2.0.1");
+            additionalDependencies += " implementation 'com.google.android.play:review:"+reviewVersion+"'\n";
         }
 
         // OidcClient routes sign-in through androidx.browser Custom Tabs.

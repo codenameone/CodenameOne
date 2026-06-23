@@ -42,7 +42,8 @@
 #endif
 #import <CoreLocation/CoreLocation.h>
 //#define CN1_USE_STOREKIT
-#ifdef CN1_USE_STOREKIT
+//#define CN1_USE_APPREVIEW
+#if defined(CN1_USE_STOREKIT) || defined(CN1_USE_APPREVIEW)
 #import "StoreKit/StoreKit.h"
 #endif
 #if !TARGET_OS_WATCH
