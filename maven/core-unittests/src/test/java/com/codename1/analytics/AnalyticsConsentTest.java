@@ -47,6 +47,32 @@ class AnalyticsConsentTest extends UITestBase {
     }
 
     @FormTest
+    void allGrantsEveryCategoryAndAliasesMatch() {
+        AnalyticsConsent all = AnalyticsConsent.all();
+        assertTrue(all.isAnalytics());
+        assertTrue(all.isCrashReporting());
+        assertTrue(all.isPersonalization());
+        assertTrue(all.isAdStorage());
+
+        AnalyticsConsent none = AnalyticsConsent.none();
+        assertFalse(none.isAnalytics());
+        assertFalse(none.isCrashReporting());
+        assertFalse(none.isPersonalization());
+        assertFalse(none.isAdStorage());
+
+        // granted()/denied() are aliases of all()/none()
+        assertEquals(AnalyticsConsent.all().isAnalytics(), AnalyticsConsent.granted().isAnalytics());
+        assertEquals(AnalyticsConsent.none().isAnalytics(), AnalyticsConsent.denied().isAnalytics());
+
+        // builder().all() seeds every category so one can be selectively revoked
+        AnalyticsConsent allButAds = AnalyticsConsent.builder().all().adStorage(false).build();
+        assertTrue(allButAds.isAnalytics());
+        assertTrue(allButAds.isCrashReporting());
+        assertTrue(allButAds.isPersonalization());
+        assertFalse(allButAds.isAdStorage());
+    }
+
+    @FormTest
     void crashRequiresCrashConsentCategory() {
         Analytics.clearProviders();
         Analytics.setConsentMode(ConsentMode.OPT_IN);

@@ -25,8 +25,10 @@ package com.codename1.analytics;
 /// An immutable snapshot of the consent the user has granted, broken down by
 /// category so that an application can honour granular choices (for example
 /// allowing crash reporting while declining behavioural analytics). Instances
-/// are created through {@link #granted()}, {@link #denied()} or {@link #builder()}
-/// and handed to {@link Analytics#setConsent(AnalyticsConsent)}.
+/// are created through {@link #all()}, {@link #none()} or {@link #builder()}
+/// and handed to {@link Analytics#setConsent(AnalyticsConsent)}. An application
+/// that has already collected consent elsewhere can unblock everything in one
+/// line: {@code Analytics.setConsent(AnalyticsConsent.all())}.
 public final class AnalyticsConsent {
     private final boolean analytics;
     private final boolean crashReporting;
@@ -77,13 +79,25 @@ public final class AnalyticsConsent {
         return adStorage;
     }
 
-    /// A consent object granting every category. Convenient when the user has
-    /// accepted a single all-encompassing consent prompt.
+    /// A consent object granting every category. Use this when the application
+    /// has already obtained consent through its own mechanism (a custom prompt,
+    /// a third-party consent-management platform, an enterprise MDM policy, or
+    /// a jurisdiction where the integrator has determined consent is not
+    /// required) and simply wants reporting to flow:
+    ///
+    /// ```java
+    /// // app handled consent elsewhere -- unblock all categories at startup
+    /// Analytics.setConsent(AnalyticsConsent.all());
+    /// ```
+    ///
+    /// For apps that would rather not gate at all, see
+    /// {@link Analytics#setConsentMode(ConsentMode)} with
+    /// {@link ConsentMode#OPT_OUT}.
     ///
     /// #### Returns
     ///
     /// consent with all categories granted
-    public static AnalyticsConsent granted() {
+    public static AnalyticsConsent all() {
         return new AnalyticsConsent(true, true, true, true);
     }
 
@@ -93,8 +107,26 @@ public final class AnalyticsConsent {
     /// #### Returns
     ///
     /// consent with all categories denied
-    public static AnalyticsConsent denied() {
+    public static AnalyticsConsent none() {
         return new AnalyticsConsent(false, false, false, false);
+    }
+
+    /// Alias for {@link #all()}; granting every category.
+    ///
+    /// #### Returns
+    ///
+    /// consent with all categories granted
+    public static AnalyticsConsent granted() {
+        return all();
+    }
+
+    /// Alias for {@link #none()}; denying every category.
+    ///
+    /// #### Returns
+    ///
+    /// consent with all categories denied
+    public static AnalyticsConsent denied() {
+        return none();
     }
 
     /// Creates a builder seeded with all categories denied.
@@ -180,6 +212,33 @@ public final class AnalyticsConsent {
         /// this builder
         public Builder adStorage(boolean value) {
             this.adStorage = value;
+            return this;
+        }
+
+        /// Grants every category. Handy as a base before selectively
+        /// revoking one, e.g. {@code builder().all().adStorage(false)}.
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder all() {
+            this.analytics = true;
+            this.crashReporting = true;
+            this.personalization = true;
+            this.adStorage = true;
+            return this;
+        }
+
+        /// Denies every category.
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder none() {
+            this.analytics = false;
+            this.crashReporting = false;
+            this.personalization = false;
+            this.adStorage = false;
             return this;
         }
 
