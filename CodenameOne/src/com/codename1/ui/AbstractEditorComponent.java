@@ -273,11 +273,19 @@ public abstract class AbstractEditorComponent extends Container {
         }
         browser.execute("callback.onSuccess(window.cn1editor.query(${0}, ${1}))",
                 new Object[]{name, arg == null ? "" : arg},
-                new SuccessCallback<BrowserComponent.JSRef>() {
-                    public void onSucess(BrowserComponent.JSRef value) {
-                        callback.onSucess(value == null ? null : value.getValue());
-                    }
-                });
+                new JSRefStringCallback(callback));
+    }
+
+    private static final class JSRefStringCallback implements SuccessCallback<BrowserComponent.JSRef> {
+        private final SuccessCallback<String> delegate;
+
+        JSRefStringCallback(SuccessCallback<String> delegate) {
+            this.delegate = delegate;
+        }
+
+        public void onSucess(BrowserComponent.JSRef value) {
+            delegate.onSucess(value == null ? null : value.getValue());
+        }
     }
 
     /// Runs the supplied task once the editor backend is ready, or immediately if it already is.

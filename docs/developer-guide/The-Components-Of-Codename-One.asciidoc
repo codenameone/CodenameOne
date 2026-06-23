@@ -3482,7 +3482,7 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/RichTextArea.html[RichT
 
 `RichTextArea` derives from `AbstractEditorComponent`. By default the editing surface is a `contenteditable` document hosted inside the platform's native web widget (the same one used by `BrowserComponent`), which makes it fully cross platform and gives correct keyboard, selection and IME behavior on every device. A platform port may transparently replace this with a fully native editing widget without any change to your code.
 
-NOTE: Because the editor is created asynchronously you should treat it like `BrowserComponent`: setters such as `setHtml(String)` are safe to call immediately (they are queued until the editor is ready) while reads such as `getHtml(SuccessCallback)` are asynchronous and deliver their result through a callback.
+NOTE: Because the editor is created asynchronously you should treat it like `BrowserComponent`: setters such as `setHtml(String)` are safe to call immediately (they're queued until the editor is ready) while reads such as `getHtml(SuccessCallback)` are asynchronous and deliver their result through a callback.
 
 The following sample places a `RichTextArea` in a form and wires a couple of formatting commands into the `Toolbar`:
 
@@ -3509,7 +3509,7 @@ image::img/components-richtextarea.png[RichTextArea with a formatting toolbar ed
 
 The formatting commands map to the operations you would expect from a word processor and all act on the current selection: `bold()`, `italic()`, `underline()`, `strikeThrough()`, `insertOrderedList()`, `insertUnorderedList()`, `indent()`/`outdent()`, `justifyLeft()`/`justifyCenter()`/`justifyRight()`, `createLink(url)`/`removeLink()`, `setForegroundColor(rgb)`/`setHighlightColor(rgb)`, `setBlockFormat("h1")`, `setFontSize(1..7)`, `removeFormat()`, `undo()` and `redo()`. You can also insert content at the cursor with `insertHtml(String)` and `insertImage(String)`.
 
-TIP: To keep a formatting toolbar in sync with the selection (e.g. to highlight the bold button when the caret is inside bold text) register a change listener with `addChangeListener(ActionListener)` and query the active state with `queryCommandState("bold", active -> ...)`.
+TIP: To keep a formatting toolbar in sync with the selection (for example, to highlight the bold button when the caret is inside bold text) register a change listener with `addChangeListener(ActionListener)` and query the active state with `queryCommandState("bold", active -> ...)`.
 
 Reading the edited content is asynchronous:
 
@@ -3521,7 +3521,7 @@ editor.getText(text -> index(text));          // plain text, markup stripped
 
 === CodeEditor
 
-The https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[CodeEditor] is an IDE-style source editor with syntax highlighting, a line-number gutter, light/dark themes and asynchronous code completion. Like `RichTextArea` it is designed for both touch devices (with the virtual keyboard) and desktops (with a physical keyboard), and uses the same cross-platform editing backend with an optional native upgrade per platform.
+The https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[CodeEditor] is an IDE-style source editor with syntax highlighting, a line-number gutter, light/dark themes and asynchronous code completion. Like `RichTextArea` it's designed for both touch devices (with the virtual keyboard) and desktops (with a physical keyboard), and uses the same cross-platform editing backend with an optional native upgrade per platform.
 
 [source,java]
 ----
@@ -3558,14 +3558,14 @@ editor.setCompletionProvider((ed, code, cursor, results) -> {
 });
 ----
 
-Each https://www.codenameone.com/javadoc/com/codename1/ui/CodeCompletion.html[CodeCompletion] carries the text shown in the popup, the text inserted when it is chosen (which may differ), an optional category used to badge the entry (`"method"`, `"keyword"`, `"class"`, ...) and an optional detail string such as a signature.
+Each https://www.codenameone.com/javadoc/com/codename1/ui/CodeCompletion.html[CodeCompletion] carries the text shown in the popup, the text inserted when it's chosen (which may differ), an optional category used to badge the entry (`"method"`, `"keyword"`, `"class"`, ...) and an optional detail string such as a signature.
 
 The editor honors light and dark themes through `setTheme(String)`:
 
 .CodeEditor in the dark theme
 image::img/components-codeeditor-dark.png[CodeEditor in the dark theme,scaledwidth=35%]
 
-TIP: The built-in editing surface is fully self contained and works offline with no external dependencies. When an app actually references `CodeEditor` the build server can additionally bundle a richer code editor library; apps that do not use `CodeEditor` never pay that cost.
+TIP: The built-in editing surface is fully self contained and works offline with no external dependencies. When an app actually references `CodeEditor` the build server can additionally bundle a richer code editor library; apps that don't use `CodeEditor` never pay that cost.
 
 === AutoCompleteTextField
 

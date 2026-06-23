@@ -57,7 +57,6 @@ import com.codename1.util.SuccessCallback;
 ///
 /// @author Shai Almog
 public class RichTextArea extends AbstractEditorComponent {
-    private String pendingHtml;
     private String placeholderText = "";
 
     /// Creates an empty rich text editor.
@@ -85,7 +84,6 @@ public class RichTextArea extends AbstractEditorComponent {
     ///
     /// - `html`: the HTML to display and edit
     public void setHtml(String html) {
-        pendingHtml = html;
         command("setHtml", html == null ? "" : html);
     }
 
@@ -273,11 +271,19 @@ public class RichTextArea extends AbstractEditorComponent {
     ///
     /// - `callback`: receives true if the command is active for the current selection
     public void queryCommandState(String command, final SuccessCallback<Boolean> callback) {
-        query("state", command, new SuccessCallback<String>() {
-            public void onSucess(String value) {
-                callback.onSucess("1".equals(value));
-            }
-        });
+        query("state", command, new StringToBoolCallback(callback));
+    }
+
+    private static final class StringToBoolCallback implements SuccessCallback<String> {
+        private final SuccessCallback<Boolean> delegate;
+
+        StringToBoolCallback(SuccessCallback<Boolean> delegate) {
+            this.delegate = delegate;
+        }
+
+        public void onSucess(String value) {
+            delegate.onSucess("1".equals(value));
+        }
     }
 
     private static String toCss(int rgb) {
@@ -293,8 +299,12 @@ public class RichTextArea extends AbstractEditorComponent {
         // editor fully functional offline and adds zero footprint to apps that do not use it.
         return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
             + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\">"
+            + "<meta name=\"color-scheme\" content=\"light\">"
             + "<style>"
-            + "html,body{margin:0;padding:0;height:100%;-webkit-text-size-adjust:100%;}"
+            // The native web widget is created transparent (e.g. iOS WKWebView opaque=NO), so without an
+            // explicit opaque background the dark peer behind it shows through and the editor looks black.
+            // Pin a light color-scheme so the platform UA does not invert colors in device dark mode.
+            + "html,body{margin:0;padding:0;height:100%;-webkit-text-size-adjust:100%;background:#ffffff;color:#24292e;color-scheme:light;}"
             + "*{-webkit-tap-highlight-color:rgba(0,0,0,0);box-sizing:border-box;}"
             + "#ed{min-height:100%;padding:8px;outline:none;font:16px -apple-system,Roboto,'Segoe UI',sans-serif;"
             + "line-height:1.4;word-wrap:break-word;-webkit-user-select:text;user-select:text;}"

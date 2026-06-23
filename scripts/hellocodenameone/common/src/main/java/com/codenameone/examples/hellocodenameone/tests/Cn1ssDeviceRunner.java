@@ -198,8 +198,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ChartTransformScreenshotTest(),
             new ChartRotatedScreenshotTest(),
             new BrowserComponentScreenshotTest(),
-            new RichTextAreaScreenshotTest(),
-            new CodeEditorScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
             new SheetSlideUpAnimationScreenshotTest(),
@@ -434,12 +432,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // BrowserComponent's iframe ``load`` event isn't routed
                 // through the worker-callback transport, so the test waits on
                 // its own ``readyRunnable`` indefinitely. Tracked under
-                // ``browserComponentLoadEvent`` in port.js. RichTextArea and
-                // CodeEditor are built on the same web widget, so they hit the
-                // identical iframe-load gap and are skipped here too.
-                || "BrowserComponentScreenshotTest".equals(testName)
-                || "RichTextAreaScreenshotTest".equals(testName)
-                || "CodeEditorScreenshotTest".equals(testName);
+                // ``browserComponentLoadEvent`` in port.js.
+                || "BrowserComponentScreenshotTest".equals(testName);
     }
 
     private static boolean isJsSkippedKnownRuntimeBug(String testName) {

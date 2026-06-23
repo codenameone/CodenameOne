@@ -61,7 +61,6 @@ public class CodeEditor extends AbstractEditorComponent {
     private String theme = "light";
     private boolean showLineNumbers = true;
     private int tabSize = 4;
-    private String pendingText;
     private String engineUrl;
     private CodeCompletionProvider completionProvider;
 
@@ -94,7 +93,6 @@ public class CodeEditor extends AbstractEditorComponent {
     ///
     /// - `text`: the source code
     public void setText(String text) {
-        pendingText = text;
         command("setText", text == null ? "" : text);
     }
 
@@ -198,19 +196,27 @@ public class CodeEditor extends AbstractEditorComponent {
     ///
     /// - `callback`: receives the caret offset as an Integer
     public void getCursorPosition(final SuccessCallback<Integer> callback) {
-        query("getCursor", null, new SuccessCallback<String>() {
-            public void onSucess(String value) {
-                int v = 0;
-                try {
-                    if (value != null && value.length() > 0) {
-                        v = Integer.parseInt(value.trim());
-                    }
-                } catch (NumberFormatException err) {
-                    v = 0;
+        query("getCursor", null, new StringToIntCallback(callback));
+    }
+
+    private static final class StringToIntCallback implements SuccessCallback<String> {
+        private final SuccessCallback<Integer> delegate;
+
+        StringToIntCallback(SuccessCallback<Integer> delegate) {
+            this.delegate = delegate;
+        }
+
+        public void onSucess(String value) {
+            int v = 0;
+            try {
+                if (value != null && value.length() > 0) {
+                    v = Integer.parseInt(value.trim());
                 }
-                callback.onSucess(Integer.valueOf(v));
+            } catch (NumberFormatException err) {
+                v = 0;
             }
-        });
+            delegate.onSucess(Integer.valueOf(v));
+        }
     }
 
     /// Sets the diagnostics (errors / warnings / hints) displayed in the editor as squiggly underlines,

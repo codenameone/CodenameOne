@@ -32,11 +32,18 @@ class CodeEditorHtml {
     private CodeEditorHtml() {
     }
 
-    static final String PAGE =
+    // Assigned in a static initializer (not at the declaration) so this large string is a runtime
+    // constant rather than a compile-time constant - that keeps the compiler from inlining the whole
+    // ~13KB literal into every class that references CodeEditorHtml.PAGE.
+    static final String PAGE;
+
+    static {
+        PAGE =
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
         + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\">"
+        + "<meta name=\"color-scheme\" content=\"light dark\">"
         + "<style>"
-        + "html,body{margin:0;padding:0;height:100%;}"
+        + "html,body{margin:0;padding:0;height:100%;background:#ffffff;}"
         + "*{box-sizing:border-box;-webkit-tap-highlight-color:rgba(0,0,0,0);}"
         + "#host{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;overflow:auto;"
         + "font:14px/1.5 Menlo,Consolas,'Courier New',monospace;background:#ffffff;color:#24292e;}"
@@ -171,4 +178,5 @@ class CodeEditorHtml {
         + "syncGutter();"
         + "fire('ready',null);"
         + "</script></body></html>";
+    }
 }
