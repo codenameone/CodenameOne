@@ -42,6 +42,7 @@
 #import <CoreLocation/CoreLocation.h>
 //#define CN1_USE_STOREKIT
 //#define CN1_USE_APPREVIEW
+//#define CN1_USE_CODEMIRROR
 #if defined(CN1_USE_STOREKIT) || defined(CN1_USE_APPREVIEW)
 #import "StoreKit/StoreKit.h"
 #endif

@@ -1,0 +1,392 @@
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.util.SuccessCallback;
+
+import java.util.List;
+
+/// An IDE style source code editor with syntax highlighting, a line-number gutter and asynchronous
+/// code completion.
+///
+/// `CodeEditor` is built for editing source code on both touch devices (with the virtual keyboard) and
+/// desktops (with a physical keyboard). Code completion is driven by a `CodeCompletionProvider`, which
+/// can resolve proposals locally or from a remote language server.
+///
+/// Like `RichTextArea`, the editor uses a 100% cross platform `BrowserComponent` backend by default and
+/// can be transparently upgraded to a native code editor by a platform port. The built-in editing
+/// surface is fully self contained and offline. When the optional bundled CodeMirror library is present
+/// (the Codename One build server adds it automatically when, and only when, an app actually uses
+/// `CodeEditor`) the editor upgrades to CodeMirror for richer language support; otherwise it uses a
+/// lightweight built-in highlighter.
+///
+/// #### Example
+///
+/// ```java
+/// CodeEditor editor = new CodeEditor();
+/// editor.setLanguage("java");
+/// editor.setText("public class Main {\n\n}");
+/// editor.setCompletionProvider((ed, code, cursor, results) -> {
+///     List<CodeCompletion> out = new ArrayList<>();
+///     out.add(new CodeCompletion("System.out.println(", "System.out.println()").setType("method"));
+///     results.onSucess(out);
+/// });
+/// form.add(BorderLayout.CENTER, editor);
+/// ```
+///
+/// @author Shai Almog
+public class CodeEditor extends AbstractEditorComponent {
+    private String language = "text";
+    private String theme = "light";
+    private boolean showLineNumbers = true;
+    private int tabSize = 4;
+    private String pendingText;
+    private String engineUrl;
+    private CodeCompletionProvider completionProvider;
+
+    /// Creates an empty code editor.
+    public CodeEditor() {
+        super("CodeEditor");
+    }
+
+    /// Creates a code editor initialized with the supplied source and language.
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: the language id used for syntax highlighting (e.g. `"java"`, `"javascript"`,
+    ///   `"kotlin"`, `"css"`, `"xml"`, `"json"`, `"python"`)
+    ///
+    /// - `text`: the initial source code
+    public CodeEditor(String language, String text) {
+        this();
+        setLanguage(language);
+        setText(text);
+    }
+
+    String getEditorType() {
+        return "code";
+    }
+
+    /// Replaces the entire editor content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the source code
+    public void setText(String text) {
+        pendingText = text;
+        command("setText", text == null ? "" : text);
+    }
+
+    /// Retrieves the current source code. The callback is invoked on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: receives the source code
+    public void getText(SuccessCallback<String> callback) {
+        query("getText", null, callback);
+    }
+
+    /// Sets the language used for syntax highlighting.
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: the language id (e.g. `"java"`, `"javascript"`, `"kotlin"`, `"css"`, `"xml"`,
+    ///   `"json"`, `"python"`)
+    public void setLanguage(String language) {
+        this.language = language == null ? "text" : language;
+        command("setLanguage", this.language);
+    }
+
+    /// Returns the current highlighting language id.
+    public String getLanguage() {
+        return language;
+    }
+
+    /// Sets the color theme. Currently `"light"` and `"dark"` are supported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: the theme id
+    public void setTheme(String theme) {
+        this.theme = theme == null ? "light" : theme;
+        command("setTheme", this.theme);
+    }
+
+    /// Returns the current theme id.
+    public String getTheme() {
+        return theme;
+    }
+
+    /// Shows or hides the line-number gutter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `show`: true to show line numbers
+    public void setShowLineNumbers(boolean show) {
+        this.showLineNumbers = show;
+        command("setLineNumbers", show ? "1" : "0");
+    }
+
+    /// Returns true if the line-number gutter is shown.
+    public boolean isShowLineNumbers() {
+        return showLineNumbers;
+    }
+
+    /// Sets the number of spaces inserted for a tab / used for indentation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tabSize`: the indentation width in spaces
+    public void setTabSize(int tabSize) {
+        this.tabSize = tabSize;
+        command("setTabSize", String.valueOf(tabSize));
+    }
+
+    /// Returns the indentation width in spaces.
+    public int getTabSize() {
+        return tabSize;
+    }
+
+    /// Makes the editor read-only or editable. This is a convenience around
+    /// `AbstractEditorComponent#setEditable(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `readOnly`: true to prevent editing
+    public void setReadOnly(boolean readOnly) {
+        setEditable(!readOnly);
+    }
+
+    /// Returns true when the editor is read-only.
+    public boolean isReadOnly() {
+        return !isEditable();
+    }
+
+    /// Inserts text at the current caret position, replacing any active selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to insert
+    public void insertAtCursor(String text) {
+        command("insertText", text);
+    }
+
+    /// Retrieves the current caret character offset. The callback is invoked on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: receives the caret offset as an Integer
+    public void getCursorPosition(final SuccessCallback<Integer> callback) {
+        query("getCursor", null, new SuccessCallback<String>() {
+            public void onSucess(String value) {
+                int v = 0;
+                try {
+                    if (value != null && value.length() > 0) {
+                        v = Integer.parseInt(value.trim());
+                    }
+                } catch (NumberFormatException err) {
+                    v = 0;
+                }
+                callback.onSucess(Integer.valueOf(v));
+            }
+        });
+    }
+
+    /// Sets the diagnostics (errors / warnings / hints) displayed in the editor as squiggly underlines,
+    /// gutter markers and tooltips. Pass an empty list (or null) to clear all diagnostics.
+    ///
+    /// #### Parameters
+    ///
+    /// - `diagnostics`: the diagnostics to display
+    public void setDiagnostics(List<CodeDiagnostic> diagnostics) {
+        command("setDiagnostics", diagnosticsJson(diagnostics));
+    }
+
+    private static String diagnosticsJson(List<CodeDiagnostic> diagnostics) {
+        StringBuilder sb = new StringBuilder("[");
+        if (diagnostics != null) {
+            for (int i = 0; i < diagnostics.size(); i++) {
+                CodeDiagnostic d = diagnostics.get(i);
+                if (d == null) {
+                    continue;
+                }
+                if (sb.length() > 1) {
+                    sb.append(",");
+                }
+                sb.append("{\"l\":").append(d.getLine())
+                    .append(",\"c\":").append(d.getColumn())
+                    .append(",\"el\":").append(d.getEndLine())
+                    .append(",\"ec\":").append(d.getEndColumn())
+                    .append(",\"s\":\"").append(jsonEscape(d.getSeverity()))
+                    .append("\",\"m\":\"").append(jsonEscape(d.getMessage()))
+                    .append("\"}");
+            }
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    /// Points the editor at a custom engine page bundled in the app's HTML hierarchy (loaded with
+    /// `BrowserComponent#setURLHierarchy(String)`) instead of the self contained built-in engine. The
+    /// custom page must implement the same `window.cn1editor` command/query bridge and post the same
+    /// `cn1ed:` events, which lets an application back `CodeEditor` with a richer editor (e.g. CodeMirror
+    /// or Monaco) when maximum polish is required while keeping the exact same Java API. Must be set
+    /// before the editor is shown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: an app-hierarchy URL such as `"/my-editor/index.html"`, or null to use the built-in engine
+    public void setEngineURL(String url) {
+        this.engineUrl = url;
+    }
+
+    /// Returns the custom engine URL set with `#setEngineURL(String)`, or null when the built-in engine
+    /// is used.
+    public String getEngineURL() {
+        return engineUrl;
+    }
+
+    String getEngineURLInternal() {
+        return engineUrl;
+    }
+
+    /// Sets the provider that supplies code completion proposals. Passing null disables completion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: the completion provider, or null to disable completion
+    public void setCompletionProvider(CodeCompletionProvider provider) {
+        this.completionProvider = provider;
+        command("setCompletionEnabled", provider != null ? "1" : "0");
+    }
+
+    /// Returns the current completion provider, or null if none is set.
+    public CodeCompletionProvider getCompletionProvider() {
+        return completionProvider;
+    }
+
+    void onEditorEvent(String type, String value) {
+        if ("complete".equals(type)) {
+            handleCompletionRequest(value);
+            return;
+        }
+        super.onEditorEvent(type, value);
+    }
+
+    private void handleCompletionRequest(String value) {
+        final CodeCompletionProvider provider = completionProvider;
+        if (provider == null || value == null) {
+            return;
+        }
+        int colon = value.indexOf(':');
+        if (colon < 0) {
+            return;
+        }
+        final String reqId = value.substring(0, colon);
+        final int cursor;
+        int c;
+        try {
+            c = Integer.parseInt(value.substring(colon + 1).trim());
+        } catch (NumberFormatException err) {
+            c = 0;
+        }
+        cursor = c;
+        getText(new SuccessCallback<String>() {
+            public void onSucess(String code) {
+                final String safeCode = code == null ? "" : code;
+                provider.getCompletions(CodeEditor.this, safeCode, cursor, new SuccessCallback<List<CodeCompletion>>() {
+                    public void onSucess(List<CodeCompletion> results) {
+                        command("showCompletions", reqId + ":" + toJson(results));
+                    }
+                });
+            }
+        });
+    }
+
+    private static String toJson(List<CodeCompletion> items) {
+        StringBuilder sb = new StringBuilder("[");
+        if (items != null) {
+            for (int i = 0; i < items.size(); i++) {
+                CodeCompletion cc = items.get(i);
+                if (cc == null) {
+                    continue;
+                }
+                if (sb.length() > 1) {
+                    sb.append(",");
+                }
+                sb.append("{\"d\":\"").append(jsonEscape(cc.getDisplayText()))
+                    .append("\",\"i\":\"").append(jsonEscape(cc.getInsertText()))
+                    .append("\",\"t\":\"").append(jsonEscape(cc.getType()))
+                    .append("\",\"x\":\"").append(jsonEscape(cc.getDetail()))
+                    .append("\"}");
+            }
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private static String jsonEscape(String s) {
+        if (s == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            switch (ch) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    if (ch < 0x20) {
+                        String hex = Integer.toHexString(ch);
+                        sb.append("\\u");
+                        for (int p = hex.length(); p < 4; p++) {
+                            sb.append('0');
+                        }
+                        sb.append(hex);
+                    } else {
+                        sb.append(ch);
+                    }
+                    break;
+            }
+        }
+        return sb.toString();
+    }
+
+    String createEditorHtml() {
+        return CodeEditorHtml.PAGE;
+    }
+}
