@@ -3480,7 +3480,7 @@ This is discussed further in the https://www.codenameone.com/blog/phonegap-cordo
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/RichTextArea.html[RichTextArea] is a visual editor for formatted text (a WYSIWYG / HTML editor). It lets the user select text and apply styling - bold, italic, underline, lists, links, colors, headings - and exchanges the result with your application as HTML. It works on phones and tablets with the on-screen virtual keyboard, and on desktops with a physical keyboard.
 
-`RichTextArea` derives from `AbstractEditorComponent`. By default the editing surface is a `contenteditable` document hosted inside the platform's native web widget (the same one used by `BrowserComponent`), which makes it fully cross platform and gives correct keyboard, selection and IME behavior on every device. A platform port may transparently replace this with a fully native editing widget without any change to your code.
+`RichTextArea` derives from `AbstractEditorComponent`. By default the editing surface is a `contenteditable` document hosted inside the platform's native web widget (the same one used by `BrowserComponent`), which makes it fully cross-platform and gives correct keyboard, selection and IME behavior on every device. A platform port may transparently replace this with a fully native editing widget without any change to your code.
 
 NOTE: Because the editor is created asynchronously you should treat it like `BrowserComponent`: setters such as `setHtml(String)` are safe to call immediately (they're queued until the editor is ready) while reads such as `getHtml(SuccessCallback)` are asynchronous and deliver their result through a callback.
 

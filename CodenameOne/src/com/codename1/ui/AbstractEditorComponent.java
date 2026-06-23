@@ -80,6 +80,7 @@ public abstract class AbstractEditorComponent extends Container {
         placeholder.setShowEvenIfBlank(true);
         addComponent(BorderLayout.CENTER, placeholder);
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 initBackend();
             }
@@ -104,11 +105,13 @@ public abstract class AbstractEditorComponent extends Container {
         // keep the editor chrome supplied by the surrounding form, the editing surface is transparent
         browser.setProperty("BackgroundColor", 0xffffff);
         browser.addWebEventListener(BrowserComponent.onMessage, new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 handleBrowserMessage((String) evt.getSource());
             }
         });
         browser.addWebEventListener(BrowserComponent.onLoad, new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 // the page defines window.cn1editor synchronously so it is ready once the page loaded
                 markReady();
@@ -155,8 +158,8 @@ public abstract class AbstractEditorComponent extends Container {
         applyEditableState();
         List<Runnable> copy = new ArrayList<Runnable>(readyQueue);
         readyQueue.clear();
-        for (int i = 0; i < copy.size(); i++) {
-            copy.get(i).run();
+        for (Runnable r : copy) {
+            r.run();
         }
         readyListeners.fireActionEvent(new ActionEvent(this));
     }
@@ -217,6 +220,7 @@ public abstract class AbstractEditorComponent extends Container {
             onEditorEvent(type, value);
         } else {
             CN.callSerially(new Runnable() {
+                @Override
                 public void run() {
                     onEditorEvent(type, value);
                 }
@@ -235,6 +239,7 @@ public abstract class AbstractEditorComponent extends Container {
     protected void command(final String name, final String arg) {
         if (!ready) {
             readyQueue.add(new Runnable() {
+                @Override
                 public void run() {
                     command(name, arg);
                 }
@@ -261,6 +266,7 @@ public abstract class AbstractEditorComponent extends Container {
     protected void query(final String name, final String arg, final SuccessCallback<String> callback) {
         if (!ready) {
             readyQueue.add(new Runnable() {
+                @Override
                 public void run() {
                     query(name, arg, callback);
                 }
@@ -283,6 +289,7 @@ public abstract class AbstractEditorComponent extends Container {
             this.delegate = delegate;
         }
 
+        @Override
         public void onSucess(BrowserComponent.JSRef value) {
             delegate.onSucess(value == null ? null : value.getValue());
         }
@@ -376,6 +383,7 @@ public abstract class AbstractEditorComponent extends Container {
     }
 
     /// Returns true if the editor currently allows editing.
+    @Override
     public boolean isEditable() {
         return editable;
     }

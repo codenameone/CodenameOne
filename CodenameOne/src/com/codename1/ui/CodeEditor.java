@@ -83,6 +83,7 @@ public class CodeEditor extends AbstractEditorComponent {
         setText(text);
     }
 
+    @Override
     String getEditorType() {
         return "code";
     }
@@ -206,6 +207,7 @@ public class CodeEditor extends AbstractEditorComponent {
             this.delegate = delegate;
         }
 
+        @Override
         public void onSucess(String value) {
             int v = 0;
             try {
@@ -232,8 +234,7 @@ public class CodeEditor extends AbstractEditorComponent {
     private static String diagnosticsJson(List<CodeDiagnostic> diagnostics) {
         StringBuilder sb = new StringBuilder("[");
         if (diagnostics != null) {
-            for (int i = 0; i < diagnostics.size(); i++) {
-                CodeDiagnostic d = diagnostics.get(i);
+            for (CodeDiagnostic d : diagnostics) {
                 if (d == null) {
                     continue;
                 }
@@ -269,6 +270,7 @@ public class CodeEditor extends AbstractEditorComponent {
 
     /// Returns the custom engine URL set with `#setEngineURL(String)`, or null when the built-in engine
     /// is used.
+    @Override
     public String getEngineURL() {
         return engineUrl;
     }
@@ -292,6 +294,7 @@ public class CodeEditor extends AbstractEditorComponent {
         return completionProvider;
     }
 
+    @Override
     void onEditorEvent(String type, String value) {
         if ("complete".equals(type)) {
             handleCompletionRequest(value);
@@ -319,9 +322,11 @@ public class CodeEditor extends AbstractEditorComponent {
         }
         cursor = c;
         getText(new SuccessCallback<String>() {
+            @Override
             public void onSucess(String code) {
                 final String safeCode = code == null ? "" : code;
                 provider.getCompletions(CodeEditor.this, safeCode, cursor, new SuccessCallback<List<CodeCompletion>>() {
+                    @Override
                     public void onSucess(List<CodeCompletion> results) {
                         command("showCompletions", reqId + ":" + toJson(results));
                     }
@@ -333,8 +338,7 @@ public class CodeEditor extends AbstractEditorComponent {
     private static String toJson(List<CodeCompletion> items) {
         StringBuilder sb = new StringBuilder("[");
         if (items != null) {
-            for (int i = 0; i < items.size(); i++) {
-                CodeCompletion cc = items.get(i);
+            for (CodeCompletion cc : items) {
                 if (cc == null) {
                     continue;
                 }
@@ -392,6 +396,7 @@ public class CodeEditor extends AbstractEditorComponent {
         return sb.toString();
     }
 
+    @Override
     String createEditorHtml() {
         return CodeEditorHtml.PAGE;
     }

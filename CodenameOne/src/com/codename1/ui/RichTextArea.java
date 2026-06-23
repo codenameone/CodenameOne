@@ -74,6 +74,7 @@ public class RichTextArea extends AbstractEditorComponent {
         setHtml(html);
     }
 
+    @Override
     String getEditorType() {
         return "richtext";
     }
@@ -281,6 +282,7 @@ public class RichTextArea extends AbstractEditorComponent {
             this.delegate = delegate;
         }
 
+        @Override
         public void onSucess(String value) {
             delegate.onSucess("1".equals(value));
         }
@@ -294,6 +296,7 @@ public class RichTextArea extends AbstractEditorComponent {
         return "#" + s;
     }
 
+    @Override
     String createEditorHtml() {
         // A self-contained contenteditable editor. No external resources are required which keeps the
         // editor fully functional offline and adds zero footprint to apps that do not use it.

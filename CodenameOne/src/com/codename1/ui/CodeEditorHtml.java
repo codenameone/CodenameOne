@@ -28,7 +28,7 @@ package com.codename1.ui;
 /// `window.cn1editor` command/query bridge used by `AbstractEditorComponent` and supports syntax
 /// highlighting, a line-number gutter, code completion, diagnostics (squiggly underlines + gutter
 /// markers + tooltips), bracket auto-close and an active-line highlight.
-class CodeEditorHtml {
+final class CodeEditorHtml {
     private CodeEditorHtml() {
     }
 
