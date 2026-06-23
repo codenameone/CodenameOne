@@ -73,6 +73,7 @@
 #import <CoreLocation/CoreLocation.h>
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
+#import <CoreText/CoreText.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <arpa/inet.h>
@@ -8838,13 +8839,41 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
 }
 #endif // NEW_CODENAME_ONE_VM
 
+// Register every .ttf bundled in the app (notably material-design-font.ttf for
+// FontImage glyphs) with the process font manager so [UIFont fontWithName:] and
+// CTFontCreateWithName can resolve them by name. The iOS app also lists these in
+// UIAppFonts, but the Metal/tvOS and Core-Graphics/watchOS slices do not reliably
+// register fonts from the Info.plist, so without this the Material font fails to
+// load there and FontImage glyphs fall back to the emoji/substitute character
+// (e.g. the lock icon rendered as the color lock emoji on the watch). Runs once;
+// re-registering an already-registered font returns an error that is ignored.
+static void cn1RegisterBundledFontsOnce() {
+    static BOOL cn1FontsRegistered = NO;
+    if (cn1FontsRegistered) {
+        return;
+    }
+    cn1FontsRegistered = YES;
+    @autoreleasepool {
+        NSArray *fontPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"ttf" inDirectory:nil];
+        for (NSString *fontPath in fontPaths) {
+            NSURL *url = [NSURL fileURLWithPath:fontPath];
+            CFErrorRef error = NULL;
+            CTFontManagerRegisterFontsForURL((BRIDGE_CAST CFURLRef)url, kCTFontManagerScopeProcess, &error);
+            if (error != NULL) {
+                CFRelease(error);
+            }
+        }
+    }
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     int pSize = 14;
-    
+
     pSize *= scaleValue;
     POOL_BEGIN();
+    cn1RegisterBundledFontsOnce();
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    
+
     UIFont* fnt;
     if(isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
         if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
