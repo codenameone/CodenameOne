@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Run the Codename One UI screenshot suite on the tvOS simulator and compare the
 # captured frames to the Apple TV golden set (scripts/ios/screenshots-tv).
+# The golden set includes the Material FontImage glyphs (tab/FAB/toolbar icons,
+# checkbox/radio marks, ImageViewer navigation arrows) which load on tvOS via
+# the runtime CTFontManagerRegisterFontsForURL registration in IOSNative.m.
 #
 # Apple TV reuses the iOS UIApplicationMain entry and the Metal renderer (tvOS
 # has UIKit + Metal, just no OpenGL ES), so the <Main>TV target is built like a
