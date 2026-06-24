@@ -2,7 +2,6 @@ package com.codenameone.examples.hellocodenameone.tests.graphics;
 
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Dimension;
@@ -44,11 +43,11 @@ import com.codenameone.examples.hellocodenameone.tests.BaseTest;
 /// fix is symmetric, so guarding the SOUTH direction guards the reported NORTH
 /// case too.
 ///
-/// The capture reads the live screen (Display.screenshot), which on the iOS
-/// simulator returns the persistent screenTexture as-is (the desktop-only
-/// forceScreenRenderForCapture is a no-op there), so the partial-flush corruption
-/// survives to the screenshot. The golden is therefore "white CENTER (turned
-/// magenta) + red SOUTH" on every platform; only a regressed Metal build deviates.
+/// Clamping a clip to the flush region is a portable correctness property, so the
+/// test runs on every platform (including tvOS, which is also Metal and gets the
+/// same fix). On any backend that clamps correctly the golden is "magenta CENTER +
+/// red SOUTH"; a backend that lets the fill escape the flush region (the regressed
+/// iOS Metal path) turns the SOUTH band magenta and fails the comparison.
 public class PartialFlushClipEscape extends BaseTest {
     private static final String NAME = "graphics-partial-flush-clip-escape";
 
@@ -63,32 +62,8 @@ public class PartialFlushClipEscape extends BaseTest {
     private final SolidComponent south = new SolidComponent(SOUTH_COLOR);
     private final EscapeComponent center = new EscapeComponent();
 
-    /// iPhone/iPad only. The #5273 escape is only a *bug* where the renderer
-    /// keeps a persistent backing texture (Metal) and a partial repaint never
-    /// rewrites the fixed band. On every other platform a full repaint follows
-    /// almost immediately, so the transient escape this test forces is not
-    /// user-visible -- the issue reporter confirmed it does not reproduce on
-    /// Android or the simulator. Capturing it elsewhere would only lock a
-    /// misleading "magenta" golden. watchOS uses the Core Graphics backend (the
-    /// fix is in the Metal ClipRect path) and tvOS is excluded to keep the guard
-    /// focused on the reported iPhone scenario; on the supported targets GL
-    /// clamps -> red, fixed Metal clamps -> red, regressed Metal -> magenta.
-    private static boolean shouldRunHere() {
-        return "ios".equals(Display.getInstance().getPlatformName())
-                && !CN.isWatch() && !CN.isTV();
-    }
-
-    @Override
-    public boolean shouldTakeScreenshot() {
-        return shouldRunHere();
-    }
-
     @Override
     public boolean runTest() {
-        if (!shouldRunHere()) {
-            done();
-            return true;
-        }
         // Empty title: a non-empty Form title renders a Label that can ticker-
         // animate (and varies per capture), so an empty title keeps the golden
         // deterministic. The fixed SOUTH band, not the title, is what the test
