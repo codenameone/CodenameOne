@@ -411,10 +411,25 @@ public class ProcessScreenshots {
         // fidelity = min(fillSim, structSim): a widget must agree in BOTH its fill
         // AND its structure/placement, so "same background, totally different
         // widget" can no longer score high.
+        // Headline = geometric mean of TWO complementary, well-understood terms:
+        //   fillSim -- mean colour agreement over the widget-content pixels (catches
+        //              a wrong fill/glyph colour: a black checkbox vs a blue one).
+        //   ssim    -- windowed structural similarity, robust to the few-pixel
+        //              sub-pixel offsets two render paths inevitably produce (so a
+        //              title that sits 8px lower in one render is still recognised
+        //              as the same title, not scored to zero).
+        // sqrt(fillSim * ssim) demands BOTH be high: a genuinely-similar widget
+        // (Toolbar: fill .96, ssim .95 -> 95) reads honestly, a real defect stays
+        // low because at least one term collapses (a broken dark field with ssim
+        // ~0 -> ~0; a wrong glyph colour drags fillSim). The earlier
+        // min(fillSim, squared-salience structSim) is kept ONLY as a diagnostic:
+        // its structural term could not tell "same widget, text a few px off" from
+        // "different widget" and so crushed genuinely-faithful renders.
         double fillSim = absoluteShapeSim(bn, bc, bgRgb);
-        double structSim = structuralSalienceSim(bn, bc, bgRgb);
-        double shapeSim = Math.min(fillSim, structSim);
-        double fidelity = 100.0d * shapeSim;
+        double structSim = structuralSalienceSim(bn, bc, bgRgb);   // diagnostic only
+        double ssim = computeSsim(nativeImg, cn1);
+        double headline = Math.sqrt(Math.max(0.0d, fillSim) * Math.max(0.0d, ssim));
+        double fidelity = 100.0d * headline;
         return new double[]{fidelity, structSim, fillSim};
     }
 

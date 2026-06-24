@@ -26,6 +26,7 @@ import com.codename1.components.FloatingActionButton;
 import com.codename1.components.Switch;
 import com.codename1.ui.Button;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Image;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Label;
@@ -34,6 +35,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.Slider;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
@@ -64,14 +66,25 @@ public final class Cn1WidgetRenderer {
      * for sizing/placing it in a fixed tile and capturing it.
      */
     public static Component build(ComponentSpec spec, String state) {
+        return build(spec, state, "light");
+    }
+
+    public static Component build(ComponentSpec spec, String state, String appearance) {
         String id = spec.getId();
         String uiid = spec.getCn1Uiid();
+        boolean dark = "dark".equals(appearance);
         String text = spec.getText() != null ? spec.getText() : "";
         Component c;
         if ("Button".equals(id) || "RaisedButton".equals(id) || "FlatButton".equals(id)) {
             Button b = new Button(text);
             b.setUIID(uiid);
             applyButtonState(b, state);
+            // iOS 26 prominentGlass (RaisedButton) is a translucent fill -- the
+            // backdrop shows faintly through the blue. Drop the fill alpha a touch
+            // so the CN1 raised button reads as glass rather than a flat opaque blue.
+            if ("RaisedButton".equals(id)) {
+                b.getAllStyles().setBgTransparency(225);
+            }
             c = b;
         } else if ("TextField".equals(id)) {
             TextField tf = new TextField(text);
@@ -88,7 +101,11 @@ public final class Cn1WidgetRenderer {
             }
             c = tf;
         } else if ("CheckBox".equals(id)) {
-            CheckBox cb = new CheckBox(text);
+            // iOS has no native checkbox; the native reference is a glyph only (no
+            // label). Drop the label on iOS so we compare box-against-box rather
+            // than penalising CN1 for a label the glyph-only reference omits.
+            boolean iosGlyph = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
+            CheckBox cb = new CheckBox(iosGlyph ? "" : text);
             cb.setUIID(uiid);
             if ("selected".equals(state)) {
                 cb.setSelected(true);
@@ -97,7 +114,8 @@ public final class Cn1WidgetRenderer {
             }
             c = cb;
         } else if ("RadioButton".equals(id)) {
-            RadioButton rb = new RadioButton(text);
+            boolean iosGlyph = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
+            RadioButton rb = new RadioButton(iosGlyph ? "" : text);
             rb.setUIID(uiid);
             if ("selected".equals(state)) {
                 rb.setSelected(true);
@@ -160,13 +178,29 @@ public final class Cn1WidgetRenderer {
             fab.getPressedStyle().setBorder(flat);
             c = fab;
         } else if ("Tabs".equals(id)) {
-            // Material tab strip: 3 tabs, first selected. Content panes are empty
-            // (the 16mm tile crops to the strip, which is what the native TabLayout
-            // golden shows).
-            Tabs tabs = new Tabs();
-            tabs.addTab("Tab 1", new Container());
-            tabs.addTab("Tab 2", new Container());
-            tabs.addTab("Tab 3", new Container());
+            // iOS UITabBar: an icon-over-label bar at the TOP, three items
+            // (Featured / Search / More) mirroring the native reference's system
+            // tab items; the first is selected (blue), the rest grey. NOT a
+            // Material pill strip.
+            Tabs tabs = new Tabs(Component.TOP);
+            // The material icons don't auto-tint to the tab's fg, so build them with
+            // explicit colours: the selected item (Featured) is blue, the rest grey,
+            // matching the native UITabBar tint.
+            int selColor = dark ? 0x0a84ff : 0x007aff;
+            int unselColor = dark ? 0xebebf5 : 0x3c3c43;
+            com.codename1.ui.plaf.Style selS = new com.codename1.ui.plaf.Style();
+            selS.setFgColor(selColor);
+            selS.setBgTransparency(0);
+            com.codename1.ui.plaf.Style unS = new com.codename1.ui.plaf.Style();
+            unS.setFgColor(unselColor);
+            unS.setBgTransparency(0);
+            Image star = FontImage.createMaterial(FontImage.MATERIAL_STAR, selS, 2.6f);
+            Image search = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, unS, 2.6f);
+            Image more = FontImage.createMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 2.6f);
+            tabs.addTab("Featured", star, star, new Container());
+            tabs.addTab("Search", search, search, new Container());
+            tabs.addTab("More", more, more, new Container());
+            tabs.setTabTextPosition(Component.BOTTOM);
             c = tabs;
         } else if ("Toolbar".equals(id)) {
             // Material small top app bar: title on the bar. The CN1 Toolbar
@@ -176,28 +210,72 @@ public final class Cn1WidgetRenderer {
             bar.setUIID("Toolbar");
             Label title = new Label(text);
             title.setUIID("Title");
-            bar.add(BorderLayout.WEST, title);
+            if ("ios".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
+                // A representative iOS navigation bar: a leading back command, a
+                // centred title and a trailing action -- the bar button items are a
+                // defining part of the look. The native UINavigationBar lays its
+                // content row at the TOP of the bar (the bar is taller than the row),
+                // so anchor the row NORTH and let the bar background fill the tile.
+                title.getAllStyles().setAlignment(Component.CENTER);
+                // The iOS 26 glass nav bar is translucent: the backdrop shows
+                // through, washed toward the bar's base colour. CN1 cannot blur
+                // (CEF-free), but a translucent bar over the shared backdrop
+                // approximates it. The light bar washes heavily toward white (232);
+                // the dark bar keeps far more of the backdrop's colour (the native
+                // dark glass barely lightens it), so it stays much more translucent.
+                // iOS 26 glass bar is very translucent -- the colourful backdrop reads
+                // through at near-full saturation, especially in dark mode (the dark
+                // glass barely darkens it). Wash only lightly.
+                bar.getAllStyles().setBgTransparency(dark ? 70 : 175);
+                Container row = new Container(new BorderLayout());
+                row.setUIID("Container");
+                row.getAllStyles().setBgTransparency(0);
+                // iOS 26 bar items are ICON-ONLY inside circular translucent-glass
+                // buttons (no "Back" text). Build the glyphs with an explicit blue.
+                int tint = dark ? 0x0a84ff : 0x007aff;
+                com.codename1.ui.plaf.Style tintS = new com.codename1.ui.plaf.Style();
+                tintS.setFgColor(tint);
+                tintS.setBgTransparency(0);
+                Button back = new Button("");
+                back.setUIID("BackCommand");
+                back.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK_IOS_NEW, tintS, 2.4f));
+                Button action = new Button("");
+                action.setUIID("TitleCommand");
+                action.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ADD, tintS, 2.8f));
+                row.add(BorderLayout.WEST, back);
+                row.add(BorderLayout.CENTER, title);
+                row.add(BorderLayout.EAST, action);
+                bar.add(BorderLayout.NORTH, row);
+            } else {
+                bar.add(BorderLayout.WEST, title);
+            }
             c = bar;
         } else if ("Dialog".equals(id)) {
-            // Material 3 alert dialog content: a rounded surface card with a
-            // headline, supporting text and two trailing text action buttons.
-            Container dialog = new Container(BoxLayout.y());
+            // iOS alert: a rounded card with a centred title + supporting text in
+            // the middle and a hairline-separated row of two equal blue actions
+            // pinned to the bottom (Cancel | OK, split by a vertical divider).
+            Container dialog = new Container(new BorderLayout());
             dialog.setUIID("Dialog");
             Label title = new Label("Title");
             title.setUIID("DialogTitle");
+            title.getAllStyles().setAlignment(Component.CENTER);
             Label body = new Label(text);
             body.setUIID("DialogBody");
-            Container btns = new Container(new FlowLayout(Component.RIGHT));
-            btns.setUIID("DialogCommandArea");
+            body.getAllStyles().setAlignment(Component.CENTER);
+            Container content = new Container(BoxLayout.y());
+            content.getAllStyles().setBgTransparency(0);
+            content.add(title);
+            content.add(body);
             Button cancel = new Button("Cancel");
             cancel.setUIID("DialogButton");
             Button ok = new Button("OK");
             ok.setUIID("DialogButton");
+            Container btns = new Container(new GridLayout(1, 2));
+            btns.setUIID("DialogCommandArea");
             btns.add(cancel);
             btns.add(ok);
-            dialog.add(title);
-            dialog.add(body);
-            dialog.add(btns);
+            dialog.add(BorderLayout.CENTER, content);
+            dialog.add(BorderLayout.SOUTH, btns);
             c = dialog;
         } else {
             return null;

@@ -550,44 +550,67 @@ public class Slider extends Label implements ActionSource {
         if (aa) {
             g.setAntiAliased(true);
         }
-        // Material 3 draws the track as TWO separate rounded segments with a gap
-        // on each side of the bar thumb (not one continuous bar running under the
-        // thumb). Each segment is a full "pill" on its OUTER end and only slightly
-        // rounded on the INNER end facing the thumb.
-        int gap = Math.max(2, d.convertToPixels(0.6f));
-        // "very subtle" inner rounding (a few px) vs the full semicircular pill on
-        // the outer ends. Each segment is drawn pill-on-BOTH-ends first (arc == the
-        // segment height), then the INNER end is "squared up" to the subtle radius by
-        // overpainting a slightly-rounded block there. (Overlaying a rounded shape
-        // INSIDE an already-square body cannot round it - it has to be the other way.)
-        int innerArc = Math.max(2, d.convertToPixels(0.35f));
         int thumbX = Math.max(x0, Math.min(x0 + w - thumbW, x0 + valueW - thumbW / 2));
-        // inactive (right) segment: pill outer (right) end, subtle inner (left) end
-        int inStart = Math.min(x0 + w, thumbX + thumbW + gap);
-        int inW = x0 + w - inStart;
-        if (inW > 0) {
-            g.setColor(trackColor);
-            g.fillRoundRect(inStart, bandY, inW, track, track, track);
-            if (inW >= track) {
-                g.fillRoundRect(inStart, bandY, track, track, innerArc, innerArc);
-            }
-        }
-        // active (left) segment: pill outer (left) end, subtle inner (right) end
-        int acW = Math.max(0, (thumbX - gap) - x0);
-        if (acW > 0) {
-            g.setColor(fullColor);
-            g.fillRoundRect(x0, bandY, acW, track, track, track);
-            if (acW >= track) {
-                g.fillRoundRect(x0 + acW - track, bandY, track, track, innerArc, innerArc);
-            }
-        }
-        // M3 "stop indicator": a SMALL dot near the inactive (far) end of the track.
-        int dotD = Math.max(3, track / 6);
-        g.setColor(fullColor);
-        g.fillArc(x0 + w - track / 2 - dotD / 2, y0 + (h - dotD) / 2, dotD, dotD, 0, 360);
-        // vertical bar thumb spanning the full height (taller than the track), M3 style
         int thumbH = Math.max(track, h);
         int thumbY = y0 + (h - thumbH) / 2;
+        // iOS renders ONE continuous track under the thumb (no M3 gap, no stop
+        // indicator); themes opt in via sliderContinuousTrackBool.
+        boolean continuousTrack = getUIManager().isThemeConstant("sliderContinuousTrackBool", false);
+        if (continuousTrack) {
+            g.setColor(trackColor);
+            g.fillRoundRect(x0, bandY, w, track, track, track);
+            if (valueW > 0) {
+                g.setColor(fullColor);
+                g.fillRoundRect(x0, bandY, Math.min(w, valueW), track, track, track);
+            }
+        } else {
+            // Material 3: TWO rounded segments with a gap on each side of the thumb;
+            // each is a full pill on its OUTER end, subtly rounded on the inner end.
+            int gap = Math.max(2, d.convertToPixels(0.6f));
+            int innerArc = Math.max(2, d.convertToPixels(0.35f));
+            int inStart = Math.min(x0 + w, thumbX + thumbW + gap);
+            int inW = x0 + w - inStart;
+            if (inW > 0) {
+                g.setColor(trackColor);
+                g.fillRoundRect(inStart, bandY, inW, track, track, track);
+                if (inW >= track) {
+                    g.fillRoundRect(inStart, bandY, track, track, innerArc, innerArc);
+                }
+            }
+            int acW = Math.max(0, (thumbX - gap) - x0);
+            if (acW > 0) {
+                g.setColor(fullColor);
+                g.fillRoundRect(x0, bandY, acW, track, track, track);
+                if (acW >= track) {
+                    g.fillRoundRect(x0 + acW - track, bandY, track, track, innerArc, innerArc);
+                }
+            }
+            // M3 "stop indicator": a small dot near the inactive (far) end.
+            int dotD = Math.max(3, track / 6);
+            g.setColor(fullColor);
+            g.fillArc(x0 + w - track / 2 - dotD / 2, y0 + (h - dotD) / 2, dotD, dotD, 0, 360);
+        }
+        // Optional soft drop-shadow under the thumb (the iOS knob casts one; without
+        // it a white knob is invisible on a light background). sliderThumbShadowSizeMM
+        // sets the spread; a few concentric low-alpha rings approximate a soft blur.
+        String shadowC = getUIManager().getThemeConstant("sliderThumbShadowSizeMM", null);
+        int shadow = 0;
+        if (shadowC != null) {
+            try {
+                shadow = d.convertToPixels(Float.parseFloat(shadowC.trim()));
+            } catch (NumberFormatException notANumber) {
+            }
+        }
+        if (shadow > 0) {
+            int drop = Math.max(1, shadow / 2);
+            for (int i = shadow; i >= 1; i--) {
+                g.setColor(0x000000);
+                int oldAlpha = g.concatenateAlpha(10);
+                g.fillRoundRect(thumbX - i, thumbY - i + drop, thumbW + 2 * i, thumbH + 2 * i,
+                        thumbW + 2 * i, thumbW + 2 * i);
+                g.setAlpha(oldAlpha);
+            }
+        }
         g.setColor(thumbColor);
         g.fillRoundRect(thumbX, thumbY, thumbW, thumbH, thumbW, thumbW);
         if (aa) {

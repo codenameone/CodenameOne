@@ -28,6 +28,14 @@ let GLASS_KINDS: Set<String> = [
     "ios_uibutton_system", "ios_uibutton_plain", "ios_uibutton_filled",
     "ios_uinavbar", "ios_uitabbar",
 ]
+// Genuinely full-width widgets that stretch to fill their tile on both sides
+// (the CN1 harness fills these too). Content-sized controls -- buttons, switch,
+// checkbox/radio glyphs -- keep their natural size pinned top-left so they line
+// up with the content-sized CN1 widgets.
+let FILL_KINDS: Set<String> = [
+    "ios_uitextfield", "ios_uislider", "ios_uiprogress",
+    "ios_uinavbar", "ios_uitabbar", "ios_alert_view",
+]
 let BACKDROP: UIImage? = {
     if let p = Bundle.main.path(forResource: "glass-backdrop", ofType: "png") {
         return UIImage(contentsOfFile: p)
@@ -125,6 +133,11 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
     case "ios_uitextfield":
         let tf = UITextField(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
         tf.borderStyle = .roundedRect
+        // The roundedRect default fill collapses to ~pure black in dark mode (the
+        // field becomes invisible). Use the system's elevated field fill so the
+        // field reads as a filled control in both appearances -- secondary system
+        // background is white in light and #1c1c1e in dark, matching CN1's field.
+        tf.backgroundColor = .secondarySystemBackground
         tf.text = label
         tf.isEnabled = !disabled
         return tf
@@ -159,9 +172,12 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
         return p
     case "ios_uitabbar":
         let bar = UITabBar(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
-        let a = UITabBarItem(tabBarSystemItem: .featured, tag: 0)
-        let b = UITabBarItem(tabBarSystemItem: .search, tag: 1)
-        let c = UITabBarItem(tabBarSystemItem: .more, tag: 2)
+        // Three UNIFORM tab items (custom title+SF-symbol). The .search SYSTEM item
+        // gets a special floating button on iOS 26, which a normal tab strip does
+        // not have, so we avoid it to keep a representative glass-pill tab bar.
+        let a = UITabBarItem(title: "Featured", image: UIImage(systemName: "star.fill"), tag: 0)
+        let b = UITabBarItem(title: "Search", image: UIImage(systemName: "magnifyingglass"), tag: 1)
+        let c = UITabBarItem(title: "More", image: UIImage(systemName: "ellipsis"), tag: 2)
         bar.items = [a, b, c]; bar.selectedItem = a
         // Modern Liquid Glass bar background (default = glass material on iOS 26),
         // not the legacy opaque fill.
@@ -172,8 +188,13 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
         return bar
     case "ios_uinavbar":
         let nav = UINavigationBar(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
+        // A representative nav bar carries a leading back button and a trailing
+        // action -- bar button items are a defining part of the iOS nav-bar look.
+        // Pushing a root item makes the system render the "< Back" chevron.
+        let root = UINavigationItem(title: "Back")
         let item = UINavigationItem(title: label)
-        nav.items = [item]
+        item.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: nil, action: nil)
+        nav.items = [root, item]
         // Modern Liquid Glass nav-bar background (default = glass on iOS 26).
         let ap = UINavigationBarAppearance()
         ap.configureWithDefaultBackground()
@@ -261,11 +282,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                         container.addSubview(iv)
                     }
                     guard let control = buildControl(spec.kind, state, wPt, hPt) else { continue }
-                    control.sizeToFit()
-                    var cs = control.bounds.size
-                    if cs.width <= 0 || cs.width > wPt { cs.width = wPt }
-                    if cs.height <= 0 || cs.height > hPt { cs.height = hPt }
-                    control.frame = CGRect(x: 0, y: 0, width: cs.width, height: cs.height)
+                    // The CN1 fidelity harness renders every widget filling its tile and
+                    // (for text widgets) centring the content vertically. Match that for
+                    // the widgets that stretch -- buttons, fields, bars, slider, progress --
+                    // so the comparison measures the WIDGET rendering (colour, font, corner
+                    // radius, glass) rather than a layout difference the app controls.
+                    // Intrinsically-sized controls (switch, checkbox/radio glyphs) keep
+                    // their natural size pinned top-left, matching how CN1 lays them out.
+                    if FILL_KINDS.contains(spec.kind) {
+                        control.frame = CGRect(x: 0, y: 0, width: wPt, height: hPt)
+                    } else {
+                        control.sizeToFit()
+                        var cs = control.bounds.size
+                        if cs.width <= 0 || cs.width > wPt { cs.width = wPt }
+                        if cs.height <= 0 || cs.height > hPt { cs.height = hPt }
+                        control.frame = CGRect(x: 0, y: 0, width: cs.width, height: cs.height)
+                    }
                     container.addSubview(control)
                     host.addSubview(container)
                     container.setNeedsLayout()
@@ -274,6 +306,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                     let fmt = UIGraphicsImageRendererFormat()
                     fmt.scale = CAPTURE_SCALE
                     fmt.opaque = true
+                    // iOS 26 defaults the renderer to extended (16-bit, wide-gamut)
+                    // range, which produces 16-bit PNGs the host comparator can't
+                    // read. Force standard 8-bit sRGB output.
+                    fmt.preferredRange = .standard
                     let renderer = UIGraphicsImageRenderer(size: CGSize(width: wPt, height: hPt), format: fmt)
                     let img = renderer.image { _ in
                         container.drawHierarchy(in: container.bounds, afterScreenUpdates: true)

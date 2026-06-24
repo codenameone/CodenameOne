@@ -166,51 +166,66 @@ public class FidelityDeviceRunner {
                 form.getContentPane().getAllStyles().setBgTransparency(255);
                 for (int s = 0; s < states.size(); s++) {
                     String state = (String) states.get(s);
-                    Component comp = Cn1WidgetRenderer.build(c, state);
+                    Component comp = Cn1WidgetRenderer.build(c, state, appearance);
                     if (comp == null) {
                         continue;
                     }
-                    // Sliders/progress bars are full-width; size them to the same
-                    // fraction of the tile the native side uses (2/3) so the two
-                    // are comparable rather than the CN1 one collapsing small.
-                    if ("Slider".equals(c.getId())) {
-                        comp.setPreferredW(w * 3 / 5 - com.codename1.ui.Display.getInstance().convertToPixels(0.4f)); // match the native slider's drawn width (~616px)
-                        comp.setPreferredH(com.codename1.ui.Display.getInstance().convertToPixels(7f)); // M3 slider is tall (~122px); thumb spans the height
-                    } else if ("ProgressBar".equals(c.getId())) {
-                        comp.setPreferredW(w * 2 / 3);
-                        comp.setPreferredH(Math.max(6, h / 21)); // native progress bar is a thin line (~11px)
-                    } else if ("Tabs".equals(c.getId()) || "Toolbar".equals(c.getId())) {
-                        comp.setPreferredW(w);    // tab strip / app bar are full-width, like native
-                    }
-                    // Land the visible widget where native lands it: Material widgets
-                    // centre their visible part vertically inside a 48dp minimum touch
-                    // target (an 88px switch sits 22px down in a 132px view, a 110px
-                    // button 11px down). Apply that same inset as a top margin so the
-                    // absolute-position metric sees them aligned. CheckBox/Radio and
-                    // Slider also carry a horizontal box/track inset on the native side.
                     com.codename1.ui.Display disp = com.codename1.ui.Display.getInstance();
-                    int band = disp.convertToPixels(7.62f);     // ~48dp = 132px
-                    int prefH = comp.getPreferredH();
-                    int topInset;
-                    if ("TextField".equals(c.getId())) {
-                        topInset = disp.convertToPixels(0.87f);  // ~15px outlined-field top inset (taller than 48dp band)
-                    } else if ("ProgressBar".equals(c.getId())) {
-                        topInset = disp.convertToPixels(0.93f);  // ~16px; the linear indicator has no 48dp touch target
-                    } else if ("Tabs".equals(c.getId()) || "Toolbar".equals(c.getId()) || "Dialog".equals(c.getId())) {
-                        topInset = 0;             // tab strip / app bar / dialog card anchor at the top-left, like native
-                    } else {
-                        topInset = Math.max(0, (band - prefH) / 2); // centre the visible widget in the 48dp touch target
-                    }
-                    int leftInset = 0;
-                    if ("Slider".equals(c.getId())) {
-                        leftInset = disp.convertToPixels(2.2f);  // ~38px track side padding native shows
-                    }
                     com.codename1.ui.plaf.Style st = comp.getAllStyles();
                     st.setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-                    st.setMargin(topInset, 0, leftInset, 0);
+                    if ("ios".equals(platform)) {
+                        // iOS: the native reference renders full-width widgets filling
+                        // the tile (handled by newTile's BorderLayout) and content-sized
+                        // controls pinned top-left at frame (0,0). Slider/progress are
+                        // full-width but thin, vertically centred (newTile uses a
+                        // LEFT/CENTRE flow). There is no Material 48dp touch-target inset
+                        // on iOS, so every widget anchors at the top-left with no margin.
+                        if ("Slider".equals(c.getId())) {
+                            comp.setPreferredW(w);
+                            // Height = the knob's height (the painter draws the thumb at
+                            // the component height); ~75px to match the iOS capsule knob.
+                            comp.setPreferredH(disp.convertToPixels(4.1f));
+                        } else if ("ProgressBar".equals(c.getId())) {
+                            comp.setPreferredW(w);
+                            comp.setPreferredH(Math.max(6, disp.convertToPixels(0.4f))); // thin bar, a touch thicker
+                        }
+                        st.setMargin(0, 0, 0, 0);
+                    } else {
+                        // Android Material: size full-width widgets and land the visible
+                        // part where native lands it -- centred vertically inside a 48dp
+                        // minimum touch target (an 88px switch sits 22px down in a 132px
+                        // view, a 110px button 11px down). CheckBox/Radio and Slider also
+                        // carry a horizontal box/track inset on the native side.
+                        if ("Slider".equals(c.getId())) {
+                            comp.setPreferredW(w * 3 / 5 - disp.convertToPixels(0.4f)); // ~616px drawn width
+                            comp.setPreferredH(disp.convertToPixels(7f)); // M3 slider is tall (~122px)
+                        } else if ("ProgressBar".equals(c.getId())) {
+                            comp.setPreferredW(w * 2 / 3);
+                            comp.setPreferredH(Math.max(6, h / 21)); // thin line (~11px)
+                        } else if ("Tabs".equals(c.getId()) || "Toolbar".equals(c.getId())) {
+                            comp.setPreferredW(w);
+                        }
+                        int band = disp.convertToPixels(7.62f);     // ~48dp = 132px
+                        int prefH = comp.getPreferredH();
+                        int topInset;
+                        if ("TextField".equals(c.getId())) {
+                            topInset = disp.convertToPixels(0.87f);  // ~15px outlined-field top inset
+                        } else if ("ProgressBar".equals(c.getId())) {
+                            topInset = disp.convertToPixels(0.93f);  // ~16px; no 48dp touch target
+                        } else if ("Tabs".equals(c.getId()) || "Toolbar".equals(c.getId()) || "Dialog".equals(c.getId())) {
+                            topInset = 0;             // app bar / dialog card anchor top-left
+                        } else {
+                            topInset = Math.max(0, (band - prefH) / 2); // centre in 48dp target
+                        }
+                        int leftInset = 0;
+                        if ("Slider".equals(c.getId())) {
+                            leftInset = disp.convertToPixels(2.2f);  // ~38px track side padding
+                        }
+                        st.setMargin(topInset, 0, leftInset, 0);
+                    }
                     Container tile = newTile(comp, c.getId(), w, h, appearance);
                     form.add(centerRow(tile));
                     wrappers.add(tile);
@@ -410,7 +425,25 @@ public class FidelityDeviceRunner {
         // top of the tile. Component theme margin is neutralized (it is external
         // spacing, absent on the native side) so only the touch-target inset places
         // the widget.
-        Container tile = new Container(new FlowLayout(Component.LEFT, Component.TOP));
+        // Genuinely full-width widgets (text field, bars, toolbar, tabs, dialog)
+        // span the whole tile in a real app, so we stretch them edge-to-edge with
+        // BorderLayout.CENTER -- matching the native reference, which fills the tile
+        // for these kinds. Content-sized controls (buttons, switch, checkbox/radio)
+        // keep their preferred size pinned top-left.
+        boolean fullWidth = isFullWidthKind(compId);
+        boolean widthCenter = isWidthCenterKind(compId);
+        Container tile;
+        if (fullWidth) {
+            tile = new Container(new BorderLayout());
+        } else if (widthCenter) {
+            // Full-width but thin. The slider track floats vertically centred; the
+            // progress bar sits at the TOP of the tile (the native linear bar is a
+            // top-anchored hairline), so progress is top-aligned, slider centred.
+            int valign = "ProgressBar".equals(compId) ? Component.TOP : Component.CENTER;
+            tile = new Container(new FlowLayout(Component.LEFT, valign));
+        } else {
+            tile = new Container(new FlowLayout(Component.LEFT, Component.TOP));
+        }
         Image backdrop = isGlassKind(compId) ? getGlassBackdrop() : null;
         if (backdrop != null) {
             // Liquid Glass needs content behind it. The iOS native reference renders
@@ -427,8 +460,34 @@ public class FidelityDeviceRunner {
         tile.getAllStyles().setMargin(0, 0, 0, 0);
         tile.setPreferredW(w);
         tile.setPreferredH(h);
-        tile.add(comp);
+        if (fullWidth) {
+            tile.add(BorderLayout.CENTER, comp);
+        } else {
+            tile.add(comp);
+        }
         return tile;
+    }
+
+    /// Full-width widgets that fill the whole tile (both CN1 and the native
+    /// reference stretch them edge-to-edge). iOS only -- on Android the tuned
+    /// preferred-size + 48dp inset path handles layout, so this stays false there
+    /// to preserve the committed Android baseline. Buttons/switch/checkbox/radio
+    /// are content-sized and excluded on every platform.
+    private boolean isFullWidthKind(String compId) {
+        if (!"ios".equals(platform) || compId == null) {
+            return false;
+        }
+        return "TextField".equals(compId) || "Tabs".equals(compId)
+                || "Toolbar".equals(compId) || "Dialog".equals(compId);
+    }
+
+    /// Full-width-but-thin iOS widgets (slider, progress) that span the tile width
+    /// and float vertically centred, like the native track. iOS only.
+    private boolean isWidthCenterKind(String compId) {
+        if (!"ios".equals(platform) || compId == null) {
+            return false;
+        }
+        return "Slider".equals(compId) || "ProgressBar".equals(compId);
     }
 
     /// Glass-styled iOS widgets that are rendered over the shared backdrop (the iOS

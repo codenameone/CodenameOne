@@ -10,7 +10,7 @@
 # Usage: build-ios-native-ref.sh [simulator_udid]
 set -euo pipefail
 
-UDID="${1:-9FD57000-B316-4E43-BA14-26D99872E282}"
+UDID="${1:-17853196-A8A7-45F2-8F06-24E8257945E6}"
 BUNDLE_ID="com.codenameone.fidelity.nativeref"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/scripts/fidelity-app/ios-native-ref/NativeRef.swift"
