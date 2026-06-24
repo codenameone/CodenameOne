@@ -2,8 +2,10 @@
 //
 // Phase 4 implementation. See header for design rationale.
 //
-// Rasterisation pattern: CGBitmapContext with DeviceGray colorspace +
-// kCGImageAlphaNone + white fill. CTFontDrawGlyphs in default Y-up CG
+// Rasterisation pattern: monochrome fonts use a CGBitmapContext with
+// DeviceGray colorspace + kCGImageAlphaNone + white fill; colour fonts
+// (Apple Color Emoji etc., isColor) use DeviceRGB + premultiplied BGRA so
+// the glyph keeps its own colours. CTFontDrawGlyphs in default Y-up CG
 // renders the glyph into the bitmap such that memory_row_0 holds the
 // padded TOP of the slot and memory_row_(gh-1) the padded BOTTOM —
 // i.e. right-side-up in raster memory order, ready for V=0-at-top
@@ -52,6 +54,7 @@ static uint64_t                atlasCacheTick = 0;
 @interface CN1MetalGlyphAtlas () {
     NSString                                *_fontKey;
     CTFontRef                                _ctFont;
+    BOOL                                     _isColor;
     int                                      _textureWidth;
     int                                      _textureHeight;
     id<MTLTexture>                           _texture;
@@ -66,7 +69,26 @@ static uint64_t                atlasCacheTick = 0;
 @implementation CN1MetalGlyphAtlas
 
 + (nullable instancetype)atlasForFont:(nonnull UIFont *)font {
-    NSString *key = [NSString stringWithFormat:@"%@|%g", font.fontName, (double)font.pointSize];
+    // Build a CTFont from the UIFont's descriptor (system fonts have private
+    // names like ".SFUI-Regular" that CTFontCreateWithName can't resolve) and
+    // route through the CTFont path so the UIFont entry point and the per-run
+    // CoreText path share one cache entry per (PostScript name, size).
+    CTFontDescriptorRef ctDesc = (__bridge CTFontDescriptorRef)font.fontDescriptor;
+    CTFontRef ctFont = CTFontCreateWithFontDescriptor(ctDesc, font.pointSize, NULL);
+    if (ctFont == NULL) return nil;
+    CN1MetalGlyphAtlas *atlas = [self atlasForCTFont:ctFont];
+    CFRelease(ctFont);
+    return atlas;
+}
+
++ (nullable instancetype)atlasForCTFont:(nonnull CTFontRef)ctFont {
+    if (ctFont == NULL) return nil;
+    CFStringRef psName = CTFontCopyPostScriptName(ctFont);
+    NSString *key = [NSString stringWithFormat:@"%@|%g",
+                     psName ? (__bridge NSString *)psName : @"?",
+                     (double)CTFontGetSize(ctFont)];
+    if (psName != NULL) CFRelease(psName);
+
     atlasCacheTick++;
     for (int i = 0; i < atlasCacheCount; i++) {
         if ([atlasCacheEntries[i].key isEqualToString:key]) {
@@ -74,7 +96,7 @@ static uint64_t                atlasCacheTick = 0;
             return atlasCacheEntries[i].atlas;
         }
     }
-    CN1MetalGlyphAtlas *fresh = [[CN1MetalGlyphAtlas alloc] initWithFont:font key:key];
+    CN1MetalGlyphAtlas *fresh = [[CN1MetalGlyphAtlas alloc] initWithCTFont:ctFont key:key];
     if (fresh == nil) return nil;
     // Note: this file builds without ARC (cn1's iOS port keeps
     // CLANG_ENABLE_OBJC_ARC=NO; see METALView.m's #ifndef CN1_USE_ARC).
@@ -117,29 +139,29 @@ static uint64_t                atlasCacheTick = 0;
     return fresh;
 }
 
-- (instancetype)initWithFont:(UIFont *)uifont key:(NSString *)key {
+- (instancetype)initWithCTFont:(CTFontRef)ctFont key:(NSString *)key {
     self = [super init];
     if (self == nil) return nil;
     id<MTLDevice> device = CN1MetalDevice();
     if (device == nil) return nil;
 
     _fontKey = [key copy];
-    // Build the CTFont from UIFont's descriptor, NOT from .fontName.
-    // iOS system fonts have private names like ".SFUI-Regular" and
-    // CTFontCreateWithName silently falls back to Times for those —
-    // text on the screen path then renders as a serif Times Roman
-    // instead of the requested system font. UIFontDescriptor and
-    // CTFontDescriptor are toll-free bridged, so casting through
-    // .fontDescriptor preserves the actual font identity.
-    CTFontDescriptorRef ctDesc = (__bridge CTFontDescriptorRef)uifont.fontDescriptor;
-    _ctFont = CTFontCreateWithFontDescriptor(ctDesc, uifont.pointSize, NULL);
-    if (_ctFont == NULL) return nil;
+    // Retain the resolved CTFont and use it for BOTH shaping and
+    // rasterisation. The caller hands us the exact font CoreText chose for
+    // the run (the base text font, or a substituted font such as Apple Color
+    // Emoji), so glyph ids always index the font they were shaped against.
+    _ctFont = (CTFontRef)CFRetain(ctFont);
+
+    // sbix/COLR fonts (Apple Color Emoji and friends) advertise the colour
+    // glyph trait. They have no alpha-coverage outline, so an R8 mask would
+    // render garbage / nothing — store premultiplied BGRA instead.
+    _isColor = (CTFontGetSymbolicTraits(_ctFont) & kCTFontTraitColorGlyphs) != 0;
 
     _textureWidth = CN1_METAL_ATLAS_INITIAL_W;
     _textureHeight = CN1_METAL_ATLAS_INITIAL_H;
 
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
+        texture2DDescriptorWithPixelFormat:(_isColor ? MTLPixelFormatBGRA8Unorm : MTLPixelFormatR8Unorm)
         width:(NSUInteger)_textureWidth
         height:(NSUInteger)_textureHeight
         mipmapped:NO];
@@ -186,6 +208,7 @@ static uint64_t                atlasCacheTick = 0;
 - (id<MTLTexture>)texture { return _texture; }
 - (int)textureWidth      { return _textureWidth; }
 - (int)textureHeight     { return _textureHeight; }
+- (BOOL)isColor          { return _isColor; }
 - (CTFontRef)ctFont      { return _ctFont; }
 
 - (BOOL)tryGrowAtlas {
@@ -197,7 +220,7 @@ static uint64_t                atlasCacheTick = 0;
     int newH = MIN(_textureHeight * 2, CN1_METAL_ATLAS_MAX_H);
 
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
+        texture2DDescriptorWithPixelFormat:(_isColor ? MTLPixelFormatBGRA8Unorm : MTLPixelFormatR8Unorm)
         width:(NSUInteger)newW height:(NSUInteger)newH mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     id<MTLTexture> newTex = [device newTextureWithDescriptor:desc];
@@ -268,10 +291,14 @@ static uint64_t                atlasCacheTick = 0;
     int slotY = _shelfY;
     _cursorX += gw + CN1_METAL_ATLAS_PADDING;
 
-    // Rasterise into a local R8 buffer using DeviceGray + kCGImageAlphaNone
-    // + white fill. CTFontDrawGlyphs renders the glyph paths in white
-    // (== 0xff in the R8 pixel) on a black (== 0x00) background; sampled
-    // through cn1_fs_alpha_mask the .r channel becomes alpha coverage.
+    // Rasterise into a local buffer. Monochrome fonts use DeviceGray +
+    // kCGImageAlphaNone + white fill: CTFontDrawGlyphs paints the glyph paths
+    // white (0xff in R8) on black, sampled as alpha coverage by
+    // cn1_fs_alpha_mask. Colour fonts (emoji) use premultiplied BGRA so the
+    // glyph's own colours land in the atlas — the byte order
+    // (byteOrder32Little | alphaPremultipliedFirst → B,G,R,A in memory)
+    // matches MTLPixelFormatBGRA8Unorm, the same combo
+    // CN1MetalTextureFromUIImage / the mutable-image readback use.
     //
     // Y-up CG default: drawing the glyph at user origin
     // (padding - bearingX, padding - bearingY) places the bbox at user
@@ -281,19 +308,28 @@ static uint64_t                atlasCacheTick = 0;
     // user-y=padding → memory_row_(gh-1-padding); i.e. the glyph occupies
     // memory rows [padding-1 .. gh-1-padding] right-side-up. memory_row_0
     // is the TOP padding band, memory_row_(gh-1) the BOTTOM padding band.
-    size_t bytesPerRow = (size_t)gw;
+    int bytesPerPixel = _isColor ? 4 : 1;
+    size_t bytesPerRow = (size_t)gw * (size_t)bytesPerPixel;
     void *pixels = calloc((size_t)gh * bytesPerRow, 1);
     if (pixels == NULL) return nil;
-    CGColorSpaceRef cs = CGColorSpaceCreateDeviceGray();
+    CGColorSpaceRef cs = _isColor ? CGColorSpaceCreateDeviceRGB()
+                                  : CGColorSpaceCreateDeviceGray();
+    CGBitmapInfo bitmapInfo = _isColor
+        ? (CGBitmapInfo)(kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst)
+        : (CGBitmapInfo)kCGImageAlphaNone;
     CGContextRef ctx = CGBitmapContextCreate(pixels, (size_t)gw, (size_t)gh, 8,
                                              bytesPerRow, cs,
-                                             (CGBitmapInfo)kCGImageAlphaNone);
+                                             bitmapInfo);
     CGColorSpaceRelease(cs);
     if (ctx == NULL) {
         free(pixels);
         return nil;
     }
-    CGContextSetGrayFillColor(ctx, 1.0, 1.0);
+    if (!_isColor) {
+        // Tint only matters for the monochrome path; colour glyphs carry
+        // their own colours and ignore the fill.
+        CGContextSetGrayFillColor(ctx, 1.0, 1.0);
+    }
 
     CGPoint origin = CGPointMake((CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.x,
                                  (CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.y);

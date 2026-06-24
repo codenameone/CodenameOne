@@ -33,6 +33,23 @@ public class DrawString extends AbstractGraphicsScreenshotTest {
             y += g.getFont().getHeight();
         }
 
+        // Emoji regression cover (matches the customer repro and issue): these
+        // supplementary code points have no glyph in the system font, so the
+        // platform font-substitutes an emoji font. On the iOS Metal renderer
+        // this used to rasterise the substituted-run glyph ids against the
+        // base font's glyph table, yielding random CJK ("Chinese") glyphs.
+        // Built from code points -- exactly as a user-entered "U+1F3E0" hex
+        // value would be via Character.toChars -- to keep this source ASCII.
+        g.setColor(0xffffff);
+        g.setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE));
+        int[] emojiCodePoints = {0x1F3E0, 0x1F389, 0x1F600, 0x1F680};
+        StringBuilder emoji = new StringBuilder();
+        for (int cp : emojiCodePoints) {
+            emoji.append(new String(Character.toChars(cp)));
+        }
+        g.drawString(emoji.toString(), bounds.getX(), y);
+        y += g.getFont().getHeight();
+
         g.setColor(0xff0000);
         g.drawStringBaseline("Baseline and עברית", bounds.getX(), bounds.getY() + bounds.getHeight());
     }
