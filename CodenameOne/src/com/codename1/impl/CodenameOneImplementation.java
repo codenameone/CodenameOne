@@ -859,12 +859,19 @@ public abstract class CodenameOneImplementation {
                         Dimension d = dirty.getSize();
                         wrapper.setClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
                         cmp.setDirtyRegion(null);
-                        // Confine any clip this component sets while painting to
-                        // its flushed (dirty) region on immediate-mode ports.
-                        setPaintDirtyRegionClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
                     }
-                    cmp.paintComponent(wrapper);
+                    // Confine any clip this component sets while painting to its
+                    // flushed region on immediate-mode ports. Use the paintable
+                    // bounds -- the region retained ports clamp to via the
+                    // flushGraphics call below -- NOT the dirty region, which
+                    // repaint() nulls (Component.repaint), in which case it would
+                    // fall back to the full screen and the clip could still escape
+                    // (#5273). Computed before paintComponent (paint does not move
+                    // the component) so the clip set during paint can be clamped.
                     getPaintableBounds(cmp, paintDirtyTmpRect);
+                    setPaintDirtyRegionClip(paintDirtyTmpRect.getX(), paintDirtyTmpRect.getY(),
+                            paintDirtyTmpRect.getWidth(), paintDirtyTmpRect.getHeight());
+                    cmp.paintComponent(wrapper);
                     int cmpAbsX = paintDirtyTmpRect.getX();
                     topX = Math.min(cmpAbsX, topX);
                     bottomX = Math.max(cmpAbsX + paintDirtyTmpRect.getWidth(), bottomX);
