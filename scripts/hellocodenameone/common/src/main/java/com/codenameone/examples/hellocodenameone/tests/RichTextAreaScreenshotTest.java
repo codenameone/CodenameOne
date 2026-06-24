@@ -49,13 +49,15 @@ public class RichTextAreaScreenshotTest extends BaseTest {
     @Override
     protected void registerReadyCallback(Form parent, final Runnable run) {
         this.readyRunnable = run;
-        UITimer.timer(4500, false, parent, this::capture);
+        // Generous bound + settle so the web view's first paint reliably completes
+        // before we capture (the paint can lag the editor's page-load "ready" event).
+        UITimer.timer(8000, false, parent, this::capture);
         maybeSettle();
     }
 
     private void maybeSettle() {
         if (ready && form != null) {
-            UITimer.timer(1200, false, form, this::capture);
+            UITimer.timer(3500, false, form, this::capture);
         }
     }
 

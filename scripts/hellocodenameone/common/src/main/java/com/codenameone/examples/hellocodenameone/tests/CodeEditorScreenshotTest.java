@@ -51,13 +51,16 @@ public class CodeEditorScreenshotTest extends BaseTest {
     @Override
     protected void registerReadyCallback(Form parent, final Runnable run) {
         this.readyRunnable = run;
-        UITimer.timer(4500, false, parent, this::capture);
+        // Generous bound + settle: the web view's first paint can lag the editor's
+        // "ready" (page-load) event, especially for the larger CodeEditor, so we wait
+        // long enough that the rendered content is reliably on screen before capturing.
+        UITimer.timer(8000, false, parent, this::capture);
         maybeSettle();
     }
 
     private void maybeSettle() {
         if (ready && form != null) {
-            UITimer.timer(1200, false, form, this::capture);
+            UITimer.timer(3500, false, form, this::capture);
         }
     }
 
