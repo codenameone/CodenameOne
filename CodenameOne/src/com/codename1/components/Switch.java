@@ -567,7 +567,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private Image getTrackDisabledImage() {
         if (trackDisabledImage == null) {
             // Material 3 disabled switch reads as a thin outline ring over a
-            // surface-coloured interior (≈ the page background, so it looks almost
+            // surface-coloured interior (~ the page background, so it looks almost
             // fill-less) - NOT the accent or a contrasting fill. The smooth ring is
             // the outer pill (foreground colour) minus the inner surface pill, so the
             // disabled style's bg must be the surface colour and its fg the outline.
