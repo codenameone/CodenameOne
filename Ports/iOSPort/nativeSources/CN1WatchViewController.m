@@ -163,6 +163,11 @@ static CGRect watchFlushRect;
             // Keep draining; a single failing op shouldn't blank the frame.
         }
     }
+    // Issue #5273: clear the flush region now the screen drain is done so a
+    // mutable-image draw executed immediately outside drawFrame is not clamped
+    // to the screen flush rect (the clamp in ClipRect's watch branch no-ops on
+    // an empty drawingRect).
+    [ClipRect setDrawRect:CGRectZero];
     [v presentFramebuffer];
     painted = YES;
 #ifndef CN1_USE_ARC

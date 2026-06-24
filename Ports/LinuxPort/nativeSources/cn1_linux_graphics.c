@@ -86,6 +86,13 @@ void cn1LinuxApplyClip(CN1Graphics* g) {
          * Window target only (mutable images keep flushW == 0 and are
          * unaffected); skipped when no flush rect is set so a clip is never
          * collapsed to nothing. */
+        if (g->isWindowTarget && g->clipH > 300) {
+            /* CN1DIAG #5273: temporary -- reveals whether the flush region is the
+             * dirty sub-region or the full screen when the escaping clip applies. */
+            fprintf(stderr, "CN1DIAG applyClip win clip=(%d,%d,%d,%d) flush=(%d,%d,%d,%d)\n",
+                    g->clipX, g->clipY, g->clipW, g->clipH, g->flushX, g->flushY, g->flushW, g->flushH);
+            fflush(stderr);
+        }
         if (g->isWindowTarget && g->flushW > 0 && g->flushH > 0) {
             int cx2 = cx + cw, cy2 = cy + ch;
             int fx2 = g->flushX + g->flushW, fy2 = g->flushY + g->flushH;

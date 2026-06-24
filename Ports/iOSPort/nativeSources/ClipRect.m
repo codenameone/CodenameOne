@@ -115,13 +115,14 @@ static CGRect drawingRect;
         // independently scrollable BorderLayout.CENTER under a fixed band) can
         // extend past the flushed sub-region and overwrite the fixed band,
         // which then stays corrupted until a full repaint -- the same defect
-        // the Metal backend had. Screen ops only ([self target] == nil): a
-        // mutable-image draw runs against its own surface bounds, where the
-        // screen flush rect does not apply. Guarded on a non-empty drawingRect
-        // so before the first flush sets it (or on any path that leaves it
-        // zero) we fall through to the unclamped clip rather than collapsing
-        // every clip to nothing and blanking the watch surface.
-        if ([self target] == nil && drawingRect.size.width > 0 && drawingRect.size.height > 0) {
+        // the Metal backend had. This is scoped to screen ops by drawFrame,
+        // which sets drawingRect to the flush region only while draining the
+        // screen op queue and resets it to zero afterwards; a mutable-image
+        // draw runs immediately outside drawFrame with drawingRect zero, so the
+        // non-empty guard below makes the clamp a no-op for it. The guard also
+        // covers the pre-first-flush state, so a clip is never collapsed to
+        // nothing and the watch surface can never be blanked.
+        if (drawingRect.size.width > 0 && drawingRect.size.height > 0) {
             int sx2 = sx + sw;
             int sy2 = sy + sh;
             int orX = (int)drawingRect.origin.x;
