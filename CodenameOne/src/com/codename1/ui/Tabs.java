@@ -1424,6 +1424,7 @@ public class Tabs extends Container {
         try {
             thickMm = Float.parseFloat(getUIManager().getThemeConstant("tabsBottomDividerThicknessMm", "0.15"));
         } catch (NumberFormatException ignore) {
+            // malformed constant -> keep the 0.15mm default
         }
         int thickness = Display.getInstance().convertToPixels(thickMm);
         if (thickness < 1) {
@@ -1467,6 +1468,7 @@ public class Tabs extends Container {
             thicknessMm = Float.parseFloat(getUIManager().getThemeConstant(
                     "tabsAnimatedIndicatorThicknessMm", String.valueOf(animatedIndicatorThicknessMm)));
         } catch (NumberFormatException ignore) {
+            // malformed constant -> keep the default indicator thickness
         }
         int thickness = Display.getInstance().convertToPixels(thicknessMm);
         // Use TabIndicator UIID color when its fg is set; otherwise pull

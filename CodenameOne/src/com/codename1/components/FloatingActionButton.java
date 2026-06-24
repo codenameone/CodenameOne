@@ -312,6 +312,7 @@ public class FloatingActionButton extends Button {
                         return new Dimension(d, d);
                     }
                 } catch (NumberFormatException ignore) {
+                    // malformed fabDiameterMM constant -> fall back to the icon-derived size
                 }
             }
             return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);

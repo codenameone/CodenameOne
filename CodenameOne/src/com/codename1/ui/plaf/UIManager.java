@@ -1834,7 +1834,7 @@ public class UIManager {
         // fonts (e.g. a native theme's text letter spacing). Flush the derived-font
         // cache so those fonts are rebuilt against the incoming constants rather than
         // returning a paint derived under the previous (or no) theme.
-        com.codename1.ui.Font.clearDerivedFontCache();
+        Font.clearDerivedFontCache();
         String con = (String) themeProps.get("@includeNativeBool");
         if (con != null && "true".equalsIgnoreCase(con) && Display.getInstance().hasNativeTheme()) {
             boolean a = accessible;
