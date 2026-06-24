@@ -32,16 +32,18 @@
 #import "ExecutableOp.h"
 #import "PaintOp.h"
 #import "GLUIImage.h"
-// MessageUI (mail/SMS composer) is unavailable on watchOS; the email/SMS native
-// methods are #if !TARGET_OS_WATCH-guarded in IOSNative.m, and the matching
-// delegate conformances below are likewise dropped on the watch slice.
-#if !TARGET_OS_WATCH
+// MessageUI (mail/SMS composer) is unavailable on watchOS, and on tvOS it ships
+// only a link stub with no composer headers; the email/SMS native methods are
+// guarded the same way in IOSNative.m, and the matching delegate conformances
+// below are likewise dropped on those slices.
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MessageUI/MFMessageComposeViewController.h>
 #endif
 #import <CoreLocation/CoreLocation.h>
 //#define CN1_USE_STOREKIT
-#ifdef CN1_USE_STOREKIT
+//#define CN1_USE_APPREVIEW
+#if defined(CN1_USE_STOREKIT) || defined(CN1_USE_APPREVIEW)
 #import "StoreKit/StoreKit.h"
 #endif
 #if !TARGET_OS_WATCH
@@ -255,18 +257,24 @@ void CN1DismissLaunchPlaceholder(void);
 -(void)drawFrame:(CGRect)rect;
 @end
 #else
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate,
-#if !TARGET_OS_WATCH
+@interface CodenameOne_GLViewController : UIViewController<
+#if !TARGET_OS_TV
+UIImagePickerControllerDelegate,
+#endif
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 MFMailComposeViewControllerDelegate,
 #endif
 UIScrollViewDelegate,
 #ifdef CN1_USE_STOREKIT
 SKProductsRequestDelegate, SKPaymentTransactionObserver,
 #endif
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 MFMessageComposeViewControllerDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate,
 #endif
-CLLocationManagerDelegate, AVAudioRecorderDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
+CLLocationManagerDelegate, AVAudioRecorderDelegate
+#if !TARGET_OS_TV
+, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
+#endif
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
 #endif
@@ -346,7 +354,9 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate, UIPickerViewDelegate, UIDocu
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event;
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event;
 
+#if !TARGET_OS_TV
 - (void)datePickerChangeDate:(UIDatePicker *)sender;
+#endif
 -(void)datePickerDismiss;
 -(void)datePickerCancel;
 

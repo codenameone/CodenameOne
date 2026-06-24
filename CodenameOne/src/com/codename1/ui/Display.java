@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.analytics.Analytics;
 import com.codename1.annotations.Async;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -4391,6 +4392,17 @@ public final class Display extends CN1Constants {
         return impl.isWatch();
     }
 
+    /// Indicates whether the application is running on a television form factor
+    /// (Apple TV / Android TV / Google TV). Notice that this is often a guess
+    /// derived from the device metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a TV
+    public boolean isTV() {
+        return impl.isTV();
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns
@@ -5244,6 +5256,31 @@ public final class Display extends CN1Constants {
         return impl.isNativeShareSupported();
     }
 
+    /// Indicates whether the platform exposes a native in-app review/rating
+    /// prompt (the OS-sanctioned "rate this app" sheet). When false the
+    /// [com.codename1.appreview.AppReview] API falls back to a Codename One
+    /// drawn rating widget.
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform can present a native review prompt.
+    public boolean isNativeInAppReviewSupported() {
+        return impl.isNativeInAppReviewSupported();
+    }
+
+    /// Requests the native in-app review prompt. Should only be invoked when
+    /// [#isNativeInAppReviewSupported] returns true. The platforms hide whether
+    /// the user actually rated and may throttle the prompt; `done` reports
+    /// whether the request reached the native review controller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `done`: invoked with `true` once the native prompt was requested or
+    ///   `false` when the platform did not handle it. May be null.
+    public void requestNativeInAppReview(SuccessCallback<Boolean> done) {
+        impl.requestNativeInAppReview(done);
+    }
+
     /// Share the required information using the platform sharing services.
     /// a Sharing service can be: mail, sms, facebook, twitter,...
     /// This method is implemented if isNativeShareSupported() returned true for
@@ -5329,6 +5366,13 @@ public final class Display extends CN1Constants {
     ///
     /// - `listener`: callback for the share outcome. May be null.
     public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
+        // Analytics auto-instrumentation: this 5-arg overload is the chokepoint
+        // that every share(...) variant funnels into. The autoEvent path is
+        // consent-gated, a no-op when no provider is registered, and never
+        // throws into the caller. "type" is the coarse share content type.
+        Map<String, Object> shareParams = new HashMap<String, Object>();
+        shareParams.put("type", image != null ? "image" : "text");
+        Analytics.autoEvent("share", "engagement", shareParams);
         if (listener == null) {
             impl.share(textOrPath, image, mimeType, sourceRect);
             return;

@@ -53,7 +53,7 @@ int connections = 0;
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout {
     dispatch_async(dispatch_get_main_queue(), ^{
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
 #endif
     });
@@ -73,7 +73,7 @@ int connections = 0;
 }
 
 - (void)connect {
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_TV
     // NSURLConnection's synchronous delegate initializer is unavailable on
     // watchOS (NSURLSession is the supported API). Networking via this legacy
     // path is a no-op on the watch slice for now.
@@ -240,7 +240,7 @@ extern void connectionError(void* peer, NSString* message);
     connectionError((BRIDGE_CAST void*)self, [error localizedDescription]);
     connections--;
     if(connections < 1) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
 #endif
     }
@@ -254,7 +254,7 @@ extern void connectionError(void* peer, NSString* message);
     connectionComplete((BRIDGE_CAST void*)self);
     connections--;
     if(connections < 1) {
-#if !TARGET_OS_WATCH
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
 #endif
     }

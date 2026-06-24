@@ -37,6 +37,15 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             done();
             return true;
         }
+        // tvOS ships no WebKit (BrowserComponent is compiled out of the tvOS
+        // slice), so the web map has no peer to render into -- skip rather than
+        // baseline a blank/black capture, exactly as on the watch form factor.
+        if (com.codename1.ui.CN.isTV()) {
+            System.out.println(
+                    "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=tv-no-webview");
+            done();
+            return true;
+        }
         // The Mac native (Catalyst) desktop backend renders into a Core Graphics
         // bitmap that does not composite the native web view, so the capture is
         // solid black there. The web map renders + captures fine on the mobile

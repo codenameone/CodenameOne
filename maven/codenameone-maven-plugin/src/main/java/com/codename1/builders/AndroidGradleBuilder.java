@@ -289,6 +289,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
+    private boolean usesAppReview;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -1200,6 +1201,27 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // Android TV / Google TV support. android.tv=true marks this as an
+        // Android TV app: the Leanback launcher category makes the app appear on
+        // the TV home screen, the leanback software feature plus an optional
+        // touchscreen declaration advertise TV compatibility, and a 320x180
+        // banner is generated from the app icon (see below). The same APK still
+        // runs on phones/tablets and CN.isTV() returns true at runtime via
+        // PackageManager.FEATURE_TELEVISION/leanback. With the hint off the
+        // manifest is unchanged.
+        String tvLeanbackCategory = "";
+        String tvActivityBanner = "";
+        if ("true".equals(request.getArg("android.tv", "false"))) {
+            tvLeanbackCategory = "                <category android:name=\"android.intent.category.LEANBACK_LAUNCHER\" />\n";
+            tvActivityBanner = "                  android:banner=\"@drawable/tv_banner\"\n";
+            if (!xPermissions.contains("android.software.leanback")) {
+                xPermissions += "    <uses-feature android:name=\"android.software.leanback\" android:required=\"false\" />\n";
+            }
+            if (!xPermissions.contains("android.hardware.touchscreen")) {
+                xPermissions += "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n";
+            }
+        }
+
         if (playServicesAds) {
             minSDK = maxInt("21", minSDK);
         }
@@ -1304,6 +1326,12 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/payment") > -1) {
                         purchasePermissions = true;
                     }
+                    // App review API -> pull in the Play In-App Review library
+                    // (see dependency injection further below). Detected from
+                    // actual usage so apps that never review stay lean.
+                    if (!usesAppReview && cls.indexOf("com/codename1/appreview") == 0) {
+                        usesAppReview = true;
+                    }
                     if (cls.indexOf("com/codename1/location/Geofence") > -1) {
                         if (!"true".equals(playServicesValue)) {
                             // If play services are not currently "blanket" enabled
@@ -1390,6 +1418,14 @@ public class AndroidGradleBuilder extends Executor {
                 public void usesClassMethod(String cls, String method) {
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && (method.indexOf("vibrate") > -1 || method.indexOf("notifyStatusBar") > -1)) {
                         vibratePermission = true;
+                    }
+
+                    // Apps that call the low-level CN/Display review entry point
+                    // directly (without the com.codename1.appreview facade).
+                    if (!usesAppReview
+                            && (cls.indexOf("com/codename1/ui/CN") == 0 || cls.indexOf("com/codename1/ui/Display") == 0)
+                            && method.indexOf("equestNativeInAppReview") > -1) {
+                        usesAppReview = true;
                     }
 
                     if ((cls.indexOf("com/codename1/media/MediaManager") == 0 && method.indexOf("createBackgroundMedia") > -1)) {
@@ -1671,6 +1707,38 @@ public class AndroidGradleBuilder extends Executor {
                         request.getArg("gradleDependencies", "") +
                                 "\n"+compile+" \"com.google.firebase:firebase-messaging:" +
                                 request.getArg("android.firebaseMessagingVersion", playServicesVersion) + "\"\n"
+                );
+            }
+        }
+
+        // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
+        // delegates to a generated FirebaseAnalyticsProvider.Bridge). Enabled
+        // with the build hint android.firebaseAnalytics=true, which -- like FCM --
+        // requires a google-services.json in native/android. Reuses the
+        // google-services Gradle plugin + buildscript classpath if FCM already
+        // added them (the contains() guards keep the lines idempotent).
+        boolean useFirebaseAnalytics = "true".equals(request.getArg("android.firebaseAnalytics", "false"));
+        if (useFirebaseAnalytics) {
+            if (!googleServicesJson.exists()) {
+                error("google-services.json not found.  android.firebaseAnalytics=true requires a valid google-services.json in the native/android directory (download it from the Firebase console: https://console.firebase.google.com/).", new RuntimeException());
+                return false;
+            }
+            if (!request.getArg("android.topDependency", "").contains("com.google.gms:google-services")) {
+                if (gradleVersionInt >= 8) {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+                } else {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.0.1'\n");
+                }
+            }
+            if (!request.getArg("android.xgradle", "").contains("apply plugin: 'com.google.gms.google-services'")) {
+                request.putArgument("android.xgradle", request.getArg("android.xgradle", "") + "\napply plugin: 'com.google.gms.google-services'\n");
+            }
+            if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-analytics")) {
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.google.firebase:firebase-analytics:" +
+                                request.getArg("android.firebaseAnalyticsVersion", "21.5.0") + "\"\n"
                 );
             }
         }
@@ -2073,6 +2141,23 @@ public class AndroidGradleBuilder extends Executor {
             createIconFile(new File(drawableXhdpiDir, "icon.png"), iconImage, 96, 96);
             createIconFile(new File(drawableXXhdpiDir, "icon.png"), iconImage, 144, 144);
             createIconFile(new File(drawableXXXhdpiDir, "icon.png"), iconImage, 192, 192);
+
+            if ("true".equals(request.getArg("android.tv", "false"))) {
+                // Android TV / Google TV launcher banner (320x180, xhdpi). The
+                // app icon is centered (scaled, not stretched) on a solid dark
+                // background so it isn't distorted; the Leanback launcher needs
+                // a banner for the app to appear on the TV home screen.
+                BufferedImage banner = new BufferedImage(320, 180, BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D bannerGraphics = banner.createGraphics();
+                bannerGraphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                bannerGraphics.setColor(new java.awt.Color(0x20, 0x20, 0x20));
+                bannerGraphics.fillRect(0, 0, 320, 180);
+                java.awt.Image scaledIcon = getScaledInstance(iconImage, 144, 144);
+                bannerGraphics.drawImage(scaledIcon, (320 - 144) / 2, (180 - 144) / 2, null);
+                bannerGraphics.dispose();
+                ImageIO.write(banner, "png", new File(drawableXhdpiDir, "tv_banner.png"));
+            }
 
             if (enableAdaptiveIcons) {
                 createIconFile(new File(mipmapMdpiDir, "ic_launcher.png"), iconImage, 48, 48);
@@ -2888,10 +2973,13 @@ public class AndroidGradleBuilder extends Executor {
                 + "                  android:theme=\""+activityTheme+"\"\n"
                 + "                  android:configChanges=\"orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout\"\n"
                 + "                  android:launchMode=\""+launchMode+"\"\n"
-                + "                  android:label=\"" + xmlizedDisplayName + "\" >\n"
+                + "                  android:label=\"" + xmlizedDisplayName + "\"\n"
+                + tvActivityBanner
+                + "                  >\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"android.intent.action.MAIN\" />\n"
                 + "                <category android:name=\"android.intent.category.LAUNCHER\" />\n"
+                + tvLeanbackCategory
                 + "            </intent-filter>\n"
                 + request.getArg("android.xintent_filter", "")
                 + "        </activity>\n"
@@ -3107,6 +3195,86 @@ public class AndroidGradleBuilder extends Executor {
         if (svgRegistryClassFile.isFile()) {
             svgRegistryInstall = "            com.codename1.generated.svg.SVGRegistry.installGlobal();\n";
         }
+
+        // Firebase Analytics bridge: when android.firebaseAnalytics=true the
+        // app has the firebase-analytics Gradle dependency, so we generate a
+        // FirebaseAnalyticsProvider.Bridge that calls the SDK directly (no
+        // reflection, no NativeInterface) and register it in the Stub before
+        // i.init(this). Without the hint no bridge is generated and
+        // FirebaseAnalyticsProvider stays a no-op.
+        String firebaseRegisterInstall = "";
+        if (useFirebaseAnalytics) {
+            String fbPkg = request.getPackageName();
+            String fbSrc = "package " + fbPkg + ";\n\n"
+                    + "import android.content.Context;\n"
+                    + "import android.os.Bundle;\n"
+                    + "import com.codename1.impl.android.AndroidNativeUtil;\n"
+                    + "import com.codename1.analytics.FirebaseAnalyticsProvider;\n"
+                    + "import com.google.firebase.analytics.FirebaseAnalytics;\n"
+                    + "import java.util.Iterator;\n"
+                    + "import org.json.JSONObject;\n\n"
+                    + "/** Generated by the Codename One build (android.firebaseAnalytics=true). */\n"
+                    + "public class FirebaseAnalyticsBridgeImpl implements FirebaseAnalyticsProvider.Bridge {\n"
+                    + "    private FirebaseAnalytics fa;\n"
+                    + "    private boolean resolved;\n"
+                    + "    private FirebaseAnalytics fa() {\n"
+                    + "        if (!resolved) {\n"
+                    + "            resolved = true;\n"
+                    + "            try {\n"
+                    + "                Context c = AndroidNativeUtil.getContext();\n"
+                    + "                if (c != null) { fa = FirebaseAnalytics.getInstance(c); }\n"
+                    + "            } catch (Throwable t) { fa = null; }\n"
+                    + "        }\n"
+                    + "        return fa;\n"
+                    + "    }\n"
+                    + "    public boolean isSupported() { return fa() != null; }\n"
+                    + "    public void logEvent(String name, String paramsJson) {\n"
+                    + "        FirebaseAnalytics f = fa();\n"
+                    + "        if (f != null) { f.logEvent(sanitize(name), toBundle(paramsJson)); }\n"
+                    + "    }\n"
+                    + "    public void logScreen(String screenName) {\n"
+                    + "        FirebaseAnalytics f = fa();\n"
+                    + "        if (f != null) { Bundle b = new Bundle(); b.putString(\"screen_name\", screenName); f.logEvent(\"screen_view\", b); }\n"
+                    + "    }\n"
+                    + "    public void setUserId(String id) { FirebaseAnalytics f = fa(); if (f != null) { f.setUserId(id); } }\n"
+                    + "    public void setUserProperty(String key, String value) { FirebaseAnalytics f = fa(); if (f != null) { f.setUserProperty(key, value); } }\n"
+                    + "    private static Bundle toBundle(String json) {\n"
+                    + "        Bundle b = new Bundle();\n"
+                    + "        if (json == null || json.length() == 0) { return b; }\n"
+                    + "        try {\n"
+                    + "            JSONObject o = new JSONObject(json);\n"
+                    + "            Iterator<String> keys = o.keys();\n"
+                    + "            while (keys.hasNext()) {\n"
+                    + "                String k = keys.next();\n"
+                    + "                Object v = o.get(k);\n"
+                    + "                if (v instanceof Number) { b.putDouble(k, ((Number) v).doubleValue()); }\n"
+                    + "                else if (v instanceof Boolean) { b.putString(k, v.toString()); }\n"
+                    + "                else { b.putString(k, String.valueOf(v)); }\n"
+                    + "            }\n"
+                    + "        } catch (Throwable t) { /* send the event without malformed params */ }\n"
+                    + "        return b;\n"
+                    + "    }\n"
+                    + "    private static String sanitize(String name) {\n"
+                    + "        if (name == null || name.length() == 0) { return \"event\"; }\n"
+                    + "        StringBuilder sb = new StringBuilder(name.length());\n"
+                    + "        for (int i = 0; i < name.length(); i++) {\n"
+                    + "            char c = name.charAt(i);\n"
+                    + "            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') { sb.append(c); }\n"
+                    + "            else { sb.append('_'); }\n"
+                    + "        }\n"
+                    + "        return sb.toString();\n"
+                    + "    }\n"
+                    + "}\n";
+            File fbBridgeFile = new File(stubFileSourceDir, "FirebaseAnalyticsBridgeImpl.java");
+            try {
+                createFile(fbBridgeFile, fbSrc.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to create FirebaseAnalyticsBridgeImpl class", ex);
+            }
+            firebaseRegisterInstall = "            com.codename1.analytics.FirebaseAnalyticsProvider.registerBridge(new "
+                    + fbPkg + ".FirebaseAnalyticsBridgeImpl());\n";
+        }
+
         String consumableCode;
         consumableCode = "public boolean isConsumable(String sku) {\n"
                 + "  boolean retVal = super.isConsumable(sku);\n"
@@ -3388,6 +3556,7 @@ public class AndroidGradleBuilder extends Executor {
                             + "    public void run(Form currentForm, boolean wasStopped) {\n"
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
+                            + firebaseRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"
                             + fcmRegisterPushCode
@@ -4060,6 +4229,13 @@ public class AndroidGradleBuilder extends Executor {
         if (purchasePermissions) {
             String billingClientVersion = request.getArg("android.billingclient.version", "4.0.0");
             additionalDependencies += " implementation 'com.android.billingclient:billing:"+billingClientVersion+"'\n";
+        }
+
+        // Play In-App Review library, added only when the app references the
+        // app-review API (detected during the class scan above).
+        if (usesAppReview) {
+            String reviewVersion = request.getArg("android.appReview.version", "2.0.1");
+            additionalDependencies += " implementation 'com.google.android.play:review:"+reviewVersion+"'\n";
         }
 
         // OidcClient routes sign-in through androidx.browser Custom Tabs.

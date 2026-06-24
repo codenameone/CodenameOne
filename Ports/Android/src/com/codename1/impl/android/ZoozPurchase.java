@@ -72,7 +72,7 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
     }
 
     @Override
-    public void purchase(String sku) {
+    public void purchaseImpl(String sku) {
         ((CodenameOneActivity)activity).purchase(sku);
     }
 

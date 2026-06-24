@@ -1523,7 +1523,8 @@ public class Resources {
         if ("HTML5".equals(platformName)) {
             platformName = Display.getInstance().getProperty("HTML5.platformName", "mac");
         }
-        String deviceType = Display.getInstance().isDesktop() ? "desktop" : Display.getInstance().isTablet() ? "tablet" : "phone";
+        Display d = Display.getInstance();
+        String deviceType = d.isDesktop() ? "desktop" : d.isTablet() ? "tablet" : d.isTV() ? "tv" : d.isWatch() ? "watch" : "phone";
         String platformPrefix = "platform-" + platformName + "-";
         String densityPrefix = "density-" + densityStr + "-";
         String devicePrefix = "device-" + deviceType + "-";

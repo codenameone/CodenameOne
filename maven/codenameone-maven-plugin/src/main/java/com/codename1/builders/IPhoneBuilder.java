@@ -64,6 +64,12 @@ public class IPhoneBuilder extends Executor {
     // watchNative.enabled hint is set, keeping the iOS build unchanged.
     private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
 
+    // tvNative.* delegate: adds an Apple TV (tvOS) target. tvOS is handled like
+    // the Mac Catalyst slice (Metal + GL stub headers + GL-only sources excluded)
+    // but as a separate appletvos target. Inert unless tvNative.enabled (or
+    // codename1.tvMain) is set, keeping the iOS build unchanged.
+    private final TvNativeBuilder tvNativeBuilder = new TvNativeBuilder(this);
+
     private boolean enableGalleryMultiselect;
     private boolean usePhotoKitForMultigallery;
     private boolean enableWKWebView, disableUIWebView;
@@ -99,6 +105,7 @@ public class IPhoneBuilder extends Executor {
     private String buildVersion;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
+    private boolean usesAppReview;
     private boolean usesWalletApi;
     private boolean usesCryptoAPI;
     private boolean usesCryptoGcm;
@@ -337,6 +344,19 @@ public class IPhoneBuilder extends Executor {
             ensureXcodeprojInstalled();
         }
 
+        // tvNative: parse + prep. The tvOS app is a SEPARATE appletvos target
+        // (like the watch target, not a Catalyst-style slice of the iOS app), so
+        // we must NOT touch the iOS app's renderer here -- forcing useMetal=true
+        // would override an explicit ios.metal=false and make the GL screenshot
+        // job actually render with Metal. tvOS itself has no OpenGL ES and runs
+        // on Metal via the project's default ios.metal=true; the tvOS target's
+        // own Xcode settings are written by tvNativeBuilder.applyXcodeSettings.
+        // We only need the xcodeproj gem to add and wire the target.
+        tvNativeBuilder.parseHints(request);
+        if (tvNativeBuilder.isEnabled()) {
+            ensureXcodeprojInstalled();
+        }
+
         log("Request Args: ");
         log("-----------------");
         for (String arg : request.getArgs()) {
@@ -414,6 +434,20 @@ public class IPhoneBuilder extends Executor {
         if (usePodsForGoogleAds) {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "Firebase/Core,Firebase/AdMob");
             addMinDeploymentTarget("7.0");
+        }
+
+        // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
+        // delegates to a generated FirebaseAnalyticsProvider.Bridge). Enabled
+        // with the build hint ios.firebaseAnalytics=true; requires a
+        // GoogleService-Info.plist in the project resources. Adds the
+        // Firebase/Analytics pod (skipped if Firebase/Core was already pulled
+        // in by AdMob, which carries Analytics transitively).
+        boolean useFirebaseAnalytics = "true".equals(request.getArg("ios.firebaseAnalytics", "false"));
+        if (useFirebaseAnalytics && !iosPods.contains("Firebase/")) {
+            String fbAnalyticsVersion = request.getArg("ios.firebaseAnalyticsVersion", "");
+            iosPods += (((iosPods.length() > 0) ? ",":"") + "Firebase/Analytics"
+                    + (fbAnalyticsVersion.length() > 0 ? " " + fbAnalyticsVersion : ""));
+            addMinDeploymentTarget("10.0");
         }
         if (enableGalleryMultiselect && photoLibraryUsage) {
             addMinDeploymentTarget("8.0");
@@ -729,6 +763,12 @@ public class IPhoneBuilder extends Executor {
                     if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
                         usesPurchaseAPI = true;
                     }
+                    // App review API (SKStoreReviewController). Gated on actual
+                    // usage so StoreKit.framework + the CN1_USE_APPREVIEW native
+                    // bridge are only linked when the app references the API.
+                    if (!usesAppReview && cls.indexOf("com/codename1/appreview") == 0) {
+                        usesAppReview = true;
+                    }
                     // Wallet issuer-provisioning natives are only compiled in when
                     // the app actually references the API (or enables the extension
                     // via the ios.wallet.extension hint) - see CN1_INCLUDE_WALLET.
@@ -811,6 +851,14 @@ public class IPhoneBuilder extends Executor {
                             && (method.indexOf("connect") > -1
                                 || method.indexOf("disconnect") > -1)) {
                         usesWifiHotspotConfig = true;
+                    }
+                    // Apps that call the low-level CN/Display review entry point
+                    // directly (without the com.codename1.appreview facade) still
+                    // need StoreKit + the native bridge.
+                    if (!usesAppReview
+                            && (cls.equals("com/codename1/ui/CN") || cls.equals("com/codename1/ui/Display"))
+                            && method.indexOf("equestNativeInAppReview") > -1) {
+                        usesAppReview = true;
                     }
                 }
             });
@@ -1314,6 +1362,123 @@ public class IPhoneBuilder extends Executor {
             svgRegistryInstall = "            com.codename1.generated.svg.SVGRegistry.installGlobal();\n";
         }
 
+        // Firebase Analytics bridge (ios.firebaseAnalytics=true): generate a
+        // FirebaseAnalyticsProvider.Bridge whose methods are native and link to
+        // the generated .m below, then register it in the Stub before init().
+        // FIRAnalytics is invoked dynamically (NSClassFromString / performSelector)
+        // so the .m compiles even without the Firebase pod; when the pod is absent
+        // isSupported() returns false and FirebaseAnalyticsProvider is a no-op.
+        String firebaseRegisterInstall = "";
+        if (useFirebaseAnalytics) {
+            String fbPkg = request.getPackageName();
+            String fbBridgeJava = "package " + fbPkg + ";\n\n"
+                    + "import com.codename1.analytics.FirebaseAnalyticsProvider;\n\n"
+                    + "/** Generated by the Codename One build (ios.firebaseAnalytics=true). */\n"
+                    + "public class FirebaseAnalyticsBridgeImpl implements FirebaseAnalyticsProvider.Bridge {\n"
+                    + "    public native boolean isSupported();\n"
+                    + "    public native void logEvent(String name, String paramsJson);\n"
+                    + "    public native void logScreen(String screenName);\n"
+                    + "    public native void setUserId(String id);\n"
+                    + "    public native void setUserProperty(String key, String value);\n"
+                    + "}\n";
+            try (OutputStream fbJavaStream = new FileOutputStream(new File(stubSource, "FirebaseAnalyticsBridgeImpl.java"))) {
+                fbJavaStream.write(fbBridgeJava.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException ex) {
+                throw new RuntimeException("Failed to generate FirebaseAnalyticsBridgeImpl.java", ex);
+            }
+            String pfx = fbPkg.replace('.', '_') + "_FirebaseAnalyticsBridgeImpl";
+            String fbM = "// Generated by the Codename One build (ios.firebaseAnalytics=true).\n"
+                    + "// Native implementation of " + fbPkg + ".FirebaseAnalyticsBridgeImpl.\n"
+                    + "// FIRAnalytics is invoked dynamically so this compiles without the\n"
+                    + "// Firebase pod; isSupported() returns NO when the SDK is absent.\n"
+                    + "#include \"xmlvm.h\"\n"
+                    + "#include \"java_lang_String.h\"\n"
+                    + "#import <Foundation/Foundation.h>\n\n"
+                    + "#pragma clang diagnostic ignored \"-Wundeclared-selector\"\n\n"
+                    + "static Class cn1FirebaseAnalyticsClass(void) {\n"
+                    + "    return NSClassFromString(@\"FIRAnalytics\");\n"
+                    + "}\n\n"
+                    + "JAVA_BOOLEAN " + pfx + "_isSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {\n"
+                    + "    return cn1FirebaseAnalyticsClass() != nil ? JAVA_TRUE : JAVA_FALSE;\n"
+                    + "}\n\n"
+                    + "void " + pfx + "_logEvent___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_OBJECT paramsJson) {\n"
+                    + "    POOL_BEGIN();\n"
+                    + "    Class fir = cn1FirebaseAnalyticsClass();\n"
+                    + "    if (fir != nil) {\n"
+                    + "        NSString* n = toNSString(CN1_THREAD_STATE_PASS_ARG name);\n"
+                    + "        NSString* pj = toNSString(CN1_THREAD_STATE_PASS_ARG paramsJson);\n"
+                    + "        NSDictionary* params = nil;\n"
+                    + "        if (pj != nil && pj.length > 0) {\n"
+                    + "            NSData* data = [pj dataUsingEncoding:NSUTF8StringEncoding];\n"
+                    + "            id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];\n"
+                    + "            if ([parsed isKindOfClass:[NSDictionary class]]) { params = (NSDictionary*) parsed; }\n"
+                    + "        }\n"
+                    + "        SEL sel = @selector(logEventWithName:parameters:);\n"
+                    + "        if ([fir respondsToSelector:sel]) {\n"
+                    + "#pragma clang diagnostic push\n"
+                    + "#pragma clang diagnostic ignored \"-Warc-performSelector-leaks\"\n"
+                    + "            [fir performSelector:sel withObject:n withObject:params];\n"
+                    + "#pragma clang diagnostic pop\n"
+                    + "        }\n"
+                    + "    }\n"
+                    + "    POOL_END();\n"
+                    + "}\n\n"
+                    + "void " + pfx + "_logScreen___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT screenName) {\n"
+                    + "    POOL_BEGIN();\n"
+                    + "    Class fir = cn1FirebaseAnalyticsClass();\n"
+                    + "    if (fir != nil) {\n"
+                    + "        NSString* n = toNSString(CN1_THREAD_STATE_PASS_ARG screenName);\n"
+                    + "        NSDictionary* params = n != nil ? @{ @\"screen_name\": n } : @{};\n"
+                    + "        SEL sel = @selector(logEventWithName:parameters:);\n"
+                    + "        if ([fir respondsToSelector:sel]) {\n"
+                    + "#pragma clang diagnostic push\n"
+                    + "#pragma clang diagnostic ignored \"-Warc-performSelector-leaks\"\n"
+                    + "            [fir performSelector:sel withObject:@\"screen_view\" withObject:params];\n"
+                    + "#pragma clang diagnostic pop\n"
+                    + "        }\n"
+                    + "    }\n"
+                    + "    POOL_END();\n"
+                    + "}\n\n"
+                    + "void " + pfx + "_setUserId___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT idStr) {\n"
+                    + "    POOL_BEGIN();\n"
+                    + "    Class fir = cn1FirebaseAnalyticsClass();\n"
+                    + "    if (fir != nil) {\n"
+                    + "        NSString* v = toNSString(CN1_THREAD_STATE_PASS_ARG idStr);\n"
+                    + "        SEL sel = @selector(setUserID:);\n"
+                    + "        if ([fir respondsToSelector:sel]) {\n"
+                    + "#pragma clang diagnostic push\n"
+                    + "#pragma clang diagnostic ignored \"-Warc-performSelector-leaks\"\n"
+                    + "            [fir performSelector:sel withObject:v];\n"
+                    + "#pragma clang diagnostic pop\n"
+                    + "        }\n"
+                    + "    }\n"
+                    + "    POOL_END();\n"
+                    + "}\n\n"
+                    + "void " + pfx + "_setUserProperty___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT key, JAVA_OBJECT value) {\n"
+                    + "    POOL_BEGIN();\n"
+                    + "    Class fir = cn1FirebaseAnalyticsClass();\n"
+                    + "    if (fir != nil) {\n"
+                    + "        NSString* k = toNSString(CN1_THREAD_STATE_PASS_ARG key);\n"
+                    + "        NSString* v = toNSString(CN1_THREAD_STATE_PASS_ARG value);\n"
+                    + "        SEL sel = @selector(setUserPropertyString:forName:);\n"
+                    + "        if ([fir respondsToSelector:sel]) {\n"
+                    + "#pragma clang diagnostic push\n"
+                    + "#pragma clang diagnostic ignored \"-Warc-performSelector-leaks\"\n"
+                    + "            [fir performSelector:sel withObject:v withObject:k];\n"
+                    + "#pragma clang diagnostic pop\n"
+                    + "        }\n"
+                    + "    }\n"
+                    + "    POOL_END();\n"
+                    + "}\n";
+            try (OutputStream fbMStream = new FileOutputStream(new File(buildinRes, "cn1_firebase_analytics_bridge.m"))) {
+                fbMStream.write(fbM.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException ex) {
+                throw new RuntimeException("Failed to generate cn1_firebase_analytics_bridge.m", ex);
+            }
+            firebaseRegisterInstall = "            com.codename1.analytics.FirebaseAnalyticsProvider.registerBridge(new "
+                    + fbPkg + ".FirebaseAnalyticsBridgeImpl());\n";
+        }
+
         String didEnterBackground =  "        stopped = true;\n"
                 + "        final long bgTask = com.codename1.impl.ios.IOSImplementation.beginBackgroundTask();\n"
                 + "        Display.getInstance().callSerially(new Runnable() { \n"
@@ -1359,6 +1524,7 @@ public class IPhoneBuilder extends Executor {
 
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"
+                    + firebaseRegisterInstall
                     + svgRegistryInstall
                     + "            i.init(this);\n"
                     + createStartInvocation(request, "i")
@@ -1852,6 +2018,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_STOREKIT", "#define CN1_USE_STOREKIT");
 
             }
+            if (usesAppReview) {
+                File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
+                replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_APPREVIEW", "#define CN1_USE_APPREVIEW");
+
+            }
         } catch (Exception ex) {
             throw new BuildException("Failure while injecting code from build hints", ex);
         }
@@ -2283,6 +2454,15 @@ public class IPhoneBuilder extends Executor {
                 if (usesPurchaseAPI) {
                     addLibs += ";StoreKit.framework";
                 }
+                // App review (SKStoreReviewController) also lives in StoreKit;
+                // link it when detected unless the purchase API already did.
+                if (usesAppReview && (addLibs == null || addLibs.toLowerCase().indexOf("storekit.framework") < 0)) {
+                    if (addLibs == null || addLibs.length() == 0) {
+                        addLibs = "StoreKit.framework";
+                    } else {
+                        addLibs += ";StoreKit.framework";
+                    }
+                }
             } catch (Exception ex) {
                 throw new BuildException("Failed to process build hints", ex);
             }
@@ -2354,6 +2534,11 @@ public class IPhoneBuilder extends Executor {
                     // sources link on both the iOS app target and the watch
                     // target. (macNative already widens the set when both apply.)
                     parparCmd.add(watchNativeBuilder.parparvmOptionalFrameworksArg());
+                } else if (tvNativeBuilder.isEnabled()) {
+                    // Weak-link the tvOS-incompatible frameworks (OpenGL ES, GLKit,
+                    // WebKit, MessageUI, AddressBook) so the shared sources link on
+                    // both the iOS app target and the tvOS target.
+                    parparCmd.add(tvNativeBuilder.parparvmOptionalFrameworksArg());
                 }
                 parparCmd.add("-Xmx384m");
                 parparCmd.add("-jar");
@@ -3022,6 +3207,12 @@ public class IPhoneBuilder extends Executor {
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
                     watchNativeBuilder.writeStubHeaders(appSrcDir);
                     watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
+                }
+
+                if (tvNativeBuilder.isEnabled()) {
+                    File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    tvNativeBuilder.writeTvInfoPlist(request, appSrcDir, resDir);
+                    tvNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
                 }
 
             } catch (Exception ex) {

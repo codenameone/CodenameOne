@@ -1013,40 +1013,9 @@ The last value is the type of content picked which can be one of:
 
 === Analytics integration
 
-One of the features in Codename One is built-in support for analytic instrumentation. Codename One has built-in support for https://www.google.com/analytics/[Google Analytics], which provides reasonable enough statistics of application usage.
+Analytics now has its own chapter. It covers the provider SPI, consent and privacy handling, the built-in providers (the Codename One first-party service, Google Analytics 4, Matomo, Firebase and a logging provider), and how to write your own. See the <<analytics, Analytics>> chapter.
 
-Analytics is pretty seamless for the old GUI builder since navigation occurs through the Codename One API and can be logged without developer interaction. For example, to begin the instrumentation one needs to add the line:
-
-[source,java]
-----
-AnalyticsService.setAppsMode(true);
-AnalyticsService.init(agent, domain);
-----
-
-To get the value for the agent value create a Google Analytics account and add a domain, then copy and paste the string that looks something like UA-99999999-8 from the console to the agent string. Once this is in place you should start receiving statistic events for the application.
-
-If your application isn't a GUI builder application or you would like to send more detailed data you can use the `Analytics.visit()` method to show that you're entering a specific page.
-
-==== Application level analytics
-
-In 2013 Google introduced an improved application level analytics API that's specifically built for mobile apps. For example, it requires a slightly different API usage. You can activate this specific mode by invoking `setAppsMode(true)`.
-
-When using this mode you can also report errors and crashes to the Google Analytics server using the `sendCrashReport(Throwable, String message, boolean fatal)` method.
-
-You recommend using this mode and setting up an apps analytics account as the results are more refined.
-
-==== Overriding the analytics implementation
-
-The Analytics API can also be enhanced to support any other form of analytics solution of your own choosing by deriving the `AnalyticsService` class.
-
-This allows you to integrate with any 3rd party through native or otherwise by overriding methods in the `AnalyticsService` class then invoking:
-
-[source,java]
-----
-AnalyticsService.init(new MyAnalyticsServiceSubclass());
-----
-
-Notice that this removes the need to invoke the other `init` method or `setAppsMode(boolean)`.
+The `AnalyticsService` class documented here previously is deprecated but still works -- it delegates to the new API. The migration table at the end of the <<analytics, Analytics>> chapter maps each old call to its replacement.
 
 === Social sign-in (Facebook, Google, ...)
 

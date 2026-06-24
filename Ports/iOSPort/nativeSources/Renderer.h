@@ -85,6 +85,13 @@ typedef struct {
     // Bounds of the drawing region, at subpixel precision.
     jint boundsMinX, boundsMinY, boundsMaxX, boundsMaxY;
 
+    // Optional clip on the OUTPUT (mask) extent, in output pixels. Set by
+    // Renderer_setOutputClip when an alpha mask is built for a bounded render
+    // target so a shape running far off-screen doesn't produce a texture larger
+    // than the backend allows. 0 in outClipApplied means "no clip" (the default).
+    jint outClipMaxX, outClipMaxY, outClipMaxDim;
+    jint outClipApplied;
+
     // Current winding rule
     jint windingRule;
 
@@ -109,6 +116,12 @@ extern void Renderer_reset(Renderer *pRenderer,
 extern void Renderer_destroy(Renderer *pRenderer);
 
 extern void Renderer_getOutputBounds(Renderer *pRenderer, jint bounds[]);
+
+// Constrain the output (mask) extent so width/height never exceed maxPixDim and
+// the right/bottom edge never passes (clipMaxX, clipMaxY) -- typically the
+// render target's framebuffer size. The full path bounds are kept for edge
+// recording; only the produced mask / texture / getOutputBounds are bounded.
+extern void Renderer_setOutputClip(Renderer *pRenderer, jint clipMaxX, jint clipMaxY, jint maxPixDim);
 
 extern void Renderer_produceAlphas(Renderer *pRenderer, AlphaConsumer *pAC);
 

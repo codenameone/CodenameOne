@@ -607,9 +607,11 @@ void Renderer_produceAlphas(Renderer *pRenderer, AlphaConsumer *pAC) {
 }
 
 //@Override
+static jint sMaxAlpha = 0;
 static void setMaxAlpha(jint maxalpha) {
     jint i;
 
+    sMaxAlpha = maxalpha;
     alphaMap = malloc(maxalpha+1);
     for (i = 0; i <= maxalpha; i++) {
         alphaMap[i] = (jbyte) ((i*255 + maxalpha/2)/maxalpha);
@@ -623,14 +625,32 @@ static void setAndClearRelativeAlphas(AlphaConsumer *pAC,
 //    System.out.println("setting row "+(pix_y - y)+
 //                       " out of "+width+" x "+height);
     jint w = pAC->width;
-    jint off = (pix_y - pAC->originY) * w;
+    jint row = pix_y - pAC->originY;
+    // The consumer's height can be smaller than the full path's row span when
+    // the output was clipped (Renderer_setOutputClip). The scanline loop still
+    // visits every path row, so a row outside the consumer buffer must be
+    // skipped -- but alphaRow must still be cleared so the next row starts from
+    // zero. Writing out[] for such a row would scribble past the buffer.
+    jboolean inBuffer = (row >= 0 && row < pAC->height);
+    jint off = row * w;
     jbyte *out = pAC->alphas;
     jint a = 0;
     jint i;
     for (i = 0; i < w; i++) {
         a += alphaRow[i];
         alphaRow[i] = 0;
-        out[off+i] = alphaMap[a];
+        if (inBuffer) {
+            // Clamp the accumulated coverage to the alphaMap range. For a
+            // balanced (closed) winding `a` already lands in [0, sMaxAlpha], so
+            // this is a no-op on the common path -- but bounding the mask extent
+            // (Renderer_setOutputClip) can pull the left edge inward through an
+            // edge whose matching crossing was clipped away, leaving the running
+            // sum momentarily unbalanced. Indexing alphaMap[a] with an
+            // out-of-range a was an out-of-bounds read (intermittent SIGBUS on
+            // the tvOS 4K theme tests). Clamp instead of fault.
+            jint ai = a < 0 ? 0 : (a > sMaxAlpha ? sMaxAlpha : a);
+            out[off+i] = alphaMap[ai];
+        }
     }
 }
 
@@ -677,4 +697,31 @@ void Renderer_getOutputBounds(Renderer *pRenderer, jint bounds[]) {
     bounds[1] = getOutpixMinY(pRenderer);
     bounds[2] = getOutpixMaxX(pRenderer);
     bounds[3] = getOutpixMaxY(pRenderer);
+    if (this.outClipApplied &&
+        ((bounds[2] - bounds[0] > this.outClipMaxDim) ||
+         (bounds[3] - bounds[1] > this.outClipMaxDim))) {
+        // Only an OVER-LIMIT mask is bounded; everything within the texture
+        // limit is left exactly as-is (so the common path -- and every iOS mask,
+        // which is far below the limit -- is untouched). For the off-screen
+        // pathological case, clip the right/bottom edge to the render target,
+        // then cap the remaining extent. The visible region is [0, target] so
+        // this keeps the visible pixels: the shape is clipped to the target;
+        // negative mins (shapes legitimately drawn at negative coords, e.g. the
+        // SVG spinner) are preserved unless the span still exceeds the limit, in
+        // which case the left/top is pulled in (only for spans far wider than
+        // any framebuffer).
+        if (bounds[2] > this.outClipMaxX) bounds[2] = this.outClipMaxX;
+        if (bounds[3] > this.outClipMaxY) bounds[3] = this.outClipMaxY;
+        if (bounds[2] - bounds[0] > this.outClipMaxDim) bounds[0] = bounds[2] - this.outClipMaxDim;
+        if (bounds[3] - bounds[1] > this.outClipMaxDim) bounds[1] = bounds[3] - this.outClipMaxDim;
+        if (bounds[2] < bounds[0]) bounds[2] = bounds[0];
+        if (bounds[3] < bounds[1]) bounds[3] = bounds[1];
+    }
+}
+
+void Renderer_setOutputClip(Renderer *pRenderer, jint clipMaxX, jint clipMaxY, jint maxPixDim) {
+    this.outClipMaxX = clipMaxX;
+    this.outClipMaxY = clipMaxY;
+    this.outClipMaxDim = maxPixDim;
+    this.outClipApplied = 1;
 }

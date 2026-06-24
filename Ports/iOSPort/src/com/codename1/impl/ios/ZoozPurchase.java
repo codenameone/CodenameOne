@@ -130,12 +130,13 @@ class ZoozPurchase extends Purchase implements Runnable {
         return ioImpl.getPurchased().contains(sku);
     }
 
-    public void purchase(String sku) {
+    @Override
+    public void purchaseImpl(String sku) {
         nativeInstance.purchase(sku);
     }
 
     @Override
-    public void purchase(String sku, PromotionalOffer promotionalOffer) {
+    public void purchaseImpl(String sku, PromotionalOffer promotionalOffer) {
         if (promotionalOffer == null) {
             nativeInstance.purchase(sku);
             return;

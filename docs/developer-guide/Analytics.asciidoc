@@ -1,0 +1,238 @@
+== Analytics
+
+The analytics API records how your application is used in the field. It's built around a small provider SPI: you register one or more providers with the `Analytics` entry point, then report screen views, events, user properties and crashes. The `Analytics` class fans every call out to all registered providers, but only after the matching consent has been granted. Consent is central to this API and is explained in <<analytics-consent, Consent and privacy>> below.
+
+Codename One ships several providers: a first-party service that reports into the Codename One cloud (with capabilities gated by your subscription tier), Google Analytics 4, Matomo (a privacy-first, self-hostable option), Firebase, and a logging provider for the simulator and tests. You can also write your own provider for any other backend.
+
+NOTE: The older `AnalyticsService` class still works but is deprecated. It now delegates to the API described here. See <<analytics-migration, Migrating from AnalyticsService>> at the end of this chapter.
+
+=== Registering providers
+
+Register providers once, early in your app's lifecycle. Providers are plain objects -- there is no reflection or service lookup, which keeps the mechanism safe under the obfuscation applied to release builds.
+
+[source,java]
+----
+// Codename One's first-party service (reports into the cloud console)
+Analytics.addProvider(new CodenameOneAnalyticsProvider());
+
+// or a third-party backend, side by side
+Analytics.addProvider(new GoogleAnalyticsProvider("G-XXXXXXXX", "API_SECRET"));
+----
+
+Once at least one provider is registered, report usage from anywhere in your app:
+
+[source,java]
+----
+Analytics.screen("Home", null);
+
+Analytics.event(AnalyticsEvent.create("purchase")
+        .category("commerce")
+        .param("sku", "abc-123")
+        .param("value", 9.99)
+        .build());
+
+Analytics.setUserProperty("plan", "pro");
+Analytics.crash(throwable, "checkout failed", false);
+----
+
+`Analytics.crash` emits a lightweight exception event (for example GA4's `app_exception`) to whichever analytics backends you have registered, so exception counts appear next to your usage metrics. It's separate from Codename One Crash Protection (`com.codename1.crash.CrashProtection`), which is a dedicated pipeline that records full, symbolicated stack traces to the build cloud crash console for debugging. The two are independent: use Crash Protection to diagnose crashes, use `Analytics.crash` when you also want exception events in your analytics, and enable either or both.
+
+[#analytics-consent]
+=== Consent and privacy
+
+The API is designed to help you comply with privacy regulations such as GDPR and CCPA. A `ConsentMode` controls what happens before the user makes an explicit choice. The default is `OPT_IN`: nothing is collected or transmitted until the application records consent.
+
+[source,java]
+----
+// Nothing is sent until this is called (opt-in is the default).
+Analytics.setConsent(AnalyticsConsent.all());
+----
+
+`AnalyticsConsent.all()` grants every category and `AnalyticsConsent.none()` denies every category. The older `granted()` and `denied()` methods remain as aliases.
+
+Consent is broken down by category, so you can honor granular choices -- for example allowing crash reporting while declining behavioral analytics:
+
+[source,java]
+----
+Analytics.setConsent(AnalyticsConsent.builder()
+        .analytics(true)
+        .crashReporting(true)
+        .personalization(false)
+        .build());
+----
+
+The consent choice is persisted, so it survives restarts. Screen views and events require the `analytics` category, crash reports require `crashReporting`, and `setUserId` requires `personalization`. Calls made without the matching consent are dropped.
+
+==== Consent you already hold
+
+If your application has already obtained consent through its own mechanism -- a custom prompt, a third-party consent-management platform, an enterprise device-management policy, or a jurisdiction where you have determined consent isn't required -- record it once at startup so reporting flows without a second prompt:
+
+[source,java]
+----
+Analytics.setConsent(AnalyticsConsent.all());
+----
+
+You can also seed every category and then revoke just one with the builder, for example to allow analytics but not ad storage:
+
+[source,java]
+----
+Analytics.setConsent(AnalyticsConsent.builder().all().adStorage(false).build());
+----
+
+If you would rather not gate at all, switch the default so collection is active unless the user withdraws it. This places the compliance responsibility on you as the integrator:
+
+[source,java]
+----
+Analytics.setConsentMode(ConsentMode.OPT_OUT);
+----
+
+Note that the service records pseudonymous data rather than anonymous data. The client id described below is a persistent identifier stored on the device; it isn't tied to a real-world identity and the server discards full IP addresses, but storing and reading such an identifier for usage tracking is often treated as consent-requiring under GDPR and similar regimes. That's why opt-in is the safe default. Relax it only when you are confident the change fits your use.
+
+==== Client identity and erasure
+
+Each device is identified by a pseudonymous client id. It's generated on first use and stored locally -- it isn't derived from any hardware identifier. To honor an erasure request ("right to be forgotten"), reset it:
+
+[source,java]
+----
+Analytics.resetClientId();
+----
+
+For the first-party service this can be paired with a server-side deletion of the previous id's data.
+
+=== Automatic events
+
+Codename One emits a few events for you, so the common funnels work without any wiring. Like every report these are consent-gated and do nothing until a provider is registered, so they're always safe.
+
+[cols="1,3", options="header"]
+|===
+| Event | When it fires
+
+| `purchase_initiated`
+| `Purchase.purchase(sku)` is called -- the start of the checkout funnel.
+
+| `purchase`
+| A purchase completes and its receipt is posted. The gap between this and `purchase_initiated` is your checkout drop-off.
+
+| `login`
+| A social login (`com.codename1.social.Login`) succeeds. The login provider class is reported in the `service` parameter.
+
+| `login_failed`
+| A social login fails, with the provider in `service` and the reason in `error`.
+
+| `share`
+| The native share sheet is invoked.
+|===
+
+You can add your own events at any time with `Analytics.event(...)`; these built-ins simply save you the boilerplate for the most common funnels.
+
+=== Built-in providers
+
+==== Codename One first-party service
+
+`CodenameOneAnalyticsProvider` batches events and posts them to the Codename One cloud, which aggregates them into the reports shown in the developer console. App identity is read from the build-injected properties, so no API key is embedded in your app.
+
+[source,java]
+----
+Analytics.addProvider(new CodenameOneAnalyticsProvider());
+----
+
+The capabilities you actually get -- screen views, custom events, user properties, retention window, raw export -- are gated server-side by your subscription tier. Higher tiers retain data longer and unlock richer reporting.
+
+==== Google Analytics 4
+
+`GoogleAnalyticsProvider` uses the GA4 Measurement Protocol. Create it with a measurement id (`G-XXXXXXXX`) and a Measurement Protocol API secret from the GA4 admin console:
+
+[source,java]
+----
+Analytics.addProvider(new GoogleAnalyticsProvider("G-XXXXXXXX", "API_SECRET"));
+----
+
+Screen views are sent as the GA4 `screen_view` event and crashes as `app_exception`.
+
+==== Matomo
+
+`MatomoAnalyticsProvider` targets Matomo (formerly Piwik) through its HTTP tracking API. Matomo can be self-hosted and supports IP anonymization, which makes it a good fit for privacy-sensitive deployments:
+
+[source,java]
+----
+Analytics.addProvider(new MatomoAnalyticsProvider("https://matomo.example.com", 1));
+----
+
+==== Firebase
+
+`FirebaseAnalyticsProvider` forwards to the native Firebase Analytics SDK on Android and iOS. Register it like any other provider:
+
+[source,java]
+----
+Analytics.addProvider(new FirebaseAnalyticsProvider());
+----
+
+Firebase reports only from a native Android or iOS build, and only when two things are in place. Without both, `FirebaseAnalyticsProvider` does nothing -- which is why it's always safe to register, including in the Codename One simulator and the desktop build, where it's a no-op.
+
+First, add the Firebase configuration file for your app (downloaded from the Firebase console) to the matching platform module's resources:
+
+* Android: `android/src/main/resources/google-services.json`
+* iOS: `ios/src/main/resources/GoogleService-Info.plist`
+
+These are Maven project paths. The `native/android` and `native/ios` directories from the old Ant projects no longer apply.
+
+Second, enable the SDK with build hints:
+
+[source]
+----
+codename1.arg.android.firebaseAnalytics=true
+codename1.arg.ios.firebaseAnalytics=true
+----
+
+These hints add the Firebase Analytics Gradle dependency (Android) and the `Firebase/Analytics` pod (iOS), and make the build generate the native bridge that `FirebaseAnalyticsProvider` talks to.
+
+WARNING: You need both the configuration file and the matching build hint. If either is missing the provider stays a no-op and no events are sent. Firebase events never show up in the Codename One simulator or a desktop run -- verify on a real device (or a platform emulator/simulator) with the Firebase project configured for the build.
+
+==== Logging provider
+
+`LoggingAnalyticsProvider` logs every call instead of sending it anywhere. It's the recommended default in the simulator and is used as the backing provider in tests.
+
+[source,java]
+----
+Analytics.addProvider(new LoggingAnalyticsProvider());
+----
+
+=== Writing your own provider
+
+Implement `AnalyticsProvider`, or extend `AbstractAnalyticsProvider` and override only the calls you support. The `Analytics` class handles consent gating and fan-out for you, so a provider just forwards the data to its backend.
+
+[source,java]
+----
+public class MyProvider extends AbstractAnalyticsProvider {
+    @Override
+    public String getName() {
+        return "my-backend";
+    }
+
+    @Override
+    public void trackScreen(String name, String referrer) {
+        // send to your backend
+    }
+
+    @Override
+    public boolean supports(AnalyticsCapability capability) {
+        return capability == AnalyticsCapability.SCREEN_VIEWS;
+    }
+}
+----
+
+The `init(AnalyticsContext)` callback hands you the app name, version, platform, locale and the pseudonymous client id. `onConsentChanged(AnalyticsConsent)` lets a provider reconfigure when the user updates consent. `supports(AnalyticsCapability)` lets tooling introspect which features a provider offers.
+
+[[analytics-migration]]
+=== Migrating from AnalyticsService
+
+The deprecated `AnalyticsService` continues to compile and now routes through this API. To preserve its historical always-on behavior -- which predates the consent model -- `AnalyticsService.init` switches the default consent mode to `OPT_OUT`. New code should migrate to `Analytics` and manage consent explicitly:
+
+[options="header",cols="1,1"]
+|===
+| Deprecated call | Replacement
+| `AnalyticsService.init(agent, domain)` | `Analytics.addProvider(new GoogleAnalyticsProvider(id, secret))`
+| `AnalyticsService.visit(page, referer)` | `Analytics.screen(page, referer)`
+| `AnalyticsService.sendCrashReport(t, msg, fatal)` | `Analytics.crash(t, msg, fatal)`
+| subclassing `AnalyticsService` | implement `AnalyticsProvider`
+|===

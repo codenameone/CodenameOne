@@ -38,6 +38,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.util.Simd;
 import com.codename1.util.RunnableWithResultSync;
+import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -902,6 +903,17 @@ public class CN extends CN1Constants {
         return Display.impl.isWatch();
     }
 
+    /// Indicates whether the application is running on a television form factor
+    /// (Apple TV / Android TV / Google TV). Notice that this is often a guess
+    /// derived from the device metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a TV
+    public static boolean isTV() {
+        return Display.impl.isTV();
+    }
+
     /// Returns the size of the desktop hosting the application window when running on a desktop platform.
     ///
     /// #### Returns
@@ -1187,6 +1199,31 @@ public class CN extends CN1Constants {
     /// true if the underlying platform handles share.
     public static boolean isNativeShareSupported() {
         return Display.impl.isNativeShareSupported();
+    }
+
+    /// Indicates whether the platform exposes a native in-app review/rating
+    /// prompt (the OS-sanctioned "rate this app" sheet). When false the
+    /// [com.codename1.appreview.AppReview] API falls back to a Codename One
+    /// drawn rating widget.
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform can present a native review prompt.
+    public static boolean isNativeInAppReviewSupported() {
+        return Display.impl.isNativeInAppReviewSupported();
+    }
+
+    /// Requests the native in-app review prompt. Should only be invoked when
+    /// [#isNativeInAppReviewSupported] returns true. The platforms hide whether
+    /// the user actually rated and may throttle the prompt; `done` reports
+    /// whether the request reached the native review controller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `done`: invoked with `true` once the native prompt was requested or
+    ///   `false` when the platform did not handle it. May be null.
+    public static void requestNativeInAppReview(SuccessCallback<Boolean> done) {
+        Display.impl.requestNativeInAppReview(done);
     }
 
     /// Share the required information using the platform sharing services.

@@ -21,6 +21,10 @@
  * need additional information or have any questions.
  */
 
+#include "TargetConditionals.h"
+// UIWebView / WebKit are unavailable on tvOS; the legacy browser-peer delegate
+// is dropped on the tvOS slice (matching how it is excluded on watchOS).
+#if !TARGET_OS_TV
 #import "UIWebViewEventDelegate.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_ui_events_BrowserNavigationCallback.h"
@@ -161,3 +165,5 @@ extern int connections;
 
 
 @end
+
+#endif // !TARGET_OS_TV

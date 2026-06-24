@@ -1,0 +1,7 @@
+# tvOS 4K: the isTV() variant draws a sparse, well-separated nested-curve sweep
+# (curveStep) instead of the dense ~bounds.w/2 overlapping curves used on phone.
+# The few remaining anti-aliased curved edges can sample within a pixel across
+# the heterogeneous CI runner GPUs; a small tolerance covers that while still
+# failing loudly on a blank / wrong / missing-curves render.
+maxChannelDelta=40
+maxMismatchPercent=2.0

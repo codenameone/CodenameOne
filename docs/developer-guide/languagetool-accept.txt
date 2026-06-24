@@ -65,6 +65,7 @@ TeaVM
 teavm
 teavmdbg
 LWUIT
+Leanback
 GUIBuilder
 UIBuilder
 UDID
@@ -622,6 +623,15 @@ transcoder
 # in the crash-reporting space talks. Shows up in CrashReportPayload
 # field descriptions.
 dedup
+# Analytics chapter: analytics vendors / APIs and privacy-law acronyms.
+Matomo
+GA4
+CCPA
+SPI
+pseudonymous
+Plausible
+PostHog
+Piwik
 
 # Maps chapter: vector-map terminology. "basemap"/"basemaps" is the standard
 # one-word cartography term for the background reference map, and "Mapbox" is

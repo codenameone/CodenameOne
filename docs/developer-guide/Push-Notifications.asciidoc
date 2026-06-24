@@ -478,7 +478,7 @@ You've implemented the Push callback in your app, and tested it in the push simu
 [[push-bureaucracy-android-section]]
 ==== The push bureaucracy - Android
 
-TIP: To set the push icon place a 24×24 icon named `ic_stat_notify.png` under the `native/android` folder of the app. The icon can be white with transparency areas
+TIP: To set the push icon place a 24×24 icon named `ic_stat_notify.png` under the `android/src/main/resources` folder of the app (the `native/android` folder from the old Ant projects no longer applies). The icon can be white with transparency areas
 
 Android Push goes through Google servers and to do that you need to register with Google to get keys for server usage. Google uses Firebase for its cloud messaging, so you will begin by creating a Firebase project.
 
@@ -525,9 +525,9 @@ This will expand "Step 2" of this form: `Download config file`.
 .Download the google-services.json file
 image::img/push-fcm-download-config-file.png[Download google-services.json,scaledwidth=30%]
 
-All you need to do here is press the "Download google-services.json" file, then copy the file into your project's native/android directory.
+All you need to do here is press the "Download google-services.json" file, then copy the file into your project's `android/src/main/resources` directory.
 
-IMPORTANT: Firebase console directs you to copy the google-services.json file into the "app" directory of your project. Ignore this direction as it applies for Android studio projects. For Codename One, this file goes into the #native/android# directory of your project.
+IMPORTANT: Firebase console directs you to copy the google-services.json file into the "app" directory of your project. Ignore this direction as it applies for Android studio projects. For a Codename One Maven project, this file goes into the `android/src/main/resources` directory. (The `native/android` directory from the old Ant projects no longer applies.)
 
 
 One last piece of information remains for you to *send* push notifications to your app: The `FCM_SERVER_API_KEY` value.

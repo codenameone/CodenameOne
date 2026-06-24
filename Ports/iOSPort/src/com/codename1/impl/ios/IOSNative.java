@@ -157,6 +157,11 @@ public final class IOSNative {
     // returning false with zero runtime cost.
     native boolean isRunningOnWatch();
 
+    // Returns true when the binary is running on the tvOS slice. Implemented
+    // natively via the TARGET_OS_TV compile-time check so the iOS slice keeps
+    // returning false with zero runtime cost.
+    native boolean isRunningOnTV();
+
     // Mac native (Catalyst): set the host window title bar text from the current form title.
     native void setWindowTitle(String title);
 
@@ -417,6 +422,11 @@ public final class IOSNative {
     native String getUDID();
     native String getOSVersion();
     native String getDeviceName();
+    // The hardware/marketing model identifier (e.g. "iPhone15,2"). Unlike
+    // getDeviceName() -- which returns the user-assigned device name and is
+    // therefore personally identifying -- this is safe to use for analytics
+    // device segmentation.
+    native String getDeviceHardwareModel();
 
     // Diagnostics for the status-bar tap-to-scroll-to-top path. Surfaced to
     // user code via Display.getProperty("cn1.iosStatusBarTap.*") in
@@ -546,6 +556,7 @@ public final class IOSNative {
     native boolean deleteContact(int id);
     
     native void dial(String phone);
+    native void requestAppStoreReview();
     native void sendSMS(String phone, String text);
 
     native void registerPush();

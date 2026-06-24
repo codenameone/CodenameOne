@@ -49,6 +49,9 @@ Here is the current list of supported arguments. Build hints change over time, s
 |android.xintent_filter
 |Allows adding an intent filter to the main android activity
 
+|android.tv
+|true/false (defaults to false). Marks the build as an Android TV / Google TV app. Adds the `LEANBACK_LAUNCHER` intent category to the launcher activity (so the app appears on the TV home screen), declares the `android.software.leanback` feature, makes `android.hardware.touchscreen` optional (so it installs on touchless TVs), and generates a 320×180 launcher banner (`@drawable/tv_banner`) from the app icon. The same APK still installs and runs on phones and tablets, and `CN.isTV()` returns true at runtime on a TV.
+
 
 |android.activity.launchMode
 |Allows explicitly setting the `android:launchMode` attribute of the main activity in android. Default is "singleTop," but for some applications you may need to change this behaviour. In particular, apps that are meant to open a file type will need to set this to "singleTask."  See https://developer.android.com/guide/topics/manifest/activity-element.html[Android docs for the activity element] for more information about the `android:launchMode` attribute.
@@ -621,6 +624,24 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 
 |desktop.mac.cef
 |Whetherto use CEF for media or BrowserComponent instead of JavaFX in Mac desktop builds.  true/false. Default value is `false` (Jan 2021), but this will be changed to `true` in a future version.
+
+|tvNative.enabled
+|true/false (defaults to false). Adds an Apple TV (tvOS) application target to the iOS build. The tvOS app is a separate `appletvos` target built from the same Java/Kotlin sources through ParparVM (UIKit + Metal; tvOS has no OpenGL ES). Enabling it doesn't change the iOS app -- in particular it doesn't override the iOS app's `ios.metal` setting. Also turned on implicitly by `codename1.tvMain`.
+
+|tvNative.mainClass (a.k.a. codename1.tvMain)
+|Fully-qualified tvOS lifecycle entry class. Setting it auto enables the tvOS target. If omitted while `tvNative.enabled=true`, the tvOS app reuses the phone main class.
+
+|tvNative.bundleId
+|Bundle identifier of the tvOS app. Defaults to `<packageName>.tvos`.
+
+|tvNative.minDeploymentTarget
+|`TVOS_DEPLOYMENT_TARGET` for the tvOS target. Defaults to `13.0`.
+
+|tvNative.displayName
+|The tvOS app name shown on Apple TV. Defaults to the app's display name.
+
+|tvNative.teamId
+|Apple Developer Team ID used to sign the tvOS target. Falls back to the iOS team id (`ios.release.teamId` / `ios.teamId` / `ios.debug.teamId`).
 
 |mac.desktop-vm
 |The JVM the should be bundled with Mac desktop build. Mac desktop builds only. Supported values: zuluFx8, zulu11, zuluFx11
