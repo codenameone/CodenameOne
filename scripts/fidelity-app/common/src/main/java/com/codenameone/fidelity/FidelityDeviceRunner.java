@@ -186,11 +186,12 @@ public class FidelityDeviceRunner {
                         if ("Slider".equals(c.getId())) {
                             comp.setPreferredW(w);
                             // Height = the knob's height (the painter draws the thumb at
-                            // the component height); ~75px to match the iOS capsule knob.
-                            comp.setPreferredH(disp.convertToPixels(4.1f));
+                            // the component height); taller so the knob is a tall vertical
+                            // capsule, not a short horizontal oval.
+                            comp.setPreferredH(disp.convertToPixels(5.5f));
                         } else if ("ProgressBar".equals(c.getId())) {
                             comp.setPreferredW(w);
-                            comp.setPreferredH(Math.max(6, disp.convertToPixels(0.4f))); // thin bar, a touch thicker
+                            comp.setPreferredH(Math.max(8, disp.convertToPixels(0.8f))); // ~2x thicker bar
                         }
                         st.setMargin(0, 0, 0, 0);
                     } else {
@@ -432,8 +433,13 @@ public class FidelityDeviceRunner {
         // keep their preferred size pinned top-left.
         boolean fullWidth = isFullWidthKind(compId);
         boolean widthCenter = isWidthCenterKind(compId);
+        // The iOS 26 tab bar is a floating glass PILL, content-sized and CENTRED
+        // horizontally near the top -- not stretched to the tile width.
+        boolean centered = "ios".equals(platform) && "Tabs".equals(compId);
         Container tile;
-        if (fullWidth) {
+        if (centered) {
+            tile = new Container(new FlowLayout(Component.CENTER, Component.TOP));
+        } else if (fullWidth) {
             tile = new Container(new BorderLayout());
         } else if (widthCenter) {
             // Full-width but thin. The slider track floats vertically centred; the
@@ -477,7 +483,7 @@ public class FidelityDeviceRunner {
         if (!"ios".equals(platform) || compId == null) {
             return false;
         }
-        return "TextField".equals(compId) || "Tabs".equals(compId)
+        return "TextField".equals(compId)
                 || "Toolbar".equals(compId) || "Dialog".equals(compId);
     }
 

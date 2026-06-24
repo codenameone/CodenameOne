@@ -93,7 +93,7 @@
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.47";
     switchThumbOffScaleY: "1.03";
-    switchThumbOffInsetMM: "0.12";
+    switchThumbOffInsetMM: "0.22";
     switchThumbShadowSpreadInt: 0;
     switchDisabledOutlineColorUIID: "SwitchDisabledTrack";
     switchTrackScaleY: "1.5";
@@ -671,13 +671,13 @@ PopupContent {
        forward into the $Dark<UIID> entries. */
     Button { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; }
     Button.pressed { background-color: #bca8e8; color: var(--accent-on-color-dark, #381e72); cn1-background-type: cn1-pill-border; }
-    Button.disabled { color: #5c5967; background-color: #2b2930; cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: #5c5967; background-color: rgba(255,255,255,0.05); cn1-background-type: cn1-pill-border; }
 
     /* M3 filled-tonal = SECONDARY container (muted grey-purple in dark), not the
        primary container -- the Android factory builds it via colorSecondaryContainer. */
     RaisedButton { color: #e8def8; background-color: #4a4458; cn1-background-type: cn1-pill-border; }
     RaisedButton.pressed { color: #e8def8; background-color: #4a4458; cn1-background-type: cn1-pill-border; }
-    RaisedButton.disabled { background-color: #2b2930; color: #5c5967; cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { background-color: rgba(255,255,255,0.05); color: #5c5967; cn1-background-type: cn1-pill-border; }
 
     FlatButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
     FlatButton.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }

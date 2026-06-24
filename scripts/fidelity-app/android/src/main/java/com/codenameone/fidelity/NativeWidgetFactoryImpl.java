@@ -394,7 +394,21 @@ public class NativeWidgetFactoryImpl {
         if ("disabled".equals(state)) {
             v.setEnabled(false);
         } else if ("pressed".equals(state)) {
+            // The M3 pressed state layer / ripple only paints when the drawable's
+            // state actually carries state_pressed AND (for a RippleDrawable) a
+            // hotspot is set. Off-screen rendering does not run the touch pipeline,
+            // so set the hotspot to the view centre and refresh the drawable state
+            // explicitly before snapping -- otherwise pressed rasterizes identically
+            // to normal.
             v.setPressed(true);
+            v.refreshDrawableState();
+            android.graphics.drawable.Drawable bg = v.getBackground();
+            if (bg != null) {
+                bg.setState(new int[]{android.R.attr.state_enabled, android.R.attr.state_pressed});
+                int cx = Math.max(1, v.getWidth() / 2);
+                int cy = Math.max(1, v.getHeight() / 2);
+                bg.setHotspot(cx, cy);
+            }
             v.jumpDrawablesToCurrentState();
         }
     }

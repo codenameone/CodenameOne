@@ -90,9 +90,11 @@
        the glyph itself paints. */
     tabIconUIID: TabIcon;
     switchThumbPaddingInt: 1;
+    /* Thumb nearly fills the track height (a large clean white knob); the track is
+       a touch narrower so the switch is not over-wide. */
     switchThumbScaleY: "1.7";
     switchTrackScaleY: "1.7";
-    switchTrackScaleX: "2.85";
+    switchTrackScaleX: "2.8";
     /* No shadow ring at all -- the native thumb is a clean white circle (a
        spread of 1 still drew a visible grey stroke). */
     switchThumbShadowSpreadInt: 0;
@@ -102,7 +104,7 @@
     switchTrackOffOutlineWidthMM: "0";
     switchTrackOnOutlineWidthMM: "0";
     switchTrackOffOutlineColor: "e9e9ea";
-    switchThumbInsetMM: "0.25";
+    switchThumbInsetMM: "0.1";
     /* iOS uses a circular mark for checkboxes (Reminders-style) and
        keeps the circular radio button. These integer constants are
        Material icon codepoints that DefaultLookAndFeel reads to
@@ -111,7 +113,9 @@
        RADIO_BUTTON_CHECKED = E837 (59447), RADIO_BUTTON_UNCHECKED
        = E836 (59446). */
     checkBoxCheckedIconInt: 59500;
-    checkBoxUncheckedIconInt: 59693;
+    /* Unchecked = a PLAIN empty circle (RADIO_BUTTON_UNCHECKED E836). The previous
+       CHECK_CIRCLE_OUTLINE drew a check the unchecked state should not have. */
+    checkBoxUncheckedIconInt: 59446;
     radioCheckedIconInt: 59447;
     radioUncheckedIconInt: 59446;
     /* Glyph size is driven by the CheckBox/RadioButton font-size (4.4mm -> ~80px,
@@ -123,7 +127,7 @@
     sliderTrackThicknessMM: "0.28";
     /* The iOS knob is a large white vertical capsule (~55x75px) with a soft drop
        shadow, sitting on one continuous track (no M3 gap / stop dot). */
-    sliderThumbWidthMM: "3.0";
+    sliderThumbWidthMM: "2.6";
     sliderContinuousTrackBool: true;
     sliderThumbShadowSizeMM: "0.5";
     /* No sliding underline under the selected tab -- the native UITabBar tints the
@@ -197,17 +201,18 @@ Button {
     font-family: "native:MainRegular";
     font-size: 2.7mm;
     background-color: transparent;
-    border-radius: 2mm;
+    /* iOS 26 glass buttons are capsules (fully rounded sides). */
+    cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-Button.pressed { color: var(--accent-pressed-color, #0064d1); background-color: #e5e5ea; }
+Button.pressed { color: var(--accent-pressed-color, #0064d1); background-color: #e5e5ea; cn1-background-type: cn1-pill-border; }
 Button.disabled { color: var(--accent-disabled-color, #b3d4ff); }
 
 RaisedButton {
     cn1-derive: Button;
     color: var(--accent-on-color, #ffffff);
     background-color: var(--accent-color, #007aff);
-    border-radius: 2mm;
+    cn1-background-type: cn1-pill-border;
     text-align: center;
 }
 RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-pressed-color, #0064d1); }
@@ -329,6 +334,9 @@ SliderFull {
     padding: 0;
     margin: 0;
 }
+/* Disabled slider is translucent (faded track, fill and thumb). */
+Slider.disabled { background-color: rgba(229,229,234,0.5); color: rgba(255,255,255,0.55); }
+SliderFull.disabled { background-color: rgba(0,122,255,0.4); }
 /* iOS linear progress: same thin track, accent fill. */
 ProgressBar {
     background-color: #e5e5ea;
@@ -371,8 +379,8 @@ MainTitle { cn1-derive: Title; }
 
 /* iOS 26 nav-bar items: a circular translucent-white glass button holding a blue
    glyph (no text). cn1-round-border draws the circle; rgba gives the glass fill. */
-BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.55); padding: 1mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
-TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.55); padding: 1mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
+BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.55); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
+TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.55); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
 
 /* ---- Desktop chrome (macOS conventions) ----
    Only used when the desktop port enables interactiveScrollBool /
@@ -711,8 +719,8 @@ PopupContent {
     TitleArea { background-color: #000000; color: #ffffff; }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
-    BackCommand { color: var(--accent-color-dark, #0a84ff); background-color: rgba(44,44,46,0.55); }
-    TitleCommand { color: var(--accent-color-dark, #0a84ff); background-color: rgba(44,44,46,0.55); }
+    BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); }
+    TitleCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); }
 
     /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
        re-declared so the round primitive carries into dark mode. */
@@ -733,7 +741,7 @@ PopupContent {
        compiler doesn't carry it forward from the light Tab.selected
        style, so without this the selected pill renders as a flat
        rectangular block instead of a rounded pill in dark mode. */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(120,120,128,0.55); cn1-background-type: cn1-pill-border; }
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(120,120,128,0.32); cn1-background-type: cn1-pill-border; }
     Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(120,120,128,0.4); cn1-background-type: cn1-pill-border; }
     SelectedTab { color: var(--accent-color-dark, #0a84ff); }
     UnselectedTab { color: #ebebf5; }

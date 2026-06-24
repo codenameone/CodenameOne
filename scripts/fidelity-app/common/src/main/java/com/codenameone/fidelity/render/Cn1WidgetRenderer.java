@@ -194,9 +194,9 @@ public final class Cn1WidgetRenderer {
             com.codename1.ui.plaf.Style unS = new com.codename1.ui.plaf.Style();
             unS.setFgColor(unselColor);
             unS.setBgTransparency(0);
-            Image star = FontImage.createMaterial(FontImage.MATERIAL_STAR, selS, 2.6f);
-            Image search = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, unS, 2.6f);
-            Image more = FontImage.createMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 2.6f);
+            Image star = FontImage.createMaterial(FontImage.MATERIAL_STAR, selS, 1.8f);
+            Image search = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, unS, 1.8f);
+            Image more = FontImage.createMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 1.8f);
             tabs.addTab("Featured", star, star, new Container());
             tabs.addTab("Search", search, search, new Container());
             tabs.addTab("More", more, more, new Container());
@@ -231,17 +231,18 @@ public final class Cn1WidgetRenderer {
                 row.setUIID("Container");
                 row.getAllStyles().setBgTransparency(0);
                 // iOS 26 bar items are ICON-ONLY inside circular translucent-glass
-                // buttons (no "Back" text). Build the glyphs with an explicit blue.
-                int tint = dark ? 0x0a84ff : 0x007aff;
+                // buttons. The glyph matches the TITLE colour (black in light, white
+                // in dark) -- NOT blue in dark mode.
+                int tint = dark ? 0xffffff : 0x007aff;
                 com.codename1.ui.plaf.Style tintS = new com.codename1.ui.plaf.Style();
                 tintS.setFgColor(tint);
                 tintS.setBgTransparency(0);
                 Button back = new Button("");
                 back.setUIID("BackCommand");
-                back.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK_IOS_NEW, tintS, 2.4f));
+                back.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK_IOS_NEW, tintS, 3.2f));
                 Button action = new Button("");
                 action.setUIID("TitleCommand");
-                action.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ADD, tintS, 2.8f));
+                action.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ADD, tintS, 3.6f));
                 row.add(BorderLayout.WEST, back);
                 row.add(BorderLayout.CENTER, title);
                 row.add(BorderLayout.EAST, action);
