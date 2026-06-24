@@ -395,11 +395,27 @@ public class ProcessScreenshots {
         // fidelity: a control rendered 15px too high is 15px of mismatch, not
         // silently slid into place. Only a small per-pixel window absorbs genuine
         // sub-pixel anti-aliasing between the two render paths.
-        double shapeSim = absoluteShapeSim(bn, bc, bgRgb);
-        // Diagnostic: how closely the top/left margins (edge-to-widget) agree.
-        double marginAgreement = marginAgreement(boxN, boxC);
+        //
+        // We score TWO independent terms and take the WORSE:
+        //   fillSim   -- mean colour agreement over the widget-content pixels. A
+        //                large flat region that happens to match (e.g. a dark nav-bar
+        //                fill against a dark tile) makes this high on its own, which
+        //                is exactly why it cannot be the whole story.
+        //   structSim -- the same colour agreement but WEIGHTED BY STRUCTURAL
+        //                SALIENCE (local gradient), so flat fills count for almost
+        //                nothing and the actual distinguishing content -- glyph
+        //                strokes, widget edges, separators -- dominates. A title that
+        //                is centred in one render and left-aligned in the other has
+        //                its strokes land on the other render's flat fill, so this
+        //                term collapses even though the fills match.
+        // fidelity = min(fillSim, structSim): a widget must agree in BOTH its fill
+        // AND its structure/placement, so "same background, totally different
+        // widget" can no longer score high.
+        double fillSim = absoluteShapeSim(bn, bc, bgRgb);
+        double structSim = structuralSalienceSim(bn, bc, bgRgb);
+        double shapeSim = Math.min(fillSim, structSim);
         double fidelity = 100.0d * shapeSim;
-        return new double[]{fidelity, shapeSim, marginAgreement};
+        return new double[]{fidelity, structSim, fillSim};
     }
 
     /// Top/left margin agreement (1 = identical edge-to-widget distance, decaying
@@ -485,6 +501,86 @@ public class ProcessScreenshots {
         }
         double shape = 1.0d - (double) sum / (count * 255.0d);
         return shape < 0 ? 0 : shape;
+    }
+
+    /// Gradient (local edge strength) below which a pixel is treated as flat fill
+    /// and contributes nothing to the structural term.
+    private static final int EDGE_TAU = 12;
+
+    /// Colour agreement WEIGHTED BY STRUCTURAL SALIENCE (local gradient magnitude),
+    /// at absolute position. Each pixel's contribution is weighted by how much
+    /// structure (edge/stroke) it carries in EITHER render, so a large flat fill --
+    /// however well it matches -- barely moves the score, while glyph strokes and
+    /// widget edges dominate. A control whose distinguishing marks land in a
+    /// different place (wrong title alignment, wrong size, missing separator) scores
+    /// low here even when the surrounding fill matches perfectly. Returns 0..1.
+    private static double structuralSalienceSim(BufferedImage bn, BufferedImage bc, int bgRgb) {
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        int[] gN = gradientMag(nArr, w, h);
+        int[] gC = gradientMag(cArr, w, h);
+        double wSum = 0.0d;
+        double dSum = 0.0d;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = y * w + x;
+                int sal = Math.max(gN[idx], gC[idx]);
+                if (sal < EDGE_TAU) {
+                    continue;   // flat in both -> not structural content
+                }
+                int d1 = tolerantDelta(nArr[idx], cArr, x, y, w, h);
+                int d2 = tolerantDelta(cArr[idx], nArr, x, y, w, h);
+                int delta = Math.max(d1, d2);
+                // Weight by salience SQUARED so the strongest edges (glyph strokes,
+                // crisp widget outlines) dominate over faint low-contrast edges (a
+                // subtle bar fill boundary). A mis-placed title -- the salient mark a
+                // human keys on -- then drives the score, not the incidental frame.
+                double weight = (double) sal * sal;
+                wSum += weight * 255.0d;
+                dSum += weight * delta;
+            }
+        }
+        if (wSum == 0.0d) {
+            return 1.0d;   // neither render has any structure -> trivially equal
+        }
+        double s = 1.0d - dSum / wSum;
+        return s < 0 ? 0 : s;
+    }
+
+    /// Per-pixel local edge strength (0..255): the larger of the right- and
+    /// down-neighbour mean channel differences. High on glyph/widget edges, ~0 on
+    /// flat fills.
+    private static int[] gradientMag(int[] arr, int w, int h) {
+        int[] g = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = arr[y * w + x];
+                int pr = (p >> 16) & 0xff, pg = (p >> 8) & 0xff, pb = p & 0xff;
+                int gx = 0, gy = 0;
+                if (x + 1 < w) {
+                    int q = arr[y * w + x + 1];
+                    gx = (Math.abs(pr - ((q >> 16) & 0xff)) + Math.abs(pg - ((q >> 8) & 0xff)) + Math.abs(pb - (q & 0xff))) / 3;
+                }
+                if (y + 1 < h) {
+                    int q = arr[(y + 1) * w + x];
+                    gy = (Math.abs(pr - ((q >> 16) & 0xff)) + Math.abs(pg - ((q >> 8) & 0xff)) + Math.abs(pb - (q & 0xff))) / 3;
+                }
+                g[idxClamp(y * w + x, g.length)] = Math.max(gx, gy);
+            }
+        }
+        return g;
+    }
+
+    private static int idxClamp(int i, int len) {
+        return i < 0 ? 0 : (i >= len ? len - 1 : i);
     }
 
     private static boolean[] contentMask(int[] arr, int bgR, int bgG, int bgB) {
