@@ -6414,6 +6414,37 @@ public final class Display extends CN1Constants {
         return impl.isJailbrokenDevice();
     }
 
+    /// Requests a signed device-attestation token (Play Integrity / App Attest) bound to the server
+    /// nonce. See `com.codename1.security.DeviceIntegrity#requestIntegrityToken(String)`.
+    public AsyncResource<String> requestIntegrityToken(String nonce) {
+        return impl.requestIntegrityToken(nonce);
+    }
+
+    /// Returns true if device-attestation (Play Integrity / App Attest) is supported and bundled.
+    public boolean isAttestationSupported() {
+        return impl.isAttestationSupported();
+    }
+
+    /// Non-exiting RASP check, true if the device appears rooted/jailbroken/instrumented/tampered.
+    public boolean isDeviceCompromised() {
+        return impl.isDeviceCompromised();
+    }
+
+    /// Returns the reason codes behind `isDeviceCompromised()` (e.g. "root", "frida", "emulator").
+    public String[] getCompromiseReasons() {
+        return impl.getCompromiseReasons();
+    }
+
+    /// Returns the component ids of the accessibility services currently enabled on the device.
+    public String[] getEnabledAccessibilityServices() {
+        return impl.getEnabledAccessibilityServices();
+    }
+
+    /// Marks the current screen secure (Android `FLAG_SECURE`), blocking screenshots/recording/scraping.
+    public void setSecureScreen(boolean secure) {
+        impl.setSecureScreen(secure);
+    }
+
     /// Returns the build hints for the simulator, this will only work in the debug environment and it's
     /// designed to allow extensions/API's to verify user settings/build hints exist
     ///

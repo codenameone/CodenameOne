@@ -10687,6 +10687,70 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Requests a signed device-attestation token (Google Play Integrity on Android, Apple App Attest
+    /// on iOS) bound to the supplied server nonce. The returned token must be sent to and verified by
+    /// the application's backend -- an on-device check is meaningless on a compromised device. This base
+    /// implementation reports the platform as unsupported by completing the resource with an error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nonce`: a server supplied nonce/challenge bound into the attestation
+    ///
+    /// #### Returns
+    ///
+    /// an `AsyncResource` that completes with the opaque attestation token, or completes with an error
+    /// when attestation is unsupported
+    public AsyncResource<String> requestIntegrityToken(String nonce) {
+        AsyncResource<String> result = new AsyncResource<String>();
+        result.error(new UnsupportedOperationException(
+                "Device integrity attestation is not supported on this platform. On Android enable the "
+                + "android.playIntegrity build hint, on iOS enable the ios.appAttest build hint."));
+        return result;
+    }
+
+    /// Returns true if device-attestation (Play Integrity / App Attest) is available on this device and
+    /// was bundled into the build. False on the base/unsupported implementation.
+    public boolean isAttestationSupported() {
+        return false;
+    }
+
+    /// Non-exiting aggregate RASP check: returns true when the device shows signs of being rooted,
+    /// jailbroken, running under dynamic instrumentation or otherwise tampered. Unlike the launch-gate
+    /// build hints (android.rootCheck / ios.detectJailbreak) this does not terminate the app, so callers
+    /// can make granular runtime decisions (e.g. blocking a high value transaction). The base
+    /// implementation falls back to [#isJailbrokenDevice()].
+    public boolean isDeviceCompromised() {
+        return isJailbrokenDevice();
+    }
+
+    /// Returns the individual reasons behind [#isDeviceCompromised()] (e.g. "root", "frida", "emulator").
+    ///
+    /// #### Returns
+    ///
+    /// an array of machine readable reason codes, empty when the device appears clean
+    public String[] getCompromiseReasons() {
+        if(isDeviceCompromised()) {
+            return new String[] {"jailbreak"};
+        }
+        return new String[0];
+    }
+
+    /// Returns the component identifiers of the accessibility services currently enabled on the device.
+    /// Used to detect malware that abuses Android accessibility services for overlay/remote-control and
+    /// text extraction. Returns an empty array on platforms where this concept does not apply (e.g. iOS).
+    public String[] getEnabledAccessibilityServices() {
+        return new String[0];
+    }
+
+    /// Marks the current screen as secure, blocking OS screenshots, screen recording and accessibility
+    /// screen scraping while it is displayed (Android `FLAG_SECURE`). No-op where unsupported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `secure`: true to mark the window secure, false to clear the flag
+    public void setSecureScreen(boolean secure) {
+    }
+
     /// Returns the build hints for the simulator, this will only work in the debug environment and it's
     /// designed to allow extensions/API's to verify user settings/build hints exist
     ///
