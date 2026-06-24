@@ -59,15 +59,42 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
     let selected = state == "selected"
     let label = textFor(kind)
     switch kind {
-    case "ios_uibutton_system", "ios_uibutton_plain":
-        let b = UIButton(type: .system)
-        b.setTitle(label, for: .normal)
+    case "ios_uibutton_system":
+        // Modern tinted action button -> iOS 26 Liquid Glass (regular glass).
+        let b: UIButton
+        if #available(iOS 26.0, *) {
+            var cfg = UIButton.Configuration.glass()
+            cfg.title = label
+            b = UIButton(configuration: cfg)
+        } else {
+            b = UIButton(type: .system)
+            b.setTitle(label, for: .normal)
+        }
+        b.isEnabled = !disabled
+        b.isHighlighted = pressed
+        return b
+    case "ios_uibutton_plain":
+        // Borderless text button: the clear-glass variant on iOS 26.
+        let b: UIButton
+        if #available(iOS 26.0, *) {
+            var cfg = UIButton.Configuration.clearGlass()
+            cfg.title = label
+            b = UIButton(configuration: cfg)
+        } else {
+            b = UIButton(type: .system)
+            b.setTitle(label, for: .normal)
+        }
         b.isEnabled = !disabled
         b.isHighlighted = pressed
         return b
     case "ios_uibutton_filled":
+        // Prominent / call-to-action button -> iOS 26 prominent Liquid Glass.
         let b: UIButton
-        if #available(iOS 15.0, *) {
+        if #available(iOS 26.0, *) {
+            var cfg = UIButton.Configuration.prominentGlass()
+            cfg.title = label
+            b = UIButton(configuration: cfg)
+        } else if #available(iOS 15.0, *) {
             var cfg = UIButton.Configuration.filled()
             cfg.title = label
             b = UIButton(configuration: cfg)
@@ -120,11 +147,23 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
         let b = UITabBarItem(tabBarSystemItem: .search, tag: 1)
         let c = UITabBarItem(tabBarSystemItem: .more, tag: 2)
         bar.items = [a, b, c]; bar.selectedItem = a
+        // Modern Liquid Glass bar background (default = glass material on iOS 26),
+        // not the legacy opaque fill.
+        let ap = UITabBarAppearance()
+        ap.configureWithDefaultBackground()
+        bar.standardAppearance = ap
+        if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap }
         return bar
     case "ios_uinavbar":
         let nav = UINavigationBar(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
         let item = UINavigationItem(title: label)
         nav.items = [item]
+        // Modern Liquid Glass nav-bar background (default = glass on iOS 26).
+        let ap = UINavigationBarAppearance()
+        ap.configureWithDefaultBackground()
+        nav.standardAppearance = ap
+        nav.scrollEdgeAppearance = ap
+        if #available(iOS 15.0, *) { nav.compactScrollEdgeAppearance = ap }
         return nav
     case "ios_alert_view":
         // The presented content view of a UIAlertController (built directly so it
