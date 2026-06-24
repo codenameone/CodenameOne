@@ -155,19 +155,19 @@ public final class DeviceIntegrity {
     /// Returns true if any entry in `enabledServices` (a `package/.ServiceClass` component id) has a
     /// package that is not present in `allowedPackages`.
     static boolean containsUntrustedService(String[] enabledServices, String[] allowedPackages) {
-        if(enabledServices == null || enabledServices.length == 0) {
+        if (enabledServices == null || enabledServices.length == 0) {
             return false;
         }
-        for(String service : enabledServices) {
-            if(service == null || service.length() == 0) {
+        for (String service : enabledServices) {
+            if (service == null || service.length() == 0) {
                 continue;
             }
             String pkg = service;
             int slash = pkg.indexOf('/');
-            if(slash >= 0) {
+            if (slash >= 0) {
                 pkg = pkg.substring(0, slash);
             }
-            if(!isAllowed(pkg, allowedPackages)) {
+            if (!isAllowed(pkg, allowedPackages)) {
                 return true;
             }
         }
@@ -175,11 +175,11 @@ public final class DeviceIntegrity {
     }
 
     private static boolean isAllowed(String pkg, String[] allowedPackages) {
-        if(allowedPackages == null) {
+        if (allowedPackages == null) {
             return false;
         }
-        for(String allowed : allowedPackages) {
-            if(pkg.equals(allowed)) {
+        for (String allowed : allowedPackages) {
+            if (pkg.equals(allowed)) {
                 return true;
             }
         }

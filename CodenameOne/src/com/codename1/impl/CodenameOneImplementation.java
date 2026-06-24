@@ -10729,7 +10729,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// an array of machine readable reason codes, empty when the device appears clean
     public String[] getCompromiseReasons() {
-        if(isDeviceCompromised()) {
+        if (isDeviceCompromised()) {
             return new String[] {"jailbreak"};
         }
         return new String[0];
