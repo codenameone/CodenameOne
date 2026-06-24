@@ -99,6 +99,32 @@ Analytics.resetClientId();
 
 For the first-party service this can be paired with a server-side deletion of the previous id's data.
 
+=== Automatic events
+
+Codename One emits a few events for you, so the common funnels work without any wiring. Like every report these are consent-gated and do nothing until a provider is registered, so they're always safe.
+
+[cols="1,3", options="header"]
+|===
+| Event | When it fires
+
+| `purchase_initiated`
+| `Purchase.purchase(sku)` is called -- the start of the checkout funnel.
+
+| `purchase`
+| A purchase completes and its receipt is posted. The gap between this and `purchase_initiated` is your checkout drop-off.
+
+| `login`
+| A social login (`com.codename1.social.Login`) succeeds. The login provider class is reported in the `service` parameter.
+
+| `login_failed`
+| A social login fails, with the provider in `service` and the reason in `error`.
+
+| `share`
+| The native share sheet is invoked.
+|===
+
+You can add your own events at any time with `Analytics.event(...)`; these built-ins simply save you the boilerplate for the most common funnels.
+
 === Built-in providers
 
 ==== Codename One first-party service
