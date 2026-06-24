@@ -303,9 +303,10 @@ jobs:
           retention-days: 14
 
   # Diffs each arch's screenshots against its in-repo baseline (x64 ->
-  # scripts/linux/screenshots, arm64 -> scripts/linux/screenshots-arm) and posts
-  # them to the PR. Report-only until the baselines are seeded (see the READMEs in
-  # those dirs); flip CN1SS_FAIL_ON_MISMATCH=1 to gate once seeded.
+  # scripts/linux/screenshots, arm64 -> scripts/linux/screenshots-arm), posts them
+  # to the PR, and GATES the build: any mismatch/error or a new screenshot with no
+  # committed golden (missing_expected) fails CI, so the Linux baselines stay in
+  # sync (mirrors the iOS/watch jobs).
   compare-comment:
     name: screenshot-comment
     needs: build-run
@@ -346,6 +347,11 @@ jobs:
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
           ART="artifacts/linux-port"
           posted=0
+          fail=0
+          # Gate the Linux port (both arches): fail on any mismatch/error or a new
+          # screenshot that has no committed golden (missing_expected).
+          export CN1SS_FAIL_ON_MISMATCH=1
+          export CN1SS_ALLOWED_MISSING=0
           for arch in x64 arm64; do
             raw="$ART/raw-$arch"
             [ -d "$raw" ] || continue
@@ -358,6 +364,7 @@ jobs:
             if [ "$arch" = "arm64" ]; then REF="scripts/linux/screenshots-arm"; else REF="scripts/linux/screenshots"; fi
             echo "Posting ${#entries[@]} screenshot(s) for $arch (baseline $REF)"
             mkdir -p "$ART/previews-$arch"
+            set +e
             CN1SS_COMMENT_MARKER="<!-- CN1SS_LINUX_${arch}_COMMENT -->" \
             CN1SS_COMMENT_LOG_PREFIX="[linux-gtk-$arch]" \
             CN1SS_PREVIEW_SUBDIR="linux-$arch" \
@@ -367,6 +374,18 @@ jobs:
               "$ART/compare-$arch.json" "$ART/summary-$arch.txt" "$ART/comment-$arch.md" \
               "$(pwd)/$REF" "$ART/previews-$arch" "$ART" \
               "${entries[@]}"
+            gate_rc=$?
+            set -e
+            if [ "$gate_rc" -ne 0 ]; then
+              echo "[linux-gtk-$arch] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+            fi
+            # A streamed screenshot with no committed golden keeps the baselines out
+            # of sync; the central gate treats it as "extra" and ignores it, so fail here.
+            if [ -f "$ART/summary-$arch.txt" ] && grep -q "^missing_expected|" "$ART/summary-$arch.txt"; then
+              me="$(grep -c "^missing_expected|" "$ART/summary-$arch.txt" || echo 0)"
+              echo "[linux-gtk-$arch] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF."; fail=1
+            fi
             posted=$((posted+1))
           done
           if [ "$posted" -eq 0 ]; then echo "No screenshots produced; skipping comment."; fi
+          if [ "$fail" -ne 0 ]; then echo "Linux screenshot gate failed."; exit 1; fi

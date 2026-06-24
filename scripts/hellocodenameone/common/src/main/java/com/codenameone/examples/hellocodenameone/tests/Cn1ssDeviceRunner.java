@@ -435,7 +435,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // through the worker-callback transport, so the test waits on
                 // its own ``readyRunnable`` indefinitely. Tracked under
                 // ``browserComponentLoadEvent`` in port.js.
-                || "BrowserComponentScreenshotTest".equals(testName);
+                || "BrowserComponentScreenshotTest".equals(testName)
+                // RichTextArea/CodeEditor are BrowserComponent-backed. On the JS
+                // port the screenshot is CN1's internal canvas render (streamed by
+                // the app), which never includes the editor's DOM ``<iframe>`` peer,
+                // so the capture is always blank. Skip here (like BrowserComponent)
+                // rather than commit a meaningless blank golden; iOS/Android capture
+                // the native web view and DO render these.
+                || "RichTextAreaScreenshotTest".equals(testName)
+                || "CodeEditorScreenshotTest".equals(testName);
     }
 
     private static boolean isJsSkippedKnownRuntimeBug(String testName) {
