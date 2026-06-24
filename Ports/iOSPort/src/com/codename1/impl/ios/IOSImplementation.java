@@ -345,6 +345,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTV() {
+        return nativeInstance.isRunningOnTV();
+    }
+
+    @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {
             nativeInstance.addCookie(c.getName(), c.getValue(), c.getDomain(), c.getPath(), c.isSecure(), c.isHttpOnly(), c.getExpires());
@@ -9406,6 +9411,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String[] getPlatformOverrides() {
         if(isWatch()) {
             return new String[] {"watch", "ios", "applewatch"};
+        }
+        if(isTV()) {
+            return new String[] {"tv", "ios", "appletv"};
         }
         if(isTablet()) {
             return new String[] {"tablet", "ios", "ipad"};

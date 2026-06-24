@@ -5665,6 +5665,17 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Indicates whether the application is running on a television form factor
+    /// (Apple TV / Android TV / Google TV). Notice that this is often a guess
+    /// derived from the device/skin metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a TV
+    public boolean isTV() {
+        return false;
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns

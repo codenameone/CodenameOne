@@ -329,7 +329,11 @@ void com_codename1_maps_MapProviderImpl_nativeSetShowMyLocation___int_boolean(CN
 void com_codename1_maps_MapProviderImpl_nativeSetRotateEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_BOOLEAN enabled) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (m) {
+        // MKMapView.rotateEnabled is unavailable on tvOS (the Apple TV map has
+        // no user-driven rotation gesture), so this is a no-op there.
+#if !TARGET_OS_TV
         dispatch_async(dispatch_get_main_queue(), ^{ m.mapView.rotateEnabled = enabled ? YES : NO; });
+#endif
     }
 }
 

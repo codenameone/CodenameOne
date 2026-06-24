@@ -519,6 +519,27 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-22T15:03:36+00:00"
       }
+    },
+    "printing-and-apple-wallet": {
+      "devto": {
+        "id": 3971284,
+        "url": "https://dev.to/codenameone/print-anywhere-and-put-your-cards-in-apple-wallet-24on",
+        "syndicated_at": "2026-06-23T13:51:48+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/538785c97682/edit",
+        "syndicated_at": "2026-06-23T15:01:18+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmqqrwmt800000cj07ftmh9m1",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a3a9fcab57736c2f7790bab",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-23T15:02:27+00:00"
+      }
     }
   }
 }

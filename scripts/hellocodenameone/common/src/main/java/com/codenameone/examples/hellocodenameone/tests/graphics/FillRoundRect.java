@@ -8,7 +8,7 @@ public class FillRoundRect extends AbstractGraphicsScreenshotTest {
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         g.setColor(0xffffff);
-        for (int iter = 0 ; iter < bounds.getWidth() / 2 ; iter++) {
+        for (int iter = 0 ; iter < bounds.getWidth() / 2 ; iter += curveStep(bounds)) {
             nextColor(g);
             g.fillRoundRect(bounds.getX() + iter, bounds.getY() + iter, bounds.getX() + bounds.getWidth() - iter, bounds.getY() + bounds.getHeight() + iter, iter % 20, iter % 20);
         }

@@ -26,7 +26,7 @@ It's a complete mobile platform featuring virtual machines, simulator, design to
 #### 🌟 &nbsp; Codename One is the only platform that..
 
 - Has Write Once Run Anywhere support with no special hardware requirements and 100% code reuse
-- Compiles Java or Kotlin into native code for iOS, UWP (Universal Windows Platform), Android and even JavaScript (with seamless PWA and Thread support)
+- Compiles Java or Kotlin into native code for iOS, UWP (Universal Windows Platform), Android and even JavaScript (with seamless PWA and Thread support), including the TV form factors Apple TV (tvOS) and Android TV / Google TV
 - Is Open Source and Free with an enterprise grade commercial offering
 - Is Easy to use with 100% portable Drag and Drop GUI builder
 - Has Full access to underlying native OS capabilities using the native OS programming language (e.g. Objective-C) without compromising portability
