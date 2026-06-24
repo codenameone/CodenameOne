@@ -69,10 +69,6 @@ import com.codename1.util.AsyncResource;
 /// - **JavaSE simulator / other ports** -- behave as a clean, unsupported device: attestation
 ///   completes with an error, [#isDeviceCompromised()] returns false and the accessibility list is
 ///   empty. Application code never needs platform `if` statements.
-///
-/// #### Since
-///
-/// 8.0
 public final class DeviceIntegrity {
 
     private DeviceIntegrity() {
