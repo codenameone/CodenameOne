@@ -115,42 +115,92 @@ public class RenderFidelityReport {
 
         double meanFidelity = compared > 0 ? fidelitySum / compared : 0.0d;
 
+        // Compared pairs sorted ascending (worst first) -- the basis for the
+        // distribution statistics, the per-pair percentage table and the cards.
+        List<PairRow> comparedRows = new ArrayList<>();
+        for (PairRow row : rows) {
+            if ("compared".equals(row.status) && row.fidelity != null) {
+                comparedRows.add(row);
+            }
+        }
+        comparedRows.sort(Comparator.comparingDouble(r -> r.fidelity));
+
         if (title != null && !title.isEmpty()) {
             commentLines.add("### " + title);
             commentLines.add("");
         }
-        commentLines.add(String.format("**Mean fidelity: %.2f%%** across %d component render(s).%s%s",
-                meanFidelity, compared,
-                missing > 0 ? " " + missing + " not delivered/missing golden." : "",
-                errors > 0 ? " " + errors + " error(s)." : ""));
+
+        if (compared > 0) {
+            double median = percentile(comparedRows, 50);
+            double p25 = percentile(comparedRows, 25);
+            PairRow worst = comparedRows.get(0);
+            // Distribution, not just the mean: a single average hides the low
+            // points, so report where the pairs actually land.
+            int b99 = 0, b95 = 0, b90 = 0, bLow = 0;
+            for (PairRow row : comparedRows) {
+                double f = row.fidelity;
+                if (f >= 99.0d) {
+                    b99++;
+                } else if (f >= 95.0d) {
+                    b95++;
+                } else if (f >= 90.0d) {
+                    b90++;
+                } else {
+                    bLow++;
+                }
+            }
+            commentLines.add(String.format(
+                    "**%d pairs compared** -- median **%.1f%%**, worst **%.1f%%** (`%s`), 25th pct %.1f%%, mean %.1f%%.",
+                    compared, median, worst.fidelity, worst.test, p25, meanFidelity));
+            commentLines.add("");
+            commentLines.add(String.format(
+                    "Distribution -- `>=99%%`: **%d** | `95-99%%`: **%d** | `90-95%%`: **%d** | `<90%%`: **%d**%s%s",
+                    b99, b95, b90, bLow,
+                    missing > 0 ? String.format(" | %d not delivered/missing golden", missing) : "",
+                    errors > 0 ? String.format(" | %d error(s)", errors) : ""));
+        } else {
+            commentLines.add(String.format("**No pairs could be compared.**%s%s",
+                    missing > 0 ? " " + missing + " not delivered/missing golden." : "",
+                    errors > 0 ? " " + errors + " error(s)." : ""));
+        }
         commentLines.add("");
 
-        // Lowest-fidelity backlog: the standing to-do list for theme authors.
-        List<PairRow> belowBar = new ArrayList<>();
-        for (PairRow row : rows) {
-            if ("compared".equals(row.status) && row.fidelity != null && row.fidelity < aspirational) {
-                belowBar.add(row);
-            }
-        }
-        belowBar.sort(Comparator.comparingDouble(r -> r.fidelity));
-        if (!belowBar.isEmpty()) {
-            commentLines.add(String.format("**Below %.0f%% fidelity (%d):**", aspirational, belowBar.size()));
-            int rank = 0;
-            for (PairRow row : belowBar) {
-                if (rank++ >= 15) {
-                    commentLines.add(String.format("- ...and %d more.", belowBar.size() - 15));
-                    break;
-                }
-                commentLines.add(String.format("- `%s` -- %.2f%%%s", row.test, row.fidelity, deltaSuffix(row.delta)));
+        // Per-pair fidelity table (worst first): the percentage data for every
+        // mismatch, at a glance, without scrolling through the image cards.
+        if (compared > 0) {
+            commentLines.add("| Component | State | Appearance | Fidelity | SSIM | mean delta | vs base |");
+            commentLines.add("|---|---|---|--:|--:|--:|--:|");
+            for (PairRow row : comparedRows) {
+                String[] p = splitTest(row.test);
+                commentLines.add(String.format("| %s | %s | %s | %.1f%% | %.3f | %.2f | %s |",
+                        p[0], p[1], p[2], row.fidelity, nz(row.ssim), nz(row.meanDelta), deltaCell(row.delta)));
             }
             commentLines.add("");
         }
 
-        // Per-component detail with side-by-side previews. Surface regressions
-        // (negative delta), then size/error problems, then everything else.
-        rows.sort(Comparator.comparingInt(RenderFidelityReport::rowPriority)
-                .thenComparingDouble(r -> r.fidelity != null ? r.fidelity : -1.0d));
+        // Non-compared pairs (errors / not delivered / missing golden) listed
+        // explicitly so they are never silently dropped from the percentages.
+        List<PairRow> problemRows = new ArrayList<>();
         for (PairRow row : rows) {
+            if (!"compared".equals(row.status)) {
+                problemRows.add(row);
+            }
+        }
+        if (!problemRows.isEmpty()) {
+            commentLines.add(String.format("**%d pair(s) not scored:**", problemRows.size()));
+            for (PairRow row : problemRows) {
+                commentLines.add(String.format("- `%s` -- %s%s", row.test, row.status,
+                        row.message != null && !row.message.isEmpty() ? " (" + row.message + ")" : ""));
+            }
+            commentLines.add("");
+        }
+
+        // Side-by-side comparison cards, worst first, then the unscored pairs.
+        commentLines.add("#### Side-by-side comparisons (worst first)");
+        commentLines.add("");
+        List<PairRow> cardRows = new ArrayList<>(comparedRows);
+        cardRows.addAll(problemRows);
+        for (PairRow row : cardRows) {
             commentLines.add(detailHeadline(row));
             addPreviewPair(commentLines, row);
             commentLines.add("");
@@ -203,6 +253,48 @@ public class RenderFidelityReport {
             return " (no change)";
         }
         return String.format(" (%+.2f vs baseline)", delta);
+    }
+
+    /// Value at percentile p (0-100) of an ascending-sorted list (nearest rank).
+    private static double percentile(List<PairRow> sortedAsc, double p) {
+        if (sortedAsc.isEmpty()) {
+            return 0.0d;
+        }
+        int idx = (int) Math.round((p / 100.0d) * (sortedAsc.size() - 1));
+        if (idx < 0) {
+            idx = 0;
+        }
+        if (idx >= sortedAsc.size()) {
+            idx = sortedAsc.size() - 1;
+        }
+        return sortedAsc.get(idx).fidelity;
+    }
+
+    /// Splits a "Component_state_appearance" test id into its three parts. The
+    /// appearance and state are the last two underscore-separated tokens; the
+    /// component name (which may itself contain no underscore) is the remainder.
+    private static String[] splitTest(String test) {
+        int last = test.lastIndexOf('_');
+        if (last < 0) {
+            return new String[] {test, "", ""};
+        }
+        String appearance = test.substring(last + 1);
+        int prev = test.lastIndexOf('_', last - 1);
+        if (prev < 0) {
+            return new String[] {test.substring(0, last), "", appearance};
+        }
+        return new String[] {test.substring(0, prev), test.substring(prev + 1, last), appearance};
+    }
+
+    /// Baseline-delta for a table cell (ASCII only).
+    private static String deltaCell(Double delta) {
+        if (delta == null) {
+            return "n/a";
+        }
+        if (Math.abs(delta) < 0.05d) {
+            return "0.0";
+        }
+        return String.format("%+.1f", delta);
     }
 
     private static void addPreviewPair(List<String> lines, PairRow row) {

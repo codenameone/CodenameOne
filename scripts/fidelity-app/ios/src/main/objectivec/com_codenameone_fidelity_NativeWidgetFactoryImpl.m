@@ -17,9 +17,18 @@
 }
 
 -(BOOL)knownKind:(NSString*)kind {
+    if (kind == nil) {
+        return NO;
+    }
+    // ParparVM-generated Objective-C is compiled MRC (no ARC), so an autoreleased
+    // +[NSSet setWithObjects:] cached in a static would be deallocated when the
+    // autorelease pool drains between native calls -- the next call then derefs a
+    // freed pointer (EXC_BAD_ACCESS), which ParparVM's signal handler surfaces as a
+    // bogus java.lang.NullPointerException on the Java side. -[alloc initWithObjects:]
+    // returns a +1 retained set, so the static cache stays valid for the app's life.
     static NSSet* kinds = nil;
     if (kinds == nil) {
-        kinds = [NSSet setWithObjects:
+        kinds = [[NSSet alloc] initWithObjects:
                  @"ios_uibutton_system", @"ios_uibutton_filled", @"ios_uibutton_plain",
                  @"ios_uitextfield", @"ios_check_glyph", @"ios_radio_glyph",
                  @"ios_uiswitch", @"ios_uislider", @"ios_uiprogress",
@@ -36,37 +45,43 @@
             NSLog(@"CN1SS:NATIVE reject kind=%@ known=%d w=%d h=%d out=%@", kind, (int)[self knownKind:kind], widthPx, heightPx, outPath);
             return NO;
         }
-        // KNOWN BLOCKER (ParparVM): this native method renders correctly only as a
-        // trivial stub. As soon as it does real UIKit work (buildAndRender:
-        // UIButton/UISwitch construction + CALayer renderInContext), a
-        // java.lang.NullPointerException surfaces on the Java side after the
-        // method's NSLog "enter" but before "done" -- with NO Objective-C exception
-        // raised. It reproduces identically whether the UIKit build runs via
-        // dispatch_sync to the main queue OR directly on the calling thread, so it
-        // is neither a threading nor an argument/return-marshaling fault (String
-        // args + BOOL return marshal cleanly; the stub delivers). The signature is
-        // that substantial ObjC work inside a ParparVM native method (which is not
-        // a GC safepoint and allocates UIKit objects the concurrent GC then scans)
-        // corrupts the thread state. Resolving it needs a ParparVM runtime fix, or
-        // a redesign that renders the native reference via a PeerComponent +
-        // Display.screenshot() (normal main-loop flow) instead of a native method.
-        // Until then the iOS fidelity round cannot collect native references.
-        NSData* result = nil;
-        @try {
-            result = [self buildAndRender:kind state:state appearance:appearance text:text w:widthPx h:heightPx];
-        } @catch (NSException* ex) {
-            NSLog(@"CN1SS:NATIVE exception kind=%@ : %@", kind, ex);
+        // UIKit construction + layout MUST run on the main thread: building most
+        // controls off-main "works", but some (e.g. an SF-Symbol image button)
+        // hang in -sizeToFit/-layoutIfNeeded off-main. This native method runs on
+        // the CN1 EDT (not the iOS main thread), so hop the build to main via
+        // dispatch_sync. The EDT is free to block here -- the main runloop runs
+        // independently -- so it does not deadlock.
+        // buildAndRender returns an AUTORELEASED NSData. It runs on the main queue
+        // (a different thread, with its own autorelease pool) while the rest of this
+        // method runs on the calling CN1 EDT. When dispatch_sync returns, main's
+        // autorelease pool drains and would free that NSData out from under us
+        // (ParparVM's MRC Obj-C does not retain across the boundary) -- the EDT's
+        // writeToFile would then hit freed memory. So -retain it inside the block
+        // and -release it after we are done.
+        __block NSData* result = nil;
+        void (^buildBlock)(void) = ^{
+            @try {
+                result = [[self buildAndRender:kind state:state appearance:appearance text:text w:widthPx h:heightPx] retain];
+            } @catch (NSException* ex) {
+                NSLog(@"CN1SS:NATIVE exception kind=%@ : %@", kind, ex);
+            }
+        };
+        if ([NSThread isMainThread]) {
+            buildBlock();
+        } else {
+            dispatch_sync(dispatch_get_main_queue(), buildBlock);
         }
         if (result == nil) {
             NSLog(@"CN1SS:NATIVE nil-result kind=%@ -> fallback", kind);
-            result = [self fallbackPng:widthPx h:heightPx];
+            result = [[self fallbackPng:widthPx h:heightPx] retain];
         }
         NSString* fsPath = outPath;
         if ([fsPath hasPrefix:@"file://"]) {
             fsPath = [[NSURL URLWithString:fsPath] path];
         }
-        BOOL ok = [result writeToFile:fsPath atomically:YES];
-        NSLog(@"CN1SS:NATIVE done kind=%@ bytes=%lu wrote=%d path=%@", kind, (unsigned long)result.length, (int)ok, fsPath);
+        BOOL ok = result != nil && [result writeToFile:fsPath atomically:YES];
+        NSLog(@"CN1SS:NATIVE done kind=%@ bytes=%lu wrote=%d", kind, (unsigned long)result.length, (int)ok);
+        [result release];
         return ok;
     } @catch (id ex) {
         NSLog(@"CN1SS:NATIVE objc-exception kind=%@ : %@", kind, ex);

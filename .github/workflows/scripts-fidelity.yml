@@ -150,13 +150,6 @@ jobs:
 
   fidelity-ios-metal:
     name: Fidelity (iOS Modern, Metal)
-    # Non-blocking: the iOS native reference render is currently blocked by a
-    # ParparVM runtime limitation (a native method NPEs as soon as it does real
-    # UIKit work -- see com_codenameone_fidelity_NativeWidgetFactoryImpl.m). The
-    # job still builds + uploads artifacts so progress is visible, but its failure
-    # must not gate the PR until the native-render path is fixed (ParparVM fix or
-    # a PeerComponent + Display.screenshot redesign).
-    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
