@@ -182,17 +182,17 @@ Notice that this isn't right, you can't be 100% sure as there are no official wa
 
 The `isJailbrokenDevice` check above is a single, coarse signal. For high-security apps (banking, payments, healthcare) Codename One exposes a richer, cross-platform device-integrity API in `com.codename1.security.DeviceIntegrity`. It groups three families of runtime self-protection (RASP) primitives, each available both as a *zero-code build hint* (an automatic launch-time guard) and as a *runtime API* (so your app can make granular, per-transaction decisions). The build hints are wired into the build server, so enabling a feature is just a settings entry away.
 
-WARNING: Every on-device check is bypassable on a sufficiently compromised device -- that is an industry truth, not a Codename One limitation. Use the on-device checks for defense-in-depth and UX (warn, degrade, require step-up auth), but gate genuinely sensitive server actions on the *server-verified attestation token* described below, never on a boolean computed on the device itself.
+WARNING: Every on-device check is bypassable on a sufficiently compromised device -- that's an industry truth, not a Codename One limitation. Use the on-device checks for defense-in-depth and UX (warn, degrade, require step-up auth), but gate genuinely sensitive server actions on the *server-verified attestation token* described below, never on a boolean computed on the device itself.
 
 ==== Detecting rooted / jailbroken / tampered devices (RASP)
 
-Codename One ships several launch-time hard gates that terminate the app on a compromised device. They are enabled purely through build hints and need no code:
+Codename One ships several launch-time hard gates that terminate the app on a compromised device. They're enabled through build hints and need no code:
 
-* `android.rootCheck=true` -- bundles the RootBeer library and exits at launch on a rooted device (su binaries, test-keys / custom ROM signals, Magisk indicators, dangerous props).
+* `android.rootCheck=true` -- bundles the RootBeer library and exits at launch on a rooted device (`su` binaries, test-keys / custom ROM signals, Magisk indicators, dangerous system properties).
 * `android.fridaDetection=true` -- detects the Frida dynamic-instrumentation toolkit (the core RASP threat) and exits.
 * `ios.detectJailbreak=true` -- exits at launch on a jailbroken iOS device (MobileSubstrate / Liberty / FridaGadget dylibs, Cydia/apt paths, sandbox-escape probes).
 
-When you'd rather react gracefully than be hard-killed -- for example to block only a single risky operation, raise a silent alarm, or require additional authentication -- use the non-exiting runtime report instead:
+When you'd rather respond in-app than be hard-killed -- for example to block only a single risky operation, raise a silent alarm, or require additional authentication -- use the non-exiting runtime report instead:
 
 [source,java]
 ----
@@ -243,7 +243,7 @@ DeviceIntegrity.requestIntegrityToken(serverNonce).onResult((token, err) -> {
 
 `DeviceIntegrity.isAttestationSupported()` reports whether attestation is available and was bundled into this build. On the simulator, on unsupported ports, or when the build hint is off, `requestIntegrityToken()` completes with an error rather than throwing.
 
-TIP: The block-the-transfer decision lives in *your backend*, gated on the verified verdict. Codename One's job is to reliably deliver the attested token; the policy enforcement -- e.g. blocking new-beneficiary transfers when integrity fails and biometric controls are not enabled -- is application + server logic that consumes this API.
+TIP: The block-the-transfer decision lives in *your backend*, gated on the verified verdict. Codename One's job is to reliably deliver the attested token; the policy enforcement -- for example blocking new-beneficiary transfers when integrity fails and biometric controls aren't enabled -- is application + server logic that consumes this API.
 
 ==== Defending against accessibility-service abuse (Android)
 
@@ -269,7 +269,7 @@ if (DeviceIntegrity.hasUntrustedAccessibilityService("com.google.android.marvin.
 }
 ----
 
-For the screens that actually matter (PIN entry, transfer confirmation), mark them secure so the OS blocks screenshots, screen recording, and accessibility screen scraping while they are displayed:
+For the screens that actually matter (PIN entry, transfer confirmation), mark them secure so the OS blocks screenshots, screen recording, and accessibility screen scraping while they're displayed:
 
 [source,java]
 ----
@@ -363,7 +363,7 @@ The hash and HMAC primitives are implemented in portable Java so they produce id
 
 Application code never sees these differences -- you call the same `com.codename1.security` classes regardless of the platform you are running on.
 
-NOTE: Cryptographic operations only throw `com.codename1.security.CryptoException`, an unchecked exception. You can let it bubble up or catch it; you do not have to declare it.
+NOTE: Cryptographic operations only throw `com.codename1.security.CryptoException`, an unchecked exception. You can let it bubble up or catch it; you don't have to declare it.
 
 ==== Hashing
 

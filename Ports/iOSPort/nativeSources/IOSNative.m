@@ -55,6 +55,7 @@
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_impl_ios_IOSBiometrics.h"
+#include "com_codename1_impl_ios_IOSDeviceIntegrity.h"
 #include "com_codename1_impl_ios_IOSSecureStorage.h"
 #include "com_codename1_impl_ios_IOSNfc.h"
 #include "com_codename1_impl_ios_IOSConnectivity.h"

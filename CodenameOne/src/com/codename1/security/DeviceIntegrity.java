@@ -73,7 +73,7 @@ import com.codename1.util.AsyncResource;
 /// #### Since
 ///
 /// 8.0
-public class DeviceIntegrity {
+public final class DeviceIntegrity {
 
     private DeviceIntegrity() {
     }
@@ -158,8 +158,7 @@ public class DeviceIntegrity {
         if(enabledServices == null || enabledServices.length == 0) {
             return false;
         }
-        for(int iter = 0 ; iter < enabledServices.length ; iter++) {
-            String service = enabledServices[iter];
+        for(String service : enabledServices) {
             if(service == null || service.length() == 0) {
                 continue;
             }
@@ -179,8 +178,8 @@ public class DeviceIntegrity {
         if(allowedPackages == null) {
             return false;
         }
-        for(int iter = 0 ; iter < allowedPackages.length ; iter++) {
-            if(pkg.equals(allowedPackages[iter])) {
+        for(String allowed : allowedPackages) {
+            if(pkg.equals(allowed)) {
                 return true;
             }
         }
