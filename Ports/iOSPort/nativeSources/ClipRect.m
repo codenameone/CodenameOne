@@ -154,6 +154,33 @@ static CGRect drawingRect;
         int sx = x, sy = y, sw = width, sh = height;
         if (sx < 0) { sw += sx; sx = 0; }
         if (sy < 0) { sh += sy; sy = 0; }
+        // Issue #5273: confine a screen clip to the current flush region
+        // (drawingRect). On a partial repaint -- e.g. an independently
+        // scrollable BorderLayout.CENTER container scrolling under a fixed
+        // toolbar / BorderLayout.NORTH -- paintDirty() flushes only the dirty
+        // sub-region, yet a clip emitted during that flush can still extend
+        // above it into the fixed header band. The GL backend clamps every
+        // clip to drawingRect (see the ES2 branch below), so an escaping draw
+        // can never touch pixels outside the flushed region. The Metal backend
+        // was missing that clamp: because it renders into a PERSISTENT
+        // screenTexture (MTLLoadActionLoad) the escaping fill overwrote the
+        // toolbar / NORTH band and it stayed blank until a full repaint (e.g.
+        // opening the overflow menu). Mirror the GL clamp here. Screen ops only
+        // (target == nil): mutable-image draws run against their own encoder
+        // with their own framebuffer bounds, where drawingRect (the screen
+        // flush rect) does not apply.
+        if ([self target] == nil) {
+            int sx2 = sx + sw;
+            int sy2 = sy + sh;
+            int orX = (int)drawingRect.origin.x;
+            int orY = (int)drawingRect.origin.y;
+            int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
+            int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
+            if (sx < orX) { sx = orX; sw = sx2 - sx; }
+            if (sy < orY) { sy = orY; sh = sy2 - sy; }
+            if (sx2 > destX2) { sw = destX2 - sx; }
+            if (sy2 > destY2) { sh = destY2 - sy; }
+        }
         CN1MetalDisablePolygonStencilClip();
         CN1MetalSetScissor(sx, sy, sw, sh);
         clipApplied = (sw > 0 && sh > 0);
