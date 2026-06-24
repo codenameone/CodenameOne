@@ -517,10 +517,13 @@ public class Slider extends Label implements ActionSource {
             try {
                 thumbW = Math.max(3, d.convertToPixels(Float.parseFloat(thumbC.trim())));
             } catch (NumberFormatException notANumber) {
-                // keep the track-derived default
+                thumbW = Math.max(3, track);   // malformed constant -> track-derived default
             }
         }
-        int x0 = getX(), y0 = getY(), w = getWidth(), h = getHeight();
+        int x0 = getX();
+        int y0 = getY();
+        int w = getWidth();
+        int h = getHeight();
         int range = maxValue - minValue;
         int valueW = range <= 0 ? 0 : (int) (((float) (value - minValue) / (float) range) * w);
         int bandY = y0 + (h - track) / 2;
@@ -599,6 +602,7 @@ public class Slider extends Label implements ActionSource {
             try {
                 shadow = d.convertToPixels(Float.parseFloat(shadowC.trim()));
             } catch (NumberFormatException notANumber) {
+                shadow = 0;   // malformed constant -> no shadow
             }
         }
         if (shadow > 0) {
