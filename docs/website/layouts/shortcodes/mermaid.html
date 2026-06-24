@@ -28,11 +28,17 @@
     'var prefersDark = document.body.classList.contains("dark")' +
     ' || window.matchMedia("(prefers-color-scheme: dark)").matches;' +
     'mermaid.initialize({' +
-    '  startOnLoad: true,' +
+    '  startOnLoad: false,' +
     '  theme: prefersDark ? "dark" : "default",' +
     '  securityLevel: "loose",' +
     '  fontFamily: "Poppins, system-ui, sans-serif"' +
-    '});';
+    '});' +
+    // This loader is a dynamically-injected ES module, so it runs AFTER the
+    // document has parsed and DOMContentLoaded has already fired -- which means
+    // mermaid's own startOnLoad listener would never trigger. Render explicitly
+    // instead. The module's deferred execution guarantees every .mermaid div
+    // (across all shortcodes on the page) is in the DOM by the time run() fires.
+    'mermaid.run();';
   document.head.appendChild(s);
 })();
 </script>

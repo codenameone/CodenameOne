@@ -295,7 +295,18 @@ class FoojayAdapter:
     @staticmethod
     def accepts(post: Post) -> bool:
         # foojay only receives the weekly Friday digest post; the deep-dive
-        # posts published on other weekdays are not syndicated there.
+        # posts published on other weekdays are not syndicated there -- unless
+        # the post opts in explicitly with `syndicate_force: [foojay]` in its
+        # front matter, used to push the occasional experimental deep dive into
+        # the rotation off-Friday.
+        forced = post.front_matter.get("syndicate_force") or []
+        if isinstance(forced, str):
+            # The blog's lightweight front-matter parser is scalar-only and
+            # hands list syntax back as a raw string (e.g. '["dzone",
+            # "foojay"]'); pull the bare platform tokens out.
+            forced = re.findall(r"[A-Za-z0-9_-]+", forced)
+        if "foojay" in {str(p).strip().lower() for p in forced}:
+            return True
         return post.date.weekday() == 4
 
     def login(self, page) -> None:

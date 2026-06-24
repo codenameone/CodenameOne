@@ -81,3 +81,8 @@ dSYM
 
 # Deobfuscation of Android stack traces via the mapping file.
 [Dd]eobfuscat(e|es|ed|ing|ion)
+
+# SIMD / compiler vocabulary from the low-level performance deep dives.
+[Aa]utovectoriz(e|es|ed|ing|er|ation)
+speedups?
+footguns?
