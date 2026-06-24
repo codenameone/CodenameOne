@@ -63,26 +63,29 @@ public class PartialFlushClipEscape extends BaseTest {
     private final SolidComponent south = new SolidComponent(SOUTH_COLOR);
     private final EscapeComponent center = new EscapeComponent();
 
-    private static boolean isIOS() {
-        return "ios".equals(Display.getInstance().getPlatformName());
+    /// iPhone/iPad only. The #5273 escape is only a *bug* where the renderer
+    /// keeps a persistent backing texture (Metal) and a partial repaint never
+    /// rewrites the fixed band. On every other platform a full repaint follows
+    /// almost immediately, so the transient escape this test forces is not
+    /// user-visible -- the issue reporter confirmed it does not reproduce on
+    /// Android or the simulator. Capturing it elsewhere would only lock a
+    /// misleading "magenta" golden. watchOS uses the Core Graphics backend (the
+    /// fix is in the Metal ClipRect path) and tvOS is excluded to keep the guard
+    /// focused on the reported iPhone scenario; on the supported targets GL
+    /// clamps -> red, fixed Metal clamps -> red, regressed Metal -> magenta.
+    private static boolean shouldRunHere() {
+        return "ios".equals(Display.getInstance().getPlatformName())
+                && !CN.isWatch() && !CN.isTV();
     }
 
-    /// iOS only. The #5273 escape is only a *bug* where the renderer keeps a
-    /// persistent backing texture (Metal) and a partial repaint never rewrites
-    /// the fixed band. On every other platform a full repaint follows almost
-    /// immediately, so the transient escape this test forces is not user-visible
-    /// -- the issue reporter confirmed it does not reproduce on Android or the
-    /// simulator. Capturing it elsewhere would only lock a misleading "magenta"
-    /// golden, so the test is scoped to iOS (GL clamps -> red; fixed Metal
-    /// clamps -> red; regressed Metal -> magenta).
     @Override
     public boolean shouldTakeScreenshot() {
-        return isIOS();
+        return shouldRunHere();
     }
 
     @Override
     public boolean runTest() {
-        if (!isIOS()) {
+        if (!shouldRunHere()) {
             done();
             return true;
         }
