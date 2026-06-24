@@ -48,6 +48,7 @@
 #endif
 #import "CN1AudioUnit.h"
 #import <UIKit/UIKit.h>
+#include <sys/sysctl.h>
 #import "CodenameOne_GLViewController.h"
 #import <QuartzCore/QuartzCore.h>
 #import <LocalAuthentication/LocalAuthentication.h>
@@ -5905,6 +5906,37 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MU
 #endif // !TARGET_OS_WATCH
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceHardwareModel__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    // hw.machine is the hardware/marketing model identifier (e.g. "iPhone15,2").
+    // On the simulator it is the host arch; we map that to a stable label so the
+    // value is never the host CPU string. This is not a per-device identifier --
+    // every unit of the same model returns the same value -- so it is safe for
+    // analytics segmentation, unlike [[UIDevice currentDevice] name].
+    size_t size = 0;
+    if (sysctlbyname("hw.machine", NULL, &size, NULL, 0) != 0 || size == 0) {
+        return JAVA_NULL;
+    }
+    char *machine = (char *)malloc(size);
+    if (machine == NULL) {
+        return JAVA_NULL;
+    }
+    NSString *model = nil;
+    if (sysctlbyname("hw.machine", machine, &size, NULL, 0) == 0) {
+        model = [NSString stringWithUTF8String:machine];
+    }
+    free(machine);
+#if TARGET_OS_SIMULATOR
+    NSString *simModel = [[NSProcessInfo processInfo] environment][@"SIMULATOR_MODEL_IDENTIFIER"];
+    if (simModel != nil && [simModel length] > 0) {
+        model = simModel;
+    }
+#endif
+    if (model == nil) {
+        return JAVA_NULL;
+    }
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG model);
+}
+
 extern int cn1GetStatusBarTapCount();
 extern double cn1GetStatusBarTapLastEpochMillis();
 extern int cn1GetStatusBarTapLastX();
@@ -11288,6 +11320,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion___R_java_lang_String(C
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceHardwareModel___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getDeviceHardwareModel__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getStatusBarTapCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
