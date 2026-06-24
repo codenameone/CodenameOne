@@ -872,6 +872,13 @@ public abstract class CodenameOneImplementation {
                     setPaintDirtyRegionClip(paintDirtyTmpRect.getX(), paintDirtyTmpRect.getY(),
                             paintDirtyTmpRect.getWidth(), paintDirtyTmpRect.getHeight());
                     cmp.paintComponent(wrapper);
+                    // Recompute the paintable bounds AFTER paint for the flush
+                    // region below: paintComponent can lay the component out (its
+                    // bounds may change), and the retained ports clamp to / flush
+                    // exactly this rect, so it must match the pre-#5273 value to
+                    // the pixel (the before-paint value above is only the immediate
+                    // -mode clip hint).
+                    getPaintableBounds(cmp, paintDirtyTmpRect);
                     int cmpAbsX = paintDirtyTmpRect.getX();
                     topX = Math.min(cmpAbsX, topX);
                     bottomX = Math.max(cmpAbsX + paintDirtyTmpRect.getWidth(), bottomX);
