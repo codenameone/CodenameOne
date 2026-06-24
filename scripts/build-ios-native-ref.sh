@@ -52,6 +52,9 @@ cat > "$BUILD/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Bundle the shared glass backdrop so the app can render glass widgets over it.
+cp "$ROOT/scripts/fidelity-app/common/src/main/resources/glass-backdrop.png" "$BUILD/" 2>/dev/null || true
+
 log "Booting simulator $UDID"
 xcrun simctl boot "$UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1 || true

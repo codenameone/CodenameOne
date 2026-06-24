@@ -19,6 +19,22 @@ let PX_PER_MM: CGFloat = 18.117
 let PT_PER_MM: CGFloat = 6.417
 let CAPTURE_SCALE: CGFloat = PX_PER_MM / PT_PER_MM   // ~2.824
 
+// Liquid Glass is translucent -- it only reveals itself by refracting/blurring
+// content BEHIND it. For the glass widgets we therefore render over a fixed,
+// committed backdrop PNG (glass-backdrop.png) shared 1:1 with the Codename One
+// side, so the only variance between the two renders is the glass itself, not the
+// background. Non-glass widgets keep the plain tile so their diff stays clean.
+let GLASS_KINDS: Set<String> = [
+    "ios_uibutton_system", "ios_uibutton_plain", "ios_uibutton_filled",
+    "ios_uinavbar", "ios_uitabbar",
+]
+let BACKDROP: UIImage? = {
+    if let p = Bundle.main.path(forResource: "glass-backdrop", ofType: "png") {
+        return UIImage(contentsOfFile: p)
+    }
+    return nil
+}()
+
 struct Spec {
     let component: String
     let kind: String
@@ -237,6 +253,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                     let container = UIView(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
                     container.backgroundColor = appearance == "dark" ? .black : .white
                     container.overrideUserInterfaceStyle = appearance == "dark" ? .dark : .light
+                    if GLASS_KINDS.contains(spec.kind), let bd = BACKDROP {
+                        let iv = UIImageView(frame: container.bounds)
+                        iv.image = bd
+                        iv.contentMode = .scaleToFill
+                        iv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                        container.addSubview(iv)
+                    }
                     guard let control = buildControl(spec.kind, state, wPt, hPt) else { continue }
                     control.sizeToFit()
                     var cs = control.bounds.size

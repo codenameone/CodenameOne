@@ -211,7 +211,7 @@ public class FidelityDeviceRunner {
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
                     st.setMargin(topInset, 0, leftInset, 0);
-                    Container tile = newTile(comp, w, h, appearance);
+                    Container tile = newTile(comp, c.getId(), w, h, appearance);
                     form.add(centerRow(tile));
                     wrappers.add(tile);
                     names.add(c.getId() + "_" + state + "_" + appearance + "_cn1");
@@ -401,7 +401,7 @@ public class FidelityDeviceRunner {
 
     // ---- helpers ----
 
-    private Container newTile(Component comp, int w, int h, String appearance) {
+    private Container newTile(Component comp, String compId, int w, int h, String appearance) {
         // Android Material widgets centre their VISIBLE part inside a 48dp minimum
         // touch target (e.g. an 88px switch track sits 22px down inside a 132px
         // view; a 110px button 11px down). The native reference render carries that
@@ -411,14 +411,60 @@ public class FidelityDeviceRunner {
         // spacing, absent on the native side) so only the touch-target inset places
         // the widget.
         Container tile = new Container(new FlowLayout(Component.LEFT, Component.TOP));
-        tile.getAllStyles().setBgColor(bgColor(appearance));
-        tile.getAllStyles().setBgTransparency(255);
+        Image backdrop = isGlassKind(compId) ? getGlassBackdrop() : null;
+        if (backdrop != null) {
+            // Liquid Glass needs content behind it. The iOS native reference renders
+            // these widgets over the SAME committed backdrop PNG, so CN1 must too --
+            // the only difference that should remain is how each renders the glass.
+            tile.getAllStyles().setBgImage(backdrop);
+            tile.getAllStyles().setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FILL);
+            tile.getAllStyles().setBgTransparency(255);
+        } else {
+            tile.getAllStyles().setBgColor(bgColor(appearance));
+            tile.getAllStyles().setBgTransparency(255);
+        }
         tile.getAllStyles().setPadding(0, 0, 0, 0);
         tile.getAllStyles().setMargin(0, 0, 0, 0);
         tile.setPreferredW(w);
         tile.setPreferredH(h);
         tile.add(comp);
         return tile;
+    }
+
+    /// Glass-styled iOS widgets that are rendered over the shared backdrop (the iOS
+    /// native reference uses iOS 26 Liquid Glass for these). iOS only -- Android
+    /// Material does not use glass, so its tiles stay on the plain background.
+    private boolean isGlassKind(String compId) {
+        if (!"ios".equals(platform) || compId == null) {
+            return false;
+        }
+        return "Button".equals(compId) || "RaisedButton".equals(compId) || "FlatButton".equals(compId)
+                || "Toolbar".equals(compId) || "Tabs".equals(compId);
+    }
+
+    private Image glassBackdrop;
+    private boolean glassBackdropLoaded;
+
+    /// The shared glass backdrop PNG (same asset the native reference uses), loaded
+    /// from the app resources once. Null if absent.
+    private Image getGlassBackdrop() {
+        if (!glassBackdropLoaded) {
+            glassBackdropLoaded = true;
+            InputStream in = Display.getInstance().getResourceAsStream(getClass(), "/glass-backdrop.png");
+            if (in == null) {
+                in = getClass().getResourceAsStream("/glass-backdrop.png");
+            }
+            if (in != null) {
+                try {
+                    glassBackdrop = Image.createImage(in);
+                } catch (Throwable t) {
+                    println("CN1SS:WARN:fidelity glass backdrop load failed " + t);
+                } finally {
+                    Util.cleanup(in);
+                }
+            }
+        }
+        return glassBackdrop;
     }
 
     private Container centerRow(Container tile) {
