@@ -202,8 +202,12 @@ jobs:
           PROJ_DIR="$(dirname "$WS")"
           SCHEME="$(xcodebuild -workspace "$WS" -list 2>/dev/null | awk '/Schemes:/{f=1;next} f&&NF{print $1; exit}')"
           DD="$PROJ_DIR/dd"
+          # arm64-only: the macos-15 runner is Apple Silicon and the x86_64
+          # simulator slice fails to build the ParparVM SIMD code (clang
+          # '_Builtin_intrinsics.arm.neon requires feature neon' module error).
           xcodebuild -workspace "$WS" -scheme "$SCHEME" -sdk iphonesimulator \
             -configuration Debug -derivedDataPath "$DD" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES VALID_ARCHS=arm64 \
             CODE_SIGNING_ALLOWED=NO build
           APP="$(find "$DD/Build/Products" -maxdepth 2 -name '*.app' -type d | head -n1)"
           echo "app_path=$APP" >> "$GITHUB_OUTPUT"
