@@ -36,6 +36,7 @@
 #import "CN1WatchHost.h"
 #import "CN1WatchRenderingView.h"
 #import "CN1CGGraphics.h"
+#import "ClipRect.h"
 #import "DrawString.h"
 #import "GLUIImage.h"
 
@@ -43,6 +44,14 @@ extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(voi
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(void);
 
 static CodenameOne_GLViewController *singletonInstance = nil;
+
+// Issue #5273: the partial-flush region handed to flushBuffer (the only place
+// the watch slice learns which sub-region is being repainted). drawFrame feeds
+// it to ClipRect.setDrawRect so a screen clip emitted while draining the op
+// queue is confined to the flushed region instead of escaping into a fixed
+// band on the persistent CG surface. Stays CGRectZero until the first flush, at
+// which point the clamp in ClipRect's watch branch is a guarded no-op.
+static CGRect watchFlushRect;
 
 @implementation CodenameOne_GLViewController
 
@@ -118,6 +127,9 @@ static CodenameOne_GLViewController *singletonInstance = nil;
             upcomingTarget = tmp;
             [upcomingTarget removeAllObjects];
         }
+        // Issue #5273: remember the sub-region being flushed so drawFrame can
+        // confine screen clips to it (see watchFlushRect / ClipRect setDrawRect).
+        watchFlushRect = CGRectMake(x, y, width, height);
     }
     [[CN1WatchHost sharedHost] setNeedsDisplay];
 }
@@ -133,10 +145,17 @@ static CodenameOne_GLViewController *singletonInstance = nil;
         return;
     }
     NSArray *ops;
+    CGRect flushRect;
     @synchronized (self) {
         ops = [currentTarget copy];
+        // Snapshot the flush region with the op queue it belongs to.
+        flushRect = watchFlushRect;
     }
     [v setFramebuffer];
+    // Issue #5273: publish the flush region to ClipRect so a screen clip
+    // drained below is clamped to the repainted sub-region (the watch branch of
+    // ClipRect.execute no-ops the clamp while this is empty).
+    [ClipRect setDrawRect:flushRect];
     for (ExecutableOp *op in ops) {
         @try {
             [op executeWithClipping];

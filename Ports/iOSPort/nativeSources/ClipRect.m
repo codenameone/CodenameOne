@@ -108,6 +108,31 @@ static CGRect drawingRect;
         int sx = x, sy = y, sw = width, sh = height;
         if (sx < 0) { sw += sx; sx = 0; }
         if (sy < 0) { sh += sy; sy = 0; }
+        // Issue #5273: confine a screen clip to the current flush region
+        // (drawingRect), mirroring the Metal and GL/ES2 branches below. The
+        // watch CG surface is persistent across partial repaints, so without
+        // this clamp a clip emitted during a partial flush (e.g. an
+        // independently scrollable BorderLayout.CENTER under a fixed band) can
+        // extend past the flushed sub-region and overwrite the fixed band,
+        // which then stays corrupted until a full repaint -- the same defect
+        // the Metal backend had. Screen ops only ([self target] == nil): a
+        // mutable-image draw runs against its own surface bounds, where the
+        // screen flush rect does not apply. Guarded on a non-empty drawingRect
+        // so before the first flush sets it (or on any path that leaves it
+        // zero) we fall through to the unclamped clip rather than collapsing
+        // every clip to nothing and blanking the watch surface.
+        if ([self target] == nil && drawingRect.size.width > 0 && drawingRect.size.height > 0) {
+            int sx2 = sx + sw;
+            int sy2 = sy + sh;
+            int orX = (int)drawingRect.origin.x;
+            int orY = (int)drawingRect.origin.y;
+            int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
+            int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
+            if (sx < orX) { sx = orX; sw = sx2 - sx; }
+            if (sy < orY) { sy = orY; sh = sy2 - sy; }
+            if (sx2 > destX2) { sw = destX2 - sx; }
+            if (sy2 > destY2) { sh = destY2 - sy; }
+        }
         if (sw > 0 && sh > 0) {
             CN1CGSetClipRect(sx, sy, sw, sh);
             clipApplied = YES;

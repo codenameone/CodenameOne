@@ -847,6 +847,10 @@ public abstract class CodenameOneImplementation {
                 paintQueueTemp[iter] = null;
                 wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
                 wrapper.resetAffine();
+                // Reset the flush-region hint to the full screen before the
+                // full-screen clip below so neither it nor a previous
+                // component's tighter region wrongly clamps this reset (#5273).
+                setPaintDirtyRegionClip(0, 0, dwidth, dheight);
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;
@@ -855,6 +859,9 @@ public abstract class CodenameOneImplementation {
                         Dimension d = dirty.getSize();
                         wrapper.setClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
                         cmp.setDirtyRegion(null);
+                        // Confine any clip this component sets while painting to
+                        // its flushed (dirty) region on immediate-mode ports.
+                        setPaintDirtyRegionClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
                     }
                     cmp.paintComponent(wrapper);
                     getPaintableBounds(cmp, paintDirtyTmpRect);
@@ -877,6 +884,25 @@ public abstract class CodenameOneImplementation {
             //Log.p("Flushing graphics : "+topX+","+topY+","+bottomX+","+bottomY);
             flushGraphics(topX, topY, bottomX - topX, bottomY - topY);
         }
+    }
+
+    /// Reports the clip region that bounds the current component's flush as
+    /// {@link #paintDirty()} is about to paint it -- its dirty region, or the
+    /// full screen for a full repaint. Immediate-mode native ports that draw
+    /// screen ops straight into a persistent surface (the Linux Cairo port)
+    /// override this to confine a clip set during that component's paint to the
+    /// flushed region, so an oversized clip cannot escape and corrupt pixels
+    /// outside it (issue #5273). Retained-mode ports (iOS) clamp at flush time
+    /// against their own flush rect instead, so the default here is a no-op and
+    /// every other port is unaffected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: left edge of the flush region in screen coordinates
+    /// - `y`: top edge of the flush region in screen coordinates
+    /// - `width`: width of the flush region
+    /// - `height`: height of the flush region
+    protected void setPaintDirtyRegionClip(int x, int y, int width, int height) {
     }
 
     /// This method is a callback from the edt before the edt enters to an idle
