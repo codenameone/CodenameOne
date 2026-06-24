@@ -135,12 +135,7 @@ jobs:
           arch: x86_64
           target: google_apis
           disk-size: 2048M
-          # SEED (temporary): regenerate the native goldens + baseline on CI's own
-          # emulator so they match the CI render density (committed goldens were
-          # rendered on a different local emulator -> "could not be compared"). After
-          # this run's artifacts are committed, drop the two env vars so the job runs
-          # as a real ratchet again.
-          script: FIDELITY_UPDATE_GOLDENS=1 FIDELITY_UPDATE_BASELINE=1 ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
+          script: ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
       - name: Upload fidelity artifacts
         if: always()
         uses: actions/upload-artifact@v7
