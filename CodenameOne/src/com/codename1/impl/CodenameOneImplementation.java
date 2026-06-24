@@ -3951,6 +3951,15 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Unsupported operation");
     }
 
+    /// Returns a variant of the given native TrueType font with the supplied letter
+    /// spacing (in EM units) applied to its glyph advances, or the same font when the
+    /// platform does not support letter spacing. Used by Style.letterSpacing so a
+    /// per-component spacing is carried by the font itself (consistent for layout
+    /// measurement and rendering). The default is a no-op.
+    public Object deriveTrueTypeFontWithLetterSpacing(Object font, float letterSpacing) {
+        return font;
+    }
+
     /// Returns true if the system supports dynamically loading truetype fonts from
     /// a file.
     ///

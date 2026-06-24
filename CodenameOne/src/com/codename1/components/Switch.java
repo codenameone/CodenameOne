@@ -378,6 +378,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getThumbOnImage() {
         if (thumbOnImage == null) {
+            // The "on" thumb keeps its elevation shadow on every platform (Material 3
+            // elevates the selected thumb); only the off/disabled thumbs go flat where
+            // the theme asks (switchThumbShadowSpreadInt).
             thumbOnImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getSelectedStyle().getFgColor(), 2, getThumbInset());
         }
         return thumbOnImage;
@@ -399,7 +402,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getThumbOffImage() {
         if (thumbOffImage == null) {
-            thumbOffImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getUnselectedStyle().getFgColor(), 2, getThumbInset()); //getUnselectedStyle().getFgColor(), true);
+            thumbOffImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbOffScaleY()), getUnselectedStyle().getFgColor(), getThumbShadowSpread(), getThumbInset()); //getUnselectedStyle().getFgColor(), true);
         }
         return thumbOffImage;
     }
@@ -420,7 +423,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getThumbDisabledImage() {
         if (thumbDisabledImage == null) {
-            thumbDisabledImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getDisabledStyle().getFgColor(), 2, getThumbInset()); //getDisabledStyle().getFgColor(), true);
+            thumbDisabledImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbOffScaleY()), getDisabledStyle().getFgColor(), getThumbShadowSpread(), getThumbInset()); //getDisabledStyle().getFgColor(), true);
         }
         return thumbDisabledImage;
     }
@@ -464,6 +467,51 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private double getThumbScaleY() {
         return Double.parseDouble(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "ThumbScaleY", "1.5"));
+    }
+
+    /// Vertical scale of the OFF (and disabled) thumb. Material 3 renders the
+    /// off-thumb smaller than the on-thumb (16dp vs 24dp); the Android theme sets
+    /// switchThumbOffScaleY below ThumbScaleY. Defaults to ThumbScaleY (a single
+    /// thumb size) so iOS and existing themes are unaffected.
+    private double getThumbOffScaleY() {
+        return Double.parseDouble(getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "ThumbOffScaleY", String.valueOf(getThumbScaleY())));
+    }
+
+    /// Pixels of drop-shadow spread painted under the thumb. Defaults to 2 (the
+    /// iOS-style elevated thumb). Material 3 renders a FLAT thumb, so the Android
+    /// native theme sets switchThumbShadowSpreadInt to 0.
+    private int getThumbShadowSpread() {
+        return getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "ThumbShadowSpreadInt", 2);
+    }
+
+    /// Extra inset (px from mm) of the OFF thumb from the track's leading edge.
+    /// Material 3 leaves a small gap; defaults to 0 so iOS/legacy are unaffected.
+    private int getThumbOffInset() {
+        String v = getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "ThumbOffInsetMM", null);
+        if (v != null) {
+            try {
+                return Display.getInstance().convertToPixels(Float.parseFloat(v.trim()));
+            } catch (NumberFormatException ignore) {
+                // fall through to no inset
+            }
+        }
+        return 0;
+    }
+
+    /// Colour of the disabled track's outline ring. Material 3 uses a very subtle
+    /// near-surface tone (distinct from the more visible disabled thumb/fg). A theme
+    /// names a UIID via switchDisabledOutlineColorUIID whose fg supplies it
+    /// (dark-resolved); unset falls back to the disabled foreground colour.
+    private int getTrackDisabledOutlineColor() {
+        String uiid = getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "DisabledOutlineColorUIID", null);
+        if (uiid != null) {
+            return getUIManager().getComponentStyle(uiid).getFgColor();
+        }
+        return getDisabledStyle().getFgColor();
     }
 
     private double getTrackScaleX() {
@@ -518,7 +566,12 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getTrackDisabledImage() {
         if (trackDisabledImage == null) {
-            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
+            // Material 3 disabled switch reads as a thin outline ring over a
+            // surface-coloured interior (≈ the page background, so it looks almost
+            // fill-less) - NOT the accent or a contrasting fill. The smooth ring is
+            // the outer pill (foreground colour) minus the inner surface pill, so the
+            // disabled style's bg must be the surface colour and its fg the outline.
+            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackDisabledOutlineColor(), Math.max(1, getTrackOffOutlineWidth()));
         }
         return trackDisabledImage;
     }
@@ -745,15 +798,15 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         int innerWidth = getWidth() - padLeft - padRight;
         int halign = s.getAlignment(); //TODO: swap left and right if RTL
 
-        int thumbrX = 0; //X position of the thumb relative to the start of the track
+        // In the OFF position Material 3 leaves a small gap between the (smaller)
+        // thumb and the track's leading edge - switchThumbOffInsetMM (0 by default,
+        // so iOS/legacy themes are unaffected). The ON position stays flush.
+        int offInset = getThumbOffInset();
+        int thumbrX; //X position of the thumb relative to the start of the track
         if (isRTL()) {
-            if (!value) {
-                thumbrX = cTrackImage.getWidth() - cthumbImage.getWidth();
-            }
+            thumbrX = value ? 0 : (cTrackImage.getWidth() - cthumbImage.getWidth() - offInset);
         } else {
-            if (value) {
-                thumbrX = cTrackImage.getWidth() - cthumbImage.getWidth();
-            }
+            thumbrX = value ? (cTrackImage.getWidth() - cthumbImage.getWidth()) : offInset;
         }
 
         Image nextThumbImage = null;

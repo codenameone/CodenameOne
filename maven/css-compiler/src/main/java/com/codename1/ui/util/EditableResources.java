@@ -630,7 +630,7 @@ public class EditableResources extends Resources implements TreeModel {
                                             theme.put(key, Boolean.valueOf(v.getValue()));
                                             continue;
                                         }
-                                        if (key.endsWith(Style.ICON_GAP)) {
+                                        if (key.endsWith(Style.ICON_GAP) || key.endsWith(Style.LETTER_SPACING)) {
                                             theme.put(key, Float.valueOf(v.getValue()));
                                             continue;
                                         }
@@ -2104,6 +2104,11 @@ public class EditableResources extends Resources implements TreeModel {
             }
 
             if (key.endsWith(Style.ICON_GAP)) {
+                output.writeFloat(((Number)theme.get(key)).floatValue());
+                continue;
+            }
+
+            if (key.endsWith(Style.LETTER_SPACING)) {
                 output.writeFloat(((Number)theme.get(key)).floatValue());
                 continue;
             }

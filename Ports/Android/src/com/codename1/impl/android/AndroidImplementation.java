@@ -2208,6 +2208,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Returns a copy of the given native font with its paint's letter spacing set
+    /// to the supplied value (Android letter spacing is in EM units, independent of
+    /// font size). Used by Style.letterSpacing so a per-UIID spacing -- matching the
+    /// Material text-appearance for each component -- is baked into the SAME paint
+    /// that does both measureText (layout) and drawText (render), keeping advances
+    /// consistent. Other ports get the default no-op.
+    @Override
+    public Object deriveTrueTypeFontWithLetterSpacing(Object font, float letterSpacing) {
+        NativeFont fnt = (NativeFont) font;
+        CodenameOneTextPaint copy = new CodenameOneTextPaint((CodenameOneTextPaint) fnt.font);
+        copy.setLetterSpacing(letterSpacing);
+        return new NativeFont(fnt.face, fnt.style, fnt.size, copy, fnt.fileName, fnt.height, fnt.weight);
+    }
+
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         NativeFont fnt = (NativeFont)font;
@@ -2225,6 +2239,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         CodenameOneTextPaint newPaint = new CodenameOneTextPaint(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
+        // preserve any letter spacing already configured on the source paint
+        newPaint.setLetterSpacing(paint.getLetterSpacing());
         NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
         return n;
     }

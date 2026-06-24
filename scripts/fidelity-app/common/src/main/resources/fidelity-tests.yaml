@@ -1,0 +1,122 @@
+# Native fidelity test specification.
+#
+# Each component below is rendered TWICE on device: once as the real native OS
+# widget (UIKit on iOS, Material on Android) and once as the Codename One
+# equivalent under the native theme (iOSModernTheme / AndroidMaterialTheme). The
+# two renders are diffed to produce a per-(component,state,appearance) fidelity
+# score; the goal is to drive every score toward 99-100%.
+#
+# This file is the trigger for the fidelity CI workflow: editing it re-runs the
+# suite. It is parsed on-device by FidelitySpecParser, which understands a flat,
+# 2-space-indented subset of YAML (maps + comma-separated scalar lists, "#"
+# comments, optional quotes). Do NOT use anchors, flow style, or tabs.
+#
+# Per-component keys:
+#   id              required; stable identifier, used in screenshot names.
+#   cn1_uiid        CN1 UIID to apply to the CN1 render (defaults to id).
+#   native          iOS native widget key (see NativeWidgetFactoryImpl .m switch).
+#   native_android  Android native widget key (see NativeWidgetFactoryImpl.java).
+#   text            label text for widgets that show text.
+#   states          comma-separated: normal, pressed, disabled, selected.
+#   platforms       comma-separated allow-list (ios, android). Omit = both.
+#   tile_width_mm   per-component width override (logical mm).
+#   tile_height_mm  per-component height override (logical mm).
+
+defaults:
+  tile_width_mm: 60
+  tile_height_mm: 14
+  bg: ffffff
+  appearances: light,dark
+
+components:
+  - id: Button
+    cn1_uiid: Button
+    native: ios_uibutton_system
+    native_android: material_button_filled
+    text: Default
+    states: normal,pressed,disabled
+
+  - id: RaisedButton
+    cn1_uiid: RaisedButton
+    native: ios_uibutton_filled
+    native_android: material_button_tonal
+    text: Raised
+    states: normal,pressed,disabled
+
+  - id: FlatButton
+    cn1_uiid: FlatButton
+    native: ios_uibutton_plain
+    native_android: material_button_outlined
+    text: Flat
+    states: normal,pressed
+
+  - id: TextField
+    cn1_uiid: TextField
+    native: ios_uitextfield
+    native_android: material_textinput
+    text: Hello
+    states: normal,disabled
+
+  - id: CheckBox
+    cn1_uiid: CheckBox
+    native: ios_check_glyph
+    native_android: material_checkbox
+    text: Enabled
+    states: normal,selected,disabled
+
+  - id: RadioButton
+    cn1_uiid: RadioButton
+    native: ios_radio_glyph
+    native_android: material_radio
+    text: Option
+    states: normal,selected,disabled
+
+  - id: Switch
+    cn1_uiid: Switch
+    native: ios_uiswitch
+    native_android: material_switch
+    states: normal,selected,disabled
+
+  - id: Slider
+    cn1_uiid: Slider
+    native: ios_uislider
+    native_android: material_slider
+    states: normal,disabled
+
+  - id: ProgressBar
+    cn1_uiid: ProgressBar
+    native: ios_uiprogress
+    native_android: material_progress_linear
+    states: normal
+
+  - id: Tabs
+    cn1_uiid: Tabs
+    native: ios_uitabbar
+    native_android: material_tablayout
+    tile_height_mm: 16
+    states: normal
+
+  - id: Toolbar
+    cn1_uiid: Toolbar
+    native: ios_uinavbar
+    native_android: material_toolbar
+    text: Title
+    tile_height_mm: 16
+    states: normal
+
+  - id: Dialog
+    cn1_uiid: Dialog
+    native: ios_alert_view
+    native_android: material_alert_view
+    text: Message
+    tile_width_mm: 60
+    tile_height_mm: 40
+    states: normal
+
+  - id: FloatingActionButton
+    cn1_uiid: FloatingActionButton
+    native_android: material_fab
+    platforms: android
+    tile_width_mm: 20
+    tile_height_mm: 20
+    states: normal,pressed

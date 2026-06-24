@@ -37,14 +37,28 @@ public class ProcessScreenshots {
             System.exit(2);
             return;
         }
-        Map<String, Object> payload = buildResults(
-                arguments.referenceDir,
-                arguments.actualEntries,
-                arguments.emitBase64,
-                arguments.previewDir,
-                arguments.maxChannelDelta,
-                arguments.maxMismatchPercent
-        );
+        Map<String, Object> payload;
+        if ("fidelity".equals(arguments.mode)) {
+            // Fidelity mode compares the CN1 render of a component against the
+            // committed native widget golden of the SAME name. There is no
+            // pass/fail equality here -- it emits a similarity score per pair so
+            // the report/gate can track how close CN1 is to the real OS widget.
+            payload = buildFidelityResults(
+                    arguments.referenceDir,
+                    arguments.actualEntries,
+                    arguments.emitBase64,
+                    arguments.previewDir
+            );
+        } else {
+            payload = buildResults(
+                    arguments.referenceDir,
+                    arguments.actualEntries,
+                    arguments.emitBase64,
+                    arguments.previewDir,
+                    arguments.maxChannelDelta,
+                    arguments.maxMismatchPercent
+            );
+        }
         String json = JsonUtil.stringify(payload);
         System.out.print(json);
     }
@@ -144,6 +158,467 @@ public class ProcessScreenshots {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("results", results);
         return payload;
+    }
+
+    /// Fidelity comparison: each delivered actual is the CN1 render of a
+    /// component (named "<prefix>", path "<prefix>_cn1.png"); the reference dir
+    /// holds the committed NATIVE widget golden "<prefix>.png". For every pair we
+    /// emit a similarity score (fidelity_percent + ssim + mean_channel_delta)
+    /// rather than an equal/different verdict, and we embed previews of BOTH the
+    /// native golden and the CN1 render so the report can show them side by side.
+    /// Goldens with no delivered CN1 render are recorded as missing_actual so the
+    /// pair-count guard (cn1ss.sh cn1ss_count_covered) sees the same reality.
+    static Map<String, Object> buildFidelityResults(
+            Path referenceDir,
+            List<Map.Entry<String, Path>> actualEntries,
+            boolean emitBase64,
+            Path previewDir
+    ) throws IOException {
+        List<Map<String, Object>> results = new ArrayList<>();
+        java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
+        for (Map.Entry<String, Path> entry : actualEntries) {
+            String testName = entry.getKey();
+            deliveredTests.add(testName);
+            Path cn1Path = entry.getValue();
+            Path nativePath = referenceDir.resolve(testName + ".png");
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("test", testName);
+            record.put("cn1_path", cn1Path.toString());
+            record.put("native_path", nativePath.toString());
+            // Keep actual_path/expected_path mirrors so the shared cn1ss.sh
+            // artifact-copy/summary plumbing can treat these records uniformly.
+            record.put("actual_path", cn1Path.toString());
+            record.put("expected_path", nativePath.toString());
+            if (!Files.exists(cn1Path)) {
+                record.put("status", "missing_actual");
+                record.put("message", "CN1 render was not delivered for this component.");
+            } else if (!Files.exists(nativePath)) {
+                record.put("status", "missing_expected");
+                record.put("message", "Native golden missing at " + nativePath
+                        + " (regenerate goldens with FIDELITY_UPDATE_GOLDENS=1).");
+                if (emitBase64) {
+                    try {
+                        recordFidelityImage(record, "", "_cn1", testName, loadPngWithRetry(cn1Path), previewDir);
+                    } catch (Exception ex) {
+                        record.put("message", "Failed to load CN1 preview: " + ex.getMessage());
+                    }
+                }
+            } else {
+                try {
+                    PNGImage cn1 = loadPngWithRetry(cn1Path);
+                    PNGImage nativeImage = loadPngWithRetry(nativePath);
+                    Map<String, Object> details = new LinkedHashMap<>();
+                    details.put("width", cn1.width());
+                    details.put("height", cn1.height());
+                    if (cn1.width() != nativeImage.width() || cn1.height() != nativeImage.height()) {
+                        // Tiles are supposed to be rendered at identical pixel
+                        // dimensions by construction; a size mismatch means the
+                        // device-side geometry diverged and the diff is invalid.
+                        details.put("native_width", nativeImage.width());
+                        details.put("native_height", nativeImage.height());
+                        details.put("fidelity_percent", 0.0d);
+                        details.put("ssim", 0.0d);
+                        details.put("mean_channel_delta", 255.0d);
+                        record.put("status", "size_mismatch");
+                        record.put("message", "CN1 tile " + cn1.width() + "x" + cn1.height()
+                                + " does not match native golden " + nativeImage.width() + "x" + nativeImage.height() + ".");
+                    } else {
+                        // Structure-aware fidelity: see structuralFidelity(). The
+                        // background colour is known from the appearance (the tile
+                        // backdrop we render), so a near-white CN1 fill still counts
+                        // as widget content rather than being mistaken for blank bg.
+                        int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
+                        double[] sf = structuralFidelity(nativeImage, cn1, bg);
+                        double meanDelta = meanChannelDelta(nativeImage, cn1);
+                        details.put("fidelity_percent", round2(sf[0]));
+                        details.put("shape_sim", round4(sf[1]));
+                        details.put("size_agreement", round4(sf[2]));
+                        details.put("ssim", round4(computeSsim(nativeImage, cn1)));
+                        details.put("mean_channel_delta", round2(meanDelta));
+                        record.put("status", "compared");
+                    }
+                    record.put("details", details);
+                    if (emitBase64) {
+                        recordFidelityImage(record, "", "_cn1", testName, cn1, previewDir);
+                        recordFidelityImage(record, "native_", "_native", testName, nativeImage, previewDir);
+                    }
+                } catch (Exception ex) {
+                    record.put("status", "error");
+                    record.put("message", ex.getMessage());
+                }
+            }
+            results.add(record);
+        }
+        // Backfill goldens that no delivered CN1 render covered as missing_actual,
+        // mirroring buildResults() so a suite that hung or crashed partway is
+        // visible to the shell-level pair-count guard rather than silently
+        // reporting a clean pass over only the survivors.
+        if (referenceDir != null && Files.isDirectory(referenceDir)) {
+            List<String> missingTests = new ArrayList<>();
+            try (java.util.stream.Stream<Path> goldens = Files.list(referenceDir)) {
+                goldens.filter(Files::isRegularFile)
+                        .map(p -> p.getFileName().toString())
+                        .filter(n -> n.endsWith(".png"))
+                        .map(n -> n.substring(0, n.length() - ".png".length()))
+                        .filter(name -> !deliveredTests.contains(name))
+                        .forEach(missingTests::add);
+            }
+            Collections.sort(missingTests);
+            for (String testName : missingTests) {
+                Path nativePath = referenceDir.resolve(testName + ".png");
+                Map<String, Object> record = new LinkedHashMap<>();
+                record.put("test", testName);
+                record.put("cn1_path", "");
+                record.put("native_path", nativePath.toString());
+                record.put("actual_path", "");
+                record.put("expected_path", nativePath.toString());
+                record.put("status", "missing_actual");
+                record.put("message", "No CN1 render was delivered for this native golden (the test did not run, hung, or the suite crashed before reaching it).");
+                results.add(record);
+            }
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("results", results);
+        return payload;
+    }
+
+    /// Builds a JPEG/PNG preview of one fidelity image and records its base64 +
+    /// preview-file metadata under a key prefix ("" for the CN1 render,
+    /// "native_" for the native golden) so a single result can carry both. The
+    /// file suffix ("_cn1"/"_native") keeps the two preview files distinct.
+    private static void recordFidelityImage(Map<String, Object> record, String keyPrefix, String fileSuffix,
+            String testName, PNGImage image, Path previewDir) throws IOException {
+        CommentPayload payload = buildCommentPayload(image, MAX_COMMENT_BASE64);
+        if (payload.base64 != null) {
+            record.put(keyPrefix + "base64", payload.base64);
+        } else {
+            record.put(keyPrefix + "base64_omitted", payload.omittedReason);
+            record.put(keyPrefix + "base64_length", payload.base64Length);
+        }
+        record.put(keyPrefix + "base64_mime", payload.mime);
+        record.put(keyPrefix + "base64_codec", payload.codec);
+        if (payload.quality != null) {
+            record.put(keyPrefix + "base64_quality", payload.quality);
+        }
+        if (payload.note != null) {
+            record.put(keyPrefix + "base64_note", payload.note);
+        }
+        if (previewDir != null && payload.data != null) {
+            Files.createDirectories(previewDir);
+            String suffix = payload.mime.equals("image/jpeg") ? ".jpg" : ".png";
+            String baseName = slugify(testName) + fileSuffix;
+            Path previewPath = previewDir.resolve(baseName + suffix);
+            Files.write(previewPath, payload.data);
+            Map<String, Object> preview = new LinkedHashMap<>();
+            preview.put("path", previewPath.toString());
+            preview.put("name", previewPath.getFileName().toString());
+            preview.put("mime", payload.mime);
+            preview.put("codec", payload.codec);
+            if (payload.quality != null) {
+                preview.put("quality", payload.quality);
+            }
+            if (payload.note != null) {
+                preview.put("note", payload.note);
+            }
+            record.put(keyPrefix + "preview", preview);
+        }
+    }
+
+    /// Structure-aware fidelity. Returns {fidelity_percent, coverage_iou}.
+    ///
+    /// A plain per-pixel colour delta over a tile that is mostly background
+    /// rewards matching empty space and is blind to structure -- two widgets that
+    /// look nothing alike (a small outlined field vs a full-width filled one) can
+    /// score 95% because both tiles are mostly near-white. Instead we score only
+    /// the WIDGET, defined as pixels that differ from the known tile background by
+    /// more than a small threshold:
+    ///   * a pixel that is widget in BOTH images contributes its colour match
+    ///     (1 - normalized channel delta),
+    ///   * a pixel that is widget in only ONE image contributes 0 (one has the
+    ///     widget there, the other does not),
+    ///   * background-in-both pixels are ignored entirely.
+    /// The score is the mean over the union of widget pixels, so extent, position,
+    /// shape AND colour all matter, and empty margins never inflate it. The
+    /// coverage IoU (widget-pixel overlap) is returned alongside as a diagnostic.
+    /// Returns {fidelity_percent, shape_sim, size_agreement}.
+    ///
+    /// The two widgets are compared at 1:1 PIXEL SCALE with NO resampling. Each is
+    /// cropped to its content bounding box (removing the surrounding tile padding,
+    /// which differs between the native and CN1 layouts) and the two crops are then
+    /// overlaid top-left -- the same corner the harness anchors both tiles to. Every
+    /// pixel that is content in at least one crop is compared; where only one crop
+    /// has a pixel (because the widgets are different sizes) the missing side is
+    /// treated as background, so a size or shape difference shows up as a real
+    /// colour mismatch rather than being scaled away. We deliberately do NOT
+    /// normalize the two widgets to a common canvas size -- a CN1 button rendered
+    /// 1.5x Material's size is a genuine fidelity gap and must score lower.
+    ///   * shape_sim     -- 1 - mean channel delta over the overlaid content pixels.
+    ///   * size_agreement -- ratio of the content bounding-box dimensions, reported
+    ///     as a diagnostic (the 1:1 overlay already accounts for size, so it is not
+    ///     multiplied back in).
+    /// fidelity = 100 * shape_sim. Identical -> 100; same widget styled slightly
+    /// differently or off by a few pixels -> high 90s; a genuinely different or
+    /// mis-sized widget -> lower, in proportion to the mismatched area.
+    private static final int CONTENT_TAU = 10;
+    private static final int MIN_CONTENT_PIXELS = 4;
+
+    private static double[] structuralFidelity(PNGImage nativeImg, PNGImage cn1, int bgRgb) {
+        BufferedImage bn = toRgbImage(nativeImg);
+        BufferedImage bc = toRgbImage(cn1);
+        int[] boxN = contentBBox(bn, bgRgb);
+        int[] boxC = contentBBox(bc, bgRgb);
+        boolean emptyN = boxN[2] <= 0;
+        boolean emptyC = boxC[2] <= 0;
+        if (emptyN && emptyC) {
+            return new double[]{100.0d, 1.0d, 1.0d};   // both blank -> trivially identical
+        }
+        if (emptyN || emptyC) {
+            return new double[]{0.0d, 0.0d, 0.0d};      // one has a widget, the other does not
+        }
+        // Compare at ABSOLUTE pixel position -- NO content-crop, NO whole-widget
+        // re-alignment. The widget's margin from the tile edges is part of
+        // fidelity: a control rendered 15px too high is 15px of mismatch, not
+        // silently slid into place. Only a small per-pixel window absorbs genuine
+        // sub-pixel anti-aliasing between the two render paths.
+        double shapeSim = absoluteShapeSim(bn, bc, bgRgb);
+        // Diagnostic: how closely the top/left margins (edge-to-widget) agree.
+        double marginAgreement = marginAgreement(boxN, boxC);
+        double fidelity = 100.0d * shapeSim;
+        return new double[]{fidelity, shapeSim, marginAgreement};
+    }
+
+    /// Top/left margin agreement (1 = identical edge-to-widget distance, decaying
+    /// with the summed absolute top+left margin error). Diagnostic only -- the
+    /// absolute-position shapeSim already penalizes a mis-placed widget.
+    private static double marginAgreement(int[] boxN, int[] boxC) {
+        int err = Math.abs(boxN[1] - boxC[1]) + Math.abs(boxN[0] - boxC[0]);
+        double a = 1.0d - err / 100.0d;
+        return a < 0 ? 0 : a;
+    }
+
+    /// Bounding box {x, y, w, h} of the widget (pixels >CONTENT_TAU off bg).
+    /// Returns w=0 when there is no meaningful content.
+    private static int[] contentBBox(BufferedImage img, int bgRgb) {
+        int w = img.getWidth(), h = img.getHeight();
+        int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;
+        int x0 = w, y0 = h, x1 = -1, y1 = -1;
+        long count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = img.getRGB(x, y);
+                int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+                if (Math.abs(r - bgR) > CONTENT_TAU || Math.abs(g - bgG) > CONTENT_TAU || Math.abs(b - bgB) > CONTENT_TAU) {
+                    if (x < x0) x0 = x;
+                    if (x > x1) x1 = x;
+                    if (y < y0) y0 = y;
+                    if (y > y1) y1 = y;
+                    count++;
+                }
+            }
+        }
+        if (x1 < 0 || count < MIN_CONTENT_PIXELS) {
+            return new int[]{0, 0, 0, 0};
+        }
+        return new int[]{x0, y0, x1 - x0 + 1, y1 - y0 + 1};
+    }
+
+    /// Sub-pixel tolerance window. For each pixel we look for the best match in the
+    /// OTHER image within +/-ALIGN_RADIUS, adding ALIGN_PENALTY per pixel of offset
+    /// beyond the first (the first pixel is free -- two render paths anti-aliasing
+    /// the same edge differ by ~1px). This absorbs ONLY genuine sub-pixel fuzz; it
+    /// is small on purpose, so a real margin / position error (the widget rendered
+    /// several px off where it belongs) is NOT absorbed and shows up as mismatch.
+    private static final int ALIGN_RADIUS = 2;
+    private static final int ALIGN_PENALTY = 22;   // per pixel of offset, in 0..255 channel units
+
+    /// Compares the two tiles at ABSOLUTE pixel position (1:1, no crop, no whole-
+    /// widget re-alignment). Every pixel that is content in either tile is matched
+    /// against the other within the small sub-pixel window; where the widget sits at
+    /// a different place (a wrong margin) the content simply does not line up and is
+    /// scored as mismatch. Symmetric: each side searches the other and the worse
+    /// direction is taken so content present on only one side is penalized.
+    private static double absoluteShapeSim(BufferedImage bn, BufferedImage bc, int bgRgb) {
+        int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        boolean[] nC = contentMask(nArr, bgR, bgG, bgB);
+        boolean[] cC = contentMask(cArr, bgR, bgG, bgB);
+        long sum = 0;
+        long count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = y * w + x;
+                if (!nC[idx] && !cC[idx]) {
+                    continue;   // background in both -> part of neither widget
+                }
+                int d1 = tolerantDelta(nArr[idx], cArr, x, y, w, h);
+                int d2 = tolerantDelta(cArr[idx], nArr, x, y, w, h);
+                sum += Math.max(d1, d2);
+                count++;
+            }
+        }
+        if (count == 0) {
+            return 1.0d;
+        }
+        double shape = 1.0d - (double) sum / (count * 255.0d);
+        return shape < 0 ? 0 : shape;
+    }
+
+    private static boolean[] contentMask(int[] arr, int bgR, int bgG, int bgB) {
+        boolean[] m = new boolean[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            int p = arr[i];
+            int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            m[i] = Math.abs(r - bgR) > CONTENT_TAU || Math.abs(g - bgG) > CONTENT_TAU
+                    || Math.abs(b - bgB) > CONTENT_TAU;
+        }
+        return m;
+    }
+
+    /// Best (lowest) cost of matching the anchor pixel against any pixel of `other`
+    /// within +/-ALIGN_RADIUS, where cost = mean channel delta + ALIGN_PENALTY per
+    /// pixel of Chebyshev offset. Returns a value in 0..255.
+    private static int tolerantDelta(int anchor, int[] other, int x, int y, int w, int h) {
+        int ar = (anchor >> 16) & 0xff, ag = (anchor >> 8) & 0xff, ab = anchor & 0xff;
+        int best = Integer.MAX_VALUE;
+        for (int dy = -ALIGN_RADIUS; dy <= ALIGN_RADIUS; dy++) {
+            int yy = y + dy;
+            if (yy < 0 || yy >= h) {
+                continue;
+            }
+            for (int dx = -ALIGN_RADIUS; dx <= ALIGN_RADIUS; dx++) {
+                int xx = x + dx;
+                if (xx < 0 || xx >= w) {
+                    continue;
+                }
+                int p = other[yy * w + xx];
+                int delta = (Math.abs(ar - ((p >> 16) & 0xff))
+                        + Math.abs(ag - ((p >> 8) & 0xff))
+                        + Math.abs(ab - (p & 0xff))) / 3;
+                // The first pixel of offset is free: a <=1px halo is just the two
+                // rendering stacks anti-aliasing the same edge a hair differently,
+                // which is visually identical. From 2px out the distance penalty
+                // kicks in, so genuine size/shape/position differences still count
+                // (e.g. a square vs a pill corner, which differs by ~2-3px, is no
+                // longer silently forgiven).
+                int cheb = Math.max(Math.abs(dx), Math.abs(dy));
+                int cost = delta + Math.max(0, cheb - 1) * ALIGN_PENALTY;
+                if (cost < best) {
+                    best = cost;
+                }
+            }
+        }
+        return best == Integer.MAX_VALUE ? 255 : Math.min(best, 255);
+    }
+
+    /// Mean absolute per-channel difference across all RGB channels, 0..255.
+    /// 0 means pixel-identical; reported only as a diagnostic now.
+    private static double meanChannelDelta(PNGImage a, PNGImage b) {
+        int[] ar = toRgbArray(a);
+        int[] br = toRgbArray(b);
+        long sum = 0;
+        long count = (long) ar.length * 3L;
+        for (int i = 0; i < ar.length; i++) {
+            int e = ar[i];
+            int f = br[i];
+            sum += Math.abs(((e >> 16) & 0xff) - ((f >> 16) & 0xff));
+            sum += Math.abs(((e >> 8) & 0xff) - ((f >> 8) & 0xff));
+            sum += Math.abs((e & 0xff) - (f & 0xff));
+        }
+        return count == 0 ? 0.0d : (double) sum / (double) count;
+    }
+
+    /// Structural similarity (SSIM) over 8x8 non-overlapping grayscale windows,
+    /// averaged. Robust to the ~1px sub-pixel offsets a mean-delta penalises
+    /// harshly, so it is the headline fidelity number while mean-delta is the
+    /// diagnostic. Falls back to a single whole-image window for tiles smaller
+    /// than the window size. Constants are the standard C1/C2 for 8-bit images.
+    private static double computeSsim(PNGImage a, PNGImage b) {
+        int w = a.width();
+        int h = a.height();
+        double[] ga = toGray(a);
+        double[] gb = toGray(b);
+        final double c1 = 6.5025d;   // (0.01*255)^2
+        final double c2 = 58.5225d;  // (0.03*255)^2
+        int win = 8;
+        double total = 0.0d;
+        int windows = 0;
+        for (int y = 0; y + win <= h; y += win) {
+            for (int x = 0; x + win <= w; x += win) {
+                total += ssimWindow(ga, gb, w, x, y, win, win, c1, c2);
+                windows++;
+            }
+        }
+        if (windows == 0) {
+            return ssimWindow(ga, gb, w, 0, 0, w, h, c1, c2);
+        }
+        return total / windows;
+    }
+
+    private static double ssimWindow(double[] ga, double[] gb, int stride, int x0, int y0, int ww, int wh,
+            double c1, double c2) {
+        int count = ww * wh;
+        if (count <= 0) {
+            return 1.0d;
+        }
+        double ma = 0.0d;
+        double mb = 0.0d;
+        for (int j = 0; j < wh; j++) {
+            int row = (y0 + j) * stride + x0;
+            for (int i = 0; i < ww; i++) {
+                ma += ga[row + i];
+                mb += gb[row + i];
+            }
+        }
+        ma /= count;
+        mb /= count;
+        double va = 0.0d;
+        double vb = 0.0d;
+        double cov = 0.0d;
+        for (int j = 0; j < wh; j++) {
+            int row = (y0 + j) * stride + x0;
+            for (int i = 0; i < ww; i++) {
+                double da = ga[row + i] - ma;
+                double db = gb[row + i] - mb;
+                va += da * da;
+                vb += db * db;
+                cov += da * db;
+            }
+        }
+        double denomCount = count > 1 ? (count - 1) : 1;
+        va /= denomCount;
+        vb /= denomCount;
+        cov /= denomCount;
+        return ((2 * ma * mb + c1) * (2 * cov + c2)) / ((ma * ma + mb * mb + c1) * (va + vb + c2));
+    }
+
+    private static double[] toGray(PNGImage image) {
+        int[] rgb = toRgbArray(image);
+        double[] gray = new double[rgb.length];
+        for (int i = 0; i < rgb.length; i++) {
+            int p = rgb[i];
+            int r = (p >> 16) & 0xff;
+            int g = (p >> 8) & 0xff;
+            int b = p & 0xff;
+            gray[i] = 0.299d * r + 0.587d * g + 0.114d * b;
+        }
+        return gray;
+    }
+
+    private static double round2(double value) {
+        return Math.round(value * 100.0d) / 100.0d;
+    }
+
+    private static double round4(double value) {
+        return Math.round(value * 10000.0d) / 10000.0d;
     }
 
     private static CommentPayload loadPreviewOrBuild(String testName, Path actualPath, Path previewDir) throws IOException {
@@ -803,15 +1278,17 @@ public class ProcessScreenshots {
         final Path previewDir;
         final int maxChannelDelta;
         final double maxMismatchPercent;
+        final String mode;
 
         private Arguments(Path referenceDir, List<Map.Entry<String, Path>> actualEntries, boolean emitBase64, Path previewDir,
-                          int maxChannelDelta, double maxMismatchPercent) {
+                          int maxChannelDelta, double maxMismatchPercent, String mode) {
             this.referenceDir = referenceDir;
             this.actualEntries = actualEntries;
             this.emitBase64 = emitBase64;
             this.previewDir = previewDir;
             this.maxChannelDelta = maxChannelDelta;
             this.maxMismatchPercent = maxMismatchPercent;
+            this.mode = mode;
         }
 
         static Arguments parse(String[] args) {
@@ -820,10 +1297,22 @@ public class ProcessScreenshots {
             Path previewDir = null;
             int maxChannelDelta = 4;
             double maxMismatchPercent = 0.30d;
+            String mode = "golden";
             List<Map.Entry<String, Path>> actuals = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
+                    case "--mode" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --mode");
+                            return null;
+                        }
+                        mode = args[i];
+                        if (!mode.equals("golden") && !mode.equals("fidelity")) {
+                            System.err.println("Unknown --mode (expected golden or fidelity): " + mode);
+                            return null;
+                        }
+                    }
                     case "--reference-dir" -> {
                         if (++i >= args.length) {
                             System.err.println("Missing value for --reference-dir");
@@ -884,7 +1373,7 @@ public class ProcessScreenshots {
                 System.err.println("--reference-dir is required");
                 return null;
             }
-            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent);
+            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent, mode);
         }
 
         private static int parseIntArg(String flag, String value) {

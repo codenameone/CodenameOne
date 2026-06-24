@@ -153,6 +153,14 @@ public class Font extends CN {
 
     private static final Hashtable bitmapCache = new Hashtable();
     private static final HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
+
+    /// Clears the cache of derived TrueType fonts. Called when the theme changes so
+    /// that fonts whose platform rendering depends on theme constants (e.g. a native
+    /// theme's text letter spacing) are re-derived against the freshly-installed
+    /// constants instead of returning a stale pre-theme paint.
+    public static void clearDerivedFontCache() {
+        derivedFontCache.clear();
+    }
     private static Font defaultFont = new Font(null);
     private static boolean enableBitmapFont = true;
     private static float fontReturnedHeight;
@@ -522,6 +530,25 @@ public class Font extends CN {
         return derive(Display.getInstance().convertToPixels(size, unitType), weight);
     }
 
+    /// Returns a variant of this truetype font with the given letter spacing (EM
+    /// units) applied to its glyph advances. Used by Style.letterSpacing so a
+    /// per-UIID spacing is baked into the font that measures and renders the text.
+    /// Returns this font unchanged when it is not a truetype font or the platform
+    /// does not support letter spacing.
+    public Font deriveLetterSpacing(float letterSpacing) {
+        if (font == null) {
+            return this;
+        }
+        Font f = new Font(Display.impl.deriveTrueTypeFontWithLetterSpacing(font, letterSpacing));
+        f.pixelSize = pixelSize;
+        // Give letter-spacing variants a distinct cache id so a later derive(size)
+        // does not collide with the base (no-spacing) font in derivedFontCache and
+        // return a font without the spacing.
+        f.fontUniqueId = fontUniqueId == null ? null : (fontUniqueId + "_ls" + letterSpacing);
+        f.ttf = true;
+        return f;
+    }
+
     /// Creates a font based on this truetype font with the given pixel, **WARNING**! This method
     /// will only work in the case of truetype fonts!
     ///
@@ -788,7 +815,17 @@ public class Font extends CN {
             if (font == null) {
                 return f.font == null;
             }
-            return font.equals(f.font);
+            if (!font.equals(f.font)) {
+                return false;
+            }
+            // Letter-spacing (and similar) variants share their native font
+            // attributes with the base font but carry a distinct fontUniqueId.
+            // Treat differing ids as different fonts so Style.setFont does not
+            // skip a spacing variant as a no-op (native equals ignores spacing).
+            if (fontUniqueId != null && f.fontUniqueId != null) {
+                return fontUniqueId.equals(f.fontUniqueId);
+            }
+            return true;
         }
         if (f.getClass() != getClass()) {
             return false;

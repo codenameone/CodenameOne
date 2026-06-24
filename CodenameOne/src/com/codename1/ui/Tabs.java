@@ -182,6 +182,7 @@ public class Tabs extends Container {
             @Override
             public void paint(Graphics g) {
                 super.paint(g);
+                paintBottomDivider(g);
                 paintAnimatedIndicator(g);
             }
         };
@@ -1406,6 +1407,38 @@ public class Tabs extends Container {
         }
     }
 
+    /// Material 3 tab strips carry a full-width hairline divider along the bottom
+    /// edge of the tab row (the surfaceVariant outline separating the bar from the
+    /// content below). A CSS `border-bottom` cannot be relied on here -- the tab
+    /// row is a custom Container whose painting path does not surface the underline
+    /// border -- so themes opt in via the `tabsBottomDividerBool` constant and we
+    /// paint it directly. The colour comes from the `TabsDivider` UIID's background
+    /// (so it tracks light/dark automatically, like `TabIndicator`);
+    /// `tabsBottomDividerThicknessMm` (default 0.15mm) sets the line weight.
+    void paintBottomDivider(Graphics g) {
+        if (!getUIManager().isThemeConstant("tabsBottomDividerBool", false)) {
+            return;
+        }
+        int color = getUIManager().getComponentStyle("TabsDivider").getBgColor();
+        float thickMm = 0.15f;
+        try {
+            thickMm = Float.parseFloat(getUIManager().getThemeConstant("tabsBottomDividerThicknessMm", "0.15"));
+        } catch (NumberFormatException ignore) {
+        }
+        int thickness = Display.getInstance().convertToPixels(thickMm);
+        if (thickness < 1) {
+            thickness = 1;
+        }
+        int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
+        g.setColor(color);
+        g.setAlpha(255);
+        int y = tabsContainer.getY() + tabsContainer.getHeight() - thickness;
+        g.fillRect(tabsContainer.getX(), y, tabsContainer.getWidth(), thickness);
+        g.setColor(oldColor);
+        g.setAlpha(oldAlpha);
+    }
+
     /// Draws the animated indicator inside `tabsContainer`'s paint flow. Called
     /// from the inner `Container` subclass installed as `tabsContainer`.
     void paintAnimatedIndicator(Graphics g) {
@@ -1424,7 +1457,17 @@ public class Tabs extends Container {
             x = active.getX();
             w = active.getWidth();
         }
-        int thicknessMm = getUIManager().getThemeConstant("tabsAnimatedIndicatorThicknessMm", animatedIndicatorThicknessMm);
+        // Read as a FLOAT mm value: the Material 3 indicator is ~0.45mm, but an
+        // int read truncates fractional millimetres (and a non-integer constant
+        // like "0.45" fails int parsing, silently falling back to the 1mm default
+        // -- a ~2x-too-thick indicator). Parse the string form so sub-mm
+        // thicknesses survive.
+        float thicknessMm = animatedIndicatorThicknessMm;
+        try {
+            thicknessMm = Float.parseFloat(getUIManager().getThemeConstant(
+                    "tabsAnimatedIndicatorThicknessMm", String.valueOf(animatedIndicatorThicknessMm)));
+        } catch (NumberFormatException ignore) {
+        }
         int thickness = Display.getInstance().convertToPixels(thicknessMm);
         // Use TabIndicator UIID color when its fg is set; otherwise pull
         // from the selected tab's foreground. `getComponentStyle(...)`
@@ -1444,7 +1487,32 @@ public class Tabs extends Container {
         g.setColor(color);
         g.setAlpha(255);
         int y = tabsContainer.getInnerY() + tabsContainer.getInnerHeight() - thickness;
-        g.fillRect(tabsContainer.getInnerX() + x, y, w, thickness);
+        // Material 3 draws the active indicator as a SHORT rounded pill matching the
+        // selected tab's LABEL width (not the full tab cell). Opt in with
+        // tabsIndicatorPillBool; legacy themes keep the full-width square line.
+        int indX = tabsContainer.getInnerX() + x;
+        int indW = w;
+        boolean pill = getUIManager().isThemeConstant("tabsIndicatorPillBool", false);
+        if (pill) {
+            Component active = tabsContainer.getComponentAt(activeComponent);
+            if (active instanceof Button) {
+                Button ab = (Button) active;
+                // stringWidth is the glyph ADVANCE, a few px wider than the visible
+                // ink; Material's indicator matches the ink width, so trim a hair.
+                int textW = ab.getStyle().getFont().stringWidth(ab.getText())
+                        - Display.getInstance().convertToPixels(0.45f);
+                if (textW > 0 && textW < w) {
+                    indW = textW;
+                    indX = tabsContainer.getInnerX() + x + (w - indW) / 2;
+                }
+            }
+            boolean priorAa = g.isAntiAliased();
+            g.setAntiAliased(true);
+            g.fillRoundRect(indX, y, indW, thickness, thickness, thickness);
+            g.setAntiAliased(priorAa);
+        } else {
+            g.fillRect(indX, y, indW, thickness);
+        }
         g.setColor(oldColor);
         g.setAlpha(oldAlpha);
     }

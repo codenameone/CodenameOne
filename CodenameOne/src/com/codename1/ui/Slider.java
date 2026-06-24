@@ -432,6 +432,17 @@ public class Slider extends Label implements ActionSource {
     /// Paint the progress indicator
     @Override
     public void paintComponentBackground(Graphics g) {
+        // Opt-in native-slider look (Material 3): a thin rounded track with the
+        // active portion in the accent colour and a vertical bar thumb, instead of
+        // the legacy full-height fill. Gated on the sliderTrackThicknessMM theme
+        // constant AND isEditable() so progress bars (non-editable sliders) and
+        // every theme that doesn't set the constant keep the existing rendering.
+        if (!infinite && !vertical && isEditable()) {
+            String trackMM = getUIManager().getThemeConstant("sliderTrackThicknessMM", null);
+            if (trackMM != null && paintNativeSlider(g, trackMM)) {
+                return;
+            }
+        }
         super.paintComponentBackground(g);
         int clipX = g.getClipX();
         int clipY = g.getClipY();
@@ -481,6 +492,108 @@ public class Slider extends Label implements ActionSource {
                         yPos);
             }
         }
+    }
+
+    /// Paints the Material-3 style slider: a thin rounded track (inactive colour
+    /// from the Slider style, active colour from the SliderFull style) plus a
+    /// vertical rounded bar thumb at the current value. Returns false (so the
+    /// caller falls back to the legacy painter) when the track constant is
+    /// malformed or non-positive. Horizontal, finite, editable sliders only.
+    private boolean paintNativeSlider(Graphics g, String trackMM) {
+        float tmm;
+        try {
+            tmm = Float.parseFloat(trackMM.trim());
+        } catch (NumberFormatException notANumber) {
+            return false;
+        }
+        if (tmm <= 0) {
+            return false;
+        }
+        Display d = Display.getInstance();
+        int track = Math.max(2, d.convertToPixels(tmm));
+        String thumbC = getUIManager().getThemeConstant("sliderThumbWidthMM", null);
+        int thumbW = Math.max(3, track);
+        if (thumbC != null) {
+            try {
+                thumbW = Math.max(3, d.convertToPixels(Float.parseFloat(thumbC.trim())));
+            } catch (NumberFormatException notANumber) {
+                // keep the track-derived default
+            }
+        }
+        int x0 = getX(), y0 = getY(), w = getWidth(), h = getHeight();
+        int range = maxValue - minValue;
+        int valueW = range <= 0 ? 0 : (int) (((float) (value - minValue) / (float) range) * w);
+        int bandY = y0 + (h - track) / 2;
+        int trackColor;
+        int fullColor;
+        // The thumb takes the Slider style's foreground colour so a native theme can
+        // give it a distinct tone (Material 3 renders the bar thumb neutral-grey,
+        // not the accent of the active track).
+        int thumbColor;
+        if (isEnabled()) {
+            trackColor = getSliderEmptyUnselectedStyle().getBgColor();
+            fullColor = getSliderFullSelectedStyle().getBgColor();
+            thumbColor = getSliderEmptyUnselectedStyle().getFgColor();
+        } else {
+            // A disabled M3 slider greys EVERY part - the active track is never
+            // the accent (which would be a bright purple in dark mode). Pull the
+            // greyed tones from the *.disabled styles so light and dark each match.
+            UIManager uim = getUIManager();
+            Style sdis = uim.getComponentCustomStyle(getUIID(), "dis");
+            Style fdis = uim.getComponentCustomStyle(getUIID() + "Full", "dis");
+            trackColor = sdis.getBgColor();
+            fullColor = fdis.getBgColor();
+            thumbColor = sdis.getFgColor();
+        }
+        boolean aa = g.isAntiAliasingSupported();
+        boolean priorAa = g.isAntiAliased();
+        if (aa) {
+            g.setAntiAliased(true);
+        }
+        // Material 3 draws the track as TWO separate rounded segments with a gap
+        // on each side of the bar thumb (not one continuous bar running under the
+        // thumb). Each segment is a full "pill" on its OUTER end and only slightly
+        // rounded on the INNER end facing the thumb.
+        int gap = Math.max(2, d.convertToPixels(0.6f));
+        // "very subtle" inner rounding (a few px) vs the full semicircular pill on
+        // the outer ends. Each segment is drawn pill-on-BOTH-ends first (arc == the
+        // segment height), then the INNER end is "squared up" to the subtle radius by
+        // overpainting a slightly-rounded block there. (Overlaying a rounded shape
+        // INSIDE an already-square body cannot round it - it has to be the other way.)
+        int innerArc = Math.max(2, d.convertToPixels(0.35f));
+        int thumbX = Math.max(x0, Math.min(x0 + w - thumbW, x0 + valueW - thumbW / 2));
+        // inactive (right) segment: pill outer (right) end, subtle inner (left) end
+        int inStart = Math.min(x0 + w, thumbX + thumbW + gap);
+        int inW = x0 + w - inStart;
+        if (inW > 0) {
+            g.setColor(trackColor);
+            g.fillRoundRect(inStart, bandY, inW, track, track, track);
+            if (inW >= track) {
+                g.fillRoundRect(inStart, bandY, track, track, innerArc, innerArc);
+            }
+        }
+        // active (left) segment: pill outer (left) end, subtle inner (right) end
+        int acW = Math.max(0, (thumbX - gap) - x0);
+        if (acW > 0) {
+            g.setColor(fullColor);
+            g.fillRoundRect(x0, bandY, acW, track, track, track);
+            if (acW >= track) {
+                g.fillRoundRect(x0 + acW - track, bandY, track, track, innerArc, innerArc);
+            }
+        }
+        // M3 "stop indicator": a SMALL dot near the inactive (far) end of the track.
+        int dotD = Math.max(3, track / 6);
+        g.setColor(fullColor);
+        g.fillArc(x0 + w - track / 2 - dotD / 2, y0 + (h - dotD) / 2, dotD, dotD, 0, 360);
+        // vertical bar thumb spanning the full height (taller than the track), M3 style
+        int thumbH = Math.max(track, h);
+        int thumbY = y0 + (h - thumbH) / 2;
+        g.setColor(thumbColor);
+        g.fillRoundRect(thumbX, thumbY, thumbW, thumbH, thumbW, thumbW);
+        if (aa) {
+            g.setAntiAliased(priorAa);
+        }
+        return true;
     }
 
     /// Indicates the slider is vertical
