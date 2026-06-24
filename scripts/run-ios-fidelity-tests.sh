@@ -100,17 +100,14 @@ cn1ss_stop_ws_server || true
 
 rf_log "CN1SS log tail:"; (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/  /' | tail -40
 
-NATIVE_REF_DIR="$WORK_DIR/native-ref"; mkdir -p "$NATIVE_REF_DIR"
-NATIVE_COUNT=0; CN1_COUNT=0
+# The iOS native references are generated OFFLINE by the standalone native-ref
+# app (scripts/build-ios-native-ref.sh -> committed goldens), NOT same-run: a real
+# UIWindow renders the UIKit widgets correctly, unlike the off-screen factory
+# render that produced blank nav/tab bars and point-sized (tiny) widgets. So the
+# CN1 suite here only renders the CN1 side and diffs it against the committed
+# goldens. The CN1 app may still deliver factory native renders; they are ignored.
+CN1_COUNT=0
 shopt -s nullglob
-for png in "$WS_RAW_DIR"/*_native.png; do
-  base="$(basename "$png" .png)"; name="${base%_native}"
-  cp -f "$png" "$NATIVE_REF_DIR/$name.png"
-  if [ "${FIDELITY_UPDATE_GOLDENS:-0}" = "1" ] || [ ! -f "$GOLDENS_DIR/$name.png" ]; then
-    cp -f "$png" "$GOLDENS_DIR/$name.png"
-  fi
-  NATIVE_COUNT=$(( NATIVE_COUNT + 1 ))
-done
 declare -a COMPARE_ENTRIES=()
 for png in "$WS_RAW_DIR"/*_cn1.png; do
   base="$(basename "$png" .png)"; name="${base%_cn1}"
@@ -118,17 +115,18 @@ for png in "$WS_RAW_DIR"/*_cn1.png; do
   COMPARE_ENTRIES+=("${name}=${dest}")
   CN1_COUNT=$(( CN1_COUNT + 1 ))
 done
+GOLDEN_COUNT=$(ls "$GOLDENS_DIR"/*.png 2>/dev/null | wc -l | tr -d ' ')
 shopt -u nullglob
-rf_log "Delivered: ${NATIVE_COUNT} native, ${CN1_COUNT} cn1"
+rf_log "Delivered: ${CN1_COUNT} cn1; committed native goldens: ${GOLDEN_COUNT}"
 [ "$CN1_COUNT" -gt 0 ] || { rf_log "FATAL: no CN1 renders delivered"; exit 12; }
-[ "$NATIVE_COUNT" -gt 0 ] || { rf_log "FATAL: no native references delivered"; exit 12; }
+[ "$GOLDEN_COUNT" -gt 0 ] || { rf_log "FATAL: no committed iOS goldens (run scripts/build-ios-native-ref.sh)"; exit 12; }
 
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_IOS_COMMENT -->"
 export CN1SS_PREVIEW_SUBDIR="ios-fidelity"
 cn1ss_process_fidelity \
   "Native fidelity (iOS Modern, Metal)" \
   "$WORK_DIR/fidelity-compare.json" "$WORK_DIR/fidelity-summary.txt" "$WORK_DIR/fidelity-comment.md" \
-  "$NATIVE_REF_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" "$BASELINE_FILE" \
+  "$GOLDENS_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" "$BASELINE_FILE" \
   "${COMPARE_ENTRIES[@]}"
 rc=$?
 cp -f "$WORK_DIR/fidelity-comment.md" "$ARTIFACTS_DIR/fidelity-comment.md" 2>/dev/null || true

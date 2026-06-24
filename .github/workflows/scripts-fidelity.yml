@@ -161,12 +161,9 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       CN1SS_FAIL_ON_MISMATCH: '1'
       CN1SS_FIDELITY_EPSILON: '2.0'
-      # Refresh the per-environment native goldens (drift artifact); the
-      # ratchet gates the CN1-vs-native SCORE against the committed baseline,
-      # which is portable across environments because both sides are rendered
-      # here. A score gap beyond the epsilon fails loudly, surfacing a real
-      # environment/theme difference to investigate (then reseed deliberately).
-      FIDELITY_UPDATE_GOLDENS: '1'
+      # iOS native references are COMMITTED goldens generated offline by
+      # scripts/build-ios-native-ref.sh (a real-UIWindow native app); they are not
+      # regenerated here, so no FIDELITY_UPDATE_GOLDENS.
     steps:
       - uses: actions/checkout@v6
       - name: Set TMPDIR

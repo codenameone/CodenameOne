@@ -210,10 +210,18 @@ public class ProcessScreenshots {
                     Map<String, Object> details = new LinkedHashMap<>();
                     details.put("width", cn1.width());
                     details.put("height", cn1.height());
-                    if (cn1.width() != nativeImage.width() || cn1.height() != nativeImage.height()) {
-                        // Tiles are supposed to be rendered at identical pixel
-                        // dimensions by construction; a size mismatch means the
-                        // device-side geometry diverged and the diff is invalid.
+                    // Allow a few px of cross-environment rounding slack: the iOS
+                    // native goldens are produced offline by a separate native app,
+                    // so the tile can round to e.g. 1088 vs CN1's 1087. The overlay
+                    // crops both to their common top-left region (no scaling), so a
+                    // small difference is harmless; only a large divergence (a real
+                    // geometry bug, e.g. point-vs-pixel sizing) is an invalid diff.
+                    int sizeTolW = Math.max(4, (int) Math.round(Math.max(cn1.width(), nativeImage.width()) * 0.02d));
+                    int sizeTolH = Math.max(4, (int) Math.round(Math.max(cn1.height(), nativeImage.height()) * 0.02d));
+                    if (Math.abs(cn1.width() - nativeImage.width()) > sizeTolW
+                            || Math.abs(cn1.height() - nativeImage.height()) > sizeTolH) {
+                        // A large size divergence means the device-side geometry
+                        // diverged and the diff is invalid.
                         details.put("native_width", nativeImage.width());
                         details.put("native_height", nativeImage.height());
                         details.put("fidelity_percent", 0.0d);
@@ -223,17 +231,24 @@ public class ProcessScreenshots {
                         record.put("message", "CN1 tile " + cn1.width() + "x" + cn1.height()
                                 + " does not match native golden " + nativeImage.width() + "x" + nativeImage.height() + ".");
                     } else {
+                        // Within tolerance but not pixel-identical (cross-environment
+                        // rounding): crop both to their common top-left region so the
+                        // diff is a true 1:1 overlay, never a scale.
+                        int cw = Math.min(cn1.width(), nativeImage.width());
+                        int ch = Math.min(cn1.height(), nativeImage.height());
+                        PNGImage cn1c = cropTopLeft(cn1, cw, ch);
+                        PNGImage natc = cropTopLeft(nativeImage, cw, ch);
                         // Structure-aware fidelity: see structuralFidelity(). The
                         // background colour is known from the appearance (the tile
                         // backdrop we render), so a near-white CN1 fill still counts
                         // as widget content rather than being mistaken for blank bg.
                         int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
-                        double[] sf = structuralFidelity(nativeImage, cn1, bg);
-                        double meanDelta = meanChannelDelta(nativeImage, cn1);
+                        double[] sf = structuralFidelity(natc, cn1c, bg);
+                        double meanDelta = meanChannelDelta(natc, cn1c);
                         details.put("fidelity_percent", round2(sf[0]));
                         details.put("shape_sim", round4(sf[1]));
                         details.put("size_agreement", round4(sf[2]));
-                        details.put("ssim", round4(computeSsim(nativeImage, cn1)));
+                        details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
                         record.put("status", "compared");
                     }
@@ -781,6 +796,22 @@ public class ProcessScreenshots {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    /// Returns the top-left w x h crop of an image (no scaling). Pixels are stored
+    /// row-major, bytesPerPixel each, width*bytesPerPixel per row.
+    private static PNGImage cropTopLeft(PNGImage img, int w, int h) {
+        if (w == img.width() && h == img.height()) {
+            return img;
+        }
+        int bpp = img.bytesPerPixel();
+        int srcStride = img.width() * bpp;
+        int dstStride = w * bpp;
+        byte[] out = new byte[h * dstStride];
+        for (int y = 0; y < h; y++) {
+            System.arraycopy(img.pixels(), y * srcStride, out, y * dstStride, dstStride);
+        }
+        return new PNGImage(w, h, img.bitDepth(), img.colorType(), out, bpp);
     }
 
     private static BufferedImage toRgbImage(PNGImage image) {
