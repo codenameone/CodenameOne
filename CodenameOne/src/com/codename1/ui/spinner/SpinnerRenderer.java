@@ -101,7 +101,19 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T> {
                 return;
             }
             Style s = getStyle();
-            drawStringPerspectivePosition(g, getText(), getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());
+            // Centre the perspective row horizontally (the native iOS picker centres
+            // every row; drawing at paddingLeft left-aligned the off-centre rows). The
+            // perspective scaling is vertical only, so the horizontal width is ~the
+            // normal glyph run minus the 4px per-gap overlap drawStringPerspective uses.
+            String text = getText();
+            Font f = s.getFont();
+            int tw = 0;
+            for (int i = 0; i < text.length(); i++) {
+                tw += f.charWidth(text.charAt(i));
+            }
+            tw -= 4 * Math.max(0, text.length() - 1);
+            int cx = getX() + Math.max(s.getPaddingLeftNoRTL(), (getWidth() - tw) / 2);
+            drawStringPerspectivePosition(g, text, cx, getY() + s.getPaddingTop());
         }
     }
 
@@ -125,7 +137,12 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T> {
             i = ImageFactory.createImage(this, w, h, 0);
             g = i.getGraphics();
             UIManager.getInstance().getLookAndFeel().setFG(g, this);
-            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());
+            // Fade rows away from the centre (the native picker dims off-selection rows
+            // toward grey). Depth 0 = adjacent to the front row .. up to FRONT_ANGLE.
+            // Baked into the per-perspective glyph cache, so it is computed once.
+            int depth = Math.abs(perspective - FRONT_ANGLE);
+            float fade = Math.max(0.35f, 1f - 0.16f * depth);
+            int alpha = g.concatenateAlpha((int) (getStyle().getFgAlpha() * fade));
             g.drawChar(c, 0, 0);
             g.setAlpha(alpha);
             i = Effects.verticalPerspective(i, TOP_SCALE[perspective], BOTTOM_SCALE[perspective], VERTICAL_SHRINK[perspective]);

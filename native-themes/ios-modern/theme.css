@@ -391,6 +391,16 @@ SpinnerRenderer {
     text-align: center;
     padding: 1mm 2mm 1mm 2mm;
 }
+/* The selected (centre) row paints the translucent rounded selection band -- the
+   FRONT_ANGLE cell renders via the normal cell paint, so its selected style is the
+   band, matching the native UIPickerView's centred selection pill. */
+SpinnerRenderer.selected {
+    color: #000000;
+    background-color: rgba(120,120,128,0.16);
+    border-radius: 2.5mm;
+    text-align: center;
+    padding: 1mm 2mm 1mm 2mm;
+}
 /* The centre (selected) row carries the translucent rounded selection band -- a
    full-bounds overlay with a round border degenerates into a big circle that hides
    the rest of the wheel. */
@@ -793,6 +803,7 @@ PopupContent {
     ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
     /* Dark picker wheel: white labels, lighter translucent selection band. */
     SpinnerRenderer { color: #ffffff; background-color: transparent; }
+    SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2.5mm; }
     SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2mm; }
     SpinnerOverlay { background-color: transparent; }
 
