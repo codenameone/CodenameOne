@@ -56,6 +56,7 @@
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_impl_ios_IOSBiometrics.h"
+#include "com_codename1_impl_ios_IOSDeviceIntegrity.h"
 #include "com_codename1_impl_ios_IOSSecureStorage.h"
 #include "com_codename1_impl_ios_IOSNfc.h"
 #include "com_codename1_impl_ios_IOSConnectivity.h"
@@ -13374,6 +13375,92 @@ void com_codename1_impl_ios_IOSNative_stopBiometricAuthentication__(CN1_THREAD_S
     }
 #endif // !TARGET_OS_TV
 }
+
+// --- App Attest (DeviceCheck.framework) -----------------------------------
+// Gated by CN1_USE_APP_ATTEST: the ios.appAttest build hint uncomments the
+// define, links DeviceCheck.framework and injects the App Attest entitlement.
+// Builds without the hint compile the stub branch below, so they neither import
+// nor link DeviceCheck. clientDataHash is the SHA-256 of the server nonce; the
+// returned token is base64(keyId):base64(attestationObject) for the backend to
+// verify with Apple.
+//#define CN1_USE_APP_ATTEST
+#ifdef CN1_USE_APP_ATTEST
+#import <DeviceCheck/DeviceCheck.h>
+#import <CommonCrypto/CommonCrypto.h>
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#if !TARGET_OS_TV && !TARGET_OS_WATCH
+    if (@available(iOS 14.0, *)) {
+        if (NSClassFromString(@"DCAppAttestService") == NULL) {
+            return JAVA_FALSE;
+        }
+        return [DCAppAttestService sharedService].isSupported ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif // !TARGET_OS_TV && !TARGET_OS_WATCH
+}
+
+void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT nonce) {
+#if !TARGET_OS_TV && !TARGET_OS_WATCH
+    POOL_BEGIN();
+    if (@available(iOS 14.0, *)) {
+        DCAppAttestService *service = [DCAppAttestService sharedService];
+        if (!service.isSupported) {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"App Attest not supported");
+            com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+            POOL_END();
+            return;
+        }
+        NSString *nsNonce = (nonce == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG nonce);
+        NSData *nonceData = [nsNonce dataUsingEncoding:NSUTF8StringEncoding];
+        unsigned char hashBytes[CC_SHA256_DIGEST_LENGTH];
+        CC_SHA256(nonceData.bytes, (CC_LONG)nonceData.length, hashBytes);
+        NSData *clientDataHash = [NSData dataWithBytes:hashBytes length:CC_SHA256_DIGEST_LENGTH];
+        [service generateKeyWithCompletionHandler:^(NSString *keyId, NSError *genErr) {
+            if (genErr != nil || keyId == nil) {
+                NSString *m = genErr ? genErr.localizedDescription : @"App Attest key generation failed";
+                JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), m);
+                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+                return;
+            }
+            [service attestKey:keyId clientDataHash:clientDataHash completionHandler:^(NSData *attestationObject, NSError *attErr) {
+                if (attErr != nil || attestationObject == nil) {
+                    NSString *m = attErr ? attErr.localizedDescription : @"App Attest attestation failed";
+                    JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), m);
+                    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+                    return;
+                }
+                NSData *keyIdData = [keyId dataUsingEncoding:NSUTF8StringEncoding];
+                NSString *b64Key = [keyIdData base64EncodedStringWithOptions:0];
+                NSString *b64Att = [attestationObject base64EncodedStringWithOptions:0];
+                NSString *token = [NSString stringWithFormat:@"%@:%@", b64Key, b64Att];
+                JAVA_OBJECT jtoken = fromNSString(getThreadLocalData(), token);
+                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestSuccess___int_java_lang_String(getThreadLocalData(), requestId, jtoken);
+            }];
+        }];
+    } else {
+        JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"App Attest requires iOS 14+");
+        com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+    }
+    POOL_END();
+#else
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, JAVA_NULL);
+#endif // !TARGET_OS_TV && !TARGET_OS_WATCH
+}
+#else // CN1_USE_APP_ATTEST
+
+// App Attest not enabled (ios.appAttest build hint off): DeviceCheck.framework
+// is neither imported nor linked. Report unsupported / fail the request.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT nonce) {
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, JAVA_NULL);
+}
+#endif // CN1_USE_APP_ATTEST
 
 void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {
     if (cn1_keychainAccessGroup != nil) {

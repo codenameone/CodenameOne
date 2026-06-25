@@ -98,6 +98,7 @@ public class IPhoneBuilder extends Executor {
     private Map<String, String> localizedIcons = new LinkedHashMap<String, String>();
 
     private boolean detectJailbreak;
+    private boolean appAttest;
 
     private boolean runPods=false;
     private boolean runSpm=false;
@@ -314,6 +315,7 @@ public class IPhoneBuilder extends Executor {
             addMinDeploymentTarget("14.0");
         }
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
+        appAttest = request.getArg("ios.appAttest", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
         useMetal = "true".equals(request.getArg("ios.metal", "true"));
@@ -1946,6 +1948,14 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(jailbreakH, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
             }
 
+            // ios.appAttest compiles the DeviceCheck-backed App Attest native code
+            // (gated by CN1_USE_APP_ATTEST so non-attest builds neither import nor
+            // link DeviceCheck) and links DeviceCheck.framework + injects the
+            // appattest-environment entitlement below.
+            if (appAttest) {
+                replaceInFile(new File(buildinRes, "IOSNative.m"), "//#define CN1_USE_APP_ATTEST", "#define CN1_USE_APP_ATTEST");
+            }
+
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
             if (glAppDelegeateBody != null && glAppDelegeateBody.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_BODY", glAppDelegeateBody);
@@ -2111,6 +2121,17 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // DeviceCheck.framework backs App Attest (com.codename1.security.
+            // DeviceIntegrity.requestIntegrityToken on iOS). Only linked when the
+            // ios.appAttest build hint enabled the CN1_USE_APP_ATTEST native code.
+            if (appAttest) {
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = "DeviceCheck.framework";
+                } else if (!addLibs.toLowerCase().contains("devicecheck")) {
+                    addLibs = addLibs + ";DeviceCheck.framework";
+                }
+            }
+
             // AuthenticationServices.framework hosts both
             // ASWebAuthenticationSession (used by SystemBrowser) and
             // ASAuthorizationAppleIDProvider (used by AppleSignIn). Linking
@@ -2240,6 +2261,19 @@ public class IPhoneBuilder extends Executor {
                             "ios.entitlements.com.apple.developer.applesignin",
                             "Default");
                 }
+            }
+
+            // App Attest requires the appattest-environment entitlement; defaults
+            // to development for debug builds, production otherwise. Override with
+            // ios.appAttest.environment.
+            if (appAttest && request.getArg(
+                    "ios.entitlements.com.apple.developer.devicecheck.appattest-environment",
+                    null) == null) {
+                String appAttestEnv = request.getArg("ios.appAttest.environment",
+                        request.getArg("ios.buildType", "debug").equals("debug") ? "development" : "production");
+                request.putArgument(
+                        "ios.entitlements.com.apple.developer.devicecheck.appattest-environment",
+                        appAttestEnv);
             }
 
             // Time-sensitive / critical notification entitlements. These require a

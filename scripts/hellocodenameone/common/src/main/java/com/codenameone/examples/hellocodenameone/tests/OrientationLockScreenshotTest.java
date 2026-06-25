@@ -9,7 +9,14 @@ import com.codename1.ui.util.UITimer;
 
 public class OrientationLockScreenshotTest extends BaseTest {
     private static final int ORIENTATION_POLL_INTERVAL_MS = 100;
-    private static final int ORIENTATION_POLL_ATTEMPTS = 25;
+    // Wait up to ~8s (not 2.5s) for the simulator rotation to actually land
+    // before capturing. On starved CI runners the device rotation + layout pass
+    // can take well over 2.5s; when the poll gave up early the test snapped the
+    // still-portrait frame and labelled it "landscape", producing a guaranteed
+    // mismatch against the landscape reference (the classic ~50% flake on this
+    // test). 80 * 100ms = 8s still leaves comfortable headroom under the 30s
+    // native test timeout even with the trailing wait-back-to-portrait poll.
+    private static final int ORIENTATION_POLL_ATTEMPTS = 80;
 
     @Override
     public boolean runTest() {
