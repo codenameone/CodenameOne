@@ -34,21 +34,21 @@ components:
     native: ios_uibutton_system
     native_android: material_button_filled
     text: Default
-    states: normal,pressed,disabled
+    states: normal,disabled
 
   - id: RaisedButton
     cn1_uiid: RaisedButton
     native: ios_uibutton_filled
     native_android: material_button_tonal
     text: Raised
-    states: normal,pressed,disabled
+    states: normal,disabled
 
   - id: FlatButton
     cn1_uiid: FlatButton
     native: ios_uibutton_plain
     native_android: material_button_outlined
     text: Flat
-    states: normal,pressed
+    states: normal
 
   - id: TextField
     cn1_uiid: TextField

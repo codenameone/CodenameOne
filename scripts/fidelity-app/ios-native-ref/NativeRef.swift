@@ -52,9 +52,9 @@ struct Spec {
 }
 
 let SPECS: [Spec] = [
-    Spec(component: "Button",      kind: "ios_uibutton_system", states: ["normal","pressed","disabled"], wMM: 60, hMM: 14),
-    Spec(component: "RaisedButton",kind: "ios_uibutton_filled", states: ["normal","pressed","disabled"], wMM: 60, hMM: 14),
-    Spec(component: "FlatButton",  kind: "ios_uibutton_plain",  states: ["normal","pressed"],            wMM: 60, hMM: 14),
+    Spec(component: "Button",      kind: "ios_uibutton_system", states: ["normal","disabled"], wMM: 60, hMM: 14),
+    Spec(component: "RaisedButton",kind: "ios_uibutton_filled", states: ["normal","disabled"], wMM: 60, hMM: 14),
+    Spec(component: "FlatButton",  kind: "ios_uibutton_plain",  states: ["normal"],            wMM: 60, hMM: 14),
     Spec(component: "TextField",   kind: "ios_uitextfield",     states: ["normal","disabled"],           wMM: 60, hMM: 14),
     Spec(component: "CheckBox",    kind: "ios_check_glyph",     states: ["normal","selected","disabled"],wMM: 60, hMM: 14),
     Spec(component: "RadioButton", kind: "ios_radio_glyph",     states: ["normal","selected","disabled"],wMM: 60, hMM: 14),

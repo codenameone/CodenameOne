@@ -407,7 +407,7 @@ TitleArea {
 
 Title {
     color: #1d1b20;
-    background-color: #fef7ff;
+    background-color: transparent;
     padding: 0.8mm 1.5mm 0.8mm 1.5mm;
     font-family: "native:MainRegular";
     font-size: 3.5mm;
@@ -717,8 +717,8 @@ PopupContent {
 
     Toolbar { background-color: transparent; color: #e6e0e9; }
     TitleArea { background-color: transparent; color: #e6e0e9; }
-    Title { color: #e6e0e9; background-color: #141218; }
-    MainTitle { color: #e6e0e9; background-color: #141218; }
+    Title { color: #e6e0e9; background-color: transparent; }
+    MainTitle { color: #e6e0e9; background-color: transparent; }
     BackCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
     TitleCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
 

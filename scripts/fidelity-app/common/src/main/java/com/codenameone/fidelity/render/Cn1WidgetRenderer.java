@@ -233,10 +233,11 @@ public final class Cn1WidgetRenderer {
                 // reads through at high saturation; an opaque-ish wash (175) read as a
                 // near-white bar that didn't match the native glass at all. Light glass
                 // washes only lightly toward white (~90/255); dark glass barely darkens.
-                // Native nav bar has essentially NO colour tint -- just the blurred
-                // backdrop. Keep the wash very light so we don't add a tint that isn't
-                // in the native glass.
-                bar.getAllStyles().setBgTransparency(dark ? 26 : 22);
+                // Native nav bar adds NO light tint (the previous white wash was wrong):
+                // light mode is just the blurred backdrop. The native DARK glass darkens
+                // the backdrop a touch, so dark keeps a very light black frost; light is
+                // fully transparent. The blur hook runs regardless of opacity.
+                bar.getAllStyles().setBgTransparency(dark ? 16 : 0);
                 Container row = new Container(new BorderLayout());
                 row.setUIID("Container");
                 row.getAllStyles().setBgTransparency(0);
