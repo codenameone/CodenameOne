@@ -1986,10 +1986,16 @@ public class AndroidGradleBuilder extends Executor {
             }
             if (!request.getArg("gradleDependencies", "").contains("androidx.car.app:app")) {
                 String carAppVersion = request.getArg("android.carAppVersion", "1.4.0");
+                // Exclude androidx.media: the Codename One Android port still uses the (jetified)
+                // support-media-compat MediaControllerCompat whose constructor throws RemoteException.
+                // androidx.car.app pulls a newer androidx.media:media where that constructor no longer
+                // throws, which turns the port's existing catch into an "exception never thrown"
+                // compile error. car-app's own media uses androidx.car.app.media, so excluding the
+                // transitive androidx.media is safe.
                 request.putArgument("gradleDependencies",
                         request.getArg("gradleDependencies", "")
-                                + "\n" + compile + " \"androidx.car.app:app:" + carAppVersion + "\"\n"
-                                + compile + " \"androidx.car.app:app-projected:" + carAppVersion + "\"\n");
+                                + "\n" + compile + "(\"androidx.car.app:app:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n"
+                                + compile + "(\"androidx.car.app:app-projected:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n");
             }
         }
 
