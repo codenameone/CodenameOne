@@ -1,0 +1,3 @@
+# Editor inside the platform web widget; absorb minor render variance.
+maxChannelDelta=16
+maxMismatchPercent=2.0

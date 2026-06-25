@@ -5114,6 +5114,59 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Creates a native peer for one of the visual editor components
+    /// (`com.codename1.ui.RichTextArea` / `com.codename1.ui.CodeEditor`).
+    ///
+    /// The default implementation returns null which makes the editor fall back to its 100% cross
+    /// platform `BrowserComponent` based backend. A platform port may override this to return a genuinely
+    /// native editing widget (e.g. a native rich text view or a native code editor) which is then driven
+    /// through `#editorPeerCommand(PeerComponent, String, String)` and
+    /// `#editorPeerQuery(PeerComponent, String, String)`. A native peer should deliver events back to the
+    /// owning editor by calling `editorComponent.fireEditorEvent(type, value)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `editorComponent`: the owning `AbstractEditorComponent` so native peers can fire events back
+    ///
+    /// - `editorType`: the editor flavor, currently `"richtext"` or `"code"`
+    ///
+    /// #### Returns
+    ///
+    /// a native editor peer, or null to use the cross platform fallback
+    public PeerComponent createNativeEditorPeer(Object editorComponent, String editorType) {
+        return null;
+    }
+
+    /// Sends a one way semantic command to a native editor peer created by
+    /// `#createNativeEditorPeer(Object, String)`. No-op by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the native editor peer
+    ///
+    /// - `name`: the semantic command name (e.g. `"setHtml"`, `"bold"`, `"setText"`)
+    ///
+    /// - `arg`: an optional string argument, may be null
+    public void editorPeerCommand(PeerComponent peer, String name, String arg) {
+    }
+
+    /// Queries a native editor peer for a string value. Returns null by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the native editor peer
+    ///
+    /// - `name`: the semantic query name (e.g. `"getHtml"`, `"getText"`)
+    ///
+    /// - `arg`: an optional string argument, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the queried value or null
+    public String editorPeerQuery(PeerComponent peer, String name, String arg) {
+        return null;
+    }
+
     /// Posts a message to the window in a BrowserComponent.  This is intended to be an abstraction of the Javascript postMessage() API.
     ///
     /// This is only overridden by the Javascript port to provide proper CORS handling.  Other ports use the implementation
