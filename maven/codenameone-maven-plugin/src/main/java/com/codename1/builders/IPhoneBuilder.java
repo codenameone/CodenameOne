@@ -4027,9 +4027,11 @@ public class IPhoneBuilder extends Executor {
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
-                    // CarPlay needs a second (CarPlay) scene alongside the phone window, which
-                    // requires multiple-scene support; non-CarPlay apps keep the single-scene default.
-                    + (usesCar ? "    <true/>\n" : "    <false/>\n")
+                    // Keep single-scene (false): the CarPlay scene is a distinct scene ROLE
+                    // (CPTemplateApplicationSceneSessionRoleApplication), not a second window of the
+                    // app role, so it does not need multiple-scene support. Setting this true changed
+                    // Mac Catalyst windowing and crashed the screenshot suite (26 GB / signal loop).
+                    + "    <false/>\n"
                     + "    <key>UISceneConfigurations</key>\n"
                     + "    <dict>\n"
                     + windowScene
