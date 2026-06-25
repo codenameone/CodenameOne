@@ -19,22 +19,55 @@ public class DrawString extends AbstractGraphicsScreenshotTest {
         g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
         g.setColor(0xffffff);
         int y = bounds.getY();
-        g.drawString("Default Font", bounds.getX(), y);
+        // Emoji are embedded in the MIDDLE of each label, across the different
+        // fonts/styles/colors below, so we verify the surrounding text does not
+        // break around a supplementary code point. The system/native fonts have
+        // no glyph for these code points, so the platform font-substitutes an
+        // emoji font: on the iOS Metal renderer this used to rasterise the
+        // substituted-run glyph ids against the base font and showed random CJK
+        // ("Chinese") glyphs. Built from code points -- exactly as a user-
+        // entered "U+1F3E0" value would be via Character.toChars -- to keep this
+        // source ASCII.
+        g.drawString("Default " + emoji(0x1F3E0) + " Font", bounds.getX(), y);
         y += g.getFont().getHeight();
         g.setFont(Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_SMALL));
-        g.drawString("Small Bold Monospace", bounds.getX(), y);
+        g.drawString("Small " + emoji(0x1F389) + " Bold Monospace", bounds.getX(), y);
         y += g.getFont().getHeight();
         String[] ttfFonts = {"native:MainThin", "native:MainLight", "native:MainRegular",
                 "native:MainBold", "native:MainBlack", "native:ItalicThin", "native:ItalicLight",
                 "native:ItalicRegular", "native:ItalicBold", "native:ItalicBlack"};
-        for(String name : ttfFonts) {
+        for(int i = 0; i < ttfFonts.length; i++) {
+            String name = ttfFonts[i];
             g.setFont(Font.createTrueTypeFont(name, 4));
-            g.drawString(name, bounds.getX(), y);
+            // Inject an emoji mid-name into one bold and one italic native font
+            // so substitution is exercised inside styled custom-font runs too.
+            String label = name;
+            if (i == 3) {
+                label = insertMid(name, emoji(0x1F680));
+            } else if (i == 8) {
+                label = insertMid(name, emoji(0x1F600));
+            }
+            g.drawString(label, bounds.getX(), y);
             y += g.getFont().getHeight();
         }
 
         g.setColor(0xff0000);
-        g.drawStringBaseline("Baseline and עברית", bounds.getX(), bounds.getY() + bounds.getHeight());
+        g.drawStringBaseline("Baseline " + emoji(0x1F525) + " and עברית",
+                bounds.getX(), bounds.getY() + bounds.getHeight());
+    }
+
+    /// Builds the string for a single Unicode code point, mirroring the
+    /// customer's "U+1F3E0" -> codePoint -> Character.toChars path. Kept here so
+    /// no literal emoji appear in this source (ASCII-only).
+    private static String emoji(int codePoint) {
+        return new String(Character.toChars(codePoint));
+    }
+
+    /// Inserts {@code ins} at the middle of {@code s} so the label has text on
+    /// both sides of the emoji.
+    private static String insertMid(String s, String ins) {
+        int mid = s.length() / 2;
+        return s.substring(0, mid) + ins + s.substring(mid);
     }
 
     @Override
