@@ -489,7 +489,8 @@ public class FidelityDeviceRunner {
             return false;
         }
         return "TextField".equals(compId)
-                || "Toolbar".equals(compId) || "Dialog".equals(compId);
+                || "Toolbar".equals(compId) || "Dialog".equals(compId)
+                || "Spinner".equals(compId);   // picker wheel fills the tile, like UIPickerView
     }
 
     /// Full-width-but-thin iOS widgets (slider, progress) that span the tile width

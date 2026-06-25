@@ -1795,6 +1795,44 @@ public class IOSImplementation extends CodenameOneImplementation {
         return Image.createImage(n);
     }
 
+    @Override
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        if (radius <= 0f || width <= 0 || height <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // In-place CSS backdrop-filter:blur on a mutable-image target (the off-screen
+        // fidelity tiles, the Dialog blur-to-image path). The live screen drawable is
+        // not handled here -> returns false and the component paints without the blur.
+        if (ng.associatedImage == null) {
+            return false;
+        }
+        // Flush whatever has been painted into the image so its peer is current, read
+        // the region behind us, Gaussian-blur it (Metal-backed CIGaussianBlur) and draw
+        // the blurred patch back where it was read.
+        ng.checkControl();
+        ng.associatedImage.peer = finishDrawingOnImage();
+        currentlyDrawingOn = null;
+        NativeImage target = ng.associatedImage;
+        int rx = Math.max(0, x), ry = Math.max(0, y);
+        int rw = Math.min(width, target.width - rx), rh = Math.min(height, target.height - ry);
+        if (rw <= 0 || rh <= 0) {
+            return true;
+        }
+        int[] rgb = new int[rw * rh];
+        getRGB(target, rgb, 0, rx, ry, rw, rh);
+        NativeImage blurred = new NativeImage("backdrop-filter blur");
+        blurred.peer = nativeInstance.gausianBlurImage(createImageFromARGB(rgb, rw, rh), radius);
+        blurred.width = rw;
+        blurred.height = rh;
+        // drawImage applies this graphics' transform; pass coordinates relative to that
+        // transform's translation so the blurred patch lands back where we read it.
+        int tx = (int) Math.round(ng.transform.getTranslateX());
+        int ty = (int) Math.round(ng.transform.getTranslateY());
+        drawImage(ng, blurred, rx - tx, ry - ty);
+        return true;
+    }
+
     
     public Object createImage(byte[] bytes, int offset, int len) {
         int[] wh = widthHeight;

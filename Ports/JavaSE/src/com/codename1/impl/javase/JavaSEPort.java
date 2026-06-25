@@ -16120,21 +16120,52 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (radius <= 0f || width <= 0 || height <= 0) {
             return true;
         }
-        Graphics2D ng = getGraphics(graphics);
-        // The target buffer the simulator paints into is typically a BufferedImage
-        // accessible via getDeviceConfiguration().createCompatibleImage during paint.
-        // For backdrop-filter we snapshot whatever the destination shows under the
-        // rectangle, blur it, and draw it back. Falling back to false signals the
-        // caller to use the snapshot+drawImage path instead.
+        // In-place backdrop-filter:blur. Read the destination region, Gaussian-blur it
+        // and paint it back. We can do this when the destination is a BufferedImage we
+        // own: a mutable Image's backing raster (the off-screen tiles / Dialog blur) at
+        // 1:1, or the simulator's edtBuffer at retinaScale. An unknown raw Graphics2D
+        // target returns false so the caller skips the blur (component still paints).
         try {
-            java.awt.geom.AffineTransform tx = ng.getTransform();
-            int sx = (int) Math.round(tx.getTranslateX()) + x;
-            int sy = (int) Math.round(tx.getTranslateY()) + y;
-            BufferedImage snap = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            java.awt.GraphicsConfiguration gc = ng.getDeviceConfiguration();
-            BufferedImage dest = (gc != null) ? gc.createCompatibleImage(width, height, java.awt.Transparency.TRANSLUCENT) : snap;
-            // Java2D doesn't easily let us read back from the destination - fall back.
-            return false;
+            BufferedImage dest;
+            double scale;
+            if (graphics instanceof NativeScreenGraphics) {
+                NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+                if (ng.sourceImage != null) {
+                    dest = ng.sourceImage;   // mutable image target (fidelity tiles, blur-to-image)
+                    scale = 1.0;
+                } else if (canvas != null && canvas.edtBuffer != null) {
+                    dest = canvas.edtBuffer;  // simulator screen buffer (rendered at retinaScale)
+                    scale = retinaScale;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;   // raw Graphics2D with no readable backing buffer
+            }
+            int rx = (int) Math.round(x * scale);
+            int ry = (int) Math.round(y * scale);
+            int rw = (int) Math.round(width * scale);
+            int rh = (int) Math.round(height * scale);
+            int dw = dest.getWidth(), dh = dest.getHeight();
+            // clamp to the destination bounds
+            if (rx < 0) { rw += rx; rx = 0; }
+            if (ry < 0) { rh += ry; ry = 0; }
+            if (rx + rw > dw) { rw = dw - rx; }
+            if (ry + rh > dh) { rh = dh - ry; }
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            // Copy the region out (a fresh ARGB buffer so the filter does not read and
+            // write the same shared raster), blur it, draw it back.
+            BufferedImage src = new BufferedImage(rw, rh, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D cg = src.createGraphics();
+            cg.drawImage(dest.getSubimage(rx, ry, rw, rh), 0, 0, null);
+            cg.dispose();
+            BufferedImage blurred = new GaussianFilter((float) (radius * scale)).filter(src, null);
+            Graphics2D dg = dest.createGraphics();
+            dg.drawImage(blurred, rx, ry, null);
+            dg.dispose();
+            return true;
         } catch (Throwable t) {
             return false;
         }

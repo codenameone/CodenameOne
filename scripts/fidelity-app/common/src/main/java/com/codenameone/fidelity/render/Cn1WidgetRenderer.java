@@ -58,7 +58,7 @@ public final class Cn1WidgetRenderer {
                 || "TextField".equals(id) || "CheckBox".equals(id) || "RadioButton".equals(id)
                 || "Switch".equals(id) || "Slider".equals(id) || "ProgressBar".equals(id)
                 || "FloatingActionButton".equals(id) || "Tabs".equals(id) || "Toolbar".equals(id)
-                || "Dialog".equals(id);
+                || "Dialog".equals(id) || "Spinner".equals(id);
     }
 
     /**
@@ -284,6 +284,18 @@ public final class Cn1WidgetRenderer {
             dialog.add(BorderLayout.CENTER, content);
             dialog.add(BorderLayout.SOUTH, btns);
             c = dialog;
+        } else if ("Spinner".equals(id)) {
+            // iOS picker wheel: a single-column spinner showing several rows with the
+            // middle one selected, the curved perspective fade and the glass selection
+            // band -- matching a native UIPickerView. The wheel rows/overlay are styled
+            // by the SpinnerRenderer / SpinnerOverlay UIIDs in the theme.
+            com.codename1.ui.spinner.GenericSpinner spinner = new com.codename1.ui.spinner.GenericSpinner();
+            com.codename1.ui.list.DefaultListModel model = new com.codename1.ui.list.DefaultListModel(
+                    new Object[]{"Value 1", "Value 2", "Value 3", "Value 4", "Value 5"});
+            spinner.setModel(model);
+            spinner.setRenderingPrototype("Value 0");
+            spinner.setValue("Value 3");
+            c = spinner;
         } else {
             return null;
         }

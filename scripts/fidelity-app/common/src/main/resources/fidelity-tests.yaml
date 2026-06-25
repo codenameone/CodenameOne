@@ -120,3 +120,11 @@ components:
     tile_width_mm: 20
     tile_height_mm: 20
     states: normal,pressed
+
+  - id: Spinner
+    cn1_uiid: Spinner
+    native: ios_uipickerview
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 34
+    states: normal

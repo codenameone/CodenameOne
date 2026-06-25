@@ -140,6 +140,10 @@
     sliderThumbHeightMM: "3.8";
     sliderContinuousTrackBool: true;
     sliderThumbShadowSizeMM: "0.6";
+    /* iOS picker wheel: the 3D perspective fade (rows shrink/dim toward the edges)
+       and ~7 visible rows, matching a native UIPickerView. */
+    ios7SpinnerBool: true;
+    spinnerElementsInt: 7;
     /* No sliding underline under the selected tab -- the native UITabBar tints the
        selected item instead. */
     tabsAnimatedIndicatorThicknessMm: "0";
@@ -213,9 +217,13 @@ Button {
     margin: 0;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: rgba(255,255,255,0.5);
+    background-color: rgba(255,255,255,0.48);
     /* iOS 26 glass buttons are capsules (fully rounded sides). */
     cn1-background-type: cn1-pill-border;
+    /* Real Liquid Glass: blur the backdrop behind the capsule (no CEF), then the
+       light translucent tint above frosts it. The blur is most visible over busy
+       content; over a smooth backdrop the tint carries the look. */
+    backdrop-filter: blur(14px);
     text-align: center;
 }
 /* Pressed (light): the frosted capsule dims slightly. */
@@ -236,7 +244,7 @@ RaisedButton.disabled { background-color: rgba(0,122,255,0.18); color: rgba(255,
 
 /* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
    backdrop shows through) with a blue label. */
-FlatButton { cn1-derive: Button; color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.3); cn1-background-type: cn1-pill-border; }
+FlatButton { cn1-derive: Button; color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.28); cn1-background-type: cn1-pill-border; backdrop-filter: blur(14px); }
 FlatButton.pressed { color: var(--accent-pressed-color, #0064d1); background-color: rgba(255,255,255,0.42); cn1-background-type: cn1-pill-border; }
 
 TextField {
@@ -370,18 +378,46 @@ ProgressBarFull {
     border-radius: 1mm;
 }
 
+/* iOS picker wheel (UIPickerView). The rows are black centred labels on a clear
+   wheel; the centre selection band is a translucent rounded grey pill. The 3D
+   perspective fade is driven by ios7SpinnerBool + spinnerElementsInt. */
+Spinner { background-color: transparent; padding: 0; margin: 0; }
+SpinnerWrapper { background-color: transparent; padding: 0; margin: 0; }
+SpinnerRenderer {
+    color: #000000;
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+    padding: 1mm 2mm 1mm 2mm;
+}
+/* The centre (selected) row carries the translucent rounded selection band -- a
+   full-bounds overlay with a round border degenerates into a big circle that hides
+   the rest of the wheel. */
+SpinnerRendererFocus {
+    color: #000000;
+    background-color: rgba(120,120,128,0.16);
+    border-radius: 2mm;
+    text-align: center;
+    padding: 1mm 2mm 1mm 2mm;
+}
+/* No full-height overlay fill (it would cover the wheel); the focus row is the band. */
+SpinnerOverlay { background-color: transparent; padding: 0; margin: 0; }
+
 Toolbar {
     background-color: #ffffff;
     color: #000000;
     padding: 0;
     margin: 0;
+    /* Liquid Glass nav bar: blur the content scrolling behind it (no CEF). */
+    backdrop-filter: blur(16px);
 }
 /* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
    to TitleArea. UIManager used to install a defensive
    Toolbar.derive=TitleArea default that produced a cycle when paired
    with TitleArea.derive=Toolbar; the framework now skips that default
    when the user theme has already wired TitleArea -> Toolbar. */
-TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
+TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; backdrop-filter: blur(16px); }
 
 Title {
     color: #000000;
@@ -475,8 +511,10 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: rgba(255,255,255,0.6);
+    background-color: rgba(255,255,255,0.58);
     color: #3c3c43;
+    /* Liquid Glass floating tab pill: blur the backdrop, frost with a light tint. */
+    backdrop-filter: blur(18px);
     padding: 1mm;
     /* Native glass pill is large (~85% tile width, near-full height); thin margins
        + tall padding let the CN1 pill grow to match. */
@@ -712,11 +750,11 @@ PopupContent {
     /* Dark glass button: a translucent blue capsule with white text. */
     /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop) with a
        white label -- not a blue fill. */
-    Button { color: #ffffff; background-color: rgba(20,20,24,0.55); cn1-background-type: cn1-pill-border; }
+    Button { color: #ffffff; background-color: rgba(20,20,24,0.52); cn1-background-type: cn1-pill-border; backdrop-filter: blur(14px); }
     Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); cn1-background-type: cn1-pill-border; }
     Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.4); cn1-background-type: cn1-pill-border; }
     /* Dark clearGlass FlatButton: lighter dark capsule, blue label. */
-    FlatButton { color: var(--accent-color-dark, #0a84ff); background-color: rgba(60,60,66,0.4); cn1-background-type: cn1-pill-border; }
+    FlatButton { color: var(--accent-color-dark, #0a84ff); background-color: rgba(60,60,66,0.4); cn1-background-type: cn1-pill-border; backdrop-filter: blur(14px); }
     FlatButton.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(80,80,86,0.5); cn1-background-type: cn1-pill-border; }
 
     RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
@@ -753,12 +791,16 @@ PopupContent {
        carried over from the base rule (which read as a white bar on the dark tile). */
     ProgressBar { background-color: #3a3a3c; color: var(--accent-color-dark, #0a84ff); }
     ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
+    /* Dark picker wheel: white labels, lighter translucent selection band. */
+    SpinnerRenderer { color: #ffffff; background-color: transparent; }
+    SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2mm; }
+    SpinnerOverlay { background-color: transparent; }
 
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
 
-    Toolbar { background-color: #000000; color: #ffffff; }
-    TitleArea { background-color: #000000; color: #ffffff; }
+    Toolbar { background-color: #000000; color: #ffffff; backdrop-filter: blur(16px); }
+    TitleArea { background-color: #000000; color: #ffffff; backdrop-filter: blur(16px); }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
     BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); cn1-background-type: cn1-round-border; }
@@ -779,7 +821,7 @@ PopupContent {
     TabbedPane { background-color: transparent; }
     /* Dark glass tab pill: more translucent so the backdrop reads through like the
        native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint). */
-    TabsContainer { background-color: rgba(50,50,55,0.42); color: #ebebf5; cn1-background-type: cn1-pill-border; }
+    TabsContainer { background-color: rgba(50,50,55,0.42); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(18px); }
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: like light, the selected item is only tinted blue --
        no per-item sub-pill (the whole bar is the single glass pill). */

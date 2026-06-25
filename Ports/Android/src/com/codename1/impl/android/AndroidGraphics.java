@@ -68,6 +68,10 @@ class AndroidGraphics {
 
     protected Canvas canvas;
     protected Paint paint;
+    // The Bitmap behind a mutable-image canvas (null for the screen canvas). Lets
+    // CSS backdrop-filter:blur read/write the destination region directly (absolute
+    // bitmap coordinates, bypassing the canvas transform). See blurRegion.
+    Bitmap underlyingBitmap;
     private boolean isMutableImageGraphics;
     private CodenameOneTextPaint font;
     private Transform transform;

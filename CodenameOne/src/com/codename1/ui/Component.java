@@ -3019,6 +3019,19 @@ public class Component implements Animation, StyleListener, Editable {
 
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
         g.clipRect(getX(), getY(), getWidth(), getHeight());
+        // CSS backdrop-filter:blur() -- the "liquid glass" effect. Blur whatever has
+        // already been painted behind this component (the clip confines it to our
+        // bounds) BEFORE our own translucent background and content paint on top. This
+        // runs regardless of opacity, since a glass surface is by definition
+        // translucent (opaque would be false and skip paintComponentBackground). The
+        // port blurs the destination region in place; an unsupported port returns
+        // false and the component simply paints without the blur.
+        // NOTE: this blurs on every paint -- fine for the static themed bars that use
+        // it today; a future optimisation could cache the blurred backdrop.
+        float backdropBlur = getStyle().getBackdropFilterBlurRadius();
+        if (backdropBlur > 0) {
+            g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
+        }
         paintComponentBackground(g);
 
         if (isScrollable()) {

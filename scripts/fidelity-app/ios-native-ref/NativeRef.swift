@@ -34,7 +34,7 @@ let GLASS_KINDS: Set<String> = [
 // up with the content-sized CN1 widgets.
 let FILL_KINDS: Set<String> = [
     "ios_uitextfield", "ios_uislider", "ios_uiprogress",
-    "ios_uinavbar", "ios_uitabbar", "ios_alert_view",
+    "ios_uinavbar", "ios_uitabbar", "ios_alert_view", "ios_uipickerview",
 ]
 let BACKDROP: UIImage? = {
     if let p = Bundle.main.path(forResource: "glass-backdrop", ofType: "png") {
@@ -64,7 +64,17 @@ let SPECS: [Spec] = [
     Spec(component: "Tabs",        kind: "ios_uitabbar",        states: ["normal"],                      wMM: 60, hMM: 16),
     Spec(component: "Toolbar",     kind: "ios_uinavbar",        states: ["normal"],                      wMM: 60, hMM: 16),
     Spec(component: "Dialog",      kind: "ios_alert_view",      states: ["normal"],                      wMM: 60, hMM: 40),
+    Spec(component: "Spinner",     kind: "ios_uipickerview",    states: ["normal"],                      wMM: 60, hMM: 34),
 ]
+
+// Minimal data source/delegate for the reference UIPickerView (5 string rows).
+final class RefPickerDelegate: NSObject, UIPickerViewDataSource, UIPickerViewDelegate {
+    static let shared = RefPickerDelegate()
+    let rows = ["Value 1", "Value 2", "Value 3", "Value 4", "Value 5"]
+    func numberOfComponents(in pickerView: UIPickerView) -> Int { return 1 }
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int { return rows.count }
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? { return rows[row] }
+}
 
 func textFor(_ kind: String) -> String {
     switch kind {
@@ -242,6 +252,12 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
             vsep.widthAnchor.constraint(equalToConstant: 0.5),
         ])
         return card
+    case "ios_uipickerview":
+        let picker = UIPickerView(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
+        picker.dataSource = RefPickerDelegate.shared
+        picker.delegate = RefPickerDelegate.shared
+        picker.selectRow(2, inComponent: 0, animated: false)   // middle row selected
+        return picker
     default:
         return nil
     }
