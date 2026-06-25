@@ -557,12 +557,17 @@ MultiLine4 { cn1-derive: Label; color: #79747e; }
    margin here forced Dialog.show() to grow the dialog to screen size
    with the body floating in mostly empty space. */
 Dialog {
-    background-color: #e6e0e9;
+    /* Material 3 alert surface = surfaceContainerHigh (#ece6f0), matching the
+       native AlertDialog. */
+    background-color: #ece6f0;
     color: #1d1b20;
     padding: 2mm;
     margin: 0;
     border-radius: 6mm;
-    border: 0.2mm solid #cac4d0;
+    /* Native Material dialogs sit on an elevation shadow; box-shadow is CEF-only,
+       so approximate the soft edge with a thin outline-variant stroke. 0.2mm
+       rounded to <1px on Android and vanished -- 0.4mm guarantees it renders. */
+    border: 0.4mm solid #cac4d0;
 }
 DialogBody {
     background-color: transparent;
@@ -761,7 +766,7 @@ PopupContent {
     MultiLine3 { color: #938f99; }
     MultiLine4 { color: #938f99; }
 
-    Dialog { background-color: #211f26; color: #e6e0e9; border: 0.2mm solid #49454f; }
+    Dialog { background-color: #211f26; color: #e6e0e9; border: 0.4mm solid #635f6b; }
     DialogBody { background-color: #211f26; color: #e6e0e9; }
     DialogTitle { color: #e6e0e9; background-color: #211f26; }
     DialogBody { color: #cac4d0; }
