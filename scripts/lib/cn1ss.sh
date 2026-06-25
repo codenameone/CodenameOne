@@ -540,6 +540,12 @@ cn1ss_process_fidelity() {
 
   # 1) Compare CN1 renders against native goldens (fidelity scoring).
   local -a compare_args=("--mode" "fidelity" "--reference-dir" "$goldens_dir" "--emit-base64" "--preview-dir" "$preview_dir")
+  # Glass tiles are composited over a shared gradient backdrop; pass it so the
+  # comparator can mask the backdrop out and score only the widget. When unset the
+  # comparator falls back to the canonical path relative to the goldens dir.
+  if [ -n "${CN1SS_FIDELITY_BACKDROP:-}" ] && [ -f "${CN1SS_FIDELITY_BACKDROP}" ]; then
+    compare_args+=("--backdrop" "${CN1SS_FIDELITY_BACKDROP}")
+  fi
   local entry
   for entry in "${actual_entries[@]}"; do
     compare_args+=("--actual" "$entry")

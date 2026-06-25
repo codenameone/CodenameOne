@@ -203,20 +203,24 @@ SpanLabelText { cn1-derive: Label; background-color: transparent; }
    degenerate to a circle when width<=height - RoundBorder paints a
    circle in that case, border-radius always keeps the corner radius. */
 Button {
-    color: var(--accent-color, #007aff);
+    /* iOS 26 .glass() system button: a translucent FROSTED-WHITE capsule (the
+       backdrop reads through, washed toward white) with a near-black label -- NOT a
+       bare blue text label. The pill fill is the defining part of the look; without
+       it the button reads as plain text over the backdrop. */
+    color: #000000;
     /* Compact glass capsule: very little padding. */
     padding: 1mm 2.5mm 1mm 2.5mm;
     margin: 0;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: transparent;
+    background-color: rgba(255,255,255,0.5);
     /* iOS 26 glass buttons are capsules (fully rounded sides). */
     cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-/* Pressed (light): translucent grey glass capsule with BLACK label (not blue). */
-Button.pressed { color: #000000; background-color: rgba(120,120,128,0.25); cn1-background-type: cn1-pill-border; }
-Button.disabled { color: var(--accent-disabled-color, #b3d4ff); }
+/* Pressed (light): the frosted capsule dims slightly. */
+Button.pressed { color: #000000; background-color: rgba(235,235,240,0.6); cn1-background-type: cn1-pill-border; }
+Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.35); cn1-background-type: cn1-pill-border; }
 
 RaisedButton {
     cn1-derive: Button;
@@ -230,10 +234,10 @@ RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color:
    tint), with greyed text. */
 RaisedButton.disabled { background-color: rgba(0,122,255,0.18); color: rgba(255,255,255,0.5); }
 
-/* clearGlass: just the tinted label, no fill or rect in any state (a pressed
-   grey rect would not match the native clear button). */
-FlatButton { cn1-derive: Button; }
-FlatButton.pressed { color: var(--accent-pressed-color, #0064d1); background-color: transparent; }
+/* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
+   backdrop shows through) with a blue label. */
+FlatButton { cn1-derive: Button; color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.3); cn1-background-type: cn1-pill-border; }
+FlatButton.pressed { color: var(--accent-pressed-color, #0064d1); background-color: rgba(255,255,255,0.42); cn1-background-type: cn1-pill-border; }
 
 TextField {
     color: #000000;
@@ -474,17 +478,18 @@ TabsContainer {
     background-color: rgba(255,255,255,0.6);
     color: #3c3c43;
     padding: 1mm;
-    /* Native pill measured 42.5mm wide; thin side margins let the pill grow. */
-    margin: 1mm 2mm 1mm 2mm;
+    /* Native glass pill is large (~85% tile width, near-full height); thin margins
+       + tall padding let the CN1 pill grow to match. */
+    margin: 0.5mm 1mm 0.5mm 1mm;
     cn1-background-type: cn1-pill-border;
 }
 
 Tab {
     color: #3c3c43;
     background-color: transparent;
-    /* Horizontal padding spreads the three items toward the native ~42mm pill
-       width; vertical padding kept small so the pill height matches (~174px). */
-    padding: 0.9mm 4.2mm 0.9mm 4.2mm;
+    /* Wide horizontal padding spreads the three items toward the native pill width;
+       taller vertical padding grows the pill height toward the native bar. */
+    padding: 1.8mm 5.5mm 1.8mm 5.5mm;
     margin: 0;
     font-family: "native:MainRegular";
     font-size: 1.2mm;
@@ -705,9 +710,14 @@ PopupContent {
     SpanLabelText { color: #ffffff; background-color: transparent; }
 
     /* Dark glass button: a translucent blue capsule with white text. */
-    Button { color: #ffffff; background-color: rgba(10,132,255,0.5); cn1-background-type: cn1-pill-border; }
-    Button.pressed { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
-    Button.disabled { color: rgba(255,255,255,0.5); background-color: rgba(10,132,255,0.2); cn1-background-type: cn1-pill-border; }
+    /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop) with a
+       white label -- not a blue fill. */
+    Button { color: #ffffff; background-color: rgba(20,20,24,0.55); cn1-background-type: cn1-pill-border; }
+    Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.4); cn1-background-type: cn1-pill-border; }
+    /* Dark clearGlass FlatButton: lighter dark capsule, blue label. */
+    FlatButton { color: var(--accent-color-dark, #0a84ff); background-color: rgba(60,60,66,0.4); cn1-background-type: cn1-pill-border; }
+    FlatButton.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(80,80,86,0.5); cn1-background-type: cn1-pill-border; }
 
     RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
     RaisedButton.pressed { background-color: var(--accent-pressed-color-dark, #64b1ff); }

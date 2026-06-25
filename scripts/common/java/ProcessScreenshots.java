@@ -47,7 +47,8 @@ public class ProcessScreenshots {
                     arguments.referenceDir,
                     arguments.actualEntries,
                     arguments.emitBase64,
-                    arguments.previewDir
+                    arguments.previewDir,
+                    arguments.backdrop
             );
         } else {
             payload = buildResults(
@@ -172,9 +173,16 @@ public class ProcessScreenshots {
             Path referenceDir,
             List<Map.Entry<String, Path>> actualEntries,
             boolean emitBase64,
-            Path previewDir
+            Path previewDir,
+            Path backdropPath
     ) throws IOException {
         List<Map<String, Object>> results = new ArrayList<>();
+        // Glass tiles (Toolbar/Tabs/Buttons over iOS Liquid Glass) are composited
+        // over a shared gradient backdrop. Comparing the whole tile lets the
+        // identical-ish backdrop (~70% of the pixels) inflate the score regardless
+        // of how wrong the widget is. Load the backdrop so we can mask it out and
+        // score ONLY the widget (see structuralFidelityGlass).
+        BufferedImage backdropImg = loadBackdrop(backdropPath, referenceDir);
         java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
@@ -243,11 +251,27 @@ public class ProcessScreenshots {
                         // backdrop we render), so a near-white CN1 fill still counts
                         // as widget content rather than being mistaken for blank bg.
                         int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
-                        double[] sf = structuralFidelity(natc, cn1c, bg);
+                        double[] sf;
+                        boolean glass = false;
+                        if (backdropImg != null) {
+                            // Reproduce CN1's/native's BACKGROUND scaleToFill (stretch,
+                            // ignore aspect) of the backdrop over the full tile, sampled
+                            // at the cropped top-left region.
+                            int[] refArr = stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch);
+                            if (isGlassTile(natc, refArr, cw, ch)) {
+                                glass = true;
+                                sf = structuralFidelityGlass(natc, cn1c, refArr);
+                            } else {
+                                sf = structuralFidelity(natc, cn1c, bg);
+                            }
+                        } else {
+                            sf = structuralFidelity(natc, cn1c, bg);
+                        }
                         double meanDelta = meanChannelDelta(natc, cn1c);
                         details.put("fidelity_percent", round2(sf[0]));
                         details.put("shape_sim", round4(sf[1]));
                         details.put("size_agreement", round4(sf[2]));
+                        details.put("glass", glass);
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
                         record.put("status", "compared");
@@ -431,6 +455,197 @@ public class ProcessScreenshots {
         double headline = Math.sqrt(Math.max(0.0d, fillSim) * Math.max(0.0d, ssim));
         double fidelity = 100.0d * headline;
         return new double[]{fidelity, structSim, fillSim};
+    }
+
+    /// A pixel further than this (mean channel delta) from the backdrop reference
+    /// is treated as WIDGET; closer pixels are the shared glass backdrop and are
+    /// excluded from the glass fidelity score. Generous enough to absorb the
+    /// minor render/AA differences in the gradient between the two stacks.
+    private static final int GLASS_TAU = 26;
+
+    /// Load the glass backdrop PNG (the gradient that the iOS Liquid-Glass tiles
+    /// composite behind the widget). Explicit --backdrop wins; otherwise fall back
+    /// to the canonical location relative to the goldens dir. Returns null when no
+    /// backdrop is found, in which case fidelity scoring stays whole-tile.
+    private static BufferedImage loadBackdrop(Path explicit, Path referenceDir) {
+        Path[] candidates = {
+            explicit,
+            referenceDir == null ? null
+                : referenceDir.resolve("../../common/src/main/resources/glass-backdrop.png").normalize()
+        };
+        for (Path p : candidates) {
+            if (p == null) {
+                continue;
+            }
+            try {
+                if (Files.isRegularFile(p)) {
+                    BufferedImage img = javax.imageio.ImageIO.read(p.toFile());
+                    if (img != null) {
+                        return img;
+                    }
+                }
+            } catch (IOException ignore) {
+                // try the next candidate
+            }
+        }
+        return null;
+    }
+
+    /// Reproduce a BACKGROUND scaleToFill (stretch to the full tile, ignoring aspect
+    /// -- matching the iOS native ref's .scaleToFill and the CN1 SCALED background
+    /// type), sampled over the top-left (cw x ch) crop the comparator overlays.
+    /// Nearest-neighbour is sufficient: the backdrop is a smooth gradient and this
+    /// is only used to classify backdrop-vs-widget pixels.
+    private static int[] stretchCropTopLeft(BufferedImage bd, int fullW, int fullH, int cw, int ch) {
+        int bw = bd.getWidth(), bh = bd.getHeight();
+        int[] out = new int[cw * ch];
+        for (int y = 0; y < ch; y++) {
+            int sy = fullH <= 0 ? 0 : (int) ((long) y * bh / fullH);
+            if (sy >= bh) {
+                sy = bh - 1;
+            }
+            for (int x = 0; x < cw; x++) {
+                int sx = fullW <= 0 ? 0 : (int) ((long) x * bw / fullW);
+                if (sx >= bw) {
+                    sx = bw - 1;
+                }
+                out[y * cw + x] = bd.getRGB(sx, sy) & 0xffffff;
+            }
+        }
+        return out;
+    }
+
+    private static int colorDist(int p, int q) {
+        return (Math.abs(((p >> 16) & 0xff) - ((q >> 16) & 0xff))
+                + Math.abs(((p >> 8) & 0xff) - ((q >> 8) & 0xff))
+                + Math.abs((p & 0xff) - (q & 0xff))) / 3;
+    }
+
+    /// A tile is "glass" when its corners show the backdrop (the widget is inset, so
+    /// the corner pixels match the stretched backdrop reference). Solid white/black
+    /// tiles (checkbox, textfield, dialog card) fail this and keep the whole-tile
+    /// solid-background scoring.
+    private static boolean isGlassTile(PNGImage nativeImg, int[] refArr, int w, int h) {
+        if (w < 16 || h < 16) {
+            return false;
+        }
+        BufferedImage bn = toRgbImage(nativeImg);
+        // Sample the corners INSET by a few pixels: the native capture leaves a 1px
+        // dark border at the very edge, so the exact corner pixel is not the backdrop.
+        int m = 5;
+        int[][] pts = {{m, m}, {w - 1 - m, m}, {m, h - 1 - m}, {w - 1 - m, h - 1 - m}};
+        int match = 0;
+        for (int[] pt : pts) {
+            int idx = pt[1] * w + pt[0];
+            int p = bn.getRGB(pt[0], pt[1]) & 0xffffff;
+            if (colorDist(p, refArr[idx]) <= GLASS_TAU) {
+                match++;
+            }
+        }
+        return match >= 3;
+    }
+
+    private static boolean[] contentMaskRef(int[] arr, int[] ref, int tau) {
+        boolean[] m = new boolean[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            m[i] = colorDist(arr[i], ref[i]) > tau;
+        }
+        return m;
+    }
+
+    /// Glass-tile fidelity: the shared gradient backdrop is masked OUT (pixels close
+    /// to the backdrop reference in BOTH images) and only the WIDGET is scored, so a
+    /// widget that looks nothing like the native one can no longer ride the matching
+    /// backdrop to a high number. fillSim is the colour agreement over the union of
+    /// widget pixels (widget-in-only-one-image counts as full mismatch); ssim is
+    /// computed over the widget bounding box only, so flat backdrop windows never
+    /// inflate it. Returns {fidelity_percent, fillSim, fillSim}.
+    private static double[] structuralFidelityGlass(PNGImage nativeImg, PNGImage cn1, int[] refArr) {
+        BufferedImage bn = toRgbImage(nativeImg);
+        BufferedImage bc = toRgbImage(cn1);
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        boolean[] nC = contentMaskRef(nArr, refArr, GLASS_TAU);
+        boolean[] cC = contentMaskRef(cArr, refArr, GLASS_TAU);
+        long sum = 0;
+        long count = 0;
+        int x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = y * w + x;
+                if (!nC[idx] && !cC[idx]) {
+                    continue;   // shared backdrop in both -> ignore
+                }
+                int d1 = tolerantDelta(nArr[idx], cArr, x, y, w, h);
+                int d2 = tolerantDelta(cArr[idx], nArr, x, y, w, h);
+                sum += Math.max(d1, d2);
+                count++;
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+            }
+        }
+        if (count == 0) {
+            // Neither render put anything over the backdrop -> identical (both bare
+            // backdrop). Treat as a perfect match rather than dividing by zero.
+            return new double[]{100.0d, 1.0d, 1.0d};
+        }
+        double fillSim = 1.0d - (double) sum / (count * 255.0d);
+        if (fillSim < 0) {
+            fillSim = 0;
+        }
+        double ssim;
+        int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+        if (bw >= 4 && bh >= 4) {
+            double[] gn = grayCrop(nArr, w, x0, y0, bw, bh);
+            double[] gc = grayCrop(cArr, w, x0, y0, bw, bh);
+            ssim = computeSsimGray(gn, gc, bw, bh);
+        } else {
+            ssim = fillSim;
+        }
+        if (ssim < 0) {
+            ssim = 0;
+        }
+        double headline = Math.sqrt(fillSim * ssim);
+        return new double[]{100.0d * headline, fillSim, fillSim};
+    }
+
+    private static double[] grayCrop(int[] arr, int stride, int x0, int y0, int w, int h) {
+        double[] g = new double[w * h];
+        for (int j = 0; j < h; j++) {
+            for (int i = 0; i < w; i++) {
+                int p = arr[(y0 + j) * stride + (x0 + i)];
+                g[j * w + i] = 0.299d * ((p >> 16) & 0xff) + 0.587d * ((p >> 8) & 0xff) + 0.114d * (p & 0xff);
+            }
+        }
+        return g;
+    }
+
+    private static double computeSsimGray(double[] ga, double[] gb, int w, int h) {
+        final double c1 = 6.5025d;
+        final double c2 = 58.5225d;
+        int win = 8;
+        double total = 0.0d;
+        int windows = 0;
+        for (int y = 0; y + win <= h; y += win) {
+            for (int x = 0; x + win <= w; x += win) {
+                total += ssimWindow(ga, gb, w, x, y, win, win, c1, c2);
+                windows++;
+            }
+        }
+        if (windows == 0) {
+            return ssimWindow(ga, gb, w, 0, 0, w, h, c1, c2);
+        }
+        return total / windows;
     }
 
     /// Top/left margin agreement (1 = identical edge-to-widget distance, decaying
@@ -1421,9 +1636,10 @@ public class ProcessScreenshots {
         final int maxChannelDelta;
         final double maxMismatchPercent;
         final String mode;
+        final Path backdrop;
 
         private Arguments(Path referenceDir, List<Map.Entry<String, Path>> actualEntries, boolean emitBase64, Path previewDir,
-                          int maxChannelDelta, double maxMismatchPercent, String mode) {
+                          int maxChannelDelta, double maxMismatchPercent, String mode, Path backdrop) {
             this.referenceDir = referenceDir;
             this.actualEntries = actualEntries;
             this.emitBase64 = emitBase64;
@@ -1431,6 +1647,7 @@ public class ProcessScreenshots {
             this.maxChannelDelta = maxChannelDelta;
             this.maxMismatchPercent = maxMismatchPercent;
             this.mode = mode;
+            this.backdrop = backdrop;
         }
 
         static Arguments parse(String[] args) {
@@ -1440,6 +1657,7 @@ public class ProcessScreenshots {
             int maxChannelDelta = 4;
             double maxMismatchPercent = 0.30d;
             String mode = "golden";
+            Path backdrop = null;
             List<Map.Entry<String, Path>> actuals = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
@@ -1461,6 +1679,13 @@ public class ProcessScreenshots {
                             return null;
                         }
                         reference = Path.of(args[i]);
+                    }
+                    case "--backdrop" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --backdrop");
+                            return null;
+                        }
+                        backdrop = Path.of(args[i]);
                     }
                     case "--emit-base64" -> emitBase64 = true;
                     case "--preview-dir" -> {
@@ -1515,7 +1740,7 @@ public class ProcessScreenshots {
                 System.err.println("--reference-dir is required");
                 return null;
             }
-            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent, mode);
+            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent, mode, backdrop);
         }
 
         private static int parseIntArg(String flag, String value) {

@@ -455,8 +455,13 @@ public class FidelityDeviceRunner {
             // Liquid Glass needs content behind it. The iOS native reference renders
             // these widgets over the SAME committed backdrop PNG, so CN1 must too --
             // the only difference that should remain is how each renders the glass.
+            // STRETCH (SCALED, ignore aspect) to match the native ref's .scaleToFill
+            // so the two backdrops are pixel-for-pixel the same gradient; the
+            // comparator then masks that shared backdrop out and scores only the
+            // widget (SCALED_FILL aspect-cropped differently from native and let the
+            // gradient mismatch leak into the fidelity score).
             tile.getAllStyles().setBgImage(backdrop);
-            tile.getAllStyles().setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FILL);
+            tile.getAllStyles().setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED);
             tile.getAllStyles().setBgTransparency(255);
         } else {
             tile.getAllStyles().setBgColor(bgColor(appearance));
