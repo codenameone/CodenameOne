@@ -522,7 +522,7 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: rgba(255,255,255,0.64);
+    background-color: rgba(255,255,255,0.78);
     color: #3c3c43;
     /* Liquid Glass floating tab pill: blur the backdrop, frost with a light tint. */
     backdrop-filter: blur(24px);
@@ -833,7 +833,7 @@ PopupContent {
     TabbedPane { background-color: transparent; }
     /* Dark glass tab pill: more translucent so the backdrop reads through like the
        native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint). */
-    TabsContainer { background-color: rgba(38,38,42,0.58); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(24px); }
+    TabsContainer { background-color: rgba(38,38,42,0.70); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(24px); }
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: like light, the selected item is only tinted blue --
        no per-item sub-pill (the whole bar is the single glass pill). */
