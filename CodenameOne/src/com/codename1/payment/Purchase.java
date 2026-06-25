@@ -22,6 +22,7 @@
  */
 package com.codename1.payment;
 
+import com.codename1.analytics.Analytics;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
@@ -112,6 +113,14 @@ public abstract class Purchase {
             r.setPurchaseDate(new Date());
         }
         Purchase.getInAppPurchase().postReceipt(r);
+
+        // Analytics auto-instrumentation: every successful native purchase
+        // routes a receipt through here, so this is the canonical completion
+        // point. The autoEvent path is consent-gated and a no-op when no
+        // provider is registered, and it never throws into the caller.
+        java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("sku", sku);
+        Analytics.autoEvent("purchase", "commerce", params);
 
     }
 
@@ -372,7 +381,33 @@ public abstract class Purchase {
     /// - `RuntimeException`: @throws RuntimeException This method is a part of the managed payments API and will fail if
     /// isManagedPaymentSupported() returns false
     public void purchase(String sku) {
+        // Analytics auto-instrumentation: the start of the purchase funnel.
+        // Platform implementations override purchaseImpl(), so this fires once
+        // per initiation regardless of platform. Pairs with the "purchase"
+        // completion event in postReceipt -- the gap between them is the
+        // checkout drop-off. Consent-gated and a no-op when no provider is
+        // registered.
+        fireAnalyticsPurchaseInitiated(sku);
+        purchaseImpl(sku);
+    }
+
+    /// Platform hook for {@link #purchase(String)}. Native implementations
+    /// override this to begin the store transaction; the public
+    /// {@code purchase} method wraps it so the {@code purchase_initiated}
+    /// analytics event fires uniformly across platforms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    protected void purchaseImpl(String sku) {
         throw new RuntimeException("Unsupported");
+    }
+
+    /// Emits the consent-gated {@code purchase_initiated} analytics event.
+    private static void fireAnalyticsPurchaseInitiated(String sku) {
+        java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
+        params.put("sku", sku);
+        Analytics.autoEvent("purchase_initiated", "commerce", params);
     }
 
     /// Begins the purchase process for the given SKU using a provided promotional offer.
@@ -394,6 +429,19 @@ public abstract class Purchase {
     ///
     /// - ApplePromotionalOffer
     public void purchase(String sku, PromotionalOffer promotionalOffer) {
+        fireAnalyticsPurchaseInitiated(sku);
+        purchaseImpl(sku, promotionalOffer);
+    }
+
+    /// Platform hook for {@link #purchase(String, PromotionalOffer)}. See
+    /// {@link #purchaseImpl(String)}.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the SKU with which to perform the purchase process
+    ///
+    /// - `promotionalOffer`: the promotional offer
+    protected void purchaseImpl(String sku, PromotionalOffer promotionalOffer) {
         throw new RuntimeException("Unsupported");
     }
 

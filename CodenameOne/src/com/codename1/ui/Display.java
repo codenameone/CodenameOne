@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.analytics.Analytics;
 import com.codename1.annotations.Async;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -5365,6 +5366,13 @@ public final class Display extends CN1Constants {
     ///
     /// - `listener`: callback for the share outcome. May be null.
     public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
+        // Analytics auto-instrumentation: this 5-arg overload is the chokepoint
+        // that every share(...) variant funnels into. The autoEvent path is
+        // consent-gated, a no-op when no provider is registered, and never
+        // throws into the caller. "type" is the coarse share content type.
+        Map<String, Object> shareParams = new HashMap<String, Object>();
+        shareParams.put("type", image != null ? "image" : "text");
+        Analytics.autoEvent("share", "engagement", shareParams);
         if (listener == null) {
             impl.share(textOrPath, image, mimeType, sourceRect);
             return;
@@ -6412,6 +6420,37 @@ public final class Display extends CN1Constants {
     /// true if this device is jailbroken or rooted, false if not or unknown.
     public boolean isJailbrokenDevice() {
         return impl.isJailbrokenDevice();
+    }
+
+    /// Requests a signed device-attestation token (Play Integrity / App Attest) bound to the server
+    /// nonce. See `com.codename1.security.DeviceIntegrity#requestIntegrityToken(String)`.
+    public AsyncResource<String> requestIntegrityToken(String nonce) {
+        return impl.requestIntegrityToken(nonce);
+    }
+
+    /// Returns true if device-attestation (Play Integrity / App Attest) is supported and bundled.
+    public boolean isAttestationSupported() {
+        return impl.isAttestationSupported();
+    }
+
+    /// Non-exiting RASP check, true if the device appears rooted/jailbroken/instrumented/tampered.
+    public boolean isDeviceCompromised() {
+        return impl.isDeviceCompromised();
+    }
+
+    /// Returns the reason codes behind `isDeviceCompromised()` (e.g. "root", "frida", "emulator").
+    public String[] getCompromiseReasons() {
+        return impl.getCompromiseReasons();
+    }
+
+    /// Returns the component ids of the accessibility services currently enabled on the device.
+    public String[] getEnabledAccessibilityServices() {
+        return impl.getEnabledAccessibilityServices();
+    }
+
+    /// Marks the current screen secure (Android `FLAG_SECURE`), blocking screenshots/recording/scraping.
+    public void setSecureScreen(boolean secure) {
+        impl.setSecureScreen(secure);
     }
 
     /// Returns the build hints for the simulator, this will only work in the debug environment and it's
