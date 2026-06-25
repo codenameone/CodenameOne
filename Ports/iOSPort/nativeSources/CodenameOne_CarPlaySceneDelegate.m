@@ -33,7 +33,7 @@ static void cn1CarPlayFireSelect(int screenId, NSString *elementId) {
     if (elementId == nil) {
         return;
     }
-    JAVA_OBJECT jel = xmlvm_create_java_string([elementId UTF8String]);
+    JAVA_OBJECT jel = newStringFromCString(getThreadLocalData(), [elementId UTF8String]);
     com_codename1_impl_ios_IOSCarPlayCallbacks_nativeElementSelected___int_java_lang_String(
             getThreadLocalData(), (JAVA_INT)screenId, jel);
 }

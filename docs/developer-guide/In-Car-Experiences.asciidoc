@@ -4,7 +4,7 @@ Codename One can project a driver-safe UI onto Apple CarPlay and Google Android 
 
 [NOTE]
 ====
-CarPlay and Android Auto are *template-based* UI systems. Unlike the phone, tablet, or even Apple TV/Android TV (which reuse the normal Codename One renderer), the car platforms do **not** let an app draw arbitrary pixels or show a regular Codename One `Form`. To minimise driver distraction the system only renders a fixed catalogue of templates -- lists, grids, info panes, messages, navigation and now-playing -- and grants access per *app category* (audio, communication, navigation, point-of-interest, and so on). The `com.codename1.car` API maps the common in-car use cases onto that catalogue. "Seamless" here means seamless integration, lifecycle and build wiring -- not running your existing phone UI on the dashboard.
+CarPlay and Android Auto are *template-based* UI systems. Unlike the phone, tablet, or even Apple TV/Android TV (which reuse the normal Codename One renderer), the car platforms don't let an app draw arbitrary pixels or show a regular Codename One `Form`. To minimise driver distraction the system only renders a fixed catalogue of templates -- lists, grids, info panes, messages, navigation and now-playing -- and grants access per *app category* (audio, communication, navigation, point-of-interest). The `com.codename1.car` API maps the common in-car use cases onto that catalogue. "Seamless" here means seamless integration, lifecycle and build wiring -- not running your existing phone UI on the dashboard.
 ====
 
 This API is *zero cost when unused*: simply referencing `com.codename1.car` is what tells the build to wire the native plumbing (the CarPlay scene + entitlement on iOS, the `androidx.car.app` dependency + `CarAppService` on Android). Apps that never touch the package get none of it.
@@ -132,6 +132,6 @@ A complete runnable example lives in `Samples/samples/CarSample`.
 
 === Limitations
 
-* The navigation map *surface* (`CarSurfaceCallback`) is scaffolded; live map blitting onto the head-unit surface is a work in progress -- the navigation template's controls, header and ETA strip are wired.
+* The navigation map *surface* (`CarSurfaceCallback`) is scaffolded; live map drawing onto the head-unit surface is a work in progress -- the navigation template's controls, header and ETA strip are wired.
 * Android Auto media browsing is driven by the standard media session; `CarNowPlayingTemplate` routes to it.
-* You cannot show arbitrary Codename One `Form`s on the head unit -- use the template catalogue above.
+* You can't show arbitrary Codename One forms on the head unit -- use the template catalogue above.

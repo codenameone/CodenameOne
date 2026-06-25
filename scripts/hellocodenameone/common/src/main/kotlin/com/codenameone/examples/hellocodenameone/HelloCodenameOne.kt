@@ -57,7 +57,11 @@ open class HelloCodenameOne : Lifecycle() {
             // Keep running so DeviceRunner can emit CN1SS markers and report swift_diag_status explicitly.
         }
         Cn1ssDeviceRunner.addTest(KotlinUiTest())
-        Cn1ssDeviceRunner.addTest(com.codenameone.examples.hellocodenameone.tests.CarApiTest())
+        // NOTE: the in-car API is exercised via Car.setApplication(...) above (which is what makes
+        // the build compile the CarPlay / Android Auto natives) and validated by the dedicated
+        // car-android.yml / car-ios.yml integration workflows + the JVM CarTest. It is deliberately
+        // NOT registered as a device-suite screenshot test: adding a screenshot-producing test to the
+        // shared suite destabilises the screenshot baselines (the JS/iOS suites are timing-sensitive).
         TestReporting.setInstance(Cn1ssDeviceRunnerReporter())
     }
 

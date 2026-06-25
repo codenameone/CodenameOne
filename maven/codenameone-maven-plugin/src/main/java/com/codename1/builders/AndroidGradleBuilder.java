@@ -1958,6 +1958,17 @@ public class AndroidGradleBuilder extends Executor {
         // resources in the plugin (not reflection blobs) and are only added for in-car apps, so apps
         // that never touch the API pay nothing.
         if (usesCar) {
+            // androidx.car.app requires minSdk 23 (app-projected requires 21). Any Android Auto app
+            // inherently needs API 23+, so raise the floor here -- otherwise the manifest merge fails
+            // with "uses-sdk:minSdkVersion N cannot be smaller than version 21/23 declared in library".
+            try {
+                if (Integer.parseInt(minSDK) < 23) {
+                    log("Android Auto (com.codename1.car) requires minSdk 23; raising android.min_sdk_version from " + minSDK + " to 23");
+                    minSDK = "23";
+                }
+            } catch (NumberFormatException ex) {
+                minSDK = "23";
+            }
             File carImpl = new File(srcDir, "com/codename1/impl/android");
             carImpl.mkdirs();
             String[] glue = {"CN1CarAppService.java", "CN1CarSession.java",

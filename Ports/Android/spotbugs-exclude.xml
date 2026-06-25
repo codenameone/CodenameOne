@@ -467,4 +467,18 @@
             <Bug pattern="REC_CATCH_EXCEPTION" />
         </Or>
     </Match>
+
+    <!--
+    AndroidCarSupport is an intentional process-wide registry: the build-injected Android Auto
+    CarAppService publishes its CarBridge here and AndroidImplementation reads it back. Storing the
+    bridge in a static field is the whole point of the registry, so the "mutable static" findings on
+    its accessors are by design.
+    -->
+    <Match>
+        <Class name="com.codename1.impl.android.AndroidCarSupport" />
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2" />
+            <Bug pattern="MS_EXPOSE_REP" />
+        </Or>
+    </Match>
 </FindBugsFilter>

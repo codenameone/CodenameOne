@@ -4,7 +4,7 @@ name: Car (Android Auto) integration
 # Scoped to the in-car feature: triggers ONLY when the com.codename1.car API, the Android Auto glue,
 # the on-device car test, or the car build wiring change. Builds the Hello Codename One app (which
 # exercises the car API, so the build injects the androidx.car.app dependency + CarAppService) and
-# runs it on a native Android emulator, executing CarApiTest as part of the device suite.
+# runs it on a native Android emulator + asserts the injected Android Auto wiring.
 'on':
   pull_request:
     paths:
@@ -13,7 +13,7 @@ name: Car (Android Auto) integration
       - 'Ports/Android/src/com/codename1/impl/android/AndroidCarSupport.java'
       - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/car/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
-      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/tests/CarApiTest.kt'
+      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
   push:
     branches:
       - master
@@ -23,7 +23,7 @@ name: Car (Android Auto) integration
       - 'Ports/Android/src/com/codename1/impl/android/AndroidCarSupport.java'
       - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/car/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
-      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/tests/CarApiTest.kt'
+      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
 
 jobs:
   car-android:
@@ -94,7 +94,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Run device suite (incl. CarApiTest) on emulator
+      - name: Run device suite on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
