@@ -562,6 +562,7 @@ Dialog {
     padding: 2mm;
     margin: 0;
     border-radius: 6mm;
+    border: 0.2mm solid #cac4d0;
 }
 DialogBody {
     background-color: transparent;
@@ -760,7 +761,7 @@ PopupContent {
     MultiLine3 { color: #938f99; }
     MultiLine4 { color: #938f99; }
 
-    Dialog { background-color: #211f26; color: #e6e0e9; }
+    Dialog { background-color: #211f26; color: #e6e0e9; border: 0.2mm solid #49454f; }
     DialogBody { background-color: #211f26; color: #e6e0e9; }
     DialogTitle { color: #e6e0e9; background-color: #211f26; }
     DialogBody { color: #cac4d0; }

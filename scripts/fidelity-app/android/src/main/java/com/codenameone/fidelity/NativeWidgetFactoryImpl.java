@@ -235,13 +235,23 @@ public class NativeWidgetFactoryImpl {
             p.setProgress(50);
             view = p;
         } else if ("material_tablayout".equals(kind)) {
-            // Material 3 fixed tab strip, 3 tabs, first selected (the indicator
-            // underlines it). Sized full-width like slider/progress below.
+            // Material 3 fixed tab strip, 3 icon+label tabs, first selected. The
+            // labels + glyphs (Featured/Search/More with the Material star/search/
+            // more icons) mirror the CN1 Tabs render so the two are comparable; the
+            // selected item is blue, the rest grey, matching CN1's tint.
+            boolean dark = "dark".equals(appearance);
+            int selColor = dark ? 0xff409cff : 0xff0a84ff;
+            int unselColor = dark ? 0xffebebf5 : 0xff3c3c43;
             TabLayout tabs = new TabLayout(ctx);
             tabs.setTabMode(TabLayout.MODE_FIXED);
-            tabs.addTab(tabs.newTab().setText("Tab 1"));
-            tabs.addTab(tabs.newTab().setText("Tab 2"));
-            tabs.addTab(tabs.newTab().setText("Tab 3"));
+            tabs.setSelectedTabIndicatorColor(selColor);
+            tabs.setTabTextColors(unselColor, selColor);
+            int[][] tintStates = new int[][]{ new int[]{android.R.attr.state_selected}, new int[0] };
+            tabs.setTabIconTint(new android.content.res.ColorStateList(
+                    tintStates, new int[]{selColor, unselColor}));
+            tabs.addTab(tabs.newTab().setText("Featured").setIcon(materialGlyph(ctx, '\uE838', 4.6f)));
+            tabs.addTab(tabs.newTab().setText("Search").setIcon(materialGlyph(ctx, '\uE8B6', 4.6f)));
+            tabs.addTab(tabs.newTab().setText("More").setIcon(materialGlyph(ctx, '\uE5D3', 4.6f)));
             tabs.selectTab(tabs.getTabAt(0));
             view = tabs;
         } else if ("material_toolbar".equals(kind)) {
@@ -361,6 +371,34 @@ public class NativeWidgetFactoryImpl {
             return com.google.android.material.R.style.Theme_Material3_Dark;
         }
         return com.google.android.material.R.style.Theme_Material3_Light;
+    }
+
+    /**
+     * Renders a Material Design icon-font glyph into a square white drawable sized
+     * in mm, mirroring CN1's FontImage.createMaterial so the native TabLayout shows
+     * the same icons as the CN1 Tabs render (the glyph is drawn white and the caller
+     * applies a colour via the tab icon tint). Returns null if the font is absent.
+     */
+    private android.graphics.drawable.Drawable materialGlyph(Context ctx, char glyph, float sizeMm) {
+        android.graphics.Typeface tf;
+        try {
+            tf = android.graphics.Typeface.createFromAsset(ctx.getAssets(), "material-design-font.ttf");
+        } catch (Throwable t) {
+            return null;
+        }
+        float dpi = ctx.getResources().getDisplayMetrics().densityDpi;
+        int px = Math.max(1, Math.round(sizeMm * dpi / 25.4f));
+        Bitmap bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+        android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        paint.setTypeface(tf);
+        paint.setColor(0xffffffff);
+        paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+        paint.setTextSize(px);
+        android.graphics.Paint.FontMetrics fm = paint.getFontMetrics();
+        float y = px / 2f - (fm.ascent + fm.descent) / 2f;
+        canvas.drawText(String.valueOf(glyph), px / 2f, y, paint);
+        return new android.graphics.drawable.BitmapDrawable(ctx.getResources(), bmp);
     }
 
     /** Alpha-composites a (possibly translucent) foreground colour over an opaque bg. */

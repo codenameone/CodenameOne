@@ -266,14 +266,19 @@ public final class Cn1WidgetRenderer {
             // iOS alert: a rounded card with a centred title + supporting text in
             // the middle and a hairline-separated row of two equal blue actions
             // pinned to the bottom (Cancel | OK, split by a vertical divider).
+            // iOS alerts centre the title/body and split two equal actions with a
+            // hairline divider; Android Material dialogs left-align the title/body
+            // and right-align a flow of text actions. Pick per platform.
+            boolean iosDlg = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
+            int dlgAlign = iosDlg ? Component.CENTER : Component.LEFT;
             Container dialog = new Container(new BorderLayout());
             dialog.setUIID("Dialog");
             Label title = new Label("Title");
             title.setUIID("DialogTitle");
-            title.getAllStyles().setAlignment(Component.CENTER);
+            title.getAllStyles().setAlignment(dlgAlign);
             Label body = new Label(text);
             body.setUIID("DialogBody");
-            body.getAllStyles().setAlignment(Component.CENTER);
+            body.getAllStyles().setAlignment(dlgAlign);
             Container content = new Container(BoxLayout.y());
             content.getAllStyles().setBgTransparency(0);
             content.add(title);
@@ -282,7 +287,9 @@ public final class Cn1WidgetRenderer {
             cancel.setUIID("DialogButton");
             Button ok = new Button("OK");
             ok.setUIID("DialogButton");
-            Container btns = new Container(new GridLayout(1, 2));
+            Container btns = iosDlg
+                    ? new Container(new GridLayout(1, 2))
+                    : new Container(new com.codename1.ui.layouts.FlowLayout(Component.RIGHT));
             btns.setUIID("DialogCommandArea");
             btns.add(cancel);
             btns.add(ok);
