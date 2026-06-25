@@ -855,8 +855,19 @@ public class Dialog extends Form implements AbstractDialog {
         dialogContentPane.setUIID("DialogContentPane");
         dialogTitle = new Label("", dialogTitleUIID);
         super.getContentPane().setLayout(new BorderLayout());
-        super.getContentPane().addComponent(BorderLayout.NORTH, dialogTitle);
-        super.getContentPane().addComponent(BorderLayout.CENTER, dialogContentPane);
+        // Liquid-glass / iOS alert layout: the title sits as the prominent centred
+        // text and the body (content pane) drops BELOW it, rather than the title being
+        // a top bar with the body filling the centre. Opt in via dialogTitleCenterBool
+        // so existing dialogs are unaffected. The title Label is centred; an app that
+        // needs a wrapping multi-line title can supply one via setTitleComponent.
+        if (UIManager.getInstance().isThemeConstant("dialogTitleCenterBool", false)) {
+            dialogTitle.getAllStyles().setAlignment(Component.CENTER);
+            super.getContentPane().addComponent(BorderLayout.CENTER, dialogTitle);
+            super.getContentPane().addComponent(BorderLayout.SOUTH, dialogContentPane);
+        } else {
+            super.getContentPane().addComponent(BorderLayout.NORTH, dialogTitle);
+            super.getContentPane().addComponent(BorderLayout.CENTER, dialogContentPane);
+        }
         super.getContentPane().setScrollable(false);
         super.getContentPane().setAlwaysTensile(false);
 

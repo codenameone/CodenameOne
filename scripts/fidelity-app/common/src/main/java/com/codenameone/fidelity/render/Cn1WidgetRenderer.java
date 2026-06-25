@@ -186,7 +186,8 @@ public final class Cn1WidgetRenderer {
             // The material icons don't auto-tint to the tab's fg, so build them with
             // explicit colours: the selected item (Featured) is blue, the rest grey,
             // matching the native UITabBar tint.
-            int selColor = dark ? 0x0a84ff : 0x007aff;
+            // The glass pill mutes the selected tint, so start from a more vivid blue.
+            int selColor = dark ? 0x409cff : 0x0a84ff;
             int unselColor = dark ? 0xebebf5 : 0x3c3c43;
             com.codename1.ui.plaf.Style selS = new com.codename1.ui.plaf.Style();
             selS.setFgColor(selColor);
@@ -232,10 +233,10 @@ public final class Cn1WidgetRenderer {
                 // reads through at high saturation; an opaque-ish wash (175) read as a
                 // near-white bar that didn't match the native glass at all. Light glass
                 // washes only lightly toward white (~90/255); dark glass barely darkens.
-                // With the backdrop now genuinely blurred behind the bar, only a light
-                // frosting is needed -- a heavier wash reads as a flat pale bar vs the
-                // native glass (which keeps the blurred backdrop's colour).
-                bar.getAllStyles().setBgTransparency(dark ? 38 : 48);
+                // Native nav bar has essentially NO colour tint -- just the blurred
+                // backdrop. Keep the wash very light so we don't add a tint that isn't
+                // in the native glass.
+                bar.getAllStyles().setBgTransparency(dark ? 26 : 22);
                 Container row = new Container(new BorderLayout());
                 row.setUIID("Container");
                 row.getAllStyles().setBgTransparency(0);

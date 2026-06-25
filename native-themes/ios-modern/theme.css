@@ -111,7 +111,7 @@
     switchThumbInsetMM: "0.22";
     /* The native UISwitch thumb is a CIRCLE (not elongated); widthScale 1.0 keeps
        it round so it matches the golden. */
-    switchThumbWidthScale: "1.0";
+    switchThumbWidthScale: "1.35";
     /* iOS uses a circular mark for checkboxes (Reminders-style) and
        keeps the circular radio button. These integer constants are
        Material icon codepoints that DefaultLookAndFeel reads to
@@ -139,7 +139,7 @@
     sliderThumbWidthMM: "5.0";
     sliderThumbHeightMM: "3.8";
     sliderContinuousTrackBool: true;
-    sliderThumbShadowSizeMM: "0.6";
+    sliderThumbShadowSizeMM: "0.4";
     /* iOS picker wheel: the 3D perspective fade (rows shrink/dim toward the edges)
        and ~7 visible rows, matching a native UIPickerView. */
     ios7SpinnerBool: true;
@@ -223,29 +223,30 @@ Button {
     /* Real Liquid Glass: blur the backdrop behind the capsule (no CEF), then the
        light translucent tint above frosts it. The blur is most visible over busy
        content; over a smooth backdrop the tint carries the look. */
-    backdrop-filter: blur(16px);
+    backdrop-filter: blur(20px);
     text-align: center;
 }
 /* Pressed (light): the frosted capsule dims slightly. */
 Button.pressed { color: #000000; background-color: rgba(235,235,240,0.6); cn1-background-type: cn1-pill-border; }
-Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.35); cn1-background-type: cn1-pill-border; }
+Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; }
 
 RaisedButton {
     cn1-derive: Button;
-    color: var(--accent-on-color, #ffffff);
-    background-color: var(--accent-color, #007aff);
+    color: var(--accent-color, #007aff);
+    background-color: rgba(0,122,255,0.38);
+    border: 0.35mm solid var(--accent-color, #007aff);
     cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-pressed-color, #0064d1); }
+RaisedButton.pressed { color: var(--accent-color, #007aff); background-color: rgba(0,122,255,0.48); border: 0.35mm solid var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; }
 /* Disabled prominent-glass button is almost fully transparent (just a hint of the
    tint), with greyed text. */
-RaisedButton.disabled { background-color: rgba(0,122,255,0.18); color: rgba(255,255,255,0.5); }
+RaisedButton.disabled { background-color: rgba(255,255,255,0.5); color: rgba(60,60,67,0.45); cn1-background-type: cn1-pill-border; }
 
 /* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
    backdrop shows through) with a blue label. */
-FlatButton { cn1-derive: Button; color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.2); cn1-background-type: cn1-pill-border; backdrop-filter: blur(16px); }
-FlatButton.pressed { color: var(--accent-pressed-color, #0064d1); background-color: rgba(255,255,255,0.42); cn1-background-type: cn1-pill-border; }
+FlatButton { cn1-derive: Button; color: #000000; background-color: rgba(255,255,255,0.32); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
+FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.52); border: 0.25mm solid rgba(255,255,255,0.85); cn1-background-type: cn1-pill-border; }
 
 TextField {
     color: #000000;
@@ -396,7 +397,7 @@ SpinnerRenderer {
    band, matching the native UIPickerView's centred selection pill. */
 SpinnerRenderer.selected {
     color: #000000;
-    background-color: rgba(120,120,128,0.16);
+    background-color: rgba(120,120,128,0.10);
     border-radius: 2.5mm;
     text-align: center;
     padding: 1mm 2mm 1mm 2mm;
@@ -420,14 +421,14 @@ Toolbar {
     padding: 0;
     margin: 0;
     /* Liquid Glass nav bar: blur the content scrolling behind it (no CEF). */
-    backdrop-filter: blur(16px);
+    backdrop-filter: blur(20px);
 }
 /* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
    to TitleArea. UIManager used to install a defensive
    Toolbar.derive=TitleArea default that produced a cycle when paired
    with TitleArea.derive=Toolbar; the framework now skips that default
    when the user theme has already wired TitleArea -> Toolbar. */
-TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; backdrop-filter: blur(16px); }
+TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; backdrop-filter: blur(20px); }
 
 Title {
     color: #000000;
@@ -445,8 +446,8 @@ MainTitle { cn1-derive: Title; }
 
 /* iOS 26 nav-bar items: a circular translucent-white glass button holding a blue
    glyph (no text). cn1-round-border draws the circle; rgba gives the glass fill. */
-BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.55); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
-TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.55); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
+BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
+TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
 
 /* ---- Desktop chrome (macOS conventions) ----
    Only used when the desktop port enables interactiveScrollBool /
@@ -524,7 +525,7 @@ TabsContainer {
     background-color: rgba(255,255,255,0.64);
     color: #3c3c43;
     /* Liquid Glass floating tab pill: blur the backdrop, frost with a light tint. */
-    backdrop-filter: blur(18px);
+    backdrop-filter: blur(24px);
     padding: 1mm;
     /* Native glass pill is large (~85% tile width, near-full height); thin margins
        + tall padding let the CN1 pill grow to match. */
@@ -540,7 +541,7 @@ Tab {
     padding: 1.1mm 3.8mm 1.1mm 3.8mm;
     margin: 0;
     font-family: "native:MainRegular";
-    font-size: 1.2mm;
+    font-size: 1.8mm;
     text-align: center;
 }
 /* iOS 26 bottom tab bar: the WHOLE bar is one glass pill; the selected item is
@@ -760,16 +761,16 @@ PopupContent {
     /* Dark glass button: a translucent blue capsule with white text. */
     /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop) with a
        white label -- not a blue fill. */
-    Button { color: #ffffff; background-color: rgba(20,20,24,0.36); cn1-background-type: cn1-pill-border; backdrop-filter: blur(16px); }
+    Button { color: #ffffff; background-color: rgba(20,20,24,0.36); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
     Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); cn1-background-type: cn1-pill-border; }
-    Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.4); cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); cn1-background-type: cn1-pill-border; }
     /* Dark clearGlass FlatButton: lighter dark capsule, blue label. */
-    FlatButton { color: var(--accent-color-dark, #0a84ff); background-color: rgba(60,60,66,0.28); cn1-background-type: cn1-pill-border; backdrop-filter: blur(16px); }
-    FlatButton.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(80,80,86,0.5); cn1-background-type: cn1-pill-border; }
+    FlatButton { color: #ffffff; background-color: rgba(255,255,255,0.18); border: 0.25mm solid rgba(255,255,255,0.4); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
+    FlatButton.pressed { color: #ffffff; background-color: rgba(255,255,255,0.3); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; }
 
-    RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
-    RaisedButton.pressed { background-color: var(--accent-pressed-color-dark, #64b1ff); }
-    RaisedButton.disabled { color: rgba(255,255,255,0.5); background-color: rgba(10,132,255,0.25); cn1-background-type: cn1-pill-border; }
+    RaisedButton { color: var(--accent-color-dark, #0a84ff); background-color: rgba(10,132,255,0.42); border: 0.35mm solid var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(10,132,255,0.52); border: 0.35mm solid var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { color: rgba(235,235,245,0.45); background-color: rgba(0,0,0,0.32); cn1-background-type: cn1-pill-border; }
 
     TextField { color: #ffffff; background-color: #1c1c1e; }
     TextField.pressed { background-color: #2c2c2e; }
@@ -803,19 +804,19 @@ PopupContent {
     ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
     /* Dark picker wheel: white labels, lighter translucent selection band. */
     SpinnerRenderer { color: #ffffff; background-color: transparent; }
-    SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2.5mm; }
+    SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.18); border-radius: 2.5mm; }
     SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2mm; }
     SpinnerOverlay { background-color: transparent; }
 
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
 
-    Toolbar { background-color: #000000; color: #ffffff; backdrop-filter: blur(16px); }
-    TitleArea { background-color: #000000; color: #ffffff; backdrop-filter: blur(16px); }
+    Toolbar { background-color: #000000; color: #ffffff; backdrop-filter: blur(20px); }
+    TitleArea { background-color: #000000; color: #ffffff; backdrop-filter: blur(20px); }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
-    BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); cn1-background-type: cn1-round-border; }
-    TitleCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); cn1-background-type: cn1-round-border; }
+    BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.72); cn1-background-type: cn1-round-border; }
+    TitleCommand { color: #ffffff; background-color: rgba(44,44,46,0.72); cn1-background-type: cn1-round-border; }
 
     /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
        re-declared so the round primitive carries into dark mode. */
@@ -832,7 +833,7 @@ PopupContent {
     TabbedPane { background-color: transparent; }
     /* Dark glass tab pill: more translucent so the backdrop reads through like the
        native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint). */
-    TabsContainer { background-color: rgba(38,38,42,0.58); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(18px); }
+    TabsContainer { background-color: rgba(38,38,42,0.58); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(24px); }
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: like light, the selected item is only tinted blue --
        no per-item sub-pill (the whole bar is the single glass pill). */
