@@ -13462,6 +13462,112 @@ void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_Stri
 }
 #endif // CN1_USE_APP_ATTEST
 
+// --- CarPlay (CarPlay.framework) ------------------------------------------
+// Gated by CN1_USE_CARPLAY: the builder uncomments the define, links
+// CarPlay.framework, injects the CarPlay scene into the Info.plist scene manifest
+// and adds the carplay entitlement, when the app references com.codename1.car.
+// Builds without it compile the stub branch (no CarPlay import/link). The C
+// functions are thin trampolines onto CN1CarPlayManager (CodenameOne_CarPlaySceneDelegate).
+// CN1_USE_CARPLAY is defined in CodenameOne_GLViewController.h (imported near the top of this file),
+// flipped by the builder when the app references com.codename1.car.
+#ifdef CN1_USE_CARPLAY
+#import "CodenameOne_CarPlaySceneDelegate.h"
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 14.0, *)) {
+        return [CN1CarPlayManager sharedManager].connected ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_carPlaySetTemplate___int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json, JAVA_BOOLEAN isRoot) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* j = (json == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG json);
+        int sid = (int)screenId;
+        BOOL root = (isRoot == JAVA_TRUE);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] setTemplate:sid json:j isRoot:root];
+        });
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayUpdateTemplate___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* j = (json == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG json);
+        int sid = (int)screenId;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] updateTemplate:sid json:j];
+        });
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayPopTemplate__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 14.0, *)) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] popTemplate];
+        });
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayRegisterImage___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT pngArr) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* k = (key == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG key);
+        NSData* data = nil;
+        if (pngArr != JAVA_NULL) {
+#ifndef NEW_CODENAME_ONE_VM
+            org_xmlvm_runtime_XMLVMArray* ba = pngArr;
+            JAVA_ARRAY_BYTE* bytes = (JAVA_ARRAY_BYTE*)ba->fields.org_xmlvm_runtime_XMLVMArray.array_;
+            int len = ba->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+            JAVA_ARRAY ba = (JAVA_ARRAY)pngArr;
+            void* bytes = ba->data;
+            int len = (int)ba->length;
+#endif
+            data = [NSData dataWithBytes:bytes length:len];
+        }
+        NSString* kk = k;
+        NSData* dd = data;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] registerImage:kk data:dd];
+        });
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayShowToast___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT message, JAVA_INT seconds) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* m = (message == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG message);
+        int s = (int)seconds;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] showToast:m seconds:s];
+        });
+        POOL_END();
+    }
+}
+#else // CN1_USE_CARPLAY
+
+// CarPlay not enabled: CarPlay.framework is neither imported nor linked.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_carPlaySetTemplate___int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json, JAVA_BOOLEAN isRoot) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayUpdateTemplate___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayPopTemplate__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayRegisterImage___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT pngArr) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayShowToast___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT message, JAVA_INT seconds) {
+}
+#endif // CN1_USE_CARPLAY
+
 void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {
     if (cn1_keychainAccessGroup != nil) {
         [cn1_keychainAccessGroup release];

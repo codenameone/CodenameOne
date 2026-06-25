@@ -914,6 +914,16 @@ public class CN extends CN1Constants {
         return Display.impl.isTV();
     }
 
+    /// Indicates whether a head unit (Apple CarPlay / Google Android Auto) is currently connected and
+    /// projecting the `com.codename1.car` experience.
+    ///
+    /// #### Returns
+    ///
+    /// true if a car is connected
+    public static boolean isCarConnected() {
+        return Display.impl.isCarConnected();
+    }
+
     /// Returns the size of the desktop hosting the application window when running on a desktop platform.
     ///
     /// #### Returns

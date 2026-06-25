@@ -113,6 +113,10 @@ public class IPhoneBuilder extends Executor {
     private boolean usesBiometrics;
     private boolean usesNfc;
     private boolean usesCn1Camera;
+    // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
+    // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
+    // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
+    private boolean usesCar;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -145,6 +149,15 @@ public class IPhoneBuilder extends Executor {
     
     public void cleanup() {
         super.cleanup();
+    }
+
+    /// Records a boolean CarPlay entitlement (e.g. com.apple.developer.carplay-audio) unless the
+    /// project already set it explicitly, mirroring how the App Attest / Apple Sign-In entitlements
+    /// are injected. The downstream entitlements generator emits these as &lt;true/&gt;.
+    private void putCarPlayEntitlement(BuildRequest request, String key) {
+        if (request.getArg("ios.entitlements." + key, null) == null) {
+            request.putArgument("ios.entitlements." + key, "true");
+        }
     }
 
     private static String maxVersionString(String commaDelimitedVersions) {
@@ -808,6 +821,12 @@ public class IPhoneBuilder extends Executor {
                     // AVFoundation-based CN1Camera natives.
                     if (!usesCn1Camera && cls.indexOf("com/codename1/camera/") == 0) {
                         usesCn1Camera = true;
+                    }
+                    // Apple CarPlay (com.codename1.car.*). Gated on actual usage so the
+                    // CarPlay scene/entitlement/framework are only added for apps that
+                    // build an in-car experience.
+                    if (!usesCar && cls.indexOf("com/codename1/car/") == 0) {
+                        usesCar = true;
                     }
                     // OidcClient + SystemBrowser rely on
                     // ASWebAuthenticationSession (AuthenticationServices.framework,
@@ -1956,6 +1975,15 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "IOSNative.m"), "//#define CN1_USE_APP_ATTEST", "#define CN1_USE_APP_ATTEST");
             }
 
+            // com.codename1.car usage compiles the CarPlay native code (gated by CN1_USE_CARPLAY so
+            // non-car builds neither import nor link CarPlay.framework) and links the framework +
+            // injects the carplay entitlement and CarPlay scene below. The define lives in the shared
+            // CodenameOne_GLViewController.h so it is visible to every CarPlay translation unit
+            // (IOSNative.m and CodenameOne_CarPlaySceneDelegate.m), mirroring CN1_INCLUDE_NFC.
+            if (usesCar) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_CARPLAY", "#define CN1_USE_CARPLAY");
+            }
+
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
             if (glAppDelegeateBody != null && glAppDelegeateBody.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_BODY", glAppDelegeateBody);
@@ -2246,6 +2274,42 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException(
                             "Failed to enable INCLUDE_CN1_CAMERA", ex);
+                }
+            }
+
+            // CarPlay: link CarPlay.framework (+ MediaPlayer for the now-playing template) and
+            // inject the per-category carplay entitlement. The CarPlay entitlements are granted by
+            // Apple per app category, so we only inject the ones the project opts into via the
+            // ios.carplay.<category> build hints; the binary references CarPlay symbols (gated by
+            // CN1_USE_CARPLAY) which is why the framework is linked here in lockstep with the scan.
+            if (usesCar) {
+                String carPlayLibs = "CarPlay.framework;MediaPlayer.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = carPlayLibs;
+                } else if (!addLibs.toLowerCase().contains("carplay.framework")) {
+                    addLibs = addLibs + ";" + carPlayLibs;
+                }
+                // ios.carplay.audio / .messaging / .navigation / .poi -> the matching Apple CarPlay
+                // entitlement. Default to the audio entitlement when no category is specified so a
+                // basic browse/now-playing app works out of the box.
+                boolean audio = request.getArg("ios.carplay.audio", "false").equals("true");
+                boolean messaging = request.getArg("ios.carplay.messaging", "false").equals("true");
+                boolean navigation = request.getArg("ios.carplay.navigation", "false").equals("true");
+                boolean poi = request.getArg("ios.carplay.poi", "false").equals("true");
+                if (!audio && !messaging && !navigation && !poi) {
+                    audio = true;
+                }
+                if (audio) {
+                    putCarPlayEntitlement(request, "com.apple.developer.carplay-audio");
+                }
+                if (messaging) {
+                    putCarPlayEntitlement(request, "com.apple.developer.carplay-communication");
+                }
+                if (navigation) {
+                    putCarPlayEntitlement(request, "com.apple.developer.carplay-maps");
+                }
+                if (poi) {
+                    putCarPlayEntitlement(request, "com.apple.developer.carplay-driving-task");
                 }
             }
 
@@ -3931,14 +3995,26 @@ public class IPhoneBuilder extends Executor {
                 inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
             }
         }
-        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true")) && !inject.contains("UIApplicationSceneManifest")) {
-            inject += "\n<key>UIApplicationSceneManifest</key>\n"
-                    + "<dict>\n"
-                    + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
-                    + "    <false/>\n"
-                    + "    <key>UISceneConfigurations</key>\n"
-                    + "    <dict>\n"
-                    + "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+        boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
+        // CarPlay requires the UIScene lifecycle and a dedicated
+        // CPTemplateApplicationSceneSessionRoleApplication scene wired to
+        // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
+        // uses CarPlay; include the phone window role only under UIScene, and the CarPlay role only
+        // when the app references com.codename1.car.
+        if ((useUISceneManifest || usesCar) && !inject.contains("UIApplicationSceneManifest")) {
+            String carPlayScene = usesCar
+                    ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
+                    + "        <array>\n"
+                    + "            <dict>\n"
+                    + "                <key>UISceneConfigurationName</key>\n"
+                    + "                <string>CarPlay Configuration</string>\n"
+                    + "                <key>UISceneDelegateClassName</key>\n"
+                    + "                <string>CodenameOne_CarPlaySceneDelegate</string>\n"
+                    + "            </dict>\n"
+                    + "        </array>\n"
+                    : "";
+            String windowScene = useUISceneManifest
+                    ? "        <key>UIWindowSceneSessionRoleApplication</key>\n"
                     + "        <array>\n"
                     + "            <dict>\n"
                     + "                <key>UISceneConfigurationName</key>\n"
@@ -3947,6 +4023,17 @@ public class IPhoneBuilder extends Executor {
                     + "                <string>CodenameOne_GLSceneDelegate</string>\n"
                     + "            </dict>\n"
                     + "        </array>\n"
+                    : "";
+            inject += "\n<key>UIApplicationSceneManifest</key>\n"
+                    + "<dict>\n"
+                    + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
+                    // CarPlay needs a second (CarPlay) scene alongside the phone window, which
+                    // requires multiple-scene support; non-CarPlay apps keep the single-scene default.
+                    + (usesCar ? "    <true/>\n" : "    <false/>\n")
+                    + "    <key>UISceneConfigurations</key>\n"
+                    + "    <dict>\n"
+                    + windowScene
+                    + carPlayScene
                     + "    </dict>\n"
                     + "</dict>";
         }

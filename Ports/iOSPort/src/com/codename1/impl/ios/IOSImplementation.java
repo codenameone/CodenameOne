@@ -349,6 +349,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isRunningOnTV();
     }
 
+    private IOSCarBridge carBridge;
+
+    @Override
+    public com.codename1.car.spi.CarBridge getCarBridge() {
+        // Only meaningful in builds that linked the CarPlay natives (CN1_USE_CARPLAY, flipped by the
+        // builder when the app references com.codename1.car). The native scene delegate creates the
+        // bridge lazily on connect via IOSCarPlayCallbacks; expose it here for the framework.
+        if (carBridge == null) {
+            carBridge = IOSCarPlayCallbacks.getBridge(nativeInstance);
+        }
+        return carBridge;
+    }
+
+    @Override
+    public boolean isCarConnected() {
+        return nativeInstance.isCarPlayConnected();
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {

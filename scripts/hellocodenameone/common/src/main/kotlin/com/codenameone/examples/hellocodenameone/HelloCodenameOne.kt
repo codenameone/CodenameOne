@@ -1,6 +1,13 @@
 package com.codenameone.examples.hellocodenameone
 
 import com.codename1.camera.Camera
+import com.codename1.car.Car
+import com.codename1.car.CarApplication
+import com.codename1.car.CarContext
+import com.codename1.car.CarListTemplate
+import com.codename1.car.CarRow
+import com.codename1.car.CarScreen
+import com.codename1.car.CarTemplate
 import com.codename1.system.Lifecycle
 import com.codename1.testing.TestReporting
 import com.codename1.ui.CN
@@ -30,6 +37,18 @@ open class HelloCodenameOne : Lifecycle() {
         } catch (t: Throwable) {
             System.out.println("CN1SS:CAMERA_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
         }
+        // Reference the in-car API (com.codename1.car.*) so the build's bytecode scanner flips
+        // usesCar: this compiles the CarPlay natives on iOS/Mac (CN1_USE_CARPLAY +
+        // CarPlay.framework + the CarPlay scene/entitlement) and injects the Android Auto
+        // CarAppService + androidx.car.app dependency. Without an app exercising this API that
+        // code is gated out of every CI build and never compiles. Registration is inert at CI:
+        // no head unit connects, so CN.isCarConnected() stays false on the simulator.
+        try {
+            Car.setApplication(HelloCarApplication())
+            System.out.println("CN1SS:CARPLAY_DIAG connected=" + CN.isCarConnected())
+        } catch (t: Throwable) {
+            System.out.println("CN1SS:CARPLAY_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
+        }
         try {
             NativeInterfaceLanguageValidator.validate()
         } catch (t: Throwable) {
@@ -38,6 +57,7 @@ open class HelloCodenameOne : Lifecycle() {
             // Keep running so DeviceRunner can emit CN1SS markers and report swift_diag_status explicitly.
         }
         Cn1ssDeviceRunner.addTest(KotlinUiTest())
+        Cn1ssDeviceRunner.addTest(com.codenameone.examples.hellocodenameone.tests.CarApiTest())
         TestReporting.setInstance(Cn1ssDeviceRunnerReporter())
     }
 
@@ -51,5 +71,19 @@ open class HelloCodenameOne : Lifecycle() {
         } else {
             Thread(runner, "CN1SS-Runner").start()
         }
+    }
+}
+
+/**
+ * Minimal in-car experience exercised only to keep the CarPlay / Android Auto native code compiled
+ * in CI (see the note in [HelloCodenameOne.init]). Builds a single browse list with the portable
+ * com.codename1.car template API; never shown unless a real head unit connects.
+ */
+class HelloCarApplication : CarApplication() {
+    override fun onCreateRootScreen(context: CarContext): CarScreen = object : CarScreen() {
+        override fun onCreateTemplate(): CarTemplate =
+            CarListTemplate().setTitle("Hello Car")
+                .addRow(CarRow("Now Playing").setBrowsable(true))
+                .addRow(CarRow("Library").setBrowsable(true))
     }
 }

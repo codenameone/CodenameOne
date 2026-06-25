@@ -1,0 +1,121 @@
+---
+name: Car (CarPlay) integration
+
+# Scoped to the in-car feature: triggers ONLY when the com.codename1.car API, the iOS CarPlay
+# bridge/native scene, the on-device car test, or the iOS car build wiring change. Builds the Hello
+# Codename One app (which exercises the car API, so the build flips CN1_USE_CARPLAY, links
+# CarPlay.framework and injects the CarPlay scene/entitlement) and runs it on the iOS Simulator,
+# executing CarApiTest as part of the device suite.
+'on':
+  pull_request:
+    paths:
+      - '.github/workflows/car-ios.yml'
+      - 'CodenameOne/src/com/codename1/car/**'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarBridge.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarPlayCallbacks.java'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.h'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.m'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/tests/CarApiTest.kt'
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/car-ios.yml'
+      - 'CodenameOne/src/com/codename1/car/**'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarBridge.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarPlayCallbacks.java'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.h'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.m'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/tests/CarApiTest.kt'
+
+jobs:
+  car-ios:
+    name: Car CarPlay
+    permissions:
+      contents: read
+    runs-on: macos-15
+    timeout-minutes: 75
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      CN1SS_SKIP_COMMENT: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-car-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-car-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-car-ios-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-car-ios-
+            ${{ runner.os }}-m2-
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          echo "$GEM_USER_DIR/bin" >> "$GITHUB_PATH"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build iOS port
+        run: ./scripts/build-ios-port.sh -q -DskipTests
+      - name: Build sample iOS app (car-enabled) and compile workspace
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 40
+      - name: Assert CarPlay wiring was injected
+        run: |
+          set -euo pipefail
+          ws="${{ steps.build-ios-app.outputs.workspace }}"
+          dir="$(dirname "$ws")"
+          echo "iOS project: $dir"
+          grep -Rqs "^#define CN1_USE_CARPLAY" "$dir" \
+            || { echo "::error::CN1_USE_CARPLAY not enabled in generated project"; exit 1; }
+          find "$dir" -name 'CodenameOne_CarPlaySceneDelegate.m' | grep -q . \
+            || { echo "::error::CarPlay scene delegate native source missing"; exit 1; }
+          grep -Rqs "CPTemplateApplicationSceneSessionRoleApplication" "$dir" \
+            || { echo "::error::CarPlay scene not injected into Info.plist"; exit 1; }
+          grep -Rqs "com.apple.developer.carplay-audio" "$dir" \
+            || { echo "::error::CarPlay entitlement not injected"; exit 1; }
+          echo "CarPlay wiring present."
+      - name: Run iOS device suite (incl. CarApiTest) on simulator
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/car-ios
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          ./scripts/run-ios-ui-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        timeout-minutes: 45
+      - name: Upload car iOS artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: car-ios-artifacts
+          path: |
+            artifacts/car-ios/**
+          if-no-files-found: warn
+          retention-days: 14
