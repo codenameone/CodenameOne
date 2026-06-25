@@ -554,7 +554,19 @@ public class Slider extends Label implements ActionSource {
             g.setAntiAliased(true);
         }
         int thumbX = Math.max(x0, Math.min(x0 + w - thumbW, x0 + valueW - thumbW / 2));
+        // Thumb height: Material's bar thumb spans the component height (a tall pill);
+        // iOS 26's slider thumb is a short horizontal capsule (wider than tall). Themes
+        // opt into the iOS look via sliderThumbHeightMM; without it the Material
+        // full-height pill is preserved.
         int thumbH = Math.max(track, h);
+        String thumbHC = getUIManager().getThemeConstant("sliderThumbHeightMM", null);
+        if (thumbHC != null) {
+            try {
+                thumbH = Math.max(track, d.convertToPixels(Float.parseFloat(thumbHC.trim())));
+            } catch (NumberFormatException notANumber) {
+                thumbH = Math.max(track, h);   // malformed constant -> full-height default
+            }
+        }
         int thumbY = y0 + (h - thumbH) / 2;
         // iOS renders ONE continuous track under the thumb (no M3 gap, no stop
         // indicator); themes opt in via sliderContinuousTrackBool.
@@ -610,13 +622,17 @@ public class Slider extends Label implements ActionSource {
             for (int i = shadow; i >= 1; i--) {
                 g.setColor(0x000000);
                 int oldAlpha = g.concatenateAlpha(10);
+                int sArc = Math.min(thumbW, thumbH) + 2 * i;
                 g.fillRoundRect(thumbX - i, thumbY - i + drop, thumbW + 2 * i, thumbH + 2 * i,
-                        thumbW + 2 * i, thumbW + 2 * i);
+                        sArc, sArc);
                 g.setAlpha(oldAlpha);
             }
         }
         g.setColor(thumbColor);
-        g.fillRoundRect(thumbX, thumbY, thumbW, thumbH, thumbW, thumbW);
+        // Use the smaller dimension as the corner arc so the knob is a true capsule
+        // whether it is taller than wide (Material) or wider than tall (iOS).
+        int thumbArc = Math.min(thumbW, thumbH);
+        g.fillRoundRect(thumbX, thumbY, thumbW, thumbH, thumbArc, thumbArc);
         if (aa) {
             g.setAntiAliased(priorAa);
         }

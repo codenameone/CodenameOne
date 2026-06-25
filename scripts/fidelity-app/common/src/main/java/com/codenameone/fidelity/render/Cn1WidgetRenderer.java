@@ -194,9 +194,11 @@ public final class Cn1WidgetRenderer {
             com.codename1.ui.plaf.Style unS = new com.codename1.ui.plaf.Style();
             unS.setFgColor(unselColor);
             unS.setBgTransparency(0);
-            Image star = FontImage.createMaterial(FontImage.MATERIAL_STAR, selS, 1.8f);
-            Image search = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, unS, 1.8f);
-            Image more = FontImage.createMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 1.8f);
+            // Bigger icons (the native tab item is icon-dominant); the label font is
+            // cut in the theme so the overall item roughly doubles toward native size.
+            Image star = FontImage.createMaterial(FontImage.MATERIAL_STAR, selS, 4.6f);
+            Image search = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, unS, 4.6f);
+            Image more = FontImage.createMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 4.6f);
             tabs.addTab("Featured", star, star, new Container());
             tabs.addTab("Search", search, search, new Container());
             tabs.addTab("More", more, more, new Container());
@@ -226,14 +228,18 @@ public final class Cn1WidgetRenderer {
                 // iOS 26 glass bar is very translucent -- the colourful backdrop reads
                 // through at near-full saturation, especially in dark mode (the dark
                 // glass barely darkens it). Wash only lightly.
-                bar.getAllStyles().setBgTransparency(dark ? 70 : 175);
+                // The iOS 26 glass nav bar is VERY translucent -- the colourful backdrop
+                // reads through at high saturation; an opaque-ish wash (175) read as a
+                // near-white bar that didn't match the native glass at all. Light glass
+                // washes only lightly toward white (~90/255); dark glass barely darkens.
+                bar.getAllStyles().setBgTransparency(dark ? 55 : 90);
                 Container row = new Container(new BorderLayout());
                 row.setUIID("Container");
                 row.getAllStyles().setBgTransparency(0);
                 // iOS 26 bar items are ICON-ONLY inside circular translucent-glass
                 // buttons. The glyph matches the TITLE colour (black in light, white
-                // in dark) -- NOT blue in dark mode.
-                int tint = dark ? 0xffffff : 0x007aff;
+                // in dark) -- NOT blue.
+                int tint = dark ? 0xffffff : 0x000000;
                 com.codename1.ui.plaf.Style tintS = new com.codename1.ui.plaf.Style();
                 tintS.setFgColor(tint);
                 tintS.setBgTransparency(0);

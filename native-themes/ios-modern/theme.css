@@ -90,11 +90,15 @@
        the glyph itself paints. */
     tabIconUIID: TabIcon;
     switchThumbPaddingInt: 1;
-    /* Thumb nearly fills the track height (a large clean white knob); the track is
-       a touch narrower so the switch is not over-wide. */
-    switchThumbScaleY: "1.7";
-    switchTrackScaleY: "1.7";
-    switchTrackScaleX: "2.8";
+    /* Native iOS UISwitch proportions: the thumb is a CIRCLE clearly inset inside
+       the track (thumbScaleY < trackScaleY + a real inset), so the grey/green
+       track stays visible around it. Earlier 1.7/1.7/0.1 made the thumb fill the
+       whole capsule, hiding the track and reading as a bare floating circle. */
+    switchThumbScaleY: "1.4";
+    switchTrackScaleY: "1.6";
+    /* Native switch track measured 177x78px (ratio 2.27); trackScaleX/trackScaleY
+       must equal that ratio (3.6/1.6 = 2.25). 2.6 made the track too narrow. */
+    switchTrackScaleX: "3.6";
     /* No shadow ring at all -- the native thumb is a clean white circle (a
        spread of 1 still drew a visible grey stroke). */
     switchThumbShadowSpreadInt: 0;
@@ -104,7 +108,10 @@
     switchTrackOffOutlineWidthMM: "0";
     switchTrackOnOutlineWidthMM: "0";
     switchTrackOffOutlineColor: "e9e9ea";
-    switchThumbInsetMM: "0.1";
+    switchThumbInsetMM: "0.22";
+    /* The native UISwitch thumb is a CIRCLE (not elongated); widthScale 1.0 keeps
+       it round so it matches the golden. */
+    switchThumbWidthScale: "1.0";
     /* iOS uses a circular mark for checkboxes (Reminders-style) and
        keeps the circular radio button. These integer constants are
        Material icon codepoints that DefaultLookAndFeel reads to
@@ -124,12 +131,15 @@
     /* iOS slider: a thin (~3px) track with a large round white knob. The thumb
        is drawn at the component height, so the runner sizes the slider tile to
        the knob diameter and the thumb width matches it -> a circle. */
-    sliderTrackThicknessMM: "0.28";
-    /* The iOS knob is a large white vertical capsule (~55x75px) with a soft drop
-       shadow, sitting on one continuous track (no M3 gap / stop dot). */
-    sliderThumbWidthMM: "2.6";
+    sliderTrackThicknessMM: "0.78";
+    /* The iOS 26 knob is a large white HORIZONTAL capsule (~106x78px =>
+       ~5.9x4.3mm, wider than tall) with a soft drop shadow, sitting on one
+       continuous track (no M3 gap / stop dot). sliderThumbHeightMM makes it a
+       horizontal capsule; without it the thumb spans the component height. */
+    sliderThumbWidthMM: "5.0";
+    sliderThumbHeightMM: "3.8";
     sliderContinuousTrackBool: true;
-    sliderThumbShadowSizeMM: "0.5";
+    sliderThumbShadowSizeMM: "0.6";
     /* No sliding underline under the selected tab -- the native UITabBar tints the
        selected item instead. */
     tabsAnimatedIndicatorThicknessMm: "0";
@@ -194,9 +204,8 @@ SpanLabelText { cn1-derive: Label; background-color: transparent; }
    circle in that case, border-radius always keeps the corner radius. */
 Button {
     color: var(--accent-color, #007aff);
-    /* Tighter padding + ~17pt label: the native glass buttons are compact with a
-       subtle corner, not a chunky 3mm rounded rect. */
-    padding: 1.4mm 3mm 1.4mm 3mm;
+    /* Compact glass capsule: very little padding. */
+    padding: 1mm 2.5mm 1mm 2.5mm;
     margin: 0;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
@@ -205,7 +214,8 @@ Button {
     cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-Button.pressed { color: var(--accent-pressed-color, #0064d1); background-color: #e5e5ea; cn1-background-type: cn1-pill-border; }
+/* Pressed (light): translucent grey glass capsule with BLACK label (not blue). */
+Button.pressed { color: #000000; background-color: rgba(120,120,128,0.25); cn1-background-type: cn1-pill-border; }
 Button.disabled { color: var(--accent-disabled-color, #b3d4ff); }
 
 RaisedButton {
@@ -230,7 +240,7 @@ TextField {
     /* secondary system background: a rounded FILLED field, no border stroke (the
        native field has no visible outline, just a tinted rounded fill). */
     background-color: #f2f2f7;
-    padding: 2mm 3mm 2mm 3mm;
+    padding: 2mm 3mm 2mm 1.5mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
     border-radius: 1.4mm;
@@ -268,12 +278,13 @@ CheckBox {
     margin: 0;
     font-family: "native:MainRegular";
     /* The glyph box follows the font height (the checkBoxIconSizeMM constant is
-       NOT honoured by the runtime); 4.4mm -> ~80px, matching the native SF symbol. */
-    font-size: 4.4mm;
+       NOT honoured by the runtime). Measured: 5mm -> 89px ring, but the native
+       30pt SF symbol renders a 107px (5.9mm) ring -> bump to 6mm to overlay 1:1. */
+    font-size: 6mm;
     icon-gap: 2mm;
 }
 CheckBox.selected { color: #007aff; }
-CheckBox.disabled { color: #b3d4ff; background-color: transparent; }
+CheckBox.disabled { color: #c6c6c8; background-color: transparent; padding: 0; margin: 0; }
 
 RadioButton {
     color: #007aff;
@@ -281,11 +292,12 @@ RadioButton {
     padding: 0;
     margin: 0;
     font-family: "native:MainRegular";
-    font-size: 4.4mm;
+    /* 6mm to match the native 30pt SF symbol ring (~107px); see CheckBox. */
+    font-size: 6mm;
     icon-gap: 2mm;
 }
 RadioButton.selected { color: #007aff; }
-RadioButton.disabled { color: #b3d4ff; background-color: transparent; }
+RadioButton.disabled { color: #c6c6c8; background-color: transparent; }
 
 /* Switch's track-left needs to land at the same x as the Label
    text-left of the row above so the column reads as aligned.
@@ -296,7 +308,8 @@ Switch {
     /* iOS off-state track is a solid light-grey fill with a white thumb and no
        visible outline (not a white pill). */
     color: #ffffff;
-    background-color: #e9e9ea;
+    /* Native off-track measured #c5c5c7 (systemGray) -- not the near-white #e9e9ea. */
+    background-color: #c5c5c7;
     padding: 0;
     margin: 1mm 2mm 1mm 2mm;
     text-align: left;
@@ -304,7 +317,7 @@ Switch {
 Switch.selected { color: #ffffff; background-color: #34c759; }
 /* Disabled OFF switch: a faded LIGHT track with a WHITE thumb (the thumb fg is
    white, not grey -- a grey thumb reads as "too dark"). */
-Switch.disabled { color: #ffffff; background-color: #f2f2f7; }
+Switch.disabled { color: #ffffff; background-color: #e2e2e3; }
 
 OnOffSwitch {
     cn1-derive: Label;
@@ -335,8 +348,11 @@ SliderFull {
     margin: 0;
 }
 /* Disabled slider is translucent (faded track, fill and thumb). */
-Slider.disabled { background-color: rgba(229,229,234,0.5); color: rgba(255,255,255,0.55); }
-SliderFull.disabled { background-color: rgba(0,122,255,0.4); }
+/* paintNativeSlider fills with the style's solid bgColor (alpha/transparency is
+   ignored), so the disabled tones must be SOLID light colours, not rgba() -- an
+   rgba fill rendered as full-saturation blue and read as "not disabled". */
+Slider.disabled { background-color: #e5e5ea; color: #ffffff; }
+SliderFull.disabled { background-color: #a6d0ff; }
 /* iOS linear progress: same thin track, accent fill. */
 ProgressBar {
     background-color: #e5e5ea;
@@ -353,7 +369,7 @@ ProgressBarFull {
 Toolbar {
     background-color: #ffffff;
     color: #000000;
-    padding: 1mm;
+    padding: 0;
     margin: 0;
 }
 /* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
@@ -455,24 +471,29 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: rgba(255,255,255,0.5);
+    background-color: rgba(255,255,255,0.6);
     color: #3c3c43;
     padding: 1mm;
-    margin: 1mm 3mm 1mm 3mm;
+    /* Native pill measured 42.5mm wide; thin side margins let the pill grow. */
+    margin: 1mm 2mm 1mm 2mm;
     cn1-background-type: cn1-pill-border;
 }
 
 Tab {
     color: #3c3c43;
     background-color: transparent;
-    padding: 1mm 2mm 1mm 2mm;
+    /* Horizontal padding spreads the three items toward the native ~42mm pill
+       width; vertical padding kept small so the pill height matches (~174px). */
+    padding: 0.9mm 4.2mm 0.9mm 4.2mm;
     margin: 0;
     font-family: "native:MainRegular";
-    font-size: 1.7mm;
+    font-size: 1.2mm;
     text-align: center;
 }
-Tab.selected { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.65); cn1-background-type: cn1-pill-border; }
-Tab.pressed { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.45); cn1-background-type: cn1-pill-border; }
+/* iOS 26 bottom tab bar: the WHOLE bar is one glass pill; the selected item is
+   only TINTED blue -- there is no per-item highlight sub-pill. */
+Tab.selected { color: var(--accent-color, #007aff); background-color: transparent; }
+Tab.pressed { color: var(--accent-color, #007aff); background-color: transparent; }
 
 SelectedTab { cn1-derive: Tab; color: var(--accent-color, #007aff); }
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
@@ -595,7 +616,9 @@ DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
 /* Action row: a hairline separator above the buttons, like the native alert. */
 DialogCommandArea { background-color: transparent; padding: 0; border-top: 0.2mm solid #c6c6c8; }
 /* Alert actions are blue, ~17pt, centred and split the row. */
-DialogButton { cn1-derive: Button; color: var(--accent-color, #007aff); background-color: transparent; font-size: 2.9mm; padding: 2mm; border-radius: 0; text-align: center; }
+/* Defined standalone (NOT cn1-derive: Button) so the Button pill background /
+   cn1-pill-border can never leak in and turn the flush alert actions into pills. */
+DialogButton { cn1-background-type: cn1-none; color: var(--accent-color, #007aff); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2mm; margin: 0; border-radius: 0; text-align: center; }
 DialogButton.pressed { background-color: #e1e1e6; color: var(--accent-color, #007aff); }
 
 FloatingActionButton {
@@ -681,13 +704,14 @@ PopupContent {
     SpanLabel { color: #ffffff; background-color: transparent; }
     SpanLabelText { color: #ffffff; background-color: transparent; }
 
-    Button { color: var(--accent-color-dark, #0a84ff); }
-    Button.pressed { color: var(--accent-pressed-color-dark, #64b1ff); background-color: #3a3a3c; }
-    Button.disabled { color: var(--accent-disabled-color-dark, #004a99); }
+    /* Dark glass button: a translucent blue capsule with white text. */
+    Button { color: #ffffff; background-color: rgba(10,132,255,0.5); cn1-background-type: cn1-pill-border; }
+    Button.pressed { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: rgba(255,255,255,0.5); background-color: rgba(10,132,255,0.2); cn1-background-type: cn1-pill-border; }
 
     RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
     RaisedButton.pressed { background-color: var(--accent-pressed-color-dark, #64b1ff); }
-    RaisedButton.disabled { background-color: var(--accent-disabled-color-dark, #004a99); }
+    RaisedButton.disabled { color: rgba(255,255,255,0.5); background-color: rgba(10,132,255,0.25); cn1-background-type: cn1-pill-border; }
 
     TextField { color: #ffffff; background-color: #1c1c1e; }
     TextField.pressed { background-color: #2c2c2e; }
@@ -699,10 +723,10 @@ PopupContent {
 
     CheckBox { color: #0a84ff; background-color: transparent; }
     CheckBox.selected { color: #0a84ff; }
-    CheckBox.disabled { color: #1c3a5e; background-color: transparent; }
+    CheckBox.disabled { color: #48484a; background-color: transparent; padding: 0; margin: 0; }
     RadioButton { color: #0a84ff; background-color: transparent; }
     RadioButton.selected { color: #0a84ff; }
-    RadioButton.disabled { color: #1c3a5e; background-color: transparent; }
+    RadioButton.disabled { color: #48484a; background-color: transparent; }
 
     Switch { color: #ffffff; background-color: #2c2c2e; }
     Switch.selected { color: #ffffff; background-color: #30d158; }
@@ -711,6 +735,14 @@ PopupContent {
        track blue, thumb white. */
     Slider { background-color: #3a3a3c; color: #ffffff; }
     SliderFull { background-color: var(--accent-color-dark, #0a84ff); }
+    /* Solid muted tones for the disabled dark slider (alpha is ignored by the painter).
+       The disabled thumb (color/fg) is grey, not white, to match the native knob. */
+    Slider.disabled { background-color: #2c2c2e; color: #8e8e93; }
+    SliderFull.disabled { background-color: #2a4a73; }
+    /* Dark progress bar: the empty track must be a DARK grey, not the light #e5e5ea
+       carried over from the base rule (which read as a white bar on the dark tile). */
+    ProgressBar { background-color: #3a3a3c; color: var(--accent-color-dark, #0a84ff); }
+    ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
 
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
@@ -719,8 +751,8 @@ PopupContent {
     TitleArea { background-color: #000000; color: #ffffff; }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
-    BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); }
-    TitleCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); }
+    BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); cn1-background-type: cn1-round-border; }
+    TitleCommand { color: #ffffff; background-color: rgba(44,44,46,0.55); cn1-background-type: cn1-round-border; }
 
     /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
        re-declared so the round primitive carries into dark mode. */
@@ -735,13 +767,13 @@ PopupContent {
 
     Tabs { background-color: transparent; }
     TabbedPane { background-color: transparent; }
-    TabsContainer { background-color: rgba(60,60,67,0.55); color: #ebebf5; cn1-background-type: cn1-pill-border; }
+    /* Dark glass tab pill: more translucent so the backdrop reads through like the
+       native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint). */
+    TabsContainer { background-color: rgba(50,50,55,0.42); color: #ebebf5; cn1-background-type: cn1-pill-border; }
     Tab { color: #ebebf5; background-color: transparent; }
-    /* Re-declare cn1-background-type on the dark overrides - the
-       compiler doesn't carry it forward from the light Tab.selected
-       style, so without this the selected pill renders as a flat
-       rectangular block instead of a rounded pill in dark mode. */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(120,120,128,0.32); cn1-background-type: cn1-pill-border; }
+    /* Dark bottom tab bar: like light, the selected item is only tinted blue --
+       no per-item sub-pill (the whole bar is the single glass pill). */
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
     Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(120,120,128,0.4); cn1-background-type: cn1-pill-border; }
     SelectedTab { color: var(--accent-color-dark, #0a84ff); }
     UnselectedTab { color: #ebebf5; }
@@ -779,7 +811,7 @@ PopupContent {
     DialogTitle { color: #ffffff; background-color: transparent; }
     DialogContentPane { background-color: transparent; }
     DialogCommandArea { background-color: transparent; border-top: 0.2mm solid #38383a; }
-    DialogButton { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
+    DialogButton { cn1-background-type: cn1-none; color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
     DialogButton.pressed { background-color: #2c2c2e; color: var(--accent-color-dark, #0a84ff); }
     PopupContent { background-color: rgba(44,44,46,0.95); color: #ffffff; }
 

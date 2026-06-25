@@ -281,43 +281,53 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     }
 
     private static Image createRoundThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
-        Image img = ImageFactory.createImage(context, pxDim + 2 * shadowSpread, pxDim + 2 * shadowSpread, 0x0);
+        // switchThumbWidthScale (>1) stretches the thumb horizontally into an
+        // elongated pill (the iOS knob is a touch wider than tall); default 1.0
+        // keeps the circular Material thumb.
+        float widthScale = 1.0f;
+        try {
+            widthScale = Float.parseFloat(UIManager.getInstance().getThemeConstant(
+                    "switchThumbWidthScale", "1.0"));
+        } catch (NumberFormatException malformed) {
+            widthScale = 1.0f;   // bad constant -> circular thumb
+        }
+        int baseH = Math.max(1, pxDim - 2 * thumbInset);
+        int baseW = Math.max(baseH, Math.round(baseH * widthScale));
+        int imgW = baseW + 2 * (shadowSpread + thumbInset);
+        int imgH = pxDim + 2 * shadowSpread;
+        Image img = ImageFactory.createImage(context, imgW, imgH, 0x0);
         Graphics g = img.getGraphics();
         g.setAntiAliased(true);
 
         int shadowOpacity = 200;
         float shadowBlur = 10;
+        int arc = baseH;
 
         if (shadowSpread > 0) {
-            // draw a gradient of sort for the shadow
+            // soft drop shadow tracing the pill body
             for (int iter = shadowSpread - 1; iter >= 0; iter--) {
                 g.translate(iter, iter);
                 g.setColor(0);
                 int alpha = g.concatenateAlpha(shadowOpacity / shadowSpread);
-                g.fillArc(
+                g.fillRoundRect(
                         Math.max(1, thumbInset + shadowSpread + shadowSpread / 2 - iter),
                         Math.max(1, thumbInset + 2 * shadowSpread - iter),
-                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset),
-                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset), 0, 360);
+                        Math.max(1, baseW - (iter * 2)),
+                        Math.max(1, baseH - (iter * 2)), arc, arc);
                 g.setAlpha(alpha);
                 g.translate(-iter, -iter);
             }
             if (Display.getInstance().isGaussianBlurSupported()) {
                 Image blured = Display.getInstance().gaussianBlurImage(img, shadowBlur / 2);
-                //img = Image.createImage(pxDim+2*shadowSpread, pxDim+2*shadowSpread, 0);
                 img = blured;
                 g = img.getGraphics();
-                //g.drawImage(blured, 0, 0);
                 g.setAntiAliased(true);
             }
         }
 
-        //g.translate(shadowSpread, shadowSpread);
         int alpha = g.concatenateAlpha(255);
         g.setColor(color);
-        g.fillArc(shadowSpread + thumbInset, shadowSpread + thumbInset, Math.max(1, pxDim - 2 * thumbInset), Math.max(1, pxDim - 2 * thumbInset), 0, 360);
-        //g.setColor(outlinecolor);
-        //g.drawArc(shadowSize, shadowSize, pxDim-1, pxDim-1, 0, 360);
+        g.fillRoundRect(shadowSpread + thumbInset, shadowSpread + thumbInset, baseW, baseH, arc, arc);
         g.setAlpha(alpha);
         return img;
     }

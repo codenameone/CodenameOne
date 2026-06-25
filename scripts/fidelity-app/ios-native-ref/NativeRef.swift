@@ -144,14 +144,14 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
     case "ios_check_glyph":
         let b = UIButton(type: .system)
         let sym = selected ? "checkmark.circle.fill" : "circle"
-        let cfg = UIImage.SymbolConfiguration(pointSize: 22)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 30)
         b.setImage(UIImage(systemName: sym, withConfiguration: cfg), for: .normal)
         b.isEnabled = !disabled
         return b
     case "ios_radio_glyph":
         let b = UIButton(type: .system)
         let sym = selected ? "largecircle.fill.circle" : "circle"
-        let cfg = UIImage.SymbolConfiguration(pointSize: 22)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 30)
         b.setImage(UIImage(systemName: sym, withConfiguration: cfg), for: .normal)
         b.isEnabled = !disabled
         return b
