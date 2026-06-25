@@ -644,3 +644,17 @@ MapTiler
 Protomaps
 TileServer
 TileJSON
+
+# Security chapter: device-integrity / RASP terminology and vendor / tool names.
+# RASP = Runtime Application Self-Protection; MTD = Mobile Threat Defense.
+RASP
+MTD
+RootBeer
+Magisk
+Cydia
+MobileSubstrate
+FridaGadget
+dylibs?
+Zimperium
+Promon
+DeviceCheck

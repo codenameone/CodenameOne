@@ -901,6 +901,21 @@ public final class IOSNative {
     /** Invalidates the LAContext so the in-flight prompt resolves with LAErrorAppCancel. */
     native void stopBiometricAuthentication();
 
+    // --- App Attest (DeviceCheck.framework) ---------------------------------
+
+    /** True when {@code DCAppAttestService.sharedService.isSupported} on this device. */
+    native boolean isAppAttestSupported();
+
+    /**
+     * Generates/uses an App Attest hardware key and produces an attestation bound
+     * to the SHA-256 of {@code nonce}. Native code calls back into
+     * {@code IOSDeviceIntegrity.nativeAttestSuccess(int, String)} or
+     * {@code IOSDeviceIntegrity.nativeAttestError(int, String)} with the same
+     * requestId. The success token is {@code base64(keyId):base64(attestationObject)}
+     * for the backend to verify with Apple.
+     */
+    native void requestAppAttestToken(int requestId, String nonce);
+
     // --- Secure storage (Security.framework keychain) -----------------------
 
     /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */
