@@ -123,7 +123,18 @@ Optional: `android.carAppVersion` pins the `androidx.car.app` version; `android.
 CarPlay and the restricted Android Auto categories require approval from Apple/Google before they will run outside the simulator/Desktop Head Unit. The build wiring is automatic, but shipping to real cars still needs the relevant CarPlay entitlement on your Apple App ID (request it at developer.apple.com) and acceptance into the Android Auto programme.
 ====
 
-=== Testing
+=== Debugging in the simulator
+
+The fastest way to build and debug an in-car experience is the Codename One simulator. Run your app as usual, then use the *Car* menu:
+
+* *Car > Connect CarPlay* or *Car > Connect Android Auto* opens a simulated head-unit window that renders your registered `CarApplication` in the matching style. Click rows, grid items and actions to drive navigation (`pushScreen`/`popScreen`) exactly as a real head unit would; the *Back* button pops the stack.
+* *Car > Disconnect* (or closing the window) ends the session and fires `onCarDisconnected()`.
+
+This needs no iOS/Android toolchain, no entitlement and no head unit -- it exercises the same portable template tree and the same `CarActionListener` callbacks (on the EDT) that ship to the device, so you can iterate on your screens in seconds. If you haven't called `Car.setApplication(...)` the menu tells you so. The simulated head unit approximates the two platform styles and the driver-distraction row caps; it's a debugging aid, not a pixel-accurate emulation.
+
+image::img/car-carplay-list.png[Simulated CarPlay head unit in the Codename One simulator,640]
+
+=== Testing on the real platforms
 
 * *iOS*: run the app in the iOS Simulator, then *I/O > External Displays > CarPlay* to open the CarPlay window.
 * *Android*: install the *Desktop Head Unit (DHU)* from the Android SDK and connect a device/emulator running Android Auto.
