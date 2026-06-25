@@ -102,23 +102,7 @@ jobs:
             && echo "CarPlay entitlement present." \
             || echo "::notice::CarPlay entitlement not in local project (applied at cloud sign time)."
           echo "CarPlay wiring present."
-      - name: Run iOS device suite on simulator
-        env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/car-ios
-        run: |
-          set -euo pipefail
-          mkdir -p "${ARTIFACTS_DIR}"
-          ./scripts/run-ios-ui-tests.sh \
-            "${{ steps.build-ios-app.outputs.workspace }}" \
-            "" \
-            "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 45
-      - name: Upload car iOS artifacts
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: car-ios-artifacts
-          path: |
-            artifacts/car-ios/**
-          if-no-files-found: warn
-          retention-days: 14
+      # Note: the full on-simulator device suite for the car-enabled app is exercised by the standard
+      # scripts-ios.yml (build-ios), which builds this same hellocodenameone (it references
+      # com.codename1.car). This car-scoped job focuses on the CarPlay build + wiring assertion to
+      # stay fast and avoid duplicating the simulator-destination handling.
