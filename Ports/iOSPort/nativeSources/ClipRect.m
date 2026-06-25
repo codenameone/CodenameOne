@@ -129,10 +129,22 @@ static CGRect drawingRect;
             int orY = (int)drawingRect.origin.y;
             int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
             int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
-            if (sx < orX) { sx = orX; sw = sx2 - sx; }
-            if (sy < orY) { sy = orY; sh = sy2 - sy; }
-            if (sx2 > destX2) { sw = destX2 - sx; }
-            if (sy2 > destY2) { sh = destY2 - sy; }
+            // Clamp an edge that spills past the flush region ONLY when the clip's
+            // OPPOSITE edge lies inside the flush region -- i.e. the clip emerges
+            // from WITHIN the repainted area and leaks out one side into a fixed
+            // band that will not be repainted (the issue #5273 escape: a scrolling
+            // CENTER bleeding into a fixed NORTH/SOUTH band). Two other shapes are
+            // legitimate over-draw on the persistent CG surface and must be left
+            // intact, or they'd be chopped down to the dirty strip and leave the
+            // rest stale: a clip that SURROUNDS the flush region (both opposite
+            // edges outside -- a translucent/cascade repaint painting a parent
+            // larger than its small dirty sub-region) and a clip that sits WHOLLY
+            // to one side (a sibling drawing its own area) -- both seen in the
+            // watch lightweight picker.
+            if (sy2 > destY2 && sy >= orY && sy <= destY2) { sh = destY2 - sy; }
+            if (sy < orY && sy2 <= destY2 && sy2 >= orY) { sy = orY; sh = sy2 - sy; }
+            if (sx2 > destX2 && sx >= orX && sx <= destX2) { sw = destX2 - sx; }
+            if (sx < orX && sx2 <= destX2 && sx2 >= orX) { sx = orX; sw = sx2 - sx; }
         }
         if (sw > 0 && sh > 0) {
             CN1CGSetClipRect(sx, sy, sw, sh);

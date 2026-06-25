@@ -169,20 +169,6 @@ static CGRect watchFlushRect;
     // drained below is clamped to the repainted sub-region (the watch branch of
     // ClipRect.execute no-ops the clamp while this is empty).
     [ClipRect setDrawRect:flushRect];
-    // Issue #5273: the persistent CG bitmap is never otherwise cleared, so a
-    // previous frame/test's pixels survive under any area the new frame's
-    // CLAMPED draws no longer overpaint (before the clamp the unclamped draws
-    // covered them) -- the source of the ValidatorLightweightPicker garble.
-    // Clear the flushed region before draining its ops: the paintDirty batch
-    // repaints that region with the components' (opaque) backgrounds, so the
-    // ops refill what we clear, while pixels OUTSIDE the flush region (not part
-    // of this repaint) are left intact. Same coordinate space as the draw ops,
-    // so a partial region clears in the right place.
-    if (flushRect.size.width > 0 && flushRect.size.height > 0) {
-        CN1CGResetClip();
-        CN1CGClearRect((int)flushRect.origin.x, (int)flushRect.origin.y,
-                       (int)flushRect.size.width, (int)flushRect.size.height);
-    }
     for (ExecutableOp *op in ops) {
         @try {
             [op executeWithClipping];
