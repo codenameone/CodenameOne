@@ -82,11 +82,36 @@ public abstract class BaseTest extends AbstractTest {
         boolean animating = (am != null && am.isAnimating())
                 || Display.getInstance().isInTransition();
         if (!animating || waitedMs >= 5000) {
+            long extra = extraSettleBeforeCaptureMillis();
+            if (extra > 0) {
+                // Heavy forms on the iOS Metal backend can have their first
+                // frame presented a beat after onShowCompleted + the animation
+                // settle, so Display.screenshot() reads the PREVIOUS form's
+                // still-current framebuffer -- the "DesktopMode captures the
+                // wrong form" race. Force a fresh paint and give the GPU a
+                // moment to present it before capturing. Opt-in per test
+                // (default 0) so no other baseline shifts.
+                form.repaint();
+                UITimer.timer((int) extra, false, form, () -> {
+                    markCaptureStarted();
+                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, onComplete);
+                });
+                return;
+            }
             markCaptureStarted();
             Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, onComplete);
             return;
         }
         UITimer.timer(50, false, form, () -> awaitSettledThenCapture(form, imageName, waitedMs + 50, onComplete));
+    }
+
+    /// Extra delay (ms) inserted AFTER the form has settled and BEFORE the
+    /// screenshot, during which the form is repainted. Defaults to 0 (capture
+    /// immediately, unchanged behaviour). A test whose heavy form trips the iOS
+    /// Metal late-present race -- the screenshot grabbing the previous form's
+    /// framebuffer -- overrides this to force a fresh, fully-presented frame.
+    protected long extraSettleBeforeCaptureMillis() {
+        return 0;
     }
 
     protected synchronized void done() {
