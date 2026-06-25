@@ -10983,6 +10983,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMetalRendering___R_boolean(CN1_T
     return com_codename1_impl_ios_IOSNative_isMetalRendering__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+// New-VM (return-type-encoded) mangling for the boolean CarPlay query. The implementation lives in
+// the CN1_USE_CARPLAY-gated block above (with an #else stub), so it is always defined; the void
+// carPlay* methods need no _R_ wrapper.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     return com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__(instanceObject);

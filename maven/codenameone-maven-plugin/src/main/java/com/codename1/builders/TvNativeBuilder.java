@@ -84,7 +84,10 @@ class TvNativeBuilder {
     // genuinely-absent frameworks need weak-linking. OpenGL ES is not used at
     // runtime (the slice renders via Metal); WebKit has no tvOS equivalent.
     private static final String TV_OPTIONAL_FRAMEWORKS =
-            "WebKit.framework;OpenGLES.framework;GLKit.framework";
+            "WebKit.framework;OpenGLES.framework;GLKit.framework;"
+            // CarPlay.framework is iOS-only (absent on tvOS); it is linked on the iOS slice when the
+            // app references com.codename1.car, so weak-link it for the tvOS slice.
+            + "CarPlay.framework";
 
     TvNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;

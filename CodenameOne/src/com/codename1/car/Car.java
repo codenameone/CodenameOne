@@ -136,6 +136,7 @@ public final class Car {
         final CarContext ctx = new CarContext(bridge);
         currentContext = ctx;
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 CarApplication app = application;
                 if (app == null) {
@@ -161,6 +162,7 @@ public final class Car {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 CarApplication app = application;
                 if (app != null) {
@@ -174,15 +176,15 @@ public final class Car {
 
     private static void fireConnected(CarContext ctx) {
         CarConnectionListener[] copy = listeners.toArray(new CarConnectionListener[listeners.size()]);
-        for (int i = 0; i < copy.length; i++) {
-            copy[i].carConnected(ctx);
+        for (CarConnectionListener l : copy) {
+            l.carConnected(ctx);
         }
     }
 
     private static void fireDisconnected() {
         CarConnectionListener[] copy = listeners.toArray(new CarConnectionListener[listeners.size()]);
-        for (int i = 0; i < copy.length; i++) {
-            copy[i].carDisconnected();
+        for (CarConnectionListener l : copy) {
+            l.carDisconnected();
         }
     }
 }
