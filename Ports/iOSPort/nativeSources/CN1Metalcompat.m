@@ -831,12 +831,13 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
         useScaledFont = NO;
     }
 
-    CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:renderFont];
-    if (atlas == nil) {
-        NSLog(@"CN1MetalDrawString: no atlas available for font %@ pt=%g; string skipped",
-              renderFont.fontName, (double)renderFont.pointSize);
-        return;
-    }
+    // The atlas is resolved PER RUN below (not once for renderFont). CoreText
+    // font-substitutes any character the base font lacks — emoji to Apple
+    // Color Emoji, CJK/Arabic/Hebrew to their own fonts — and emits a separate
+    // run whose glyph ids index THAT font, not renderFont. Rasterising those
+    // ids against renderFont's glyph table produced unrelated glyphs (the
+    // "random Chinese characters" emoji bug). Each run now rasterises against
+    // the font CoreText actually resolved for it.
 
     // Pass the UIFont directly as the kCTFontAttributeName value. CoreText
     // accepts UIFont here and uses it to drive glyph mapping and positions
@@ -881,9 +882,12 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     float invScale = useScaledFont ? (1.0f / glyphScale) : 1.0f;
 
     simd_float4 colorV = premultipliedColor(color, alpha);
-    int textureW = atlas.textureWidth;
-    int textureH = atlas.textureHeight;
-    id<MTLTexture> atlasTex = atlas.texture;
+    // Colour-emoji runs draw through the TexturedRGBA pipeline, which samples
+    // the premultiplied BGRA atlas and multiplies by a straight alpha
+    // modulator (same as DrawImage) — the glyph keeps its own colours and is
+    // NOT tinted with the text colour.
+    float emojiA = alpha / 255.0f;
+    simd_float4 emojiTint = (simd_float4){ emojiA, emojiA, emojiA, emojiA };
 
     CFArrayRef runs = CTLineGetGlyphRuns(line);
     CFIndex runCount = CFArrayGetCount(runs);
@@ -891,6 +895,27 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
         CTRunRef run = CFArrayGetValueAtIndex(runs, r);
         CFIndex glyphCount = CTRunGetGlyphCount(run);
         if (glyphCount == 0) continue;
+
+        // Resolve the atlas for the font CoreText chose for THIS run. The
+        // kCTFontAttributeName value is a CTFontRef for runs CoreText
+        // font-substituted (the fallback font — emoji/CJK/etc.), but for the
+        // base run it can be the very UIFont we passed in as the shaping
+        // attribute. UIFont and CTFontRef are NOT toll-free bridged, so probe
+        // the CF type before calling CTFont C functions on it; fall back to
+        // the UIFont entry point (and finally renderFont) otherwise.
+        CFDictionaryRef runAttrs = CTRunGetAttributes(run);
+        CFTypeRef fontVal = (runAttrs != NULL)
+            ? CFDictionaryGetValue(runAttrs, kCTFontAttributeName) : NULL;
+        CN1MetalGlyphAtlas *atlas;
+        if (fontVal != NULL && CFGetTypeID(fontVal) == CTFontGetTypeID()) {
+            atlas = [CN1MetalGlyphAtlas atlasForCTFont:(CTFontRef)fontVal];
+        } else if (fontVal != NULL && [(__bridge id)fontVal isKindOfClass:[UIFont class]]) {
+            atlas = [CN1MetalGlyphAtlas atlasForFont:(__bridge UIFont *)fontVal];
+        } else {
+            atlas = [CN1MetalGlyphAtlas atlasForFont:renderFont];
+        }
+        if (atlas == nil) continue;     // device unavailable / atlas full
+        BOOL atlasIsColor = atlas.isColor;
 
         const CGGlyph *glyphPtr = CTRunGetGlyphsPtr(run);
         CGGlyph *glyphBuf = NULL;
@@ -912,6 +937,14 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
             CN1MetalGlyphSlot *slot = [atlas slotForGlyph:g];
             if (slot == nil) continue;          // atlas full
             if (slot.width == 0) continue;      // empty glyph (space, control)
+
+            // Read texture + dims AFTER slotForGlyph: a first-reference glyph
+            // can trigger tryGrowAtlas, which replaces the MTLTexture and
+            // doubles textureWidth/Height. Capturing before the loop would
+            // sample a freed texture / wrong UVs for everything past the grow.
+            id<MTLTexture> atlasTex = atlas.texture;
+            int textureW = atlas.textureWidth;
+            int textureH = atlas.textureHeight;
 
             // Slot bitmap covers (bbox + 2px padding). Place the slot's
             // top-left so the glyph art lines up with where CT expects:
@@ -959,7 +992,13 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
                 u1, v1,
             };
 
-            drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, atlasTex);
+            if (atlasIsColor) {
+                // Premultiplied BGRA emoji glyph: sample-and-modulate by alpha,
+                // no colour tint. Matches CN1MetalDrawImage's blend path.
+                drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, emojiTint, atlasTex);
+            } else {
+                drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, atlasTex);
+            }
         }
 
         if (glyphBuf) free(glyphBuf);

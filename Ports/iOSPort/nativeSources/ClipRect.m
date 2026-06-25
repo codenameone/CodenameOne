@@ -108,6 +108,44 @@ static CGRect drawingRect;
         int sx = x, sy = y, sw = width, sh = height;
         if (sx < 0) { sw += sx; sx = 0; }
         if (sy < 0) { sh += sy; sy = 0; }
+        // Issue #5273: confine a screen clip to the current flush region
+        // (drawingRect), mirroring the Metal and GL/ES2 branches below. The
+        // watch CG surface is persistent across partial repaints, so without
+        // this clamp a clip emitted during a partial flush (e.g. an
+        // independently scrollable BorderLayout.CENTER under a fixed band) can
+        // extend past the flushed sub-region and overwrite the fixed band,
+        // which then stays corrupted until a full repaint -- the same defect
+        // the Metal backend had. This is scoped to screen ops by drawFrame,
+        // which sets drawingRect to the flush region only while draining the
+        // screen op queue and resets it to zero afterwards; a mutable-image
+        // draw runs immediately outside drawFrame with drawingRect zero, so the
+        // non-empty guard below makes the clamp a no-op for it. The guard also
+        // covers the pre-first-flush state, so a clip is never collapsed to
+        // nothing and the watch surface can never be blanked.
+        if (drawingRect.size.width > 0 && drawingRect.size.height > 0) {
+            int sx2 = sx + sw;
+            int sy2 = sy + sh;
+            int orX = (int)drawingRect.origin.x;
+            int orY = (int)drawingRect.origin.y;
+            int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
+            int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
+            // Clamp an edge that spills past the flush region ONLY when the clip's
+            // OPPOSITE edge lies inside the flush region -- i.e. the clip emerges
+            // from WITHIN the repainted area and leaks out one side into a fixed
+            // band that will not be repainted (the issue #5273 escape: a scrolling
+            // CENTER bleeding into a fixed NORTH/SOUTH band). Two other shapes are
+            // legitimate over-draw on the persistent CG surface and must be left
+            // intact, or they'd be chopped down to the dirty strip and leave the
+            // rest stale: a clip that SURROUNDS the flush region (both opposite
+            // edges outside -- a translucent/cascade repaint painting a parent
+            // larger than its small dirty sub-region) and a clip that sits WHOLLY
+            // to one side (a sibling drawing its own area) -- both seen in the
+            // watch lightweight picker.
+            if (sy2 > destY2 && sy >= orY && sy <= destY2) { sh = destY2 - sy; }
+            if (sy < orY && sy2 <= destY2 && sy2 >= orY) { sy = orY; sh = sy2 - sy; }
+            if (sx2 > destX2 && sx >= orX && sx <= destX2) { sw = destX2 - sx; }
+            if (sx < orX && sx2 <= destX2 && sx2 >= orX) { sx = orX; sw = sx2 - sx; }
+        }
         if (sw > 0 && sh > 0) {
             CN1CGSetClipRect(sx, sy, sw, sh);
             clipApplied = YES;
@@ -154,6 +192,33 @@ static CGRect drawingRect;
         int sx = x, sy = y, sw = width, sh = height;
         if (sx < 0) { sw += sx; sx = 0; }
         if (sy < 0) { sh += sy; sy = 0; }
+        // Issue #5273: confine a screen clip to the current flush region
+        // (drawingRect). On a partial repaint -- e.g. an independently
+        // scrollable BorderLayout.CENTER container scrolling under a fixed
+        // toolbar / BorderLayout.NORTH -- paintDirty() flushes only the dirty
+        // sub-region, yet a clip emitted during that flush can still extend
+        // above it into the fixed header band. The GL backend clamps every
+        // clip to drawingRect (see the ES2 branch below), so an escaping draw
+        // can never touch pixels outside the flushed region. The Metal backend
+        // was missing that clamp: because it renders into a PERSISTENT
+        // screenTexture (MTLLoadActionLoad) the escaping fill overwrote the
+        // toolbar / NORTH band and it stayed blank until a full repaint (e.g.
+        // opening the overflow menu). Mirror the GL clamp here. Screen ops only
+        // (target == nil): mutable-image draws run against their own encoder
+        // with their own framebuffer bounds, where drawingRect (the screen
+        // flush rect) does not apply.
+        if ([self target] == nil) {
+            int sx2 = sx + sw;
+            int sy2 = sy + sh;
+            int orX = (int)drawingRect.origin.x;
+            int orY = (int)drawingRect.origin.y;
+            int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
+            int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
+            if (sx < orX) { sx = orX; sw = sx2 - sx; }
+            if (sy < orY) { sy = orY; sh = sy2 - sy; }
+            if (sx2 > destX2) { sw = destX2 - sx; }
+            if (sy2 > destY2) { sh = destY2 - sy; }
+        }
         CN1MetalDisablePolygonStencilClip();
         CN1MetalSetScissor(sx, sy, sw, sh);
         clipApplied = (sw > 0 && sh > 0);

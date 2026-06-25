@@ -94,6 +94,10 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean fridaDetection = false;
 
+    private boolean playIntegrity = false;
+
+    private boolean accessibilityGuard = false;
+
     private boolean useGradle8 = true;
 
     // Flag to indicate whether we should strip kotlin from user classes
@@ -290,6 +294,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
     private boolean usesAppReview;
+    private boolean usesCodeEditor;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -549,6 +554,8 @@ public class AndroidGradleBuilder extends Executor {
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
         rootCheck = request.getArg("android.rootCheck", "false").equals("true");
         fridaDetection = request.getArg("android.fridaDetection", "false").equals("true");
+        playIntegrity = request.getArg("android.playIntegrity", "false").equals("true");
+        accessibilityGuard = request.getArg("android.accessibilityGuard", "false").equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
@@ -1331,6 +1338,13 @@ public class AndroidGradleBuilder extends Executor {
                     // actual usage so apps that never review stay lean.
                     if (!usesAppReview && cls.indexOf("com/codename1/appreview") == 0) {
                         usesAppReview = true;
+                    }
+                    // CodeEditor optionally upgrades its built-in highlighter to
+                    // the bundled CodeMirror web assets. Detected from actual
+                    // usage so apps that never embed a code editor pay nothing
+                    // (see the bundling step further below).
+                    if (!usesCodeEditor && cls.indexOf("com/codename1/ui/CodeEditor") == 0) {
+                        usesCodeEditor = true;
                     }
                     if (cls.indexOf("com/codename1/location/Geofence") > -1) {
                         if (!"true".equals(playServicesValue)) {
@@ -3348,6 +3362,95 @@ public class AndroidGradleBuilder extends Executor {
             fridaDetectionCall = "        com.codename1.impl.android.FridaDetectionUtil.runFridaDetection(this);\n";
         }
 
+        // android.playIntegrity bundles the Google Play Integrity SDK so the
+        // DeviceIntegrity.requestIntegrityToken() runtime API works. When
+        // android.playIntegrity.verifyUrl is set we also attest at launch on a
+        // background thread and exit if the backend rejects the token (the verdict
+        // MUST be verified server-side - an on-device decision is untrustworthy).
+        String playIntegrityCall = "";
+        if (playIntegrity) {
+            if (!request.getArg("gradleDependencies", "").contains("com.google.android.play:integrity")) {
+                String integrityVersion = request.getArg("android.playIntegrityVersion", "1.4.0");
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.google.android.play:integrity:"+integrityVersion+"\"\n"
+                );
+            }
+            String verifyUrl = request.getArg("android.playIntegrity.verifyUrl", null);
+            if (verifyUrl != null && verifyUrl.length() > 0) {
+                String escapedUrl = verifyUrl.replace("\\", "\\\\").replace("\"", "\\\"");
+                playIntegrityCall = "        try {\n"
+                        + "            final String __cn1IntegrityUrl = \"" + escapedUrl + "\";\n"
+                        + "            final android.content.Context __cn1Ctx = getApplicationContext();\n"
+                        + "            new Thread(new Runnable() { public void run() {\n"
+                        + "                try {\n"
+                        + "                    String __cn1Nonce = java.util.UUID.randomUUID().toString();\n"
+                        + "                    com.google.android.play.core.integrity.IntegrityManager __cn1IM = com.google.android.play.core.integrity.IntegrityManagerFactory.create(__cn1Ctx);\n"
+                        + "                    com.google.android.gms.tasks.Task __cn1Task = __cn1IM.requestIntegrityToken(com.google.android.play.core.integrity.IntegrityTokenRequest.builder().setNonce(__cn1Nonce).build());\n"
+                        + "                    com.google.android.play.core.integrity.IntegrityTokenResponse __cn1Resp = (com.google.android.play.core.integrity.IntegrityTokenResponse) com.google.android.gms.tasks.Tasks.await(__cn1Task);\n"
+                        + "                    String __cn1Token = __cn1Resp.token();\n"
+                        + "                    java.net.HttpURLConnection __cn1Conn = (java.net.HttpURLConnection) new java.net.URL(__cn1IntegrityUrl).openConnection();\n"
+                        + "                    __cn1Conn.setRequestMethod(\"POST\");\n"
+                        + "                    __cn1Conn.setDoOutput(true);\n"
+                        + "                    __cn1Conn.setRequestProperty(\"Content-Type\", \"application/json\");\n"
+                        + "                    byte[] __cn1Body = (\"{\\\"nonce\\\":\\\"\" + __cn1Nonce + \"\\\",\\\"token\\\":\\\"\" + __cn1Token + \"\\\"}\").getBytes(\"UTF-8\");\n"
+                        + "                    __cn1Conn.getOutputStream().write(__cn1Body);\n"
+                        + "                    int __cn1Code = __cn1Conn.getResponseCode();\n"
+                        + "                    if (__cn1Code < 200 || __cn1Code >= 300) {\n"
+                        + "                        android.util.Log.e(\"Codename One\", \"Play Integrity verification failed: \" + __cn1Code + \". Exiting app.\");\n"
+                        + "                        System.exit(0);\n"
+                        + "                    }\n"
+                        + "                } catch(Throwable __cn1Ex) {\n"
+                        + "                    android.util.Log.e(\"Codename One\", \"Play Integrity check error\", __cn1Ex);\n"
+                        + "                }\n"
+                        + "            }}).start();\n"
+                        + "        } catch(Throwable t) {}\n";
+            }
+        }
+
+        // android.accessibilityGuard detects malware abusing Android accessibility
+        // services. Any enabled service whose package is not in
+        // android.accessibilityGuard.allow trips the guard; android.accessibilityGuard.mode
+        // (exit|warn, default exit) decides whether to terminate or just log.
+        String accessibilityGuardCall = "";
+        if (accessibilityGuard) {
+            String allow = request.getArg("android.accessibilityGuard.allow", "");
+            String mode = request.getArg("android.accessibilityGuard.mode", "exit");
+            StringBuilder allowArr = new StringBuilder();
+            String[] allowParts = allow.split(",");
+            for (int i = 0; i < allowParts.length; i++) {
+                String p = allowParts[i].trim();
+                if (p.length() > 0) {
+                    if (allowArr.length() > 0) {
+                        allowArr.append(", ");
+                    }
+                    allowArr.append("\"").append(p.replace("\\", "\\\\").replace("\"", "\\\"")).append("\"");
+                }
+            }
+            accessibilityGuardCall = "        try {\n"
+                    + "            String[] __cn1Allow = new String[] {" + allowArr.toString() + "};\n"
+                    + "            android.view.accessibility.AccessibilityManager __cn1AM = (android.view.accessibility.AccessibilityManager) getSystemService(android.content.Context.ACCESSIBILITY_SERVICE);\n"
+                    + "            java.util.List __cn1Svcs = __cn1AM == null ? null : __cn1AM.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK);\n"
+                    + "            if (__cn1Svcs != null) {\n"
+                    + "                for (int __cn1i = 0; __cn1i < __cn1Svcs.size(); __cn1i++) {\n"
+                    + "                    android.accessibilityservice.AccessibilityServiceInfo __cn1Info = (android.accessibilityservice.AccessibilityServiceInfo) __cn1Svcs.get(__cn1i);\n"
+                    + "                    String __cn1Id = __cn1Info.getId();\n"
+                    + "                    if (__cn1Id == null) { continue; }\n"
+                    + "                    String __cn1Pkg = __cn1Id;\n"
+                    + "                    int __cn1Slash = __cn1Pkg.indexOf('/');\n"
+                    + "                    if (__cn1Slash >= 0) { __cn1Pkg = __cn1Pkg.substring(0, __cn1Slash); }\n"
+                    + "                    boolean __cn1Ok = false;\n"
+                    + "                    for (int __cn1j = 0; __cn1j < __cn1Allow.length; __cn1j++) { if (__cn1Allow[__cn1j].equals(__cn1Pkg)) { __cn1Ok = true; break; } }\n"
+                    + "                    if (!__cn1Ok) {\n"
+                    + "                        android.util.Log.e(\"Codename One\", \"Untrusted accessibility service enabled: \" + __cn1Id);\n"
+                    + (mode.equals("warn") ? "" : "                        System.exit(0);\n")
+                    + "                    }\n"
+                    + "                }\n"
+                    + "            }\n"
+                    + "        } catch(Throwable t) { android.util.Log.e(\"Codename One\", \"Accessibility guard error\", t); }\n";
+        }
+
 
         String waitingForPermissionsRequest=
                 "        if (isWaitingForPermissionResult()) {\n" +
@@ -3407,6 +3510,8 @@ public class AndroidGradleBuilder extends Executor {
                     + "        super.onCreate(savedInstanceState);\n"
                     + fridaDetectionCall
                     + rootCheckCall
+                    + accessibilityGuardCall
+                    + playIntegrityCall
                     + facebookHashCode
                     + facebookSupport
                     + mapsProviderSupport
@@ -4236,6 +4341,15 @@ public class AndroidGradleBuilder extends Executor {
         if (usesAppReview) {
             String reviewVersion = request.getArg("android.appReview.version", "2.0.1");
             additionalDependencies += " implementation 'com.google.android.play:review:"+reviewVersion+"'\n";
+        }
+
+        // CodeEditor (com.codename1.ui.CodeEditor) can upgrade its self-contained
+        // built-in highlighter to the bundled CodeMirror assets. We only flag the
+        // bundling when the app actually references CodeEditor (detected during the
+        // class scan above) so apps that never embed a code editor stay lean.
+        if (usesCodeEditor) {
+            debug("CodeEditor detected: enabling CodeMirror asset bundling");
+            request.putArgument("codeEditor.bundleCodeMirror", "true");
         }
 
         // OidcClient routes sign-in through androidx.browser Custom Tabs.

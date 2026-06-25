@@ -343,6 +343,31 @@ print(sum(1 for r in results if isinstance(r, dict) and r.get("status") in ("equ
 PY
 }
 
+# Count "missing_expected" results: a screenshot the suite captured and delivered
+# but which has NO committed golden under the reference directory. This is the
+# signal that a test ran for real yet its reference was never integrated -- the
+# golden set is incomplete. It is invisible to the count-regression guard (which
+# counts goldens, and there is no golden here) and to the mismatch guard (status
+# is not "different"/"error"), so without an explicit check a brand-new test that
+# captures fine but whose golden was forgotten passes silently on every platform.
+cn1ss_count_missing_expected() {
+  local json="$1"
+  if [ -z "$json" ] || [ ! -s "$json" ]; then
+    echo 0
+    return
+  fi
+  python3 - "$json" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    results = data.get("results", []) if isinstance(data, dict) else []
+except Exception:
+    print(0)
+    sys.exit(0)
+print(sum(1 for r in results if isinstance(r, dict) and r.get("status") == "missing_expected"))
+PY
+}
+
 # Shared function to generate report, compare screenshots, and post PR comment
 cn1ss_process_and_report() {
   local platform_title="$1"
@@ -503,6 +528,26 @@ cn1ss_process_and_report() {
         return 17
       fi
       cn1ss_log "Screenshot count check passed: $covered_count of $expected_count goldens covered ($uncovered_count uncovered <= $allowed_missing tolerated)."
+
+      # Missing-reference guard: a test that captured and delivered a screenshot
+      # but has no committed golden (status "missing_expected") means the
+      # reference set is incomplete -- the golden was never integrated. Neither
+      # the mismatch guard (status != different/error) nor the count guard (no
+      # golden to count) catches it, so it would otherwise pass silently. Fail
+      # here so a new/ported test's golden cannot be left unintegrated on any
+      # strict pipeline. CN1SS_ALLOWED_MISSING_EXPECTED can set a tolerance; the
+      # deliberate seeding bypass (CN1SS_SKIP_COUNT_CHECK=1) skips this too.
+      local missing_expected_count allowed_missing_expected
+      missing_expected_count=$(cn1ss_count_missing_expected "$compare_json_out")
+      missing_expected_count="${missing_expected_count//[^0-9]/}"; : "${missing_expected_count:=0}"
+      allowed_missing_expected="${CN1SS_ALLOWED_MISSING_EXPECTED:-0}"
+      allowed_missing_expected="${allowed_missing_expected//[^0-9]/}"; : "${allowed_missing_expected:=0}"
+      if [ "$missing_expected_count" -gt "$allowed_missing_expected" ]; then
+        cn1ss_log "FATAL: $missing_expected_count captured screenshot(s) have no committed reference (missing_expected); $allowed_missing_expected tolerated (CN1SS_ALLOWED_MISSING_EXPECTED)."
+        cn1ss_log "       A test ran and produced a screenshot but its golden was never integrated under the reference directory. Seed the golden (see the reference dir README) and commit it."
+        return 18
+      fi
+      cn1ss_log "Missing-reference check passed: $missing_expected_count captured screenshots without a golden <= $allowed_missing_expected tolerated."
     fi
   fi
 

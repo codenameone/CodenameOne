@@ -847,6 +847,10 @@ public abstract class CodenameOneImplementation {
                 paintQueueTemp[iter] = null;
                 wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
                 wrapper.resetAffine();
+                // Reset the flush-region hint to the full screen before the
+                // full-screen clip below so neither it nor a previous
+                // component's tighter region wrongly clamps this reset (#5273).
+                setPaintDirtyRegionClip(0, 0, dwidth, dheight);
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;
@@ -856,7 +860,24 @@ public abstract class CodenameOneImplementation {
                         wrapper.setClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
                         cmp.setDirtyRegion(null);
                     }
+                    // Confine any clip this component sets while painting to its
+                    // flushed region on immediate-mode ports. Use the paintable
+                    // bounds -- the region retained ports clamp to via the
+                    // flushGraphics call below -- NOT the dirty region, which
+                    // repaint() nulls (Component.repaint), in which case it would
+                    // fall back to the full screen and the clip could still escape
+                    // (#5273). Computed before paintComponent (paint does not move
+                    // the component) so the clip set during paint can be clamped.
+                    getPaintableBounds(cmp, paintDirtyTmpRect);
+                    setPaintDirtyRegionClip(paintDirtyTmpRect.getX(), paintDirtyTmpRect.getY(),
+                            paintDirtyTmpRect.getWidth(), paintDirtyTmpRect.getHeight());
                     cmp.paintComponent(wrapper);
+                    // Recompute the paintable bounds AFTER paint for the flush
+                    // region below: paintComponent can lay the component out (its
+                    // bounds may change), and the retained ports clamp to / flush
+                    // exactly this rect, so it must match the pre-#5273 value to
+                    // the pixel (the before-paint value above is only the immediate
+                    // -mode clip hint).
                     getPaintableBounds(cmp, paintDirtyTmpRect);
                     int cmpAbsX = paintDirtyTmpRect.getX();
                     topX = Math.min(cmpAbsX, topX);
@@ -877,6 +898,25 @@ public abstract class CodenameOneImplementation {
             //Log.p("Flushing graphics : "+topX+","+topY+","+bottomX+","+bottomY);
             flushGraphics(topX, topY, bottomX - topX, bottomY - topY);
         }
+    }
+
+    /// Reports the clip region that bounds the current component's flush as
+    /// {@link #paintDirty()} is about to paint it -- its dirty region, or the
+    /// full screen for a full repaint. Immediate-mode native ports that draw
+    /// screen ops straight into a persistent surface (the Linux Cairo port)
+    /// override this to confine a clip set during that component's paint to the
+    /// flushed region, so an oversized clip cannot escape and corrupt pixels
+    /// outside it (issue #5273). Retained-mode ports (iOS) clamp at flush time
+    /// against their own flush rect instead, so the default here is a no-op and
+    /// every other port is unaffected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: left edge of the flush region in screen coordinates
+    /// - `y`: top edge of the flush region in screen coordinates
+    /// - `width`: width of the flush region
+    /// - `height`: height of the flush region
+    protected void setPaintDirtyRegionClip(int x, int y, int width, int height) {
     }
 
     /// This method is a callback from the edt before the edt enters to an idle
@@ -5120,6 +5160,59 @@ public abstract class CodenameOneImplementation {
     ///
     /// an instance of the native browser peer or null
     public PeerComponent createBrowserComponent(Object browserComponent) {
+        return null;
+    }
+
+    /// Creates a native peer for one of the visual editor components
+    /// (`com.codename1.ui.RichTextArea` / `com.codename1.ui.CodeEditor`).
+    ///
+    /// The default implementation returns null which makes the editor fall back to its 100% cross
+    /// platform `BrowserComponent` based backend. A platform port may override this to return a genuinely
+    /// native editing widget (e.g. a native rich text view or a native code editor) which is then driven
+    /// through `#editorPeerCommand(PeerComponent, String, String)` and
+    /// `#editorPeerQuery(PeerComponent, String, String)`. A native peer should deliver events back to the
+    /// owning editor by calling `editorComponent.fireEditorEvent(type, value)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `editorComponent`: the owning `AbstractEditorComponent` so native peers can fire events back
+    ///
+    /// - `editorType`: the editor flavor, currently `"richtext"` or `"code"`
+    ///
+    /// #### Returns
+    ///
+    /// a native editor peer, or null to use the cross platform fallback
+    public PeerComponent createNativeEditorPeer(Object editorComponent, String editorType) {
+        return null;
+    }
+
+    /// Sends a one way semantic command to a native editor peer created by
+    /// `#createNativeEditorPeer(Object, String)`. No-op by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the native editor peer
+    ///
+    /// - `name`: the semantic command name (e.g. `"setHtml"`, `"bold"`, `"setText"`)
+    ///
+    /// - `arg`: an optional string argument, may be null
+    public void editorPeerCommand(PeerComponent peer, String name, String arg) {
+    }
+
+    /// Queries a native editor peer for a string value. Returns null by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the native editor peer
+    ///
+    /// - `name`: the semantic query name (e.g. `"getHtml"`, `"getText"`)
+    ///
+    /// - `arg`: an optional string argument, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the queried value or null
+    public String editorPeerQuery(PeerComponent peer, String name, String arg) {
         return null;
     }
 
@@ -10694,6 +10787,70 @@ public abstract class CodenameOneImplementation {
     /// true if this device is jailbroken or rooted, false if not or unknown.
     public boolean isJailbrokenDevice() {
         return false;
+    }
+
+    /// Requests a signed device-attestation token (Google Play Integrity on Android, Apple App Attest
+    /// on iOS) bound to the supplied server nonce. The returned token must be sent to and verified by
+    /// the application's backend -- an on-device check is meaningless on a compromised device. This base
+    /// implementation reports the platform as unsupported by completing the resource with an error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nonce`: a server supplied nonce/challenge bound into the attestation
+    ///
+    /// #### Returns
+    ///
+    /// an `AsyncResource` that completes with the opaque attestation token, or completes with an error
+    /// when attestation is unsupported
+    public AsyncResource<String> requestIntegrityToken(String nonce) {
+        AsyncResource<String> result = new AsyncResource<String>();
+        result.error(new UnsupportedOperationException(
+                "Device integrity attestation is not supported on this platform. On Android enable the "
+                + "android.playIntegrity build hint, on iOS enable the ios.appAttest build hint."));
+        return result;
+    }
+
+    /// Returns true if device-attestation (Play Integrity / App Attest) is available on this device and
+    /// was bundled into the build. False on the base/unsupported implementation.
+    public boolean isAttestationSupported() {
+        return false;
+    }
+
+    /// Non-exiting aggregate RASP check: returns true when the device shows signs of being rooted,
+    /// jailbroken, running under dynamic instrumentation or otherwise tampered. Unlike the launch-gate
+    /// build hints (android.rootCheck / ios.detectJailbreak) this does not terminate the app, so callers
+    /// can make granular runtime decisions (e.g. blocking a high value transaction). The base
+    /// implementation falls back to [#isJailbrokenDevice()].
+    public boolean isDeviceCompromised() {
+        return isJailbrokenDevice();
+    }
+
+    /// Returns the individual reasons behind [#isDeviceCompromised()] (e.g. "root", "frida", "emulator").
+    ///
+    /// #### Returns
+    ///
+    /// an array of machine readable reason codes, empty when the device appears clean
+    public String[] getCompromiseReasons() {
+        if (isDeviceCompromised()) {
+            return new String[] {"jailbreak"};
+        }
+        return new String[0];
+    }
+
+    /// Returns the component identifiers of the accessibility services currently enabled on the device.
+    /// Used to detect malware that abuses Android accessibility services for overlay/remote-control and
+    /// text extraction. Returns an empty array on platforms where this concept does not apply (e.g. iOS).
+    public String[] getEnabledAccessibilityServices() {
+        return new String[0];
+    }
+
+    /// Marks the current screen as secure, blocking OS screenshots, screen recording and accessibility
+    /// screen scraping while it is displayed (Android `FLAG_SECURE`). No-op where unsupported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `secure`: true to mark the window secure, false to clear the flag
+    public void setSecureScreen(boolean secure) {
     }
 
     /// Returns the build hints for the simulator, this will only work in the debug environment and it's

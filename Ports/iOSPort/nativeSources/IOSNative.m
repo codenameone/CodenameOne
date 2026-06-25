@@ -56,6 +56,7 @@
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_impl_ios_IOSBiometrics.h"
+#include "com_codename1_impl_ios_IOSDeviceIntegrity.h"
 #include "com_codename1_impl_ios_IOSSecureStorage.h"
 #include "com_codename1_impl_ios_IOSNfc.h"
 #include "com_codename1_impl_ios_IOSConnectivity.h"
@@ -168,7 +169,14 @@
 extern int popoverSupported();
 //#define CN1_INCLUDE_NOTIFICATIONS2
 #define INCLUDE_CN1_PUSH2
-#ifdef CN1_INCLUDE_NOTIFICATIONS2
+// Import UserNotifications whenever it is actually used below. The push code
+// (INCLUDE_CN1_PUSH2) references UNUserNotificationCenter/UNNotification*, but
+// the import was gated only on CN1_INCLUDE_NOTIFICATIONS2 and otherwise relied
+// on clang's implicit module auto-import. Enabling the Metal screenTexture
+// readback above (compiled on iOS now, not just Catalyst/TV) perturbs that
+// auto-import and the push symbols fail to resolve; importing the framework
+// explicitly when push is enabled makes it robust.
+#if defined(CN1_INCLUDE_NOTIFICATIONS2) || (defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH)
 #import <UserNotifications/UserNotifications.h>
 #endif
 #if !TARGET_OS_WATCH
@@ -6702,7 +6710,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
+#if defined(CN1_USE_METAL)
 // Reads the Metal renderer's persistent screenTexture back into a CGImage.
 // screenTexture is exactly the frame presentFramebuffer blits into the
 // CAMetalLayer drawable, so it IS the genuine on-screen pixel content. Unlike
@@ -6740,14 +6748,14 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                            width:w height:h mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
-#if TARGET_OS_TV
-    // tvOS is unified-memory only (like iOS): MTLStorageModeManaged and
-    // -synchronizeResource: are unavailable. Stage into a Shared texture, which
-    // the CPU can getBytes from directly once the blit completes -- no
-    // synchronize step is needed.
-    desc.storageMode = MTLStorageModeShared;
-#else
+#if TARGET_OS_MACCATALYST
     desc.storageMode = MTLStorageModeManaged;
+#else
+    // iOS (device + simulator) and tvOS are unified-memory: MTLStorageModeManaged
+    // and -synchronizeResource: are unavailable there. Stage into a Shared
+    // texture, which the CPU can getBytes from directly once the blit completes
+    // -- no synchronize step is needed.
+    desc.storageMode = MTLStorageModeShared;
 #endif
     id<MTLTexture> staging = [device newTextureWithDescriptor:desc];
     if (staging == nil) {
@@ -6762,9 +6770,9 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
                 toTexture:staging
          destinationSlice:0 destinationLevel:0
         destinationOrigin:MTLOriginMake(0, 0, 0)];
-#if !TARGET_OS_TV
+#if TARGET_OS_MACCATALYST
     // Managed storage (Catalyst) must be synchronized to become CPU-visible;
-    // Shared storage (tvOS) is already CPU-visible, so this would be invalid.
+    // Shared storage (iOS / tvOS) is already CPU-visible, so this would be invalid.
     [blit synchronizeResource:staging];
 #endif
     [blit endEncoding];
@@ -6911,12 +6919,24 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
     }
 #endif
-#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
+#if defined(CN1_USE_METAL)
     // The Metal screen view: capture from the renderer's screenTexture, the
     // exact pixels presented to the drawable. On headless Mac Catalyst the
     // display link never presents, so -drawViewHierarchyInRect: below would
     // snapshot a stale CALayer frame. The screenTexture readback is always the
     // latest committed frame, so it is both correct and deterministic.
+    //
+    // This used to be gated to Catalyst/TV, leaving the iPhone/iPad simulator
+    // and device on drawViewHierarchyInRect:afterScreenUpdates:NO, which
+    // snapshots the CALayer's currently-presented drawable. That drawable lags
+    // the screenTexture: presentFramebuffer commits the screenTexture->drawable
+    // blit without waiting (METALView.m), and the CALayer composites it on a
+    // later CA transaction, so a screenshot taken right after a Form.show()
+    // could capture the PREVIOUS form (the stale-frame race that made
+    // DesktopModeScreenshotTest non-deterministic -- it intermittently captured
+    // the prior test's form). The screenTexture readback below blits +
+    // waitUntilCompleted, so it always reflects the latest committed CN1 frame
+    // regardless of drawable-present / CALayer-composite timing.
     if (!drawn && [renderView isKindOfClass:[METALView class]]) {
         CGImageRef cg = cn1_copyMetalScreenTextureImage((METALView *)renderView);
         if (cg != NULL) {
@@ -13374,6 +13394,92 @@ void com_codename1_impl_ios_IOSNative_stopBiometricAuthentication__(CN1_THREAD_S
     }
 #endif // !TARGET_OS_TV
 }
+
+// --- App Attest (DeviceCheck.framework) -----------------------------------
+// Gated by CN1_USE_APP_ATTEST: the ios.appAttest build hint uncomments the
+// define, links DeviceCheck.framework and injects the App Attest entitlement.
+// Builds without the hint compile the stub branch below, so they neither import
+// nor link DeviceCheck. clientDataHash is the SHA-256 of the server nonce; the
+// returned token is base64(keyId):base64(attestationObject) for the backend to
+// verify with Apple.
+//#define CN1_USE_APP_ATTEST
+#ifdef CN1_USE_APP_ATTEST
+#import <DeviceCheck/DeviceCheck.h>
+#import <CommonCrypto/CommonCrypto.h>
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#if !TARGET_OS_TV && !TARGET_OS_WATCH
+    if (@available(iOS 14.0, *)) {
+        if (NSClassFromString(@"DCAppAttestService") == NULL) {
+            return JAVA_FALSE;
+        }
+        return [DCAppAttestService sharedService].isSupported ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif // !TARGET_OS_TV && !TARGET_OS_WATCH
+}
+
+void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT nonce) {
+#if !TARGET_OS_TV && !TARGET_OS_WATCH
+    POOL_BEGIN();
+    if (@available(iOS 14.0, *)) {
+        DCAppAttestService *service = [DCAppAttestService sharedService];
+        if (!service.isSupported) {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"App Attest not supported");
+            com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+            POOL_END();
+            return;
+        }
+        NSString *nsNonce = (nonce == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG nonce);
+        NSData *nonceData = [nsNonce dataUsingEncoding:NSUTF8StringEncoding];
+        unsigned char hashBytes[CC_SHA256_DIGEST_LENGTH];
+        CC_SHA256(nonceData.bytes, (CC_LONG)nonceData.length, hashBytes);
+        NSData *clientDataHash = [NSData dataWithBytes:hashBytes length:CC_SHA256_DIGEST_LENGTH];
+        [service generateKeyWithCompletionHandler:^(NSString *keyId, NSError *genErr) {
+            if (genErr != nil || keyId == nil) {
+                NSString *m = genErr ? genErr.localizedDescription : @"App Attest key generation failed";
+                JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), m);
+                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+                return;
+            }
+            [service attestKey:keyId clientDataHash:clientDataHash completionHandler:^(NSData *attestationObject, NSError *attErr) {
+                if (attErr != nil || attestationObject == nil) {
+                    NSString *m = attErr ? attErr.localizedDescription : @"App Attest attestation failed";
+                    JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), m);
+                    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+                    return;
+                }
+                NSData *keyIdData = [keyId dataUsingEncoding:NSUTF8StringEncoding];
+                NSString *b64Key = [keyIdData base64EncodedStringWithOptions:0];
+                NSString *b64Att = [attestationObject base64EncodedStringWithOptions:0];
+                NSString *token = [NSString stringWithFormat:@"%@:%@", b64Key, b64Att];
+                JAVA_OBJECT jtoken = fromNSString(getThreadLocalData(), token);
+                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestSuccess___int_java_lang_String(getThreadLocalData(), requestId, jtoken);
+            }];
+        }];
+    } else {
+        JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"App Attest requires iOS 14+");
+        com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+    }
+    POOL_END();
+#else
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, JAVA_NULL);
+#endif // !TARGET_OS_TV && !TARGET_OS_WATCH
+}
+#else // CN1_USE_APP_ATTEST
+
+// App Attest not enabled (ios.appAttest build hint off): DeviceCheck.framework
+// is neither imported nor linked. Report unsupported / fail the request.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT nonce) {
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, JAVA_NULL);
+}
+#endif // CN1_USE_APP_ATTEST
 
 void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {
     if (cn1_keychainAccessGroup != nil) {

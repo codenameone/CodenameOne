@@ -21,18 +21,35 @@
 (function () {
   if (window.__cn1MermaidLoaded) return;
   window.__cn1MermaidLoaded = true;
+
+  // Keep wide diagrams legible on phones: scale to the column, but never
+  // below a readable floor -- scroll horizontally past that instead of
+  // shrinking the labels into an illegible smudge.
+  var st = document.createElement("style");
+  st.textContent =
+    ".cn1-mermaid{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:1.5rem 0}" +
+    ".cn1-mermaid svg{max-width:100%!important;height:auto;display:block;margin:0 auto}";
+  document.head.appendChild(st);
+
   var s = document.createElement("script");
   s.type = "module";
+  // Do NOT rely on mermaid's startOnLoad: it hooks the window "load" event
+  // when the module evaluates, but this module is imported dynamically -- on a
+  // cache hit / bfcache restore / non-Chromium browser "load" has already
+  // fired, the listener never runs, and the diagram silently stays blank.
+  // Calling mermaid.run() explicitly renders every .mermaid block regardless
+  // of load-event timing.
   s.textContent =
     'import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";' +
     'var prefersDark = document.body.classList.contains("dark")' +
     ' || window.matchMedia("(prefers-color-scheme: dark)").matches;' +
     'mermaid.initialize({' +
-    '  startOnLoad: true,' +
+    '  startOnLoad: false,' +
     '  theme: prefersDark ? "dark" : "default",' +
     '  securityLevel: "loose",' +
     '  fontFamily: "Poppins, system-ui, sans-serif"' +
-    '});';
+    '});' +
+    'mermaid.run();';
   document.head.appendChild(s);
 })();
 </script>

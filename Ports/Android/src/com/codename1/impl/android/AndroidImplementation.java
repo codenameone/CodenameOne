@@ -12527,6 +12527,196 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isAttestationSupported() {
+        try {
+            Class.forName("com.google.android.play.core.integrity.IntegrityManagerFactory");
+            return true;
+        } catch(Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public AsyncResource<String> requestIntegrityToken(final String nonce) {
+        final AsyncResource<String> result = new AsyncResource<String>();
+        try {
+            Context context = getContext();
+            Class factory = Class.forName("com.google.android.play.core.integrity.IntegrityManagerFactory");
+            Object manager = factory.getMethod("create", Context.class).invoke(null, context);
+            Class requestClass = Class.forName("com.google.android.play.core.integrity.IntegrityTokenRequest");
+            Object builder = requestClass.getMethod("builder").invoke(null);
+            builder = builder.getClass().getMethod("setNonce", String.class).invoke(builder, nonce);
+            Object request = builder.getClass().getMethod("build").invoke(builder);
+            Class managerClass = Class.forName("com.google.android.play.core.integrity.IntegrityManager");
+            Object task = managerClass.getMethod("requestIntegrityToken", requestClass).invoke(manager, request);
+
+            Class taskClass = Class.forName("com.google.android.gms.tasks.Task");
+            Class onSuccessClass = Class.forName("com.google.android.gms.tasks.OnSuccessListener");
+            Class onFailureClass = Class.forName("com.google.android.gms.tasks.OnFailureListener");
+            final Class responseClass = Class.forName("com.google.android.play.core.integrity.IntegrityTokenResponse");
+
+            Object successListener = java.lang.reflect.Proxy.newProxyInstance(
+                    onSuccessClass.getClassLoader(), new Class[] { onSuccessClass },
+                    new java.lang.reflect.InvocationHandler() {
+                        public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
+                            try {
+                                Object response = args[0];
+                                String token = (String) responseClass.getMethod("token").invoke(response);
+                                result.complete(token);
+                            } catch(Throwable t) {
+                                result.error(t);
+                            }
+                            return null;
+                        }
+                    });
+            Object failureListener = java.lang.reflect.Proxy.newProxyInstance(
+                    onFailureClass.getClassLoader(), new Class[] { onFailureClass },
+                    new java.lang.reflect.InvocationHandler() {
+                        public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
+                            Throwable err = (args != null && args.length > 0 && args[0] instanceof Throwable)
+                                    ? (Throwable) args[0] : new RuntimeException("Play Integrity request failed");
+                            result.error(err);
+                            return null;
+                        }
+                    });
+            taskClass.getMethod("addOnSuccessListener", onSuccessClass).invoke(task, successListener);
+            taskClass.getMethod("addOnFailureListener", onFailureClass).invoke(task, failureListener);
+        } catch(ClassNotFoundException notBundled) {
+            result.error(new UnsupportedOperationException(
+                    "Google Play Integrity is not bundled. Enable the android.playIntegrity build hint."));
+        } catch(Throwable t) {
+            result.error(t);
+        }
+        return result;
+    }
+
+    @Override
+    public boolean isDeviceCompromised() {
+        return getCompromiseReasons().length > 0;
+    }
+
+    @Override
+    public String[] getCompromiseReasons() {
+        java.util.ArrayList<String> reasons = new java.util.ArrayList<String>();
+        if(isRootedViaRootBeer() || isJailbrokenDevice()) {
+            reasons.add("root");
+        }
+        try {
+            if(FridaDetectionUtil.isFridaDetected()) {
+                reasons.add("frida");
+            }
+        } catch(Throwable t) {
+            // detection must never crash the host app
+        }
+        if(isProbablyEmulator()) {
+            reasons.add("emulator");
+        }
+        return reasons.toArray(new String[reasons.size()]);
+    }
+
+    private boolean isRootedViaRootBeer() {
+        try {
+            Class rootBeerClass = Class.forName("com.scottyab.rootbeer.RootBeer");
+            Object rootBeer = rootBeerClass.getConstructor(Context.class).newInstance(getContext());
+            Object rooted = rootBeerClass.getMethod("isRooted").invoke(rootBeer);
+            return Boolean.TRUE.equals(rooted);
+        } catch(Throwable t) {
+            // RootBeer not bundled (android.rootCheck off) - caller falls back to the su probe
+            return false;
+        }
+    }
+
+    private boolean isProbablyEmulator() {
+        try {
+            String fingerprint = Build.FINGERPRINT;
+            if(fingerprint != null && (fingerprint.startsWith("generic") || fingerprint.startsWith("unknown")
+                    || fingerprint.contains("emulator"))) {
+                return true;
+            }
+            String model = Build.MODEL;
+            if(model != null && (model.contains("google_sdk") || model.contains("Emulator")
+                    || model.contains("Android SDK built for"))) {
+                return true;
+            }
+            String manufacturer = Build.MANUFACTURER;
+            if(manufacturer != null && manufacturer.contains("Genymotion")) {
+                return true;
+            }
+            String product = Build.PRODUCT;
+            if(product != null && (product.contains("sdk_gphone") || product.equals("google_sdk")
+                    || product.contains("emulator") || product.contains("simulator"))) {
+                return true;
+            }
+            String hardware = Build.HARDWARE;
+            if(hardware != null && (hardware.contains("goldfish") || hardware.contains("ranchu"))) {
+                return true;
+            }
+        } catch(Throwable t) {
+            // ignore
+        }
+        return false;
+    }
+
+    @Override
+    public String[] getEnabledAccessibilityServices() {
+        Context context = getContext();
+        if(context == null) {
+            return new String[0];
+        }
+        try {
+            AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
+            if(am != null) {
+                java.util.List<android.accessibilityservice.AccessibilityServiceInfo> list =
+                        am.getEnabledAccessibilityServiceList(
+                                android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK);
+                if(list != null && !list.isEmpty()) {
+                    java.util.ArrayList<String> ids = new java.util.ArrayList<String>();
+                    for(android.accessibilityservice.AccessibilityServiceInfo info : list) {
+                        String id = info.getId();
+                        if(id != null && id.length() > 0) {
+                            ids.add(id);
+                        }
+                    }
+                    return ids.toArray(new String[ids.size()]);
+                }
+            }
+        } catch(Throwable t) {
+            // fall through to the Settings.Secure based lookup below
+        }
+        try {
+            String enabled = Settings.Secure.getString(context.getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if(enabled != null && enabled.length() > 0) {
+                return enabled.split(":");
+            }
+        } catch(Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        return new String[0];
+    }
+
+    @Override
+    public void setSecureScreen(final boolean secure) {
+        final Activity act = getActivity();
+        if(act == null) {
+            return;
+        }
+        act.runOnUiThread(new Runnable() {
+            public void run() {
+                try {
+                    if(secure) {
+                        act.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+                    } else {
+                        act.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+                    }
+                } catch(Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
+            }
+        });
+    }
+
+    @Override
     public void announceForAccessibility(final Component cmp, final String text) {
         final Activity act = getActivity();
         if (act == null) {

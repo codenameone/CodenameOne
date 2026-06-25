@@ -208,6 +208,11 @@ public final class LinuxNative {
 
     public static native void clipRect(long graphics, int x, int y, int width, int height);
 
+    /** Issue #5273: report the current paintDirty flush region so the native
+     *  renderer can confine a screen clip set during a component's paint to it.
+     *  width/height == 0 disables the clamp (full repaint). */
+    public static native void setFlushRect(long graphics, int x, int y, int width, int height);
+
     /** Sets the clip to an arbitrary screen-space polygon/path (flattened, same
      *  encoding as {@link #fillShape}). Used for clipRect under a transform and
      *  setClip(Shape). */

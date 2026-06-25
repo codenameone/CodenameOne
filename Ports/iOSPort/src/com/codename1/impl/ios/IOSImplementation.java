@@ -3807,6 +3807,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private IOSBiometrics biometrics;
     private IOSSecureStorage secureStorage;
     private IOSNfc nfc;
+    private IOSDeviceIntegrity deviceIntegrity;
 
     @Override
     public com.codename1.security.Biometrics getBiometrics() {
@@ -3814,6 +3815,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             biometrics = new IOSBiometrics(nativeInstance);
         }
         return biometrics;
+    }
+
+    @Override
+    public boolean isAttestationSupported() {
+        return nativeInstance.isAppAttestSupported();
+    }
+
+    @Override
+    public com.codename1.util.AsyncResource<String> requestIntegrityToken(String nonce) {
+        if (deviceIntegrity == null) {
+            deviceIntegrity = new IOSDeviceIntegrity(nativeInstance);
+        }
+        return deviceIntegrity.requestToken(nonce);
     }
 
     @Override
