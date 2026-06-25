@@ -93,7 +93,7 @@
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.47";
     switchThumbOffScaleY: "1.03";
-    switchThumbOffInsetMM: "0.22";
+    switchThumbOffInsetMM: "0.34";
     switchThumbShadowSpreadInt: 0;
     switchDisabledOutlineColorUIID: "SwitchDisabledTrack";
     switchTrackScaleY: "1.5";
@@ -106,7 +106,7 @@
        instead of the legacy full-height fill. Only editable sliders honour
        these (progress bars keep the flat track). */
     sliderTrackThicknessMM: "2.56";
-    sliderThumbWidthMM: "0.7";
+    sliderThumbWidthMM: "0.5";
     checkBoxIconSizeMM: "3.8";
     radioIconSizeMM: "3.75";
     checkBoxUncheckedColorUIID: "CheckBoxUnchecked";
@@ -390,7 +390,7 @@ OnOffSwitch {
 OnOffSwitch.selected { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); }
 
 Toolbar {
-    background-color: #fef7ff;
+    background-color: transparent;
     color: #1d1b20;
     padding: 2mm 1mm 2mm 1mm;
     margin: 0;
@@ -399,7 +399,7 @@ Toolbar {
    modern theme for the resolver-hang note. The two UIIDs serve
    different purposes and keeping inheritance simple is safer. */
 TitleArea {
-    background-color: #fef7ff;
+    background-color: transparent;
     color: #1d1b20;
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
@@ -700,7 +700,7 @@ PopupContent {
     CheckBoxUnchecked.disabled { color: #575559; }
     RadioButtonUnchecked { color: #cac4d0; }
     RadioButtonUnchecked.disabled { color: #575559; }
-    Slider { background-color: #49454f; color: #c9c5ca; border-radius: 1mm; }
+    Slider { background-color: #49454f; color: #8e8e93; border-radius: 1mm; }
     SliderFull { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-color-dark, #d0bcff); border-radius: 1mm; }
     Slider.disabled { background-color: #1c1c1d; color: #585559; border-radius: 1mm; }
     SliderFull.disabled { background-color: #585559; color: #585559; border-radius: 1mm; }
@@ -715,8 +715,8 @@ PopupContent {
     OnOffSwitch { color: var(--accent-on-color-dark, #381e72); background-color: #49454f; }
     OnOffSwitch.selected { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); }
 
-    Toolbar { background-color: #141218; color: #e6e0e9; }
-    TitleArea { background-color: #141218; color: #e6e0e9; }
+    Toolbar { background-color: transparent; color: #e6e0e9; }
+    TitleArea { background-color: transparent; color: #e6e0e9; }
     Title { color: #e6e0e9; background-color: #141218; }
     MainTitle { color: #e6e0e9; background-color: #141218; }
     BackCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
