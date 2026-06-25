@@ -314,7 +314,14 @@ extern "C" void cn1dwDrawText(void* renderTarget, void* format, void* brush,
     D2D1_POINT_2F origin;
     origin.x = x;
     origin.y = y;
-    target->DrawTextLayout(origin, layout, b, D2D1_DRAW_TEXT_OPTIONS_NONE);
+    // ENABLE_COLOR_FONT makes Direct2D composite COLR/CBDT/sbix colour glyphs
+    // (e.g. Segoe UI Emoji) with their own palette instead of rendering only
+    // the monochrome base outline tinted by the brush -- so emoji and other
+    // colour glyphs keep their intrinsic colours. Non-colour glyphs are
+    // unaffected: they still paint with `b`. Supported on ID2D1RenderTarget
+    // since Windows 8.1 (the flag is 0x4 in d2d1.h); the port's HWND render
+    // target honours it.
+    target->DrawTextLayout(origin, layout, b, D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
     layout->Release();
 }
 
