@@ -170,18 +170,18 @@ static CGRect watchFlushRect;
     // ClipRect.execute no-ops the clamp while this is empty).
     [ClipRect setDrawRect:flushRect];
     // Issue #5273: the persistent CG bitmap is never otherwise cleared, so a
-    // previous form/test's pixels survive under areas the new frame's CLAMPED
-    // draws no longer overpaint (before the clamp the unclamped draws covered
-    // them). On a FULL-screen flush clear the bitmap first: a full repaint's ops
-    // repaint the whole surface with the opaque form background, so this is
-    // gap-safe (nothing is left transparent) and removes the stale underlay.
-    // Partial flushes are left alone (their ops may not cover the whole region).
-    int lw = [v logicalWidth];
-    int lh = [v logicalHeight];
-    if (flushRect.origin.x <= 1 && flushRect.origin.y <= 1 &&
-        flushRect.size.width >= lw - 1 && flushRect.size.height >= lh - 1) {
+    // previous frame/test's pixels survive under any area the new frame's
+    // CLAMPED draws no longer overpaint (before the clamp the unclamped draws
+    // covered them) -- the source of the ValidatorLightweightPicker garble.
+    // Clear the flushed region before draining its ops: the paintDirty batch
+    // repaints that region with the components' (opaque) backgrounds, so the
+    // ops refill what we clear, while pixels OUTSIDE the flush region (not part
+    // of this repaint) are left intact. Same coordinate space as the draw ops,
+    // so a partial region clears in the right place.
+    if (flushRect.size.width > 0 && flushRect.size.height > 0) {
         CN1CGResetClip();
-        CN1CGClearRect(0, 0, lw, lh);
+        CN1CGClearRect((int)flushRect.origin.x, (int)flushRect.origin.y,
+                       (int)flushRect.size.width, (int)flushRect.size.height);
     }
     for (ExecutableOp *op in ops) {
         @try {
