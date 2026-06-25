@@ -109,6 +109,18 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         return true;
     }
 
+    /// The map is a native peer (BrowserComponent) view. On the iOS Metal
+    /// backend the screenshot has been seen to capture solid black -- the
+    /// peer's web-view layer not composited into the captured frame in time
+    /// (the same reason the desktop/Mac-native runner is skipped above, though
+    /// iOS does composite it most of the time). Force a repaint and a short
+    /// extra present window before the capture so the composited frame includes
+    /// the loaded map. Opt-in hook; default is 0 for every other test.
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        return 1200;
+    }
+
     private String readKey() {
         try {
             InputStream is = Display.getInstance().getResourceAsStream(
