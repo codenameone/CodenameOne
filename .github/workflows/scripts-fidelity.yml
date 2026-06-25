@@ -117,6 +117,11 @@ jobs:
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
         run: ./scripts/build-android-port.sh -q -DskipTests
+      - name: Regenerate native themes from CSS
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
       - name: Build fidelity app (Android)
         id: build
         run: |
@@ -186,6 +191,11 @@ jobs:
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
+      - name: Regenerate native themes from CSS
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
       - name: Install Metal toolchain
         run: xcodebuild -downloadComponent MetalToolchain || true
       - name: Build fidelity app (iOS, Metal)
