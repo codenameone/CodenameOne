@@ -16,6 +16,7 @@ class AnalyticsServiceTest extends UITestBase {
         implementation.clearQueuedRequests();
         AnalyticsService.init("UA-1", "app.example.com");
         AnalyticsService.setAppsMode(true);
+        Analytics.setConsent(null);
 
         AnalyticsService.visit("Home", "/");
 
@@ -32,6 +33,7 @@ class AnalyticsServiceTest extends UITestBase {
         implementation.clearQueuedRequests();
         AnalyticsService.init("UA-2", "app.example.com");
         AnalyticsService.setAppsMode(true);
+        Analytics.setConsent(null);
 
         AnalyticsService.sendCrashReport(new RuntimeException("boom"), "failure", true);
         List<ConnectionRequest> requests = implementation.getQueuedRequests();

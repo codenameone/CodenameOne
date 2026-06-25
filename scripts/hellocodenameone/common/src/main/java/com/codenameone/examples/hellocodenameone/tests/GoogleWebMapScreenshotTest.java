@@ -90,7 +90,14 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
                 final Form self = this;
                 // Let the Google Maps JS load and paint tiles from the network
                 // (well over the native-map settle), capture, then dispose.
-                UITimer.timer(8000, false, self, () ->
+                // 8s was enough on a healthy runner but not on a starved CI box
+                // (88s simulator boot, 450s suite execution), where the live map
+                // had not painted a single tile yet and we captured a blank grey
+                // page -- a ~66% mismatch the test (correctly) rejects as a blank
+                // map. 22s gives the network load real headroom (~3x the boot
+                // slowdown that runner showed) while still sitting under the 30s
+                // native test timeout.
+                UITimer.timer(22000, false, self, () ->
                         captureWhenSettled(self, "GoogleWebMap", () -> {
                             map.dispose();
                             done();

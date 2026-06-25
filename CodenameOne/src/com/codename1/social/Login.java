@@ -464,6 +464,13 @@ public abstract class Login {
 
         @Override
         public void loginSuccessful() {
+            // Analytics auto-instrumentation: emit a "login" event tagged with
+            // the provider. Consent-gated and a no-op when no provider is
+            // registered; never throws into the login flow.
+            java.util.HashMap<String, Object> loginEvt = new java.util.HashMap<String, Object>();
+            loginEvt.put("service", Login.this.getClass().getSimpleName());
+            com.codename1.analytics.Analytics.autoEvent("login", "auth", loginEvt);
+
             //store the access token upon login success for future use
             Preferences.set(Login.this.getClass().getName() + "Token", getAccessToken().getToken());
 
@@ -492,6 +499,15 @@ public abstract class Login {
 
         @Override
         public void loginFailed(final String errorMessage) {
+            // Analytics auto-instrumentation: the failure half of the auth
+            // funnel. Consent-gated, no-op without a provider, never throws.
+            java.util.HashMap<String, Object> failEvt = new java.util.HashMap<String, Object>();
+            failEvt.put("service", Login.this.getClass().getSimpleName());
+            if (errorMessage != null) {
+                failEvt.put("error", errorMessage);
+            }
+            com.codename1.analytics.Analytics.autoEvent("login_failed", "auth", failEvt);
+
             if (callbackEnabled) {
                 if (loginCallback != null) {
                     loginCallback.loginFailed(errorMessage);

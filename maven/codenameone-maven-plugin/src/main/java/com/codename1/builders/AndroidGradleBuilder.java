@@ -94,6 +94,10 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean fridaDetection = false;
 
+    private boolean playIntegrity = false;
+
+    private boolean accessibilityGuard = false;
+
     private boolean useGradle8 = true;
 
     // Flag to indicate whether we should strip kotlin from user classes
@@ -549,6 +553,8 @@ public class AndroidGradleBuilder extends Executor {
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
         rootCheck = request.getArg("android.rootCheck", "false").equals("true");
         fridaDetection = request.getArg("android.fridaDetection", "false").equals("true");
+        playIntegrity = request.getArg("android.playIntegrity", "false").equals("true");
+        accessibilityGuard = request.getArg("android.accessibilityGuard", "false").equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
@@ -1707,6 +1713,38 @@ public class AndroidGradleBuilder extends Executor {
                         request.getArg("gradleDependencies", "") +
                                 "\n"+compile+" \"com.google.firebase:firebase-messaging:" +
                                 request.getArg("android.firebaseMessagingVersion", playServicesVersion) + "\"\n"
+                );
+            }
+        }
+
+        // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
+        // delegates to a generated FirebaseAnalyticsProvider.Bridge). Enabled
+        // with the build hint android.firebaseAnalytics=true, which -- like FCM --
+        // requires a google-services.json in native/android. Reuses the
+        // google-services Gradle plugin + buildscript classpath if FCM already
+        // added them (the contains() guards keep the lines idempotent).
+        boolean useFirebaseAnalytics = "true".equals(request.getArg("android.firebaseAnalytics", "false"));
+        if (useFirebaseAnalytics) {
+            if (!googleServicesJson.exists()) {
+                error("google-services.json not found.  android.firebaseAnalytics=true requires a valid google-services.json in the native/android directory (download it from the Firebase console: https://console.firebase.google.com/).", new RuntimeException());
+                return false;
+            }
+            if (!request.getArg("android.topDependency", "").contains("com.google.gms:google-services")) {
+                if (gradleVersionInt >= 8) {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+                } else {
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.0.1'\n");
+                }
+            }
+            if (!request.getArg("android.xgradle", "").contains("apply plugin: 'com.google.gms.google-services'")) {
+                request.putArgument("android.xgradle", request.getArg("android.xgradle", "") + "\napply plugin: 'com.google.gms.google-services'\n");
+            }
+            if (!request.getArg("gradleDependencies", "").contains("com.google.firebase:firebase-analytics")) {
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.google.firebase:firebase-analytics:" +
+                                request.getArg("android.firebaseAnalyticsVersion", "21.5.0") + "\"\n"
                 );
             }
         }
@@ -3163,6 +3201,86 @@ public class AndroidGradleBuilder extends Executor {
         if (svgRegistryClassFile.isFile()) {
             svgRegistryInstall = "            com.codename1.generated.svg.SVGRegistry.installGlobal();\n";
         }
+
+        // Firebase Analytics bridge: when android.firebaseAnalytics=true the
+        // app has the firebase-analytics Gradle dependency, so we generate a
+        // FirebaseAnalyticsProvider.Bridge that calls the SDK directly (no
+        // reflection, no NativeInterface) and register it in the Stub before
+        // i.init(this). Without the hint no bridge is generated and
+        // FirebaseAnalyticsProvider stays a no-op.
+        String firebaseRegisterInstall = "";
+        if (useFirebaseAnalytics) {
+            String fbPkg = request.getPackageName();
+            String fbSrc = "package " + fbPkg + ";\n\n"
+                    + "import android.content.Context;\n"
+                    + "import android.os.Bundle;\n"
+                    + "import com.codename1.impl.android.AndroidNativeUtil;\n"
+                    + "import com.codename1.analytics.FirebaseAnalyticsProvider;\n"
+                    + "import com.google.firebase.analytics.FirebaseAnalytics;\n"
+                    + "import java.util.Iterator;\n"
+                    + "import org.json.JSONObject;\n\n"
+                    + "/** Generated by the Codename One build (android.firebaseAnalytics=true). */\n"
+                    + "public class FirebaseAnalyticsBridgeImpl implements FirebaseAnalyticsProvider.Bridge {\n"
+                    + "    private FirebaseAnalytics fa;\n"
+                    + "    private boolean resolved;\n"
+                    + "    private FirebaseAnalytics fa() {\n"
+                    + "        if (!resolved) {\n"
+                    + "            resolved = true;\n"
+                    + "            try {\n"
+                    + "                Context c = AndroidNativeUtil.getContext();\n"
+                    + "                if (c != null) { fa = FirebaseAnalytics.getInstance(c); }\n"
+                    + "            } catch (Throwable t) { fa = null; }\n"
+                    + "        }\n"
+                    + "        return fa;\n"
+                    + "    }\n"
+                    + "    public boolean isSupported() { return fa() != null; }\n"
+                    + "    public void logEvent(String name, String paramsJson) {\n"
+                    + "        FirebaseAnalytics f = fa();\n"
+                    + "        if (f != null) { f.logEvent(sanitize(name), toBundle(paramsJson)); }\n"
+                    + "    }\n"
+                    + "    public void logScreen(String screenName) {\n"
+                    + "        FirebaseAnalytics f = fa();\n"
+                    + "        if (f != null) { Bundle b = new Bundle(); b.putString(\"screen_name\", screenName); f.logEvent(\"screen_view\", b); }\n"
+                    + "    }\n"
+                    + "    public void setUserId(String id) { FirebaseAnalytics f = fa(); if (f != null) { f.setUserId(id); } }\n"
+                    + "    public void setUserProperty(String key, String value) { FirebaseAnalytics f = fa(); if (f != null) { f.setUserProperty(key, value); } }\n"
+                    + "    private static Bundle toBundle(String json) {\n"
+                    + "        Bundle b = new Bundle();\n"
+                    + "        if (json == null || json.length() == 0) { return b; }\n"
+                    + "        try {\n"
+                    + "            JSONObject o = new JSONObject(json);\n"
+                    + "            Iterator<String> keys = o.keys();\n"
+                    + "            while (keys.hasNext()) {\n"
+                    + "                String k = keys.next();\n"
+                    + "                Object v = o.get(k);\n"
+                    + "                if (v instanceof Number) { b.putDouble(k, ((Number) v).doubleValue()); }\n"
+                    + "                else if (v instanceof Boolean) { b.putString(k, v.toString()); }\n"
+                    + "                else { b.putString(k, String.valueOf(v)); }\n"
+                    + "            }\n"
+                    + "        } catch (Throwable t) { /* send the event without malformed params */ }\n"
+                    + "        return b;\n"
+                    + "    }\n"
+                    + "    private static String sanitize(String name) {\n"
+                    + "        if (name == null || name.length() == 0) { return \"event\"; }\n"
+                    + "        StringBuilder sb = new StringBuilder(name.length());\n"
+                    + "        for (int i = 0; i < name.length(); i++) {\n"
+                    + "            char c = name.charAt(i);\n"
+                    + "            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') { sb.append(c); }\n"
+                    + "            else { sb.append('_'); }\n"
+                    + "        }\n"
+                    + "        return sb.toString();\n"
+                    + "    }\n"
+                    + "}\n";
+            File fbBridgeFile = new File(stubFileSourceDir, "FirebaseAnalyticsBridgeImpl.java");
+            try {
+                createFile(fbBridgeFile, fbSrc.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to create FirebaseAnalyticsBridgeImpl class", ex);
+            }
+            firebaseRegisterInstall = "            com.codename1.analytics.FirebaseAnalyticsProvider.registerBridge(new "
+                    + fbPkg + ".FirebaseAnalyticsBridgeImpl());\n";
+        }
+
         String consumableCode;
         consumableCode = "public boolean isConsumable(String sku) {\n"
                 + "  boolean retVal = super.isConsumable(sku);\n"
@@ -3236,6 +3354,95 @@ public class AndroidGradleBuilder extends Executor {
             fridaDetectionCall = "        com.codename1.impl.android.FridaDetectionUtil.runFridaDetection(this);\n";
         }
 
+        // android.playIntegrity bundles the Google Play Integrity SDK so the
+        // DeviceIntegrity.requestIntegrityToken() runtime API works. When
+        // android.playIntegrity.verifyUrl is set we also attest at launch on a
+        // background thread and exit if the backend rejects the token (the verdict
+        // MUST be verified server-side - an on-device decision is untrustworthy).
+        String playIntegrityCall = "";
+        if (playIntegrity) {
+            if (!request.getArg("gradleDependencies", "").contains("com.google.android.play:integrity")) {
+                String integrityVersion = request.getArg("android.playIntegrityVersion", "1.4.0");
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.google.android.play:integrity:"+integrityVersion+"\"\n"
+                );
+            }
+            String verifyUrl = request.getArg("android.playIntegrity.verifyUrl", null);
+            if (verifyUrl != null && verifyUrl.length() > 0) {
+                String escapedUrl = verifyUrl.replace("\\", "\\\\").replace("\"", "\\\"");
+                playIntegrityCall = "        try {\n"
+                        + "            final String __cn1IntegrityUrl = \"" + escapedUrl + "\";\n"
+                        + "            final android.content.Context __cn1Ctx = getApplicationContext();\n"
+                        + "            new Thread(new Runnable() { public void run() {\n"
+                        + "                try {\n"
+                        + "                    String __cn1Nonce = java.util.UUID.randomUUID().toString();\n"
+                        + "                    com.google.android.play.core.integrity.IntegrityManager __cn1IM = com.google.android.play.core.integrity.IntegrityManagerFactory.create(__cn1Ctx);\n"
+                        + "                    com.google.android.gms.tasks.Task __cn1Task = __cn1IM.requestIntegrityToken(com.google.android.play.core.integrity.IntegrityTokenRequest.builder().setNonce(__cn1Nonce).build());\n"
+                        + "                    com.google.android.play.core.integrity.IntegrityTokenResponse __cn1Resp = (com.google.android.play.core.integrity.IntegrityTokenResponse) com.google.android.gms.tasks.Tasks.await(__cn1Task);\n"
+                        + "                    String __cn1Token = __cn1Resp.token();\n"
+                        + "                    java.net.HttpURLConnection __cn1Conn = (java.net.HttpURLConnection) new java.net.URL(__cn1IntegrityUrl).openConnection();\n"
+                        + "                    __cn1Conn.setRequestMethod(\"POST\");\n"
+                        + "                    __cn1Conn.setDoOutput(true);\n"
+                        + "                    __cn1Conn.setRequestProperty(\"Content-Type\", \"application/json\");\n"
+                        + "                    byte[] __cn1Body = (\"{\\\"nonce\\\":\\\"\" + __cn1Nonce + \"\\\",\\\"token\\\":\\\"\" + __cn1Token + \"\\\"}\").getBytes(\"UTF-8\");\n"
+                        + "                    __cn1Conn.getOutputStream().write(__cn1Body);\n"
+                        + "                    int __cn1Code = __cn1Conn.getResponseCode();\n"
+                        + "                    if (__cn1Code < 200 || __cn1Code >= 300) {\n"
+                        + "                        android.util.Log.e(\"Codename One\", \"Play Integrity verification failed: \" + __cn1Code + \". Exiting app.\");\n"
+                        + "                        System.exit(0);\n"
+                        + "                    }\n"
+                        + "                } catch(Throwable __cn1Ex) {\n"
+                        + "                    android.util.Log.e(\"Codename One\", \"Play Integrity check error\", __cn1Ex);\n"
+                        + "                }\n"
+                        + "            }}).start();\n"
+                        + "        } catch(Throwable t) {}\n";
+            }
+        }
+
+        // android.accessibilityGuard detects malware abusing Android accessibility
+        // services. Any enabled service whose package is not in
+        // android.accessibilityGuard.allow trips the guard; android.accessibilityGuard.mode
+        // (exit|warn, default exit) decides whether to terminate or just log.
+        String accessibilityGuardCall = "";
+        if (accessibilityGuard) {
+            String allow = request.getArg("android.accessibilityGuard.allow", "");
+            String mode = request.getArg("android.accessibilityGuard.mode", "exit");
+            StringBuilder allowArr = new StringBuilder();
+            String[] allowParts = allow.split(",");
+            for (int i = 0; i < allowParts.length; i++) {
+                String p = allowParts[i].trim();
+                if (p.length() > 0) {
+                    if (allowArr.length() > 0) {
+                        allowArr.append(", ");
+                    }
+                    allowArr.append("\"").append(p.replace("\\", "\\\\").replace("\"", "\\\"")).append("\"");
+                }
+            }
+            accessibilityGuardCall = "        try {\n"
+                    + "            String[] __cn1Allow = new String[] {" + allowArr.toString() + "};\n"
+                    + "            android.view.accessibility.AccessibilityManager __cn1AM = (android.view.accessibility.AccessibilityManager) getSystemService(android.content.Context.ACCESSIBILITY_SERVICE);\n"
+                    + "            java.util.List __cn1Svcs = __cn1AM == null ? null : __cn1AM.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK);\n"
+                    + "            if (__cn1Svcs != null) {\n"
+                    + "                for (int __cn1i = 0; __cn1i < __cn1Svcs.size(); __cn1i++) {\n"
+                    + "                    android.accessibilityservice.AccessibilityServiceInfo __cn1Info = (android.accessibilityservice.AccessibilityServiceInfo) __cn1Svcs.get(__cn1i);\n"
+                    + "                    String __cn1Id = __cn1Info.getId();\n"
+                    + "                    if (__cn1Id == null) { continue; }\n"
+                    + "                    String __cn1Pkg = __cn1Id;\n"
+                    + "                    int __cn1Slash = __cn1Pkg.indexOf('/');\n"
+                    + "                    if (__cn1Slash >= 0) { __cn1Pkg = __cn1Pkg.substring(0, __cn1Slash); }\n"
+                    + "                    boolean __cn1Ok = false;\n"
+                    + "                    for (int __cn1j = 0; __cn1j < __cn1Allow.length; __cn1j++) { if (__cn1Allow[__cn1j].equals(__cn1Pkg)) { __cn1Ok = true; break; } }\n"
+                    + "                    if (!__cn1Ok) {\n"
+                    + "                        android.util.Log.e(\"Codename One\", \"Untrusted accessibility service enabled: \" + __cn1Id);\n"
+                    + (mode.equals("warn") ? "" : "                        System.exit(0);\n")
+                    + "                    }\n"
+                    + "                }\n"
+                    + "            }\n"
+                    + "        } catch(Throwable t) { android.util.Log.e(\"Codename One\", \"Accessibility guard error\", t); }\n";
+        }
+
 
         String waitingForPermissionsRequest=
                 "        if (isWaitingForPermissionResult()) {\n" +
@@ -3295,6 +3502,8 @@ public class AndroidGradleBuilder extends Executor {
                     + "        super.onCreate(savedInstanceState);\n"
                     + fridaDetectionCall
                     + rootCheckCall
+                    + accessibilityGuardCall
+                    + playIntegrityCall
                     + facebookHashCode
                     + facebookSupport
                     + mapsProviderSupport
@@ -3444,6 +3653,7 @@ public class AndroidGradleBuilder extends Executor {
                             + "    public void run(Form currentForm, boolean wasStopped) {\n"
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
+                            + firebaseRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"
                             + fcmRegisterPushCode

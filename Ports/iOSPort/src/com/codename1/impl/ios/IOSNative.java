@@ -422,6 +422,11 @@ public final class IOSNative {
     native String getUDID();
     native String getOSVersion();
     native String getDeviceName();
+    // The hardware/marketing model identifier (e.g. "iPhone15,2"). Unlike
+    // getDeviceName() -- which returns the user-assigned device name and is
+    // therefore personally identifying -- this is safe to use for analytics
+    // device segmentation.
+    native String getDeviceHardwareModel();
 
     // Diagnostics for the status-bar tap-to-scroll-to-top path. Surfaced to
     // user code via Display.getProperty("cn1.iosStatusBarTap.*") in
@@ -895,6 +900,21 @@ public final class IOSNative {
 
     /** Invalidates the LAContext so the in-flight prompt resolves with LAErrorAppCancel. */
     native void stopBiometricAuthentication();
+
+    // --- App Attest (DeviceCheck.framework) ---------------------------------
+
+    /** True when {@code DCAppAttestService.sharedService.isSupported} on this device. */
+    native boolean isAppAttestSupported();
+
+    /**
+     * Generates/uses an App Attest hardware key and produces an attestation bound
+     * to the SHA-256 of {@code nonce}. Native code calls back into
+     * {@code IOSDeviceIntegrity.nativeAttestSuccess(int, String)} or
+     * {@code IOSDeviceIntegrity.nativeAttestError(int, String)} with the same
+     * requestId. The success token is {@code base64(keyId):base64(attestationObject)}
+     * for the backend to verify with Apple.
+     */
+    native void requestAppAttestToken(int requestId, String nonce);
 
     // --- Secure storage (Security.framework keychain) -----------------------
 
