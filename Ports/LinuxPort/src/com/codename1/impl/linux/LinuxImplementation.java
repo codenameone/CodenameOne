@@ -545,6 +545,17 @@ public class LinuxImplementation extends CodenameOneImplementation {
         LinuxNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
     }
 
+    /// Issue #5273: confine a clip set while a component paints to its flushed
+    /// (dirty) region. The Linux port draws screen ops immediately into a
+    /// persistent Cairo surface, so without this an oversized clip would escape
+    /// the repainted sub-region and leave stale pixels until a full repaint.
+    @Override
+    protected void setPaintDirtyRegionClip(int x, int y, int width, int height) {
+        if (windowGraphicsPeer != 0) {
+            LinuxNative.setFlushRect(windowGraphicsPeer, x, y, width, height);
+        }
+    }
+
     /*
      * Capture the already-rendered window instead of the base behaviour, which
      * re-paints the current form into a fresh mutable image

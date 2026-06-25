@@ -169,7 +169,14 @@
 extern int popoverSupported();
 //#define CN1_INCLUDE_NOTIFICATIONS2
 #define INCLUDE_CN1_PUSH2
-#ifdef CN1_INCLUDE_NOTIFICATIONS2
+// Import UserNotifications whenever it is actually used below. The push code
+// (INCLUDE_CN1_PUSH2) references UNUserNotificationCenter/UNNotification*, but
+// the import was gated only on CN1_INCLUDE_NOTIFICATIONS2 and otherwise relied
+// on clang's implicit module auto-import. Enabling the Metal screenTexture
+// readback above (compiled on iOS now, not just Catalyst/TV) perturbs that
+// auto-import and the push symbols fail to resolve; importing the framework
+// explicitly when push is enabled makes it robust.
+#if defined(CN1_INCLUDE_NOTIFICATIONS2) || (defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH)
 #import <UserNotifications/UserNotifications.h>
 #endif
 #if !TARGET_OS_WATCH
@@ -6703,7 +6710,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
+#if defined(CN1_USE_METAL)
 // Reads the Metal renderer's persistent screenTexture back into a CGImage.
 // screenTexture is exactly the frame presentFramebuffer blits into the
 // CAMetalLayer drawable, so it IS the genuine on-screen pixel content. Unlike
@@ -6741,14 +6748,14 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                            width:w height:h mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
-#if TARGET_OS_TV
-    // tvOS is unified-memory only (like iOS): MTLStorageModeManaged and
-    // -synchronizeResource: are unavailable. Stage into a Shared texture, which
-    // the CPU can getBytes from directly once the blit completes -- no
-    // synchronize step is needed.
-    desc.storageMode = MTLStorageModeShared;
-#else
+#if TARGET_OS_MACCATALYST
     desc.storageMode = MTLStorageModeManaged;
+#else
+    // iOS (device + simulator) and tvOS are unified-memory: MTLStorageModeManaged
+    // and -synchronizeResource: are unavailable there. Stage into a Shared
+    // texture, which the CPU can getBytes from directly once the blit completes
+    // -- no synchronize step is needed.
+    desc.storageMode = MTLStorageModeShared;
 #endif
     id<MTLTexture> staging = [device newTextureWithDescriptor:desc];
     if (staging == nil) {
@@ -6763,9 +6770,9 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
                 toTexture:staging
          destinationSlice:0 destinationLevel:0
         destinationOrigin:MTLOriginMake(0, 0, 0)];
-#if !TARGET_OS_TV
+#if TARGET_OS_MACCATALYST
     // Managed storage (Catalyst) must be synchronized to become CPU-visible;
-    // Shared storage (tvOS) is already CPU-visible, so this would be invalid.
+    // Shared storage (iOS / tvOS) is already CPU-visible, so this would be invalid.
     [blit synchronizeResource:staging];
 #endif
     [blit endEncoding];
@@ -6912,12 +6919,24 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
     }
 #endif
-#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
+#if defined(CN1_USE_METAL)
     // The Metal screen view: capture from the renderer's screenTexture, the
     // exact pixels presented to the drawable. On headless Mac Catalyst the
     // display link never presents, so -drawViewHierarchyInRect: below would
     // snapshot a stale CALayer frame. The screenTexture readback is always the
     // latest committed frame, so it is both correct and deterministic.
+    //
+    // This used to be gated to Catalyst/TV, leaving the iPhone/iPad simulator
+    // and device on drawViewHierarchyInRect:afterScreenUpdates:NO, which
+    // snapshots the CALayer's currently-presented drawable. That drawable lags
+    // the screenTexture: presentFramebuffer commits the screenTexture->drawable
+    // blit without waiting (METALView.m), and the CALayer composites it on a
+    // later CA transaction, so a screenshot taken right after a Form.show()
+    // could capture the PREVIOUS form (the stale-frame race that made
+    // DesktopModeScreenshotTest non-deterministic -- it intermittently captured
+    // the prior test's form). The screenTexture readback below blits +
+    // waitUntilCompleted, so it always reflects the latest committed CN1 frame
+    // regardless of drawable-present / CALayer-composite timing.
     if (!drawn && [renderView isKindOfClass:[METALView class]]) {
         CGImageRef cg = cn1_copyMetalScreenTextureImage((METALView *)renderView);
         if (cg != NULL) {

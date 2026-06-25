@@ -75,6 +75,12 @@ typedef struct CN1Graphics {
     struct CN1Font* font;       /* current font (not owned) */
     cairo_matrix_t transform;   /* current affine (identity by default) */
     int isWindowTarget;         /* 1 for the on-screen/headless window buffer */
+    /* Issue #5273: the current paintDirty flush region (screen space), pushed by
+     * setFlushRect before a component paints. A rectangular screen clip is
+     * confined to it in cn1LinuxApplyClip so an oversized clip cannot escape the
+     * repainted sub-region and leave stale pixels on the persistent surface.
+     * flushW/flushH == 0 means "no flush rect set" -> the clip is left unclamped. */
+    int flushX, flushY, flushW, flushH;
 } CN1Graphics;
 
 /* A resolved Pango font description + a metrics snapshot for fast char widths. */

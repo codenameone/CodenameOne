@@ -36,6 +36,7 @@
 #import "CN1WatchHost.h"
 #import "CN1WatchRenderingView.h"
 #import "CN1CGGraphics.h"
+#import "ClipRect.h"
 #import "DrawString.h"
 #import "GLUIImage.h"
 
@@ -43,6 +44,14 @@ extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(voi
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(void);
 
 static CodenameOne_GLViewController *singletonInstance = nil;
+
+// Issue #5273: the partial-flush region handed to flushBuffer (the only place
+// the watch slice learns which sub-region is being repainted). drawFrame feeds
+// it to ClipRect.setDrawRect so a screen clip emitted while draining the op
+// queue is confined to the flushed region instead of escaping into a fixed
+// band on the persistent CG surface. Stays CGRectZero until the first flush, at
+// which point the clamp in ClipRect's watch branch is a guarded no-op.
+static CGRect watchFlushRect;
 
 @implementation CodenameOne_GLViewController
 
@@ -108,16 +117,27 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 #endif
 }
 
-// flushBuffer swaps the upcoming queue into the current one and requests a
+// flushBuffer hands the accumulated op queue to the renderer and requests a
 // paint; the actual rasterization happens in drawFrame (driven by CN1WatchHost).
 - (void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
     @synchronized (self) {
         if ([upcomingTarget count] > 0) {
-            NSMutableArray *tmp = currentTarget;
-            currentTarget = upcomingTarget;
-            upcomingTarget = tmp;
+            // Issue #5273: APPEND the accumulated ops to the not-yet-drawn set
+            // rather than swapping and discarding the previous set. When
+            // setNeedsDisplay coalesces several flushes into one drawFrame the
+            // old swap dropped every batch but the last, leaving stale pixels on
+            // the persistent CG surface -- which only looked correct before the
+            // clip clamp because the unclamped draws overpainted them. Keeping
+            // every batch is what makes the clamp safe (e.g. the lightweight
+            // picker's multi-flush repaint no longer corrupts).
+            [currentTarget addObjectsFromArray:upcomingTarget];
             [upcomingTarget removeAllObjects];
         }
+        // Union the flushed sub-regions so a clip drained in drawFrame is
+        // confined to the combined dirty area of all coalesced flushes; each op
+        // still draws within its own region, the union only widens the clamp.
+        CGRect r = CGRectMake(x, y, width, height);
+        watchFlushRect = CGRectIsEmpty(watchFlushRect) ? r : CGRectUnion(watchFlushRect, r);
     }
     [[CN1WatchHost sharedHost] setNeedsDisplay];
 }
@@ -133,10 +153,22 @@ static CodenameOne_GLViewController *singletonInstance = nil;
         return;
     }
     NSArray *ops;
+    CGRect flushRect;
     @synchronized (self) {
         ops = [currentTarget copy];
+        // Snapshot the flush region with the op queue it belongs to.
+        flushRect = watchFlushRect;
+        // Consume both: these ops + region are about to be drawn, so the next
+        // flush starts fresh. The persistent bitmap keeps the pixels, so a later
+        // forced re-present (drawScreen) still shows this frame.
+        [currentTarget removeAllObjects];
+        watchFlushRect = CGRectZero;
     }
     [v setFramebuffer];
+    // Issue #5273: publish the flush region to ClipRect so a screen clip
+    // drained below is clamped to the repainted sub-region (the watch branch of
+    // ClipRect.execute no-ops the clamp while this is empty).
+    [ClipRect setDrawRect:flushRect];
     for (ExecutableOp *op in ops) {
         @try {
             [op executeWithClipping];
@@ -144,6 +176,11 @@ static CodenameOne_GLViewController *singletonInstance = nil;
             // Keep draining; a single failing op shouldn't blank the frame.
         }
     }
+    // Issue #5273: clear the flush region now the screen drain is done so a
+    // mutable-image draw executed immediately outside drawFrame is not clamped
+    // to the screen flush rect (the clamp in ClipRect's watch branch no-ops on
+    // an empty drawingRect).
+    [ClipRect setDrawRect:CGRectZero];
     [v presentFramebuffer];
     painted = YES;
 #ifndef CN1_USE_ARC

@@ -12,6 +12,7 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.ClipUnderRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
 import com.codenameone.examples.hellocodenameone.tests.graphics.EmptyClip;
+import com.codenameone.examples.hellocodenameone.tests.graphics.PartialFlushClipEscape;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradientStops;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawImage;
@@ -158,6 +159,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // backend used to open the whole framebuffer instead, flooding the
             // screen with the fully-clipped-out draws.
             new EmptyClip(),
+            // Regression guard for issue #5273: a clip emitted during a PARTIAL
+            // flush (a scrollable BorderLayout.CENTER repainting under a fixed
+            // header) must be clamped to the flushed sub-region. The iOS Metal
+            // backend skipped that clamp, so the fill escaped into the fixed
+            // toolbar / NORTH band and blanked it in the persistent screenTexture.
+            new PartialFlushClipEscape(),
             new TileImage(),
             new Rotate(),
             new TransformTranslation(),
