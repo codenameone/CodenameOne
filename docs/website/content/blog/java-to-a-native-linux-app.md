@@ -45,7 +45,7 @@ Rendering was the easy part. The two genuinely hard parts of shipping a Linux de
 **glibc.** This is the single worst thing about shipping a Linux binary, and the only thing worse is the alternative. A binary linked against a new glibc refuses to start on a machine with an older one, and "older" can mean a distribution from last year. The fix is to build against an old glibc, so the resulting binary needs only an ancient, universally present version. We compile against roughly `GLIBC_2.17`, which dates to 2013, so the ELF starts on essentially any mainstream desktop. GTK3 is linked dynamically and resolved from the system at startup; it has shipped on every Linux desktop since 2011.
 
 {{< mermaid >}}
-flowchart LR
+flowchart TD
     A["Your Java / Kotlin"] --> B["ParparVM: bytecode to C"]
     B --> C["zig cc against an old glibc"]
     C --> D["Single self-contained ELF<br/>resources embedded"]
