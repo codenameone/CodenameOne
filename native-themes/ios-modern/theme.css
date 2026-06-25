@@ -217,13 +217,13 @@ Button {
     margin: 0;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: rgba(255,255,255,0.48);
+    background-color: rgba(255,255,255,0.34);
     /* iOS 26 glass buttons are capsules (fully rounded sides). */
     cn1-background-type: cn1-pill-border;
     /* Real Liquid Glass: blur the backdrop behind the capsule (no CEF), then the
        light translucent tint above frosts it. The blur is most visible over busy
        content; over a smooth backdrop the tint carries the look. */
-    backdrop-filter: blur(14px);
+    backdrop-filter: blur(16px);
     text-align: center;
 }
 /* Pressed (light): the frosted capsule dims slightly. */
@@ -244,7 +244,7 @@ RaisedButton.disabled { background-color: rgba(0,122,255,0.18); color: rgba(255,
 
 /* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
    backdrop shows through) with a blue label. */
-FlatButton { cn1-derive: Button; color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.28); cn1-background-type: cn1-pill-border; backdrop-filter: blur(14px); }
+FlatButton { cn1-derive: Button; color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.2); cn1-background-type: cn1-pill-border; backdrop-filter: blur(16px); }
 FlatButton.pressed { color: var(--accent-pressed-color, #0064d1); background-color: rgba(255,255,255,0.42); cn1-background-type: cn1-pill-border; }
 
 TextField {
@@ -511,7 +511,7 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: rgba(255,255,255,0.58);
+    background-color: rgba(255,255,255,0.5);
     color: #3c3c43;
     /* Liquid Glass floating tab pill: blur the backdrop, frost with a light tint. */
     backdrop-filter: blur(18px);
@@ -525,9 +525,9 @@ TabsContainer {
 Tab {
     color: #3c3c43;
     background-color: transparent;
-    /* Wide horizontal padding spreads the three items toward the native pill width;
-       taller vertical padding grows the pill height toward the native bar. */
-    padding: 1.8mm 5.5mm 1.8mm 5.5mm;
+    /* Moderate padding: enough to spread the three items toward the native pill
+       width without an over-tall/over-wide pill. */
+    padding: 1.1mm 3.8mm 1.1mm 3.8mm;
     margin: 0;
     font-family: "native:MainRegular";
     font-size: 1.2mm;
@@ -750,11 +750,11 @@ PopupContent {
     /* Dark glass button: a translucent blue capsule with white text. */
     /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop) with a
        white label -- not a blue fill. */
-    Button { color: #ffffff; background-color: rgba(20,20,24,0.52); cn1-background-type: cn1-pill-border; backdrop-filter: blur(14px); }
+    Button { color: #ffffff; background-color: rgba(20,20,24,0.36); cn1-background-type: cn1-pill-border; backdrop-filter: blur(16px); }
     Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); cn1-background-type: cn1-pill-border; }
     Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.4); cn1-background-type: cn1-pill-border; }
     /* Dark clearGlass FlatButton: lighter dark capsule, blue label. */
-    FlatButton { color: var(--accent-color-dark, #0a84ff); background-color: rgba(60,60,66,0.4); cn1-background-type: cn1-pill-border; backdrop-filter: blur(14px); }
+    FlatButton { color: var(--accent-color-dark, #0a84ff); background-color: rgba(60,60,66,0.28); cn1-background-type: cn1-pill-border; backdrop-filter: blur(16px); }
     FlatButton.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(80,80,86,0.5); cn1-background-type: cn1-pill-border; }
 
     RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }

@@ -183,7 +183,11 @@ public class FidelityDeviceRunner {
                         // full-width but thin, vertically centred (newTile uses a
                         // LEFT/CENTRE flow). There is no Material 48dp touch-target inset
                         // on iOS, so every widget anchors at the top-left with no margin.
-                        if ("Slider".equals(c.getId())) {
+                        if ("Toolbar".equals(c.getId())) {
+                            // Match the native nav bar's covered height (~7.3mm); the
+                            // bar is NORTH-anchored so the sharp backdrop fills below.
+                            comp.setPreferredH(disp.convertToPixels(7.3f));
+                        } else if ("Slider".equals(c.getId())) {
                             comp.setPreferredW(w);
                             // Height = the knob's height (the painter draws the thumb at
                             // the component height); taller so the knob is a tall vertical
@@ -241,8 +245,37 @@ public class FidelityDeviceRunner {
             }
         });
         settle();
-        Image screen = captureScreen();
-        cropAndEmit(screen, wrappers, names, w, h);
+        emitTiles(wrappers, names);
+    }
+
+    // Render each tile into its OWN mutable Image via paintComponent, rather than
+    // screenshotting the live form. This is what makes CSS backdrop-filter:blur work
+    // for the glass tiles: the blur hook (Component.internalPaintImpl) calls
+    // impl.blurRegion, and the iOS/Android/JavaSE ports can blur a mutable image's
+    // backing buffer in place -- which they cannot do for the live screen drawable.
+    // It also sidesteps screen retina-scale / peer-compositing entirely.
+    private void emitTiles(List wrappers, List names) {
+        final int n = wrappers.size();
+        final Image[] imgs = new Image[n];
+        runOnEdtSync(new Runnable() {
+            public void run() {
+                for (int i = 0; i < n; i++) {
+                    Container tile = (Container) wrappers.get(i);
+                    int cw = tile.getWidth() > 0 ? tile.getWidth() : 1;
+                    int ch = tile.getHeight() > 0 ? tile.getHeight() : 1;
+                    Image img = Image.createImage(cw, ch, 0xffffffff);
+                    com.codename1.ui.Graphics g = img.getGraphics();
+                    g.translate(-tile.getAbsoluteX(), -tile.getAbsoluteY());
+                    tile.paintComponent(g, true);
+                    imgs[i] = img;
+                }
+            }
+        });
+        for (int i = 0; i < n; i++) {
+            if (imgs[i] != null) {
+                Cn1ssDeviceRunnerHelper.emitImage(imgs[i], (String) names.get(i), null);
+            }
+        }
     }
 
     // ---- Native render ----
@@ -472,7 +505,15 @@ public class FidelityDeviceRunner {
         tile.setPreferredW(w);
         tile.setPreferredH(h);
         if (fullWidth) {
-            tile.add(BorderLayout.CENTER, comp);
+            if ("ios".equals(platform) && "Toolbar".equals(compId)) {
+                // The native nav bar covers only the top ~7mm of the tile (its blurred
+                // glass); the rest of the tile shows the SHARP backdrop. Anchor the CN1
+                // bar NORTH at its natural height so the tile's (sharp) backdrop shows
+                // below it, matching the native golden -- not a full-height blurred bar.
+                tile.add(BorderLayout.NORTH, comp);
+            } else {
+                tile.add(BorderLayout.CENTER, comp);
+            }
         } else {
             tile.add(comp);
         }

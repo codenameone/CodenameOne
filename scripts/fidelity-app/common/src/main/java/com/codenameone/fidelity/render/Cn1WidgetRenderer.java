@@ -232,7 +232,10 @@ public final class Cn1WidgetRenderer {
                 // reads through at high saturation; an opaque-ish wash (175) read as a
                 // near-white bar that didn't match the native glass at all. Light glass
                 // washes only lightly toward white (~90/255); dark glass barely darkens.
-                bar.getAllStyles().setBgTransparency(dark ? 55 : 90);
+                // With the backdrop now genuinely blurred behind the bar, only a light
+                // frosting is needed -- a heavier wash reads as a flat pale bar vs the
+                // native glass (which keeps the blurred backdrop's colour).
+                bar.getAllStyles().setBgTransparency(dark ? 38 : 48);
                 Container row = new Container(new BorderLayout());
                 row.setUIID("Container");
                 row.getAllStyles().setBgTransparency(0);
