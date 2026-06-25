@@ -169,6 +169,20 @@ static CGRect watchFlushRect;
     // drained below is clamped to the repainted sub-region (the watch branch of
     // ClipRect.execute no-ops the clamp while this is empty).
     [ClipRect setDrawRect:flushRect];
+    // Issue #5273: the persistent CG bitmap is never otherwise cleared, so a
+    // previous form/test's pixels survive under areas the new frame's CLAMPED
+    // draws no longer overpaint (before the clamp the unclamped draws covered
+    // them). On a FULL-screen flush clear the bitmap first: a full repaint's ops
+    // repaint the whole surface with the opaque form background, so this is
+    // gap-safe (nothing is left transparent) and removes the stale underlay.
+    // Partial flushes are left alone (their ops may not cover the whole region).
+    int lw = [v logicalWidth];
+    int lh = [v logicalHeight];
+    if (flushRect.origin.x <= 1 && flushRect.origin.y <= 1 &&
+        flushRect.size.width >= lw - 1 && flushRect.size.height >= lh - 1) {
+        CN1CGResetClip();
+        CN1CGClearRect(0, 0, lw, lh);
+    }
     for (ExecutableOp *op in ops) {
         @try {
             [op executeWithClipping];
