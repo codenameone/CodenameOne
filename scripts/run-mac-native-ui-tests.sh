@@ -224,7 +224,48 @@ XCODE_BUILD_CMD=(
   "GCC_OPTIMIZATION_LEVEL=${CN1_TEST_OPT_LEVEL:-2}"
   build
 )
-if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
+
+# On fresh GitHub macOS runners the very first xcodebuild against a
+# freshly-generated project sometimes runs before Xcode has enumerated its
+# build destinations, so the build aborts in ~2s with an *empty* "Available
+# destinations" list and "Unable to find a destination matching ... Mac
+# Catalyst". Mac Catalyst is not a downloadable runtime -- it is the host
+# macOS SDK already shipped inside Xcode, so there is nothing to fetch; the
+# destination cache just needs to warm. Poll -showdestinations until the
+# Catalyst destination is listed before building (mirrors the iOS scripts).
+warm_catalyst_destination() {
+  local deadline=$(( $(date +%s) + 90 ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" \
+         -showdestinations 2>/dev/null | grep -q "Mac Catalyst"; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
+
+BUILD_OK=0
+for attempt in 1 2 3; do
+  if [ "$attempt" -gt 1 ]; then
+    rm_log "xcodebuild could not resolve the Mac Catalyst destination (attempt $((attempt - 1))); warming destinations and retrying"
+  fi
+  if warm_catalyst_destination; then
+    rm_log "Mac Catalyst destination available"
+  else
+    rm_log "Mac Catalyst destination still not listed after 90s warm-up; attempting build anyway"
+  fi
+  if "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
+    BUILD_OK=1
+    break
+  fi
+  # Only the destination-resolution race is transient -- a genuine clang/link
+  # error must fail fast rather than burn three full builds.
+  if ! grep -q "Unable to find a destination matching" "$BUILD_LOG"; then
+    break
+  fi
+done
+if [ "$BUILD_OK" -ne 1 ]; then
   rm_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
   exit 10
 fi

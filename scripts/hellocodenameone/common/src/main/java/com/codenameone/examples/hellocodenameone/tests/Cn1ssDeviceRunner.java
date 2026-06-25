@@ -205,6 +205,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ChartTransformScreenshotTest(),
             new ChartRotatedScreenshotTest(),
             new BrowserComponentScreenshotTest(),
+            new RichTextAreaScreenshotTest(),
+            new CodeEditorScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
             new SheetSlideUpAnimationScreenshotTest(),

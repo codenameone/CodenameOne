@@ -51,7 +51,7 @@ Two more parts follow on the next Thursdays: a blackjack card game, then a first
 It is seamless in three senses. You do not wire up anything complex: the build servers do the heavy lifting. It connects to GitHub issues instead of sending a barrage of emails. And it symbolicates native crashes on every operating system we support, so a faulting address on iOS, Android, Windows or Linux comes back as a readable stack. On the device, reports are written to storage before they are sent and only deleted after the server confirms receipt, so nothing is lost to a flaky connection; a failed send is retried on the next launch and the server deduplicates it.
 
 {{< mermaid >}}
-flowchart LR
+flowchart TD
     A["App crashes on device"] --> B["Write report to Storage with eventId"]
     B --> C["POST to the crash endpoint"]
     C -->|2xx confirmed| D["Delete the stored report"]

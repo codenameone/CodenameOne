@@ -48,7 +48,7 @@ The same Debug tool window you use for any other Java project. Frames panel on t
 On iOS the IDE never talks to the device directly. The CN1 Debug Proxy is a small Java process you run on your developer machine. It binds two TCP ports: one for the iOS app to dial into using the CN1 wire protocol, and one that speaks standard JDWP for the IDE. The IDE sees a normal remote JVM. The iOS app sees a debug proxy. The proxy translates between the two and walks the ParparVM struct layout so Java fields, method calls, and values round-trip cleanly in both directions.
 
 {{< mermaid >}}
-flowchart LR
+flowchart TD
     IDE["IntelliJ IDEA<br/><i>any OS</i>"] -- "JDWP<br/>(localhost:8000)" --> Proxy["CN1 Debug Proxy<br/><i>your dev machine</i>"]
     Proxy -- "CN1 wire protocol<br/>(Wi-Fi or loopback)" --> App["Codename One iOS app<br/><i>real iPhone or iOS Simulator</i>"]
 {{< /mermaid >}}
@@ -56,7 +56,7 @@ flowchart LR
 On Android the proxy is unnecessary. Dalvik / ART implement JDWP themselves, so IntelliJ attaches directly to the device through `adb`'s built-in JDWP forwarder. The Maven plugin's new `cn1:android-on-device-debugging` goal does the `adb` orchestration and the port forwarding for you.
 
 {{< mermaid >}}
-flowchart LR
+flowchart TD
     IDE["IntelliJ IDEA<br/><i>macOS / Linux / Windows</i>"] -- "JDWP<br/>(localhost:5005)" --> ADB["adb forward<br/><i>your dev machine</i>"]
     ADB -- "JDWP over USB or Wi-Fi" --> Device["Android device<br/>or emulator<br/><i>Dalvik / ART</i>"]
 {{< /mermaid >}}

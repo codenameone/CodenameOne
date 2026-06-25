@@ -143,6 +143,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private PeerComponent browserComponent;
     private final List<String> browserExecuted = new ArrayList<>();
     private final Map<PeerComponent, String> browserUrls = new HashMap<PeerComponent, String>();
+    private boolean editorNativePeerSupported = false;
+    private String lastEditorType;
+    private PeerComponent lastEditorPeer;
+    private final List<String> editorCommands = new ArrayList<String>();
+    private Function<String, String> editorQueryResponder;
     private AsyncResource<Media> backgroundMediaAsync;
     private Media backgroundMedia;
     private Media media;
@@ -950,6 +955,68 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return browserExecuted;
     }
 
+    // --- Native editor SPI test backing (RichTextArea / CodeEditor) ---
+    // When editorNativePeerSupported is true the editor components run against this
+    // deterministic native backend instead of the BrowserComponent fallback, which lets
+    // unit tests exercise the full command/query/event machinery without a real web view.
+
+    @Override
+    public PeerComponent createNativeEditorPeer(Object editorComponent, String editorType) {
+        if (!editorNativePeerSupported) {
+            return null;
+        }
+        lastEditorType = editorType;
+        lastEditorPeer = new PeerComponent(new Object()) {
+        };
+        return lastEditorPeer;
+    }
+
+    @Override
+    public void editorPeerCommand(PeerComponent peer, String name, String arg) {
+        editorCommands.add(name + ":" + (arg == null ? "" : arg));
+    }
+
+    @Override
+    public String editorPeerQuery(PeerComponent peer, String name, String arg) {
+        if (editorQueryResponder != null) {
+            String r = editorQueryResponder.apply(name + ":" + (arg == null ? "" : arg));
+            if (r != null) {
+                return r;
+            }
+        }
+        return "";
+    }
+
+    public void setEditorNativePeerSupported(boolean supported) {
+        this.editorNativePeerSupported = supported;
+    }
+
+    public boolean isEditorNativePeerSupported() {
+        return editorNativePeerSupported;
+    }
+
+    public String getLastEditorType() {
+        return lastEditorType;
+    }
+
+    public PeerComponent getLastEditorPeer() {
+        return lastEditorPeer;
+    }
+
+    public List<String> getEditorCommands() {
+        return editorCommands;
+    }
+
+    public String getLastEditorCommand() {
+        return editorCommands.isEmpty() ? null : editorCommands.get(editorCommands.size() - 1);
+    }
+
+    /// Configures the canned response for editorPeerQuery. The responder receives "name:arg"
+    /// and returns the value to hand back to the editor, or null to fall through to "".
+    public void setEditorQueryResponder(Function<String, String> responder) {
+        this.editorQueryResponder = responder;
+    }
+
     @Override
     public void blockCopyPaste(boolean blockCopyPaste) {
         this.blockCopyAndPaste = blockCopyPaste;
@@ -1077,6 +1144,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         databases.clear();
         browserExecuted.clear();
         browserUrls.clear();
+        editorNativePeerSupported = false;
+        lastEditorType = null;
+        lastEditorPeer = null;
+        editorCommands.clear();
+        editorQueryResponder = null;
         mediaAsync = null;
         hasDragStarted = null;
         backgroundMediaAsync = null;
