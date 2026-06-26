@@ -540,6 +540,21 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-23T15:02:27+00:00"
       }
+    },
+    "native-linux-apple-watch-game-builder-crash-protection": {
+      "devto": {
+        "id": 3998768,
+        "url": "https://dev.to/codenameone/native-linux-apple-watch-a-game-builder-and-crash-protection-2i4c",
+        "syndicated_at": "2026-06-26T13:40:18+00:00"
+      },
+      "foojay": {
+        "id": 124397,
+        "url": "https://foojay.io/wp-admin/post.php?post=124397&action=edit",
+        "preview_url": "https://foojay.io/?p=124397",
+        "featured_media_id": 124396,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-26T13:41:12+00:00"
+      }
     }
   }
 }
