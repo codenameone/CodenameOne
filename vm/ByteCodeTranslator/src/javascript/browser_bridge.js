@@ -1569,6 +1569,92 @@
     return hostResult(event);
   });
 
+  // Copy text to the system clipboard ON THE MAIN THREAD. The worker that runs
+  // the translated Java cannot reach the clipboard itself: document/execCommand
+  // do not exist in a Web Worker and navigator.clipboard is a Window-only API.
+  // The Java copyToClipboard() therefore routes the actual write here, where it
+  // still runs inside the transient user-activation window carried by the
+  // forwarded click that triggered it. Returns 1 on success, 0 on failure so the
+  // worker can fall back to its permission-prompt path.
+  function execCommandClipboardFallback(text) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) {
+      return false;
+    }
+    var textArea = doc.createElement('textarea');
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-1000px';
+    textArea.style.left = '0';
+    textArea.style.opacity = '0';
+    doc.body.appendChild(textArea);
+    textArea.value = text;
+    var ok = false;
+    try {
+      textArea.focus();
+      textArea.select();
+      ok = !!doc.execCommand('copy');
+    } catch (err) {
+      ok = false;
+    }
+    doc.body.removeChild(textArea);
+    return ok;
+  }
+
+  hostBridge.register('__cn1_copy_to_clipboard__', function(request) {
+    var text = (request && request.text != null) ? String(request.text) : '';
+    var nav = global.navigator || (global.window && global.window.navigator);
+    try {
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        return nav.clipboard.writeText(text).then(function() {
+          return 1;
+        }, function() {
+          return execCommandClipboardFallback(text) ? 1 : 0;
+        });
+      }
+    } catch (err) {
+      // navigator.clipboard can throw synchronously in insecure contexts.
+    }
+    return execCommandClipboardFallback(text) ? 1 : 0;
+  });
+
+  // Web Share API (navigator.share / navigator.canShare) is Window-only and so
+  // is unreachable from the worker that runs the translated Java. Both the
+  // capability check and the share invocation are routed here to the main
+  // thread, where navigator.share lives and the forwarded click's user
+  // activation is still valid. Mirrors the clipboard handlers above.
+  hostBridge.register('__cn1_native_share_supported__', function() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    var loc = (global.window || global).location;
+    var secure = !!(loc && (loc.protocol === 'https:'
+      || loc.hostname === 'localhost' || loc.hostname === '127.0.0.1'));
+    return (nav && typeof nav.share === 'function' && secure) ? 1 : 0;
+  });
+
+  hostBridge.register('__cn1_native_share__', function(request) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    if (!nav || typeof nav.share !== 'function') {
+      return 0;
+    }
+    var data = {};
+    if (request && request.text != null && String(request.text).length) {
+      data.text = String(request.text);
+    }
+    if (request && request.url != null && String(request.url).length) {
+      data.url = String(request.url);
+    }
+    try {
+      // Resolves 0 on user-cancel/abort -- a rejection here is not an error.
+      return nav.share(data).then(function() {
+        return 1;
+      }, function() {
+        return 0;
+      });
+    } catch (err) {
+      return 0;
+    }
+  });
+
   function afterPaint(frames) {
     return new Promise(function(resolve) {
       var win = global.window || global;

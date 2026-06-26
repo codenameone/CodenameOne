@@ -9829,13 +9829,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return isNavigatorShareSupported_();
     }
 
-    @JSBody(params={"url"}, script="navigator.share({text:'', url:url})")
+    // navigator.share is Window-only, so on the worker-based port these scripts
+    // run where it does not exist. Fire-and-forget the share to the main thread
+    // (__cn1_native_share__ in browser_bridge.js) using the same host-call
+    // message shape the renderer uses for void surface ops. On the legacy
+    // main-thread (TeaVM) runtime navigator.share is present and used directly.
+    // __cn1Share(text, url) is the shared JS helper prepended to each script.
+    private static final String SHARE_POST_HELPER =
+        "function __cn1Share(t, u){"
+        // Worker args arrive as Java String objects; convert to native JS strings
+        // (toNativeString is a no-op on real strings, so this is safe on TeaVM).
+      + "  var hasJ = (typeof jvm !== 'undefined' && jvm && typeof jvm.toNativeString === 'function');"
+      + "  var ts = hasJ ? jvm.toNativeString(t) : t; var us = hasJ ? jvm.toNativeString(u) : u;"
+      + "  ts = (ts == null || ts === 'null') ? '' : String(ts); us = (us == null || us === 'null') ? '' : String(us);"
+      + "  try { if (typeof navigator !== 'undefined' && navigator.share) { navigator.share({text: ts, url: us}); return; } } catch (e) {}"
+      + "  try {"
+      + "    var m = { type: 'host-call', symbol: '__cn1_native_share__', args: [{ text: ts, url: us, __cn1_no_response: true }], id: 0 };"
+      + "    if (typeof self !== 'undefined') {"
+      + "      if (typeof self.emitVmMessage === 'function') { self.emitVmMessage(m); }"
+      + "      else if (typeof self.postMessage === 'function') { self.postMessage(m); }"
+      + "    }"
+      + "  } catch (e) {}"
+      + "}";
+
+    @JSBody(params={"url"}, script=SHARE_POST_HELPER + " __cn1Share('', url);")
     private native static void shareURL_(String url);
-    
-    @JSBody(params={"text"}, script="navigator.share({text:text, url:''})")
+
+    @JSBody(params={"text"}, script=SHARE_POST_HELPER + " __cn1Share(text, '');")
     private native static void shareText_(String text);
-    
-    @JSBody(params={"text", "link"}, script="navigator.share({text:text, url:link})")
+
+    @JSBody(params={"text", "link"}, script=SHARE_POST_HELPER + " __cn1Share(text, link);")
     private native static void shareTextAndLink_(String text, String link);
     
     @Override
@@ -10182,7 +10205,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     @JSBody(params={"command"}, script="if (!document.queryCommandEnabled) return true; return document.queryCommandEnabled(command);")
     private native static boolean queryCommandEnabled(String command);
-    
+
+    // Writes text to the system clipboard. On the worker-based JavaScript port
+    // this method is overridden by a port.js binding that hands the write to the
+    // main thread (the worker has no document/execCommand and no
+    // navigator.clipboard), so the @JSBody below is only ever used by the legacy
+    // main-thread (TeaVM) runtime, where document.execCommand is available.
+    @JSBody(params={"text"}, script=
+        "try {" +
+        "  var ta = document.createElement('textarea');" +
+        "  ta.setAttribute('readonly', '');" +
+        "  ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.left = '0'; ta.style.opacity = '0';" +
+        "  document.body.appendChild(ta);" +
+        "  ta.value = text;" +
+        "  var ok = false;" +
+        "  try { ta.focus(); ta.select(); ok = !!document.execCommand('copy'); } catch (e) { ok = false; }" +
+        "  document.body.removeChild(ta);" +
+        "  return ok;" +
+        "} catch (e) { return false; }")
+    private native static boolean nativeBrowserCopyToClipboard(String text);
+
     @Override
     public void copyToClipboard(Object obj) {
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
@@ -10192,6 +10234,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         String selectedText = (String)obj;
+        // Preferred path: let the main thread perform the copy via the modern
+        // async clipboard API (or an execCommand fallback). This is the only
+        // path that works on the worker-based port; the textarea/execCommand
+        // dance below runs in the worker where document is unavailable.
+        if (nativeBrowserCopyToClipboard(selectedText)) {
+            return;
+        }
         HTMLDocument doc = Window.current().getDocument();
         HTMLTextAreaElement textArea = (HTMLTextAreaElement)doc.createElement("textarea");
         textArea.setAttribute("readonly", "");

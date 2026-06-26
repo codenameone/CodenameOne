@@ -1797,6 +1797,37 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
   return flags[jvm.toNativeString(name)] ? 1 : 0;
 });
 
+// The clipboard is unreachable from the worker (no document/execCommand, and
+// navigator.clipboard is Window-only), so route the write to the main thread
+// host bridge, which performs it within the forwarded click's user activation.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard___java_lang_String_R_boolean"
+], function*(text) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const value = text == null ? "" : jvm.toNativeString(text);
+  const result = yield jvm.invokeHostNative("__cn1_copy_to_clipboard__", [{ text: value }]);
+  return result ? 1 : 0;
+});
+
+// navigator.share lives on the main-thread Window only, so the worker cannot
+// answer "is native share supported" itself -- route the check to the host.
+// (The actual share() invocations are void and self-route via the @JSBody
+// fire-and-forget host-call in HTML5Implementation.) Symbol mangling mirrors
+// the no-arg boolean isPhone_ binding above.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isNavigatorShareSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isNavigatorShareSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const result = yield jvm.invokeHostNative("__cn1_native_share_supported__", []);
+  return result ? 1 : 0;
+});
+
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
   const win = global.window || global;
   const normalizeWheel = win.cn1NormalizeWheel;
