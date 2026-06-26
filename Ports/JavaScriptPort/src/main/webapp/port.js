@@ -1828,6 +1828,20 @@ bindNative([
   return result ? 1 : 0;
 });
 
+// The build version lives on the host page's <html data-cn1-app-version> and is
+// unreadable from the worker. Route to the host; null falls back to AppVersion
+// in getBuildVersion(). Safe either way -- the @JSBody is document-guarded.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBuildVersion__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBuildVersion___R_java_lang_String"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const value = yield jvm.invokeHostNative("__cn1_build_version__", []);
+  return value == null ? null : jvm.createStringLiteral(String(value));
+});
+
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
   const win = global.window || global;
   const normalizeWheel = win.cn1NormalizeWheel;

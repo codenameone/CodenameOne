@@ -1655,6 +1655,17 @@
     }
   });
 
+  // The build version is published as the data-cn1-app-version attribute on the
+  // host page's <html> element, which the worker can't read (no document). Used
+  // for cache-busting resource URLs; returns null when absent.
+  hostBridge.register('__cn1_build_version__', function() {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.documentElement) {
+      return null;
+    }
+    return doc.documentElement.getAttribute('data-cn1-app-version');
+  });
+
   function afterPaint(frames) {
     return new Promise(function(resolve) {
       var win = global.window || global;

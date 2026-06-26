@@ -518,8 +518,8 @@ final class PlaygroundExamples {
             import com.codename1.ui.layouts.*;
 
             // Prints an image through Printer.printImage(). On the web this opens
-            // the browser print dialog for a generated PNG. A null result listener
-            // is passed -- the print outcome callback is optional.
+            // the browser print dialog for a generated PNG. The result listener
+            // is a lambda (PrintResultListener is in the lambda-adapter switch).
             Container root = new Container(BoxLayout.y());
             root.setScrollableY(true);
             root.add(new SpanLabel("Generate an image and send it to the platform print dialog."));
@@ -536,9 +536,12 @@ final class PlaygroundExamples {
                 g.fillRect(0, 0, 400, 250);
                 g.setColor(0xffffff);
                 g.drawString("Codename One Playground", 40, 110);
-                Printer.printImage(img, null);
-                status.setText("Print dialog requested");
+                status.setText("Printing...");
                 status.getParent().revalidate();
+                Printer.printImage(img, result -> {
+                    status.setText("Print result: " + result);
+                    status.getParent().revalidate();
+                });
                 ctx.log("printImage called");
             });
 

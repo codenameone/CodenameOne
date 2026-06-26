@@ -2378,7 +2378,8 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             "com.codename1.ui.events.ActionListener",
             "java.lang.Runnable",
             "com.codename1.ui.events.DataChangedListener",
-            "com.codename1.ui.events.SelectionListener"
+            "com.codename1.ui.events.SelectionListener",
+            "com.codename1.printing.PrintResultListener"
         };
         Map<String, ApiClass> byName = new HashMap<String, ApiClass>();
         for (GeneratedPackage pkg : discovery.packages) {
