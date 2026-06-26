@@ -132,7 +132,11 @@ The fastest way to build and debug an in-car experience is the Codename One simu
 
 This needs no iOS/Android toolchain, no entitlement and no head unit -- it exercises the same portable template tree and the same `CarActionListener` callbacks (on the EDT) that ship to the device, so you can iterate on your screens in seconds. If you haven't called `Car.setApplication(...)` the menu tells you so. The simulated head unit approximates the two platform styles and the driver-distraction row caps; it's a debugging aid, not a pixel-accurate emulation.
 
-image::img/car-carplay-list.png[Simulated CarPlay head unit in the Codename One simulator,640]
+image::img/car-sim-carplay-list.png[Simulated CarPlay head unit rendering a CarListTemplate,640]
+
+Selecting a browsable row pushes the next screen, just as it would in the car -- here a `CarGridTemplate`, reachable via the *Back* button:
+
+image::img/car-sim-carplay-grid.png[Simulated CarPlay head unit rendering a CarGridTemplate,640]
 
 === Testing on the real platforms
 
