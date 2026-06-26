@@ -28,7 +28,7 @@ Crash protection last week was the first clear example. Analytics this week is t
 
 {{< mermaid >}}
 flowchart TD
-    A["Your app calls Analytics.event(...)"] --> B{"Consent gate<br/>(opt-in by default)"}
+    A["Your app calls Analytics.event()"] --> B{"Consent gate<br/>(opt-in by default)"}
     B -->|granted| C["AnalyticsProvider SPI"]
     B -->|denied| Z["Nothing leaves the device"]
     C --> D["GoogleAnalyticsProvider (GA4)"]
@@ -57,7 +57,7 @@ Analytics.event(AnalyticsEvent.create("checkout")
         .build());
 ```
 
-Five providers ship in the box: our first-party `CodenameOneAnalyticsProvider` (batched to the cloud, part of a paid plan), `GoogleAnalyticsProvider` for GA4, the privacy-first non-Google `MatomoAnalyticsProvider`, `FirebaseAnalyticsProvider`, and a `LoggingAnalyticsProvider` for development. The old `AnalyticsService` is still there, deprecated, and now delegates to the new API so existing apps keep working. {{< post-link path="/blog/privacy-first-analytics" text="Monday's post" >}} is the full walkthrough.
+Five providers ship in the box: our first-party `CodenameOneAnalyticsProvider` (batched to the cloud, part of a paid plan), `GoogleAnalyticsProvider` for GA4, the privacy-first non-Google `MatomoAnalyticsProvider`, `FirebaseAnalyticsProvider`, and a `LoggingAnalyticsProvider` for development. The old `AnalyticsService` is still there, deprecated, and now delegates to the new API so existing apps keep working. The full walkthrough is in {{< post-link path="/blog/privacy-first-analytics" text="Monday's post" >}}.
 
 ## Maps you control, down to the pixel
 
@@ -65,7 +65,7 @@ Five providers ship in the box: our first-party `CodenameOneAnalyticsProvider` (
 
 ![A pure-vector OpenStreetMap render and the same area in the built-in dark style, both drawn entirely through the Codename One Graphics pipeline with no native peer](/blog/vector-and-native-maps/maps-vector.png)
 
-The second component, `NativeMap`, is the native-provider path for when you want Apple MapKit or Google Maps, and it is wired through an SPI selected by a build hint rather than code. Because the provider is injected at build time, the core and ports carry no map SDK, unused providers cost zero project size, and adding a provider for a device without Google Play, Huawei for instance, is a build-hint change, not a fork. When no provider is configured, `NativeMap` falls back to an embedded `MapView`. {{< post-link path="/blog/vector-and-native-maps" text="Saturday's post" >}} covers the engine and the provider model.
+The second component, `NativeMap`, is the native-provider path for when you want Apple MapKit or Google Maps, and it is wired through an SPI selected by a build hint rather than code. Because the provider is injected at build time, the core and ports carry no map SDK, unused providers cost zero project size, and adding a provider for a device without Google Play, Huawei for instance, is a build-hint change, not a fork. When no provider is configured, `NativeMap` falls back to an embedded `MapView`. The engine and the provider model are covered in {{< post-link path="/blog/vector-and-native-maps" text="Saturday's post" >}}.
 
 ## Apple TV, Android TV, and CSS that knows the form factor
 
@@ -82,7 +82,7 @@ The part with the most day-to-day reach is in the styling layer. The CSS engine 
 }
 ```
 
-That work also finished wiring `@media` for the existing watch port, which never had it. Apple TV builds from the same project once you point `codename1.tvMain` at a tvOS target, and the framework's screenshot suite already renders the full component set on the Apple TV simulator. {{< post-link path="/blog/apple-tv-and-android-tv" text="Tuesday's post" >}} goes through the form-factor API, the `@media` styling, and shows real Codename One UI running on the TV.
+That work also finished wiring `@media` for the existing watch port, which never had it. Apple TV builds from the same project once you point `codename1.tvMain` at a tvOS target, and the framework's screenshot suite already renders the full component set on the Apple TV simulator. The form-factor API and the `@media` styling, with real Codename One UI running on the TV, are covered in {{< post-link path="/blog/apple-tv-and-android-tv" text="Tuesday's post" >}}.
 
 ## Rich text and code editing
 
@@ -90,7 +90,7 @@ That work also finished wiring `@media` for the existing watch port, which never
 
 ![The CodeEditor with Java syntax highlighting, a gutter, and an async code-completion popup, and the RichTextArea WYSIWYG editor with a formatting toolbar](/blog/rich-text-and-code-editing/components-codeeditor.png)
 
-Both sit on a single `AbstractEditorComponent` with two interchangeable backends: a fully cross-platform engine made of self-contained HTML and JS inside the core jar, and an optional richer native backend a port can supply. The `CodeEditor` is not a toy demo: the Playground already uses it. {{< post-link path="/blog/rich-text-and-code-editing" text="Sunday's post" >}} is the deep dive.
+Both sit on a single `AbstractEditorComponent` with two interchangeable backends: a fully cross-platform engine made of self-contained HTML and JS inside the core jar, and an optional richer native backend a port can supply. The `CodeEditor` is not a toy demo: the Playground already uses it. The deep dive is in {{< post-link path="/blog/rich-text-and-code-editing" text="Sunday's post" >}}.
 
 ## Device integrity and app review
 

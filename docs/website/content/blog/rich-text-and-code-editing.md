@@ -34,7 +34,7 @@ flowchart TD
 
 ## CodeEditor
 
-`CodeEditor` highlights eight languages: java, kotlin, js, python, css, xml, json and c. It draws a line-number gutter, ships light and dark themes, and auto-closes brackets and quotes as you type.
+`CodeEditor` highlights eight languages: java, kotlin, js, python, css, xml, json, and c. It draws a line-number gutter, ships light and dark themes, and auto-closes brackets and quotes as you type.
 
 ```java
 CodeEditor editor = new CodeEditor();

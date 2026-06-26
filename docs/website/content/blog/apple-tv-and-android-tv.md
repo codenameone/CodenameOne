@@ -88,7 +88,7 @@ android.tv=true
 android.tv.banner=tv_banner.png
 ```
 
-When `android.tv` is set, `AndroidGradleBuilder` adds the `LEANBACK_LAUNCHER` intent category so the app shows up on the TV home screen, declares the `android.software.leanback` uses-feature, marks the touchscreen optional so non-touch devices still qualify, and generates a 320x180 `tv_banner` (overridable via `android.tv.banner`). One build, three device classes.
+When `android.tv` is set, `AndroidGradleBuilder` adds the `LEANBACK_LAUNCHER` intent category so the app shows up on the TV home screen, declares the `android.software.leanback` uses-feature, marks the touchscreen optional so non-touch devices still qualify, and generates a 320×180 `tv_banner` (overridable via `android.tv.banner`). One build, three device classes.
 
 ## Apple TV: a separate Metal target
 

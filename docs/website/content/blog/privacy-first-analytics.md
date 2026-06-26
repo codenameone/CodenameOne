@@ -26,7 +26,7 @@ So instead of patching the old service, the new code separates the three concern
 
 {{< mermaid >}}
 flowchart TD
-  A["Your app calls Analytics.event(...)"] --> B{"Consent gate<br/>opt-in by default"}
+  A["Your app calls Analytics.event()"] --> B{"Consent gate<br/>opt-in by default"}
   B -->|granted| C["fan out to every registered provider"]
   B -->|denied| Z["nothing leaves the device"]
   C --> D["GoogleAnalyticsProvider (GA4)"]
@@ -111,7 +111,7 @@ public class CountingProvider extends AbstractAnalyticsProvider {
 }
 ```
 
-`AnalyticsCapability` lets a caller ask a provider what it actually honors (`SCREEN_VIEWS`, `EVENTS`, `CRASH_REPORTING`, `FUNNELS`, `RAW_EXPORT` and so on) instead of guessing.
+`AnalyticsCapability` lets a caller ask a provider what it actually honors (`SCREEN_VIEWS`, `EVENTS`, `CRASH_REPORTING`, `FUNNELS`, `RAW_EXPORT`, among others) instead of guessing.
 
 ## Migrating from the old service
 
