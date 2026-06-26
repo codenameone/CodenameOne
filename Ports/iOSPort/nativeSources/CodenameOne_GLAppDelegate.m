@@ -48,6 +48,17 @@ int pendingRemoteNotificationRegistrations = 0;
 BOOL isAppSuspended = NO;
 static BOOL cn1GestureRecognizerInstalled = NO;
 static BOOL cn1IsHiddenInBackground = NO;
+#if TARGET_OS_MACCATALYST
+// trackpad / mouse-wheel scrolling on Mac Catalyst: a UIPanGestureRecognizer
+// configured for indirect scrolls only (maximumNumberOfTouches == 0) turns
+// two-finger trackpad and mouse-wheel scrolls into synthetic Codename One
+// pointer drags so scrollable containers scroll under the cursor, matching
+// desktop expectations. Direct touches are still handled by the tap recognizer.
+static BOOL cn1ScrollRecognizerInstalled = NO;
+extern void pointerPressedC(int* x, int* y, int length);
+extern void pointerDraggedC(int* x, int* y, int length);
+extern void pointerReleasedC(int* x, int* y, int length);
+#endif
 //GL_APP_DELEGATE_IMPORT
 //GL_APP_DELEGATE_INCLUDE
 
@@ -185,6 +196,60 @@ static void installSignalHandlers() {
     cn1GestureRecognizerInstalled = YES;
 }
 
+#if TARGET_OS_MACCATALYST
+- (void)cn1HandlePanScroll:(UIPanGestureRecognizer *)pan
+{
+    CodenameOne_GLViewController *viewController = [self cn1EnsureViewController];
+    UIView *view = viewController.view;
+    extern float scaleValue;
+    CGPoint loc = [pan locationInView:view];
+    CGPoint t = [pan translationInView:view];
+    // anchor the synthetic drag at the cursor so the scrollable under the
+    // pointer is the one that scrolls; only the vertical delta is applied.
+    int x[1];
+    int y[1];
+    x[0] = (int)(loc.x * scaleValue);
+    switch (pan.state) {
+        case UIGestureRecognizerStateBegan:
+            y[0] = (int)(loc.y * scaleValue);
+            pointerPressedC(x, y, 1);
+            break;
+        case UIGestureRecognizerStateChanged:
+            y[0] = (int)((loc.y + t.y) * scaleValue);
+            pointerDraggedC(x, y, 1);
+            break;
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled:
+        case UIGestureRecognizerStateFailed:
+            y[0] = (int)((loc.y + t.y) * scaleValue);
+            pointerReleasedC(x, y, 1);
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)cn1InstallScrollGestureRecognizerIfNeeded
+{
+    CodenameOne_GLViewController *viewController = [self cn1EnsureViewController];
+    if (cn1ScrollRecognizerInstalled || viewController.view.window == nil) {
+        return;
+    }
+    if (@available(macCatalyst 13.4, *)) {
+        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
+                initWithTarget:self action:@selector(cn1HandlePanScroll:)];
+        // indirect scrolls only - never steal direct finger drags from the
+        // tap recognizer, which keeps handling on-screen touch interactions.
+        pan.allowedScrollTypesMask = UIScrollTypeMaskAll;
+        pan.maximumNumberOfTouches = 0;
+        pan.cancelsTouchesInView = NO;
+        [viewController.view addGestureRecognizer:pan];
+        [pan release];
+        cn1ScrollRecognizerInstalled = YES;
+    }
+}
+#endif
+
 - (void)cn1InstallRootViewControllerIntoWindow:(UIWindow *)window
 {
     self.window = window;
@@ -197,6 +262,9 @@ static void installSignalHandlers() {
     // launch icon) that drawFrame fades out on the first content frame.
     CN1ShowLaunchPlaceholder(self.window);
     [self cn1InstallTapGestureRecognizerIfNeeded];
+#if TARGET_OS_MACCATALYST
+    [self cn1InstallScrollGestureRecognizerIfNeeded];
+#endif
 }
 
 - (void)cn1StoreAppArgForURL:(NSURL *)url
@@ -362,6 +430,23 @@ static void installSignalHandlers() {
     // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the
     // app will throw an NPE.
     installSignalHandlers();
+#if TARGET_OS_MACCATALYST
+    // A Catalyst app that supports macOS Automatic Termination is KILLED by the
+    // OS when it is not the active app, to reclaim resources. A desktop app -
+    // and especially the simulator relay - must keep running in the background.
+    // The clean opt-out is NSSupportsAutomaticTermination=NO in Info.plist (the
+    // relay build sets it). NSProcessInfo's disable* methods are marked
+    // unavailable on Catalyst at compile time, but the AppKit implementation is
+    // there at runtime, so reach them through the Obj-C runtime as a backstop.
+    NSProcessInfo *cn1Pi = [NSProcessInfo processInfo];
+    if ([cn1Pi respondsToSelector:@selector(disableAutomaticTermination:)]) {
+        ((void (*)(id, SEL, id))objc_msgSend)(cn1Pi, @selector(disableAutomaticTermination:),
+                @"Codename One desktop app stays alive in the background");
+    }
+    if ([cn1Pi respondsToSelector:@selector(disableSuddenTermination)]) {
+        ((void (*)(id, SEL))objc_msgSend)(cn1Pi, @selector(disableSuddenTermination));
+    }
+#endif
 #ifdef CN1_ON_DEVICE_DEBUG
     // Spawn the on-device-debug listener thread. Non-blocking: if
     // CN1ProxyWaitForAttach=YES the function also installs a translucent
@@ -832,6 +917,11 @@ static NSString *cn1MacPendingTitle = nil;
 static BOOL cn1MacObserverRegistered = NO;
 static BOOL cn1MacUndecorated = NO;
 static BOOL cn1MacUndecoratedSet = NO;
+static BOOL cn1MacAlwaysOnTop = NO;
+static BOOL cn1MacAlwaysOnTopSet = NO;
+static BOOL cn1MacSolidTitlebarActive = NO;
+static int cn1MacPendingWidth = 0;
+static int cn1MacPendingHeight = 0;
 
 // Applies the "custom" desktop title-bar mode to the host NSWindow: hide the AppKit title bar so the
 // CN1 Toolbar (drawn at the top of the content) becomes the window's title bar, while keeping the
@@ -888,6 +978,139 @@ static void cn1ApplyMacWindowTitle(void) API_AVAILABLE(ios(13.0)) {
     }
 }
 
+// Always On Top: raise/lower the host NSWindow's level. NSFloatingWindowLevel == 3,
+// NSNormalWindowLevel == 0. All AppKit access goes through the Obj-C runtime.
+static void cn1ApplyMacWindowLevel(void) API_AVAILABLE(ios(13.0)) {
+    if (!cn1MacAlwaysOnTopSet) { return; }
+    const NSInteger CN1_FLOATING_LEVEL = 3;
+    const NSInteger CN1_NORMAL_LEVEL = 0;
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) { continue; }
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        for (UIWindow *w in ws.windows) {
+            id nsWindow = nil;
+            @try { nsWindow = [w valueForKey:@"_nsWindow"]; } @catch (id e) { nsWindow = nil; }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"nsWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"hostNSWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { continue; }
+            BOOL responds = [nsWindow respondsToSelector:@selector(setLevel:)];
+            if (responds) {
+                ((void (*)(id, SEL, NSInteger))objc_msgSend)(nsWindow, @selector(setLevel:),
+                        cn1MacAlwaysOnTop ? CN1_FLOATING_LEVEL : CN1_NORMAL_LEVEL);
+            }
+            // also nudge the collection behavior so a floating window stays
+            // visible across spaces / over fullscreen apps
+            if (cn1MacAlwaysOnTop && [nsWindow respondsToSelector:@selector(setCollectionBehavior:)]) {
+                // NSWindowCollectionBehaviorCanJoinAllSpaces (1<<0) | FullScreenAuxiliary (1<<8)
+                ((void (*)(id, SEL, NSUInteger))objc_msgSend)(nsWindow,
+                        @selector(setCollectionBehavior:), (NSUInteger)((1UL << 0) | (1UL << 8)));
+            }
+            NSInteger lvl = 0;
+            if ([nsWindow respondsToSelector:@selector(level)]) {
+                lvl = ((NSInteger (*)(id, SEL))objc_msgSend)(nsWindow, @selector(level));
+            }
+            NSLog(@"CN1SIM alwaysOnTop=%d window=%@ respondsSetLevel=%d levelAfter=%ld",
+                    (int)cn1MacAlwaysOnTop, [nsWindow class], (int)responds, (long)lvl);
+        }
+    }
+}
+
+// Resize the host NSWindow's content area to the requested size. The caller passes the size in
+// BACKING PIXELS (the relay's surface units); AppKit content sizes are in points, so divide by the
+// window's backingScaleFactor (retina = 2) before applying.
+static void cn1ApplyMacWindowSize(void) API_AVAILABLE(ios(13.0)) {
+    if (cn1MacPendingWidth <= 0 || cn1MacPendingHeight <= 0) { return; }
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) { continue; }
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        if (ws.sizeRestrictions == nil) { continue; }
+        // The caller passes BACKING PIXELS; sizeRestrictions are in points, so
+        // divide by the window's backing scale (retina = 2).
+        CGFloat scale = [UIScreen mainScreen].scale;
+        for (UIWindow *w in ws.windows) {
+            id nsWindow = nil;
+            @try { nsWindow = [w valueForKey:@"_nsWindow"]; } @catch (id e) { nsWindow = nil; }
+            if (nsWindow != nil && [nsWindow respondsToSelector:@selector(backingScaleFactor)]) {
+                scale = ((CGFloat (*)(id, SEL))objc_msgSend)(nsWindow, @selector(backingScaleFactor));
+                break;
+            }
+        }
+        if (scale <= 0.0) { scale = 2.0; }
+        CGFloat newW = (CGFloat)cn1MacPendingWidth / scale;
+        CGFloat newH = (CGFloat)cn1MacPendingHeight / scale;
+        // Catalyst manages window geometry through the scene, not the NSWindow -
+        // setContentSize is ignored. Pinning sizeRestrictions min==max forces
+        // the window to the target (this is what the fixedWindowSize build hint
+        // uses). Then relax a beat later so the user can still resize manually.
+        CGSize target = CGSizeMake(newW, newH);
+        ws.sizeRestrictions.minimumSize = target;
+        ws.sizeRestrictions.maximumSize = target;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+                dispatch_get_main_queue(), ^{
+            if (ws.sizeRestrictions != nil) {
+                ws.sizeRestrictions.minimumSize = CGSizeMake(160, 160);
+                ws.sizeRestrictions.maximumSize = CGSizeMake(100000, 100000);
+            }
+        });
+    }
+}
+
+// The simulator relay keeps its CN1 form transparent so the RPC-drawn Metal
+// surface shows through, which leaves the host NSWindow non-opaque - and a
+// non-opaque window's title bar is transparent glass that samples whatever is
+// behind/below it (floating traffic lights + a smeary blur). Give such a window
+// a solid opaque dark title bar. Gated on !isOpaque so ordinary opaque apps are
+// left completely untouched.
+static void cn1ApplyMacSolidTitlebar(void) API_AVAILABLE(ios(13.0)) {
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) { continue; }
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        for (UIWindow *w in ws.windows) {
+            id nsWindow = nil;
+            @try { nsWindow = [w valueForKey:@"_nsWindow"]; } @catch (id e) { nsWindow = nil; }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"nsWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"hostNSWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { continue; }
+            BOOL opaque = YES;
+            if ([nsWindow respondsToSelector:@selector(isOpaque)]) {
+                opaque = ((BOOL (*)(id, SEL))objc_msgSend)(nsWindow, @selector(isOpaque));
+            }
+            // Identify the relay (transparent-content) window the FIRST time it
+            // is seen non-opaque, then keep re-applying forever via the flag -
+            // because we set opaque=YES below, the isOpaque test alone would
+            // skip every later call and the title bar would revert (e.g. after
+            // a resize/rotate triggers the port's appearance re-sync).
+            if (opaque && !cn1MacSolidTitlebarActive) { continue; }
+            cn1MacSolidTitlebarActive = YES;
+            // Dark window appearance so AppKit draws the title bar dark with
+            // LIGHT (readable) title text, instead of dark-on-dark.
+            Class appearanceClass = NSClassFromString(@"NSAppearance");
+            if (appearanceClass != nil && [nsWindow respondsToSelector:@selector(setAppearance:)]) {
+                id darkAppearance = ((id (*)(Class, SEL, id))objc_msgSend)(
+                        appearanceClass, @selector(appearanceNamed:), @"NSAppearanceNameDarkAqua");
+                if (darkAppearance != nil) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(nsWindow, @selector(setAppearance:), darkAppearance);
+                }
+            }
+            if ([nsWindow respondsToSelector:@selector(setTitlebarAppearsTransparent:)]) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(nsWindow, @selector(setTitlebarAppearsTransparent:), NO);
+            }
+            Class colorClass = NSClassFromString(@"NSColor");
+            if (colorClass != nil && [nsWindow respondsToSelector:@selector(setBackgroundColor:)]) {
+                id darkColor = ((id (*)(Class, SEL, CGFloat, CGFloat, CGFloat, CGFloat))objc_msgSend)(
+                        colorClass, @selector(colorWithRed:green:blue:alpha:),
+                        (CGFloat)0.17, (CGFloat)0.17, (CGFloat)0.17, (CGFloat)1.0);
+                if (darkColor != nil) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(nsWindow, @selector(setBackgroundColor:), darkColor);
+                }
+            }
+            if ([nsWindow respondsToSelector:@selector(setOpaque:)]) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(nsWindow, @selector(setOpaque:), YES);
+            }
+        }
+    }
+}
+
 static void cn1RegisterMacObserver(void) API_AVAILABLE(ios(13.0)) {
     if (cn1MacObserverRegistered) { return; }
     cn1MacObserverRegistered = YES;
@@ -897,6 +1120,8 @@ static void cn1RegisterMacObserver(void) API_AVAILABLE(ios(13.0)) {
                                                   usingBlock:^(NSNotification *note) {
         cn1ApplyMacWindowTitle();
         cn1ApplyMacWindowChrome();
+        cn1ApplyMacWindowLevel();
+        cn1ApplyMacSolidTitlebar();
         [[UIMenuSystem mainSystem] setNeedsRebuild];
     }];
 }
@@ -918,8 +1143,30 @@ void CN1SetMacWindowUndecorated(BOOL undecorated) {
     }
 }
 
+void CN1SetMacWindowAlwaysOnTop(BOOL onTop) {
+    if (@available(iOS 13.0, *)) {
+        cn1MacAlwaysOnTop = onTop;
+        cn1MacAlwaysOnTopSet = YES;
+        cn1RegisterMacObserver();
+        dispatch_async(dispatch_get_main_queue(), ^{ cn1ApplyMacWindowLevel(); });
+    }
+}
+
+void CN1SetMacWindowContentSize(int width, int height) {
+    if (@available(iOS 13.0, *)) {
+        cn1MacPendingWidth = width;
+        cn1MacPendingHeight = height;
+        cn1RegisterMacObserver();
+        dispatch_async(dispatch_get_main_queue(), ^{ cn1ApplyMacWindowSize(); });
+    }
+}
+
 void CN1SetMacMenuLabels(NSArray *labels) {
-    cn1MacMenuLabels = labels;
+    // retain across the async rebuild: the caller's array is autoreleased and
+    // buildMenuWithBuilder reads it on a later main-queue turn (MRC file)
+    NSArray *old = cn1MacMenuLabels;
+    cn1MacMenuLabels = [labels retain];
+    [old release];
     if (@available(iOS 13.0, *)) {
         cn1RegisterMacObserver();
         dispatch_async(dispatch_get_main_queue(), ^{ [[UIMenuSystem mainSystem] setNeedsRebuild]; });
@@ -945,16 +1192,79 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     return nil;
 }
 
+// A menu node: { title, elements }. "elements" is an ordered list of entries,
+// each a dictionary tagged "cmd" (a UICommand), "sep" (a divider) or "submenu"
+// (a nested node). "childMap" dedups submenus by title so repeated hint paths
+// accumulate into one submenu. All collections are autoreleased (MRC file) and
+// live only for the duration of buildMenuWithBuilder.
+static NSMutableDictionary *cn1NewMenuNode(NSString *title) API_AVAILABLE(ios(13.0));
+static NSMutableDictionary *cn1NewMenuNode(NSString *title) {
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    d[@"title"] = title != nil ? title : @"";
+    d[@"elements"] = [NSMutableArray array];
+    d[@"childMap"] = [NSMutableDictionary dictionary];
+    return d;
+}
+
+static UIMenu *cn1BuildSubmenu(NSDictionary *node, NSString *identifier) API_AVAILABLE(ios(13.0));
+
+// Converts a node's elements into the child element list of its UIMenu. Runs of
+// commands/submenus between "-" separators become inline groups, so adjacent
+// groups render with a divider line between them.
+static NSArray<UIMenuElement *> *cn1BuildMenuChildren(NSDictionary *node) API_AVAILABLE(ios(13.0));
+static NSArray<UIMenuElement *> *cn1BuildMenuChildren(NSDictionary *node) {
+    NSMutableArray<UIMenuElement *> *result = [NSMutableArray array];
+    NSMutableArray<UIMenuElement *> *group = [NSMutableArray array];
+    for (NSDictionary *el in (NSArray *)node[@"elements"]) {
+        if (el[@"sep"] != nil) {
+            if (group.count > 0) {
+                [result addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil
+                                                options:UIMenuOptionsDisplayInline
+                                               children:[group copy]]];
+                [group removeAllObjects];
+            }
+        } else if (el[@"cmd"] != nil) {
+            [group addObject:el[@"cmd"]];
+        } else if (el[@"submenu"] != nil) {
+            [group addObject:cn1BuildSubmenu(el[@"submenu"], nil)];
+        }
+    }
+    if (group.count > 0) {
+        [result addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil
+                                        options:UIMenuOptionsDisplayInline
+                                       children:[group copy]]];
+    }
+    return result;
+}
+
+static UIMenu *cn1BuildSubmenu(NSDictionary *node, NSString *identifier) {
+    return [UIMenu menuWithTitle:node[@"title"] image:nil identifier:identifier
+                         options:0 children:cn1BuildMenuChildren(node)];
+}
+
 - (void)buildMenuWithBuilder:(id<UIMenuBuilder>)builder API_AVAILABLE(ios(13.0)) {
     [super buildMenuWithBuilder:builder];
+    // Strip the boilerplate Catalyst menus an app-less host has no use for
+    // (File / Edit / Format / View / Window). Only when the app actually pushes
+    // its own menu rows - otherwise leave the defaults so a plain Mac app keeps
+    // its standard menu bar.
+    if (cn1MacMenuLabels != nil && cn1MacMenuLabels.count > 0) {
+        [builder removeMenuForIdentifier:UIMenuFile];
+        [builder removeMenuForIdentifier:UIMenuEdit];
+        [builder removeMenuForIdentifier:UIMenuFormat];
+        [builder removeMenuForIdentifier:UIMenuView];
+        [builder removeMenuForIdentifier:UIMenuWindow];
+    }
     if (cn1MacMenuLabels == nil || cn1MacMenuLabels.count == 0) {
         return;
     }
-    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>" rows by hint, preserving
-    // first-seen order. The row index is the command index passed back to Java, so it must match
-    // IOSImplementation's filtered list.
-    NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
-    NSMutableDictionary<NSString *, NSMutableArray<UICommand *> *> *groups = [NSMutableDictionary dictionary];
+    // Each row is "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<checked>".
+    // The hint may nest submenus with ">" (e.g. "Device>Skin"); a "-" label is a
+    // divider; a "c" in the checked column shows a checkmark. The row index i is
+    // the command index passed back to Java, so it MUST stay the absolute loop
+    // index (separators consume an index too, matching the filtered Java list).
+    NSMutableArray<NSMutableDictionary *> *topOrder = [NSMutableArray array];
+    NSMutableDictionary<NSString *, NSMutableDictionary *> *topMap = [NSMutableDictionary dictionary];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
         NSString *row = cn1MacMenuLabels[i];
         NSArray<NSString *> *cols = [row componentsSeparatedByString:@"\t"];
@@ -962,6 +1272,39 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         NSString *label = (cols.count > 1) ? cols[1] : row;
         int shortcutKeyChar = (cols.count > 2) ? [cols[2] intValue] : 0;
         int shortcutModifiers = (cols.count > 3) ? [cols[3] intValue] : 0;
+        BOOL checked = (cols.count > 4)
+                && [cols[4] rangeOfString:@"c"].location != NSNotFound;
+
+        // resolve the hint path into menu nodes, creating submenus as needed
+        NSMutableArray<NSString *> *segs = [NSMutableArray array];
+        for (NSString *seg in [hint componentsSeparatedByString:@">"]) {
+            NSString *t = [seg stringByTrimmingCharactersInSet:
+                    [NSCharacterSet whitespaceCharacterSet]];
+            if (t.length > 0) { [segs addObject:t]; }
+        }
+        if (segs.count == 0) { [segs addObject:@"Commands"]; }
+        NSString *topTitle = segs[0];
+        NSMutableDictionary *node = topMap[topTitle];
+        if (node == nil) {
+            node = cn1NewMenuNode(topTitle);
+            topMap[topTitle] = node;
+            [topOrder addObject:node];
+        }
+        for (NSUInteger s = 1; s < segs.count; s++) {
+            NSMutableDictionary *childMap = node[@"childMap"];
+            NSMutableDictionary *child = childMap[segs[s]];
+            if (child == nil) {
+                child = cn1NewMenuNode(segs[s]);
+                childMap[segs[s]] = child;
+                [(NSMutableArray *)node[@"elements"] addObject:@{@"submenu": child}];
+            }
+            node = child;
+        }
+
+        if ([label isEqualToString:@"-"]) {
+            [(NSMutableArray *)node[@"elements"] addObject:@{@"sep": @YES}];
+            continue;
+        }
         UICommand *cmd;
         if (shortcutKeyChar != 0) {
             // Java Command modifier flags: PRIMARY=1 (Command on mac), SHIFT=2, ALT=4
@@ -982,41 +1325,41 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
                                        action:@selector(cn1MenuAction:)
                                  propertyList:@(i)];
         }
-        NSMutableArray<UICommand *> *bucket = groups[hint];
-        if (bucket == nil) {
-            bucket = [NSMutableArray array];
-            groups[hint] = bucket;
-            [groupOrder addObject:hint];
-        }
-        [bucket addObject:cmd];
+        if (checked) { cmd.state = UIMenuElementStateOn; }
+        [(NSMutableArray *)node[@"elements"] addObject:@{@"cmd": cmd}];
     }
+
+    // place each top-level node: standard menus (App/File/Edit/View/Window/Help)
+    // receive the items inline; everything else becomes a custom top-level menu,
+    // chained after View in first-seen order
     NSUInteger customMenuCounter = 0;
-    for (NSString *hint in groupOrder) {
-        NSArray<UICommand *> *bucket = groups[hint];
+    NSString *lastCustomId = nil;
+    for (NSMutableDictionary *tn in topOrder) {
         BOOL placeAtStart = NO;
-        NSString *targetIdentifier = cn1MenuIdentifierForHint(hint, &placeAtStart);
+        NSString *targetIdentifier = cn1MenuIdentifierForHint(tn[@"title"], &placeAtStart);
+        NSArray<UIMenuElement *> *children = cn1BuildMenuChildren(tn);
         if (targetIdentifier != nil) {
-            // insert the commands as an inline (anonymous) group into the standard menu
-            UIMenu *inlineMenu = [UIMenu menuWithTitle:@""
-                                                 image:nil
-                                            identifier:nil
-                                               options:UIMenuOptionsDisplayInline
-                                              children:bucket];
-            if (placeAtStart) {
-                [builder insertChildMenu:inlineMenu atStartOfMenuForIdentifier:targetIdentifier];
-            } else {
-                [builder insertChildMenu:inlineMenu atEndOfMenuForIdentifier:targetIdentifier];
+            for (UIMenuElement *child in children) {
+                if (![child isKindOfClass:[UIMenu class]]) { continue; }
+                if (placeAtStart) {
+                    [builder insertChildMenu:(UIMenu *)child atStartOfMenuForIdentifier:targetIdentifier];
+                } else {
+                    [builder insertChildMenu:(UIMenu *)child atEndOfMenuForIdentifier:targetIdentifier];
+                }
             }
         } else {
-            // empty hint -> default "Commands" menu; custom hint -> a top-level menu by that title
-            NSString *title = (hint.length == 0) ? @"Commands" : hint;
-            NSString *identifier = [NSString stringWithFormat:@"com.codename1.menu.%lu", (unsigned long)customMenuCounter++];
-            UIMenu *menu = [UIMenu menuWithTitle:title
-                                           image:nil
-                                      identifier:identifier
-                                         options:0
-                                        children:bucket];
-            [builder insertSiblingMenu:menu afterMenuForIdentifier:UIMenuView];
+            NSString *identifier = [NSString stringWithFormat:@"com.codename1.menu.%lu",
+                    (unsigned long)customMenuCounter++];
+            UIMenu *menu = [UIMenu menuWithTitle:tn[@"title"] image:nil
+                                      identifier:identifier options:0 children:children];
+            if (lastCustomId == nil) {
+                // View is stripped above; anchor the first custom menu to the
+                // always-present application menu so ours sit right after it
+                [builder insertSiblingMenu:menu afterMenuForIdentifier:UIMenuApplication];
+            } else {
+                [builder insertSiblingMenu:menu afterMenuForIdentifier:lastCustomId];
+            }
+            lastCustomId = identifier;
         }
     }
 }

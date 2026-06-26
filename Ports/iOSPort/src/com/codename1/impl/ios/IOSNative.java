@@ -194,7 +194,15 @@ public final class IOSNative {
     // Toolbar acts as the window title bar, and make the window movable by its background so the
     // toolbar drags it. Passing false restores the standard titled window. A no-op on iOS/iPadOS.
     native void setMacWindowUndecorated(boolean undecorated);
-    
+
+    // Mac native (Catalyst): float the host window above all others (Always On Top) by raising its
+    // NSWindow level, or restore the normal level. Used by the simulator relay. A no-op on iOS/iPadOS.
+    native void setMacWindowAlwaysOnTop(boolean onTop);
+
+    // Mac native (Catalyst): resize the host window's content area to the given size in points. Used
+    // by the simulator relay to fit the window to the skin. A no-op on iOS/iPadOS.
+    native void setMacWindowContentSize(int width, int height);
+
     native void setImageName(long nativeImage, String name);
     
     native boolean canExecute(String url);

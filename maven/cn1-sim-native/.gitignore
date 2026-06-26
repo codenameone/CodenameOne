@@ -1,0 +1,5 @@
+# Build output (host jars, generated classes, native dylib/dll) - all script-built
+target/
+generator/target/
+*.dylib
+*.dll

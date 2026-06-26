@@ -4379,6 +4379,25 @@ public abstract class CodenameOneImplementation {
     public void setNativeCommands(Vector commands) {
     }
 
+    /// Floats the desktop host window above all others (Always On Top) or restores its normal
+    /// stacking level. Used by the simulator relay. No-op on platforms without a desktop window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onTop`: true to float the window, false to restore the normal level
+    public void setMacWindowAlwaysOnTop(boolean onTop) {
+    }
+
+    /// Resizes the desktop host window's content area, in backing pixels. Used by the simulator
+    /// relay to fit the window to the skin. No-op on platforms without a desktop window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the content width in backing pixels
+    /// - `height`: the content height in backing pixels
+    public void setMacWindowContentSize(int width, int height) {
+    }
+
     /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
     /// bar + native menu bar), {@code "custom"} (undecorated window where the CN1 Toolbar acts as
     /// the title bar) or {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"}

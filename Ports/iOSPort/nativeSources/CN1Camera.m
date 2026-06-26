@@ -32,6 +32,26 @@
 // thread state via getThreadLocalData() internally, so it takes no thread arg.
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
+// A preview host whose capture layer always fills its bounds. The simulator
+// (and device peer layout) resizes the host view after creation; a bare
+// CALayer does not autoresize with its view, so without this the preview
+// stays pinned at its initial frame and the view shows only its black
+// background.
+@interface CN1CameraPreviewView : UIView
+@property (nonatomic, readonly) AVCaptureVideoPreviewLayer *previewLayer;
+@end
+
+@implementation CN1CameraPreviewView
+// Make the capture layer the view's OWN backing layer: it then resizes with
+// the view automatically, no layoutSubviews needed (the simulator floats this
+// view and never drives a normal UIKit layout pass, so layoutSubviews was
+// never called and the preview stayed black).
++ (Class)layerClass { return [AVCaptureVideoPreviewLayer class]; }
+- (AVCaptureVideoPreviewLayer *)previewLayer {
+    return (AVCaptureVideoPreviewLayer *)self.layer;
+}
+@end
+
 @interface CN1Camera ()
 @property (nonatomic, copy) NSString *pendingPhotoFilePath;
 @property (nonatomic, assign) int pendingPhotoCallbackId;
@@ -161,14 +181,13 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
 - (UIView *)createPreviewView {
     if (self.previewView) return self.previewView;
-    UIView *v = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
+    CN1CameraPreviewView *v =
+        [[CN1CameraPreviewView alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
     v.backgroundColor = [UIColor blackColor];
-    AVCaptureVideoPreviewLayer *layer =
-        [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
+    // v.layer IS the AVCaptureVideoPreviewLayer (see +layerClass)
+    AVCaptureVideoPreviewLayer *layer = v.previewLayer;
+    layer.session = self.session;
     layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    layer.frame = v.bounds;
-    v.layer.masksToBounds = YES;
-    [v.layer addSublayer:layer];
     self.previewLayer = layer;
     self.previewView = v;
     return v;

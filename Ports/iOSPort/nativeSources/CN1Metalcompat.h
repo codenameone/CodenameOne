@@ -180,7 +180,13 @@ void CN1MetalFillPolygon(const float *xCoords, const float *yCoords, int num,
 // Draw an RGBA image to (x,y,w,h) with a uniform alpha modulator (0-255).
 // Texture is owned by the caller (typically a GLUIImage); it is retained
 // only for the current command buffer.
-void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height);
+// srcMutable: YES when the source texture is a mutable-image render target
+// (GLUIImage.mtlMutableTexture). On Mac Catalyst a mutable source rendered
+// INTO another mutable target samples V-flipped (the offscreen render-target
+// row convention differs from the screen drawable), so the caller flags it
+// and CN1MetalDrawImage compensates. Drawing a mutable to the screen is
+// unaffected. NO for plain UIImage-backed textures.
+void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height, BOOL srcMutable);
 
 // Tile an RGBA image across (x,y,w,h). imageWidth/imageHeight are the
 // natural size of the source UIImage. Issues one textured quad per

@@ -729,7 +729,12 @@ void CN1MetalClearRect(int x, int y, int width, int height) {
     drawQuad(CN1MetalPipelineClearPunch, vertices, NULL, zero, nil);
 }
 
-void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height) {
+// Forward declaration: the mutable-drain state flag is defined further down
+// (with the Phase 3 mutable-image side-trip statics) but CN1MetalDrawImage
+// below needs it for the Catalyst mutable-into-mutable V-flip compensation.
+static BOOL savedScreenStateValid;
+
+void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height, BOOL srcMutable) {
     if (texture == nil) return;
     float a = alpha / 255.0f;
     // Texture tint uses straight alpha modulator (no premultiplication here;
@@ -755,6 +760,24 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
         0, 1,
         1, 1
     };
+    // Mac Catalyst: a mutable-image source drawn INTO another mutable-image
+    // target (savedScreenStateValid == we are mid mutable-drain) samples
+    // V-flipped vs. the same source drawn to the screen drawable. The
+    // offscreen render target's row-0 lands at the opposite edge of the
+    // screen drawable's, so compensate by flipping V for this case only.
+    // Screen-dest draws and plain UIImage sources keep the mapping above.
+#if TARGET_OS_MACCATALYST
+    if (srcMutable && savedScreenStateValid) {
+        static const float texcoordsFlipV[8] = {
+            0, 1,
+            1, 1,
+            0, 0,
+            1, 0
+        };
+        drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoordsFlipV, tint, texture);
+        return;
+    }
+#endif
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, texture);
 }
 

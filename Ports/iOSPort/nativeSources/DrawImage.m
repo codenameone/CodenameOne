@@ -110,7 +110,7 @@ static GLuint getOGLProgram(){
 #ifdef USE_ES2
 -(void)execute {
 #ifdef CN1_USE_METAL
-    CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);
+    CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height, [img mtlMutableTexture] != nil);
 #else
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);

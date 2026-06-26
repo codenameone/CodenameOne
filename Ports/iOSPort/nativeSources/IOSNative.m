@@ -1664,6 +1664,8 @@ void com_codename1_impl_ios_IOSNative_setMacWindowDarkAppearance___boolean(CN1_T
 extern void CN1SetMacWindowTitle(NSString* title);
 extern void CN1SetMacMenuLabels(NSArray* labels);
 extern void CN1SetMacWindowUndecorated(BOOL undecorated);
+extern void CN1SetMacWindowAlwaysOnTop(BOOL onTop);
+extern void CN1SetMacWindowContentSize(int width, int height);
 #endif
 void com_codename1_impl_ios_IOSNative_setWindowTitle___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT title) {
 #if TARGET_OS_MACCATALYST
@@ -1683,6 +1685,16 @@ void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(C
 void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN undecorated) {
 #if TARGET_OS_MACCATALYST
     CN1SetMacWindowUndecorated(undecorated ? YES : NO);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_setMacWindowAlwaysOnTop___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN onTop) {
+#if TARGET_OS_MACCATALYST
+    CN1SetMacWindowAlwaysOnTop(onTop ? YES : NO);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_setMacWindowContentSize___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    CN1SetMacWindowContentSize((int)width, (int)height);
 #endif
 }
 

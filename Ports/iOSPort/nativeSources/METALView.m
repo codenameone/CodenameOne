@@ -417,7 +417,9 @@ extern BOOL isRetinaBug();
         // jarring than a black flash. screenTexture is rendered with the same
         // y-down projection, so CN1MetalDrawImage's V=0-at-top mapping keeps
         // the old top at the new top (no vertical flip needed).
-        CN1MetalDrawImage(oldScreen, 255, 0, 0, pw, ph);
+        // Drawn to the screen drawable (not into a mutable target), so the
+        // Catalyst mutable-into-mutable V-flip does not apply here: pass NO.
+        CN1MetalDrawImage(oldScreen, 255, 0, 0, pw, ph, NO);
         CN1MetalEndFrame();
     }
     [clearEnc endEncoding];

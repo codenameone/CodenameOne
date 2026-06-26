@@ -926,6 +926,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setWindowTitle(t == null ? "" : t);
     }
 
+    /// Floats the Mac host window above all others (Always On Top) or restores its normal level.
+    /// Used by the simulator relay. A no-op off the Mac desktop.
+    public void setMacWindowAlwaysOnTop(boolean onTop) {
+        if (isDesktop()) {
+            nativeInstance.setMacWindowAlwaysOnTop(onTop);
+        }
+    }
+
+    /// Resizes the Mac host window's content area to the given size in backing pixels. Used by the
+    /// simulator relay to fit the window to the skin. A no-op off the Mac desktop.
+    public void setMacWindowContentSize(int width, int height) {
+        if (isDesktop() && width > 0 && height > 0) {
+            nativeInstance.setMacWindowContentSize(width, height);
+        }
+    }
+
     // Commands currently exposed in the Mac native menu, index-aligned with the labels pushed to
     // native; fireMacMenuCommand(int) (invoked from the native menu action) resolves through this.
     private static List<com.codename1.ui.Command> macNativeCommands;
@@ -962,7 +978,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 sb.append(hint).append('\t').append(name).append('\t')
                         .append(c.getDesktopShortcutKeyChar()).append('\t')
-                        .append(c.getDesktopShortcutModifiers());
+                        .append(c.getDesktopShortcutModifiers()).append('\t');
+                // optional 5th column: 'c' marks a checked item (a checkmark in
+                // the native menu); absent/empty means unchecked
+                if (Boolean.TRUE.equals(c.getClientProperty("cn1.sim.checked"))) {
+                    sb.append('c');
+                }
                 filtered.add(c);
             }
         }

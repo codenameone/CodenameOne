@@ -136,8 +136,12 @@ ensure_setting "codename1.arg.macNative.appCategory" \
 # Pin the Catalyst window size deterministically so the screenshot
 # CI's strict-pixel comparison stays stable across runs. Off by
 # default for real apps -- only the screenshot sample sets this.
-ensure_setting "codename1.arg.macNative.fixedWindowSize" \
-    "${MAC_NATIVE_FIXED_WINDOW_SIZE:-1024x685}"
+# Set MAC_NATIVE_NO_FIXED_WINDOW=1 to leave the window freely
+# resizable (the simulator relay wants this).
+if [ -z "${MAC_NATIVE_NO_FIXED_WINDOW:-}" ]; then
+  ensure_setting "codename1.arg.macNative.fixedWindowSize" \
+      "${MAC_NATIVE_FIXED_WINDOW_SIZE:-1024x685}"
+fi
 
 bma_log "macNative.* hints in codenameone_settings.properties:"
 grep -n 'codename1\.arg\.macNative' "$CN1_SETTINGS_FILE" || true
