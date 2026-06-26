@@ -1056,6 +1056,14 @@ void com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeBlurScreenRegionImpl(int x, int y, int width, int height, float radius);
+void com_codename1_impl_ios_IOSNative_nativeBlurScreenRegion___int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_nativeBlurScreenRegionImpl(n1, n2, n3, n4, n5);
+    POOL_END();
+}
+
 void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int]

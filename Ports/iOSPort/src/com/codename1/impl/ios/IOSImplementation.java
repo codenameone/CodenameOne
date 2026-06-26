@@ -1801,11 +1801,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             return true;
         }
         NativeGraphics ng = (NativeGraphics) graphics;
-        // In-place CSS backdrop-filter:blur on a mutable-image target (the off-screen
-        // fidelity tiles, the Dialog blur-to-image path). The live screen drawable is
-        // not handled here -> returns false and the component paints without the blur.
+        // Live screen (no backing mutable image): enqueue a BlurRegion op in paint
+        // order. During the drain it blurs the already-drawn screenTexture region
+        // (the backdrop) and draws it back, so the component's translucent fill +
+        // foreground (queued right after this returns) paint on top -- real
+        // "Liquid Glass" on a running app, not just the offscreen fidelity tiles.
         if (ng.associatedImage == null) {
-            return false;
+            nativeInstance.nativeBlurScreenRegion(x, y, width, height, radius);
+            return true;
         }
         // Flush whatever has been painted into the image so its peer is current, read
         // the region behind us, Gaussian-blur it (Metal-backed CIGaussianBlur) and draw

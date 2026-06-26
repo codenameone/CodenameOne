@@ -32,6 +32,7 @@
 #import "FillRect.h"
 #import "ClipRect.h"
 #import "DrawLine.h"
+#import "BlurRegion.h"
 #import "DrawRect.h"
 #import "ClearRect.h"
 #import "FillPolygon.h"
@@ -2215,6 +2216,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
     [f release];
 #endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeBlurScreenRegionImpl
+(int x, int y, int width, int height, float radius) {
+    BlurRegion* f = [[BlurRegion alloc] initWithArgs:x ypos:y w:width h:height r:radius];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl

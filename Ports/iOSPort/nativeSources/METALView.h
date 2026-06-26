@@ -80,6 +80,7 @@
 -(void)deleteFramebuffer;
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
+- (void)blurScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius;
 -(void)presentPreservedFrameIfNeeded;
 -(void)updateFrameBufferSize:(int)w h:(int)h;
 -(void)textFieldDidChange;

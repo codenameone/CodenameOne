@@ -25,6 +25,7 @@
 #import <QuartzCore/QuartzCore.h>
 @import Metal;
 @import simd;
+@import CoreImage;
 
 #import "METALView.h"
 #import "CN1Metalcompat.h"
@@ -573,6 +574,105 @@ extern BOOL isRetinaBug();
     // Publish the encoder + projection to the CN1Metalcompat layer; each
     // ExecutableOp's Metal branch pulls the encoder from there.
     CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
+}
+
+// Live-screen "Liquid Glass": blur the region of screenTexture that has already
+// been drawn this frame (the backdrop behind a glass component) and draw the
+// blurred + vibrancy-boosted result back, so the component's foreground (queued
+// after this op) paints on top. Runs during the drain, against the live screen
+// command buffer -- the only path that produces real glass on a running app
+// (the offscreen-image blur only covered fidelity tiles). Costs a GPU sync per
+// glass paint; acceptable for the small, mostly-static nav/tab bars.
+- (void)blurScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius {
+    if (self.screenTexture == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
+        return;
+    }
+    CGFloat s = self.contentScaleFactor;
+    int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
+    int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
+    if (fx < 0) { fw += fx; fx = 0; }
+    if (fy < 0) { fh += fy; fy = 0; }
+    if (fx + fw > texW) { fw = texW - fx; }
+    if (fy + fh > texH) { fh = texH - fy; }
+    if (fw <= 0 || fh <= 0) { return; }
+
+    // 1) End + commit the screen encoder so screenTexture holds the backdrop
+    //    drawn so far this frame, then wait so the blit-read sees it.
+    if (self.renderCommandEncoder != nil) {
+        CN1MetalEndFrame();
+        [self.renderCommandEncoder endEncoding];
+        self.renderCommandEncoder = nil;
+    }
+    id<MTLCommandBuffer> cb = self.commandBuffer;
+    self.commandBuffer = nil;
+    if (cb != nil) {
+        [cb commit];
+        [cb waitUntilCompleted];
+    }
+
+    // 2) Blit the region into a shared scratch texture and read its bytes.
+    id<MTLDevice> device = CN1MetalDevice();
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:fw height:fh mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    id<MTLCommandBuffer> blitCb = [self.commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [blitCb blitCommandEncoder];
+    [blit copyFromTexture:self.screenTexture sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(fx, fy, 0) sourceSize:MTLSizeMake(fw, fh, 1)
+                 toTexture:scratch destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+    [blitCb commit];
+    [blitCb waitUntilCompleted];
+
+    NSUInteger rowBytes = (NSUInteger)fw * 4;
+    uint8_t *bytes = (uint8_t *)malloc(rowBytes * (NSUInteger)fh);
+    if (bytes == NULL) { [self setFramebuffer]; return; }
+    [scratch getBytes:bytes bytesPerRow:rowBytes fromRegion:MTLRegionMake2D(0, 0, fw, fh) mipmapLevel:0];
+
+    // 3) CIGaussianBlur + saturation (the UIBlurEffect-style material recipe).
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef bmp = CGBitmapContextCreate(bytes, fw, fh, 8, rowBytes, cs,
+        kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+    CGImageRef srcCg = CGBitmapContextCreateImage(bmp);
+    CIImage *ci = [CIImage imageWithCGImage:srcCg];
+    CIFilter *sat = [CIFilter filterWithName:@"CIColorControls"];
+    [sat setValue:ci forKey:kCIInputImageKey];
+    [sat setValue:@(1.8) forKey:@"inputSaturation"];
+    CIFilter *gb = [CIFilter filterWithName:@"CIGaussianBlur"];
+    [gb setValue:[sat outputImage] forKey:kCIInputImageKey];
+    [gb setValue:@(radius * s) forKey:kCIInputRadiusKey];
+    CIImage *clamped = [[gb outputImage] imageByClampingToExtent];
+    // Retain the cached context: under MRC the autoreleased CIContext would
+    // dangle and crash on the next glass paint (a static Foundation cache must
+    // be +1 retained). The retain is a harmless no-op under ARC.
+    static CIContext *ciCtx = nil;
+    if (ciCtx == nil) {
+        ciCtx = [CIContext contextWithMTLDevice:device];
+#ifndef CN1_USE_ARC
+        [ciCtx retain];
+#endif
+    }
+    CGImageRef outCg = [ciCtx createCGImage:clamped fromRect:CGRectMake(0, 0, fw, fh)];
+    UIImage *blurredImage = outCg ? [UIImage imageWithCGImage:outCg] : nil;
+    if (srcCg) { CGImageRelease(srcCg); }
+    if (outCg) { CGImageRelease(outCg); }
+    CGContextRelease(bmp);
+    CGColorSpaceRelease(cs);
+    free(bytes);
+
+    // 4) Restart the screen encoder (loadAction Load preserves screenTexture).
+    [self setFramebuffer];
+
+    // 5) Draw the blurred patch back over the region (display coords).
+    if (blurredImage != nil) {
+        id<MTLTexture> blurredTex = CN1MetalTextureFromUIImage(blurredImage);
+        if (blurredTex != nil) {
+            CN1MetalDrawImage(blurredTex, 255, x, y, w, h);
+        }
+    }
 }
 
 - (BOOL)presentFramebuffer

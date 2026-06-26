@@ -76,6 +76,9 @@ public final class IOSNative {
 
     native void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2);
     native void nativeDrawLineGlobal(int color, int alpha, int x1, int y1, int x2, int y2);
+    // Queues a live-screen backdrop-filter:blur op (real glass). Enqueued in paint
+    // order; the drain blurs the already-drawn screenTexture region and draws it back.
+    native void nativeBlurScreenRegion(int x, int y, int width, int height, float radius);
     native void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height);
     native void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height);
     native void nativeDrawRectMutable(int color, int alpha, int x, int y, int width, int height);
