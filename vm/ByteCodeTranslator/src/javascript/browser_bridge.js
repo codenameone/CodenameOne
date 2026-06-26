@@ -1746,6 +1746,37 @@
   // into a hidden iframe and invoke the browser print dialog. Resolves {ok,
   // error} once afterprint fires or the 1s fallback elapses; the worker then
   // invokes the Java PrintFrameCallback with the outcome.
+  // FileChooser: read the file the user picked in the <input type=file>. The
+  // input host-ref is resolved here; the worker only ever sees the bytes.
+  hostBridge.register('__cn1_input_file_count__', function(request) {
+    var el = resolveHostRef(request && request.el);
+    return (el && el.files) ? el.files.length : 0;
+  });
+
+  hostBridge.register('__cn1_read_input_file__', function(request) {
+    var el = resolveHostRef(request && request.el);
+    var index = (request && request.index) | 0;
+    var f = (el && el.files) ? el.files[index] : null;
+    if (!f) {
+      return null;
+    }
+    return new Promise(function(resolve) {
+      try {
+        var fr = new FileReader();
+        fr.onload = function() {
+          var res = String(fr.result || '');
+          var comma = res.indexOf(',');
+          var b64 = comma >= 0 ? res.substring(comma + 1) : res;
+          resolve((f.name || '') + '\n' + b64);
+        };
+        fr.onerror = function() { resolve(null); };
+        fr.readAsDataURL(f);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  });
+
   hostBridge.register('__cn1_print_data__', function(request) {
     var b64 = (request && request.b64 != null) ? String(request.b64) : '';
     var mimeType = (request && request.mimeType != null) ? String(request.mimeType) : 'application/octet-stream';
@@ -1753,20 +1784,25 @@
     if (!doc || !doc.body) {
       return { ok: 0, error: 'Printing requires a browser document context' };
     }
+    var isImage = mimeType.indexOf('image/') === 0;
     var urlApi = (typeof URL !== 'undefined' && URL) ? URL
       : ((global.window && global.window.webkitURL) ? global.window.webkitURL : null);
-    var url;
-    try {
-      var bin = atob(b64);
-      var u8 = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }
-      var blob = new Blob([u8], { type: mimeType });
-      url = urlApi ? urlApi.createObjectURL(blob) : null;
-    } catch (err) {
-      return { ok: 0, error: 'Failed to decode document for printing: ' + err };
-    }
-    if (!url) {
-      return { ok: 0, error: 'Object URLs are not supported in this browser' };
+    var url = null;
+    if (!isImage) {
+      // PDF and other binary formats the browser can render natively go through
+      // an object URL loaded directly into the iframe.
+      try {
+        var bin = atob(b64);
+        var u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }
+        var blob = new Blob([u8], { type: mimeType });
+        url = urlApi ? urlApi.createObjectURL(blob) : null;
+      } catch (err) {
+        return { ok: 0, error: 'Failed to decode document for printing: ' + err };
+      }
+      if (!url) {
+        return { ok: 0, error: 'Object URLs are not supported in this browser' };
+      }
     }
     return new Promise(function(resolve) {
       var done = false, cleaned = false, iframe = null;
@@ -1782,26 +1818,60 @@
         try { if (iframe && iframe.parentNode) { iframe.parentNode.removeChild(iframe); } } catch (e) {}
       };
       iframe = doc.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;visibility:hidden;right:0;bottom:0;width:0;height:0;border:0';
+      // Off-screen but laid out and rendered. A zero-size or visibility:hidden
+      // iframe prints blank in several browsers (the "white page" symptom).
+      iframe.style.cssText = 'position:fixed;left:-100000px;top:0;width:794px;height:1123px;border:0;background:#fff';
       iframe.onload = function() {
         try {
           var win = iframe.contentWindow;
           try { win.addEventListener('afterprint', function() { finish(1, null); setTimeout(cleanup, 0); }); } catch (e) {}
-          win.focus();
-          win.print();
-          setTimeout(function() { finish(1, null); }, 1000);
+          var doPrint = function() {
+            try { win.focus(); win.print(); }
+            catch (e) { finish(0, '' + e); cleanup(); return; }
+            setTimeout(function() { finish(1, null); }, 1000);
+          };
+          if (isImage) {
+            // Wait for the (data-URL) image to decode/paint before printing,
+            // otherwise the print captures an empty page.
+            var idoc = null;
+            try { idoc = iframe.contentDocument || win.document; } catch (e) {}
+            var img = (idoc && idoc.images && idoc.images.length) ? idoc.images[0] : null;
+            if (img && !(img.complete && img.naturalWidth > 0)) {
+              var tries = 0;
+              var waitImg = function() {
+                if ((img.complete && img.naturalWidth > 0) || tries++ > 100) { doPrint(); }
+                else { setTimeout(waitImg, 20); }
+              };
+              waitImg();
+              return;
+            }
+          }
+          doPrint();
         } catch (e) {
           finish(0, '' + e);
           cleanup();
         }
       };
       iframe.onerror = function() { finish(0, 'Failed to load document for printing'); cleanup(); };
-      iframe.src = url;
+      if (isImage) {
+        // Printing a raw image blob as the iframe src yields a tiny centred
+        // thumbnail on a white page in most browsers. Wrap it in a page-filling
+        // <img> so the printout actually shows the image.
+        var dataUrl = 'data:' + mimeType + ';base64,' + b64;
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+          + '<style>@page{margin:0}html,body{margin:0;padding:0;background:#fff}'
+          + 'img{display:block;width:100%;height:auto}</style></head>'
+          + '<body><img src="' + dataUrl + '"></body></html>';
+        try { iframe.srcdoc = html; }
+        catch (e) { iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(html); }
+      } else {
+        iframe.src = url;
+      }
       doc.body.appendChild(iframe);
-      // onload/afterprint don't fire reliably for an image blob in a hidden
-      // iframe, which would leave the promise -- and the caller's listener --
-      // hanging. Resolve as completed after a short grace period regardless; the
-      // print dialog still triggers from onload when it does fire.
+      // afterprint doesn't fire reliably for an off-screen iframe, which would
+      // leave the promise -- and the caller's listener -- hanging. Resolve as
+      // completed after a grace period regardless; the print dialog still
+      // triggers from onload when it fires.
       setTimeout(function() { finish(1, null); }, 3000);
       setTimeout(cleanup, 60000);
     });

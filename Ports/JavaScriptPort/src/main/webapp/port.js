@@ -1896,6 +1896,33 @@ bindNative([
   return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLButtonElement");
 });
 
+// FileChooser file reading: the chosen <input>.files only exist on the MAIN
+// thread; in the worker fileEl is a host-ref proxy with no real .files. Read the
+// count + per-file bytes (base64) via the host so the worker can persist them.
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFileCount_com_codename1_html5_js_dom_HTMLInputElement_R_int",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFileCount___com_codename1_html5_js_dom_HTMLInputElement_R_int"
+], function*(el) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const ref = jvm.unwrapJsValue(el);
+  const n = yield jvm.invokeHostNative("__cn1_input_file_count__", [{ el: ref }]);
+  return n | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFile_com_codename1_html5_js_dom_HTMLInputElement_int_R_java_lang_String",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFile___com_codename1_html5_js_dom_HTMLInputElement_int_R_java_lang_String"
+], function*(el, index) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = jvm.unwrapJsValue(el);
+  const r = yield jvm.invokeHostNative("__cn1_read_input_file__", [{ el: ref, index: index | 0 }]);
+  return r == null ? null : jvm.createStringLiteral(String(r));
+});
+
 // Fullscreen: document.fullscreen* lives on the main thread. Queries return the
 // real host state; enter/exit do the host request and then invoke the Java
 // RequestFullScreenCallback (onComplete(boolean)) back in the worker.

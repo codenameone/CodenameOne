@@ -7669,7 +7669,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         } else if (instanceOf(obj, "Uint8Array")) {
             return BlobUtil.createBlob((Uint8Array)obj, "application/octet-stream");
         } else {
-            throw new IOException("File at "+file+" is not a blob");
+            // Files written via openOutputStream are stored in LocalForage's
+            // serialized byte form (e.g. a "b:<base64>" string), not as a live
+            // Blob/Uint8Array. Recover the bytes through the input-stream path
+            // (the same one openFileInputStream uses) and wrap them so e.g.
+            // Image.createImage(capturedPhotoPath) works.
+            InputStream in = null;
+            try {
+                in = openFileInputStream(file);
+                byte[] data = com.codename1.io.Util.readInputStream(in);
+                return BlobUtil.createBlob(data, "application/octet-stream");
+            } finally {
+                com.codename1.io.Util.cleanup(in);
+            }
         }
     }
 
