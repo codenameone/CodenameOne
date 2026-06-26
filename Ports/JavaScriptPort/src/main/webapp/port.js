@@ -1949,15 +1949,16 @@ bindNative([
   return null;
 });
 
-// Print: the iframe + window.print() must run on the main thread. Route the
-// object URL to the host, then invoke the Java PrintFrameCallback
-// (onResult(boolean, String)) in the worker with the {ok, error} outcome.
+// Print: the Blob + object URL + iframe + window.print() must all run on the
+// main thread (a worker-created blob: URL is invalid in the main-thread iframe).
+// Hand the base64 document bytes to the host, then invoke the Java
+// PrintFrameCallback (onResult(boolean, String)) with the {ok, error} outcome.
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL__java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL___java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL__java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL___java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void"
-], function*(url, callback) {
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData__java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData___java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData__java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData___java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void"
+], function*(b64, mimeType, callback) {
   const cb = jvm.unwrapJsValue(callback);
   if (typeof jvm.invokeHostNative !== "function") {
     if (cb) {
@@ -1966,12 +1967,18 @@ bindNative([
     }
     return null;
   }
-  const u = url == null ? "" : jvm.toNativeString(url);
-  const res = yield jvm.invokeHostNative("__cn1_print_object_url__", [{ url: u }]);
+  const data = b64 == null ? "" : jvm.toNativeString(b64);
+  const type = mimeType == null ? "application/octet-stream" : jvm.toNativeString(mimeType);
+  const res = yield jvm.invokeHostNative("__cn1_print_data__", [{ b64: data, mimeType: type }]);
   if (cb) {
     const ok = res && res.ok ? 1 : 0;
     const err = (res && res.error != null) ? jvm.createStringLiteral(String(res.error)) : null;
-    spawnVirtualCallback(cb, "cn1_s_onResult_boolean_java_lang_String", [ok, err], null);
+    // Invoke onResult on THIS green thread (which resumed on the EDT after the
+    // host call) rather than via spawnVirtualCallback: a freshly-spawned thread's
+    // callSerially never reaches the EDT queue, so the PrintResultListener would
+    // never fire.
+    const onResult = jvm.resolveVirtual(cb.__class, "cn1_s_onResult_boolean_java_lang_String");
+    yield* cn1_ivAdapt(onResult.apply(null, [cb, ok, err]));
   }
   return null;
 });

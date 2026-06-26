@@ -9931,35 +9931,42 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // would never run. callSerially keeps print() non-blocking on every port.
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                String url;
+                String b64;
                 try {
-                    Blob blob = openFileAsBlob(filePath);
-                    if (mimeType != null && !Objects.equals(blob.getType(), mimeType)) {
-                        blob = BlobUtil.toType(blob, mimeType);
+                    // Read the document bytes through the file system input stream,
+                    // which recovers binary data even when LocalForage round-trips
+                    // it as an array-like (the host<->worker bridge drops the
+                    // Uint8Array type). The bytes are base64'd and handed to the
+                    // main thread, which builds the Blob + object URL + print
+                    // iframe there -- a worker-created blob: URL would be invalid
+                    // in the main-thread iframe.
+                    InputStream in = FileSystemStorage.getInstance().openInputStream(filePath);
+                    byte[] data;
+                    try {
+                        data = Util.readInputStream(in);
+                    } finally {
+                        Util.cleanup(in);
                     }
-                    url = BlobUtil.createObjectURL(blob);
-                    if (url == null) {
-                        firePrintResult(listener, PrintResult.failed("Object URLs are not supported in this browser"), fired);
+                    if (data == null || data.length == 0) {
+                        firePrintResult(listener, PrintResult.failed("Document is empty or could not be read"), fired);
                         return;
                     }
-                } catch (Exception ex) {
+                    b64 = Base64.encodeNoNewline(data);
+                } catch (Throwable ex) {
                     Log.e(ex);
                     firePrintResult(listener, PrintResult.failed(ex.getMessage()), fired);
                     return;
                 }
-                printObjectURL_(url, new PrintFrameCallback() {
+                final String type = (mimeType == null || mimeType.length() == 0) ? "application/octet-stream" : mimeType;
+                printData_(b64, type, new PrintFrameCallback() {
                     public void onResult(final boolean completed, final String error) {
-                        // Hop onto the EDT before touching Codename One code,
-                        // matching the other JSFunctor callbacks in this class.
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                if (completed) {
-                                    firePrintResult(listener, PrintResult.completed(), fired);
-                                } else {
-                                    firePrintResult(listener, PrintResult.failed(error), fired);
-                                }
-                            }
-                        });
+                        // onResult is dispatched on the EDT (the port routes it
+                        // there), so report the result directly.
+                        if (completed) {
+                            firePrintResult(listener, PrintResult.completed(), fired);
+                        } else {
+                            firePrintResult(listener, PrintResult.failed(error), fired);
+                        }
                     }
                 });
             }
@@ -9991,17 +9998,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // outcome through the callback. The iframe and the object URL are kept
     // alive for 60 seconds (or until afterprint) because print dialogs read
     // the frame content lazily.
-    @JSBody(params = {"url", "callback"}, script =
+    @JSBody(params = {"b64", "mimeType", "callback"}, script =
             "var done = false;\n"
             + "var cleaned = false;\n"
             + "var iframe = null;\n"
+            + "var url = null;\n"
+            + "var urlApi = (typeof URL !== 'undefined' && URL) ? URL : ((typeof window !== 'undefined' && window.webkitURL) ? window.webkitURL : null);\n"
             + "var finish = function(ok, msg) { if (done) return; done = true; callback(ok, msg); };\n"
             + "var cleanup = function() {\n"
             + "    if (cleaned) return; cleaned = true;\n"
-            + "    try { var u = (typeof URL !== 'undefined' && URL) ? URL : ((typeof window !== 'undefined' && window.webkitURL) ? window.webkitURL : null); if (u) u.revokeObjectURL(url); } catch (e) {}\n"
+            + "    try { if (urlApi && url) urlApi.revokeObjectURL(url); } catch (e) {}\n"
             + "    try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}\n"
             + "};\n"
             + "if (typeof document === 'undefined' || !document.body) { finish(false, 'Printing requires a browser document context'); return; }\n"
+            + "try {\n"
+            + "    var bin = atob(b64); var u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }\n"
+            + "    var blob = new Blob([u8], { type: mimeType });\n"
+            + "    url = urlApi ? urlApi.createObjectURL(blob) : null;\n"
+            + "    if (!url) { finish(false, 'Object URLs are not supported in this browser'); return; }\n"
+            + "} catch (e) { finish(false, 'Failed to decode document for printing: ' + e); return; }\n"
             + "iframe = document.createElement('iframe');\n"
             + "iframe.style.cssText = 'position:fixed;visibility:hidden;right:0;bottom:0;width:0;height:0;border:0';\n"
             + "iframe.onload = function() {\n"
@@ -10019,8 +10034,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             + "iframe.onerror = function() { finish(false, 'Failed to load document for printing'); cleanup(); };\n"
             + "iframe.src = url;\n"
             + "document.body.appendChild(iframe);\n"
+            // onload/afterprint don't fire reliably for an image blob in a hidden
+            // iframe; resolve as completed after a short grace period regardless.
+            + "setTimeout(function() { finish(true, null); }, 3000);\n"
             + "setTimeout(cleanup, 60000);")
-    private native static void printObjectURL_(String url, PrintFrameCallback callback);
+    private native static void printData_(String b64, String mimeType, PrintFrameCallback callback);
 
     private static interface CancelableEvent extends Event {
         @JSProperty

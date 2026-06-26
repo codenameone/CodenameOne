@@ -1740,15 +1740,33 @@
       return 0;
     }
   });
-  // Print: load the object URL into a hidden iframe on the MAIN thread and
-  // invoke the browser print dialog (document/iframe don't exist in the worker).
-  // Resolves {ok, error} once afterprint fires or the 1s fallback elapses; the
-  // worker then invokes the Java PrintFrameCallback with the outcome.
-  hostBridge.register('__cn1_print_object_url__', function(request) {
-    var url = (request && request.url != null) ? String(request.url) : '';
+  // Print: build the Blob + object URL on the MAIN thread from the base64
+  // document bytes the worker sent (a worker-created blob: URL is invalid in a
+  // main-thread iframe, and document/iframe don't exist in the worker), load it
+  // into a hidden iframe and invoke the browser print dialog. Resolves {ok,
+  // error} once afterprint fires or the 1s fallback elapses; the worker then
+  // invokes the Java PrintFrameCallback with the outcome.
+  hostBridge.register('__cn1_print_data__', function(request) {
+    var b64 = (request && request.b64 != null) ? String(request.b64) : '';
+    var mimeType = (request && request.mimeType != null) ? String(request.mimeType) : 'application/octet-stream';
     var doc = global.document || (global.window && global.window.document);
     if (!doc || !doc.body) {
       return { ok: 0, error: 'Printing requires a browser document context' };
+    }
+    var urlApi = (typeof URL !== 'undefined' && URL) ? URL
+      : ((global.window && global.window.webkitURL) ? global.window.webkitURL : null);
+    var url;
+    try {
+      var bin = atob(b64);
+      var u8 = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }
+      var blob = new Blob([u8], { type: mimeType });
+      url = urlApi ? urlApi.createObjectURL(blob) : null;
+    } catch (err) {
+      return { ok: 0, error: 'Failed to decode document for printing: ' + err };
+    }
+    if (!url) {
+      return { ok: 0, error: 'Object URLs are not supported in this browser' };
     }
     return new Promise(function(resolve) {
       var done = false, cleaned = false, iframe = null;
@@ -1760,11 +1778,7 @@
       var cleanup = function() {
         if (cleaned) { return; }
         cleaned = true;
-        try {
-          var u = (typeof URL !== 'undefined' && URL) ? URL
-            : ((global.window && global.window.webkitURL) ? global.window.webkitURL : null);
-          if (u) { u.revokeObjectURL(url); }
-        } catch (e) {}
+        try { if (urlApi && url) { urlApi.revokeObjectURL(url); } } catch (e) {}
         try { if (iframe && iframe.parentNode) { iframe.parentNode.removeChild(iframe); } } catch (e) {}
       };
       iframe = doc.createElement('iframe');
@@ -1784,6 +1798,11 @@
       iframe.onerror = function() { finish(0, 'Failed to load document for printing'); cleanup(); };
       iframe.src = url;
       doc.body.appendChild(iframe);
+      // onload/afterprint don't fire reliably for an image blob in a hidden
+      // iframe, which would leave the promise -- and the caller's listener --
+      // hanging. Resolve as completed after a short grace period regardless; the
+      // print dialog still triggers from onload when it does fire.
+      setTimeout(function() { finish(1, null); }, 3000);
       setTimeout(cleanup, 60000);
     });
   });
