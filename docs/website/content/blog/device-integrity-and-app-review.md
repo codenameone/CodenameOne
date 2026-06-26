@@ -10,7 +10,7 @@ feed_html: '<img src="https://www.codenameone.com/blog/device-integrity-and-app-
 
 ![Device Integrity And App Review: RASP, Attestation, And Asking For Ratings Right](/blog/device-integrity-and-app-review.jpg)
 
-In [Friday's post on funding open source without the bait-and-switch](/blog/funding-open-source-without-the-bait-and-switch/) I promised the weekly feature drops would keep landing, and here are two of them.
+[Friday's post on funding open source without the bait-and-switch](/blog/funding-open-source-without-the-bait-and-switch/) covered the model behind this week's releases. Here are two more features from it.
 
 Both ship this week. Both are small. Both live in core: no cn1lib to add, no native interface for you to write. They follow the same pattern you have seen across Codename One for years. There is a portable Java API, it calls through to native behavior where the platform supports it, and it falls back to something reasonable everywhere else.
 
@@ -18,7 +18,7 @@ One handles security. The other handles asking users for a rating without annoyi
 
 ## Device integrity
 
-`com.codename1.security.DeviceIntegrity` is a portable runtime self-protection (RASP) and attestation API. It exists for the apps that actually need it: banking, payments, anything where you have to detect a hostile runtime and react to it. If your app is a recipe browser, you can skip this section.
+`com.codename1.security.DeviceIntegrity` is a portable runtime self-protection (RASP) and attestation API. It exists for the apps that actually need it: banking, payments, anything where you have to detect a hostile runtime and react to it. We already serve several customers in banking, and Codename One is hardened to meet the requirements they bring; this API is part of that work. If your app is a recipe browser, you can skip this section.
 
 There are four capabilities. Each one has a zero-code build hint that turns it on, and a runtime API you call when you want to make decisions in Java.
 
@@ -51,7 +51,7 @@ if (DeviceIntegrity.isDeviceCompromised()) {
 }
 ```
 
-Now the honest part, and it is the most important sentence in this section: the client is not the security boundary. An attestation token is opaque. The API hands the signed token to your app, but the block-or-allow decision has to happen on your backend, because the verification keys live there and the device does not get a vote. If you treat `isDeviceCompromised()` returning `false` as proof the device is clean, you have built nothing. A determined attacker who controls the device can tamper with what your app sees. RASP signals are defense-in-depth that raise the cost of an attack. They are not a guarantee, and I would rather tell you that up front than have you ship a false sense of safety.
+The most important sentence in this section: the client is not the security boundary. An attestation token is opaque. The API hands the signed token to your app, but the block-or-allow decision has to happen on your backend, because the verification keys live there and the device does not get a vote. If you treat `isDeviceCompromised()` returning `false` as proof the device is clean, you have built nothing. A determined attacker who controls the device can tamper with what your app sees. RASP signals are defense-in-depth that raise the cost of an attack. They are not a guarantee!
 
 The accessibility-abuse guard deserves a note because it is the newest of the four. Overlay and accessibility-service malware is a real vector for reading and driving banking apps. `getEnabledAccessibilityServices()` tells you what is active, `hasUntrustedAccessibilityService(...)` evaluates that list against an allow-list you configure with `android.accessibilityGuard.allow`, and `setSecureScreen(true)` blocks screen capture on sensitive forms. The allow-list evaluation is exactly what `DeviceIntegrityTest` exercises across its six tests.
 
@@ -103,7 +103,7 @@ The native plumbing mirrors `share()` and `dial()`. `CodenameOneImplementation.i
 
 The dependency part is what I like most here, because you do not configure it. The Android and iOS builders already scan your compiled classes to auto-enable native deps, and this extends that scan. Merely referencing `com.codename1.appreview` (or the `CN`/`Display` review methods) auto-injects `com.google.android.play:review` on Android, and links `StoreKit.framework` plus flips `CN1_USE_APPREVIEW` on iOS. An app that never asks for a review carries no extra weight. There is no build hint to remember and no checkbox to forget. The scheduler logic that decides all this is covered by eight JUnit 5 tests, and there is a new App-Review chapter in the developer guide.
 
-The tradeoff to keep in mind: nagging users for ratings backfires. A prompt at the wrong moment costs you a rating and some goodwill. The scheduler defaults and the never-re-prompt rule exist precisely so the easy path is the restrained one. If you fight them by manually firing `requestReview()` on every launch, you will earn your one-star reviews honestly.
+The tradeoff to keep in mind: nagging users for ratings backfires. A prompt at the wrong moment costs you a rating and some goodwill. The scheduler defaults and the never-re-prompt rule exist precisely so the easy path is the restrained one. If you fight them by manually firing `requestReview()` on every launch, you will earn those one-star reviews.
 
 ## Wrapping up
 

@@ -10,13 +10,13 @@ feed_html: '<img src="https://www.codenameone.com/blog/vector-and-native-maps.jp
 
 ![Maps You Control: A Pure-Vector MapView And Pluggable Native Providers](/blog/vector-and-native-maps.jpg)
 
-Yesterday's post on [funding open source without the bait-and-switch](/blog/funding-open-source-without-the-bait-and-switch/) explained how we keep the lights on; today's is one of the features that money paid for. [PR #5264](https://github.com/codenameone/CodenameOne/pull/5264) brings mapping back into core with two components: a `MapView` that draws an entire map through `Graphics` with no native peer, and a `NativeMap` that embeds the platform's own map. Both sit behind one `MapSurface` API, so you can switch between them by changing a class name.
+Yesterday's [funding post](/blog/funding-open-source-without-the-bait-and-switch/) covered the model behind this week's releases. Here is the first one. [PR #5264](https://github.com/codenameone/CodenameOne/pull/5264) brings mapping back into core with two components: a `MapView` that draws an entire map through `Graphics` with no native peer, and a `NativeMap` that embeds the platform's own map. Both sit behind one `MapSurface` API, so you can switch between them by changing a class name.
 
 ## What was wrong with the old maps
 
 For years the answer to "how do I show a map" was one of two things. The deprecated tile-based `MapComponent` fetched raster tiles and painted them, which worked but was frozen in time. Or you added the external `codenameone-google-maps` cn1lib, which embedded the actual Google Maps SDK as a native peer.
 
-The cn1lib approach had the problems every native peer has. A native peer is a real platform view punched through the CN1 canvas, so it fights you on z-order. You cannot reliably draw a CN1 component on top of it, animations that move the map area need snapshot workarounds, and the map only exists on devices that ship the provider. Tie your app to Google Maps and a device without Google Play, such as a Huawei phone, becomes a porting problem. The map also looked different on every platform because it *was* a different map on every platform, and it did not exist at all in the simulator or on the web.
+The cn1lib approach worked, but it locked you to one vendor. It embedded the Google Maps SDK specifically, so a device without Google Play, such as a Huawei phone, was a porting problem rather than a build setting. Being a native peer, the map was also a separate platform surface that only existed where the provider shipped, so it looked different on every platform, because it *was* a different map on every platform, and it did not exist at all in the simulator or on the web. None of that makes native maps wrong; it makes them one tool among two, which is exactly what this PR gives you.
 
 ## The MapView vector engine
 
@@ -62,7 +62,7 @@ Because the whole thing is `Graphics`, it renders identically everywhere: simula
 
 ## NativeMap and the build-hint provider model
 
-Sometimes you genuinely want the platform's map, with its road data, its traffic, and its look. That is what `NativeMap` is for. It embeds the actual platform map, Apple MapKit or Google Maps, behind the same `MapSurface` API. When no provider is wired in, or none is available at runtime, `NativeMap` falls back to an embedded `MapView` so the screen still works.
+Sometimes you want the platform's map, with its road data, its traffic, and its look. That is what `NativeMap` is for. It embeds the actual platform map, Apple MapKit or Google Maps, behind the same `MapSurface` API. When no provider is wired in, or none is available at runtime, `NativeMap` falls back to an embedded `MapView` so the code still works.
 
 The interesting design decision is that the public API never names a provider. There is no `GoogleMapsImpl` to import, no `NativeInterface`, and no `CodenameOneImplementation` hook. You select a provider with the `maps.provider` build hint, set to `apple`, `google`, or another supported value. At build time a `MapsProviderInjector` in the builders drops that provider's native implementation into your app's `com.codename1.maps` package. Core and the ports carry no map SDK at all, so a provider you do not use costs zero project size.
 
@@ -79,13 +79,13 @@ flowchart TD
 
 This moves a hard problem from a fork to a build hint. Supporting a device without Google Play stops being "maintain a separate branch" and becomes "set `maps.provider` to something else." The provider SPI lives in `com.codename1.maps.spi.MapProvider`, and registrations go through `MapProviderRegistry`, both covered by the unit tests.
 
-I validated the Apple path end to end on the iOS simulator. With `maps.provider=apple` the app builds, links, and renders a live MapKit map with a marker through `NativeMap`.
+With `maps.provider=apple`, `NativeMap` renders a live MapKit map with a marker. The screenshot below is from the native Mac desktop build, which supports the Apple provider:
 
-![A NativeMap rendering through Apple MapKit](/blog/vector-and-native-maps/maps-native.png)
+![A NativeMap rendering through Apple MapKit on the native Mac desktop build](/blog/vector-and-native-maps/maps-native.png)
 
-`NativeMap` with `maps.provider=apple`, showing a real MapKit map and a marker. This is the platform's map embedded, not the vector engine.
+`NativeMap` with `maps.provider=apple` on the native Mac desktop build, showing a real MapKit map and a marker. This is the platform's map embedded, not the vector engine.
 
-## The honest tradeoff
+## The tradeoff
 
 The vector engine is new, and the style format is a subset of a full MapLibre style, not the whole specification. If you bring a complex upstream style it may reference layer or expression features the subset does not implement yet. Labeling and coverage also depend on the tile data you point it at. The default OSM source is fine for general use, but if your tiles lack a layer, the map will not draw what is not there. `NativeMap` sidesteps both concerns by deferring to the platform, at the cost of the native-peer behavior the vector path was built to avoid. Pick the one that matches what you are building.
 

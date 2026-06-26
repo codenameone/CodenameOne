@@ -16,15 +16,15 @@ We have spent fourteen years trying not to become either of those stories. This 
 
 ## The deal we actually offer
 
-Codename One the open source project and Codename One the company are not the same thing, and that distinction is the whole game. The project has to stay genuinely open: it is licensed under the GNU GPL with the Classpath Exception, the same license the JDK ships under, so you can fork it, build closed-source apps on top of it, and run the whole build toolchain yourself. That license choice is the point, not a footnote. The piece I linked above argued that the honest way to fund open source is a strong copyleft license plus a real commercial offering, not a permissive license you quietly relicense once the community is locked in. Codename One has been GPL with the Classpath Exception the entire time. The exception keeps your apps yours; the copyleft keeps a free, forkable Codename One in the world no matter what the company does or who owns it.
+Codename One the open source project and Codename One the company are not the same thing, and that distinction is the whole game. The project has to stay open: it is licensed under the GNU GPL with the Classpath Exception, the same license the JDK ships under, so you can fork it, build closed-source apps on top of it, and run the whole build toolchain yourself. That license choice is the point, not a footnote. The piece I linked above argued that the sustainable way to fund open source is a strong copyleft license plus a real commercial offering, not a permissive license you quietly relicense once the community is locked in. Codename One has been GPL with the Classpath Exception the entire time. The exception keeps your apps yours; the copyleft keeps a free, forkable Codename One in the world no matter what the company does or who owns it.
 
-The company still has to make enough money to keep paying the people who move the project forward at the pace you have seen this year. That need pulls against the open one, and the usual way companies resolve the tension is to make the open part worse so the paid part looks better. We said years ago in [We Will Not Sabotage Your Code](/blog/we-will-not-sabotage-your-code/) that we would not do that, and the model below is how we avoid it.
+The company still has to make enough money to keep paying the people who move the project forward at the pace you have seen this year. That need pulls against the open one, and the usual way companies resolve the tension is to make the open part worse so the paid part looks better. We said it plainly in [We Will Not Sabotage Your Code](/blog/we-will-not-sabotage-your-code/) a couple of weeks ago: we will not do that, and the model below is how we avoid it.
 
-The first answer is the build cloud. Compiling your Java to a native iOS binary on our servers costs us real money in machines and maintenance, so charging for build capacity is honest: you are paying for a thing that has a meter on it. But build credits alone do not fund the rate of progress this blog has been documenting, and they never will. We need a second answer that grows.
+The first answer is the build cloud. Compiling your Java to a native iOS binary on our servers costs us real money in machines and maintenance, so charging for build capacity is fair: you are paying for a thing that has a meter on it. But build credits alone do not fund the pace we have been shipping at, and they never will. We need a second answer that grows.
 
-That second answer is **optional services that sit on top of the open source project and enhance it, without ever standing in your way**. The rule we hold ourselves to is that every one of them ships behind a Service Provider Interface, an SPI, so the open framework has a real seam where any provider can plug in, ours or a third party's. The paid service is one implementation of an open contract, never the only door.
+That second answer is **optional services that sit on top of the open source project and enhance it, without ever standing in your way**. The rule we hold ourselves to is that they stay optional. Nothing forces you into ours, and where an alternative exists you are free to wire it in instead. What makes ours worth choosing is integration depth, not lock-in: because we run the build servers, we can make a service like crash protection seamless in a way a bolt-on tool cannot, symbolicating native crashes for you with no setup on your side.
 
-Crash protection last week was the first clear example. Analytics this week is the second, and it is built exactly this way:
+Crash protection last week was the first example of that depth. Analytics this week adds a second pattern: a paid provider that sits behind an open Service Provider Interface, so the same code can target a third-party backend just as easily as ours.
 
 {{< mermaid >}}
 flowchart TD
@@ -34,15 +34,15 @@ flowchart TD
     C --> D["GoogleAnalyticsProvider (GA4)"]
     C --> E["MatomoAnalyticsProvider"]
     C --> F["FirebaseAnalyticsProvider"]
-    C --> G["CodenameOneAnalyticsProvider<br/>(first-party, part of a paid plan)"]
+    C --> G["CodenameOneAnalyticsProvider<br/>(first-party, included with a subscription)"]
     style G fill:#1f6feb,color:#fff
 {{< /mermaid >}}
 
 You can wire the analytics facade to Google Analytics, to Matomo, to Firebase, or to your own `AnalyticsProvider`, and the framework does not care which. If you pick our first-party provider you get a privacy-oriented analytics backend with the consent handling already done, and you also fund the next port, the next API, the next year of this. That is the entire pitch. It is not a tax on the open source project; it is a better default that happens to also pay for the open source project.
 
-We are going to keep adding services in this shape, and we are genuinely [open to requests](https://github.com/codenameone/CodenameOne/issues) for which ones. If the model makes sense to you, the most useful thing you can do is help us tell people about these services. Promoting them is not a betrayal of the open source ethos; it is the thing that keeps the open source project from becoming one of the two sad endings above.
+We are going to keep adding services in this shape, and we are open to requests for which ones. We'd love to hear from you in the comments below. If the model makes sense to you, the most useful thing you can do is help us tell people about these services. Promoting them is not a betrayal of the open source ethos; it is the thing that keeps the open source project from becoming one of the two sad endings above.
 
-With that said, here is what shipped.
+Here is what we shipped this week.
 
 ## A privacy-first analytics API
 
@@ -57,7 +57,7 @@ Analytics.event(AnalyticsEvent.create("checkout")
         .build());
 ```
 
-Five providers ship in the box: our first-party `CodenameOneAnalyticsProvider` (batched to the cloud, part of a paid plan), `GoogleAnalyticsProvider` for GA4, the privacy-first non-Google `MatomoAnalyticsProvider`, `FirebaseAnalyticsProvider`, and a `LoggingAnalyticsProvider` for development. The old `AnalyticsService` is still there, deprecated, and now delegates to the new API so existing apps keep working. The full walkthrough is in {{< post-link path="/blog/privacy-first-analytics" text="Monday's post" >}}.
+Five providers ship in the box: our first-party `CodenameOneAnalyticsProvider` (batched to the cloud, included with every paid subscription down to the basic tier, where the plan sets your data-retention window), `GoogleAnalyticsProvider` for GA4, the privacy-first non-Google `MatomoAnalyticsProvider`, `FirebaseAnalyticsProvider`, and a `LoggingAnalyticsProvider` for development. The old `AnalyticsService` is still there, deprecated, and now delegates to the new API so existing apps keep working. The full walkthrough is in {{< post-link path="/blog/privacy-first-analytics" text="Monday's post" >}}.
 
 ## Maps you control, down to the pixel
 
@@ -65,7 +65,7 @@ Five providers ship in the box: our first-party `CodenameOneAnalyticsProvider` (
 
 ![A pure-vector OpenStreetMap render and the same area in the built-in dark style, both drawn entirely through the Codename One Graphics pipeline with no native peer](/blog/vector-and-native-maps/maps-vector.png)
 
-The second component, `NativeMap`, is the native-provider path for when you want Apple MapKit or Google Maps, and it is wired through an SPI selected by a build hint rather than code. Because the provider is injected at build time, the core and ports carry no map SDK, unused providers cost zero project size, and adding a provider for a device without Google Play, Huawei for instance, is a build-hint change, not a fork. When no provider is configured, `NativeMap` falls back to an embedded `MapView`. The engine and the provider model are covered in {{< post-link path="/blog/vector-and-native-maps" text="Saturday's post" >}}.
+The second component, `NativeMap`, gives you a real native map from a provider like Apple MapKit or Google Maps, wired through an SPI selected by a build hint rather than code. The old Google Maps cn1lib tied you to one vendor; this does not. Because the provider is injected at build time, the core and ports carry no map SDK, unused providers cost zero project size, and a device without Google Play, a Huawei phone for instance, is one build hint away from a working native map instead of a porting dead end. When no provider is configured, `NativeMap` falls back to an embedded `MapView`. The engine and the provider model are covered in {{< post-link path="/blog/vector-and-native-maps" text="Saturday's post" >}}.
 
 ## Apple TV, Android TV, and CSS that knows the form factor
 
@@ -94,7 +94,7 @@ Both sit on a single `AbstractEditorComponent` with two interchangeable backends
 
 ## Device integrity and app review
 
-Two smaller APIs round out the week, both built in core rather than as cn1libs. [PR #5277](https://github.com/codenameone/CodenameOne/pull/5277) adds `DeviceIntegrity`, a portable runtime self-protection API for high-security apps: Play Integrity and iOS App Attest attestation, root, jailbreak and Frida detection, and an accessibility-service abuse guard, most of it driven by build hints with a runtime API on top. [PR #5268](https://github.com/codenameone/CodenameOne/pull/5268) adds `AppReview`, which uses the platform's native store-review prompt where it exists and falls back to a built-in widget everywhere else, with a feedback split that quietly routes unhappy users to you instead of to a one-star public review.
+Two smaller APIs round out the week, both built in core rather than as cn1libs. [PR #5277](https://github.com/codenameone/CodenameOne/pull/5277) adds `DeviceIntegrity`, a portable runtime self-protection API for high-security apps: Play Integrity and iOS App Attest attestation, root, jailbreak and Frida detection, and an accessibility-service abuse guard, most of it driven by build hints with a runtime API on top. We already have several customers in banking and payments, and Codename One is hardened to meet the requirements they bring; this API is part of that work. [PR #5268](https://github.com/codenameone/CodenameOne/pull/5268) adds `AppReview`, which uses the platform's native store-review prompt where it exists and falls back to a built-in widget everywhere else, with a feedback split that quietly routes unhappy users to you instead of to a one-star public review.
 
 ![The AppReview fallback rating widget, used on platforms without a native in-app review prompt](/blog/device-integrity-and-app-review/app-review-sheet.png)
 
@@ -102,11 +102,11 @@ Both are covered in {{< post-link path="/blog/device-integrity-and-app-review" t
 
 ## The state of the JavaScript port
 
-The Playground is now built with our own JavaScript port. [PR #5250](https://github.com/codenameone/CodenameOne/pull/5250) moved it off the pinned old release and the lagging cloud TeaVM backend onto the local ParparVM `local-javascript` target, the same path the Initializr now uses. The visible payoff is that the Playground tracks the current API directly, so new API demos, including the 3D ones, run in the browser without a special-case build.
+The Playground is now built with our own JavaScript port. [PR #5250](https://github.com/codenameone/CodenameOne/pull/5250) moved it off a pinned old release and onto our ParparVM-based JavaScript port, the same path the Initializr now uses. The visible payoff is that the Playground tracks the current API directly, so new API demos, including the 3D ones, run in the browser without a special-case build.
 
 Getting here has been whack-a-mole in the most literal sense. The Playground's reflective access registry references nearly the whole API, which exercises paths a normal app never touches, and each one surfaced its own translator bug. Array class literals like `byte[].class` threw `Unsupported ldc constant` because the JS backend only handled object class literals. A `Throwable` caught mid-emit was rethrown only if it was an `Exception`, so an `OutOfMemoryError` could let the translator exit successfully with a truncated, broken bundle. A varargs array of arrays generated malformed `new byte[][len]` instead of `new byte[len][]`. None of these are exotic on their own; the Playground just hits all of them at once.
 
-This is the hardest port we have ever built, and every percentage point of compatibility is earned one fixed bug at a time. The work is ongoing, and the goal is to get the JavaScript port aligned with the others and properly launched in the near future.
+This is the hardest port we have ever built, and every percentage point of compatibility is earned one fixed bug at a time. The JavaScript port is now aligned with the other ports; what is left is getting it production-ready, and we are in the final stages of that. We hope to reach that point in the near future. Stay tuned.
 
 ## From the community
 
@@ -114,7 +114,7 @@ If you write about Codename One, on a blog, on Stack Overflow, in a forum, this 
 
 ## Upcoming attractions
 
-A tutorial follows this post each day; each link below goes live on its day:
+We have a week full of feature deep-dives:
 
 - **Saturday.** {{< post-link path="/blog/vector-and-native-maps" text="Vector and native maps" >}}. PR [#5264](https://github.com/codenameone/CodenameOne/pull/5264).
 - **Sunday.** {{< post-link path="/blog/rich-text-and-code-editing" text="Rich text and code editing" >}}. PR [#5272](https://github.com/codenameone/CodenameOne/pull/5272).
@@ -125,7 +125,7 @@ A tutorial follows this post each day; each link below goes live on its day:
 
 ## Wrapping up
 
-The issue tracker is [here](https://github.com/codenameone/CodenameOne/issues) and it is the best place to reach us, including for requests on which optional service you would want next. The discussion forum is [here](https://www.codenameone.com/discussion-forum.html), and the Build Cloud console is at [`/console/`](https://cloud.codenameone.com/console/index.html). The [Playground](/playground/), [Initializr](/initializr/), and [Skin Designer](/skindesigner/) are where they have always been.
+The best place to reach us is the comments on this post, including requests for which optional service you want next. The [issue tracker](https://github.com/codenameone/CodenameOne/issues) and the [discussion forum](https://www.codenameone.com/discussion-forum.html) are there too, and the Build Cloud console is at [`/console/`](https://cloud.codenameone.com/console/index.html). The [Playground](/playground/), [Initializr](/initializr/), and [Skin Designer](/skindesigner/) are where they have always been.
 
 ---
 

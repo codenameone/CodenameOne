@@ -122,8 +122,6 @@ I built the tvOS target end-to-end against the Xcode 26 / tvOS 26 SDK, and the f
 
 There is no separate SDK to learn. On Android you set `android.tv=true` and the same APK gains a TV launcher; on iOS you point the build at the tvOS target with `codename1.tvMain` and `TvNativeBuilder` generates the `appletvos` target. Then you restyle for the ten-foot screen with an `@media device-tv` block and branch the few behaviors CSS can't reach on `CN.isTV()`. The same project, the same code, three more screens.
 
-The native sub-platform guards (the `#if !TARGET_OS_TV` slices that keep iPhone-only frameworks like MessageUI out of the TV build) are tracked in the open in `Ports/iOSPort/nativeSources/TVOS_PORT.md` if you want to see exactly how the target is composed.
-
 ## Wrapping up
 
 The television is now a Codename One form factor, detected with `CN.isTV()`, themed with `@media device-tv`, and built with a flag. Set `android.tv=true` for Google TV and point `codename1.tvMain` at your tvOS target for Apple TV, and the screens you already wrote show up in the living room.

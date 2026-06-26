@@ -74,7 +74,7 @@ Analytics.setConsent(AnalyticsConsent.none());
 
 Five providers ship in the `com.codename1.analytics` package:
 
-- `CodenameOneAnalyticsProvider` batches to the Codename One cloud and is part of a paid plan.
+- `CodenameOneAnalyticsProvider` batches to the Codename One cloud; it is included with every paid subscription, and the tier sets your data-retention window.
 - `GoogleAnalyticsProvider` speaks the GA4 Measurement Protocol.
 - `MatomoAnalyticsProvider` targets a self-hosted, non-Google backend.
 - `FirebaseAnalyticsProvider` routes through the native Firebase SDK (Android via reflection, iOS via dynamic dispatch on `FIRAnalytics`); the builders inject the Firebase dependency only when you set the `android.firebaseAnalytics` / `ios.firebaseAnalytics` build hints.
@@ -113,15 +113,29 @@ public class CountingProvider extends AbstractAnalyticsProvider {
 
 `AnalyticsCapability` lets a caller ask a provider what it actually honors (`SCREEN_VIEWS`, `EVENTS`, `CRASH_REPORTING`, `FUNNELS`, `RAW_EXPORT`, among others) instead of guessing.
 
+## The first-party backend: events, goals, and a console
+
+`CodenameOneAnalyticsProvider` is the one provider that needs no third-party account. It batches events to the Build Cloud, where they show up in an analytics console next to your builds. An app appears on its own once it sends data, so there is no dashboard to provision first.
+
+![The Codename One analytics console Overview, with active-user, form-view and event counts, a form-views-over-time chart, and a left-hand nav for Trends, Forms, Events, Segments, User flow, Goals and Reports](/blog/privacy-first-analytics/analytics-console-overview.png)
+
+The console is more than a raw event log. The Overview gives you headline numbers, active users, form views and events, over a 7-, 30- or 90-day window, and the left nav opens Trends, Forms, Events, Segments, User flow, Goals, and Reports. Common events are understood out of the box: screen and form views are tracked for you, and a `purchase` event carrying a `value` parameter feeds revenue and funnel reporting without a custom dashboard. Goals let you mark the events that matter and track conversion against them, while the segment and user-flow views answer more involved questions than a flat counter can. All of it is in the console today.
+
+An app only shows up after it sends data, which only happens after the on-device consent gate opens:
+
+![The analytics console empty state, explaining that an app appears once it registers CodenameOneAnalyticsProvider and the user grants opt-in analytics consent on the device](/blog/privacy-first-analytics/analytics-console-empty.png)
+
+The first-party provider is included with every paid Codename One subscription, down to the basic tier. What your plan changes is how long your data is retained, not whether you get analytics at all.
+
 ## Migrating from the old service
 
 The old `AnalyticsService` still works. It is deprecated, and it now delegates to the new API rather than carrying its own Google Analytics code, so existing apps keep running without a change. The `UIBuilder` analytics hook is unchanged too.
 
-One honest detail you need to know: `AnalyticsService.init()` flips the facade to opt-*out* mode. The legacy API always reported immediately, and silently switching it to opt-in would have stopped data flowing for every app that relied on it. So legacy callers keep their old always-on behavior, while new code written against `Analytics` gets opt-in by default. Do not assume the new default applies to a project still calling the deprecated service.
+One detail you need to know: `AnalyticsService.init()` flips the facade to opt-*out* mode. The legacy API always reported immediately, and silently switching it to opt-in would have stopped data flowing for every app that relied on it. So legacy callers keep their old always-on behavior, while new code written against `Analytics` gets opt-in by default. Do not assume the new default applies to a project still calling the deprecated service.
 
 ## The business-model thread
 
-This is the shape every paid Codename One service takes, and [Friday's post](/blog/funding-open-source-without-the-bait-and-switch/) is the longer argument for why. The analytics API is an open SPI in a framework that stays open, licensed under GPL with the Classpath Exception: point it at Matomo, at GA4, at Firebase, or at a provider you wrote in twenty lines, and the framework does not care. `CodenameOneAnalyticsProvider` is one optional implementation of that contract, batched to our cloud and sold as part of a paid plan, and choosing it is what helps fund the next port and the next API. It is a better default for people who want consent handling done for them, not a toll gate on the open framework. If you would rather self-host Matomo, you lose nothing.
+This is the shape every paid Codename One service takes, and [Friday's post](/blog/funding-open-source-without-the-bait-and-switch/) is the longer argument for why. The analytics API is an open SPI in a framework that stays open, licensed under GPL with the Classpath Exception: point it at Matomo, at GA4, at Firebase, or at a provider you wrote in twenty lines, and the framework does not care. `CodenameOneAnalyticsProvider` is one optional implementation of that contract, batched to our cloud and included with every paid subscription down to the basic tier, and choosing it is what helps fund the next port and the next API. It is a better default for people who want consent handling done for them, not a toll gate on the open framework. If you would rather self-host Matomo, you lose nothing.
 
 ## A tradeoff worth saying out loud
 

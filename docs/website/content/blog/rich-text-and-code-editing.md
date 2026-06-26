@@ -103,9 +103,7 @@ The toolbar drives the same command channel described earlier; pressing the bold
 
 `CodeEditor` can be backed by a heavier engine, and CodeMirror assets are not free weight to carry around. So the Android and iOS builders scan your app for use of `com.codename1.ui.CodeEditor`. The optional CodeMirror assets are bundled only when that API actually appears, gated by `CN1_USE_CODEMIRROR`. An app that never touches `CodeEditor` ships nothing extra.
 
-One honest iOS detail came out of this. The native web widget is created transparent (`WKWebView` with `opaque=NO`), which is correct for overlaying content but meant the dark editor's background let the page behind it bleed through as black. The fix was on the editor page: paint an opaque background and pin the color scheme, so the peer no longer shows through. It is the kind of bug you only find by running the thing.
-
-We did run the thing. The Playground already uses `CodeEditor` for its editor pane, so it is dogfooded rather than demo-ware. There are 33 deterministic unit tests across `RichTextAreaTest` and `CodeEditorTest`, backed by an editor SPI in the test implementation so they run without a real web view, plus new developer-guide sections with screenshots.
+The Playground already uses `CodeEditor` for its editor pane, so it is dogfooded rather than demo-ware. There are 33 deterministic unit tests across `RichTextAreaTest` and `CodeEditorTest`, backed by an editor SPI in the test implementation so they run without a real web view, plus new developer-guide sections with screenshots.
 
 ## The tradeoff
 
