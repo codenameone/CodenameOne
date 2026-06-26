@@ -70,6 +70,12 @@ public class FileChooser {
 
             @Override
             public void handleEvent(Event evt) {
+                // Run synchronously on the current (green) thread via run() rather
+                // than start(): a java.lang.Thread never executes on the
+                // single-threaded HTML5 worker, so the response listener (and the
+                // invokeAndBlock'd Capture.capturePhoto() that waits on it) would
+                // otherwise hang forever. The body only does cooperative,
+                // host-bridge work, so it's safe inline.
                 new Thread() {
                     public void run() {
                         if (clickBtn != null) {
@@ -154,9 +160,9 @@ public class FileChooser {
                             
                         }
                     }
-                }.start();
+                }.run();
             }
-            
+
         });
         return fileEl;
         

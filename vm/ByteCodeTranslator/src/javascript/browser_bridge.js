@@ -1666,6 +1666,96 @@
     return doc.documentElement.getAttribute('data-cn1-app-version');
   });
 
+  // Create a DOM element on the MAIN thread and return its host-ref. The worker
+  // cannot create DOM nodes (no document, and jQuery isn't loaded there), so the
+  // jQuery/`createElement`-based @JSBody helpers (showButton_, FileChooser's
+  // file inputs + buttons) route here. ``spec`` = {tag, attrs, text, appendToBody};
+  // ``clickCallback`` (optional, a separate top-level arg so mapHostArgs
+  // materialises it into a worker-callback proxy) is wired as a click listener.
+  // text is set via textContent, never innerHTML -- no markup injection from
+  // user-controlled labels.
+  hostBridge.register('__cn1_create_dom_element__', function(spec, clickCallback) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof doc.createElement !== 'function') {
+      return null;
+    }
+    spec = spec || {};
+    var el = doc.createElement(String(spec.tag || 'div'));
+    if (spec.attrs) {
+      for (var k in spec.attrs) {
+        if (Object.prototype.hasOwnProperty.call(spec.attrs, k)) {
+          el.setAttribute(k, String(spec.attrs[k]));
+        }
+      }
+    }
+    if (spec.text != null) {
+      el.textContent = String(spec.text);
+    }
+    // hostBridge.invoke passes args raw (no mapHostArgs), so a worker-side
+    // EventListener arrives as a {__cn1WorkerCallback} marker -- materialise it
+    // into a proxy that posts the click back to the worker.
+    var cb = clickCallback;
+    if (cb && typeof cb === 'object' && typeof cb.__cn1WorkerCallback === 'number') {
+      cb = makeWorkerCallback(cb.__cn1WorkerCallback);
+    }
+    if (typeof cb === 'function') {
+      el.addEventListener('click', cb);
+    }
+    if (spec.appendToBody && doc.body) {
+      doc.body.appendChild(el);
+    }
+    // hostResult stores the element as a host-ref and returns a cloneable
+    // {__cn1HostRef} marker -- returning the raw element makes postHostCallback's
+    // structured-clone postMessage throw DataCloneError.
+    return hostResult(el);
+  });
+
+  // Fullscreen lives on the main-thread document. The worker routes the
+  // capability/state queries and the enter/exit requests here; enter/exit
+  // resolve to 1/0 once the browser's requestFullscreen()/exitFullscreen()
+  // promise settles, and the worker invokes the Java callback with that result.
+  function fullscreenDoc() {
+    return global.document || (global.window && global.window.document);
+  }
+  hostBridge.register('__cn1_fullscreen_supported__', function() {
+    var doc = fullscreenDoc();
+    return (doc && doc.body && typeof doc.body.requestFullscreen === 'function') ? 1 : 0;
+  });
+  hostBridge.register('__cn1_is_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    return (doc && doc.fullscreenElement) ? 1 : 0;
+  });
+  hostBridge.register('__cn1_request_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    if (!doc || !doc.body || typeof doc.body.requestFullscreen !== 'function') {
+      return 0;
+    }
+    try {
+      var p = doc.body.requestFullscreen();
+      if (p && typeof p.then === 'function') {
+        return p.then(function() { return 1; }, function() { return 0; });
+      }
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  });
+  hostBridge.register('__cn1_exit_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    if (!doc || typeof doc.exitFullscreen !== 'function') {
+      return 0;
+    }
+    try {
+      var p = doc.exitFullscreen();
+      if (p && typeof p.then === 'function') {
+        return p.then(function() { return 1; }, function() { return 0; });
+      }
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  });
+
   function afterPaint(frames) {
     return new Promise(function(resolve) {
       var win = global.window || global;

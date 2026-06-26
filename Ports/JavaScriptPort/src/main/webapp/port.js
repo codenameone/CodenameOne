@@ -1842,6 +1842,113 @@ bindNative([
   return value == null ? null : jvm.createStringLiteral(String(value));
 });
 
+// DOM-element creation for the native overlay button (fullscreen gesture) and
+// the FileChooser file inputs/buttons (photo capture) can't run in the worker
+// (no document/jQuery). Route to the host element factory; the click
+// EventListener is passed as a top-level arg so mapHostArgs materialises it into
+// a worker-callback proxy on the main thread.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_showButton__java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_showButton___java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement"
+], function*(label, l) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const text = label == null ? "" : jvm.toNativeString(label);
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "button", attrs: { "class": "btn btn-default" }, text: text, appendToBody: true }, l]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLButtonElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createFileInput__R_com_codename1_html5_js_dom_HTMLInputElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createFileInput___R_com_codename1_html5_js_dom_HTMLInputElement"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__", [{ tag: "input", attrs: { type: "file" } }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLInputElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createMultiFileInput__R_com_codename1_html5_js_dom_HTMLInputElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createMultiFileInput___R_com_codename1_html5_js_dom_HTMLInputElement"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "input", attrs: { type: "file", multiple: "" } }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLInputElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_showButton_java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_showButton___java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement"
+], function*(label, l) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const text = label == null ? "" : jvm.toNativeString(label);
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "button", attrs: { "class": "btn btn-default" }, text: text, appendToBody: true }, l]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLButtonElement");
+});
+
+// Fullscreen: document.fullscreen* lives on the main thread. Queries return the
+// real host state; enter/exit do the host request and then invoke the Java
+// RequestFullScreenCallback (onComplete(boolean)) back in the worker.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreenSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreenSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_fullscreen_supported__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreen__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreen___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_is_fullscreen__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestFullScreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestFullScreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_boolean"
+], function*(onComplete) {
+  const cb = jvm.unwrapJsValue(onComplete);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [0], null); }
+    return 0;
+  }
+  const ok = yield jvm.invokeHostNative("__cn1_request_fullscreen__", []);
+  if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [ok ? 1 : 0], null); }
+  return 1;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_void"
+], function*(onComplete) {
+  const cb = jvm.unwrapJsValue(onComplete);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [0], null); }
+    return null;
+  }
+  const ok = yield jvm.invokeHostNative("__cn1_exit_fullscreen__", []);
+  if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [ok ? 1 : 0], null); }
+  return null;
+});
+
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
   const win = global.window || global;
   const normalizeWheel = win.cn1NormalizeWheel;

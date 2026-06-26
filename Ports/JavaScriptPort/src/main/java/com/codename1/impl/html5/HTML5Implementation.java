@@ -9651,20 +9651,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 requestFullScreen_(new RequestFullScreenCallback() {
                     @Override
                     public void onComplete(final boolean result) {
-                        new Thread(new Runnable() {
-                           public void run() {
-                               res[0] = result;
-                                complete[0] = true;
-                                synchronized(complete) {
-                                    try {
-                                        complete.notifyAll();
-                                    } catch (Throwable t) {
+                        // Notify directly -- the callback already runs on its own
+                        // thread/green-thread, and spawning a java.lang.Thread here
+                        // never executes on the single-threaded HTML5 worker, which
+                        // would leave the invokeAndBlock below waiting forever.
+                        synchronized(complete) {
+                            res[0] = result;
+                            complete[0] = true;
+                            try {
+                                complete.notifyAll();
+                            } catch (Throwable t) {
 
-                                    }
-                                }
-                           }
-                        }).start();
-
+                            }
+                        }
                     }
                 });
             }
@@ -9701,21 +9700,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         exitFullscreen_(new RequestFullScreenCallback() {
             @Override
             public void onComplete(final boolean result) {
-                new Thread(new Runnable() {
-                    public void run() {
-                        res[0] = result;
-                         complete[0] = true;
-                         synchronized(complete) {
-                             try {
-                                 complete.notifyAll();
-                             } catch (Throwable t) {
+                // Notify directly -- a java.lang.Thread never executes on the
+                // single-threaded HTML5 worker (see requestFullScreen()).
+                synchronized(complete) {
+                    res[0] = result;
+                    complete[0] = true;
+                    try {
+                        complete.notifyAll();
+                    } catch (Throwable t) {
 
-                             }
-                         }
                     }
-                 }).start();
+                }
             }
-            
+
         });
         CN.invokeAndBlock(new Runnable() {
             public void run() {
@@ -10191,7 +10188,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
 
-    @JSBody(params={"name"}, script="return document.execCommand(name)")
+    @JSBody(params={"name"}, script="return (typeof document !== 'undefined' && document.execCommand) ? document.execCommand(name) : false")
     private native static boolean execCommand(String name);
     
     
@@ -10203,7 +10200,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
     }
-    @JSBody(params={"command"}, script="if (!document.queryCommandEnabled) return true; return document.queryCommandEnabled(command);")
+    @JSBody(params={"command"}, script="if (typeof document === 'undefined' || !document.queryCommandEnabled) return false; return document.queryCommandEnabled(command);")
     private native static boolean queryCommandEnabled(String command);
 
     // Writes text to the system clipboard. On the worker-based JavaScript port
