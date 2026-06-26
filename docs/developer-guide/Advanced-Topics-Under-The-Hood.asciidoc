@@ -695,7 +695,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 
 === Versioned builds
 
-By default a cloud build always uses the current Codename One release. With a _versioned build_ you can instead pin the build to a specific previously released framework version, so you get reproducible output over time. This helps when stabilizing a release, supporting an older app, or isolating a regression: if an app that built correctly before suddenly fails, rebuilding against the last known good version tells you whether the change came from your code or from the framework and build server.
+By default a cloud build always uses the current Codename One release. With a _versioned build_ you can instead pin the build to a specific previously released framework version, so you get reproducible output over time. This helps when stabilizing a release, supporting an older app, or isolating a regression: if an app that built correctly in the past starts failing, rebuilding against the last known good version tells you whether the change came from your code or from the framework and build server.
 
 Set the `build.cn1Version` build hint to the version you want to target. Versions use the standard Maven release scheme published to Maven Central, for example `7.0.182`:
 
@@ -714,7 +714,7 @@ Versioned builds are a Pro and Enterprise feature, and how far back you can targ
 |Enterprise |Any version released within the last six months
 |===
 
-If you request a version older than your tier's window, a version that was never published, or you are not on a Pro or Enterprise plan, the build fails with an explanatory message instead of silently falling back to the current release.
+If you request a version older than your tier's window, a version that was never published, or you aren't on a Pro or Enterprise plan, the build fails with an explanatory message instead of falling back to the current release.
 
 ==== Building against master
 
