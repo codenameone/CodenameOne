@@ -123,8 +123,8 @@
     dialogPosition: Center;
     /* Cap the alert width so a long body wraps into a Material card instead of
        stretching full-width on wide screens (tablet / landscape / desktop).
-       Material dialog ~50mm card-width; caps on wide screens, full on phones. */
-    dialogMaxWidthMMInt: 50;
+       Material dialog ~88% width; density-robust cap, card on wide screens. */
+    dialogMaxWidthPercentInt: 88;
     hideEmptyTitleBool: true;
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;

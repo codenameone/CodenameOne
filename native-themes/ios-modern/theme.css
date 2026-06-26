@@ -158,8 +158,8 @@
        title, grid commands) but don't affect outer sizing. */
     dialogPosition: Center;
     /* Cap the alert width so a long body wraps into an iOS-style card instead of
-       stretching full-width on wide screens (tablet / landscape / desktop): ~45mm is the UIAlertController proportion. */
-    dialogMaxWidthMMInt: 45;
+       stretching full-width on wide screens (tablet / landscape / desktop): ~72% is the UIAlertController proportion (density-robust). */
+    dialogMaxWidthPercentInt: 72;
     hideEmptyTitleBool: true;
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;
