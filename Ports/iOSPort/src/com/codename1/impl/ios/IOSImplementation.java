@@ -1821,6 +1821,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         int[] rgb = new int[rw * rh];
         getRGB(target, rgb, 0, rx, ry, rw, rh);
+        // UIKit "Liquid Glass" doesn't just blur the backdrop -- it boosts the
+        // backdrop's saturation (vibrancy) so colours pop through the frost. A plain
+        // CIGaussianBlur leaves the glass washed-out vs the native material; lift
+        // saturation here (this is the backdrop-filter path only -- blurRegion is
+        // never invoked for a plain filter:blur) before blurring.
+        saturateInPlace(rgb, GLASS_SATURATION);
         NativeImage blurred = new NativeImage("backdrop-filter blur");
         blurred.peer = nativeInstance.gausianBlurImage(createImageFromARGB(rgb, rw, rh), radius);
         blurred.width = rw;
@@ -1831,6 +1837,34 @@ public class IOSImplementation extends CodenameOneImplementation {
         int ty = (int) Math.round(ng.transform.getTranslateY());
         drawImage(ng, blurred, rx - tx, ry - ty);
         return true;
+    }
+
+    /** Liquid-glass vibrancy: how far backdrop colours are pushed from grey (1.0 = off). */
+    private static final float GLASS_SATURATION = 1.35f;
+
+    /**
+     * Boosts the saturation of an ARGB buffer in place by interpolating each pixel
+     * away from its perceptual luminance (the standard saturation-matrix approach):
+     * c' = lum + (c - lum) * factor. Alpha is preserved. Used to give the
+     * backdrop-filter glass the vibrancy UIKit's real material has.
+     */
+    private static void saturateInPlace(int[] argb, float factor) {
+        if (factor == 1f) {
+            return;
+        }
+        for (int i = 0; i < argb.length; i++) {
+            int p = argb[i];
+            int a = p & 0xff000000;
+            int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            r = (int) (lum + (r - lum) * factor);
+            g = (int) (lum + (g - lum) * factor);
+            b = (int) (lum + (b - lum) * factor);
+            if (r < 0) { r = 0; } else if (r > 255) { r = 255; }
+            if (g < 0) { g = 0; } else if (g > 255) { g = 255; }
+            if (b < 0) { b = 0; } else if (b > 255) { b = 255; }
+            argb[i] = a | (r << 16) | (g << 8) | b;
+        }
     }
 
     
