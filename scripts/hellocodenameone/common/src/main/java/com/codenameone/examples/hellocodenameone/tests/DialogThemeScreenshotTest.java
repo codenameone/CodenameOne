@@ -59,6 +59,15 @@ public class DialogThemeScreenshotTest extends DualAppearanceBaseTest {
         commands.add(new Button("Cancel")).add(new Button("OK"));
 
         dialog.add(BorderLayout.CENTER, body).add(BorderLayout.SOUTH, commands);
-        form.add(dialog);
+
+        // Constrain the inline dialog to a centered card width so the screenshot
+        // reads as a real dialog on wide screens (desktop / Mac native) instead of
+        // a full-width strip. Mirrors the ~72% width a packed Dialog.show() now caps
+        // to (dialogMaxWidthPercentInt); narrow phone/JS screens were already
+        // card-width, so this only tightens the wide-screen render.
+        dialog.setPreferredW(com.codename1.ui.Display.getInstance().getDisplayWidth() * 72 / 100);
+        Container center = new Container(new FlowLayout(Component.CENTER));
+        center.add(dialog);
+        form.add(center);
     }
 }
