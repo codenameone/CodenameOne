@@ -1805,13 +1805,15 @@ public class Dialog extends Form implements AbstractDialog {
 
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
-        // Cap the packed dialog width on wide screens (tablet / desktop / landscape)
-        // so a long body wraps into a card instead of stretching to a full-width
-        // strip. Driven by the dialogMaxWidthDips theme constant (DIPs ~= points,
-        // e.g. ~300 for an iOS-style alert); unset (0) keeps the legacy behaviour.
-        int maxWidthDips = getUIManager().getThemeConstant("dialogMaxWidthDipsInt", 0);
-        if (maxWidthDips > 0) {
-            int maxWidthPx = Display.getInstance().convertToPixels((float) maxWidthDips);
+        // Cap the packed dialog width so a long body wraps into a centered card
+        // instead of stretching to a full-width strip on wide screens (tablet /
+        // desktop / landscape). The cap is in MILLIMETRES (CN1's density-independent
+        // unit): ~45mm is an iOS-style alert, ~50mm a Material dialog. On a narrow
+        // phone the cap can exceed the screen (no effect = full-width alert); on a
+        // wide screen it constrains to a card. Unset (0) keeps the legacy behaviour.
+        int maxWidthMM = getUIManager().getThemeConstant("dialogMaxWidthMMInt", 0);
+        if (maxWidthMM > 0) {
+            int maxWidthPx = Display.getInstance().convertToPixels(maxWidthMM, true);
             if (maxWidthPx > 0 && prefWidth > maxWidthPx) {
                 prefWidth = maxWidthPx;
                 // Re-measure at the capped width so the wrapped body reports its

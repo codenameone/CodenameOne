@@ -123,8 +123,8 @@
     dialogPosition: Center;
     /* Cap the alert width so a long body wraps into a Material card instead of
        stretching full-width on wide screens (tablet / landscape / desktop).
-       Material 3 dialogs cap at ~560dp; 360 keeps it card-like on phones too. */
-    dialogMaxWidthDipsInt: 360;
+       Material dialog ~50mm card-width; caps on wide screens, full on phones. */
+    dialogMaxWidthMMInt: 50;
     hideEmptyTitleBool: true;
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;
