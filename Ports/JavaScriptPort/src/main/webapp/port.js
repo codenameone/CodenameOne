@@ -1949,6 +1949,33 @@ bindNative([
   return null;
 });
 
+// Print: the iframe + window.print() must run on the main thread. Route the
+// object URL to the host, then invoke the Java PrintFrameCallback
+// (onResult(boolean, String)) in the worker with the {ok, error} outcome.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL__java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL___java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL__java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printObjectURL___java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void"
+], function*(url, callback) {
+  const cb = jvm.unwrapJsValue(callback);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) {
+      spawnVirtualCallback(cb, "cn1_s_onResult_boolean_java_lang_String",
+        [0, jvm.createStringLiteral("Printing host bridge unavailable")], null);
+    }
+    return null;
+  }
+  const u = url == null ? "" : jvm.toNativeString(url);
+  const res = yield jvm.invokeHostNative("__cn1_print_object_url__", [{ url: u }]);
+  if (cb) {
+    const ok = res && res.ok ? 1 : 0;
+    const err = (res && res.error != null) ? jvm.createStringLiteral(String(res.error)) : null;
+    spawnVirtualCallback(cb, "cn1_s_onResult_boolean_java_lang_String", [ok, err], null);
+  }
+  return null;
+});
+
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
   const win = global.window || global;
   const normalizeWheel = win.cn1NormalizeWheel;

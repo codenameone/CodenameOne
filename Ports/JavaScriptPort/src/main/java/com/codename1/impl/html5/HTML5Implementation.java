@@ -9926,7 +9926,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void print(final String filePath, final String mimeType, final PrintResultListener listener) {
         final boolean[] fired = new boolean[1];
-        new Thread(new Runnable() {
+        // callSerially rather than new Thread(): a java.lang.Thread never executes
+        // on the single-threaded HTML5 worker, so the work below (and the listener)
+        // would never run. callSerially keeps print() non-blocking on every port.
+        Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 String url;
                 try {
@@ -9946,10 +9949,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 printObjectURL_(url, new PrintFrameCallback() {
                     public void onResult(final boolean completed, final String error) {
-                        // Hop off the JS callback context before touching
-                        // Codename One code, matching the other JSFunctor
-                        // callbacks in this class.
-                        new Thread(new Runnable() {
+                        // Hop onto the EDT before touching Codename One code,
+                        // matching the other JSFunctor callbacks in this class.
+                        Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 if (completed) {
                                     firePrintResult(listener, PrintResult.completed(), fired);
@@ -9957,11 +9959,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                     firePrintResult(listener, PrintResult.failed(error), fired);
                                 }
                             }
-                        }).start();
+                        });
                     }
                 });
             }
-        }).start();
+        });
     }
 
     /// Reports a print result exactly once. The native print script fires

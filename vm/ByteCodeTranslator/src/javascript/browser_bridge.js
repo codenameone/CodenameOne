@@ -1740,6 +1740,54 @@
       return 0;
     }
   });
+  // Print: load the object URL into a hidden iframe on the MAIN thread and
+  // invoke the browser print dialog (document/iframe don't exist in the worker).
+  // Resolves {ok, error} once afterprint fires or the 1s fallback elapses; the
+  // worker then invokes the Java PrintFrameCallback with the outcome.
+  hostBridge.register('__cn1_print_object_url__', function(request) {
+    var url = (request && request.url != null) ? String(request.url) : '';
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) {
+      return { ok: 0, error: 'Printing requires a browser document context' };
+    }
+    return new Promise(function(resolve) {
+      var done = false, cleaned = false, iframe = null;
+      var finish = function(ok, msg) {
+        if (done) { return; }
+        done = true;
+        resolve({ ok: ok ? 1 : 0, error: msg == null ? null : String(msg) });
+      };
+      var cleanup = function() {
+        if (cleaned) { return; }
+        cleaned = true;
+        try {
+          var u = (typeof URL !== 'undefined' && URL) ? URL
+            : ((global.window && global.window.webkitURL) ? global.window.webkitURL : null);
+          if (u) { u.revokeObjectURL(url); }
+        } catch (e) {}
+        try { if (iframe && iframe.parentNode) { iframe.parentNode.removeChild(iframe); } } catch (e) {}
+      };
+      iframe = doc.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;visibility:hidden;right:0;bottom:0;width:0;height:0;border:0';
+      iframe.onload = function() {
+        try {
+          var win = iframe.contentWindow;
+          try { win.addEventListener('afterprint', function() { finish(1, null); setTimeout(cleanup, 0); }); } catch (e) {}
+          win.focus();
+          win.print();
+          setTimeout(function() { finish(1, null); }, 1000);
+        } catch (e) {
+          finish(0, '' + e);
+          cleanup();
+        }
+      };
+      iframe.onerror = function() { finish(0, 'Failed to load document for printing'); cleanup(); };
+      iframe.src = url;
+      doc.body.appendChild(iframe);
+      setTimeout(cleanup, 60000);
+    });
+  });
+
   hostBridge.register('__cn1_exit_fullscreen__', function() {
     var doc = fullscreenDoc();
     if (!doc || typeof doc.exitFullscreen !== 'function') {
