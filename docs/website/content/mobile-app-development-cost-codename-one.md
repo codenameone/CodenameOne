@@ -47,7 +47,7 @@ $79/mo
 - [Push Notification](#/)
 - [Crash Reporting](#/)
 - [Concurrent Builds](#/)
-- [Versioning (5 months)](#/)
+- [Versioning (2 months)](#/)
 - [E-Mail Support](#/)
 - [Native Desktop Apps](#/)
 
@@ -62,7 +62,7 @@ $399/mo
 - [in this tutorial](#/)." data-original-title="" title="">JavaScript App Generation
 - [Offline Builds](#/)
 - [High Priority Builds](#/)
-- [Versioning (18 months)](#/)
+- [Versioning (6 months)](#/)
 - [Continuous Integration](#/)
 - [On Device Unit Tests](#/)
 - [Office Hours/Phone Support](#/)

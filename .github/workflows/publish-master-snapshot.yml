@@ -1,0 +1,64 @@
+# Publishes the framework artifacts for the current master to a fixed,
+# overwritten GitHub release ("master-snapshot"). The cloud build server grabs
+# these when a project sets the build hint `build.cn1Version=master`, letting
+# Pro/Enterprise users build against the development head. Only the release
+# ASSETS are overwritten each run; the daemon always downloads the latest.
+name: Publish master snapshot
+
+on:
+  push:
+    branches:
+      - master
+
+# Never let two master pushes publish at the same time.
+concurrency:
+  group: master-snapshot
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build framework artifacts
+        run: |
+          cd maven
+          # Build only the four modules whose artifacts the daemon stages
+          # (core, ios bundle, parparvm bundle, android), plus their reactor
+          # dependencies (-am). Widen the -pl list if a needed module is missed.
+          xvfb-run -a mvn -B package -Plocal-dev-javase -DskipTests \
+            -Darchetype.test.skip=true \
+            -pl :codenameone-core,:codenameone-ios,:codenameone-parparvm,:codenameone-android -am
+
+      - name: Collect artifacts under fixed names
+        run: |
+          set -e
+          mkdir -p master-out
+          pick() { ls $1 2>/dev/null | grep -vE '\-(sources|javadoc|tests)\.jar$' | head -1; }
+          cp "$(pick 'maven/core/target/codenameone-core-*.jar')"            master-out/codenameone-core-master.jar
+          cp  maven/ios/target/codenameone-ios-*-bundle.jar                  master-out/codenameone-ios-master-bundle.jar
+          cp  maven/parparvm/target/codenameone-parparvm-*-bundle.jar        master-out/codenameone-parparvm-master-bundle.jar
+          cp "$(pick 'maven/android/target/codenameone-android-*.jar')"      master-out/codenameone-android-master.jar
+          ls -l master-out
+
+      - name: Publish to the master-snapshot release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create the rolling release once; afterwards just overwrite its assets.
+          gh release create master-snapshot \
+            --prerelease \
+            --title "Codename One master snapshot" \
+            --notes "Rolling framework artifacts built from the latest master. Used by build.cn1Version=master." \
+            || true
+          gh release upload master-snapshot master-out/*.jar --clobber
