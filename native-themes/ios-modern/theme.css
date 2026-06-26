@@ -157,6 +157,10 @@
        boolean constants below tune button-area rendering (compact
        title, grid commands) but don't affect outer sizing. */
     dialogPosition: Center;
+    /* Cap the alert width so a long body wraps into an iOS-style card instead of
+       stretching full-width on wide screens (iPad / landscape / desktop). ~300pt
+       matches the native UIAlertController width. */
+    dialogMaxWidthDipsInt: 300;
     hideEmptyTitleBool: true;
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;

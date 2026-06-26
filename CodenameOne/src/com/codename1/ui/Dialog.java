@@ -1803,9 +1803,24 @@ public class Dialog extends Form implements AbstractDialog {
 
         revalidate();
 
-        int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
+        // Cap the packed dialog width on wide screens (tablet / desktop / landscape)
+        // so a long body wraps into a card instead of stretching to a full-width
+        // strip. Driven by the dialogMaxWidthDips theme constant (DIPs ~= points,
+        // e.g. ~300 for an iOS-style alert); unset (0) keeps the legacy behaviour.
+        int maxWidthDips = getUIManager().getThemeConstant("dialogMaxWidthDipsInt", 0);
+        if (maxWidthDips > 0) {
+            int maxWidthPx = Display.getInstance().convertToPixels((float) maxWidthDips);
+            if (maxWidthPx > 0 && prefWidth > maxWidthPx) {
+                prefWidth = maxWidthPx;
+                // Re-measure at the capped width so the wrapped body reports its
+                // true (taller) height for correct vertical centring.
+                contentPane.setWidth(prefWidth);
+                contentPane.setShouldCalcPreferredSize(true);
+            }
+        }
+        int prefHeight = contentPane.getPreferredH();
         if (contentPaneStyle.getBorder() != null) {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
