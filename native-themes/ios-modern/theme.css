@@ -59,6 +59,13 @@
     tabPlacementInt: 2;
     tabsFillRowsBool: true;
     tabsGridBool: true;
+    /* Native iOS 26: content scrolls UNDER the translucent floating tab pill so
+       the glass blurs real content. tabsOnTopBool makes the content pane fill the
+       full height (BorderLayout TOTAL_BELOW) with the pill overlaying the bottom,
+       and the framework adds bottom padding to scrollable pages so the last rows
+       clear the bar. Without this the content stops above the bar and the glass
+       has nothing to blur. */
+    tabsOnTopBool: true;
     /* For a floating-pill tab bar, Tabs wraps the pill in a host
        container that absorbs the safe-area inset as bottom padding -
        pushing the pill UP, away from the home indicator, without
@@ -536,6 +543,16 @@ TabsContainer {
        + tall padding let the CN1 pill grow to match. */
     margin: 0.5mm 1mm 0.5mm 1mm;
     cn1-background-type: cn1-pill-border;
+}
+
+/* Transparent wrapper that holds the floating tab pill and absorbs the bottom
+   safe-area inset. The negative bottom margin pulls the whole bar down toward the
+   home indicator so the pill sits close to the bottom (native iOS 26) instead of
+   floating a full safe-area height above it; the pill keeps its own shape. */
+TabsContainerHost {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 -4mm 0;
 }
 
 Tab {

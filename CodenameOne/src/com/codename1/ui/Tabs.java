@@ -199,10 +199,23 @@ public class Tabs extends Container {
         tabsContainer.setSafeArea(tabsSafeAreaOnPill);
         tabsContainer.setUIID("TabsContainer");
         tabsContainer.setScrollVisible(false);
-        tabsContainer.getStyle().setMargin(0, 0, 0, 0);
-        if (!tabsSafeAreaOnPill) {
+        if (tabsSafeAreaOnPill) {
+            // Legacy / flush full-width bar: the background reaches the screen
+            // edges, so the bar carries no margin.
+            tabsContainer.getStyle().setMargin(0, 0, 0, 0);
+        } else {
+            // Modern floating glass pill: KEEP the theme's TabsContainer margin
+            // (e.g. iOS-modern's 0.5mm/1mm) so the pill insets from the screen
+            // edges and reads as a floating capsule rather than a full-width bar.
+            // Forcing the margin to 0 here defeated the float. The host below is a
+            // transparent spacer that only absorbs the safe-area inset; the pill
+            // itself paints the glass, so the host must not tint behind it.
             tabsContainerHost = new Container(new BorderLayout());
-            tabsContainerHost.setUIID("Container");
+            // Dedicated UIID so a theme can tune the host (e.g. a negative bottom
+            // margin to pull the floating pill closer to the home indicator).
+            // Defaults to transparent so only the pill paints the glass.
+            tabsContainerHost.setUIID("TabsContainerHost");
+            tabsContainerHost.getStyle().setBgTransparency(0);
             tabsContainerHost.setSafeArea(true);
             tabsContainerHost.add(BorderLayout.CENTER, tabsContainer);
         }
@@ -249,11 +262,16 @@ public class Tabs extends Container {
 
     private void checkTabsCanBeSeen() {
         if (UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
+            // The whole bar's height -- the floating pill PLUS the safe-area host
+            // wrapper when present -- so the last scrollable rows clear the bar
+            // (the content scrolls UNDER the translucent pill, native style).
+            Component bar = tabsContainerHost != null ? tabsContainerHost : tabsContainer;
+            int barH = bar.getPreferredH();
             for (int iter = 0; iter < getTabCount(); iter++) {
                 Component c = getTabComponentAt(iter);
                 if (c.isScrollableY()) {
-                    if (c.getStyle().getPaddingBottom() < tabsContainer.getPreferredH()) {
-                        c.getStyle().setPadding(BOTTOM, tabsContainer.getPreferredH());
+                    if (c.getStyle().getPaddingBottom() < barH) {
+                        c.getStyle().setPadding(BOTTOM, barH);
                     }
                 }
             }
