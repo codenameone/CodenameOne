@@ -135,10 +135,18 @@ public class JavaSECarBridge implements CarBridge {
         header.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
         backButton = new JButton("‹ Back");
         styleHeaderButton(backButton);
-        backButton.addActionListener(e -> {
-            CarContext ctx = Car.getCurrentContext();
-            if (ctx != null) {
-                Display.getInstance().callSerially(() -> ctx.popScreen());
+        backButton.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                final CarContext ctx = Car.getCurrentContext();
+                if (ctx != null) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            ctx.popScreen();
+                        }
+                    });
+                }
             }
         });
         backButton.setVisible(false);
@@ -212,23 +220,29 @@ public class JavaSECarBridge implements CarBridge {
     }
 
     @Override
-    public void showToast(final String message, int durationSeconds) {
-        SwingUtilities.invokeLater(() -> {
-            if (toast == null) {
-                return;
-            }
-            toast.setText(message);
-            toast.setVisible(true);
-            frame.revalidate();
-            if (toastTimer != null) {
-                toastTimer.stop();
-            }
-            toastTimer = new Timer(Math.max(1, durationSeconds) * 1000, e -> {
-                toast.setVisible(false);
+    public void showToast(final String message, final int durationSeconds) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                if (toast == null) {
+                    return;
+                }
+                toast.setText(message);
+                toast.setVisible(true);
                 frame.revalidate();
-            });
-            toastTimer.setRepeats(false);
-            toastTimer.start();
+                if (toastTimer != null) {
+                    toastTimer.stop();
+                }
+                toastTimer = new Timer(Math.max(1, durationSeconds) * 1000, new java.awt.event.ActionListener() {
+                    @Override
+                    public void actionPerformed(java.awt.event.ActionEvent e) {
+                        toast.setVisible(false);
+                        frame.revalidate();
+                    }
+                });
+                toastTimer.setRepeats(false);
+                toastTimer.start();
+            }
         });
     }
 
@@ -246,10 +260,13 @@ public class JavaSECarBridge implements CarBridge {
     /** Tears down the window; called by the simulator on disconnect. */
     void close() {
         connected = false;
-        SwingUtilities.invokeLater(() -> {
-            if (frame != null) {
-                frame.dispose();
-                frame = null;
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                if (frame != null) {
+                    frame.dispose();
+                    frame = null;
+                }
             }
         });
     }
@@ -263,7 +280,9 @@ public class JavaSECarBridge implements CarBridge {
         final CarScreen screen = stack.get(stack.size() - 1);
         final CarTemplate template = screen.dispatchCreateTemplate();
         final boolean canGoBack = stack.size() > 1;
-        SwingUtilities.invokeLater(() -> {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
             if (content == null) {
                 return;
             }
@@ -285,6 +304,7 @@ public class JavaSECarBridge implements CarBridge {
             }
             content.revalidate();
             content.repaint();
+            }
         });
     }
 
@@ -459,7 +479,12 @@ public class JavaSECarBridge implements CarBridge {
             b.setBackground(accent);
             b.setFocusPainted(false);
             b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            b.addActionListener(e -> dispatch(a.getOnAction()));
+            b.addActionListener(new java.awt.event.ActionListener() {
+                @Override
+                public void actionPerformed(java.awt.event.ActionEvent e) {
+                    dispatch(a.getOnAction());
+                }
+            });
             bar.add(b);
             bar.add(javax.swing.Box.createHorizontalStrut(10));
         }
@@ -508,10 +533,13 @@ public class JavaSECarBridge implements CarBridge {
         if (listener == null) {
             return;
         }
-        Display.getInstance().callSerially(() -> {
-            CarContext ctx = Car.getCurrentContext();
-            if (ctx != null) {
-                listener.actionPerformed(ctx);
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                CarContext ctx = Car.getCurrentContext();
+                if (ctx != null) {
+                    listener.actionPerformed(ctx);
+                }
             }
         });
     }
