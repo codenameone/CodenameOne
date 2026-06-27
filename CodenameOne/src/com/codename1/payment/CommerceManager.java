@@ -46,7 +46,7 @@ import java.util.Map;
 /// ({@code codename1.arg.commerce.cloud.enabled=true}); when they are absent
 /// this class is inert and every call is a safe no-op that defers to
 /// {@link Purchase}.
-public class CommerceManager {
+public final class CommerceManager {
 
     private static final String PROP_ENABLED = "codename1.commerce.cloud.enabled";
     private static final String PROP_ENDPOINT = "codename1.commerce.cloud.endpoint";
@@ -192,8 +192,8 @@ public class CommerceManager {
         }
         boolean anySuccess = false;
         boolean anyDegraded = false;
-        for (int i = 0; i < receipts.size(); i++) {
-            Receipt r = (Receipt) receipts.get(i);
+        for (Object o : receipts) {
+            Receipt r = (Receipt) o;
             Boolean[] flags = validateReceipt(r);
             if (flags != null) {
                 anySuccess = true;

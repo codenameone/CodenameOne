@@ -51,6 +51,7 @@ final class DefaultSecretsStore implements SecretsStore {
         return key;
     }
 
+    @Override
     public void set(String secretKey, String value) {
         if (value == null) {
             delete(secretKey);
@@ -61,6 +62,7 @@ final class DefaultSecretsStore implements SecretsStore {
         Storage.getInstance().writeObject(entryName(secretKey), hex(concat(nonce, ct)));
     }
 
+    @Override
     public String get(String secretKey) {
         Object raw = Storage.getInstance().readObject(entryName(secretKey));
         if (!(raw instanceof String)) {
@@ -86,25 +88,27 @@ final class DefaultSecretsStore implements SecretsStore {
         }
     }
 
+    @Override
     public boolean contains(String secretKey) {
         return Storage.getInstance().exists(entryName(secretKey));
     }
 
+    @Override
     public void delete(String secretKey) {
         Storage.getInstance().deleteStorageFile(entryName(secretKey));
     }
 
+    @Override
     public List<String> keys() {
         List<String> out = new ArrayList<String>();
         String[] entries = Storage.getInstance().listEntries();
         if (entries != null) {
-            for (int i = 0; i < entries.length; i++) {
-                String e = entries[i];
+            for (String e : entries) {
                 if (e != null && e.startsWith(ENTRY_PREFIX)) {
                     try {
                         out.add(new String(unhex(e.substring(ENTRY_PREFIX.length())), "UTF-8"));
                     } catch (UnsupportedEncodingException ex) {
-                        // skip un-decodable entry name
+                        continue; // skip un-decodable entry name
                     }
                 }
             }
@@ -112,6 +116,7 @@ final class DefaultSecretsStore implements SecretsStore {
         return out;
     }
 
+    @Override
     public boolean isHardwareBacked() {
         return false;
     }
@@ -142,8 +147,8 @@ final class DefaultSecretsStore implements SecretsStore {
 
     private static String hex(byte[] b) {
         StringBuilder sb = new StringBuilder(b.length * 2);
-        for (int i = 0; i < b.length; i++) {
-            sb.append(HEX[(b[i] >> 4) & 0xF]).append(HEX[b[i] & 0xF]);
+        for (byte bb : b) {
+            sb.append(HEX[(bb >> 4) & 0xF]).append(HEX[bb & 0xF]);
         }
         return sb.toString();
     }
