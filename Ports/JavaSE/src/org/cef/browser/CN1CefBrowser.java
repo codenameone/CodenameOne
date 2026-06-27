@@ -28,6 +28,7 @@ import com.codename1.impl.javase.JavaSEPort.CN1JPanel;
 import com.codename1.impl.javase.PeerComponentBuffer;
 import com.codename1.ui.CN;
 */
+import org.cef.CefBrowserSettings;
 import org.cef.CefClient;
 import org.cef.callback.CefDragData;
 import org.cef.handler.CefRenderHandlerAdapter;
@@ -122,7 +123,7 @@ public class CN1CefBrowser extends CefBrowser_N {
 
     private CN1CefBrowser(CefClient client, String url, boolean transparent,
             CefRequestContext context, CN1CefBrowser parent, Point inspectAt) {
-        super(client, url, context, parent, inspectAt);
+        super(client, url, context, parent, inspectAt, new CefBrowserSettings());
         isTransparent_ = transparent;
         createComponent();
     }
