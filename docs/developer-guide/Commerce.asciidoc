@@ -68,6 +68,20 @@ For the entitlement state to stay correct after the initial purchase -- renewals
 
 Notifications are idempotent (deduplicated on Apple's `notificationUUID` / Google's Pub/Sub `messageId`), so a redelivery never double-counts.
 
+=== Server-side validation (connect your store credentials)
+
+By default the service validates the store-signed receipt the device presents -- enough to gate features, and it works with no setup. For *server-authoritative* validation -- where the service calls Apple's and Google's own server APIs to confirm the real subscription state -- provide your store credentials in the console *Secrets* page:
+
+- *Apple* -- an App Store Connect API key, as three secrets: `commerce.apple.keyId`, `commerce.apple.issuerId`, and `commerce.apple.privateKey` (the contents of the `.p8` file).
+- *Google* -- a service account with Android Publisher access, as `commerce.google.serviceAccountJson` (the full JSON key).
+
+Secrets are stored AES-256-GCM encrypted in the BuildCloud vault; they are decrypted only server-side at call time and are never shown in the console again. Once set:
+
+- entitlements are confirmed against Apple's `Get All Subscription Statuses` and Google's `subscriptionsv2.get`, so a grant is server-verified rather than device-trusted, and
+- subscription *renewals* signalled by store notifications are metered at their real amount (the renewal price lives only in the store's server response).
+
+Without credentials the service stays in device-trusted mode -- everything still works, you just don't get the server cross-check or renewal metering.
+
 === Lifecycle webhooks to your backend
 
 Commerce can forward every normalized state change to your own backend. Configure a URL and a signing secret on the *Commerce* page of the console. Each event is HMAC-SHA256 signed (header `CN1-Commerce-Signature`) and carries:
