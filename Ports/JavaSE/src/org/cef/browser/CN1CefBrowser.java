@@ -52,6 +52,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
@@ -113,6 +114,22 @@ public class CN1CefBrowser extends CefBrowser_N {
         @Override
         public void updateDragCursor(CefBrowser browser, int operation) {
             CN1CefBrowser.this.updateDragCursorImpl(browser, operation);
+        }
+
+        // The onPaint listener convenience API was added to CefRenderHandler in
+        // newer JCEF and is left abstract by CefRenderHandlerAdapter. CN1 renders
+        // directly in onPaintImpl and does not use these listeners, so they are
+        // intentionally no-ops.
+        @Override
+        public void addOnPaintListener(Consumer<CefPaintEvent> listener) {
+        }
+
+        @Override
+        public void setOnPaintListener(Consumer<CefPaintEvent> listener) {
+        }
+
+        @Override
+        public void removeOnPaintListener(Consumer<CefPaintEvent> listener) {
         }
     };
     
