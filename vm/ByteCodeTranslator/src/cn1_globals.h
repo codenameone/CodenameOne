@@ -669,10 +669,18 @@ extern int instanceofFunction(int sourceClass, int destId);
 #endif
 extern struct clazz class__java_lang_Integer;
 #if CN1_TAGGED_ACTIVE
+struct JavaObjectPrototype;
+// A static object-shaped proxy whose header is Integer's class. CN1_CLASS_OF selects a
+// VALID object pointer (proxy for a tagged int, else the object itself) BEFORE the single
+// header load, so clang's if-conversion can branchlessly select the pointer yet the load
+// is always on a dereferenceable address -- a plain ternary lets clang speculate the
+// faulting `tagged->header` load above the tag test (observed: a SIGSEGV in interface
+// dispatch like Comparable.compareTo, where no inline fast path guards it first).
+extern struct JavaObjectPrototype cn1TaggedProxy;
 #define CN1_IS_TAGGED(o) (((uintptr_t)(o)) & 1)
 #define CN1_TAG_INT(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_INT)(v)) << 1) | 1))
 #define CN1_UNTAG_INT(o) ((JAVA_INT)(((intptr_t)(o)) >> 1))
-#define CN1_CLASS_OF(o) (CN1_IS_TAGGED(o) ? (&class__java_lang_Integer) : (o)->__codenameOneParentClsReference)
+#define CN1_CLASS_OF(o) ((CN1_IS_TAGGED(o) ? &cn1TaggedProxy : (struct JavaObjectPrototype*)(o))->__codenameOneParentClsReference)
 #else
 #define CN1_IS_TAGGED(o) (0)
 #define CN1_CLASS_OF(o) ((o)->__codenameOneParentClsReference)

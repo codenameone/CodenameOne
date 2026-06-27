@@ -349,7 +349,7 @@ JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_T
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
-    if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
         return JAVA_FALSE;
     }
     struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
@@ -394,7 +394,7 @@ JAVA_BOOLEAN java_lang_String_equalsIgnoreCase___java_lang_String_R_boolean(CODE
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
-    if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
         return JAVA_FALSE;
     }
     struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
@@ -1216,8 +1216,9 @@ JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENA
 }
 
 JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT obj) {
+    if(obj == JAVA_NULL) { return JAVA_FALSE; }
     struct clazz* clz1 = (struct clazz*)cls;
-    struct clazz* clz2 = (struct clazz*)obj->__codenameOneParentClsReference;
+    struct clazz* clz2 = (struct clazz*)CN1_CLASS_OF(obj); // tag-aware: a tagged Integer has no header
     return instanceofFunction(clz2->classId, clz1->classId);
 }
 
@@ -1297,6 +1298,13 @@ void initClazzClazz() {
 
 JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     initClazzClazz();
+#if CN1_TAGGED_ACTIVE
+    // A tagged Integer has no object header to read; its class is always Integer.
+    if(CN1_IS_TAGGED(obj)) {
+        class__java_lang_Integer.__codenameOneParentClsReference = &ClazzClazz;
+        return (JAVA_OBJECT)(&class__java_lang_Integer);
+    }
+#endif
     if(!obj->__codenameOneParentClsReference) {
         return (JAVA_OBJECT)(&ClazzClazz);
     }

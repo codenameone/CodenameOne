@@ -1118,8 +1118,8 @@ public class ByteCodeClass {
                     } else {
                         // we pretend to have a virtual method here but the optimizer says its not really needed
                         if(!m.isVirtualOverriden()) {
-                            m.appendVirtualMethodC(clsName, b, "classToInterfaceMap_" + clsName + 
-                                    "[__cn1ThisObject->__codenameOneParentClsReference->classId][" + offset + "]", true);
+                            m.appendVirtualMethodC(clsName, b, "classToInterfaceMap_" + clsName +
+                                    "[CN1_CLASS_OF(__cn1ThisObject)->classId][" + offset + "]", true);
                         }
                         offset++;
                     }

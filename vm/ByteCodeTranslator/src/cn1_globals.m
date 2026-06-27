@@ -1290,6 +1290,12 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
 extern void cn1NurseryPromote(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 #endif
 
+#if CN1_TAGGED_ACTIVE
+// Object-shaped proxy whose header is Integer's class; see CN1_CLASS_OF in cn1_globals.h.
+// Lets a tagged Integer resolve to Integer without dereferencing the tagged pointer.
+struct JavaObjectPrototype cn1TaggedProxy = { .__codenameOneParentClsReference = &class__java_lang_Integer };
+#endif
+
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
