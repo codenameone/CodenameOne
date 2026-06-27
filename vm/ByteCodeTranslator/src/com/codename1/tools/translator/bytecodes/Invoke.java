@@ -177,7 +177,7 @@ public class Invoke extends Instruction {
         if (opcode == Opcodes.INVOKESPECIAL && !name.equals("<init>") && !name.equals("<clinit>")) {
             owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
-        
+
         String invokeOwner = owner;
         StringBuilder bld = new StringBuilder();
         boolean isVirtualCall = false;
@@ -357,6 +357,179 @@ public class Invoke extends Instruction {
     }
     
     
+    // Master off-switch: -DCN1_DISABLE_INLINE=true disables trivial-method inlining.
+    private static final boolean DISABLE_INLINE =
+            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_INLINE", "false"));
+
+    /**
+     * If this invoke is a direct (provably monomorphic) instance call to a trivial
+     * getter ({@code ALOAD 0; GETFIELD f; xRETURN}) or setter
+     * ({@code ALOAD 0; xLOAD 1; PUTFIELD f; RETURN}), returns the equivalent
+     * GETFIELD/PUTFIELD {@link Field} the optimizer can swap in for the call. The
+     * field op has the identical operand-stack effect (getter: pop receiver, push
+     * field; setter: pop receiver+value, push nothing) and derefs the same receiver,
+     * so null-pointer behavior is preserved. {@code Field.tryReduce} later folds the
+     * operands into a direct field expression. Returns null otherwise.
+     */
+    public Field asInlinableFieldAccess() {
+        if (DISABLE_INLINE) {
+            return null;
+        }
+        // Static no-arg singleton/static-field accessor: GETSTATIC f; xRETURN.
+        // Monomorphic by definition (static dispatch), no receiver -> no null concern.
+        if (opcode == Opcodes.INVOKESTATIC) {
+            if (desc.length() < 3 || desc.charAt(0) != '(' || desc.charAt(1) != ')' || desc.charAt(2) == 'V') {
+                return null;
+            }
+            BytecodeMethod target = findMethodUp(Parser.getClassObject(owner.replace('/', '_').replace('$', '_')));
+            if (target == null || !target.isStatic()) {
+                return null;
+            }
+            Field f = trivialStaticFieldGetter(target);
+            if (f != null) {
+                Field getstatic = new Field(Opcodes.GETSTATIC, f.getOwner(), f.getFieldName(), f.getDesc());
+                getstatic.setMethod(getMethod());
+                return getstatic;
+            }
+            return null;
+        }
+        if (opcode != Opcodes.INVOKEVIRTUAL && opcode != Opcodes.INVOKESPECIAL) {
+            return null;
+        }
+        BytecodeMethod target = resolveDirectTarget();
+        if (target == null) {
+            return null;
+        }
+        // getter: zero args, non-void return
+        if (desc.length() >= 3 && desc.charAt(0) == '(' && desc.charAt(1) == ')' && desc.charAt(2) != 'V') {
+            Field f = trivialGetterField(target);
+            if (f != null) {
+                Field getfield = new Field(Opcodes.GETFIELD, f.getOwner(), f.getFieldName(), f.getDesc());
+                getfield.setMethod(getMethod());
+                return getfield;
+            }
+        }
+        // setter: one arg, void return
+        if (desc.endsWith(")V")) {
+            Field f = trivialSetterField(target);
+            if (f != null) {
+                Field putfield = new Field(Opcodes.PUTFIELD, f.getOwner(), f.getFieldName(), f.getDesc());
+                putfield.setMethod(getMethod());
+                return putfield;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The concretely-called method if this is a direct (provably monomorphic)
+     * instance call, else null. Monomorphic when: INVOKESPECIAL, or the static-type
+     * owner class is final (no subtypes), or the target method is final or private,
+     * or the existing @Concrete devirtualization resolves a single concrete owner.
+     */
+    private BytecodeMethod resolveDirectTarget() {
+        if (opcode == Opcodes.INVOKESPECIAL) {
+            return findMethodUp(Parser.getClassObject(owner.replace('/', '_').replace('$', '_')));
+        }
+        // INVOKEVIRTUAL
+        ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+        if (bc == null) {
+            return null;
+        }
+        BytecodeMethod m = findMethodUp(bc);
+        if (m != null && (bc.isFinalClass() || m.isFinal() || m.isPrivate())) {
+            return m;
+        }
+        String rc = resolveConcreteInvokeOwner(bc, false);
+        if (rc == null) {
+            return null; // genuinely virtual -> target not fixed -> unsafe to inline
+        }
+        return findMethodUp(Parser.getClassObject(rc.replace('/', '_').replace('$', '_')));
+    }
+
+    /** Finds the method (name+desc) declared in cls or, if inherited, a superclass. */
+    private BytecodeMethod findMethodUp(ByteCodeClass cls) {
+        while (cls != null) {
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.getMethodName().equals(name) && desc.equals(m.getSignature())) {
+                    return m;
+                }
+            }
+            cls = cls.getBaseClassObject();
+        }
+        return null;
+    }
+
+    /** Returns the GETFIELD Field if the method body is exactly ALOAD 0; GETFIELD f; xRETURN. */
+    private static Field trivialGetterField(BytecodeMethod m) {
+        Instruction a = null, b = null, c = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else if (count == 3) c = in;
+            else return null;
+        }
+        if (count != 3) return null;
+        if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0) return null;
+        if (!(b instanceof Field) || b.getOpcode() != Opcodes.GETFIELD) return null;
+        int rc = c.getOpcode();
+        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
+        return (Field) b;
+    }
+
+    /** Returns the GETSTATIC Field if the body is exactly GETSTATIC f; xRETURN. */
+    private static Field trivialStaticFieldGetter(BytecodeMethod m) {
+        Instruction a = null, b = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else return null;
+        }
+        if (count != 2) return null;
+        if (!(a instanceof Field) || a.getOpcode() != Opcodes.GETSTATIC) return null;
+        int rc = b.getOpcode();
+        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
+        return (Field) a;
+    }
+
+    /** Returns the PUTFIELD Field if the body is exactly ALOAD 0; xLOAD 1; PUTFIELD f; RETURN. */
+    private static Field trivialSetterField(BytecodeMethod m) {
+        Instruction a = null, b = null, c = null, d = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else if (count == 3) c = in;
+            else if (count == 4) d = in;
+            else return null;
+        }
+        if (count != 4) return null;
+        if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0) return null;
+        if (!(b instanceof VarOp) || ((VarOp) b).getIndex() != 1) return null; // the single value arg
+        int lop = b.getOpcode();
+        if (lop != Opcodes.ILOAD && lop != Opcodes.LLOAD && lop != Opcodes.FLOAD
+                && lop != Opcodes.DLOAD && lop != Opcodes.ALOAD) return null;
+        if (!(c instanceof Field) || c.getOpcode() != Opcodes.PUTFIELD) return null;
+        if (d.getOpcode() != Opcodes.RETURN) return null; // void
+        return (Field) c;
+    }
+
     public List<ByteCodeMethodArg> getArgs() {
         return Util.getMethodArgs(desc);
     }

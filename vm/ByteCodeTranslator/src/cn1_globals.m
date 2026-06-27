@@ -1046,6 +1046,7 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 extern JAVA_BOOLEAN gcCurrentlyRunning;
 int allocationsSinceLastGC = 0;
 long long totalAllocations = 0;
+long long cn1_instr_allocCount = 0;
 
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
     int alloc = allocationsSinceLastGC;
@@ -1075,6 +1076,19 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
     allocationsSinceLastGC += size;
     totalAllocations += size;
+#ifdef CN1_GC_INSTRUMENT
+    extern long long cn1_instr_allocCount; cn1_instr_allocCount++;
+#endif
+#ifdef CN1_NURSERY
+    // Small objects go to the thread-local young generation and bypass the global
+    // heap table entirely. Returns 0 (arena exhausted) -> fall through to the heap.
+    if(size <= CN1_NURSERY_MAX_OBJECT && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
+        JAVA_OBJECT nurseryObj = cn1NurseryAlloc(threadStateData, size, parent);
+        if(nurseryObj != JAVA_NULL) {
+            return nurseryObj;
+        }
+    }
+#endif
     if(lowMemoryMode && !threadStateData->nativeAllocationMode) {
         threadStateData->threadActive = JAVA_FALSE;
         usleep((JAVA_INT)(1000));
@@ -1089,8 +1103,14 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     *ptr = size;
     ptr++;
     JAVA_OBJECT o = (JAVA_OBJECT)ptr;
+    JAVA_BOOLEAN needsZeroing = JAVA_TRUE;
 #else
-    JAVA_OBJECT o = (JAVA_OBJECT)malloc(size);
+    // calloc instead of malloc+memset: the allocator returns zero-filled memory,
+    // and for large/array allocations the kernel can hand back lazily-zeroed
+    // (copy-on-write zero) pages, avoiding an eager memset pass over memory that
+    // is about to be written anyway. Object-header fields are set explicitly below.
+    JAVA_OBJECT o = (JAVA_OBJECT)calloc(1, size);
+    JAVA_BOOLEAN needsZeroing = JAVA_FALSE;
 #endif
     if(o == NULL) {
         // malloc failed! We need to free up RAM FAST!
@@ -1104,7 +1124,9 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         threadStateData->threadActive = JAVA_TRUE;
         return codenameOneGcMalloc(threadStateData, size, parent);
     }
-    memset(o, 0, size);
+    if(needsZeroing) {
+        memset(o, 0, size);
+    }
     o->__codenameOneParentClsReference = parent;
     o->__codenameOneGcMark = -1;
     o->__ownerThread = threadStateData;
@@ -1190,6 +1212,15 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         free(obj->__codenameOneThreadData);
         obj->__codenameOneThreadData = 0;
     }
+#ifdef CN1_NURSERY
+    // A promoted nursery object lives inside an arena block; never free() it -- just
+    // drop the block's live count and recycle the whole block once it hits zero.
+    if(cn1InNursery(obj)) {
+        extern void cn1NurseryObjectFreed(JAVA_OBJECT o);
+        cn1NurseryObjectFreed(obj);
+        return;
+    }
+#endif
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
     int* ptr = (int*)obj;
     ptr--;
@@ -1255,10 +1286,26 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     gcMarkWorklistTop++;
 }
 
+#ifdef CN1_NURSERY
+extern void cn1NurseryPromote(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+#endif
+
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
-    if(obj == JAVA_NULL || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
+    if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
     }
+#ifdef CN1_NURSERY
+    // During THIS thread's minor collection we reuse the per-class mark functions to
+    // walk the object graph, but PROMOTE nursery objects instead of marking (and stop
+    // at heap objects -- the write barrier guarantees they don't point into the
+    // nursery). The flag is per-thread so the concurrent GC thread is unaffected.
+    if(threadStateData->nurseryPromoting) {
+        if(cn1InNursery(obj) && obj->__heapPosition == -1) {
+            cn1NurseryPromote(threadStateData, obj);
+        }
+        return;
+    }
+#endif
 
     // if this is a Class object or already marked this should be ignored
     if(obj->__codenameOneGcMark == currentGcMarkValue) {
@@ -1279,6 +1326,274 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         gcMarkWorklistPush(obj, force);
     }
 }
+
+#ifdef CN1_NURSERY
+// ===================== Thread-local young generation (nursery) =====================
+char* cn1NurseryArenaStart = 0;
+char* cn1NurseryArenaEnd = 0;
+static int cn1NurseryBlockCount = 0;
+// young: the block is in some thread's young set (being bump-allocated). A young block
+// is reclaimed ONLY by that thread's minor collection. cn1NurseryObjectFreed (sweep
+// thread) must never push a young block to the free stack, or it races the minor
+// collection's release and double-pushes -> free-stack overflow -> SIGABRT.
+typedef struct { int liveCount; JAVA_BOOLEAN tenured; JAVA_BOOLEAN young; } CN1NurseryBlockMeta;
+static CN1NurseryBlockMeta* cn1NurseryBlocks = 0;
+static int* cn1NurseryFreeStack = 0;
+static int cn1NurseryFreeTop = 0;
+static pthread_mutex_t cn1NurseryMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_once_t cn1NurseryOnce = PTHREAD_ONCE_INIT;
+
+static void cn1NurseryDoInit() {
+    cn1NurseryArenaStart = (char*)malloc(CN1_NURSERY_ARENA_SIZE);
+    cn1NurseryArenaEnd = cn1NurseryArenaStart + CN1_NURSERY_ARENA_SIZE;
+    cn1NurseryBlockCount = CN1_NURSERY_ARENA_SIZE / CN1_NURSERY_BLOCK_SIZE;
+    cn1NurseryBlocks = (CN1NurseryBlockMeta*)calloc(cn1NurseryBlockCount, sizeof(CN1NurseryBlockMeta));
+    cn1NurseryFreeStack = (int*)malloc(sizeof(int) * cn1NurseryBlockCount);
+    for(int i = 0 ; i < cn1NurseryBlockCount ; i++) {
+        cn1NurseryFreeStack[i] = cn1NurseryBlockCount - 1 - i;
+    }
+    cn1NurseryFreeTop = cn1NurseryBlockCount;
+}
+
+static inline int cn1NurseryBlockIndex(void* p) {
+    return (int)(((char*)p - cn1NurseryArenaStart) / CN1_NURSERY_BLOCK_SIZE);
+}
+
+static int cn1NurseryGrabBlock() {
+    int idx = -1;
+    pthread_mutex_lock(&cn1NurseryMutex);
+    if(cn1NurseryFreeTop > 0) {
+        idx = cn1NurseryFreeStack[--cn1NurseryFreeTop];
+        // Reset under the mutex so the sweep thread can't observe a half-initialized
+        // block (it reads liveCount/tenured/young in cn1NurseryObjectFreed).
+        cn1NurseryBlocks[idx].liveCount = 0;
+        cn1NurseryBlocks[idx].tenured = JAVA_FALSE;
+        cn1NurseryBlocks[idx].young = JAVA_TRUE;
+    }
+    pthread_mutex_unlock(&cn1NurseryMutex);
+    return idx;
+}
+
+// Called by the global sweep when it frees a promoted (tenured-block) object. The
+// object stays in place; we just drop the block's live count and recycle the whole
+// block once every survivor in it has died -- but ONLY if the block has been retired
+// from its thread's young set. A still-young block is reclaimed by the minor
+// collection instead; freeing it here too would double-push and overflow the stack.
+void cn1NurseryObjectFreed(JAVA_OBJECT o) {
+    int idx = cn1NurseryBlockIndex(o);
+    pthread_mutex_lock(&cn1NurseryMutex);
+    int lc = --cn1NurseryBlocks[idx].liveCount;
+    if(lc <= 0 && cn1NurseryBlocks[idx].tenured && !cn1NurseryBlocks[idx].young) {
+        cn1NurseryBlocks[idx].tenured = JAVA_FALSE;
+        cn1NurseryFreeStack[cn1NurseryFreeTop++] = idx;
+    }
+    pthread_mutex_unlock(&cn1NurseryMutex);
+}
+
+static void cn1PromotePush(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+    if(threadStateData->nurseryPromoteTop >= threadStateData->nurseryPromoteCap) {
+        threadStateData->nurseryPromoteCap = threadStateData->nurseryPromoteCap ? threadStateData->nurseryPromoteCap * 2 : 8192;
+        threadStateData->nurseryPromoteWorklist = (JAVA_OBJECT*)realloc(threadStateData->nurseryPromoteWorklist, sizeof(JAVA_OBJECT) * threadStateData->nurseryPromoteCap);
+    }
+    threadStateData->nurseryPromoteWorklist[threadStateData->nurseryPromoteTop++] = o;
+}
+
+// Add an object to this thread's pending-allocation buffer, exactly like a normal
+// heap allocation. The mark phase migrates pending -> allObjectsInHeap while the
+// thread is paused, so registration never races the concurrent sweep/mark.
+static void cn1AddPending(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+    if(threadStateData->heapAllocationSize >= threadStateData->threadHeapTotalSize) {
+        if (!threadStateData->lightweightThread) lockThreadHeapMutex();
+        void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
+        memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
+        memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
+        threadStateData->threadHeapTotalSize *= 2;
+        free(threadStateData->pendingHeapAllocations);
+        threadStateData->pendingHeapAllocations = tmp;
+        if (!threadStateData->lightweightThread) unlockThreadHeapMutex();
+    }
+    threadStateData->pendingHeapAllocations[threadStateData->heapAllocationSize++] = o;
+}
+
+// Promote one nursery object IN PLACE (address unchanged): tenure its block and hand
+// it to the normal pending-allocation path so the next paused mark registers it in
+// allObjectsInHeap. __heapPosition: -1 = un-promoted nursery, -2 = promoted/pending,
+// >=0 = migrated into the global table.
+void cn1NurseryPromote(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+    pthread_mutex_lock(&cn1NurseryMutex);
+    int idx = cn1NurseryBlockIndex(o);
+    cn1NurseryBlocks[idx].tenured = JAVA_TRUE;
+    cn1NurseryBlocks[idx].liveCount++;
+    pthread_mutex_unlock(&cn1NurseryMutex);
+    o->__heapPosition = -2;
+    threadStateData->nurseryPromotedSinceMinor++;
+    cn1AddPending(threadStateData, o);
+    cn1PromotePush(threadStateData, o);
+}
+
+static void cn1PromoteDrain(CODENAME_ONE_THREAD_STATE) {
+    while(threadStateData->nurseryPromoteTop > 0) {
+        JAVA_OBJECT o = threadStateData->nurseryPromoteWorklist[--threadStateData->nurseryPromoteTop];
+        gcMarkFunctionPointer fp = o->__codenameOneParentClsReference->markFunction;
+        if(fp != 0) {
+            fp(threadStateData, o, JAVA_FALSE);
+        }
+    }
+}
+
+void cn1NurseryMinorCollect(CODENAME_ONE_THREAD_STATE) {
+    threadStateData->nurseryPromoting = JAVA_TRUE;
+    threadStateData->nurseryPromoteTop = 0;
+    int top = threadStateData->threadObjectStackOffset;
+    struct elementStruct* stack = threadStateData->threadObjectStack;
+    for(int i = 0 ; i < top ; i++) {
+        if(stack[i].type == CN1_TYPE_OBJECT) {
+            JAVA_OBJECT o = stack[i].data.o;
+            if(o != JAVA_NULL && cn1InNursery(o) && o->__heapPosition == -1) {
+                cn1NurseryPromote(threadStateData, o);
+            }
+        }
+    }
+    JAVA_OBJECT ct = threadStateData->currentThreadObject;
+    if(ct != JAVA_NULL && cn1InNursery(ct) && ct->__heapPosition == -1) cn1NurseryPromote(threadStateData, ct);
+    JAVA_OBJECT ex = threadStateData->exception;
+    if(ex != JAVA_NULL && cn1InNursery(ex) && ex->__heapPosition == -1) cn1NurseryPromote(threadStateData, ex);
+    // Static fields are also roots. If the write barrier holds (statics never point
+    // into the nursery) this is cheap -- it just walks heap objects, which the
+    // promotion hook ignores -- but it also catches any store path that bypassed the
+    // barrier, so a still-live nursery object can never be left unpromoted (and then
+    // wrongly reclaimed). markStatics calls gcMarkObject, which promotes in this mode.
+    extern void markStatics(CODENAME_ONE_THREAD_STATE);
+    markStatics(threadStateData);
+    cn1PromoteDrain(threadStateData);
+    threadStateData->nurseryPromoting = JAVA_FALSE;
+    // Retire every young block from the young set (under the mutex, so the sweep thread
+    // sees a consistent young flag). A block with no live promoted survivors (liveCount
+    // <= 0: never tenured, or every survivor it held already died) is reclaimed now;
+    // one that still has survivors stays tenured and is freed later by
+    // cn1NurseryObjectFreed when its last survivor dies. Clearing `young` first hands
+    // that responsibility cleanly to the sweep with no double-push window.
+    pthread_mutex_lock(&cn1NurseryMutex);
+    for(int i = 0 ; i < threadStateData->nurseryYoungCount ; i++) {
+        int idx = threadStateData->nurseryYoungBlocks[i];
+        cn1NurseryBlocks[idx].young = JAVA_FALSE;
+#ifndef CN1_NURSERY_NO_RECLAIM
+        if(cn1NurseryBlocks[idx].liveCount <= 0) {
+            cn1NurseryBlocks[idx].tenured = JAVA_FALSE;
+            cn1NurseryFreeStack[cn1NurseryFreeTop++] = idx;
+        }
+#endif
+    }
+    pthread_mutex_unlock(&cn1NurseryMutex);
+    threadStateData->nurseryYoungCount = 0;
+    threadStateData->nurseryCurrentBlock = -1;
+    threadStateData->nurseryBump = 0;
+    threadStateData->nurseryEnd = 0;
+    threadStateData->nurseryBytesSinceMinor = 0;
+    // Adaptive bypass decision. If most of what we allocated since the last minor
+    // survived, the nursery (bump + write barrier + promote-to-pending) was strictly
+    // more work than allocating into the heap directly would have been. Bypass it for
+    // a while, then re-probe. A churny phase reclaims whole blocks here and keeps the
+    // nursery on; an escaping phase trips this and stops paying the overhead.
+    int allocated = threadStateData->nurseryAllocSinceMinor;
+    int promoted = threadStateData->nurseryPromotedSinceMinor;
+    if(allocated >= CN1_NURSERY_BYPASS_MIN_SAMPLE &&
+       promoted * 100 >= allocated * CN1_NURSERY_BYPASS_SURVIVAL_PCT) {
+        threadStateData->nurseryBypass = JAVA_TRUE;
+        threadStateData->nurseryBypassCountdown = CN1_NURSERY_BYPASS_ALLOCS;
+    }
+#ifdef CN1_NURSERY_DEBUG
+    fprintf(stderr, "[NURSERY] minor: alloc=%d promoted=%d survival=%d%% reprobe=%d -> bypass=%d\n",
+            allocated, promoted, allocated ? (promoted*100/allocated) : 0,
+            threadStateData->nurseryReprobing, threadStateData->nurseryBypass);
+#endif
+    threadStateData->nurseryReprobing = JAVA_FALSE;
+    threadStateData->nurseryAllocSinceMinor = 0;
+    threadStateData->nurseryPromotedSinceMinor = 0;
+}
+
+JAVA_OBJECT cn1NurseryAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    pthread_once(&cn1NurseryOnce, cn1NurseryDoInit);
+    // GC safepoint. The concurrent GC pauses lightweight threads (threadBlockedByGC +
+    // wait on threadActive) before scanning their stacks/nursery objects. The normal
+    // allocation path yields here too (~line 1141); the nursery fast path must as
+    // well, otherwise the GC either scans this thread's nursery while a minor
+    // collection mutates it (corruption) or waits forever. A minor collection itself
+    // keeps threadActive true throughout, so the GC never scans mid-collection.
+    if(threadStateData->threadBlockedByGC && !threadStateData->nativeAllocationMode) {
+        threadStateData->threadActive = JAVA_FALSE;
+        while(threadStateData->threadBlockedByGC) {
+            usleep(1000);
+        }
+        threadStateData->threadActive = JAVA_TRUE;
+    }
+    // Adaptive bypass: a recent minor collection saw high survival, so skip the
+    // nursery and let the caller allocate into the global heap. Decrement toward a
+    // re-probe; when it elapses, allocate in the nursery again to re-measure survival.
+    if(threadStateData->nurseryBypass) {
+        if(--threadStateData->nurseryBypassCountdown > 0) {
+            return JAVA_NULL;
+        }
+        threadStateData->nurseryBypass = JAVA_FALSE;
+        threadStateData->nurseryReprobing = JAVA_TRUE;
+    }
+    if(threadStateData->nurseryYoungBlocks == 0) {
+        threadStateData->nurseryYoungCapacity = 256;
+        threadStateData->nurseryYoungBlocks = (int*)malloc(sizeof(int) * threadStateData->nurseryYoungCapacity);
+        threadStateData->nurseryYoungCount = 0;
+        threadStateData->nurseryCurrentBlock = -1;
+    }
+    int asize = (size + 15) & ~15;
+    if(threadStateData->nurseryBump == 0 || threadStateData->nurseryBump + asize > threadStateData->nurseryEnd) {
+        long minorTrigger = threadStateData->nurseryReprobing ? CN1_NURSERY_REPROBE_BYTES : CN1_NURSERY_MINOR_TRIGGER;
+        if(threadStateData->nurseryBytesSinceMinor >= minorTrigger) {
+            cn1NurseryMinorCollect(threadStateData);
+        }
+        int idx = cn1NurseryGrabBlock();
+        if(idx < 0) {
+            return JAVA_NULL; // arena exhausted -> use the global heap
+        }
+        if(threadStateData->nurseryYoungCount >= threadStateData->nurseryYoungCapacity) {
+            threadStateData->nurseryYoungCapacity *= 2;
+            threadStateData->nurseryYoungBlocks = (int*)realloc(threadStateData->nurseryYoungBlocks, sizeof(int) * threadStateData->nurseryYoungCapacity);
+        }
+        threadStateData->nurseryYoungBlocks[threadStateData->nurseryYoungCount++] = idx;
+        threadStateData->nurseryCurrentBlock = idx;
+        threadStateData->nurseryBump = cn1NurseryArenaStart + (long)idx * CN1_NURSERY_BLOCK_SIZE;
+        threadStateData->nurseryEnd = threadStateData->nurseryBump + CN1_NURSERY_BLOCK_SIZE;
+    }
+    JAVA_OBJECT o = (JAVA_OBJECT)threadStateData->nurseryBump;
+    threadStateData->nurseryBump += asize;
+    threadStateData->nurseryBytesSinceMinor += asize;
+    threadStateData->nurseryAllocSinceMinor++;
+    memset(o, 0, size);
+    o->__codenameOneParentClsReference = parent;
+    o->__codenameOneGcMark = -1;
+    o->__ownerThread = threadStateData;
+    o->__heapPosition = -1;
+    o->__codenameOneReferenceCount = 1;
+    return o;
+}
+
+// Write barrier: an object reference is being stored into a non-nursery location, so
+// the value escapes the thread-local nursery and must be promoted to the global heap.
+void cn1NurseryWriteBarrier(JAVA_OBJECT target, JAVA_OBJECT value) {
+    if(value != JAVA_NULL && cn1InNursery(value) && value->__heapPosition == -1 && !cn1InNursery(target)) {
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        // Re-entrancy guard: promotion walks markFunctions which can store refs and
+        // re-enter the barrier; the outermost call owns the worklist drain.
+        if(threadStateData->nurseryPromoting) {
+            cn1NurseryPromote(threadStateData, value);
+            return;
+        }
+        threadStateData->nurseryPromoting = JAVA_TRUE;
+        threadStateData->nurseryPromoteTop = 0;
+        cn1NurseryPromote(threadStateData, value);
+        cn1PromoteDrain(threadStateData);
+        threadStateData->nurseryPromoting = JAVA_FALSE;
+    }
+}
+#endif
 
 void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL) {

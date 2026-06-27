@@ -933,6 +933,26 @@ public class ByteCodeTranslator {
                 writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
             }
+
+            // Opt-in Link-Time Optimization. The translator emits a separate C
+            // function per reachable Java method; LTO lets the C compiler inline
+            // the tiny per-call frame helpers and the array-access inline helpers
+            // across translation units, which is where most of the AOT call/array
+            // overhead hides. It considerably increases link time, so it is OFF by
+            // default and must stay out of regular CI -- enable with
+            // -DCN1_ENABLE_LTO=ON only for release/perf builds. Uses CMake's
+            // INTERPROCEDURAL_OPTIMIZATION so it maps to -flto (clang/gcc) or
+            // /LTCG (MSVC) per toolchain; ${PROJECT_NAME} exists in every branch above.
+            writer.append("option(CN1_ENABLE_LTO \"Enable Link-Time Optimization (slow link; off in CI)\" OFF)\n");
+            writer.append("if(CN1_ENABLE_LTO)\n");
+            writer.append("    include(CheckIPOSupported)\n");
+            writer.append("    check_ipo_supported(RESULT CN1_IPO_OK OUTPUT CN1_IPO_MSG)\n");
+            writer.append("    if(CN1_IPO_OK)\n");
+            writer.append("        set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)\n");
+            writer.append("    else()\n");
+            writer.append("        message(WARNING \"CN1_ENABLE_LTO requested but IPO/LTO unsupported: ${CN1_IPO_MSG}\")\n");
+            writer.append("    endif()\n");
+            writer.append("endif()\n");
         }
     }
 

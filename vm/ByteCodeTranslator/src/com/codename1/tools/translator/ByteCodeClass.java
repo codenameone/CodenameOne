@@ -848,6 +848,9 @@ public class ByteCodeClass {
                     b.append(bf.getClsName());
                     if (bf.isObjectType()) {
                         b.append("(threadStateData);\n    ");
+                        // A static field is a GC root outside any nursery -> a nursery
+                        // value stored here always escapes and must be promoted.
+                        b.append("CN1_WRITE_BARRIER(JAVA_NULL, __cn1StaticVal);\n    ");
                     } else {
                         b.append("(getThreadLocalData());\n    ");
                     }
@@ -924,6 +927,10 @@ public class ByteCodeClass {
             b.append(fld.getCDefinition());
             if(fld.isObjectType()) {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   ");
+                // Nursery write barrier: a reference is being stored into a heap object's
+                // field, so a nursery value escapes and must be promoted. No-op unless
+                // -DCN1_NURSERY.
+                b.append("CN1_WRITE_BARRIER(__cn1T, __cn1Val); ");
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  ");
             }
@@ -1079,6 +1086,11 @@ public class ByteCodeClass {
                 }
                 if(m.isMain()) {
                     b.append("\nint main(int argc, char *argv[]) {\n    initConstantPool();\n");
+                    // With the nursery, the main thread allocates and must cooperate with
+                    // the concurrent GC's stop-the-world pause (so the GC never scans its
+                    // nursery while a minor collection runs). Lightweight threads are the
+                    // ones the GC pauses; mark the main thread lightweight too.
+                    b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
                     b.append("    ");
                     b.append(clsName);
                     b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");

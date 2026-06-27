@@ -99,6 +99,8 @@ public class BytecodeMethod implements SignatureSet {
     private int maxStack;
     private int maxLocals;
     private static boolean acceptStaticOnEquals;
+    private static final boolean FORCE_VOLATILE_LOCALS =
+            "true".equalsIgnoreCase(System.getProperty("CN1_FORCE_VOLATILE_LOCALS", "false"));
     private int methodOffset;
     private boolean forceVirtual;
     private boolean virtualOverriden;
@@ -1070,13 +1072,46 @@ public class BytecodeMethod implements SignatureSet {
             if (barebone) {
                 fixUpBarebone();
             }
+            // Local autos only need to be `volatile` when a setjmp/longjmp can land
+            // back in THIS frame -- i.e. the method has a try/catch (so it emits
+            // setjmp) -- or when the on-device debugger must inspect them. A method
+            // with no try/catch is unwound *past* when a callee throws, so its
+            // primitive autos are never read after a longjmp and need not be
+            // volatile. Dropping volatile there lets the C compiler register-allocate
+            // and vectorize hot loops (e.g. array reductions ran ~3x faster). It is
+            // GC-safe: primitive autos are never GC roots (object locals live in the
+            // scanned threadObjectStack, not here). setjmp-frame methods keep
+            // volatile for longjmp correctness.
+            // synchronizedMethod is included conservatively: a synchronized method
+            // releases its monitor during exception unwinding and carries no explicit
+            // TryCatch instruction, so we cannot prove its frame is never re-entered
+            // by the unwind machinery -- keep its locals volatile.
+            //
+            // A call in the body also forces volatile, as a PERFORMANCE heuristic
+            // (non-volatile is still correct without it): non-volatile locals in a
+            // loop that makes calls (e.g. libm sqrt/sin/cos) make clang juggle
+            // callee-saved registers across each call and run slower, whereas
+            // call-free compute loops (array reductions, integer kernels) vectorize
+            // and register-allocate dramatically better without volatile. Inlined
+            // accessors no longer count as calls, so this composes with inlining.
+            // -DCN1_FORCE_VOLATILE_LOCALS=true restores the always-volatile behavior
+            // (off-switch for the non-volatile-locals optimization).
+            boolean volatileLocals = FORCE_VOLATILE_LOCALS || onDeviceDebug || synchronizedMethod;
+            if (!volatileLocals) {
+                for (Instruction tcScan : instructions) {
+                    if (tcScan instanceof TryCatch || tcScan instanceof Invoke || tcScan instanceof CustomInvoke) {
+                        volatileLocals = true;
+                        break;
+                    }
+                }
+            }
             Set<String> added = new HashSet<String>();
             for (LocalVariable lv : localVariables) {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
                 if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
                     b.append("    ");
-                    if (!disableDebugInfo) {
+                    if (volatileLocals) {
                         b.append("volatile ");
                     }
                     switch (lv.getQualifier()) {
@@ -1398,7 +1433,19 @@ public class BytecodeMethod implements SignatureSet {
         
         appendCMethodPrefix(b, "virtual_", cls);
         b.append(" {\n    ");
-        
+
+        // Devirtualize the tagged-Integer fast path for the hottest collection methods.
+        // A tagged receiver is ALWAYS an Integer, so its hashCode IS the untagged value --
+        // turning HashMap's per-lookup key.hashCode() into a bare inline untag with no
+        // indirect dispatch and no call. equals between two tagged ints is a pointer
+        // compare (tags are canonical); the mixed case falls through to normal dispatch.
+        String cn1mn = getCMethodName();
+        if(cn1mn.equals("hashCode") && arguments.isEmpty() && !returnType.isVoid()) {
+            b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_IS_TAGGED(__cn1ThisObject)) { return CN1_UNTAG_INT(__cn1ThisObject); }\n#endif\n    ");
+        } else if(cn1mn.equals("equals") && arguments.size() == 1 && !returnType.isVoid()) {
+            b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_IS_TAGGED(__cn1ThisObject) && CN1_IS_TAGGED(__cn1Arg1)) { return (__cn1ThisObject == __cn1Arg1) ? JAVA_TRUE : JAVA_FALSE; }\n#endif\n    ");
+        }
+
         if(includeStaticInitializer) {
             b.append("__STATIC_INITIALIZER_");
             b.append(cls);
@@ -1413,7 +1460,7 @@ public class BytecodeMethod implements SignatureSet {
             b.append("(*(functionPtr_");            
         }
         b.append(bld);
-        b.append(")__cn1ThisObject->__codenameOneParentClsReference->vtable[");
+        b.append(")CN1_CLASS_OF(__cn1ThisObject)->vtable[");
         b.append(offset);
         b.append("])(threadStateData, ");
         
@@ -1888,6 +1935,11 @@ public class BytecodeMethod implements SignatureSet {
         return virtualOverriden;
     }
 
+    /** True if the method is declared {@code final} (cannot be overridden). */
+    public boolean isFinal() {
+        return finalMethod;
+    }
+
     /**
      * @param virtualOverriden the virtualOverriden to set
      */
@@ -1912,6 +1964,164 @@ public class BytecodeMethod implements SignatureSet {
 
 
     private int varCounter = 0;
+    // Master off-switch: -DCN1_DISABLE_BCE=true reverts to fully-checked array access.
+    private static final boolean DISABLE_BCE =
+            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_BCE", "false"));
+
+    /**
+     * Prove-safe array-bounds-check elimination. Conservative and fail-closed:
+     * marks an array LOAD bounds-safe only for the canonical counted loop
+     * {@code for (int i = <const >= 0>; i < arr.length; i++) { ... arr[i] ... }}
+     * recognised in the RAW (pre-reduction) bytecode IR. Because the loop
+     * condition re-evaluates {@code arr.length} every iteration, entering the body
+     * proves {@code arr != null} and {@code i < arr.length}; we additionally prove
+     * {@code i} is monotonic non-negative and that neither {@code i} nor
+     * {@code arr} is mutated between the loop top and the access, and that nothing
+     * branches into the body bypassing the test. Any construct we don't model
+     * precisely (try/catch, switch, computed jumps, non-constant init) bails.
+     */
+    void analyzeBoundsChecks() {
+        if (DISABLE_BCE) {
+            return;
+        }
+        // View without LineNumber noise but keeping labels for back-edge detection.
+        java.util.ArrayList<Instruction> r = new java.util.ArrayList<Instruction>(instructions.size());
+        for (Instruction in : instructions) {
+            if (in instanceof LineNumber) {
+                continue;
+            }
+            // Control flow we don't model precisely -> disable BCE for the whole method.
+            if (in instanceof SwitchInstruction || in instanceof CustomJump || in instanceof TryCatch) {
+                return;
+            }
+            r.add(in);
+        }
+        if (TryCatch.isTryCatchInMethod()) {
+            return;
+        }
+        int n = r.size();
+        java.util.HashMap<Label, Integer> pos = new java.util.HashMap<Label, Integer>();
+        for (int i = 0; i < n; i++) {
+            Instruction x = r.get(i);
+            if (x instanceof LabelInstruction) {
+                pos.put(((LabelInstruction) x).getLabel(), i);
+            }
+        }
+        // Canonical javac top-test counted loop:
+        //   ISTORE i(=const>=0)
+        //   header: ILOAD i ; ALOAD a ; ARRAYLENGTH ; IF_ICMPGE exit   (forward)
+        //   body:   ... a[i] ...
+        //   IINC i,+k ; GOTO header
+        //   exit:
+        // Falling through the IF_ICMPGE proves i < a.length (and a != null, since
+        // ARRAYLENGTH ran); the body is dominated by that test.
+        for (int jx = 4; jx < n; jx++) {
+            Instruction ji = r.get(jx);
+            if (!(ji instanceof Jump) || ji.getOpcode() != Opcodes.IF_ICMPGE) {
+                continue;
+            }
+            Jump j = (Jump) ji;
+            Integer exitP = pos.get(j.getLabel());
+            if (exitP == null || exitP <= jx) {
+                continue; // exit must be a forward target
+            }
+            int exit = exitP;
+            // condition shape:  ILOAD i ; ALOAD a ; ARRAYLENGTH ; IF_ICMPGE exit
+            Instruction len = r.get(jx - 1);
+            Instruction arr = r.get(jx - 2);
+            Instruction idx = r.get(jx - 3);
+            Instruction hdr = r.get(jx - 4);
+            if (len.getOpcode() != Opcodes.ARRAYLENGTH) continue;
+            if (!(arr instanceof VarOp) || arr.getOpcode() != Opcodes.ALOAD) continue;
+            if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) continue;
+            if (!(hdr instanceof LabelInstruction)) continue;     // header label the back-edge returns to
+            int header = jx - 4;
+            int arrVar = ((VarOp) arr).getIndex();
+            int indVar = ((VarOp) idx).getIndex();
+            if (arrVar == indVar) continue;
+            if (!bceInductionMonotonicNonNegative(r, indVar)) continue;
+            if (bceCountJumpsTargeting(r, header) != 1) continue;          // only the back-edge enters the header
+            if (bceLocalWrittenInRange(r, arrVar, jx, exit)) continue;     // array invariant in loop body
+
+            for (int k = jx + 1; k < exit; k++) {
+                Instruction ld = r.get(k);
+                if (!bceIsArrayLoadOpcode(ld.getOpcode())) continue;
+                Instruction li = r.get(k - 1);
+                Instruction la = r.get(k - 2);
+                if (!(li instanceof VarOp) || li.getOpcode() != Opcodes.ILOAD || ((VarOp) li).getIndex() != indVar) continue;
+                if (!(la instanceof VarOp) || la.getOpcode() != Opcodes.ALOAD || ((VarOp) la).getIndex() != arrVar) continue;
+                if (bceLocalWrittenInRange(r, indVar, jx, k)) continue;     // i unchanged test->access
+                if (bceForeignEntry(r, pos, header, k, j)) continue;        // no bypass entry into cond/body
+                ld.markBoundsSafe();
+            }
+        }
+    }
+
+    private static boolean bceIsArrayLoadOpcode(int op) {
+        switch (op) {
+            case Opcodes.IALOAD: case Opcodes.LALOAD: case Opcodes.FALOAD:
+            case Opcodes.DALOAD: case Opcodes.AALOAD: case Opcodes.BALOAD:
+            case Opcodes.CALOAD: case Opcodes.SALOAD: return true;
+            default: return false;
+        }
+    }
+
+    // i is written only by IInc(+positive) and ISTORE of a non-negative int constant,
+    // with at least one such initializing store. Anything else -> not provably >= 0.
+    private static boolean bceInductionMonotonicNonNegative(java.util.List<Instruction> r, int v) {
+        boolean hasInit = false;
+        for (int i = 0; i < r.size(); i++) {
+            Instruction in = r.get(i);
+            if (in instanceof IInc && ((IInc) in).getVar() == v) {
+                if (((IInc) in).getAmount() <= 0) return false;
+            } else if (in instanceof VarOp && in.getOpcode() == Opcodes.ISTORE && ((VarOp) in).getIndex() == v) {
+                if (i == 0) return false;
+                int srcOp = r.get(i - 1).getOpcode();
+                if (srcOp != Opcodes.ICONST_0 && srcOp != Opcodes.ICONST_1 && srcOp != Opcodes.ICONST_2
+                        && srcOp != Opcodes.ICONST_3 && srcOp != Opcodes.ICONST_4 && srcOp != Opcodes.ICONST_5) {
+                    return false;
+                }
+                hasInit = true;
+            }
+        }
+        return hasInit;
+    }
+
+    private static boolean bceLocalWrittenInRange(java.util.List<Instruction> r, int v, int from, int to) {
+        for (int i = from + 1; i < to; i++) {
+            Instruction in = r.get(i);
+            if (in instanceof IInc && ((IInc) in).getVar() == v) return true;
+            if (in instanceof VarOp) {
+                int op = in.getOpcode();
+                if ((op == Opcodes.ISTORE || op == Opcodes.ASTORE) && ((VarOp) in).getIndex() == v) return true;
+            }
+        }
+        return false;
+    }
+
+    private static int bceCountJumpsTargeting(java.util.List<Instruction> r, int headerIndex) {
+        Instruction li = r.get(headerIndex);
+        if (!(li instanceof LabelInstruction)) return -1;
+        Label target = ((LabelInstruction) li).getLabel();
+        int c = 0;
+        for (Instruction in : r) {
+            if (in instanceof Jump && ((Jump) in).getLabel() == target) c++;
+        }
+        return c;
+    }
+
+    private static boolean bceForeignEntry(java.util.List<Instruction> r, java.util.HashMap<Label, Integer> pos,
+                                           int from, int to, Jump backEdge) {
+        for (Instruction in : r) {
+            if (!(in instanceof Jump)) continue;
+            Jump jj = (Jump) in;
+            Integer tgt = pos.get(jj.getLabel());
+            if (tgt == null) continue;
+            if (tgt > from && tgt <= to && jj != backEdge) return true;
+        }
+        return false;
+    }
+
     boolean optimize() {
         int instructionCount = instructions.size();
         
@@ -1936,7 +2146,13 @@ public class BytecodeMethod implements SignatureSet {
                 return false;
             }
         }
-        
+
+        // Prove-safe bounds-check elimination runs HERE, on the raw (pre-reduction)
+        // instruction list, where stores/inits/lengths are still explicit opcodes
+        // (the reduction passes below fuse them into opaque CustomIntructions that
+        // could hide a write and make the analysis unsound).
+        analyzeBoundsChecks();
+
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
         
@@ -2506,6 +2722,17 @@ public class BytecodeMethod implements SignatureSet {
                 case Opcodes.INVOKEINTERFACE: {
                     if (current instanceof Invoke) {
                         Invoke inv = (Invoke)current;
+                        // AOT trivial accessor inlining: a monomorphic call to a
+                        // `return this.field` getter / `this.field = arg` setter has the
+                        // exact stack effect of a GETFIELD / PUTFIELD, so swap the call
+                        // for the field op. Reprocess the slot so Field.tryReduce above
+                        // folds the operands into a direct field expression.
+                        Field inlinedField = inv.asInlinableFieldAccess();
+                        if (inlinedField != null) {
+                            instructions.set(iter, inlinedField);
+                            iter--;
+                            continue;
+                        }
                         List<ByteCodeMethodArg> invocationArgs = inv.getArgs();
                         int numArgs = invocationArgs.size();
                         

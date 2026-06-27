@@ -655,7 +655,30 @@ extern struct clazz* classesList[];
 
 extern int instanceofFunction(int sourceClass, int destId);
 
-#define GET_CLASS_ID(JavaObj) (*(*JavaObj).__codenameOneParentClsReference).classId
+// Tagged small-integer ("poor man's Valhalla"): Integer.valueOf returns an immediate
+// tagged pointer (low bit = 1, the int in the high bits) instead of allocating, and the
+// GC ignores it while every class/dispatch lookup substitutes Integer's class. 64-bit
+// POINTERS ONLY: on a 32-bit-pointer target a 32-bit int can't be tagged losslessly, so
+// it must fall back to heap boxing. That includes armv7/armv7k AND arm64_32 (Apple Watch
+// Series 4+, which is 64-bit hardware but uses 32-bit pointers) -- hence the gate is on
+// __SIZEOF_POINTER__, not the architecture. Opt in with -DCN1_TAGGED_INT.
+#if defined(CN1_TAGGED_INT) && defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ >= 8)
+#define CN1_TAGGED_ACTIVE 1
+#else
+#define CN1_TAGGED_ACTIVE 0
+#endif
+extern struct clazz class__java_lang_Integer;
+#if CN1_TAGGED_ACTIVE
+#define CN1_IS_TAGGED(o) (((uintptr_t)(o)) & 1)
+#define CN1_TAG_INT(v) ((JAVA_OBJECT)((((uintptr_t)(intptr_t)(JAVA_INT)(v)) << 1) | 1))
+#define CN1_UNTAG_INT(o) ((JAVA_INT)(((intptr_t)(o)) >> 1))
+#define CN1_CLASS_OF(o) (CN1_IS_TAGGED(o) ? (&class__java_lang_Integer) : (o)->__codenameOneParentClsReference)
+#else
+#define CN1_IS_TAGGED(o) (0)
+#define CN1_CLASS_OF(o) ((o)->__codenameOneParentClsReference)
+#endif
+
+#define GET_CLASS_ID(JavaObj) ((CN1_CLASS_OF(JavaObj))->classId)
 
 #define BC_INSTANCEOF(typeOfInstanceOf) { \
     if(SP[-1].data.o != JAVA_NULL) { \
@@ -730,11 +753,13 @@ extern int instanceofFunction(int sourceClass, int destId);
 
 #define BC_AASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
     JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
+    CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
 }
 #define BC_AASTORE_WITH_ARGS(array, index, value) CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
     JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
+    CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
 }
@@ -772,6 +797,71 @@ struct TryBlock {
 
 #define PER_THREAD_ALLOCATION_COUNT 4096
 
+#ifdef CN1_NURSERY
+// Tunables (override with -D). Block size and arena size trade footprint against
+// how long churn lives before a minor collection (the bigger the nursery, the more
+// short-lived garbage dies in-place instead of being promoted).
+// 64 KB measured better than 256 KB across the allocation benchmarks (less waste when
+// a block tenures at low density -> stringBuilding 0.92x -> 1.23x, objectAllocation
+// slightly better, hashMapChurn ~neutral). Configurable for fragmentation tuning.
+#ifndef CN1_NURSERY_BLOCK_SIZE
+#define CN1_NURSERY_BLOCK_SIZE (64*1024)
+#endif
+#ifndef CN1_NURSERY_ARENA_SIZE
+#define CN1_NURSERY_ARENA_SIZE (64*1024*1024)
+#endif
+#ifndef CN1_NURSERY_MAX_OBJECT
+#define CN1_NURSERY_MAX_OBJECT 512
+#endif
+// Minor collection fires after this many bytes have been bump-allocated by a thread.
+#ifndef CN1_NURSERY_MINOR_TRIGGER
+#define CN1_NURSERY_MINOR_TRIGGER (8*1024*1024)
+#endif
+// Adaptive survival-based bypass. When a minor collection finds that at least
+// CN1_NURSERY_BYPASS_SURVIVAL_PCT% of the objects allocated since the last collection
+// survived (escaped/were promoted), the nursery is pure overhead for this phase: the
+// thread bypasses it and allocates straight into the global heap for the next
+// CN1_NURSERY_BYPASS_ALLOCS allocations, then re-probes by allocating in the nursery
+// again. CN1_NURSERY_BYPASS_MIN_SAMPLE avoids deciding on a tiny sample.
+#ifndef CN1_NURSERY_BYPASS_SURVIVAL_PCT
+#define CN1_NURSERY_BYPASS_SURVIVAL_PCT 60
+#endif
+#ifndef CN1_NURSERY_BYPASS_ALLOCS
+#define CN1_NURSERY_BYPASS_ALLOCS 200000
+#endif
+#ifndef CN1_NURSERY_BYPASS_MIN_SAMPLE
+#define CN1_NURSERY_BYPASS_MIN_SAMPLE 1024
+#endif
+// When re-probing after a bypass, collect after this many bytes (a small sample)
+// instead of the full minor trigger, so a still-escaping phase pays only a tiny
+// re-measurement cost before bypassing again.
+#ifndef CN1_NURSERY_REPROBE_BYTES
+#define CN1_NURSERY_REPROBE_BYTES (512*1024)
+#endif
+extern char* cn1NurseryArenaStart;
+extern char* cn1NurseryArenaEnd;
+// Forward-declare at file scope so the prototype below refers to THIS tag, not a new
+// prototype-scoped one. CODENAME_ONE_THREAD_STATE isn't defined this early either.
+struct ThreadLocalData;
+extern JAVA_OBJECT cn1NurseryAlloc(struct ThreadLocalData* threadStateData, int size, struct clazz* parent);
+extern void cn1NurseryWriteBarrier(JAVA_OBJECT target, JAVA_OBJECT value);
+static inline JAVA_BOOLEAN cn1InNursery(void* p) {
+    return (char*)p >= cn1NurseryArenaStart && (char*)p < cn1NurseryArenaEnd;
+}
+// Emitted by the translator before an object-reference store into a heap location.
+// Fast path is INLINE: only a value that actually lives in the nursery can escape, so
+// the overwhelmingly common heap->heap / null store collapses to a two-compare range
+// check with no call and no getThreadLocalData() TLS lookup. This matters enormously
+// for store-heavy code (HashMap internals, etc.) and makes the barrier ~free whenever
+// the nursery isn't holding the value (including while bypassed).
+#define CN1_WRITE_BARRIER(target, value) \
+    do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(value); \
+         if(cn1__bv != JAVA_NULL && cn1InNursery(cn1__bv)) { \
+             cn1NurseryWriteBarrier((JAVA_OBJECT)(target), cn1__bv); } } while(0)
+#else
+#define CN1_WRITE_BARRIER(target, value)
+#endif
+
 #define enteringNativeAllocations() threadStateData->nativeAllocationMode = JAVA_TRUE
 #define finishedNativeAllocations() threadStateData->nativeAllocationMode = JAVA_FALSE
 
@@ -798,6 +888,33 @@ struct ThreadLocalData {
     void** pendingHeapAllocations;
     JAVA_INT heapAllocationSize;
     JAVA_INT threadHeapTotalSize;
+
+#ifdef CN1_NURSERY
+    // Thread-local young-generation ("nursery") bump allocator. Small objects are
+    // bump-allocated here and NEVER enter allObjectsInHeap; a thread-local minor
+    // collection promotes only the survivors and reclaims the rest in bulk, so the
+    // global mark/sweep cost becomes O(survivors) instead of O(allocated).
+    char* nurseryBump;                 // next free byte in the current block
+    char* nurseryEnd;                  // end of the current block
+    int   nurseryCurrentBlock;         // index of the current block (-1 = none)
+    int*  nurseryYoungBlocks;          // block indices owned by this thread's young gen
+    int   nurseryYoungCount;
+    int   nurseryYoungCapacity;
+    long  nurseryBytesSinceMinor;      // drives the minor-GC trigger
+    // Per-thread promotion state. MUST be per-thread: the concurrent GC thread runs
+    // gcMarkObject at the same time a mutator promotes, and a shared flag would make
+    // the GC thread promote-instead-of-mark and corrupt the heap.
+    JAVA_BOOLEAN nurseryPromoting;
+    JAVA_OBJECT* nurseryPromoteWorklist;
+    int   nurseryPromoteTop;
+    int   nurseryPromoteCap;
+    // Adaptive bypass: survival sampling + bypass countdown (see CN1_NURSERY_BYPASS_*).
+    int   nurseryAllocSinceMinor;      // objects bump-allocated since the last minor
+    int   nurseryPromotedSinceMinor;   // of those, how many survived (were promoted)
+    JAVA_BOOLEAN nurseryBypass;        // true => allocate straight to the global heap
+    int   nurseryBypassCountdown;      // allocations left before re-probing the nursery
+    JAVA_BOOLEAN nurseryReprobing;     // just exited bypass: collect on a small sample
+#endif
 
     // used to construct stack trace
     int* callStackClass;
@@ -1105,6 +1222,7 @@ static inline JAVA_VOID cn1_set_array_element_object(CODENAME_ONE_THREAD_STATE, 
     if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
         return;
     }
+    CN1_WRITE_BARRIER(array, value); // nursery: storing a ref into a (heap) array escapes
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
@@ -1130,6 +1248,21 @@ static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JA
 #define CN1_ARRAY_ELEMENT_OBJECT(array, index) cn1_array_element_object(threadStateData, array, index)
 #define CN1_ARRAY_ELEMENT_SHORT(array, index) cn1_array_element_short(threadStateData, array, index)
 #define CN1_ARRAY_ELEMENT_CHAR(array, index) cn1_array_element_char(threadStateData, array, index)
+
+// Unchecked array element reads. Emitted by the translator ONLY for accesses the
+// prove-safe bounds-check-elimination pass proved are always in range and on a
+// non-null array (canonical counted loops indexed by their own induction var,
+// bounded by arr.length). No null/bounds branch -> the C compiler is free to keep
+// the load in registers and auto-vectorize. If the proof is ever wrong this reads
+// out of bounds, so the pass is deliberately conservative and fail-closed.
+#define CN1_ARRAY_ELEMENT_INT_NOCHK(array, index) (((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_BYTE_NOCHK(array, index) (((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_FLOAT_NOCHK(array, index) (((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_DOUBLE_NOCHK(array, index) (((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_LONG_NOCHK(array, index) (((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_OBJECT_NOCHK(array, index) (((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_SHORT_NOCHK(array, index) (((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)(array)).data)[(index)])
+#define CN1_ARRAY_ELEMENT_CHAR_NOCHK(array, index) (((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)(array)).data)[(index)])
 
 #define CN1_SET_ARRAY_ELEMENT_INT(array, index, value) cn1_set_array_element_int(threadStateData, array, index, value)
 #define CN1_SET_ARRAY_ELEMENT_BYTE(array, index, value) cn1_set_array_element_byte(threadStateData, array, index, value)

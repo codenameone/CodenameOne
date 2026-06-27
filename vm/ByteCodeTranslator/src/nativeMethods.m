@@ -1449,8 +1449,24 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         pthread_setschedparam(pthread_self(), policy, &param);
     }
     flushReleaseQueue();
+#ifdef CN1_GC_INSTRUMENT
+    extern long long cn1_instr_allocCount; extern int currentSizeOfAllObjectsInHeap;
+    static long long markNs=0, sweepNs=0; static int gcCount=0;
+    struct timespec _t0,_t1,_t2;
+    clock_gettime(CLOCK_MONOTONIC,&_t0);
+    codenameOneGCMark();
+    clock_gettime(CLOCK_MONOTONIC,&_t1);
+    codenameOneGCSweep();
+    clock_gettime(CLOCK_MONOTONIC,&_t2);
+    markNs  += (_t1.tv_sec-_t0.tv_sec)*1000000000LL+(_t1.tv_nsec-_t0.tv_nsec);
+    sweepNs += (_t2.tv_sec-_t1.tv_sec)*1000000000LL+(_t2.tv_nsec-_t1.tv_nsec);
+    gcCount++;
+    if(gcCount==1 || (gcCount % 20)==0) fprintf(stderr,"[GC-INSTR] cycles=%d allocs=%lld heapTableSize=%d markMs=%.0f sweepMs=%.0f\n",
+        gcCount, cn1_instr_allocCount, currentSizeOfAllObjectsInHeap, markNs/1e6, sweepNs/1e6);
+#else
     codenameOneGCMark();
     codenameOneGCSweep();
+#endif
     flushReleaseQueue();
     lowMemoryMode = JAVA_FALSE;
     gcCurrentlyRunning = JAVA_FALSE;
@@ -1461,6 +1477,7 @@ JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
 }
 
 JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    if(CN1_IS_TAGGED(obj)) { return; } // tagged Integer has no header/monitor; lock is a NOP
     int err = 0;
     // Double-checked locking for the lazily allocated per-object monitor. The fast-path
     // read MUST be an acquire load and the publishing store (inside the critical section)
@@ -1524,6 +1541,7 @@ JAVA_VOID monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 }
 
 JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    if(CN1_IS_TAGGED(obj)) { return; } // tagged Integer has no header/monitor; unlock is a NOP
     //printf("Unlocked mutex %i ", (int)obj->__codenameOneMutex);
     // remove the ownership of the thread
     ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter--;
@@ -1535,6 +1553,37 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     if(err != 0) {
         printf("Error with unlock %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", err, EINVAL, ETIMEDOUT, EPERM);
     }
+}
+
+// ---- Tagged small-integer support (poor man's Valhalla, 64-bit pointers only) ----
+// Integer.valueOf returns an immediate tagged pointer instead of allocating; cn1Value
+// recovers the int from either a tagged immediate or a heap Integer's field. When the
+// optimization is off (or on a 32-bit-pointer target) these behave exactly as before:
+// valueOf delegates to the cached heap path and cn1Value just reads the field.
+#if CN1_TAGGED_ACTIVE
+extern void __STATIC_INITIALIZER_java_lang_Integer(CODENAME_ONE_THREAD_STATE);
+#endif
+JAVA_OBJECT java_lang_Integer_valueOf___int_R_java_lang_Integer(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
+#if CN1_TAGGED_ACTIVE
+    // Tagged ints never allocate, so nothing else triggers Integer's class init -- but
+    // dispatching hashCode/equals on a tagged int reads class__java_lang_Integer.vtable,
+    // which the static initializer populates. Force it once. The guard keeps the hot path
+    // a single predictable branch (the initializer itself is also idempotent).
+    static volatile int cn1IntInit = 0;
+    if(!cn1IntInit) { __STATIC_INITIALIZER_java_lang_Integer(threadStateData); cn1IntInit = 1; }
+    return CN1_TAG_INT(i);
+#else
+    return java_lang_Integer_valueOfHeap___int_R_java_lang_Integer(threadStateData, i);
+#endif
+}
+
+JAVA_INT java_lang_Integer_cn1Value___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if CN1_TAGGED_ACTIVE
+    if(CN1_IS_TAGGED(__cn1ThisObject)) {
+        return CN1_UNTAG_INT(__cn1ThisObject);
+    }
+#endif
+    return ((struct obj__java_lang_Integer*)__cn1ThisObject)->java_lang_Integer_value;
 }
 
 // monitorEnterBlock is used for synchronized methods because the JVM bytecode

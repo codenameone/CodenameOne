@@ -16,10 +16,21 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
     private Instruction targetArrayInstruction;
     private Instruction indexInstruction;
     private Instruction loadInstruction;
-    
 
     private ArrayLoadExpression() {
         super(-4);
+    }
+
+    public Instruction getTargetArrayInstruction() {
+        return targetArrayInstruction;
+    }
+
+    public Instruction getIndexInstruction() {
+        return indexInstruction;
+    }
+
+    public Instruction getLoadInstruction() {
+        return loadInstruction;
     }
     
     
@@ -57,6 +68,10 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
         out.loadInstruction = instr;
         out.indexInstruction = indexInstr;
         out.targetArrayInstruction = arrInstr;
+        // Carry the prove-safe flag the BCE pre-pass set on the raw load opcode.
+        if (instr.isBoundsSafe()) {
+            out.markBoundsSafe();
+        }
         
         instructions.remove(index-2);
         instructions.remove(index-2);
@@ -184,7 +199,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             b.append("{\n");
             b.append("    JAVA_OBJECT __cn1ArrayTmp = ").append(arrayExpr).append(";\n");
             b.append("    JAVA_INT __cn1IndexTmp = ").append(indexExpr).append(";\n");
-            if (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks()) {
+            if (!isBoundsSafe() && (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks())) {
                 b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
             }
             b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp];\n");
@@ -197,7 +212,12 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             b.append(varName).append("=");
         }
         b.append("CN1_ARRAY_ELEMENT_");
-        b.append(arrayType).append("(");
+        b.append(arrayType);
+        // Unchecked variant only when our prove-safe BCE pass cleared this access.
+        if (isBoundsSafe()) {
+            b.append("_NOCHK");
+        }
+        b.append("(");
         b.append(arrayExpr);
         b.append(", ");
         b.append(indexExpr);
