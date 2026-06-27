@@ -15,21 +15,19 @@ import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-/**
- * The software fallback {@link SecretsStore}: each value is AES-256-CBC
- * encrypted and HMAC-SHA256 authenticated (encrypt-then-MAC) before being
- * written to {@link Storage}, so secrets are never stored in the clear. The
- * master key is generated once with {@link SecureRandom} and kept in
- * {@link Preferences}; per-value encryption and MAC subkeys are derived from
- * it with domain separation.
- *
- * <p>This is secure <em>at rest</em> but software-only ({@link
- * #isHardwareBacked()} is false): the master key lives in app storage, not a
- * secure enclave. On a device, register a hardware-backed store (iOS Keychain
- * / Android Keystore) via {@link Secrets#setStore(SecretsStore)} instead --
- * this fallback exists so {@code Secrets} works everywhere (notably the
- * simulator) without a plaintext write.
- */
+/// The software fallback [SecretsStore]: each value is AES-256-CBC
+/// encrypted and HMAC-SHA256 authenticated (encrypt-then-MAC) before being
+/// written to `Storage`, so secrets are never stored in the clear. The
+/// master key is generated once with `SecureRandom` and kept in
+/// `Preferences`; per-value encryption and MAC subkeys are derived from
+/// it with domain separation.
+///
+/// This is secure *at rest* but software-only ([#isHardwareBacked()] is
+/// false): the master key lives in app storage, not a secure enclave. On a
+/// device, register a hardware-backed store (iOS Keychain / Android Keystore)
+/// via [Secrets#setStore(SecretsStore)] instead -- this fallback exists so
+/// `Secrets` works everywhere (notably the simulator) without a plaintext
+/// write.
 final class DefaultSecretsStore implements SecretsStore {
 
     private static final String ENTRY_PREFIX = "cn1secret$";
