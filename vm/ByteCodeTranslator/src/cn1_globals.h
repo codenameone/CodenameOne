@@ -1645,7 +1645,12 @@ static inline struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, str
 }
 */
 
-extern struct elementStruct* pop(struct elementStruct**sp);
+// Inlined: POP_INT/POP_LONG/POP_OBJ hit this on every pop, including hot return paths
+// (return POP_LONG()). It was a non-inline call -- pure overhead for a pointer decrement.
+static inline struct elementStruct* pop(struct elementStruct**sp) {
+    --(*sp);
+    return *sp;
+}
 extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp);
 
 

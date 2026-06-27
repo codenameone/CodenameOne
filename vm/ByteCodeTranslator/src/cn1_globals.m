@@ -298,10 +298,6 @@ struct clazz class_array3__JAVA_DOUBLE = {
    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
-struct elementStruct* pop(struct elementStruct** sp) {
-    --(*sp);
-    return *sp;
-}
 
 void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** SP) {
     while(count > 0) {
