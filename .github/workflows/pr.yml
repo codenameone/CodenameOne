@@ -346,6 +346,8 @@ jobs:
             await publishQualityComment({ github, context, core });
       - name: Link cn1-binaries
         run: ln -s /opt/cn1-binaries ../cn1-binaries
+      - name: Use upstream JCEF for the Ant build
+        run: ./scripts/ci-install-upstream-jcef-jar.sh
       - name: Build CLDC11 JAR
         run: |
           ANT_OPTS_ARGS=""

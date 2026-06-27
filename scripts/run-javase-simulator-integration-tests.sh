@@ -136,6 +136,7 @@ js_log "Building CSS-driven native themes"
 "$REPO_ROOT/scripts/build-native-themes.sh"
 
 js_log "Ensuring JavaSE port is built"
+"$REPO_ROOT/scripts/ci-install-upstream-jcef-jar.sh"
 js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
 JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/JavaSE/build.xml jar
 
