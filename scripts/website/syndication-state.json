@@ -568,6 +568,10 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-06-26T15:06:06+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3663747/edit.html",
+        "syndicated_at": "2026-06-27T17:26:56+00:00"
       }
     },
     "java-to-a-native-linux-app": {
