@@ -1777,6 +1777,86 @@
     });
   });
 
+  // Live camera (com.codename1.camera.Camera). The whole getUserMedia/<video>/
+  // capture-<canvas> session runs here on the main thread; the worker only holds
+  // the opaque <video> host-ref.
+  hostBridge.register('__cn1_camera_supported__', function() {
+    return (typeof navigator !== 'undefined' && navigator.mediaDevices
+      && navigator.mediaDevices.getUserMedia) ? 1 : 0;
+  });
+
+  hostBridge.register('__cn1_camera_last_error__', function() {
+    return global.__cn1_camera_error || '';
+  });
+
+  hostBridge.register('__cn1_camera_open__', function(request) {
+    var facing = (request && request.facing) ? String(request.facing) : 'environment';
+    var audio = !!(request && request.audio);
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof navigator === 'undefined' || !navigator.mediaDevices
+        || !navigator.mediaDevices.getUserMedia) {
+      global.__cn1_camera_error = 'NotSupportedError';
+      return null;
+    }
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: audio })
+      .then(function(stream) {
+        var v = doc.createElement('video');
+        v.autoplay = true;
+        v.muted = true;
+        v.setAttribute('muted', '');
+        v.setAttribute('playsinline', '');
+        v.setAttribute('autoplay', '');
+        v.srcObject = stream;
+        try { var p = v.play(); if (p && p.catch) { p.catch(function() {}); } } catch (e) {}
+        global.__cn1_camera_error = '';
+        return hostResult(v);
+      })
+      .catch(function(e) {
+        global.__cn1_camera_error = (e && e.name) ? e.name : ('' + e);
+        return null;
+      });
+  });
+
+  hostBridge.register('__cn1_camera_grab__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v) { return null; }
+    var w = (request && request.w) | 0;
+    var h = (request && request.h) | 0;
+    if (w <= 0) { w = v.videoWidth || 640; }
+    if (h <= 0) { h = v.videoHeight || 480; }
+    var quality = (request && typeof request.quality === 'number') ? request.quality : 0.9;
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc) { return null; }
+    try {
+      var c = doc.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(v, 0, 0, w, h);
+      var dataUrl = c.toDataURL('image/jpeg', quality);
+      var comma = dataUrl.indexOf(',');
+      var b64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;
+      return w + ',' + h + ',' + b64;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  hostBridge.register('__cn1_camera_close__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v) { return 0; }
+    try {
+      if (v.srcObject) {
+        var t = v.srcObject.getTracks();
+        for (var i = 0; i < t.length; i++) { t[i].stop(); }
+      }
+    } catch (e) {}
+    try { v.pause(); } catch (e) {}
+    try { if (v.parentNode) { v.parentNode.removeChild(v); } } catch (e) {}
+    try { v.srcObject = null; } catch (e) {}
+    return 1;
+  });
+
   hostBridge.register('__cn1_print_data__', function(request) {
     var b64 = (request && request.b64 != null) ? String(request.b64) : '';
     var mimeType = (request && request.mimeType != null) ? String(request.mimeType) : 'application/octet-stream';

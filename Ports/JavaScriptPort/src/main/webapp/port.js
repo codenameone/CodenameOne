@@ -1923,6 +1923,69 @@ bindNative([
   return r == null ? null : jvm.createStringLiteral(String(r));
 });
 
+// Live camera (com.codename1.camera.Camera): getUserMedia, the <video> preview
+// and the capture <canvas> are all main-thread only -- and a MediaStream can't
+// cross the worker boundary -- so the whole media session runs on the host and
+// the worker holds only the opaque <video> host-ref (handed to PeerComponent for
+// the live preview and back to the host to grab still frames).
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_camera_supported__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraOpen_java_lang_String_boolean_R_com_codename1_html5_js_dom_HTMLVideoElement",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraOpen___java_lang_String_boolean_R_com_codename1_html5_js_dom_HTMLVideoElement"
+], function*(facing, audio) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const f = facing == null ? "environment" : jvm.toNativeString(facing);
+  const ref = yield jvm.invokeHostNative("__cn1_camera_open__", [{ facing: f, audio: !!audio }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLVideoElement");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError___R_java_lang_String"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return jvm.createStringLiteral("");
+  }
+  const v = yield jvm.invokeHostNative("__cn1_camera_last_error__", []);
+  return jvm.createStringLiteral(v == null ? "" : String(v));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraGrab_com_codename1_html5_js_dom_HTMLVideoElement_int_int_double_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraGrab___com_codename1_html5_js_dom_HTMLVideoElement_int_int_double_R_java_lang_String"
+], function*(video, w, h, quality) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = jvm.unwrapJsValue(video);
+  const r = yield jvm.invokeHostNative("__cn1_camera_grab__", [{ video: ref, w: w | 0, h: h | 0, quality: +quality }]);
+  return r == null ? null : jvm.createStringLiteral(String(r));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraClose_com_codename1_html5_js_dom_HTMLVideoElement",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraClose___com_codename1_html5_js_dom_HTMLVideoElement"
+], function*(video) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return;
+  }
+  const ref = jvm.unwrapJsValue(video);
+  yield jvm.invokeHostNative("__cn1_camera_close__", [{ video: ref }]);
+});
+
 // Fullscreen: document.fullscreen* lives on the main thread. Queries return the
 // real host state; enter/exit do the host request and then invoke the Java
 // RequestFullScreenCallback (onComplete(boolean)) back in the worker.

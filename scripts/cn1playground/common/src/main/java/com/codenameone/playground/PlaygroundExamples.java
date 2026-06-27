@@ -301,51 +301,88 @@ final class PlaygroundExamples {
 
     static final String CAMERA_SCRIPT = """
             import com.codename1.camera.Camera;
+            import com.codename1.camera.CameraFacing;
             import com.codename1.camera.CameraInfo;
-            import com.codename1.capture.Capture;
+            import com.codename1.camera.CameraSession;
+            import com.codename1.camera.CameraSessionOptions;
+            import com.codename1.camera.CameraView;
+            import com.codename1.camera.CapturedPhoto;
             import com.codename1.components.*;
             import com.codename1.ui.*;
             import com.codename1.ui.layouts.*;
 
-            // The new com.codename1.camera.Camera API reports the cameras the
-            // platform exposes (read-only metadata, available on every target).
-            // Photo/audio capture goes through Capture, which opens the device
-            // camera/file picker on the web (getUserMedia/file input).
-            Container root = new Container(BoxLayout.y());
-            root.setScrollableY(true);
-            root.add(new SpanLabel("Enumerate cameras with the new Camera API, then capture a photo or audio clip. On the web this opens the device camera or file picker."));
+            // The new com.codename1.camera.Camera API opens a LIVE getUserMedia
+            // preview (not a file picker) and snaps a still. The browser prompts
+            // for camera permission; a secure context (HTTPS or localhost) is
+            // required. Camera.open() must originate from a tap.
+            Form form = new Form("Camera", new BorderLayout());
+            Label status = new Label("Tap 'Start Camera'");
+            Button start = new Button("Start Camera");
+            FontImage.setMaterialIcon(start, FontImage.MATERIAL_VIDEOCAM);
+            Button snap = new Button("Take Photo");
+            FontImage.setMaterialIcon(snap, FontImage.MATERIAL_PHOTO_CAMERA);
+            snap.setEnabled(false);
+            Container south = new Container(BoxLayout.y());
+            south.addAll(start, snap, status);
+            form.add(BorderLayout.SOUTH, south);
 
-            boolean supported = Camera.isSupported();
-            root.add(new Label("Camera API supported: " + supported));
-            if (supported) {
-                CameraInfo[] cams = Camera.getCameras();
-                root.add(new Label("Cameras detected: " + cams.length));
-                for (int i = 0; i < cams.length; i++) {
-                    root.add(new Label("  - id=" + cams[i].getId()
-                            + "  flash=" + cams[i].hasFlash()
-                            + "  autofocus=" + cams[i].hasAutoFocus()));
-                }
-            }
+            CameraSession[] sessionHolder = new CameraSession[1];
 
-            Label status = new Label("Ready to use camera features");
-            Button photo = new Button("Capture Photo");
-            FontImage.setMaterialIcon(photo, FontImage.MATERIAL_PHOTO_CAMERA);
-            photo.addActionListener(evt -> {
-                String path = Capture.capturePhoto();
-                status.setText(path == null ? "Photo capture cancelled" : ("Captured: " + path));
-                if (path != null) {
-                    root.add(new Label(Image.createImage(path)));
+            start.addActionListener(evt -> {
+                if (!Camera.isSupported()) {
+                    status.setText("Camera not supported on this device");
+                    status.getParent().revalidate();
+                    return;
                 }
-                root.revalidate();
+                CameraInfo info = Camera.getDefault(CameraFacing.BACK);
+                if (info == null) {
+                    status.setText("No camera available");
+                    status.getParent().revalidate();
+                    return;
+                }
+                try {
+                    CameraSession session = Camera.open(info, new CameraSessionOptions());
+                    sessionHolder[0] = session;
+                    CameraView view = session.createView();
+                    form.add(BorderLayout.CENTER, view);
+                    start.setEnabled(false);
+                    snap.setEnabled(true);
+                    status.setText("Live preview running - tap 'Take Photo'");
+                    form.revalidate();
+                } catch (Exception ex) {
+                    status.setText("Camera open failed: " + ex.getMessage());
+                    status.getParent().revalidate();
+                }
             });
-            Button audio = new Button("Record Audio");
-            FontImage.setMaterialIcon(audio, FontImage.MATERIAL_MIC);
-            audio.addActionListener(evt -> {
-                String path = Capture.captureAudio();
-                status.setText(path == null ? "Audio capture cancelled" : ("Recorded: " + path));
+
+            snap.addActionListener(evt -> {
+                CameraSession session = sessionHolder[0];
+                if (session == null) {
+                    return;
+                }
+                status.setText("Capturing...");
                 status.getParent().revalidate();
+                session.takePhoto().ready(photo -> {
+                    try {
+                        Image img = photo.toImage();
+                        status.setText("Captured " + photo.getWidth() + " x " + photo.getHeight());
+                        status.getParent().revalidate();
+                        Dialog dlg = new Dialog("Captured Photo");
+                        dlg.setLayout(new BorderLayout());
+                        dlg.add(BorderLayout.CENTER,
+                                new Label(img.scaledWidth(Display.getInstance().getDisplayWidth() - 80)));
+                        Button done = new Button("Close");
+                        done.addActionListener(e2 -> dlg.dispose());
+                        dlg.add(BorderLayout.SOUTH, done);
+                        dlg.show();
+                    } catch (Exception ex) {
+                        status.setText("Capture failed: " + ex.getMessage());
+                        status.getParent().revalidate();
+                    }
+                });
             });
-            root.addAll(photo, audio, status);
+
+            form.show();
             """;
 
     static final String PHYSICS_SCRIPT = """
