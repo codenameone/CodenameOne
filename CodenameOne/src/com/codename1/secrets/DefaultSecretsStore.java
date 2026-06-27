@@ -77,7 +77,10 @@ final class DefaultSecretsStore implements SecretsStore {
             System.arraycopy(all, NONCE_LEN, ct, 0, ct.length);
             byte[] pt = Cipher.aesDecrypt(Cipher.AES_GCM, key(), nonce, null, ct);
             return new String(pt, "UTF-8");
-        } catch (Exception e) {
+        } catch (UnsupportedEncodingException e) {
+            // UTF-8 is guaranteed by the platform; never reached.
+            return null;
+        } catch (RuntimeException e) {
             // tampered ciphertext (GCM tag mismatch), wrong key, or corruption
             return null;
         }

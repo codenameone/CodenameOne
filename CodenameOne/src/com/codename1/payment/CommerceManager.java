@@ -215,7 +215,7 @@ public class CommerceManager {
         String body = buildRequest(r);
         try {
             Response resp = Rest.post(url + "/validate").jsonContent().body(body).getAsJsonMap();
-            if (resp == null || resp.getResponseCode() < 200 || resp.getResponseCode() >= 300) {
+            if (resp.getResponseCode() < 200 || resp.getResponseCode() >= 300) {
                 return null;
             }
             Object data = resp.getResponseData();
