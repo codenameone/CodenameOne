@@ -14,6 +14,8 @@
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-gamebuilder</artifactId>
     <name>codenameone-gamebuilder</name>
+    <!-- description is required by Maven Central and is not inherited. -->
+    <description>Standalone Codename One Game Builder editor (visual level/map editor).</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
