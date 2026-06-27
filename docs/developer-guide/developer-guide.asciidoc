@@ -99,6 +99,8 @@ include::Analytics.asciidoc[]
 
 include::Commerce.asciidoc[]
 
+include::Secrets.asciidoc[]
+
 include::Monetization.asciidoc[]
 
 include::App-Review.asciidoc[]

@@ -110,12 +110,26 @@ When an account crosses its cap, the service *degrades, it does not block*: it s
 
 === The console
 
-The *Commerce* page in the console at https://cloud.codenameone.com/console/index.html shows, per app:
+The *Commerce* section in the console at https://cloud.codenameone.com/console/index.html is account-level by default, with an app filter to narrow to one app:
 
-- *Overview* -- active subscriptions, active trials, customers, and this month's validated revenue against your cap.
+- *Overview* -- the subscription dashboard: headline KPIs (MRR, ARR, ARPU, active subscriptions, active trials, churn, trial conversion, customers), the monthly validated-volume meter, and trend charts for MRR, active subscriptions and revenue.
+- *Insights* -- MRR movement (new vs churned), MRR forecast, realized-LTV curve, active subscriptions by store and by product, cohort-retention, and period-over-period MRR.
 - *Customers* -- each app user and their active entitlements.
 - *Transactions* -- the recent validated-event ledger.
 - *Webhook* -- your delivery endpoint and signing secret.
+
+=== Analytics
+
+Commerce normalizes every active subscription to a monthly figure (MRR) and reconstructs the trends from the subscription history, so the dashboard matches what dedicated subscription-analytics tools provide:
+
+- *MRR / ARR / ARPU* -- normalized recurring revenue, annualized, and per active subscription.
+- *Churn* and *trial conversion* rates, *refund rate*.
+- *Cohort retention* -- monthly acquisition cohorts and the percentage still active each subsequent month.
+- *Realized LTV* -- average cumulative revenue per paying customer by months since acquisition.
+- *Forecast* -- projected MRR for the coming months from the current run-rate and recent growth.
+- *Breakdowns* by store and by product, and *period-over-period* comparison.
+
+Every chart pairs a graph with its underlying data table (one tab-flip away) for export-friendly inspection. All money is shown in your reporting currency; transactions in other currencies are normalized to USD via daily exchange rates.
 
 === Privacy
 
