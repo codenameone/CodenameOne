@@ -60,6 +60,23 @@ public class CN1Bootstrap {
         } catch (Throwable ex){}
         return false;
     }
+
+    private static boolean hasFFmpeg() {
+        File ffmpegDir = getFFmpegDir();
+        if (ffmpegDir == null || !ffmpegDir.exists()) {
+            return false;
+        }
+        String suffix = isWindows ? ".exe" : "";
+        return new File(ffmpegDir, "ffmpeg" + suffix).exists() && new File(ffmpegDir, "ffprobe" + suffix).exists();
+    }
+
+    private static File getFFmpegDir() {
+        String path = System.getProperty("ffmpeg.dir");
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
+        return new File(path);
+    }
     
     /**
      * Checks to see if this has already bootstrapped the classpath.  This doesn't necessarily
@@ -196,6 +213,16 @@ public class CN1Bootstrap {
                 System.setProperty("cn1.javase.implementation", "fx");
             } else {
                 System.setProperty("cn1.javase.implementation", "jmf");
+            }
+        }
+        String mediaImplementation = System.getProperty("cn1.javase.mediaImplementation", "");
+        if ("".equals(mediaImplementation)) {
+            if (hasFFmpeg()) {
+                System.setProperty("cn1.javase.mediaImplementation", "ffmpeg");
+            } else if (fxSupported) {
+                System.setProperty("cn1.javase.mediaImplementation", "fx");
+            } else {
+                System.setProperty("cn1.javase.mediaImplementation", "jmf");
             }
         }
         

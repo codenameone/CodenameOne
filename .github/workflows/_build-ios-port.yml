@@ -97,6 +97,7 @@ jobs:
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
+        id: cn1_tools
         uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
@@ -146,7 +147,13 @@ jobs:
           key: ${{ steps.cn1_built_key.outputs.key }}
 
       - name: Setup workspace
-        if: steps.cn1_built.outputs.cache-hit != 'true'
+        # Run when the prebuilt CN1 jars are missing, OR when the
+        # codenameone-tools cache (keyed separately, on setup-workspace.sh) is
+        # missing. Without the second condition a jars-cache hit short-circuits
+        # setup-workspace and leaves tools/env.sh absent, which the dependent app
+        # jobs (build-ios*, native-ios, packaging, mac-native) need but only ever
+        # restore from cache -- so an evicted tools cache breaks all of them.
+        if: steps.cn1_built.outputs.cache-hit != 'true' || steps.cn1_tools.outputs.cache-hit != 'true'
         run: ./scripts/setup-workspace.sh -q -DskipTests
         timeout-minutes: 40
 

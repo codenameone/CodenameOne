@@ -85,7 +85,14 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         } else {
             getLog().debug("CEF is already set up. cef.dir="+System.getProperty("cef.dir"));
         }
+        if (!isFFmpegSetup()) {
+            getLog().debug("FFmpeg not set up yet. Setting it up now");
+            setupFFmpeg();
+        }
         project.getProperties().setProperty("cef.dir", System.getProperty("cef.dir"));
+        if (System.getProperty("ffmpeg.dir") != null) {
+            project.getProperties().setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
+        }
         
         File designerJar = getDesignerJar();
         
@@ -192,6 +199,12 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         } catch (Exception ex){}
 
         try (FileOutputStream fos = new FileOutputStream(simulatorPropertiesFile)) {
+            if (System.getProperty("cef.dir") != null) {
+                simulatorProperties.setProperty("cef.dir", System.getProperty("cef.dir"));
+            }
+            if (System.getProperty("ffmpeg.dir") != null) {
+                simulatorProperties.setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
+            }
             simulatorProperties.store(fos, "Updated simulator properties in PrepareSimulatorClasspathMojo");
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to write simulator.properties file", ex);
