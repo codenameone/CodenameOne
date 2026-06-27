@@ -36,6 +36,15 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     transient Entry<K, V>[] elementData;
 
     /*
+     * Entry object pool. clear()/removeEntry() push freed entries here (linked via
+     * next, key/value nulled to release refs) and createHashedEntry pops from it before
+     * allocating. Eliminates per-key allocation in churn patterns (fill/clear loops)
+     * where a generational nursery can't help (entries escape into the map). The pool is
+     * a GC-marked field, so pooled entries stay live.
+     */
+    transient Entry<K, V> cn1FreeList;
+
+    /*
      * modification count, to keep track of structural modifications between the
      * HashMap and the iterator
      */
@@ -60,7 +69,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     int threshold;
 
     static class Entry<K, V> extends MapEntry<K, V> {
-        final int origKeyHash;
+        int origKeyHash;   // non-final so pooled (recycled) entries can be re-keyed
 
         Entry<K, V> next;
 
@@ -340,8 +349,21 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     @Override
     public void clear() {
         if (elementCount > 0) {
+            // Pool the entries instead of dropping them to GC: null their key/value to
+            // release references, then push onto the free list for reuse.
+            for (int i = 0; i < elementData.length; i++) {
+                Entry<K, V> e = elementData[i];
+                while (e != null) {
+                    Entry<K, V> nx = e.next;
+                    e.key = null;
+                    e.value = null;
+                    e.next = cn1FreeList;
+                    cn1FreeList = e;
+                    e = nx;
+                }
+                elementData[i] = null;
+            }
             elementCount = 0;
-            Arrays.fill(elementData, null);
             modCount++;
         }
     }
@@ -562,7 +584,15 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     Entry<K,V> createHashedEntry(K key, int index, int hash) {
-        Entry<K,V> entry = new Entry<K,V>(key,hash);
+        Entry<K,V> entry = cn1FreeList;
+        if (entry != null) {
+            cn1FreeList = entry.next;   // reuse a pooled entry
+            entry.key = key;
+            entry.origKeyHash = hash;
+            entry.value = null;
+        } else {
+            entry = new Entry<K,V>(key,hash);
+        }
         entry.next = elementData[index];
         elementData[index] = entry;
         return entry;
@@ -655,6 +685,11 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         }
         modCount++;
         elementCount--;
+        // Pool the removed entry for reuse (release its references first).
+        entry.key = null;
+        entry.value = null;
+        entry.next = cn1FreeList;
+        cn1FreeList = entry;
     }
 
     final Entry<K, V> removeEntry(Object key) {
