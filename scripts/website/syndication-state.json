@@ -569,6 +569,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-26T15:06:06+00:00"
       }
+    },
+    "java-to-a-native-linux-app": {
+      "devto": {
+        "id": 4006227,
+        "url": "https://dev.to/codenameone/java-to-native-linux-app-one-5mb-binary-x64-and-arm-3cio",
+        "syndicated_at": "2026-06-27T13:32:14+00:00"
+      }
     }
   }
 }
