@@ -2,7 +2,7 @@
 
 Commerce is an optional service that validates your in-app purchases and subscriptions server-side and gives your app a single, store-agnostic question to ask: _does this user have this entitlement right now?_ It wraps the existing Purchase API (see the _Monetization_ chapter) -- purchases still go through the platform store -- and adds cloud receipt validation, a normalized subscription state machine across Apple and Google, lifecycle webhooks to your backend, and a revenue console.
 
-Unlike Crash Protection and Analytics, Commerce is available on *every* tier, including the free tier. What differs per tier is the monthly *validated transaction volume*, not the feature itself (see _Tiers and the meter_ below). Codename One does not process payments and never touches your money -- the stores (and, for physical goods, your own payment processor) do. Commerce is infrastructure that sits beside the money flow, exactly like the third-party services it replaces.
+Unlike Crash Protection and Analytics, Commerce is available on *every* tier, including the free tier. What differs per tier is the monthly *validated transaction volume*, not the feature itself (see _Tiers and the meter_ below). Codename One doesn't process payments and never touches your money -- the stores (and, for physical goods, your own payment processor) do. Commerce is infrastructure that sits beside the money flow, exactly like the third-party services it replaces.
 
 === Entitlements, not SKUs
 
@@ -15,7 +15,7 @@ if (CommerceManager.getInstance().isEntitled("pro")) {
 }
 ----
 
-An entitlement is active when *any* of its granting products is active. This matters: a promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single authoritative rule -- the latest expiry over the active grants, evaluated against a server timestamp -- so a tampered device clock cannot extend it. Everything else (will-renew, billing stage, period type, family-shared) is advisory and never silently removes access.
+An entitlement is active when *any* of its granting products is active. This matters: a promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single authoritative rule -- the latest expiry over the active grants, evaluated against a server timestamp -- so a tampered device clock can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access on its own.
 
 === Client usage
 
@@ -50,7 +50,7 @@ new Thread(() -> {
 
 === How the app finds the service
 
-Commerce reuses the standard `build_key` that every Codename One cloud build already carries, the same token the analytics provider sends -- so there is *nothing to wire into the build*. `CommerceManager.isCloudEnabled()` is true on any cloud build and false in the simulator or a local build (where every call safely defers to `Purchase`). To turn the cloud path off in a cloud build, set:
+Commerce reuses the standard `build_key` that every Codename One cloud build already carries, the same token the analytics provider sends -- so there is *nothing to wire into the build*. `CommerceManager.isCloudEnabled()` is true on any cloud build and false in the simulator or a local build (where every call defers to `Purchase`). To turn the cloud path off in a cloud build, set:
 
 [source]
 ----
@@ -75,7 +75,7 @@ By default the service validates the store-signed receipt the device presents --
 - *Apple* -- an App Store Connect API key, as three secrets: `commerce.apple.keyId`, `commerce.apple.issuerId`, and `commerce.apple.privateKey` (the contents of the `.p8` file).
 - *Google* -- a service account with Android Publisher access, as `commerce.google.serviceAccountJson` (the full JSON key).
 
-Secrets are stored AES-256-GCM encrypted in the BuildCloud vault; they are decrypted only server-side at call time and are never shown in the console again. Once set:
+Secrets are stored AES-256-GCM encrypted in the BuildCloud vault; they're decrypted only server-side at call time and are never shown in the console again. Once set:
 
 - entitlements are confirmed against Apple's `Get All Subscription Statuses` and Google's `subscriptionsv2.get`, so a grant is server-verified rather than device-trusted, and
 - subscription *renewals* signalled by store notifications are metered at their real amount (the renewal price lives only in the store's server response).
@@ -95,7 +95,7 @@ Delivery is at-least-once, in sequence order per customer, with exponential back
 
 === Tiers and the meter
 
-Commerce meters *validated transaction volume* per calendar month. Amounts in any currency are normalized to US dollars using exchange rates refreshed once a day, so a sale in EUR or JPY counts the same as one in USD. Up to the cap, transactions are validated server-side, entitlements are authoritative, webhooks fire, and revenue shows in the console. The cap is a soft limit:
+Commerce meters *validated transaction volume* per calendar month. Amounts in any currency are normalized to USD using exchange rates refreshed once a day, so a sale in EUR or JPY counts the same as one in USD. Up to the cap, transactions are validated server-side, entitlements are authoritative, webhooks fire, and revenue shows in the console. The cap is a soft limit:
 
 [options="header",cols="1,1"]
 |===
@@ -106,7 +106,7 @@ Commerce meters *validated transaction volume* per calendar month. Amounts in an
 | Enterprise  | unlimited
 |===
 
-When an account crosses its cap, the service *degrades, it does not block*: it stops server-validating and stops metering for the rest of the month, the device SDK falls back to store-direct (the store-signed receipt grants the entitlement locally), and `CommerceManager.isDegraded()` becomes `true`. A real purchase is never rejected -- that would cost you revenue. The console shows usage against the cap with an upgrade prompt.
+When an account crosses its cap, the service *degrades, it doesn't block*: it stops server-validating and stops metering for the rest of the month, the device SDK falls back to store-direct (the store-signed receipt grants the entitlement locally), and `CommerceManager.isDegraded()` becomes `true`. A real purchase is never rejected -- that would cost you revenue. The console shows usage against the cap with an upgrade prompt.
 
 === The console
 
@@ -133,7 +133,7 @@ Every chart pairs a graph with its underlying data table (one tab-flip away) for
 
 === Privacy
 
-Commerce stores entitlement state and transaction metadata (store, product id, event type, amount, validation state) keyed by your app-user id. It never stores card numbers or payment credentials -- those stay with Apple, Google, or your processor. Family-shared purchases grant access but are excluded from revenue. The minimum lookup state needed to resolve the next notification is kept; grants are retained as the durable record, while the high-churn ledger and delivered webhook rows are purged on a rolling window.
+Commerce stores entitlement state and transaction metadata (store, product id, event type, amount, validation state) keyed by your app-user id. It never stores card numbers or payment credentials -- those stay with Apple, Google, or your processor. Family shared purchases grant access but are excluded from revenue. The minimum lookup state needed to resolve the next notification is kept; grants are retained as the durable record, while the high-churn ledger and delivered webhook rows are purged on a rolling window.
 
 === Setup checklist
 
