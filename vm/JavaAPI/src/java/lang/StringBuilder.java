@@ -40,7 +40,19 @@ public final class StringBuilder implements CharSequence, Appendable {
 
     private int count;
 
-    //private boolean shared;
+    // toString() shares the char[] with the returned String (no copy); set when shared.
+    // append() is safe to share (it only writes beyond the String's view or reallocates
+    // via enlargeBuffer); only the editing mutators copy-on-write via cn1Unshare().
+    private boolean shared;
+
+    private void cn1Unshare() {
+        if (shared) {
+            char[] nv = new char[value.length];
+            System.arraycopy(value, 0, nv, 0, count);
+            value = nv;
+            shared = false;
+        }
+    }
 
     /**
      * Constructs a string builder with no characters in it and an initial capacity of 16 characters.
@@ -99,7 +111,7 @@ public final class StringBuilder implements CharSequence, Appendable {
         char[] newData = new char[min > newCount ? min : newCount];
         System.arraycopy(value, 0, newData, 0, count);
         value = newData;
-        //shared = false;
+        shared = false; // we reallocated; the old (possibly shared) buffer stays with the String
     }
 
     final void appendNull() {
@@ -260,7 +272,7 @@ public final class StringBuilder implements CharSequence, Appendable {
         if (end > start) {
             int length = count - end;
             if (length >= 0) {
-                //if (!shared) {
+                cn1Unshare();
                     System.arraycopy(value, end, value, start, length);
                 /*} else {
                     char[] newData = new char[value.length];
@@ -282,7 +294,7 @@ public final class StringBuilder implements CharSequence, Appendable {
     public java.lang.StringBuilder deleteCharAt(int index){
         int length = count - index - 1;
         if (length > 0) {
-            //if (!shared) {
+            cn1Unshare();
                 System.arraycopy(value, index + 1, value, index, length);
             /*} else {
                 char[] newData = new char[value.length];
@@ -338,6 +350,7 @@ public final class StringBuilder implements CharSequence, Appendable {
     }
     
     private void move(int size, int index) {
+        cn1Unshare();
         int newCount;
         if (value.length - count >= size) {
             //if (!shared) {
@@ -449,6 +462,7 @@ public final class StringBuilder implements CharSequence, Appendable {
         if (count < 2) {
             return this;
         }
+        cn1Unshare();
         //if (!shared) {
             int end = count - 1;
             char frontHigh = value[0];
@@ -528,6 +542,7 @@ public final class StringBuilder implements CharSequence, Appendable {
      * The offset argument must be greater than or equal to 0, and less than the length of this string builder.
      */
     public void setCharAt(int index, char ch){
+        cn1Unshare();
         value[index] = ch;
     }
 
@@ -544,6 +559,7 @@ public final class StringBuilder implements CharSequence, Appendable {
         if (newLength > value.length) {
             enlargeBuffer(newLength);
         } else {
+            cn1Unshare(); // truncate-then-append could otherwise overwrite a shared String's view
             //if (shared) {
 //                char[] newData = new char[value.length];
 //                System.arraycopy(value, 0, newData, 0, count);
@@ -563,6 +579,15 @@ public final class StringBuilder implements CharSequence, Appendable {
      * Implementation advice: This method can be coded so as to create a new String object without allocating new memory to hold a copy of the character sequence. Instead, the string can share the memory used by the string builder. Any subsequent operation that alters the content or capacity of the string builder must then make a copy of the internal builder at that time. This strategy is effective for reducing the amount of memory allocated by a string concatenation operation when it is implemented using a string builder.
      */
     public java.lang.String toString(){
+        if (count == 0) {
+            return "";
+        }
+        // Share the buffer with the String (no copy); the editing mutators copy-on-write.
+        shared = true;
+        return new String(0, count, value);
+    }
+
+    private java.lang.String toStringOld(){
         if (count == 0) {
             return "";
         }
