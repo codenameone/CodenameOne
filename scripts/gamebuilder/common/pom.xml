@@ -8,6 +8,10 @@
     </parent>
     <artifactId>cn1-gamebuilder-common</artifactId>
     <packaging>jar</packaging>
+    <!-- name + description are required by Maven Central and are not inherited
+         from the parent, so each module declares its own. -->
+    <name>cn1-gamebuilder-common</name>
+    <description>Shared editor/model code for the Codename One Game Builder.</description>
 
     <dependencies>
         <dependency>

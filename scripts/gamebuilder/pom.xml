@@ -15,6 +15,32 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+    <!-- developers + scm are required by Maven Central's POM validation and are
+         inherited by the common + javase modules. Mirrors maven/pom.xml. -->
+    <developers>
+        <developer>
+            <id>shai</id>
+            <name>Shai Almog</name>
+            <email>shai.almog@codenameone.com</email>
+            <timezone>+4</timezone>
+        </developer>
+        <developer>
+            <id>chen</id>
+            <name>Chen Fishbein</name>
+            <email>chen.fishbein@codenameone.com</email>
+            <timezone>+4</timezone>
+        </developer>
+        <developer>
+            <id>shannah</id>
+            <name>Steve Hannah</name>
+            <email>steve.hannah@codenameone.com</email>
+            <timezone>-8</timezone>
+        </developer>
+    </developers>
+    <scm>
+        <url>https://github.com/codenameone/CodenameOne</url>
+        <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
+    </scm>
 
     <modules>
         <module>common</module>

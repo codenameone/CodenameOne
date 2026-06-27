@@ -122,7 +122,14 @@ jobs:
           # JUnit test deps are irrelevant to the published jar). -Pgamebuilder-
           # central adds the sources/javadoc jars, GPG signatures and the
           # central-publishing bundle; -Pexecutable-jar builds the fat jar.
+          # -Dcodename1.platform=javase is REQUIRED: it activates the parent's
+          # `javase` profile (which contributes the editor module) by property.
+          # That profile is activeByDefault, but any explicit -P activation
+          # suppresses activeByDefault, so without this property the editor
+          # (codenameone-gamebuilder) silently drops out of the reactor and only
+          # the parent + common modules would be published.
           xvfb-run -a mvn -Pexecutable-jar -Pgamebuilder-central deploy \
+            -Dcodename1.platform=javase \
             -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
             -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
             -Dmaven.test.skip=true
