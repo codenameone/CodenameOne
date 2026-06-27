@@ -208,6 +208,12 @@ private static final String GROUP_ID="com.codenameone";
             java.addSysproperty(v);
             
         }
+        if (System.getProperty("ffmpeg.dir") != null) {
+            Variable v = new Variable();
+            v.setKey("ffmpeg.dir");
+            v.setValue(System.getProperty("ffmpeg.dir"));
+            java.addSysproperty(v);
+        }
         copyKotlinIncrementalCompileOutputToOutputDir();
         for (Artifact artifact : project.getArtifacts()) {
             
