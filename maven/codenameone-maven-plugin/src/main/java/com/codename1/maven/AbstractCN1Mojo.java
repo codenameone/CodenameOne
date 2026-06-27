@@ -1035,48 +1035,18 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return null;
     }
 
-    private File findExecutableOnPath(String name) {
-        String path = System.getenv("PATH");
-        if (path == null || path.isEmpty()) {
-            return null;
-        }
-        String executable = isWindows ? name + ".exe" : name;
-        for (String dir : path.split(File.pathSeparator)) {
-            File candidate = new File(dir, executable);
-            if (candidate.exists() && candidate.canExecute()) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
     protected void setupFFmpeg() {
+        // The simulator resolves ffmpeg/ffprobe from the bundled
+        // org.bytedeco:ffmpeg-platform binaries at runtime (see FFMPEGMedia), so
+        // we no longer stage an externally installed ffmpeg here. Staging a copy
+        // of a PATH executable is fragile -- e.g. on Windows it picks up a
+        // chocolatey shimgen shim that does not work once copied out of place,
+        // which silently produced zero decoded frames. We only honor an explicit
+        // ffmpeg.dir override when one is already configured.
         if (isFFmpegSetup()) {
             project.getProperties().setProperty("ffmpeg.dir", getFFmpegDir().getAbsolutePath());
             System.setProperty("ffmpeg.dir", getFFmpegDir().getAbsolutePath());
-            return;
         }
-
-        File ffmpeg = findExecutableOnPath("ffmpeg");
-        File ffprobe = findExecutableOnPath("ffprobe");
-        if (ffmpeg == null || ffprobe == null) {
-            getLog().warn("FFmpeg executables not found on PATH. FFmpeg media backend will be unavailable");
-            return;
-        }
-
-        File stagingDir = new File(project.getBuild().getDirectory(), "cn1-ffmpeg");
-        stagingDir.mkdirs();
-        try {
-            FileUtils.copyFile(ffmpeg, new File(stagingDir, ffmpeg.getName()));
-            FileUtils.copyFile(ffprobe, new File(stagingDir, ffprobe.getName()));
-        } catch (IOException ex) {
-            getLog().warn("Failed to stage ffmpeg binaries", ex);
-            return;
-        }
-        new File(stagingDir, ffmpeg.getName()).setExecutable(true, false);
-        new File(stagingDir, ffprobe.getName()).setExecutable(true, false);
-        project.getProperties().setProperty("ffmpeg.dir", stagingDir.getAbsolutePath());
-        System.setProperty("ffmpeg.dir", stagingDir.getAbsolutePath());
     }
 
     protected void setupCef() {
