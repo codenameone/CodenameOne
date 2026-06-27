@@ -113,7 +113,7 @@ public class CommerceManager {
     public String getAppUserId() {
         if (appUserId == null) {
             appUserId = "anon-" + Long.toString(System.currentTimeMillis(), 36)
-                    + "-" + Integer.toString(Math.abs(hashCode()), 36);
+                    + "-" + Integer.toString(hashCode() & 0x7fffffff, 36);
             Preferences.set(PREF_APP_USER_ID, appUserId);
         }
         return appUserId;
@@ -159,10 +159,11 @@ public class CommerceManager {
     /// Snapshot of the entitlement ids currently considered active.
     public List getActiveEntitlements() {
         List out = new ArrayList();
-        for (Object key : entitlementCache.keySet()) {
-            Object v = entitlementCache.get(key);
+        for (Object o : entitlementCache.entrySet()) {
+            Map.Entry e = (Map.Entry) o;
+            Object v = e.getValue();
             if (v instanceof Boolean && ((Boolean) v).booleanValue()) {
-                out.add(key);
+                out.add(e.getKey());
             }
         }
         return out;
@@ -237,13 +238,14 @@ public class CommerceManager {
             return;
         }
         Map ents = (Map) entitlements;
-        for (Object key : ents.keySet()) {
-            Object view = ents.get(key);
+        for (Object o : ents.entrySet()) {
+            Map.Entry e = (Map.Entry) o;
+            Object view = e.getValue();
             boolean active = false;
             if (view instanceof Map) {
                 active = asBoolean(((Map) view).get("active"));
             }
-            entitlementCache.put(String.valueOf(key), active ? Boolean.TRUE : Boolean.FALSE);
+            entitlementCache.put(String.valueOf(e.getKey()), active ? Boolean.TRUE : Boolean.FALSE);
         }
     }
 
