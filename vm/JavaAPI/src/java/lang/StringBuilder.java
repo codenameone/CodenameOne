@@ -190,17 +190,15 @@ public final class StringBuilder implements CharSequence, Appendable {
      * Appends the string representation of the int argument to this string builder.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string builder.
      */
-    public java.lang.StringBuilder append(int i){
-        return append(Integer.toString(i)); 
-    }
+    // Native: write the decimal digits straight into the buffer instead of allocating a
+    // temporary String via Integer.toString. Same result, no per-append allocation.
+    public native java.lang.StringBuilder append(int i);
 
     /**
      * Appends the string representation of the long argument to this string builder.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string builder.
      */
-    public java.lang.StringBuilder append(long l){
-        return append(Long.toString(l)); 
-    }
+    public native java.lang.StringBuilder append(long l);
 
     /**
      * Appends the string representation of the Object argument to this string builder.

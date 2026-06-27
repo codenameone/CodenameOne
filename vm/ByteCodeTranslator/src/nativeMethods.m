@@ -2371,6 +2371,53 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_Object_R_java_lang_String
     return java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, __cn1ThisObject, virtual_java_lang_Object_toString___R_java_lang_String(threadStateData, obj));
 }
 
+// Native append(int)/append(long): write decimal digits straight into the StringBuilder
+// buffer, no temporary String. Digits are generated in negative space so INT/LONG_MIN
+// work without overflow.
+JAVA_OBJECT java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT i) {
+    enteringNativeAllocations();
+    char tmp[12]; int tlen = 0;
+    JAVA_BOOLEAN neg = (i < 0);
+    JAVA_INT q = i; if(q > 0) q = -q;
+    do { tmp[tlen++] = (char)('0' - (q % 10)); q /= 10; } while(q != 0);
+    JAVA_INT needed = tlen + (neg ? 1 : 0);
+    JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_OBJECT value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    if(count + needed > ((JAVA_ARRAY)value)->length) {
+        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, count + needed);
+        value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    }
+    JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)value)->data;
+    JAVA_INT pos = count;
+    if(neg) { d[pos++] = '-'; }
+    for(int k = tlen - 1; k >= 0; k--) { d[pos++] = tmp[k]; }
+    set_field_java_lang_StringBuilder_count(count + needed, __cn1ThisObject);
+    finishedNativeAllocations();
+    return __cn1ThisObject;
+}
+
+JAVA_OBJECT java_lang_StringBuilder_append___long_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG l) {
+    enteringNativeAllocations();
+    char tmp[21]; int tlen = 0;
+    JAVA_BOOLEAN neg = (l < 0);
+    JAVA_LONG q = l; if(q > 0) q = -q;
+    do { tmp[tlen++] = (char)('0' - (q % 10)); q /= 10; } while(q != 0);
+    JAVA_INT needed = tlen + (neg ? 1 : 0);
+    JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_OBJECT value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    if(count + needed > ((JAVA_ARRAY)value)->length) {
+        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, count + needed);
+        value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    }
+    JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)value)->data;
+    JAVA_INT pos = count;
+    if(neg) { d[pos++] = '-'; }
+    for(int k = tlen - 1; k >= 0; k--) { d[pos++] = tmp[k]; }
+    set_field_java_lang_StringBuilder_count(count + needed, __cn1ThisObject);
+    finishedNativeAllocations();
+    return __cn1ThisObject;
+}
+
 JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_CHAR __cn1Arg1) {
     enteringNativeAllocations();
     JAVA_INT len = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
