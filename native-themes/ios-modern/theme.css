@@ -419,7 +419,7 @@ SpinnerRendererFocus {
 SpinnerOverlay { background-color: transparent; padding: 0; margin: 0; }
 
 Toolbar {
-    background-color: #ffffff;
+    background-color: rgba(255,255,255,0.62);
     color: #000000;
     padding: 0;
     margin: 0;
@@ -816,8 +816,8 @@ PopupContent {
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
 
-    Toolbar { background-color: #000000; color: #ffffff; backdrop-filter: blur(64px); }
-    TitleArea { background-color: #000000; color: #ffffff; backdrop-filter: blur(64px); }
+    Toolbar { background-color: rgba(28,28,30,0.55); color: #ffffff; backdrop-filter: blur(64px); }
+    TitleArea { background-color: rgba(28,28,30,0.55); color: #ffffff; backdrop-filter: blur(64px); }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
     BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.72); cn1-background-type: cn1-round-border; }
