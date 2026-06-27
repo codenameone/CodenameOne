@@ -202,8 +202,14 @@ public class Initializr extends Lifecycle {
     private ProjectOptions currentOptions(boolean[] includeLocalizationBundles,
                                           ProjectOptions.PreviewLanguage[] previewLanguage,
                                           ProjectOptions.JavaVersion[] javaVersion) {
-        ProjectOptions.ThemeMode mode = darkMode ? ProjectOptions.ThemeMode.DARK : ProjectOptions.ThemeMode.LIGHT;
-        return new ProjectOptions(mode, ProjectOptions.Accent.DEFAULT, true,
+        // The initializr UI no longer exposes a theme picker, so every generated
+        // project ships the barebones default theme. That theme.css already adapts
+        // to the device's light/dark setting at runtime via an
+        // @media (prefers-color-scheme: dark) block, so we must NOT bake the
+        // website's current dark/light state into the download -- doing so used to
+        // emit hard-coded dark colors at top-level scope that then broke light mode
+        // for anyone who opened the project.
+        return new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT, true,
                 includeLocalizationBundles[0], previewLanguage[0], javaVersion[0], "");
     }
 

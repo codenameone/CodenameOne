@@ -53,17 +53,40 @@ SideCommand {
     border-bottom: 2px solid #cccccc;
 }
 
-/* Dark mode example - uncomment to override styles when the
- * device is in dark mode:
- *
- * @media (prefers-color-scheme: dark) {
- *     SideNavigationPanel {
- *         background: #0f172a;
- *     }
- *     SideCommand {
- *         color: #e2e8f0;
- *         background: #0f172a;
- *         border-bottom: 2px solid #334155;
- *     }
- * }
- */
+/* Dark mode: the default theme adapts automatically when the device
+ * (or simulator) is switched to dark mode. Tweak the colors below or
+ * delete this block entirely if you only want a light theme. */
+@media (prefers-color-scheme: dark) {
+    Form {
+        background-color: #0f172a;
+        color: #e2e8f0;
+    }
+    Toolbar {
+        background-color: #0f172a;
+        border: none;
+    }
+    Title, TitleCommand, Command, OverflowCommand {
+        color: #e2e8f0;
+    }
+    Button {
+        color: #e2e8f0;
+        background-color: #1f2937;
+        border: 1px solid #475569;
+    }
+    Button.pressed {
+        color: #e2e8f0;
+        background-color: #334155;
+        border: 1px solid #64748b;
+    }
+    DialogBody, DialogTitle {
+        color: #e2e8f0;
+    }
+    SideNavigationPanel {
+        background: #0f172a;
+    }
+    SideCommand {
+        color: #e2e8f0;
+        background: #0f172a;
+        border-bottom: 2px solid #334155;
+    }
+}
