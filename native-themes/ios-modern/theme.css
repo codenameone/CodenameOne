@@ -566,12 +566,29 @@ Tab {
     font-size: 1.8mm;
     text-align: center;
 }
-/* iOS 26 bottom tab bar: the WHOLE bar is one glass pill; the selected item is
-   only TINTED blue -- there is no per-item highlight sub-pill. */
-Tab.selected { color: var(--accent-color, #007aff); background-color: transparent; }
-Tab.pressed { color: var(--accent-color, #007aff); background-color: transparent; }
+/* iOS 26 bottom tab bar: the selected item sits on its OWN brighter frosted
+   sub-capsule (a lighter glass pill INSIDE the outer bar) and turns blue -- a
+   layered "glass on glass" highlight, like the native UITabBar. */
+Tab.selected {
+    color: var(--accent-color, #007aff);
+    background-color: rgba(255,255,255,0.5);
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm 0.8mm 0.8mm 0.8mm;
+}
+Tab.pressed {
+    color: var(--accent-color, #007aff);
+    background-color: rgba(255,255,255,0.35);
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm 0.8mm 0.8mm 0.8mm;
+}
 
-SelectedTab { cn1-derive: Tab; color: var(--accent-color, #007aff); }
+SelectedTab {
+    cn1-derive: Tab;
+    color: var(--accent-color, #007aff);
+    background-color: rgba(255,255,255,0.5);
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm 0.8mm 0.8mm 0.8mm;
+}
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
 
 /* TabIcon: separate UIID applied via tabIconUIID so the icon's glyph
@@ -857,11 +874,11 @@ PopupContent {
        native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint). */
     TabsContainer { background-color: rgba(38,38,42,0.70); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(24px); }
     Tab { color: #ebebf5; background-color: transparent; }
-    /* Dark bottom tab bar: like light, the selected item is only tinted blue --
-       no per-item sub-pill (the whole bar is the single glass pill). */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
-    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(120,120,128,0.4); cn1-background-type: cn1-pill-border; }
-    SelectedTab { color: var(--accent-color-dark, #0a84ff); }
+    /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
+       over the dark pill (layered glass), matching the native UITabBar. */
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.16); cn1-background-type: cn1-pill-border; margin: 0.8mm 0.8mm 0.8mm 0.8mm; }
+    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.1); cn1-background-type: cn1-pill-border; margin: 0.8mm 0.8mm 0.8mm 0.8mm; }
+    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.16); cn1-background-type: cn1-pill-border; margin: 0.8mm 0.8mm 0.8mm 0.8mm; }
     UnselectedTab { color: #ebebf5; }
 
     /* Dark overrides for the icon-only UIID. Background stays transparent
