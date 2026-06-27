@@ -3,7 +3,6 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -40,6 +39,7 @@ def run(cmd, cwd=None, env=None, log_name=None, timeout=None):
     rc = subprocess.call(cmd, cwd=str(cwd), env=env)
     if rc != 0:
         raise RuntimeError(f"Command failed with exit code {rc}: {' '.join(str(c) for c in cmd)}")
+    return None
 
 
 def tail_text(path: Path, max_lines: int = 60) -> str:
