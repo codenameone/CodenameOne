@@ -98,6 +98,12 @@ jobs:
       # core/javase/plugin published above, so it is built and deployed in a
       # second pass here. These steps run only when the core release succeeded;
       # update-version.sh already synced the gamebuilder poms to GITHUB_REF_NAME.
+      # Deliberately does NOT import the GPG key: it was already imported by the
+      # Java 8 "Set up Maven Central Repository" step above and persists in the
+      # runner keyring (gpg signing in the editor deploy below uses it fine). If
+      # both setup-java steps import the key, both of their cleanup post-steps
+      # try to delete it; the second deletion fails ("gpg ... exit code 2") and
+      # marks the whole release red even though every artifact published.
       - name: Set up JDK 17 for the Game Builder editor
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
         uses: actions/setup-java@v5
@@ -107,8 +113,6 @@ jobs:
           server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
-          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
-          gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Deploy Game Builder editor to Maven Central
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
