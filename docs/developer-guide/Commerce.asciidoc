@@ -77,8 +77,8 @@ By default the service validates the store-signed receipt the device presents --
 
 Secrets are stored AES-256-GCM encrypted in the BuildCloud vault; they're decrypted only server-side at call time and are never shown in the console again. Once set:
 
-- entitlements are confirmed against Apple's `Get All Subscription Statuses` and Google's `subscriptionsv2.get`, so a grant is server-verified rather than device-trusted, and
-- subscription *renewals* signalled by store notifications are metered at their real amount (the renewal price lives only in the store's server response).
+- Entitlements are confirmed against Apple's `Get All Subscription Statuses` and Google's `subscriptionsv2.get`, so a grant is server-verified rather than device-trusted, and
+- Subscription *renewals* signalled by store notifications are metered at their real amount (the renewal price lives only in the store's server response).
 
 Without credentials the service stays in device-trusted mode -- everything still works, you just don't get the server cross-check or renewal metering.
 
@@ -86,12 +86,12 @@ Without credentials the service stays in device-trusted mode -- everything still
 
 Commerce can forward every normalized state change to your own backend. Configure a URL and a signing secret on the *Commerce* page of the console. Each event is HMAC-SHA256 signed (header `CN1-Commerce-Signature`) and carries:
 
-- a *per-customer monotonic `sequence`* -- so your consumer can reject stale events and never has to reorder defensively,
-- the grant's *`state_version`* -- reconcile against this,
-- an always-present *`effective_expiration_at`*, and
-- the event `id` for idempotent dedup.
+- A *per-customer monotonic `sequence`* -- so your consumer can reject stale events and never has to reorder defensively,
+- The grant's *`state_version`* -- reconcile against this,
+- An always-present *`effective_expiration_at`*, and
+- The event `id` for idempotent dedup.
 
-Delivery is at-least-once, in sequence order per customer, with exponential backoff. Event types mirror the familiar set: `INITIAL_PURCHASE`, `RENEWAL`, `CANCELLATION`, `UNCANCELLATION`, `EXPIRATION`, `BILLING_ISSUE`, `PRODUCT_CHANGE`, `SUBSCRIPTION_PAUSED`, `REFUND_REVERSED`, `TRANSFER`.
+Delivery is at-least-once, in sequence order per customer, with retries that back off exponentially. Event types mirror the familiar set: `INITIAL_PURCHASE`, `RENEWAL`, `CANCELLATION`, `UNCANCELLATION`, `EXPIRATION`, `BILLING_ISSUE`, `PRODUCT_CHANGE`, `SUBSCRIPTION_PAUSED`, `REFUND_REVERSED`, `TRANSFER`.
 
 === Tiers and the meter
 
