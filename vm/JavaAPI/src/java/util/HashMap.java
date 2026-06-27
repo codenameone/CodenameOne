@@ -520,9 +520,10 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      *         {@code null} if there was no such mapping.
      */
     @Override
-    public V put(K key, V value) {
-        return putImpl(key, value);
-    }
+    // Native: collapses put/putImpl/computeHashCode into one C call (closed-world hot
+    // path), reusing the native chain walk and the Java createHashedEntry/rehash slow
+    // path. Semantically identical to putImpl below.
+    public native V put(K key, V value);
 
     V putImpl(K key, V value) {
         Entry<K,V> entry;

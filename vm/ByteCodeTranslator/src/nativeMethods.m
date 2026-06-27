@@ -1951,6 +1951,42 @@ JAVA_OBJECT java_util_HashMap_get___java_lang_Object_R_java_lang_Object(CODENAME
     return JAVA_NULL;
 }
 
+// Closed-world native HashMap.put: collapses put/putImpl/computeHashCode into one C
+// call. Find (native chain walk) + value update done in C; the slow path (new key)
+// reuses the Java createHashedEntry/rehash (which barrier their own stores). The only
+// store we own here is entry.value = value, hence the explicit write barrier.
+extern JAVA_OBJECT java_util_HashMap_createHashedEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_INT);
+extern JAVA_VOID java_util_HashMap_rehash__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key, JAVA_OBJECT value) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    struct obj__java_util_HashMap_Entry* entry;
+    if(key == JAVA_NULL) {
+        entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNullKeyEntry___R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject);
+        if(entry == 0) {
+            t->java_util_HashMap_modCount++;
+            entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_createHashedEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, JAVA_NULL, 0, 0);
+            if(++t->java_util_HashMap_elementCount > t->java_util_HashMap_threshold) {
+                java_util_HashMap_rehash__(threadStateData, __cn1ThisObject);
+            }
+        }
+    } else {
+        JAVA_INT hash = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
+        JAVA_INT index = hash & (((JAVA_ARRAY)t->java_util_HashMap_elementData)->length - 1);
+        entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, key, index, hash);
+        if(entry == 0) {
+            t->java_util_HashMap_modCount++;
+            entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_createHashedEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, key, index, hash);
+            if(++t->java_util_HashMap_elementCount > t->java_util_HashMap_threshold) {
+                java_util_HashMap_rehash__(threadStateData, __cn1ThisObject);
+            }
+        }
+    }
+    JAVA_OBJECT result = entry->java_util_MapEntry_value;
+    CN1_WRITE_BARRIER((JAVA_OBJECT)entry, value);
+    entry->java_util_MapEntry_value = value;
+    return result;
+}
+
 JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
     if(__cn1Arg1 == __cn1Arg2) {
         return JAVA_TRUE;
