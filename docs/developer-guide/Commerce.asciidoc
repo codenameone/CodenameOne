@@ -81,7 +81,7 @@ Delivery is at-least-once, in sequence order per customer, with exponential back
 
 === Tiers and the meter
 
-Commerce meters *validated transaction volume* per calendar month. Up to the cap, transactions are validated server-side, entitlements are authoritative, webhooks fire, and revenue shows in the console. The cap is a soft limit:
+Commerce meters *validated transaction volume* per calendar month. Amounts in any currency are normalized to US dollars using exchange rates refreshed once a day, so a sale in EUR or JPY counts the same as one in USD. Up to the cap, transactions are validated server-side, entitlements are authoritative, webhooks fire, and revenue shows in the console. The cap is a soft limit:
 
 [options="header",cols="1,1"]
 |===
