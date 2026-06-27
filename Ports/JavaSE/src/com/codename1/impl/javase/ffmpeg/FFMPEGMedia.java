@@ -24,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,6 +91,10 @@ public final class FFMPEGMedia {
                 return candidate;
             }
         }
+        File bundled = resolveBundledExecutable(name);
+        if (bundled != null) {
+            return bundled;
+        }
         String path = System.getenv("PATH");
         if (path != null) {
             for (String entry : path.split(File.pathSeparator)) {
@@ -98,6 +103,37 @@ public final class FFMPEGMedia {
                     return candidate;
                 }
             }
+        }
+        return null;
+    }
+
+    /**
+     * Resolves an ffmpeg/ffprobe executable bundled by the
+     * {@code org.bytedeco:ffmpeg-platform} dependency, so simulator media
+     * playback works with no externally installed ffmpeg. The bytedeco binaries
+     * are full builds whose native decoders cover H.264/AAC/MP3 (those require
+     * no GPL/x264 encoder), which is what the codec-free upstream CEF can no
+     * longer decode. Reflection keeps the dependency optional: when it is absent
+     * we simply fall back to {@code ffmpeg.dir}/PATH.
+     *
+     * @param name either {@code "ffmpeg"} or {@code "ffprobe"}, which also match
+     * the bytedeco loader class simple names {@code org.bytedeco.ffmpeg.ffmpeg}
+     * and {@code org.bytedeco.ffmpeg.ffprobe}.
+     */
+    private static File resolveBundledExecutable(String name) {
+        try {
+            Class<?> execClass = Class.forName("org.bytedeco.ffmpeg." + name);
+            Class<?> loaderClass = Class.forName("org.bytedeco.javacpp.Loader");
+            Method load = loaderClass.getMethod("load", Class.class);
+            Object resolved = load.invoke(null, execClass);
+            if (resolved instanceof String) {
+                File candidate = new File((String) resolved);
+                if (candidate.exists()) {
+                    return candidate;
+                }
+            }
+        } catch (Throwable ex) {
+            // bytedeco ffmpeg not on the classpath or extraction failed; fall back
         }
         return null;
     }

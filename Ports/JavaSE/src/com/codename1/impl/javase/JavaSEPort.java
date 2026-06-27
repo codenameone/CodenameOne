@@ -12402,7 +12402,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
-        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+        if (FFMPEGMedia.isConfigured() && !"cef".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", ""))) {
             return FFMPEGMedia.createMediaAsync(this, uriAddress, isVideo, onCompletion);
         }
         throw new UnsupportedOperationException("Not implemented");
@@ -12483,7 +12483,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
-        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+        if (FFMPEGMedia.isConfigured() && !"cef".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", ""))) {
             return FFMPEGMedia.createMediaAsync(this, stream, mimeType, onCompletion);
         }
         throw new UnsupportedOperationException("Not implemented");

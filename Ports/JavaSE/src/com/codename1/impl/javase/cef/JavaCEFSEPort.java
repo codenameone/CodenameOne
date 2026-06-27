@@ -593,7 +593,7 @@ public class JavaCEFSEPort extends JavaSEPort {
 
     @Override
     public AsyncResource<Media> createMediaAsync(InputStream inputStream, String mimeType, Runnable onCompletion) {
-        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+        if (FFMPEGMedia.isConfigured() && !"cef".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", ""))) {
             return super.createMediaAsync(inputStream, mimeType, onCompletion);
         }
         final AsyncResource<Media> out = new AsyncResource<Media>();
@@ -633,7 +633,7 @@ public class JavaCEFSEPort extends JavaSEPort {
 
     @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, boolean isVideo, Runnable onCompletion) {
-        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+        if (FFMPEGMedia.isConfigured() && !"cef".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", ""))) {
             return super.createMediaAsync(uriAddress, isVideo, onCompletion);
         }
         final AsyncResource<Media> out = new AsyncResource<Media>();
