@@ -1030,7 +1030,10 @@ extern struct ThreadLocalData* getThreadLocalData();
         goto labelToJumpTo; \
     }
 
-extern void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread);
+static inline void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {
+    threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
+    threadStateData->callStackOffset--;
+}
 
 
 #define RETURN_AND_RELEASE_FROM_METHOD(returnVal, cn1SizeOfLocals) { \
@@ -1486,6 +1489,30 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
     threadStateData->callStackOffset++;
 }
 
+// Inline frame setup WITH stack-trace name recording. Methods that make calls can't use
+// the fast leaf frame (the trace must keep their frame), but they were paying a non-inline
+// initMethodStack() call per invocation -- brutal for hot recursive methods (fib: ~30M
+// calls, two extern calls each with releaseForReturn). This inlines it so the C compiler
+// folds the offset arithmetic and the call overhead disappears.
+static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {
+#ifdef CN1_INCLUDE_NPE_CHECKS
+    if(__cn1ThisObject == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
+#endif
+    if (threadStateData->callStackOffset >= CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT - 1) {
+        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        return;
+    }
+    if (threadStateData->threadObjectStackOffset + localsStackSize + stackSize >= CN1_MAX_OBJECT_STACK_DEPTH - 1024) {
+        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        return;
+    }
+    memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0, sizeof(struct elementStruct) * (localsStackSize + stackSize));
+    threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
+    threadStateData->callStackClass[threadStateData->callStackOffset] = classNameId;
+    threadStateData->callStackMethod[threadStateData->callStackOffset] = methodNameId;
+    threadStateData->callStackOffset++;
+}
+
 // we need to zero out the values with memset otherwise we will run into a problem
 // when invoking release on pre-existing object which might be garbage
 #define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
@@ -1493,7 +1520,7 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
-    initMethodStack(threadStateData, (JAVA_OBJECT)1, stackSize,localsStackSize, classNameId, methodNameId); \
+    cn1InitMethodStackInline(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
@@ -1502,7 +1529,7 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
-    initMethodStack(threadStateData, __cn1ThisObject, stackSize,localsStackSize, classNameId, methodNameId); \
+    cn1InitMethodStackInline(threadStateData, __cn1ThisObject, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 

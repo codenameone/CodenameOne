@@ -1893,10 +1893,6 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
     threadStateData->callStackOffset++;
 }
 
-void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {
-    threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
-    threadStateData->callStackOffset--;
-}
 
 void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset) {
     threadStateData->tryBlockOffset = methodBlockOffset;
