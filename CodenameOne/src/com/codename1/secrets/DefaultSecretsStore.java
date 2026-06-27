@@ -5,22 +5,21 @@ package com.codename1.secrets;
 
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
+import com.codename1.security.Cipher;
+import com.codename1.security.KeyGenerator;
+import com.codename1.security.SecretKey;
+import com.codename1.security.SecureRandom;
 import java.io.UnsupportedEncodingException;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
-import javax.crypto.Cipher;
-import javax.crypto.Mac;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
-/// The software fallback [SecretsStore]: each value is AES-256-CBC
-/// encrypted and HMAC-SHA256 authenticated (encrypt-then-MAC) before being
-/// written to `Storage`, so secrets are never stored in the clear. The
-/// master key is generated once with `SecureRandom` and kept in
-/// `Preferences`; per-value encryption and MAC subkeys are derived from
-/// it with domain separation.
+/// The software fallback [SecretsStore]: each value is encrypted with
+/// authenticated AES-256-GCM (via [com.codename1.security.Cipher], which runs
+/// on the platform's native crypto provider) before being written to
+/// `Storage`, so secrets are never stored in the clear and tampering is
+/// detected on read. The 256-bit master key is generated once with the
+/// platform CSPRNG and kept in `Preferences`; every value uses a fresh
+/// 12-byte nonce.
 ///
 /// This is secure *at rest* but software-only ([#isHardwareBacked()] is
 /// false): the master key lives in app storage, not a secure enclave. On a
@@ -32,86 +31,64 @@ final class DefaultSecretsStore implements SecretsStore {
 
     private static final String ENTRY_PREFIX = "cn1secret$";
     private static final String MASTER_KEY_PREF = "cn1$secrets$master";
-    private static final int IV_LEN = 16;
-    private static final int MAC_LEN = 32;
+    private static final int NONCE_LEN = 12;
 
-    private byte[] encKey;
-    private byte[] macKey;
+    private SecretKey key;
 
-    private synchronized void ensureKeys() {
-        if (encKey != null) {
-            return;
+    private synchronized SecretKey key() {
+        if (key != null) {
+            return key;
         }
         String mk = Preferences.get(MASTER_KEY_PREF, (String) null);
-        byte[] master;
+        byte[] raw;
         if (mk == null || mk.length() == 0) {
-            master = new byte[32];
-            new SecureRandom().nextBytes(master);
-            Preferences.set(MASTER_KEY_PREF, hex(master));
+            raw = KeyGenerator.aes(256).getEncoded();
+            Preferences.set(MASTER_KEY_PREF, hex(raw));
         } else {
-            master = unhex(mk);
+            raw = unhex(mk);
         }
-        encKey = derive("cn1-enc", master);
-        macKey = derive("cn1-mac", master);
+        key = new SecretKey("AES", raw);
+        return key;
     }
 
-    public void set(String key, String value) {
+    public void set(String secretKey, String value) {
         if (value == null) {
-            delete(key);
+            delete(secretKey);
             return;
         }
-        ensureKeys();
-        try {
-            byte[] iv = new byte[IV_LEN];
-            new SecureRandom().nextBytes(iv);
-            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(encKey, "AES"), new IvParameterSpec(iv));
-            byte[] ct = c.doFinal(utf8(value));
-            byte[] body = concat(iv, ct);
-            byte[] mac = hmac(body);
-            Storage.getInstance().writeObject(entryName(key), hex(concat(body, mac)));
-        } catch (Exception e) {
-            throw new IllegalStateException("secret encryption failed", e);
-        }
+        byte[] nonce = SecureRandom.bytes(NONCE_LEN);
+        byte[] ct = Cipher.aesEncrypt(Cipher.AES_GCM, key(), nonce, null, utf8(value));
+        Storage.getInstance().writeObject(entryName(secretKey), hex(concat(nonce, ct)));
     }
 
-    public String get(String key) {
-        ensureKeys();
-        Object raw = Storage.getInstance().readObject(entryName(key));
+    public String get(String secretKey) {
+        Object raw = Storage.getInstance().readObject(entryName(secretKey));
         if (!(raw instanceof String)) {
             return null;
         }
         try {
             byte[] all = unhex((String) raw);
-            if (all.length < IV_LEN + MAC_LEN) {
+            if (all.length <= NONCE_LEN) {
                 return null;
             }
-            int bodyLen = all.length - MAC_LEN;
-            byte[] body = new byte[bodyLen];
-            byte[] mac = new byte[MAC_LEN];
-            System.arraycopy(all, 0, body, 0, bodyLen);
-            System.arraycopy(all, bodyLen, mac, 0, MAC_LEN);
-            if (!constantTimeEquals(mac, hmac(body))) {
-                return null; // tampered or wrong key
-            }
-            byte[] iv = new byte[IV_LEN];
-            byte[] ct = new byte[bodyLen - IV_LEN];
-            System.arraycopy(body, 0, iv, 0, IV_LEN);
-            System.arraycopy(body, IV_LEN, ct, 0, ct.length);
-            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(encKey, "AES"), new IvParameterSpec(iv));
-            return new String(c.doFinal(ct), "UTF-8");
+            byte[] nonce = new byte[NONCE_LEN];
+            byte[] ct = new byte[all.length - NONCE_LEN];
+            System.arraycopy(all, 0, nonce, 0, NONCE_LEN);
+            System.arraycopy(all, NONCE_LEN, ct, 0, ct.length);
+            byte[] pt = Cipher.aesDecrypt(Cipher.AES_GCM, key(), nonce, null, ct);
+            return new String(pt, "UTF-8");
         } catch (Exception e) {
+            // tampered ciphertext (GCM tag mismatch), wrong key, or corruption
             return null;
         }
     }
 
-    public boolean contains(String key) {
-        return Storage.getInstance().exists(entryName(key));
+    public boolean contains(String secretKey) {
+        return Storage.getInstance().exists(entryName(secretKey));
     }
 
-    public void delete(String key) {
-        Storage.getInstance().deleteStorageFile(entryName(key));
+    public void delete(String secretKey) {
+        Storage.getInstance().deleteStorageFile(entryName(secretKey));
     }
 
     public List<String> keys() {
@@ -138,32 +115,16 @@ final class DefaultSecretsStore implements SecretsStore {
 
     // ---- helpers -------------------------------------------------------------
 
-    private static String entryName(String key) {
-        return ENTRY_PREFIX + hex(utf8(key));
-    }
-
-    private byte[] hmac(byte[] data) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(macKey, "HmacSHA256"));
-        return mac.doFinal(data);
-    }
-
-    private static byte[] derive(String label, byte[] master) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            md.update(utf8(label));
-            md.update(master);
-            return md.digest();
-        } catch (Exception e) {
-            throw new IllegalStateException("secret key derivation failed", e);
-        }
+    private static String entryName(String secretKey) {
+        return ENTRY_PREFIX + hex(utf8(secretKey));
     }
 
     private static byte[] utf8(String s) {
         try {
             return s.getBytes("UTF-8");
         } catch (UnsupportedEncodingException e) {
-            return s.getBytes();
+            // UTF-8 is guaranteed by the platform; never reached.
+            throw new IllegalStateException("UTF-8 unsupported", e);
         }
     }
 
@@ -172,17 +133,6 @@ final class DefaultSecretsStore implements SecretsStore {
         System.arraycopy(a, 0, out, 0, a.length);
         System.arraycopy(b, 0, out, a.length, b.length);
         return out;
-    }
-
-    private static boolean constantTimeEquals(byte[] a, byte[] b) {
-        if (a.length != b.length) {
-            return false;
-        }
-        int r = 0;
-        for (int i = 0; i < a.length; i++) {
-            r |= a[i] ^ b[i];
-        }
-        return r == 0;
     }
 
     private static final char[] HEX = "0123456789abcdef".toCharArray();

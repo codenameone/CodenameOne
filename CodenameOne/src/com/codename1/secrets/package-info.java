@@ -6,7 +6,7 @@
 /// `set`/`get`/`contains`/`delete`/`keys` API. On a device with a platform
 /// keychain wired in (iOS Keychain Services, Android Keystore) values are
 /// protected by the OS secure enclave; otherwise a software fallback
-/// AES-256-CBC encrypts and HMAC-SHA256 authenticates each value at rest.
+/// encrypts each value at rest with authenticated AES-256-GCM.
 /// The backend is pluggable through the [com.codename1.secrets.SecretsStore]
 /// SPI.
 package com.codename1.secrets;
