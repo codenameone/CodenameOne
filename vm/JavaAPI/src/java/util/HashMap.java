@@ -421,14 +421,12 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * @return the value of the mapping with the specified key, or {@code null}
      *         if no mapping for the specified key is found.
      */
+    // Native: collapses get/getEntry/computeHashCode into one C call (closed-world hot
+    // path). The inner chain walk (findNonNullKeyEntry) was already native; this removes
+    // the translated-Java wrapper frames and inlines the key's hashCode (an untag for a
+    // tagged Integer). Semantically identical to the Java getEntry path it replaces.
     @Override
-    public V get(Object key) {
-        Entry<K, V> m = getEntry(key);
-        if (m != null) {
-            return m.value;
-        }
-        return null;
-    }
+    public native V get(Object key);
 
     final Entry<K, V> getEntry(Object key) {
         Entry<K, V> m;

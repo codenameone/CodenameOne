@@ -1929,6 +1929,28 @@ JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
 }
 
 
+// Closed-world native HashMap.get: one C call instead of get -> getEntry ->
+// computeHashCode(virtual hashCode) -> findNonNullKeyEntry. The chain walk and the
+// tagged-int hashCode (an inline untag in virtual_..._hashCode) are already cheap; this
+// removes the translated-Java wrapper frames. Bit-identical to the Java getEntry path.
+extern JAVA_OBJECT java_util_HashMap_findNullKeyEntry___R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+extern JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_INT);
+JAVA_OBJECT java_util_HashMap_get___java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    struct obj__java_util_HashMap_Entry* m;
+    if(key == JAVA_NULL) {
+        m = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNullKeyEntry___R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject);
+    } else {
+        JAVA_INT hash = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
+        JAVA_INT index = hash & (((JAVA_ARRAY)t->java_util_HashMap_elementData)->length - 1);
+        m = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, key, index, hash);
+    }
+    if(m != 0) {
+        return m->java_util_MapEntry_value;
+    }
+    return JAVA_NULL;
+}
+
 JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
     if(__cn1Arg1 == __cn1Arg2) {
         return JAVA_TRUE;
