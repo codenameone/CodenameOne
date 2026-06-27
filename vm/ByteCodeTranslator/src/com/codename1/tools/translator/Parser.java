@@ -1285,9 +1285,37 @@ public class Parser extends ClassVisitor {
                 BytecodeMethod helper = new BytecodeMethod(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, helperName, desc, null, null);
                 cls.addMethod(helper);
 
+                // Pre-size the StringBuilder from the recipe literals + per-argument length
+                // estimates so the common-case concat never grows its char[] (each growth is
+                // a fresh array + arraycopy). Over-estimates are harmless; under-estimates
+                // (e.g. a long String arg) still grow correctly.
+                int cn1Cap = 0;
+                if ("makeConcatWithConstants".equals(bsm.getName())) {
+                    String rcp = bsmArgs != null && bsmArgs.length > 0 ? String.valueOf(bsmArgs[0]) : "";
+                    for (int ci = 0; ci < rcp.length(); ci++) {
+                        char rc = rcp.charAt(ci);
+                        if (rc != 0x0001 && rc != 0x0002) cn1Cap++; // skip arg/const markers
+                    }
+                    if (bsmArgs != null) {
+                        for (int ci = 1; ci < bsmArgs.length; ci++) cn1Cap += String.valueOf(bsmArgs[ci]).length();
+                    }
+                }
+                for (Type at : invokedType.getArgumentTypes()) {
+                    switch (at.getSort()) {
+                        case Type.LONG: cn1Cap += 20; break;
+                        case Type.DOUBLE: cn1Cap += 24; break;
+                        case Type.FLOAT: cn1Cap += 15; break;
+                        case Type.BOOLEAN: cn1Cap += 5; break;
+                        case Type.CHAR: cn1Cap += 1; break;
+                        case Type.OBJECT: case Type.ARRAY: cn1Cap += 16; break;
+                        default: cn1Cap += 11; break; // int/short/byte
+                    }
+                }
+                if (cn1Cap < 16) cn1Cap = 16; else if (cn1Cap > 8192) cn1Cap = 8192;
                 helper.addTypeInstruction(Opcodes.NEW, "java/lang/StringBuilder");
                 helper.addInstruction(Opcodes.DUP);
-                helper.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
+                helper.addInstruction(Opcodes.SIPUSH, cn1Cap);
+                helper.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(I)V", false);
 
                 Type[] argTypes = invokedType.getArgumentTypes();
                 int maxLocal = 0;
