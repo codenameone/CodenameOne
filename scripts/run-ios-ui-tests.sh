@@ -421,6 +421,31 @@ fallback_sim_destination() {
   fi
 }
 
+# Create a throwaway iOS simulator from the newest available iOS runtime + an
+# iPhone device type. Used after `xcodebuild -downloadPlatform iOS` installs a
+# runtime for the active Xcode but no device of that runtime exists yet, so
+# -showdestinations / `simctl list` still surface nothing buildable. Building
+# against a device of the freshly-installed runtime works where a device from a
+# *different* Xcode's runtime does not. Mirrors run-ios-native-tests.sh. Echoes
+# "platform=iOS Simulator,id=<udid>" or nothing on failure.
+create_ios_sim_destination() {
+  command -v xcrun >/dev/null 2>&1 || return
+  command -v python3 >/dev/null 2>&1 || return
+  local runtime device_type new_id
+  runtime="$(xcrun simctl list -j runtimes available 2>/dev/null | python3 -c 'import json,sys
+rs=[r for r in json.load(sys.stdin).get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]
+rs.sort(key=lambda r: r.get("version",""), reverse=True)
+print(rs[0]["identifier"] if rs else "")' 2>/dev/null || true)"
+  device_type="$(xcrun simctl list -j devicetypes 2>/dev/null | python3 -c 'import json,sys
+ts=[t["identifier"] for t in json.load(sys.stdin).get("devicetypes",[]) if "iPhone" in t.get("name","")]
+ts.sort(reverse=True)
+print(ts[0] if ts else "")' 2>/dev/null || true)"
+  [ -z "$runtime" ] && return
+  [ -z "$device_type" ] && return
+  new_id="$(xcrun simctl create "cn1-ui-tests" "$device_type" "$runtime" 2>/dev/null || true)"
+  [ -n "$new_id" ] && printf 'platform=iOS Simulator,id=%s\n' "$new_id"
+}
+
 
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
@@ -445,7 +470,11 @@ if [ -z "$SIM_DESTINATION" ]; then
     # runtime probe doesn't catch this because simctl's runtime list is global and
     # already shows the other Xcode's iOS runtime. Download the iOS platform for
     # the active Xcode and re-run discovery.
+    IOS_PLATFORM_MISSING="false"
     if grep -q "not installed" "$SHOW_DEST_LOG" || ! grep -q "platform:iOS Simulator" "$SHOW_DEST_LOG"; then
+      IOS_PLATFORM_MISSING="true"
+    fi
+    if [ "$IOS_PLATFORM_MISSING" = "true" ]; then
       if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
         ri_log "No iOS simulator platform for the active Xcode; downloading via xcodebuild -downloadPlatform iOS"
         xcodebuild -downloadPlatform iOS || true
@@ -456,15 +485,26 @@ if [ -z "$SIM_DESTINATION" ]; then
           SIM_DESTINATION="$SELECTED_DESTINATION"
           ri_log "Auto-selected simulator destination after platform download '$SIM_DESTINATION'"
         fi
+        # Installing the runtime does not create a device, and -showdestinations
+        # can keep reporting no concrete iOS destination until one exists.
+        # Create a device from the freshly-installed runtime and build against it.
+        if [ -z "$SIM_DESTINATION" ]; then
+          CREATED_DESTINATION="$(create_ios_sim_destination || true)"
+          if [ -n "${CREATED_DESTINATION:-}" ]; then
+            SIM_DESTINATION="$CREATED_DESTINATION"
+            ri_log "Created iOS simulator destination after platform download '$SIM_DESTINATION'"
+          fi
+        fi
+        # If discovery/creation produced a destination the platform is now usable.
+        [ -n "$SIM_DESTINATION" ] && IOS_PLATFORM_MISSING="false"
       else
         ri_log "Destinations report no iOS simulator platform. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
       fi
     fi
-    # Bail with a clear error only if the iOS platform is still absent after the
-    # download attempt. If it is now present but no concrete device was
+    # Bail with a clear error only when the iOS platform is genuinely absent and
+    # we obtained no destination. If the platform is present but no device was
     # auto-selected, fall through to the simctl fallback below.
-    if [ -z "$SIM_DESTINATION" ] && \
-       { grep -q "not installed" "$SHOW_DEST_LOG" || ! grep -q "platform:iOS Simulator" "$SHOW_DEST_LOG"; }; then
+    if [ "$IOS_PLATFORM_MISSING" = "true" ] && [ -z "$SIM_DESTINATION" ]; then
       ri_log "No iOS simulator platform available for the active Xcode. See $SHOW_DEST_LOG" >&2
       exit 3
     fi
