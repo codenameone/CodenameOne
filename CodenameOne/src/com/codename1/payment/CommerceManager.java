@@ -48,8 +48,8 @@ import java.util.Map;
 /// {@link Purchase}.
 public final class CommerceManager {
 
-    private static final String PROP_ENABLED = "codename1.commerce.cloud.enabled";
-    private static final String PROP_ENDPOINT = "codename1.commerce.cloud.endpoint";
+    private static final String PROP_ENABLED = "commerce.cloud.enabled";
+    private static final String PROP_ENDPOINT = "commerce.cloud.endpoint";
     private static final String DEFAULT_ENDPOINT = "https://cloud.codenameone.com/api/v2/commerce";
 
     // Standard build-stamped properties, shared with crash/analytics: every
