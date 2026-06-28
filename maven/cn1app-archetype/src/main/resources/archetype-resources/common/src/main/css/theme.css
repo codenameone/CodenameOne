@@ -53,17 +53,18 @@ SideCommand {
     border-bottom: 2px solid #cccccc;
 }
 
-/* Dark mode example - uncomment to override styles when the
- * device is in dark mode:
- *
- * @media (prefers-color-scheme: dark) {
- *     SideNavigationPanel {
- *         background: #0f172a;
- *     }
- *     SideCommand {
- *         color: #e2e8f0;
- *         background: #0f172a;
- *         border-bottom: 2px solid #334155;
- *     }
- * }
- */
+/* Dark mode: the native theme handles dark mode for standard components
+ * (Form, Toolbar, Button, ...). The side menu below is the only thing this
+ * template hard-codes to light colors, so it's the only thing we flip for
+ * dark mode -- keeping the rest of the UI native. Add your own rules here as
+ * needed, or delete this block if you only want a light theme. */
+@media (prefers-color-scheme: dark) {
+    SideNavigationPanel {
+        background: #0f172a;
+    }
+    SideCommand {
+        color: #e2e8f0;
+        background: #0f172a;
+        border-bottom: 2px solid #334155;
+    }
+}

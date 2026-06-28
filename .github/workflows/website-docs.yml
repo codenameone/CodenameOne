@@ -107,27 +107,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Set up Java 17 for Skin Designer screenshots
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up xvfb for headless simulator
+      # The Initializr/Playground/Skin Designer JavaScript bundles are built by
+      # scripts/website/build.sh through xvfb-run: the Codename One Maven
+      # plugin's CSS/theme compile instantiates JavaSEPort, which needs a
+      # display on the headless runner. (xvfb formerly also served the Skin
+      # Designer screenshot generation step, which has been removed -- the
+      # screenshots are now committed under docs/developer-guide/img/skin-designer.)
+      - name: Set up xvfb for headless JavaScript bundle builds
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb
-
-      - name: Bootstrap Codename One tooling for screenshots
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.codenameone"
-          cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-          touch "$HOME/.codenameone/guibuilder.jar"
-
-      - name: Generate Skin Designer screenshots
-        run: ./scripts/skindesigner/screenshots/take-screenshots.sh
 
       - name: Set up Java 25 for website build
         uses: actions/setup-java@v5

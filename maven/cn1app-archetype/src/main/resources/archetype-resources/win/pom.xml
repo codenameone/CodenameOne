@@ -29,7 +29,7 @@
                 <version>${cn1.plugin.version}</version>
                 <executions>
                     <execution>
-                        <id>build-android</id>
+                        <id>build-windows</id>
                         <phase>package</phase>
                         <goals>
                             <goal>build</goal>

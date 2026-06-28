@@ -118,28 +118,22 @@ def pickJavaVersionFromCurrentJvm() {
 }
 
 /**
- * Apply the Java-17-only transforms that the initializr does on its
+ * Apply the Java-version-specific transforms that the initializr does on its
  * server-rendered templates:
- *   - drop the win/ native source tree and the matching <profile id="win"> block
- *     from the root pom (the legacy Windows device cloud target is retired for
- *     Java 17 builds)
- *   - keep .claude/skills/codename-one/** (the Codename One authoring skill)
+ *   - Java 17 keeps .claude/skills/codename-one/** (the Codename One authoring skill)
+ *   - Java 8 strips .claude/ so older projects don't suddenly grow an AI-agent
+ *     skill they never opted into.
  *
- * For Java 8 projects we do the inverse: keep win/, strip .claude/ so older
- * projects don't suddenly grow an AI-agent skill they never opted into.
+ * The win/ module is the native win32 target and ships for every Java version
+ * (only the long-retired UWP module that previously lived under win/ used to be
+ * dropped for Java 17).
  *
  * Also rewrites the IntelliJ misc.xml languageLevel attribute to match the
  * resolved JDK (universal cleanup: the project-jdk-name/-type attributes
  * are already stripped in the archetype template itself).
  */
 def applyJavaVersionTransforms(rootDir, rootPom, resolvedJava) {
-    if (resolvedJava == "17") {
-        def winDir = new java.io.File(rootDir, "win")
-        if (winDir.exists()) {
-            deleteRecursively(winDir)
-        }
-        stripWindowsModuleProfile(rootPom)
-    } else {
+    if (resolvedJava != "17") {
         def claudeDir = new java.io.File(rootDir, ".claude")
         if (claudeDir.exists()) {
             deleteRecursively(claudeDir)
@@ -173,40 +167,6 @@ def setIntellijLanguageLevel(rootDir, resolvedJava) {
     }
     def rewritten = content.substring(0, valueStart) + desired + content.substring(valueEnd)
     miscXml.newWriter("UTF-8").withWriter { w -> w << rewritten }
-}
-
-/**
- * Mirror of initializr's GeneratorModel.stripWindowsModuleProfile: locate the
- * <profile> block whose <id>win</id> identifies the Windows device profile and
- * remove the whole block (and trailing newline) from the root pom. Tolerant of
- * indentation. No-op if the profile is not present.
- */
-def stripWindowsModuleProfile(pomFile) {
-    if (!pomFile.exists()) {
-        return
-    }
-    def pom = pomFile.text
-    def idIdx = pom.indexOf("<id>win</id>")
-    if (idIdx < 0) {
-        return
-    }
-    def profileStart = pom.lastIndexOf("<profile>", idIdx)
-    if (profileStart < 0) {
-        return
-    }
-    def profileEnd = pom.indexOf("</profile>", idIdx)
-    if (profileEnd < 0) {
-        return
-    }
-    profileEnd += "</profile>".length()
-    while (profileEnd < pom.length() && (pom.charAt(profileEnd) == (char) '\n' || pom.charAt(profileEnd) == (char) '\r')) {
-        profileEnd++
-    }
-    while (profileStart > 0 && (pom.charAt(profileStart - 1) == (char) ' ' || pom.charAt(profileStart - 1) == (char) '\t')) {
-        profileStart--
-    }
-    def rewritten = pom.substring(0, profileStart) + pom.substring(profileEnd)
-    pomFile.newWriter("UTF-8").withWriter { w -> w << rewritten }
 }
 
 def deleteRecursively(file) {

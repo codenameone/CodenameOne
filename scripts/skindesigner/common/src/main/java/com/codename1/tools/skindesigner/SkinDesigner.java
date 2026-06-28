@@ -10,6 +10,7 @@ import com.codename1.io.Properties;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.system.Lifecycle;
+import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -62,6 +63,8 @@ public class SkinDesigner extends Lifecycle {
     private static final int STEP_DONE = 3;
 
     private boolean websiteDarkMode;
+    private WebsiteTheme websiteTheme;
+    private boolean websiteThemeChecked;
     private Form form;
     private int step;
     private DeviceDatabase.Device device;
@@ -159,52 +162,11 @@ public class SkinDesigner extends Lifecycle {
                 Log.e(err);
             }
         }
-        // Demo / screenshot harness override. Set on the JVM command line via:
-        //   -Dcn1.skindesigner.demoStep=2
-        //   -Dcn1.skindesigner.demoDevice=apple_iphone_16_pro
-        //   -Dcn1.skindesigner.demoSource=shape
-        //   -Dcn1.skindesigner.demoSidebarTab=cutouts
-        //   -Dcn1.skindesigner.demoPreset=island
-        // Used by the screenshot harness in scripts/skindesigner/screenshots/
-        // to take repeatable per-step screenshots for the developer guide.
-        applyDemoOverrides();
         if (step >= STEP_SOURCE && device == null) {
             step = STEP_DEVICE;
         }
         if (step >= STEP_EDIT && source == null) {
             step = STEP_SOURCE;
-        }
-    }
-
-    private void applyDemoOverrides() {
-        String demoDev = CN.getProperty("cn1.skindesigner.demoDevice", null);
-        if (demoDev != null && !demoDev.isEmpty()) {
-            DeviceDatabase.Device d = DeviceDatabase.findById(demoDev);
-            if (d != null) {
-                device = d;
-                skin = new SkinModel();
-                skin.resetForDevice(d);
-            }
-        }
-        String demoSrc = CN.getProperty("cn1.skindesigner.demoSource", null);
-        if (demoSrc != null && !demoSrc.isEmpty()) {
-            source = demoSrc;
-        }
-        String demoStep = CN.getProperty("cn1.skindesigner.demoStep", null);
-        if (demoStep != null) {
-            try {
-                step = Math.max(STEP_DEVICE, Math.min(STEP_DONE, Integer.parseInt(demoStep)));
-            } catch (NumberFormatException ignored) {
-                // ignore, keep persisted value
-            }
-        }
-        String demoTab = CN.getProperty("cn1.skindesigner.demoSidebarTab", null);
-        if (demoTab != null && !demoTab.isEmpty()) {
-            activeSidebarTab = demoTab;
-        }
-        String demoPreset = CN.getProperty("cn1.skindesigner.demoPreset", null);
-        if (demoPreset != null && !demoPreset.isEmpty()) {
-            applyPreset(demoPreset);
         }
     }
 
@@ -1941,28 +1903,22 @@ public class SkinDesigner extends Lifecycle {
     // ====================================================================
 
     private boolean readThemeFromUrl() {
-        String href = CN.getProperty("browser.window.location.href", "");
-        String theme = queryParam(href, "theme");
-        if ("dark".equalsIgnoreCase(theme)) return true;
-        if ("light".equalsIgnoreCase(theme)) return false;
+        // The translated app runs in a Web Worker (no window.location /
+        // matchMedia), so the "?theme=" the website passes on the iframe URL is
+        // read through the WebsiteTheme native interface, whose JavaScript
+        // implementation runs on the main-thread front end. On every other
+        // platform isSupported() is false and we fall back to Display.isDarkMode().
+        if (!websiteThemeChecked) {
+            websiteThemeChecked = true;
+            websiteTheme = NativeLookup.create(WebsiteTheme.class);
+        }
+        if (websiteTheme != null && websiteTheme.isSupported()) {
+            String theme = websiteTheme.currentTheme();
+            if ("dark".equalsIgnoreCase(theme)) return true;
+            if ("light".equalsIgnoreCase(theme)) return false;
+        }
         Boolean platformDark = Display.getInstance().isDarkMode();
         return platformDark != null && platformDark.booleanValue();
-    }
-
-    private String queryParam(String href, String name) {
-        if (href == null || href.length() == 0) return null;
-        int q = href.indexOf('?');
-        if (q < 0 || q == href.length() - 1) return null;
-        String query = href.substring(q + 1);
-        int hash = query.indexOf('#');
-        if (hash >= 0) query = query.substring(0, hash);
-        String prefix = name + "=";
-        for (String pair : Util.split(query, "&")) {
-            if (pair.startsWith(prefix) && pair.length() > prefix.length()) {
-                return pair.substring(prefix.length());
-            }
-        }
-        return null;
     }
 
     private void applyDarkRecursive(Component c) {

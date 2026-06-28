@@ -9,4 +9,8 @@ public class WebsiteThemeNativeImpl {
         return false;
     }
     public void notifyUiReady() {}
+
+    public int chatLauncherClearance() {
+        return 0;
+    }
 }

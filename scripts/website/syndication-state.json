@@ -594,6 +594,27 @@
         "url": "https://medium.com/p/70d0604baedf/edit",
         "syndicated_at": "2026-06-27T19:03:09+00:00"
       }
+    },
+    "native-apple-watch-and-wear": {
+      "devto": {
+        "id": 4012367,
+        "url": "https://dev.to/codenameone/just-watch-13j9",
+        "syndicated_at": "2026-06-28T13:31:44+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/b737efc67ec1/edit",
+        "syndicated_at": "2026-06-28T15:01:23+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmqxx40iv00000akp98za2gxn",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a41375086a0252c2eb7d8e8",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-28T15:02:33+00:00"
+      }
     }
   }
 }
