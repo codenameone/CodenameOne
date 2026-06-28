@@ -1530,11 +1530,14 @@ public final class Graphics {
 
     /// Applies the iOS "Liquid Glass" material to the contents already painted
     /// into the rectangular region. This is a blur followed by an affine colour
-    /// transform (saturation boost + scale + offset). Used to realize the
-    /// frosted glass backdrop-filter material.
-    public boolean glassRegion(int x, int y, int width, int height, float radius, float sat, float scale, float offset) {
+    /// transform (saturation boost + scale + offset). The material is masked to a
+    /// rounded rectangle of the given corner radius (in pixels; a negative value
+    /// means a full capsule/pill) so it matches the host component's shape rather
+    /// than spilling into a square. Used to realize the frosted glass
+    /// backdrop-filter material.
+    public boolean glassRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset) {
         if (width <= 0 || height <= 0) { return true; }
-        return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, sat, scale, offset);
+        return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, cornerRadius, sat, scale, offset);
     }
 
     /// Fills a rectangle with an optionally translucent fill color

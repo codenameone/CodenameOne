@@ -44,6 +44,7 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -3034,10 +3035,28 @@ public class Component implements Animation, StyleListener, Editable {
                 int fg = getStyle().getFgColor();
                 int fgLuma = (int)(0.2126f*((fg>>16)&0xff) + 0.7152f*((fg>>8)&0xff) + 0.0722f*(fg&0xff));
                 boolean darkMat = fgLuma > 128; // dark theme uses a light fg
-                float sat = darkMat ? 2.5f : 1.95f;
-                float scale = darkMat ? 0.238f : 0.303f;
-                float offset = darkMat ? 28.4f : 174.3f;
-                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, sat, scale, offset);
+                // Material params (reverse-engineered UIVisualEffectView / UIGlassEffect
+                // defaults). Different native glass surfaces use different materials
+                // (a navbar's chrome background is far more transparent than a bare
+                // UIGlassEffect panel), so the params are overridable per-UIID via theme
+                // constants -- e.g. ToolbarGlassScaleDark -- falling back to a global
+                // glassScaleDark and finally the measured panel default.
+                String uiid = getUIID();
+                float sat = glassMaterialParam(uiid, "GlassSat", darkMat, darkMat ? 2.5f : 1.95f);
+                float scale = glassMaterialParam(uiid, "GlassScale", darkMat, darkMat ? 0.238f : 0.303f);
+                float offset = glassMaterialParam(uiid, "GlassOffset", darkMat, darkMat ? 28.4f : 174.3f);
+                // Match the glass material to the component's rounded/pill shape so it
+                // does not spill into a square. RoundBorder is a capsule (-1 sentinel);
+                // RoundRectBorder carries an explicit corner radius (mm -> px); any
+                // other border leaves the patch rectangular (0).
+                Border bd = getStyle().getBorder();
+                float cornerRadius = 0f;
+                if (bd instanceof RoundBorder) {
+                    cornerRadius = -1f;
+                } else if (bd instanceof RoundRectBorder) {
+                    cornerRadius = Display.getInstance().convertToPixels(((RoundRectBorder) bd).getCornerRadius());
+                }
+                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius, sat, scale, offset);
             } else {
                 g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
             }
@@ -3068,6 +3087,27 @@ public class Component implements Animation, StyleListener, Editable {
         if (paintIntersects && parent != null) {
             paintIntersectingComponentsAbove(g);
         }
+    }
+
+    /// Resolves a glass-material parameter (saturation/scale/offset) for the
+    /// backdrop-filter "Liquid Glass" effect. Lets a theme override the measured
+    /// panel defaults per-UIID (e.g. ToolbarGlassScaleDark for the chrome material
+    /// of a translucent nav bar) with a global fallback (glassScaleDark) and finally
+    /// the supplied default. The "Dark"/"Light" suffix selects the appearance.
+    private float glassMaterialParam(String uiid, String key, boolean dark, float def) {
+        UIManager m = getUIManager();
+        String suffix = dark ? "Dark" : "Light";
+        String v = m.getThemeConstant(uiid + key + suffix, null);
+        if (v == null) {
+            v = m.getThemeConstant("glass" + key + suffix, null);
+        }
+        if (v != null) {
+            try {
+                return Float.parseFloat(v.trim());
+            } catch (NumberFormatException ignore) {
+            }
+        }
+        return def;
     }
 
     /// Paints intersecting components that appear above this component.

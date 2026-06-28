@@ -43,6 +43,31 @@
     --accent-color-dark: #0a84ff;
     /* Opt the backdrop-filter glass layers into the reverse-engineered iOS Liquid Glass material (affine luma/sat/scale/offset transform). */
     glassMaterialBool: true;
+    /* A UINavigationBar's default "chrome" background is a far more transparent
+       glass than a bare UIGlassEffect panel -- it lets the backdrop through almost
+       unchanged rather than flooring to a frosted off-white/charcoal. Override the
+       material per-UIID for the Toolbar/TitleArea so the bar tracks the backdrop
+       (near pass-through: high scale, low offset floor, mild saturation). Quoted
+       so the CSS compiler keeps them as string constants the runtime parses to
+       float. Dark/Light selected at paint time by appearance. */
+    ToolbarGlassScaleDark: "1.02";
+    ToolbarGlassOffsetDark: "15";
+    ToolbarGlassSatDark: "1.6";
+    ToolbarGlassScaleLight: "0.72";
+    ToolbarGlassOffsetLight: "75";
+    ToolbarGlassSatLight: "1.6";
+    TitleAreaGlassScaleDark: "1.02";
+    TitleAreaGlassOffsetDark: "15";
+    TitleAreaGlassSatDark: "1.6";
+    TitleAreaGlassScaleLight: "0.72";
+    TitleAreaGlassOffsetLight: "75";
+    TitleAreaGlassSatLight: "1.6";
+    /* The light tab pill (UITabBar glass) is a brighter, whiter floor than the
+       dark one -- nudge light-only toward white; dark keeps the measured panel
+       default (already matched). */
+    TabsContainerGlassScaleLight: "0.22";
+    TabsContainerGlassOffsetLight: "200";
+    TabsContainerGlassSatLight: "1.95";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;

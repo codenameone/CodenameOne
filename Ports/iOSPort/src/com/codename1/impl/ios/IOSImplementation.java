@@ -1857,7 +1857,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float sat, float scale, float offset) {
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset) {
         if (radius <= 0f || width <= 0 || height <= 0) {
             return true;
         }
@@ -1880,14 +1880,41 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (rw <= 0 || rh <= 0) {
             return true;
         }
-        int[] rgb = new int[rw * rh];
-        getRGB(target, rgb, 0, rx, ry, rw, rh);
+        // Read a region PADDED by the blur radius on all sides (clamped to the image)
+        // so the Gaussian blur has real backdrop to sample at the panel edges. Without
+        // this the blur fades to transparency at the patch border, revealing the
+        // backdrop underneath as a dark vignette / feathered halo (very visible on the
+        // bright light material). We blur the padded buffer then crop back to the panel
+        // rect, which is equivalent to a clamp-to-extent blur.
+        int pad = (int) Math.ceil(radius);
+        int px0 = Math.max(0, rx - pad), py0 = Math.max(0, ry - pad);
+        int px1 = Math.min(target.width, rx + rw + pad), py1 = Math.min(target.height, ry + rh + pad);
+        int pw = px1 - px0, ph = py1 - py0;
+        int[] prgb = new int[pw * ph];
+        getRGB(target, prgb, 0, px0, py0, pw, ph);
         // Reverse-engineered iOS UIVisualEffectView material: an affine colour
         // transform (saturation boost + scale + offset floor) of the backdrop before
         // blurring (this is the backdrop-filter path only).
-        glassMaterialInPlace(rgb, sat, scale, offset);
+        glassMaterialInPlace(prgb, sat, scale, offset);
+        NativeImage blurredPadded = new NativeImage("backdrop-filter glass");
+        blurredPadded.peer = nativeInstance.gausianBlurImage(createImageFromARGB(prgb, pw, ph), radius);
+        blurredPadded.width = pw;
+        blurredPadded.height = ph;
+        // Crop the blurred padded buffer back to the panel rect, then mask to the host
+        // component's rounded/pill shape AFTER the blur (masking before would feather
+        // the edge -- the blur bleeds the transparent corners inward).
+        int[] pbargb = new int[pw * ph];
+        getRGB(blurredPadded, pbargb, 0, 0, 0, pw, ph);
+        int offX = rx - px0, offY = ry - py0;
+        int[] out = new int[rw * rh];
+        for (int yy = 0; yy < rh; yy++) {
+            System.arraycopy(pbargb, (yy + offY) * pw + offX, out, yy * rw, rw);
+        }
+        if (cornerRadius != 0f) {
+            applyRoundedMask(out, rw, rh, cornerRadius);
+        }
         NativeImage blurred = new NativeImage("backdrop-filter glass");
-        blurred.peer = nativeInstance.gausianBlurImage(createImageFromARGB(rgb, rw, rh), radius);
+        blurred.peer = createImageFromARGB(out, rw, rh);
         blurred.width = rw;
         blurred.height = rh;
         // drawImage applies this graphics' transform; pass coordinates relative to that
@@ -1896,6 +1923,40 @@ public class IOSImplementation extends CodenameOneImplementation {
         int ty = (int) Math.round(ng.transform.getTranslateY());
         drawImage(ng, blurred, rx - tx, ry - ty);
         return true;
+    }
+
+    /**
+     * Punches the corners of an ARGB buffer to transparency so a rectangular glass
+     * patch reads as a rounded rectangle (or, when cornerRadius is negative, a full
+     * capsule/pill of radius min(w,h)/2). A 1px anti-aliased coverage band keeps the
+     * curve smooth. Matches the shape of the host component's RoundRectBorder /
+     * RoundBorder so the glass material does not spill into a square.
+     */
+    private static void applyRoundedMask(int[] argb, int w, int h, float cornerRadius) {
+        float r = cornerRadius < 0f ? Math.min(w, h) / 2f : Math.min(cornerRadius, Math.min(w, h) / 2f);
+        if (r <= 0f) {
+            return;
+        }
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                float cx, cy;
+                if (x < r && y < r) { cx = r; cy = r; }
+                else if (x >= w - r && y < r) { cx = w - r; cy = r; }
+                else if (x < r && y >= h - r) { cx = r; cy = h - r; }
+                else if (x >= w - r && y >= h - r) { cx = w - r; cy = h - r; }
+                else { continue; }
+                float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                float cov = r - (float) Math.sqrt(dx * dx + dy * dy);
+                int idx = y * w + x;
+                if (cov <= 0f) {
+                    argb[idx] &= 0x00ffffff;
+                } else if (cov < 1f) {
+                    int p = argb[idx];
+                    int a = (int) (((p >>> 24) & 0xff) * cov);
+                    argb[idx] = (a << 24) | (p & 0xffffff);
+                }
+            }
+        }
     }
 
     /**
