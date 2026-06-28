@@ -3546,7 +3546,7 @@ public abstract class CodenameOneImplementation {
     /// In-place region "Liquid Glass" material for backdrop-filter. Default falls
     /// back to a plain blur (so non-iOS ports still blur, just without the colour
     /// transform). Ports that support the full material override this.
-    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset) {
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
         return blurRegion(graphics, x, y, width, height, radius);
     }
 

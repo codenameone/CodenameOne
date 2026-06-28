@@ -43,6 +43,24 @@
     --accent-color-dark: #0a84ff;
     /* Opt the backdrop-filter glass layers into the reverse-engineered iOS Liquid Glass material (affine luma/sat/scale/offset transform). */
     glassMaterialBool: true;
+    /* Liquid Glass OPTICS (global defaults; per-UIID override as <UIID>RefractLight
+       etc). Refract = edge lensing strength (bends the backdrop toward the edges so
+       the glass reads as a layer on top, not a flat hole); Specular = brightness of
+       the edge glint. Quoted floats. */
+    glassRefractLight: "0.4";
+    glassRefractDark: "0.4";
+    glassSpecularLight: "0.5";
+    glassSpecularDark: "0.5";
+    /* The nav bar is an edge-to-edge chrome bar, not a floating glass pill -- it has
+       no visible floating edges, so the specular rim and edge lensing don't apply. */
+    ToolbarRefractLight: "0";
+    ToolbarRefractDark: "0";
+    ToolbarSpecularLight: "0";
+    ToolbarSpecularDark: "0";
+    TitleAreaRefractLight: "0";
+    TitleAreaRefractDark: "0";
+    TitleAreaSpecularLight: "0";
+    TitleAreaSpecularDark: "0";
     /* A UINavigationBar's default "chrome" background is a far more transparent
        glass than a bare UIGlassEffect panel -- it lets the backdrop through almost
        unchanged rather than flooring to a frosted off-white/charcoal. Override the

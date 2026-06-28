@@ -3045,6 +3045,11 @@ public class Component implements Animation, StyleListener, Editable {
                 float sat = glassMaterialParam(uiid, "GlassSat", darkMat, darkMat ? 2.5f : 1.95f);
                 float scale = glassMaterialParam(uiid, "GlassScale", darkMat, darkMat ? 0.238f : 0.303f);
                 float offset = glassMaterialParam(uiid, "GlassOffset", darkMat, darkMat ? 28.4f : 174.3f);
+                // Liquid Glass optics: edge refraction (lensing -- bends the backdrop
+                // toward the edges so the glass reads as a layer ON TOP, not a flat
+                // see-through hole) and the specular edge rim (the bright glint).
+                float refract = glassMaterialParam(uiid, "Refract", darkMat, 0.4f);
+                float specular = glassMaterialParam(uiid, "Specular", darkMat, 0.5f);
                 // Match the glass material to the component's rounded/pill shape so it
                 // does not spill into a square. RoundBorder is a capsule (-1 sentinel);
                 // RoundRectBorder carries an explicit corner radius (mm -> px); any
@@ -3056,7 +3061,7 @@ public class Component implements Animation, StyleListener, Editable {
                 } else if (bd instanceof RoundRectBorder) {
                     cornerRadius = Display.getInstance().convertToPixels(((RoundRectBorder) bd).getCornerRadius());
                 }
-                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius, sat, scale, offset);
+                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius, sat, scale, offset, refract, specular);
             } else {
                 g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
             }

@@ -1535,9 +1535,9 @@ public final class Graphics {
     /// means a full capsule/pill) so it matches the host component's shape rather
     /// than spilling into a square. Used to realize the frosted glass
     /// backdrop-filter material.
-    public boolean glassRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset) {
+    public boolean glassRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
         if (width <= 0 || height <= 0) { return true; }
-        return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, cornerRadius, sat, scale, offset);
+        return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
     }
 
     /// Fills a rectangle with an optionally translucent fill color
