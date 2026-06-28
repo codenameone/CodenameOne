@@ -60,6 +60,7 @@ public final class Cn1WidgetRenderer {
                 || "FloatingActionButton".equals(id) || "Tabs".equals(id) || "Toolbar".equals(id)
                 || "Dialog".equals(id) || "Spinner".equals(id)
                 || "TabsGeom".equals(id)                       // geometry-isolation: Tabs over a flat backdrop
+                || "TabOne".equals(id)                         // minimal: one text-only tab, flat backdrop
                 || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
     }
 
@@ -187,6 +188,15 @@ public final class Cn1WidgetRenderer {
             Container panel = new Container(new BorderLayout());
             panel.setUIID("GlassPanel");
             c = panel;
+        } else if ("TabOne".equals(id)) {
+            // Minimal isolation case: a tab bar with ONE text-only tab (no icon,
+            // no second/unselected item). Strips away the SF-vs-Material icon
+            // mismatch and multi-tab spacing so only the glass pill geometry, the
+            // single centred text label and the (flat-backdrop) glass tint remain
+            // -- the smallest reproduction we can drive to ~100%.
+            Tabs tabs = new Tabs(Component.TOP);
+            tabs.addTab("Tab", new Container());
+            c = tabs;
         } else if ("Tabs".equals(id) || "TabsGeom".equals(id)) {
             // iOS UITabBar: an icon-over-label bar at the TOP, three items
             // (Featured / Search / More) mirroring the native reference's system

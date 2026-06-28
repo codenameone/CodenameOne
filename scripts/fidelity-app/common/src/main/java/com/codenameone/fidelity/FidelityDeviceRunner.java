@@ -479,7 +479,7 @@ public class FidelityDeviceRunner {
         // horizontally near the top -- not stretched to the tile width. TabsGeom is
         // the same widget over a flat backdrop (geometry-isolation), so it lays out
         // identically.
-        boolean centered = "ios".equals(platform) && ("Tabs".equals(compId) || "TabsGeom".equals(compId));
+        boolean centered = "ios".equals(platform) && ("Tabs".equals(compId) || "TabsGeom".equals(compId) || "TabOne".equals(compId));
         Container tile;
         if (centered) {
             tile = new Container(new FlowLayout(Component.CENTER, Component.TOP));

@@ -26,7 +26,7 @@ let CAPTURE_SCALE: CGFloat = PX_PER_MM / PT_PER_MM   // ~2.824
 // background. Non-glass widgets keep the plain tile so their diff stays clean.
 let GLASS_KINDS: Set<String> = [
     "ios_uibutton_system", "ios_uibutton_plain", "ios_uibutton_filled",
-    "ios_uinavbar", "ios_uitabbar",
+    "ios_uinavbar", "ios_uitabbar", "ios_uitabbar_one",
 ]
 // Genuinely full-width widgets that stretch to fill their tile on both sides
 // (the CN1 harness fills these too). Content-sized controls -- buttons, switch,
@@ -34,7 +34,7 @@ let GLASS_KINDS: Set<String> = [
 // up with the content-sized CN1 widgets.
 let FILL_KINDS: Set<String> = [
     "ios_uitextfield", "ios_uislider", "ios_uiprogress",
-    "ios_uinavbar", "ios_uitabbar", "ios_alert_view", "ios_uipickerview",
+    "ios_uinavbar", "ios_uitabbar", "ios_uitabbar_one", "ios_alert_view", "ios_uipickerview",
 ]
 let BACKDROP: UIImage? = {
     if let p = Bundle.main.path(forResource: "glass-backdrop", ofType: "png") {
@@ -104,6 +104,7 @@ let SPECS: [Spec] = [
     Spec(component: "GlassCharG",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "00ff00"),
     Spec(component: "GlassCharB",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "0000ff"),
     Spec(component: "TabsGeom",        kind: "ios_uitabbar",    states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
+    Spec(component: "TabOne",          kind: "ios_uitabbar_one", states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
 ]
 
 // Minimal data source/delegate for the reference UIPickerView (5 string rows).
@@ -230,6 +231,17 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
         bar.items = [a, b, c]; bar.selectedItem = a
         // Modern Liquid Glass bar background (default = glass material on iOS 26),
         // not the legacy opaque fill.
+        let ap = UITabBarAppearance()
+        ap.configureWithDefaultBackground()
+        bar.standardAppearance = ap
+        if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap }
+        return bar
+    case "ios_uitabbar_one":
+        // Minimal tab bar: a single text-only item (no SF symbol). Isolates the
+        // glass pill + one centred label from the icon/multi-tab confounds.
+        let bar = UITabBar(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
+        let only = UITabBarItem(title: "Tab", image: nil, tag: 0)
+        bar.items = [only]; bar.selectedItem = only
         let ap = UITabBarAppearance()
         ap.configureWithDefaultBackground()
         bar.standardAppearance = ap

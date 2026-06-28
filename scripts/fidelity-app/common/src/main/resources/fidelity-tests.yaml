@@ -186,3 +186,16 @@ components:
     tile_width_mm: 60
     tile_height_mm: 16
     states: normal
+
+  # TabOne: the MINIMAL tab bar -- one text-only tab over flat grey. No icons (no
+  # SF-vs-Material mismatch), no second item, no multi-tab spacing. Only the glass
+  # pill geometry, a single centred text label and the uniform glass tint remain,
+  # so this is the smallest case we can drive to ~100% to expose what breaks.
+  - id: TabOne
+    cn1_uiid: Tabs
+    native: ios_uitabbar_one
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 16
+    states: normal
