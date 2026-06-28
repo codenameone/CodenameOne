@@ -58,7 +58,9 @@ public final class Cn1WidgetRenderer {
                 || "TextField".equals(id) || "CheckBox".equals(id) || "RadioButton".equals(id)
                 || "Switch".equals(id) || "Slider".equals(id) || "ProgressBar".equals(id)
                 || "FloatingActionButton".equals(id) || "Tabs".equals(id) || "Toolbar".equals(id)
-                || "Dialog".equals(id) || "Spinner".equals(id);
+                || "Dialog".equals(id) || "Spinner".equals(id)
+                || "TabsGeom".equals(id)                       // geometry-isolation: Tabs over a flat backdrop
+                || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
     }
 
     /**
@@ -177,7 +179,15 @@ public final class Cn1WidgetRenderer {
             fab.getSelectedStyle().setBorder(flat);
             fab.getPressedStyle().setBorder(flat);
             c = fab;
-        } else if ("Tabs".equals(id)) {
+        } else if (id != null && id.startsWith("GlassPanel")) {
+            // Glass-blend isolation: a plain rounded glass panel (no text/items) so
+            // only the GlassPanel UIID's translucent tint + backdrop-filter:blur is
+            // compared, across four different backdrops (grey/red/gradient/photo).
+            // The container fills the tile (minus its 1mm theme/runner margin).
+            Container panel = new Container(new BorderLayout());
+            panel.setUIID("GlassPanel");
+            c = panel;
+        } else if ("Tabs".equals(id) || "TabsGeom".equals(id)) {
             // iOS UITabBar: an icon-over-label bar at the TOP, three items
             // (Featured / Search / More) mirroring the native reference's system
             // tab items; the first is selected (blue), the rest grey. NOT a

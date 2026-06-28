@@ -183,21 +183,30 @@ public class FidelityDeviceRunner {
                         // full-width but thin, vertically centred (newTile uses a
                         // LEFT/CENTRE flow). There is no Material 48dp touch-target inset
                         // on iOS, so every widget anchors at the top-left with no margin.
-                        if ("Toolbar".equals(c.getId())) {
-                            // Match the native nav bar's covered height (~7.3mm); the
-                            // bar is NORTH-anchored so the sharp backdrop fills below.
-                            comp.setPreferredH(disp.convertToPixels(7.3f));
-                        } else if ("Slider".equals(c.getId())) {
-                            comp.setPreferredW(w);
-                            // Height = the knob's height (the painter draws the thumb at
-                            // the component height); taller so the knob is a tall vertical
-                            // capsule, not a short horizontal oval.
-                            comp.setPreferredH(disp.convertToPixels(5.5f));
-                        } else if ("ProgressBar".equals(c.getId())) {
-                            comp.setPreferredW(w);
-                            comp.setPreferredH(Math.max(8, disp.convertToPixels(0.8f))); // ~2x thicker bar
+                        if (isGlassPanelKind(c.getId())) {
+                            // The native UIVisualEffectView glass panel is inset ~1mm
+                            // inside the tile; match that with an equivalent pixel margin
+                            // (reinterpreted in pixels by the unit switch above) so the
+                            // CN1 GlassPanel fills the tile minus the same inset.
+                            int inset = disp.convertToPixels(1f);
+                            st.setMargin(inset, inset, inset, inset);
+                        } else {
+                            if ("Toolbar".equals(c.getId())) {
+                                // Match the native nav bar's covered height (~7.3mm); the
+                                // bar is NORTH-anchored so the sharp backdrop fills below.
+                                comp.setPreferredH(disp.convertToPixels(7.3f));
+                            } else if ("Slider".equals(c.getId())) {
+                                comp.setPreferredW(w);
+                                // Height = the knob's height (the painter draws the thumb at
+                                // the component height); taller so the knob is a tall vertical
+                                // capsule, not a short horizontal oval.
+                                comp.setPreferredH(disp.convertToPixels(5.5f));
+                            } else if ("ProgressBar".equals(c.getId())) {
+                                comp.setPreferredW(w);
+                                comp.setPreferredH(Math.max(8, disp.convertToPixels(0.8f))); // ~2x thicker bar
+                            }
+                            st.setMargin(0, 0, 0, 0);
                         }
-                        st.setMargin(0, 0, 0, 0);
                     } else {
                         // Android Material: size full-width widgets and land the visible
                         // part where native lands it -- centred vertically inside a 48dp
@@ -231,7 +240,7 @@ public class FidelityDeviceRunner {
                         }
                         st.setMargin(topInset, 0, leftInset, 0);
                     }
-                    Container tile = newTile(comp, c.getId(), w, h, appearance);
+                    Container tile = newTile(comp, c.getId(), w, h, appearance, resolveBackdrop(c));
                     form.add(centerRow(tile));
                     wrappers.add(tile);
                     names.add(c.getId() + "_" + state + "_" + appearance + "_cn1");
@@ -450,7 +459,7 @@ public class FidelityDeviceRunner {
 
     // ---- helpers ----
 
-    private Container newTile(Component comp, String compId, int w, int h, String appearance) {
+    private Container newTile(Component comp, String compId, int w, int h, String appearance, String backdropSpec) {
         // Android Material widgets centre their VISIBLE part inside a 48dp minimum
         // touch target (e.g. an 88px switch track sits 22px down inside a 132px
         // view; a 110px button 11px down). The native reference render carries that
@@ -467,8 +476,10 @@ public class FidelityDeviceRunner {
         boolean fullWidth = isFullWidthKind(compId);
         boolean widthCenter = isWidthCenterKind(compId);
         // The iOS 26 tab bar is a floating glass PILL, content-sized and CENTRED
-        // horizontally near the top -- not stretched to the tile width.
-        boolean centered = "ios".equals(platform) && "Tabs".equals(compId);
+        // horizontally near the top -- not stretched to the tile width. TabsGeom is
+        // the same widget over a flat backdrop (geometry-isolation), so it lays out
+        // identically.
+        boolean centered = "ios".equals(platform) && ("Tabs".equals(compId) || "TabsGeom".equals(compId));
         Container tile;
         if (centered) {
             tile = new Container(new FlowLayout(Component.CENTER, Component.TOP));
@@ -483,23 +494,7 @@ public class FidelityDeviceRunner {
         } else {
             tile = new Container(new FlowLayout(Component.LEFT, Component.TOP));
         }
-        Image backdrop = isGlassKind(compId) ? getGlassBackdrop() : null;
-        if (backdrop != null) {
-            // Liquid Glass needs content behind it. The iOS native reference renders
-            // these widgets over the SAME committed backdrop PNG, so CN1 must too --
-            // the only difference that should remain is how each renders the glass.
-            // STRETCH (SCALED, ignore aspect) to match the native ref's .scaleToFill
-            // so the two backdrops are pixel-for-pixel the same gradient; the
-            // comparator then masks that shared backdrop out and scores only the
-            // widget (SCALED_FILL aspect-cropped differently from native and let the
-            // gradient mismatch leak into the fidelity score).
-            tile.getAllStyles().setBgImage(backdrop);
-            tile.getAllStyles().setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED);
-            tile.getAllStyles().setBgTransparency(255);
-        } else {
-            tile.getAllStyles().setBgColor(bgColor(appearance));
-            tile.getAllStyles().setBgTransparency(255);
-        }
+        applyBackdrop(tile, backdropSpec, appearance);
         tile.getAllStyles().setPadding(0, 0, 0, 0);
         tile.getAllStyles().setMargin(0, 0, 0, 0);
         tile.setPreferredW(w);
@@ -531,7 +526,14 @@ public class FidelityDeviceRunner {
         }
         return "TextField".equals(compId)
                 || "Toolbar".equals(compId) || "Dialog".equals(compId)
-                || "Spinner".equals(compId);   // picker wheel fills the tile, like UIPickerView
+                || "Spinner".equals(compId)   // picker wheel fills the tile, like UIPickerView
+                || isGlassPanelKind(compId);  // glass panel fills the tile (minus its margin)
+    }
+
+    /// The glass-panel isolation widgets (plain GlassPanel-UIID containers that
+    /// fill the tile minus a 1mm inset, each over a different backdrop). iOS only.
+    private boolean isGlassPanelKind(String compId) {
+        return "ios".equals(platform) && compId != null && compId.startsWith("GlassPanel");
     }
 
     /// Full-width-but-thin iOS widgets (slider, progress) that span the tile width
@@ -543,15 +545,74 @@ public class FidelityDeviceRunner {
         return "Slider".equals(compId) || "ProgressBar".equals(compId);
     }
 
-    /// Glass-styled iOS widgets that are rendered over the shared backdrop (the iOS
-    /// native reference uses iOS 26 Liquid Glass for these). iOS only -- Android
-    /// Material does not use glass, so its tiles stay on the plain background.
-    private boolean isGlassKind(String compId) {
-        if (!"ios".equals(platform) || compId == null) {
+    /// Resolves the tile backdrop for a component. The backdrop (solid colour,
+    /// gradient or photo) is an iOS-only concept driven by the iOS 26 Liquid Glass
+    /// blend; Android Material tiles always stay on the plain appearance background,
+    /// preserving the committed Android baseline. Returns null for "no backdrop".
+    private String resolveBackdrop(ComponentSpec c) {
+        if (!"ios".equals(platform)) {
+            return null;
+        }
+        return c.getBackdrop();
+    }
+
+    /// Paints the resolved backdrop behind a tile. Mirrors the native reference
+    /// (NativeRef.swift) exactly: a 6-hex value is a solid fill, "gradient" is a
+    /// vertical blue (#1e64ff top) to green (#28c850 bottom) ramp, and "photo" is
+    /// the shared glass-backdrop.png. Anything else (incl. null) is a plain tile.
+    private void applyBackdrop(Container tile, String backdropSpec, String appearance) {
+        com.codename1.ui.plaf.Style s = tile.getAllStyles();
+        if ("photo".equals(backdropSpec)) {
+            // Liquid Glass needs content behind it. The iOS native reference renders
+            // these widgets over the SAME committed backdrop PNG, so CN1 must too --
+            // the only difference that should remain is how each renders the glass.
+            // STRETCH (SCALED, ignore aspect) to match the native ref's .scaleToFill
+            // so the two backdrops are pixel-for-pixel the same gradient; the
+            // comparator then masks that shared backdrop out and scores only the
+            // widget.
+            Image backdrop = getGlassBackdrop();
+            if (backdrop != null) {
+                s.setBgImage(backdrop);
+                s.setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED);
+                s.setBgTransparency(255);
+                return;
+            }
+            // Asset missing: fall through to the plain background.
+        } else if ("gradient".equals(backdropSpec)) {
+            // Vertical linear gradient, start colour at the top, end at the bottom
+            // (matches CAGradientLayer with startPoint y=0, endPoint y=1).
+            s.setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL);
+            s.setBackgroundGradientStartColor(0x1e64ff);
+            s.setBackgroundGradientEndColor(0x28c850);
+            s.setBgTransparency(255);
+            return;
+        } else if (isHexColor(backdropSpec)) {
+            s.setBgColor(parseHexColor(backdropSpec));
+            s.setBgTransparency(255);
+            return;
+        }
+        s.setBgColor(bgColor(appearance));
+        s.setBgTransparency(255);
+    }
+
+    /// True when the string is exactly six hexadecimal digits (an RGB colour).
+    private boolean isHexColor(String value) {
+        if (value == null || value.length() != 6) {
             return false;
         }
-        return "Button".equals(compId) || "RaisedButton".equals(compId) || "FlatButton".equals(compId)
-                || "Toolbar".equals(compId) || "Tabs".equals(compId);
+        for (int i = 0; i < 6; i++) {
+            char ch = value.charAt(i);
+            boolean hex = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+            if (!hex) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Parses a 6-hex RGB string into a 0xRRGGBB int. Caller guarantees validity.
+    private int parseHexColor(String value) {
+        return Integer.parseInt(value, 16) & 0xffffff;
     }
 
     private Image glassBackdrop;

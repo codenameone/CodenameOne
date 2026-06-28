@@ -49,6 +49,27 @@ struct Spec {
     let states: [String]
     let wMM: CGFloat
     let hMM: CGFloat
+    // Tile backdrop behind the widget. Empty = use the kind default (glass kinds
+    // get the photo, everything else gets none). A 6-hex value = solid fill;
+    // "gradient" = vertical blue->green ramp; "photo" = the shared backdrop PNG.
+    // Mirrors ComponentSpec.getBackdrop() on the CN1 side.
+    var backdrop: String = ""
+}
+
+// Resolves the backdrop string for a spec, applying the same default as the CN1
+// side: glass kinds fall back to the photo, every other kind to none.
+func resolveBackdrop(_ spec: Spec) -> String {
+    if !spec.backdrop.isEmpty { return spec.backdrop }
+    return GLASS_KINDS.contains(spec.kind) ? "photo" : ""
+}
+
+// Parses a 6-hex RGB string ("808080") into an opaque UIColor. nil if malformed.
+func colorFromHex(_ hex: String) -> UIColor? {
+    guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return nil }
+    let r = CGFloat((v >> 16) & 0xff) / 255.0
+    let g = CGFloat((v >> 8) & 0xff) / 255.0
+    let b = CGFloat(v & 0xff) / 255.0
+    return UIColor(red: r, green: g, blue: b, alpha: 1)
 }
 
 let SPECS: [Spec] = [
@@ -65,6 +86,13 @@ let SPECS: [Spec] = [
     Spec(component: "Toolbar",     kind: "ios_uinavbar",        states: ["normal"],                      wMM: 60, hMM: 16),
     Spec(component: "Dialog",      kind: "ios_alert_view",      states: ["normal"],                      wMM: 60, hMM: 40),
     Spec(component: "Spinner",     kind: "ios_uipickerview",    states: ["normal"],                      wMM: 60, hMM: 34),
+    // Isolation tests (iOS only). GlassPanel = a bare glass rect over four
+    // backdrops; TabsGeom = the tab bar over a flat grey so only geometry differs.
+    Spec(component: "GlassPanelGrey",  kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "808080"),
+    Spec(component: "GlassPanelRed",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "ff3b30"),
+    Spec(component: "GlassPanelGrad",  kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "gradient"),
+    Spec(component: "GlassPanelPhoto", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "photo"),
+    Spec(component: "TabsGeom",        kind: "ios_uitabbar",    states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
 ]
 
 // Minimal data source/delegate for the reference UIPickerView (5 string rows).
@@ -258,6 +286,19 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
         picker.delegate = RefPickerDelegate.shared
         picker.selectRow(2, inComponent: 0, animated: false)   // middle row selected
         return picker
+    case "ios_glass_panel":
+        // Bare Liquid Glass panel (no content) for the glass-blend isolation tests.
+        // iOS 26 exposes the real glass material via UIGlassEffect; earlier OSes
+        // fall back to the closest thin material blur.
+        let effectView: UIVisualEffectView
+        if #available(iOS 26.0, *) {
+            effectView = UIVisualEffectView(effect: UIGlassEffect())
+        } else {
+            effectView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
+        }
+        effectView.layer.cornerRadius = 8
+        effectView.clipsToBounds = true
+        return effectView
     default:
         return nil
     }
@@ -290,12 +331,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                     let container = UIView(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
                     container.backgroundColor = appearance == "dark" ? .black : .white
                     container.overrideUserInterfaceStyle = appearance == "dark" ? .dark : .light
-                    if GLASS_KINDS.contains(spec.kind), let bd = BACKDROP {
+                    // Paint the spec's backdrop behind the widget, matching the CN1
+                    // side (FidelityDeviceRunner.applyBackdrop) pixel-for-pixel: a
+                    // solid hex fill, a vertical blue->green gradient, or the shared
+                    // photo PNG. Empty/unknown leaves the plain appearance background.
+                    let backdrop = resolveBackdrop(spec)
+                    if backdrop == "photo", let bd = BACKDROP {
                         let iv = UIImageView(frame: container.bounds)
                         iv.image = bd
                         iv.contentMode = .scaleToFill
                         iv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
                         container.addSubview(iv)
+                    } else if backdrop == "gradient" {
+                        let gl = CAGradientLayer()
+                        gl.frame = container.bounds
+                        gl.colors = [colorFromHex("1e64ff")!.cgColor, colorFromHex("28c850")!.cgColor]
+                        gl.startPoint = CGPoint(x: 0.5, y: 0.0)   // blue at top
+                        gl.endPoint = CGPoint(x: 0.5, y: 1.0)     // green at bottom
+                        container.layer.addSublayer(gl)
+                    } else if let col = colorFromHex(backdrop) {
+                        container.backgroundColor = col
                     }
                     guard let control = buildControl(spec.kind, state, wPt, hPt) else { continue }
                     // The CN1 fidelity harness renders every widget filling its tile and
@@ -305,7 +360,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                     // radius, glass) rather than a layout difference the app controls.
                     // Intrinsically-sized controls (switch, checkbox/radio glyphs) keep
                     // their natural size pinned top-left, matching how CN1 lays them out.
-                    if FILL_KINDS.contains(spec.kind) {
+                    if spec.kind == "ios_glass_panel" {
+                        // The glass panel fills the tile minus a ~1mm inset, matching
+                        // the CN1 GlassPanel's 1mm margin.
+                        let inset = 1.0 * PT_PER_MM
+                        control.frame = container.bounds.insetBy(dx: inset, dy: inset)
+                    } else if FILL_KINDS.contains(spec.kind) {
                         control.frame = CGRect(x: 0, y: 0, width: wPt, height: hPt)
                     } else {
                         control.sizeToFit()

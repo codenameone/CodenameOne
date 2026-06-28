@@ -17,6 +17,11 @@
 #   native          iOS native widget key (see NativeWidgetFactoryImpl .m switch).
 #   native_android  Android native widget key (see NativeWidgetFactoryImpl.java).
 #   text            label text for widgets that show text.
+#   backdrop        tile background behind the widget (iOS only): a 6-hex colour
+#                   (e.g. 808080) = solid fill; "gradient" = vertical blue->green
+#                   ramp; "photo" = the shared glass-backdrop.png. Omit to use the
+#                   default: glass kinds (Tabs/Toolbar/Button/RaisedButton/
+#                   FlatButton) default to "photo", everything else to none.
 #   states          comma-separated: normal, pressed, disabled, selected.
 #   platforms       comma-separated allow-list (ios, android). Omit = both.
 #   tile_width_mm   per-component width override (logical mm).
@@ -127,4 +132,57 @@ components:
     platforms: ios
     tile_width_mm: 60
     tile_height_mm: 34
+    states: normal
+
+  # --- Isolation tests (iOS only) ---------------------------------------------
+  # GlassPanel: a plain glass rectangle (no text/items) rendered over four
+  # different backdrops, so the glass BLEND can be inspected independently of any
+  # widget content. CN1 paints a GlassPanel-UIID container; native paints a
+  # UIVisualEffectView (iOS 26 Liquid Glass when available).
+  - id: GlassPanelGrey
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassPanelRed
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: ff3b30
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassPanelGrad
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: gradient
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassPanelPhoto
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: photo
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  # TabsGeom: the same tab bar as Tabs but over a SOLID grey backdrop. The glass
+  # blurs a flat colour into a uniform tint, so only the tab GEOMETRY differs --
+  # isolating layout fidelity from the glass blend.
+  - id: TabsGeom
+    cn1_uiid: Tabs
+    native: ios_uitabbar
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 16
     states: normal

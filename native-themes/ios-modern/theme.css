@@ -611,6 +611,19 @@ TabIndicator { color: var(--accent-color, #007aff); background-color: transparen
 TabIcon.selected { background-color: transparent; }
 TabIcon.pressed { background-color: transparent; }
 
+/* GlassPanel: a bare Liquid Glass rectangle used only by the fidelity
+   isolation tests (no text/items), so the glass blend can be inspected on its
+   own across several backdrops. Same recipe as the glass widgets -- a
+   translucent white tint + backdrop-filter:blur over a rounded rect -- but
+   plain. This is the CN1 approximation of a UIVisualEffectView; tuned later. */
+GlassPanel {
+    background-color: rgba(255,255,255,0.5);
+    cn1-background-type: cn1-round-border;
+    backdrop-filter: blur(40px);
+    padding: 0;
+    margin: 1mm;
+}
+
 SideNavigationPanel { background-color: #ffffff; padding: 0; margin: 0; }
 
 SideCommand {
@@ -893,6 +906,10 @@ PopupContent {
     TabIcon { color: #ffffff; background-color: transparent; }
     TabIcon.selected { color: #ffffff; background-color: transparent; }
     TabIcon.pressed { color: #ffffff; background-color: transparent; }
+
+    /* Dark glass panel: a translucent dark tint so the backdrop reads through as
+       Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */
+    GlassPanel { background-color: rgba(40,40,44,0.5); cn1-background-type: cn1-round-border; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
 
     /* Animated indicator inherits the dark-mode accent. */
     TabIndicator { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }

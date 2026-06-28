@@ -149,6 +149,8 @@ public class FidelitySpecParser {
             component.setNativeKindAndroid(value);
         } else if ("text".equals(key)) {
             component.setText(value);
+        } else if ("backdrop".equals(key)) {
+            component.setBackdrop(value);
         } else if ("tile_width_mm".equals(key)) {
             component.setTileWidthMm(parseInt(value, -1));
         } else if ("tile_height_mm".equals(key)) {

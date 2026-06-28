@@ -36,6 +36,7 @@ public class ComponentSpec {
     private String nativeKind;
     private String nativeAndroidKind;
     private String text;
+    private String backdrop;
     private int tileWidthMm = -1;
     private int tileHeightMm = -1;
     private List states = new ArrayList();
@@ -87,6 +88,30 @@ public class ComponentSpec {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    /**
+     * The tile backdrop behind the rendered widget. Accepted values:
+     *   a 6-hex colour ("808080") => a solid fill of that colour;
+     *   "gradient" => a vertical blue (#1e64ff top) to green (#28c850 bottom) ramp;
+     *   "photo"    => the shared glass-backdrop.png asset.
+     * When omitted, glass kinds (Tabs, Toolbar, Button, RaisedButton, FlatButton)
+     * default to "photo" so the Liquid Glass blend has content behind it; every
+     * other component defaults to none (a plain tile, returned as null here).
+     */
+    public String getBackdrop() {
+        if (backdrop != null) {
+            return backdrop;
+        }
+        if ("Tabs".equals(id) || "Toolbar".equals(id) || "Button".equals(id)
+                || "RaisedButton".equals(id) || "FlatButton".equals(id)) {
+            return "photo";
+        }
+        return null;
+    }
+
+    public void setBackdrop(String backdrop) {
+        this.backdrop = backdrop;
     }
 
     public int getTileWidthMm() {
