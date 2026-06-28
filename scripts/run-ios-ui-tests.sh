@@ -481,7 +481,20 @@ if [ -n "$SIM_UDID" ]; then
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   SIM_DESTINATION="id=$SIM_UDID"
 fi
-if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
+if [ -n "$SIM_UDID" ]; then
+  # We have a concrete simulator that simctl already booted, so build against
+  # its id rather than generic/platform=iOS Simulator. The generic destination
+  # is resolved through the same `xcodebuild -showdestinations` enumeration that
+  # returned no iOS devices for this scheme on tvOS-heavy GitHub runners (the
+  # generated project gained tvOS support, so -showdestinations lists only Apple
+  # TV destinations). A generic build there fails with "Unable to find a
+  # destination matching ... { platform:iOS Simulator }" even though an iPhone
+  # simulator is booted and usable. An id= destination is matched directly
+  # against the booted device and sidesteps that enumeration. ARCHS is still
+  # pinned below while USE_GENERIC_BUILD_DESTINATION is set.
+  BUILD_DESTINATION="$SIM_DESTINATION"
+  ri_log "Building on concrete simulator destination '$BUILD_DESTINATION' and running on '$SIM_DESTINATION'"
+elif [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
   ri_log "Building with generic simulator destination '$BUILD_DESTINATION' and running on '$SIM_DESTINATION'"
 else
   BUILD_DESTINATION="$SIM_DESTINATION"
