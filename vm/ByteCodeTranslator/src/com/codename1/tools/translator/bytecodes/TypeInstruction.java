@@ -36,9 +36,32 @@ public class TypeInstruction extends Instruction {
     private String type;
     private String actualType;
     private int stackAllocId = -1;
+    private boolean scalarReplaced = false;
+    private int scalarStructId = -1;
     public TypeInstruction(int opcode, String type) {
         super(opcode);
         this.type = type;
+    }
+
+    /**
+     * Marks this {@code NEW} of a primitive-only {@code @StackAllocate} class as
+     * scalar-replaced: the object becomes a pure C local struct
+     * {@code __cn1sr_<id>} whose address is never taken, so clang's SROA promotes
+     * its fields to registers. The NEW itself then emits nothing (no header init,
+     * no PUSH); the matching {@code <init>}, {@code DUP}, {@code ASTORE} and field
+     * accesses are rewritten by {@code BytecodeMethod.scalarReplaceStackAllocations}.
+     */
+    public void markScalarReplaced(int id) {
+        this.scalarReplaced = true;
+        this.scalarStructId = id;
+    }
+
+    public boolean isScalarReplaced() {
+        return scalarReplaced;
+    }
+
+    public int getScalarStructId() {
+        return scalarStructId;
     }
 
     /**
@@ -131,6 +154,15 @@ public class TypeInstruction extends Instruction {
         b.append("    ");
         switch(opcode) {
             case Opcodes.NEW:
+                if(scalarReplaced) {
+                    // Scalar-replaced @StackAllocate: the struct __cn1sr_<id> is a
+                    // pure C local (declared at method top by BytecodeMethod). The
+                    // object never escapes -- it is built directly into the struct
+                    // by the inlined <init> and read via direct member access -- so
+                    // the NEW emits nothing at all (no header, no PUSH).
+                    b.append("/* NEW scalar-replaced (__cn1sr_").append(scalarStructId).append(") */\n");
+                    break;
+                }
                 if(stackAllocId >= 0) {
                     // @StackAllocate: the object lives in the method-scoped struct
                     // __cn1stk_<id> (declared by BytecodeMethod). Replicate exactly

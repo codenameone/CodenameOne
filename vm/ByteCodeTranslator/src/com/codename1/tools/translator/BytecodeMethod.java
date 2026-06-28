@@ -39,6 +39,7 @@ import com.codename1.tools.translator.bytecodes.Invoke;
 import com.codename1.tools.translator.bytecodes.Jump;
 import com.codename1.tools.translator.bytecodes.LabelInstruction;
 import com.codename1.tools.translator.bytecodes.Ldc;
+import com.codename1.tools.translator.bytecodes.ScalarAllocInit;
 import com.codename1.tools.translator.bytecodes.LineNumber;
 import com.codename1.tools.translator.bytecodes.LocalVariable;
 import com.codename1.tools.translator.bytecodes.MultiArray;
@@ -1280,10 +1281,21 @@ public class BytecodeMethod implements SignatureSet {
         for(int saIter = 0 ; saIter < instructions.size() ; saIter++) {
             Instruction saInst = instructions.get(saIter);
             if(saInst instanceof TypeInstruction) {
-                String saType = ((TypeInstruction)saInst).getStackAllocType();
+                TypeInstruction saTi = (TypeInstruction)saInst;
+                if(saTi.isScalarReplaced()) {
+                    // Scalar-replaced @StackAllocate site: declare the struct as a
+                    // pure C local whose address is never taken so clang SROA can
+                    // promote its fields to registers. No header is needed -- the
+                    // object is primitive-only and never visible to the GC. The id
+                    // is stable (assigned during optimize), independent of list pos.
+                    b.append("    struct obj__").append(saTi.getStackAllocType())
+                            .append(" __cn1sr_").append(saTi.getScalarStructId()).append(";\n");
+                    continue;
+                }
+                String saType = saTi.getStackAllocType();
                 if(saType != null) {
                     b.append("    struct obj__").append(saType).append(" __cn1stk_").append(saIter).append(";\n");
-                    ((TypeInstruction)saInst).setStackAllocId(saIter);
+                    saTi.setStackAllocId(saIter);
                 }
             }
         }
@@ -2138,6 +2150,403 @@ public class BytecodeMethod implements SignatureSet {
         return false;
     }
 
+    // ------------------------------------------------------------------
+    // Scalar replacement of non-escaping primitive-only @StackAllocate objects.
+    //
+    // Recognizes exactly:   NEW X ; DUP ; <args> ; INVOKESPECIAL X.<init> ; ASTORE n
+    // where X is @StackAllocate, extends java.lang.Object directly, every instance
+    // field is primitive, X has no static initializer, and X.<init> is exactly
+    // ALOAD0;INVOKESPECIAL Object.<init>()V followed only by groups of
+    // ALOAD0; <load of one ctor param>; PUTFIELD X.f that, together, assign every
+    // field exactly once (a bijection params<->fields). Local n must be used ONLY
+    // as "ALOAD n; GETFIELD X.f". Anything else -> bail (leave today's stack-alloc
+    // codegen, which is correct and GC-safe, in place).
+    //
+    // On a match the struct becomes a pure C local __cn1sr_<id> whose address is
+    // never taken: NEW/DUP/ASTORE emit nothing, the <init> becomes direct field
+    // assignments (ScalarAllocInit -- the arg expressions are folded straight in
+    // when they reduce to pure assignables, else popped off the operand stack),
+    // and each field read becomes a direct member access. clang then SROA-promotes
+    // the whole struct to registers.
+    // ------------------------------------------------------------------
+    private static final boolean DISABLE_SCALAR_REPLACE =
+            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_SCALAR_REPLACE", "false"));
+
+    private static String srMangle(String s) {
+        return s.replace('.', '_').replace('/', '_').replace('$', '_');
+    }
+
+    /** Next index of a non-trivia instruction at or after {@code from}, or -1. */
+    private int srNextReal(int from) {
+        for (int i = from; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private void scalarReplaceStackAllocations() {
+        if (DISABLE_SCALAR_REPLACE) {
+            return;
+        }
+        int srId = 0;
+        // (localN, structId) of every accepted site; field reads are rewritten in
+        // a deferred pass (it removes the ALOAD, which shifts indices) so the
+        // matching loop below -- which only uses index-stable set() edits -- stays
+        // valid throughout.
+        List<int[]> acceptedReads = new ArrayList<int[]>();
+        for (int idx = 0; idx < instructions.size(); idx++) {
+            Instruction ins = instructions.get(idx);
+            if (!(ins instanceof TypeInstruction)) {
+                continue;
+            }
+            TypeInstruction ti = (TypeInstruction) ins;
+            if (ti.getOpcode() != Opcodes.NEW) {
+                continue;
+            }
+            String saType = ti.getStackAllocType();
+            if (saType == null) {
+                continue; // not a @StackAllocate NEW
+            }
+            ByteCodeClass x = Parser.getClassObject(saType);
+            if (x == null || !srPrimitiveOnlyDirectObject(x)) {
+                continue; // bail -> today's stack-alloc path
+            }
+
+            // DUP must immediately follow the NEW.
+            int dupIdx = srNextReal(idx + 1);
+            if (dupIdx < 0 || instructions.get(dupIdx).getOpcode() != Opcodes.DUP) {
+                continue;
+            }
+
+            // Find the matching INVOKESPECIAL X.<init>. Bail if the arg region
+            // contains a nested NEW, another <init>, any stack-shuffle (DUP*/SWAP)
+            // or any control flow -- those break the simple receiver-at-bottom shape.
+            int invIdx = -1;
+            boolean bail = false;
+            for (int j = srNextReal(dupIdx + 1); j >= 0; j = srNextReal(j + 1)) {
+                Instruction c = instructions.get(j);
+                int op = c.getOpcode();
+                if (c instanceof Invoke && op == Opcodes.INVOKESPECIAL
+                        && "<init>".equals(((Invoke) c).getName())) {
+                    if (srMangle(((Invoke) c).getOwner()).equals(saType)) {
+                        invIdx = j;
+                    } else {
+                        bail = true; // a different constructor call sits in the args
+                    }
+                    break;
+                }
+                if (c instanceof TypeInstruction && op == Opcodes.NEW) { bail = true; break; }
+                if (c instanceof Jump || c instanceof CustomJump || c instanceof SwitchInstruction
+                        || c instanceof TryCatch) { bail = true; break; }
+                switch (op) {
+                    case Opcodes.DUP: case Opcodes.DUP_X1: case Opcodes.DUP_X2:
+                    case Opcodes.DUP2: case Opcodes.DUP2_X1: case Opcodes.DUP2_X2:
+                    case Opcodes.SWAP: case Opcodes.GOTO:
+                        bail = true;
+                        break;
+                    default:
+                        break;
+                }
+                if (bail) { break; }
+            }
+            if (bail || invIdx < 0) {
+                continue;
+            }
+            Invoke initInv = (Invoke) instructions.get(invIdx);
+
+            // ASTORE n must immediately follow the constructor call.
+            int storeIdx = srNextReal(invIdx + 1);
+            if (storeIdx < 0) {
+                continue;
+            }
+            Instruction st = instructions.get(storeIdx);
+            if (!(st instanceof VarOp) || st.getOpcode() != Opcodes.ASTORE) {
+                continue;
+            }
+            int localN = ((VarOp) st).getIndex();
+
+            // Analyze the constructor into an ordered param->field map.
+            String[] members = new String[0];
+            char[] quals = new char[0];
+            String[][] mapOut = new String[1][];
+            char[][] qualOut = new char[1][];
+            if (!srAnalyzeCtor(x, initInv, saType, mapOut, qualOut)) {
+                continue;
+            }
+            members = mapOut[0];
+            quals = qualOut[0];
+
+            // Validate every use of local n is exactly "ALOAD n; GETFIELD X.f"
+            // and there is no second store / no read before the construction.
+            if (!srValidateLocalUses(localN, storeIdx)) {
+                continue;
+            }
+
+            // -------- accept: rewrite in place (set() keeps indices stable) --------
+            int id = srId++;
+            ti.markScalarReplaced(id);
+            instructions.set(dupIdx, srEmpty());
+            instructions.set(invIdx, new ScalarAllocInit(id, members, quals));
+            instructions.set(storeIdx, srEmpty());
+            acceptedReads.add(new int[]{localN, id});
+        }
+        for (int[] site : acceptedReads) {
+            srRewriteFieldReads(site[0], site[1]);
+        }
+    }
+
+    /** X extends java.lang.Object directly and every instance field is primitive (no static initializer). */
+    private boolean srPrimitiveOnlyDirectObject(ByteCodeClass x) {
+        ByteCodeClass base = x.getBaseClassObject();
+        if (base == null || !"java_lang_Object".equals(base.getClsName())) {
+            return false; // require a direct Object subclass so dropping super.<init> is safe
+        }
+        for (BytecodeMethod m : x.getMethods()) {
+            if ("__CLINIT__".equals(m.getMethodName())) {
+                return false; // a static initializer would be skipped -> unsafe
+            }
+        }
+        for (ByteCodeField f : x.getFields()) {
+            if (!f.isStaticField() && f.isObjectType()) {
+                return false; // an object field must stay heap/GC-visible
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Verifies X.<init> is exactly Object.<init> + param->field PUTFIELD groups,
+     * each ctor param consumed once, every instance field of X assigned once.
+     * On success fills membersOut[0] / qualsOut[0] indexed by ctor-arg position.
+     */
+    private boolean srAnalyzeCtor(ByteCodeClass x, Invoke initInv, String saType,
+                                  String[][] membersOut, char[][] qualsOut) {
+        String desc = initInv.getDesc();
+        List<ByteCodeMethodArg> args = Util.getMethodArgs(desc);
+        int n = args.size();
+        if (n == 0) {
+            return false; // empty ctor leaves fields uninitialized under scalar repl
+        }
+        // ctor-arg local-slot layout (this=0; long/double take two slots)
+        Map<Integer, Integer> slotToParam = new HashMap<Integer, Integer>();
+        int slot = 1;
+        for (int i = 0; i < n; i++) {
+            slotToParam.put(slot, i);
+            slot += args.get(i).isDoubleOrLong() ? 2 : 1;
+        }
+
+        BytecodeMethod ctor = null;
+        for (BytecodeMethod m : x.getMethods()) {
+            if ("__INIT__".equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                ctor = m;
+                break;
+            }
+        }
+        if (ctor == null) {
+            return false;
+        }
+
+        List<Instruction> body = new ArrayList<Instruction>();
+        for (Instruction in : ctor.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            body.add(in);
+        }
+
+        int i = 0;
+        // optional (in practice always present) super call -- must be no-arg Object.<init>
+        if (i + 1 < body.size()
+                && body.get(i) instanceof VarOp && body.get(i).getOpcode() == Opcodes.ALOAD
+                && ((VarOp) body.get(i)).getIndex() == 0
+                && body.get(i + 1) instanceof Invoke && body.get(i + 1).getOpcode() == Opcodes.INVOKESPECIAL
+                && "<init>".equals(((Invoke) body.get(i + 1)).getName())) {
+            Invoke sup = (Invoke) body.get(i + 1);
+            if (!"java/lang/Object".equals(sup.getOwner()) || !"()V".equals(sup.getDesc())) {
+                return false;
+            }
+            i += 2;
+        }
+
+        String[] members = new String[n];
+        char[] quals = new char[n];
+        java.util.Set<String> assigned = new java.util.HashSet<String>();
+        while (i < body.size()) {
+            Instruction a = body.get(i);
+            if (a.getOpcode() == Opcodes.RETURN) {
+                if (i != body.size() - 1) {
+                    return false; // trailing instructions after the void return
+                }
+                break;
+            }
+            if (i + 2 >= body.size()) {
+                return false;
+            }
+            Instruction l0 = body.get(i), l1 = body.get(i + 1), l2 = body.get(i + 2);
+            if (!(l0 instanceof VarOp) || l0.getOpcode() != Opcodes.ALOAD || ((VarOp) l0).getIndex() != 0) {
+                return false;
+            }
+            if (!(l1 instanceof VarOp)) {
+                return false;
+            }
+            int lop = l1.getOpcode();
+            if (lop != Opcodes.ILOAD && lop != Opcodes.LLOAD && lop != Opcodes.FLOAD && lop != Opcodes.DLOAD) {
+                return false; // object load -> not a primitive param store
+            }
+            Integer pi = slotToParam.get(((VarOp) l1).getIndex());
+            if (pi == null) {
+                return false; // not loading a ctor param exactly
+            }
+            if (!(l2 instanceof Field) || l2.getOpcode() != Opcodes.PUTFIELD) {
+                return false;
+            }
+            Field f = (Field) l2;
+            if (f.isObject() || !srMangle(f.getOwner()).equals(saType)) {
+                return false;
+            }
+            char q = args.get(pi).getQualifier();
+            if (q != srQualifierOfDesc(f.getDesc())) {
+                return false; // ctor param type must match field type
+            }
+            if (members[pi] != null) {
+                return false; // param stored into two fields
+            }
+            String member = srMangle(f.getOwner()) + "_" + f.getFieldName();
+            if (!assigned.add(member)) {
+                return false; // field assigned twice
+            }
+            members[pi] = member;
+            quals[pi] = q;
+            i += 3;
+        }
+
+        for (int k = 0; k < n; k++) {
+            if (members[k] == null) {
+                return false; // some ctor param never stored
+            }
+        }
+        // every instance field of X must be assigned exactly once (definite init)
+        int instanceFieldCount = 0;
+        for (ByteCodeField bf : x.getFields()) {
+            if (!bf.isStaticField()) {
+                instanceFieldCount++;
+                if (!assigned.contains(srMangle(x.getClsName()) + "_" + bf.getFieldName())) {
+                    return false;
+                }
+            }
+        }
+        if (instanceFieldCount != assigned.size()) {
+            return false;
+        }
+
+        membersOut[0] = members;
+        qualsOut[0] = quals;
+        return true;
+    }
+
+    private static char srQualifierOfDesc(String desc) {
+        switch (desc.charAt(0)) {
+            case 'J': return 'l';
+            case 'D': return 'd';
+            case 'F': return 'f';
+            case 'L': case '[': return 'o';
+            default:  return 'i'; // I,S,B,C,Z
+        }
+    }
+
+    /** True iff every use of local n is "ALOAD n; GETFIELD" and n is not read before storeIdx. */
+    private boolean srValidateLocalUses(int localN, int storeIdx) {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (!(in instanceof VarOp)) {
+                continue;
+            }
+            VarOp v = (VarOp) in;
+            if (v.getIndex() != localN) {
+                continue;
+            }
+            int op = v.getOpcode();
+            if (op == Opcodes.ASTORE) {
+                if (i != storeIdx) {
+                    return false; // a second store to n -> slot reused, bail
+                }
+                continue;
+            }
+            if (op == Opcodes.ALOAD) {
+                if (i < storeIdx) {
+                    return false; // read before the construction
+                }
+                int g = srNextReal(i + 1);
+                if (g < 0) {
+                    return false;
+                }
+                Instruction nxt = instructions.get(g);
+                if (!(nxt instanceof Field) || nxt.getOpcode() != Opcodes.GETFIELD) {
+                    return false; // any use other than an immediate field read
+                }
+                continue;
+            }
+            return false; // ILOAD/etc. on this slot -> type confusion, bail
+        }
+        return true;
+    }
+
+    /**
+     * Replaces every "ALOAD n; GETFIELD X.f" with a single direct member-read
+     * instruction. The ALOAD is removed outright (rather than blanked) so the read
+     * sits with no gap between it and its arithmetic neighbours -- otherwise a
+     * leftover blank breaks the operand adjacency the arithmetic/store reduction
+     * relies on and the surrounding math stays in slow operand-stack form.
+     */
+    private void srRewriteFieldReads(int localN, int id) {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (!(in instanceof VarOp) || in.getOpcode() != Opcodes.ALOAD
+                    || ((VarOp) in).getIndex() != localN) {
+                continue;
+            }
+            int g = srNextReal(i + 1);
+            Field f = (Field) instructions.get(g);
+            String member = srMangle(f.getOwner()) + "_" + f.getFieldName();
+            String push;
+            switch (f.getDesc().charAt(0)) {
+                case 'D': push = "PUSH_DOUBLE"; break;
+                case 'F': push = "PUSH_FLOAT"; break;
+                case 'J': push = "PUSH_LONG"; break;
+                default:  push = "PUSH_INT"; break;
+            }
+            final String lvalue = "__cn1sr_" + id + "." + member;
+            String code = "    " + push + "(" + lvalue + "); /* scalar-replaced GETFIELD */\n";
+            // Supply an AssignableExpression yielding the bare member lvalue so the
+            // arithmetic/store reduction passes can fold the read straight into a
+            // direct register expression (instead of round-tripping the operand
+            // stack). Without this the surrounding math stays in slow SP[] form.
+            AssignableExpression read = new AssignableExpression() {
+                public boolean assignTo(String varName, StringBuilder sb) {
+                    if (varName != null) {
+                        sb.append("    ").append(varName).append(" = ");
+                    }
+                    sb.append(lvalue);
+                    if (varName != null) {
+                        sb.append(";\n");
+                    }
+                    return true;
+                }
+            };
+            instructions.set(g, new CustomIntruction(code, code, new ArrayList<String>(), read));
+            instructions.remove(i);   // drop the ALOAD; read now occupies one slot
+            // 'i' now points at the read (former g-1); loop's i++ moves past it.
+        }
+    }
+
+    private CustomIntruction srEmpty() {
+        return new CustomIntruction("", "", new ArrayList<String>());
+    }
+
     boolean optimize() {
         int instructionCount = instructions.size();
         
@@ -2168,6 +2577,15 @@ public class BytecodeMethod implements SignatureSet {
         // (the reduction passes below fuse them into opaque CustomIntructions that
         // could hide a write and make the analysis unsound).
         analyzeBoundsChecks();
+
+        // Scalar-replace non-escaping primitive-only @StackAllocate objects. Runs
+        // on the raw (pre-reduction) instruction list so the NEW/DUP/<init>/ASTORE
+        // and field-access idiom is still made of explicit opcodes. Conservative:
+        // anything that deviates from the exact recognized shape is left untouched
+        // and falls back to the already-working stack-alloc codegen.
+        scalarReplaceStackAllocations();
+        // the pass above may have removed instructions (ALOADs folded into reads)
+        instructionCount = instructions.size();
 
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
@@ -2218,6 +2636,18 @@ public class BytecodeMethod implements SignatureSet {
             
             if (current instanceof Field) {
                 int newIter = Field.tryReduce(instructions, iter);
+                if (newIter >= 0) {
+                    iter = newIter;
+                    instructionCount = instructions.size();
+                    continue;
+                }
+            }
+
+            if (current instanceof ScalarAllocInit) {
+                // By now the constructor args ahead of this point have been reduced
+                // to single assignable expressions; pull them straight into the
+                // struct-field assignments so the args never touch the operand stack.
+                int newIter = ((ScalarAllocInit) current).fold(instructions, iter);
                 if (newIter >= 0) {
                     iter = newIter;
                     instructionCount = instructions.size();
