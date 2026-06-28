@@ -62,12 +62,15 @@
     TitleAreaGlassScaleLight: "0.42";
     TitleAreaGlassOffsetLight: "125";
     TitleAreaGlassSatLight: "0.8";
-    /* The light tab pill (UITabBar glass) is a brighter, whiter floor than the
-       dark one -- nudge light-only toward white; dark keeps the measured panel
-       default (already matched). */
-    TabsContainerGlassScaleLight: "0.22";
-    TabsContainerGlassOffsetLight: "200";
-    TabsContainerGlassSatLight: "1.95";
+    /* The tab bar glass is a TRANSLUCENT chrome (like the nav bar), NOT the opaque
+       UIGlassEffect panel: the backdrop must show through the OUTER bar so the
+       brighter white selected sub-capsule (Tab.selected) stands out (glass-on-glass).
+       Measured native light outer bar ~171 vs selected ~237; dark outer ~150. The
+       earlier opaque floor (offset 200) washed the whole bar white and hid the
+       selected capsule. */
+    TabsContainerGlassScaleLight: "0.45";
+    TabsContainerGlassOffsetLight: "140";
+    TabsContainerGlassSatLight: "1.4";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;
