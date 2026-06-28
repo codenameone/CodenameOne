@@ -4403,6 +4403,27 @@ public final class Display extends CN1Constants {
         return impl.isTV();
     }
 
+    /// Indicates whether a head unit (Apple CarPlay / Google Android Auto) is currently connected and
+    /// projecting the `com.codename1.car` experience. See `com.codename1.car.Car#isCarConnected()`.
+    ///
+    /// #### Returns
+    ///
+    /// true if a car is connected
+    public boolean isCarConnected() {
+        return impl.isCarConnected();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.car` API to render in-car templates, or
+    /// null when in-car projection is unsupported on this port. Internal -- application code uses the
+    /// `com.codename1.car` API rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the car bridge, or null
+    public com.codename1.car.spi.CarBridge getCarBridge() {
+        return impl.getCarBridge();
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns

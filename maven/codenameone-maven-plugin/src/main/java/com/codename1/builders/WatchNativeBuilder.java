@@ -107,7 +107,10 @@ class WatchNativeBuilder {
             "OpenGLES.framework;GLKit.framework;Metal.framework;"
             + "MapKit.framework;MediaPlayer.framework;MessageUI.framework;"
             + "AddressBookUI.framework;AddressBook.framework;"
-            + "WebKit.framework;StoreKit.framework";
+            + "WebKit.framework;StoreKit.framework;"
+            // CarPlay.framework is iOS-only (absent on watchOS); it is linked on the iOS slice when
+            // the app references com.codename1.car, so weak-link it for the watch slice.
+            + "CarPlay.framework";
 
     WatchNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;

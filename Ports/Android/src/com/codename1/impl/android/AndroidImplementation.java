@@ -5714,6 +5714,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return tvCache;
     }
 
+    @Override
+    public com.codename1.car.spi.CarBridge getCarBridge() {
+        // The Android Auto glue (injected by the builder only when the app references
+        // com.codename1.car) registers its bridge here; null otherwise so the API no-ops.
+        return AndroidCarSupport.getBridge();
+    }
+
+    @Override
+    public boolean isCarConnected() {
+        com.codename1.car.spi.CarBridge b = AndroidCarSupport.getBridge();
+        return b != null && b.isConnected();
+    }
+
     /**
      * Executes r on the UI thread and blocks the EDT to completion
      * @param r runnable to execute

@@ -326,6 +326,48 @@ public class JavaSEPort extends CodenameOneImplementation {
         */
     }
 
+    @Override
+    public com.codename1.car.spi.CarBridge getCarBridge() {
+        return carBridge;
+    }
+
+    @Override
+    public boolean isCarConnected() {
+        return carBridge != null && carBridge.isConnected();
+    }
+
+    /// Connects a simulated in-car head unit (CarPlay / Android Auto), opening a window that renders
+    /// the registered {@code CarApplication}. Triggered from the simulator's Car menu.
+    void connectSimulatedCar(JavaSECarBridge.Style style) {
+        if (com.codename1.car.Car.getApplication() == null) {
+            javax.swing.JOptionPane.showMessageDialog(window,
+                    "No CarApplication is registered.\n\n"
+                    + "Call Car.setApplication(new MyCarApplication()) from your app's init() so the\n"
+                    + "simulator can render your in-car experience.",
+                    "In-Car Experience", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        disconnectSimulatedCar();
+        carBridge = new JavaSECarBridge(style);
+        carBridge.openWindow(window, new Runnable() {
+            @Override
+            public void run() {
+                disconnectSimulatedCar();
+            }
+        });
+        com.codename1.car.Car.startSession(carBridge);
+    }
+
+    /// Disconnects the simulated head unit, ending the session and closing the window.
+    void disconnectSimulatedCar() {
+        if (carBridge != null) {
+            JavaSECarBridge b = carBridge;
+            carBridge = null;
+            com.codename1.car.Car.endSession();
+            b.close();
+        }
+    }
+
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
         if (!isDesktop() || !Display.isInitialized()) {
             return;
@@ -877,6 +919,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     protected static boolean fxExists = false;
     private JFrame window;
+    // Simulated in-car (CarPlay / Android Auto) head unit, created from the Car menu. Lets developers
+    // see and click through their com.codename1.car experience locally without a real head unit.
+    private JavaSECarBridge carBridge;
     // Application frame used for simulator
     private AppFrame appFrame;
     private long lastIdleTime;
@@ -4768,6 +4813,40 @@ public class JavaSEPort extends CodenameOneImplementation {
         return new ArrayList<JMenu>(byName.values());
     }
 
+    /// Builds the simulator "Car" menu, which connects/disconnects a simulated CarPlay / Android Auto
+    /// head unit. The head-unit window renders the app's registered {@code CarApplication} (see
+    /// {@link #connectSimulatedCar}) so the in-car experience can be debugged locally.
+    private JMenu buildCarMenu() {
+        JMenu carMenu = new JMenu("Car");
+        registerMenuWithBlit(carMenu);
+        JMenuItem connectCarPlay = new JMenuItem("Connect CarPlay");
+        connectCarPlay.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                connectSimulatedCar(JavaSECarBridge.Style.CARPLAY);
+            }
+        });
+        JMenuItem connectAndroidAuto = new JMenuItem("Connect Android Auto");
+        connectAndroidAuto.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                connectSimulatedCar(JavaSECarBridge.Style.ANDROID_AUTO);
+            }
+        });
+        JMenuItem disconnectCar = new JMenuItem("Disconnect");
+        disconnectCar.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                disconnectSimulatedCar();
+            }
+        });
+        carMenu.add(connectCarPlay);
+        carMenu.add(connectAndroidAuto);
+        carMenu.addSeparator();
+        carMenu.add(disconnectCar);
+        return carMenu;
+    }
+
     private static Component findStatusBarComponent(Form f) {
         if (f == null || f.getToolbar() == null) {
             return null;
@@ -6197,6 +6276,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             for (JMenu extensionMenu : buildExtensionMenus()) {
                 bar.add(extensionMenu);
             }
+            bar.add(buildCarMenu());
             bar.add(helpMenu);
         }
 

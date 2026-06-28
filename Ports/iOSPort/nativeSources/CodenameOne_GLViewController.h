@@ -108,6 +108,19 @@
 #undef INCLUDE_CN1_CAMERA
 #endif
 
+// CN1_USE_CARPLAY gates the Apple CarPlay native bridge
+// (CodenameOne_CarPlaySceneDelegate.{h,m} + the IOSNative carPlay* trampolines:
+// CarPlay.framework, the CPTemplate translation). IPhoneBuilder uncomments this
+// only when the classpath scanner saw com.codename1.car.*, so apps that never
+// build an in-car experience ship without any CarPlay symbols and need no
+// CarPlay entitlement. Lives in this central header (included first by every
+// CarPlay TU) so the define is visible across translation units.
+//#define CN1_USE_CARPLAY
+// CarPlay is unavailable on watchOS / tvOS; undo the define on those slices.
+#if TARGET_OS_WATCH || TARGET_OS_TV
+#undef CN1_USE_CARPLAY
+#endif
+
 // CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge
 // (AuthenticationServices.framework import, ASWebAuthenticationSession code
 // in CN1OidcBrowser.m). IPhoneBuilder uncomments this only when the

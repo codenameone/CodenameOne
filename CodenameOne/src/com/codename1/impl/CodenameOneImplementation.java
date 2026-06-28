@@ -5716,6 +5716,29 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Returns the platform bridge that renders the portable `com.codename1.car` template tree onto
+    /// the connected head unit (Apple CarPlay / Google Android Auto), or null when in-car projection
+    /// is unsupported on this port (the base implementation). When null, the `com.codename1.car` API
+    /// degrades to a harmless no-op.
+    ///
+    /// #### Returns
+    ///
+    /// the car bridge, or null when unsupported
+    public com.codename1.car.spi.CarBridge getCarBridge() {
+        return null;
+    }
+
+    /// Returns true while a head unit (Apple CarPlay / Google Android Auto) is currently connected.
+    /// False on the base/unsupported implementation.
+    ///
+    /// #### Returns
+    ///
+    /// true if a car is connected
+    public boolean isCarConnected() {
+        com.codename1.car.spi.CarBridge b = getCarBridge();
+        return b != null && b.isConnected();
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns
