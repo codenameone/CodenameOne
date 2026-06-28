@@ -53,15 +53,15 @@
     ToolbarGlassScaleDark: "1.02";
     ToolbarGlassOffsetDark: "15";
     ToolbarGlassSatDark: "1.6";
-    ToolbarGlassScaleLight: "0.72";
-    ToolbarGlassOffsetLight: "75";
-    ToolbarGlassSatLight: "1.6";
+    ToolbarGlassScaleLight: "0.42";
+    ToolbarGlassOffsetLight: "125";
+    ToolbarGlassSatLight: "0.8";
     TitleAreaGlassScaleDark: "1.02";
     TitleAreaGlassOffsetDark: "15";
     TitleAreaGlassSatDark: "1.6";
-    TitleAreaGlassScaleLight: "0.72";
-    TitleAreaGlassOffsetLight: "75";
-    TitleAreaGlassSatLight: "1.6";
+    TitleAreaGlassScaleLight: "0.42";
+    TitleAreaGlassOffsetLight: "125";
+    TitleAreaGlassSatLight: "0.8";
     /* The light tab pill (UITabBar glass) is a brighter, whiter floor than the
        dark one -- nudge light-only toward white; dark keeps the measured panel
        default (already matched). */
