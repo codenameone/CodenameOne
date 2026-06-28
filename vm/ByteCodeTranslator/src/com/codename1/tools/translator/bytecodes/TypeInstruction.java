@@ -24,6 +24,7 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
+import com.codename1.tools.translator.Parser;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
@@ -34,9 +35,33 @@ import org.objectweb.asm.Opcodes;
 public class TypeInstruction extends Instruction {
     private String type;
     private String actualType;
+    private int stackAllocId = -1;
     public TypeInstruction(int opcode, String type) {
         super(opcode);
         this.type = type;
+    }
+
+    /**
+     * If this is a {@code NEW} of a class annotated {@code @StackAllocate},
+     * returns the mangled struct suffix (e.g. {@code com_bench_Point}); otherwise
+     * null. Used by BytecodeMethod to declare one method-scoped struct per such
+     * site and to route the NEW codegen to the stack path. Must be queried before
+     * {@link #appendInstruction} mangles {@code type} in place.
+     */
+    public String getStackAllocType() {
+        if(opcode != Opcodes.NEW) {
+            return null;
+        }
+        String mangled = type.replace('.', '_').replace('/', '_').replace('$', '_');
+        ByteCodeClass bc = Parser.getClassObject(mangled);
+        if(bc != null && bc.isStackAllocatable()) {
+            return mangled;
+        }
+        return null;
+    }
+
+    public void setStackAllocId(int id) {
+        this.stackAllocId = id;
     }
 
     public String getTypeName() {
@@ -106,6 +131,38 @@ public class TypeInstruction extends Instruction {
         b.append("    ");
         switch(opcode) {
             case Opcodes.NEW:
+                if(stackAllocId >= 0) {
+                    // @StackAllocate: the object lives in the method-scoped struct
+                    // __cn1stk_<id> (declared by BytecodeMethod). Replicate exactly
+                    // what __NEW_<type> does -- run the static initializer, then set
+                    // the same header fields codenameOneGcMalloc sets -- but skip the
+                    // heap registration so the sweep never visits it. The GC still
+                    // reaches it as a root (its pointer rides the operand stack) and
+                    // scans its fields, so any heap objects it references stay live.
+                    // It is never freed; it simply dies when the frame unwinds.
+                    b.append("__STATIC_INITIALIZER_");
+                    b.append(type);
+                    b.append("(threadStateData); memset(&__cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(", 0, sizeof(struct obj__");
+                    b.append(type);
+                    b.append(")); __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__codenameOneParentClsReference = &class__");
+                    b.append(type);
+                    b.append("; __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__codenameOneGcMark = -1; __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__ownerThread = threadStateData; __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__heapPosition = -1; __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__codenameOneReferenceCount = 1; PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
+                    b.append(stackAllocId);
+                    b.append("); /* NEW stack-allocated */\n");
+                    break;
+                }
                 b.append("PUSH_POINTER(__NEW_");
                 b.append(type);
                 b.append("(threadStateData)); /* NEW */\n");

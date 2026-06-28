@@ -2218,6 +2218,21 @@ public class ByteCodeClass {
     /**
      * @return the finalClass
      */
+    private boolean stackAllocatable;
+
+    /**
+     * True when the class carries {@code @com.codename1.annotations.StackAllocate}:
+     * its instances are allocated as method-scoped C structs instead of on the GC
+     * heap. The developer guarantees instances never escape their creating frame.
+     */
+    public boolean isStackAllocatable() {
+        return stackAllocatable;
+    }
+
+    public void setStackAllocatable(boolean stackAllocatable) {
+        this.stackAllocatable = stackAllocatable;
+    }
+
     public boolean isFinalClass() {
         return finalClass;
     }

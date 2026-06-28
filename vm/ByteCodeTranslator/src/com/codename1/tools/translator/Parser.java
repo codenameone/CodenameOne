@@ -60,6 +60,7 @@ public class Parser extends ClassVisitor {
     private static final String DISABLE_NULL_AND_ARRAY_BOUNDS_CHECKS_ANNOTATION =
             "Lcom/codename1/annotations/DisableNullChecksAndArrayBoundsChecks;";
     private static final String CONCRETE_ANNOTATION = "Lcom/codename1/annotations/Concrete;";
+    private static final String STACK_ALLOCATE_ANNOTATION = "Lcom/codename1/annotations/StackAllocate;";
     private ByteCodeClass cls;
     private String clsName;
     private static String[] nativeSources;
@@ -1081,6 +1082,10 @@ public class Parser extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+        if (STACK_ALLOCATE_ANNOTATION.equals(desc)) {
+            cls.setStackAllocatable(true);
+            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible));
+        }
         if (CONCRETE_ANNOTATION.equals(desc)) {
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)) {
                 private String defaultConcrete;

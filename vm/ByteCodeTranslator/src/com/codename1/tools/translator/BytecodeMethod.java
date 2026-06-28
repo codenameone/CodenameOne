@@ -1271,6 +1271,22 @@ public class BytecodeMethod implements SignatureSet {
         BasicInstruction.setSynchronizedMethod(synchronizedMethod, staticMethod, clsName);
         TryCatch.reset();
         BasicInstruction.setHasInstructions(hasInstructions);
+        // Annotation-driven stack allocation: every NEW of a @StackAllocate class
+        // gets one method-scoped struct, reused across loop iterations (only one
+        // instance per site is live at a time -- the annotation's contract). The
+        // struct lives for the whole frame so the object's references stay valid
+        // until it dies with the frame; the matching TypeInstruction NEW codegen
+        // initializes the header and pushes its address instead of heap-allocating.
+        for(int saIter = 0 ; saIter < instructions.size() ; saIter++) {
+            Instruction saInst = instructions.get(saIter);
+            if(saInst instanceof TypeInstruction) {
+                String saType = ((TypeInstruction)saInst).getStackAllocType();
+                if(saType != null) {
+                    b.append("    struct obj__").append(saType).append(" __cn1stk_").append(saIter).append(";\n");
+                    ((TypeInstruction)saInst).setStackAllocId(saIter);
+                }
+            }
+        }
         for(Instruction i : instructions) {
             i.setMethod(this);
             i.setMaxes(maxStack, maxLocals);
