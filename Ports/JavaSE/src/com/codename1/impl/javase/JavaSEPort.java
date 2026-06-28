@@ -8772,19 +8772,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             editStringLegacy(cmp, maxSize, constraint, text, keyCode);
             return;
         }
-        if (editingInProgress != null) {
+        // Snapshot the field into a local: editingInProgress is read on the CN1 EDT
+        // here but nulled on the AWT event dispatch thread when the previous native
+        // edit completes (focusLost/done). Without the snapshot the field can turn
+        // null between the check and the dereferences below, causing an NPE when
+        // quickly switching between editable fields (issue #5304).
+        final EditingInProgress currentEditing = editingInProgress;
+        if (currentEditing != null) {
             final String fText = text;
-            editingInProgress.invokeAfter(new Runnable() {
+            currentEditing.invokeAfter(new Runnable() {
                 public void run() {
                     CN.callSerially(new Runnable() {
                         public void run() {
                             editString(cmp, maxSize, constraint, fText, keyCode);
                         }
                     });
-                    
+
                 }
             });
-            editingInProgress.endEditing();
+            currentEditing.endEditing();
             return;
         }
         //a workaround to fix an issue where the previous Text Component wasn't removed properly. 
