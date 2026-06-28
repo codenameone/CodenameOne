@@ -3145,7 +3145,17 @@ public class BytecodeMethod implements SignatureSet {
                             }
                                     
                             
-                            sb.append("if (").append(leftLiteral).append(operator).append(rightArg).append(") /* ").append(opName).append(" CustomJump */ ");
+                            // Fuse LCMP+IFxx into a direct long comparison (a <op> b)
+                            // instead of CN1_CMP_EXPR(a,b) <op> 0, which clang can
+                            // actually analyze/vectorize. Long only -- float/double
+                            // keep CN1_CMP_EXPR for NaN-correct ordering.
+                            String directLongCmp = (leftArg instanceof ArithmeticExpression)
+                                    ? ((ArithmeticExpression) leftArg).getLongCompareDirect(operator) : null;
+                            if (directLongCmp != null) {
+                                sb.append("if (").append(directLongCmp).append(") /* ").append(opName).append(" CustomJump LCMP */ ");
+                            } else {
+                                sb.append("if (").append(leftLiteral).append(operator).append(rightArg).append(") /* ").append(opName).append(" CustomJump */ ");
+                            }
                             CustomJump newJump = CustomJump.create(jmp, sb.toString());
                             //jmp.setCustomCompareCode(sb.toString());
                             newJump.setOptimized(true);
