@@ -3590,10 +3590,14 @@ public class Component implements Animation, StyleListener, Editable {
             }
             repaint();
         }
-        if (scrollListeners != null) {
-            scrollListeners.fireScrollEvent(scrollXtmp, this.scrollY, this.scrollX, this.scrollY);
-        }
+        // See setScrollY: update the field before notifying listeners and skip the
+        // event when the clamped value didn't change, so a listener that scrolls the
+        // component back into view can't recurse infinitely (issue #5305).
+        int oldScrollX = this.scrollX;
         this.scrollX = scrollXtmp;
+        if (scrollListeners != null && oldScrollX != scrollXtmp) {
+            scrollListeners.fireScrollEvent(scrollXtmp, this.scrollY, oldScrollX, this.scrollY);
+        }
         onScrollX(scrollX);
     }
 
@@ -3640,10 +3644,18 @@ public class Component implements Animation, StyleListener, Editable {
             }
             repaint();
         }
-        if (scrollListeners != null) {
-            scrollListeners.fireScrollEvent(this.scrollX, scrollYtmp, this.scrollX, this.scrollY);
-        }
+        // Update the field *before* notifying listeners and only notify when the
+        // (clamped) value actually changed. A listener that reacts by scrolling the
+        // same component back into view (e.g. via scrollComponentToVisible) reads
+        // getScrollY() during its callback; if the field were still stale it would
+        // recompute the same target and re-fire forever, overflowing the stack
+        // (issue #5305). Suppressing the no-op event also lets such a listener
+        // terminate once the position has settled.
+        int oldScrollY = this.scrollY;
         this.scrollY = scrollYtmp;
+        if (scrollListeners != null && oldScrollY != scrollYtmp) {
+            scrollListeners.fireScrollEvent(this.scrollX, scrollYtmp, this.scrollX, oldScrollY);
+        }
         onScrollY(this.scrollY);
     }
 
