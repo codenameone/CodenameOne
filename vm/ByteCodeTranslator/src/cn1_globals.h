@@ -990,8 +990,18 @@ extern void cn1_debugger_check(struct ThreadLocalData* threadStateData, int line
             cn1_debugger_check(threadStateData, (line)); \
         } \
     } while (0)
+// Line-info store for a source line whose every instruction is provably
+// non-throwing/non-calling (pure arithmetic, local load/store, constants,
+// compares, branches, conversions). Such a line can NEVER be the line reported
+// in a stack trace -- the trace line is always read at a call/throw/alloc site,
+// which lives on a kept line -- so eliding its store is trace-identical. Kept
+// fully under the on-device debugger (which steps line-by-line and needs every
+// line); elided in release/device builds, where it removes the only per-line hot
+// cost (lets clang keep tight loops in registers / vectorize).
+#define __CN1_DEBUG_INFO_NT(line) __CN1_DEBUG_INFO(line)
 #else
 #define __CN1_DEBUG_INFO(line) threadStateData->callStackLine[threadStateData->callStackOffset - 1] = line;
+#define __CN1_DEBUG_INFO_NT(line) do {} while(0)
 #endif
 
 // we need to throw stack overflow error but its unavailable here...

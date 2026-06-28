@@ -2188,6 +2188,103 @@ public class BytecodeMethod implements SignatureSet {
         return -1;
     }
 
+    // Mark each LineNumber whose source line contains no throwing or calling
+    // instruction as elidable. The reported line of any stack frame is only ever
+    // read at a call/throw/alloc site (that is the only place a trace is captured
+    // or an exception originates), and every such site lives on a non-elidable
+    // line -- so a line with no throwing/calling instruction can never be the line
+    // a trace reports, and eliding its per-line store is trace-IDENTICAL. The
+    // store is then emitted as __CN1_DEBUG_INFO_NT (no-op in release / full under
+    // the on-device debugger). Conservative: default keep (non-elidable); only the
+    // explicit non-throwing whitelist in canThrowOrCall() is treated as safe.
+    private void analyzeElidableLineInfo() {
+        LineNumber current = null;
+        boolean lineHasThrowingInstruction = false;
+        for (Instruction in : instructions) {
+            if (in instanceof LineNumber) {
+                if (current != null) {
+                    current.setElidable(!lineHasThrowingInstruction);
+                }
+                current = (LineNumber) in;
+                lineHasThrowingInstruction = false;
+            } else if (current != null && canThrowOrCall(in)) {
+                lineHasThrowingInstruction = true;
+            }
+        }
+        if (current != null) {
+            current.setElidable(!lineHasThrowingInstruction);
+        }
+    }
+
+    // True if the instruction may throw a Java exception or transfer control to
+    // another method (so the current line must be live for an accurate trace).
+    // Conservative: anything not in the explicit non-throwing/non-calling whitelist
+    // returns true. Excludes integer div/rem (ArithmeticException), array access
+    // (NPE/AIOOBE/ArrayStore), field/static access (NPE / class-init), allocation
+    // (OOM/NegativeArraySize), invoke/athrow/checkcast/monitor, and single-word LDC
+    // (a class/method-type constant can trigger throwing resolution).
+    private boolean canThrowOrCall(Instruction in) {
+        int op = in.getOpcode();
+        if (op < 0) {
+            return false; // LineNumber/Label/LocalVariable/TryCatch/ScalarAllocInit/empty markers
+        }
+        if (in instanceof TypeInstruction && ((TypeInstruction) in).isScalarReplaced()) {
+            return false; // a scalar-replaced NEW emits nothing -- no allocation, cannot throw
+        }
+        if (in instanceof com.codename1.tools.translator.bytecodes.Ldc) {
+            // numeric and String LDC constants never resolve/throw; a class (Type),
+            // method handle, or constant-dynamic LDC can -> keep those (conservative).
+            Object v = ((com.codename1.tools.translator.bytecodes.Ldc) in).getValue();
+            return !(v instanceof Integer || v instanceof Long || v instanceof Float
+                    || v instanceof Double || v instanceof String);
+        }
+        switch (op) {
+            case Opcodes.NOP: case Opcodes.ACONST_NULL:
+            case Opcodes.ICONST_M1: case Opcodes.ICONST_0: case Opcodes.ICONST_1:
+            case Opcodes.ICONST_2: case Opcodes.ICONST_3: case Opcodes.ICONST_4: case Opcodes.ICONST_5:
+            case Opcodes.LCONST_0: case Opcodes.LCONST_1:
+            case Opcodes.FCONST_0: case Opcodes.FCONST_1: case Opcodes.FCONST_2:
+            case Opcodes.DCONST_0: case Opcodes.DCONST_1:
+            case Opcodes.BIPUSH: case Opcodes.SIPUSH: // (LDC of any width falls to default/keep: a class/method-type constant can throw on resolution)
+            case Opcodes.ILOAD: case Opcodes.LLOAD: case Opcodes.FLOAD: case Opcodes.DLOAD: case Opcodes.ALOAD:
+            case Opcodes.ISTORE: case Opcodes.LSTORE: case Opcodes.FSTORE: case Opcodes.DSTORE: case Opcodes.ASTORE:
+            case Opcodes.POP: case Opcodes.POP2:
+            case Opcodes.DUP: case Opcodes.DUP_X1: case Opcodes.DUP_X2:
+            case Opcodes.DUP2: case Opcodes.DUP2_X1: case Opcodes.DUP2_X2: case Opcodes.SWAP:
+            case Opcodes.IADD: case Opcodes.LADD: case Opcodes.FADD: case Opcodes.DADD:
+            case Opcodes.ISUB: case Opcodes.LSUB: case Opcodes.FSUB: case Opcodes.DSUB:
+            case Opcodes.IMUL: case Opcodes.LMUL: case Opcodes.FMUL: case Opcodes.DMUL:
+            case Opcodes.FDIV: case Opcodes.DDIV: case Opcodes.FREM: case Opcodes.DREM: // float div/rem: no throw
+            case Opcodes.INEG: case Opcodes.LNEG: case Opcodes.FNEG: case Opcodes.DNEG:
+            case Opcodes.ISHL: case Opcodes.ISHR: case Opcodes.IUSHR:
+            case Opcodes.LSHL: case Opcodes.LSHR: case Opcodes.LUSHR:
+            case Opcodes.IAND: case Opcodes.IOR: case Opcodes.IXOR:
+            case Opcodes.LAND: case Opcodes.LOR: case Opcodes.LXOR:
+            case Opcodes.IINC:
+            case Opcodes.I2L: case Opcodes.I2F: case Opcodes.I2D:
+            case Opcodes.L2I: case Opcodes.L2F: case Opcodes.L2D:
+            case Opcodes.F2I: case Opcodes.F2L: case Opcodes.F2D:
+            case Opcodes.D2I: case Opcodes.D2L: case Opcodes.D2F:
+            case Opcodes.I2B: case Opcodes.I2C: case Opcodes.I2S:
+            case Opcodes.LCMP: case Opcodes.FCMPL: case Opcodes.FCMPG: case Opcodes.DCMPL: case Opcodes.DCMPG:
+            case Opcodes.IFEQ: case Opcodes.IFNE: case Opcodes.IFLT: case Opcodes.IFGE:
+            case Opcodes.IFGT: case Opcodes.IFLE:
+            case Opcodes.IF_ICMPEQ: case Opcodes.IF_ICMPNE: case Opcodes.IF_ICMPLT:
+            case Opcodes.IF_ICMPGE: case Opcodes.IF_ICMPGT: case Opcodes.IF_ICMPLE:
+            case Opcodes.IF_ACMPEQ: case Opcodes.IF_ACMPNE:
+            case Opcodes.IFNULL: case Opcodes.IFNONNULL:
+            case Opcodes.GOTO: case Opcodes.TABLESWITCH: case Opcodes.LOOKUPSWITCH:
+            case Opcodes.IRETURN: case Opcodes.LRETURN: case Opcodes.FRETURN:
+            case Opcodes.DRETURN: case Opcodes.ARETURN: case Opcodes.RETURN:
+            case Opcodes.INSTANCEOF:
+                return false;
+            default:
+                return true; // invoke*, *ALOAD/*ASTORE, ARRAYLENGTH, GET/PUTFIELD,
+                             // GET/PUTSTATIC, IDIV/IREM/LDIV/LREM, NEW*, ATHROW,
+                             // CHECKCAST, MONITORENTER/EXIT, LDC(class), JSR/RET, ...
+        }
+    }
+
     private void scalarReplaceStackAllocations() {
         if (DISABLE_SCALAR_REPLACE) {
             return;
@@ -2586,6 +2683,14 @@ public class BytecodeMethod implements SignatureSet {
         scalarReplaceStackAllocations();
         // the pass above may have removed instructions (ALOADs folded into reads)
         instructionCount = instructions.size();
+
+        // Mark source lines whose every instruction is non-throwing/non-calling as
+        // elidable (their per-line line-info store becomes a no-op in release --
+        // trace-identical, see analyzeElidableLineInfo). Runs AFTER scalar
+        // replacement so a scalar-replaced object's NEW/<init>/field reads (now
+        // pure struct access, no alloc/NPE) are correctly seen as non-throwing, and
+        // before the general fusion below so the remaining opcodes are still clean.
+        analyzeElidableLineInfo();
 
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
