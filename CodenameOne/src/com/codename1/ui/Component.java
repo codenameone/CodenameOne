@@ -3030,7 +3030,17 @@ public class Component implements Animation, StyleListener, Editable {
         // it today; a future optimisation could cache the blurred backdrop.
         float backdropBlur = getStyle().getBackdropFilterBlurRadius();
         if (backdropBlur > 0) {
-            g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
+            if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
+                int fg = getStyle().getFgColor();
+                int fgLuma = (int)(0.2126f*((fg>>16)&0xff) + 0.7152f*((fg>>8)&0xff) + 0.0722f*(fg&0xff));
+                boolean darkMat = fgLuma > 128; // dark theme uses a light fg
+                float sat = darkMat ? 2.5f : 1.95f;
+                float scale = darkMat ? 0.238f : 0.303f;
+                float offset = darkMat ? 28.4f : 174.3f;
+                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, sat, scale, offset);
+            } else {
+                g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
+            }
         }
         paintComponentBackground(g);
 

@@ -41,6 +41,8 @@
        override is supplied. */
     --accent-color: #007aff;
     --accent-color-dark: #0a84ff;
+    /* Opt the backdrop-filter glass layers into the reverse-engineered iOS Liquid Glass material (affine luma/sat/scale/offset transform). */
+    glassMaterialBool: true;
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;
@@ -430,7 +432,7 @@ SpinnerRendererFocus {
 SpinnerOverlay { background-color: transparent; padding: 0; margin: 0; }
 
 Toolbar {
-    background-color: rgba(255,255,255,0.62);
+    background-color: transparent;
     color: #000000;
     padding: 0;
     margin: 0;
@@ -538,7 +540,7 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: rgba(255,255,255,0.52);
+    background-color: transparent;
     color: #3c3c43;
     /* Liquid Glass floating tab pill: a moderate frost (0.52) so the blurred
        backdrop tints through and reads as glass, while the brighter selected
@@ -621,7 +623,8 @@ TabIcon.pressed { background-color: transparent; }
    translucent white tint + backdrop-filter:blur over a rounded rect -- but
    plain. This is the CN1 approximation of a UIVisualEffectView; tuned later. */
 GlassPanel {
-    background-color: rgba(255,255,255,0.5);
+    color: #3c3c43;
+    background-color: transparent;
     border-radius: 2.8mm;
     backdrop-filter: blur(40px);
     padding: 0;
@@ -873,8 +876,8 @@ PopupContent {
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
 
-    Toolbar { background-color: rgba(28,28,30,0.55); color: #ffffff; backdrop-filter: blur(64px); }
-    TitleArea { background-color: rgba(28,28,30,0.55); color: #ffffff; backdrop-filter: blur(64px); }
+    Toolbar { background-color: transparent; color: #ffffff; backdrop-filter: blur(64px); }
+    TitleArea { background-color: transparent; color: #ffffff; backdrop-filter: blur(64px); }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
     BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.72); cn1-background-type: cn1-round-border; }
@@ -895,7 +898,7 @@ PopupContent {
     TabbedPane { background-color: transparent; }
     /* Dark glass tab pill: more translucent so the backdrop reads through like the
        native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint). */
-    TabsContainer { background-color: rgba(40,40,44,0.45); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); }
+    TabsContainer { background-color: transparent; color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); }
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
@@ -913,7 +916,7 @@ PopupContent {
 
     /* Dark glass panel: a translucent dark tint so the backdrop reads through as
        Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */
-    GlassPanel { background-color: rgba(40,40,44,0.5); border-radius: 2.8mm; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
+    GlassPanel { color: #ebebf5; background-color: transparent; border-radius: 2.8mm; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
 
     /* Animated indicator inherits the dark-mode accent. */
     TabIndicator { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }

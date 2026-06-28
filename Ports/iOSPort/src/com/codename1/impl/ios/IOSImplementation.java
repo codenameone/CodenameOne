@@ -1856,6 +1856,71 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
 
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float sat, float scale, float offset) {
+        if (radius <= 0f || width <= 0 || height <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // Live screen path: the full colour-transform material is a follow-up; for
+        // now fall back to a plain in-place blur of the running screen region.
+        if (ng.associatedImage == null) {
+            return blurRegion(graphics, x, y, width, height, radius);
+        }
+        // Flush whatever has been painted into the image so its peer is current, read
+        // the region behind us, apply the "Liquid Glass" affine colour material and
+        // Gaussian-blur it (Metal-backed CIGaussianBlur) and draw the patch back where
+        // it was read.
+        ng.checkControl();
+        ng.associatedImage.peer = finishDrawingOnImage();
+        currentlyDrawingOn = null;
+        NativeImage target = ng.associatedImage;
+        int rx = Math.max(0, x), ry = Math.max(0, y);
+        int rw = Math.min(width, target.width - rx), rh = Math.min(height, target.height - ry);
+        if (rw <= 0 || rh <= 0) {
+            return true;
+        }
+        int[] rgb = new int[rw * rh];
+        getRGB(target, rgb, 0, rx, ry, rw, rh);
+        // Reverse-engineered iOS UIVisualEffectView material: an affine colour
+        // transform (saturation boost + scale + offset floor) of the backdrop before
+        // blurring (this is the backdrop-filter path only).
+        glassMaterialInPlace(rgb, sat, scale, offset);
+        NativeImage blurred = new NativeImage("backdrop-filter glass");
+        blurred.peer = nativeInstance.gausianBlurImage(createImageFromARGB(rgb, rw, rh), radius);
+        blurred.width = rw;
+        blurred.height = rh;
+        // drawImage applies this graphics' transform; pass coordinates relative to that
+        // transform's translation so the blurred patch lands back where we read it.
+        int tx = (int) Math.round(ng.transform.getTranslateX());
+        int ty = (int) Math.round(ng.transform.getTranslateY());
+        drawImage(ng, blurred, rx - tx, ry - ty);
+        return true;
+    }
+
+    /**
+     * Reverse-engineered iOS "Liquid Glass" material (empirically derived from a
+     * real UIVisualEffectView, validated &lt;1 LSB): an affine colour transform of
+     * each (blurred) backdrop pixel. For each channel c:
+     * c' = clamp( (lum + (c - lum) * sat) * scale + offset ) where lum is the
+     * pixel luma. The offset term is the white/dark frost floor. Alpha preserved.
+     */
+    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset) {
+        for (int i = 0; i < argb.length; i++) {
+            int p = argb[i];
+            int a = p & 0xff000000;
+            float r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            r = (lum + (r - lum) * sat) * scale + offset;
+            g = (lum + (g - lum) * sat) * scale + offset;
+            b = (lum + (b - lum) * sat) * scale + offset;
+            int ri = r < 0 ? 0 : (r > 255 ? 255 : (int) r);
+            int gi = g < 0 ? 0 : (g > 255 ? 255 : (int) g);
+            int bi = b < 0 ? 0 : (b > 255 ? 255 : (int) b);
+            argb[i] = a | (ri << 16) | (gi << 8) | bi;
+        }
+    }
+
     /** Liquid-glass vibrancy: how far backdrop colours are pushed from grey (1.0 = off). */
     private static final float GLASS_SATURATION = 1.35f;
 

@@ -3543,6 +3543,13 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// In-place region "Liquid Glass" material for backdrop-filter. Default falls
+    /// back to a plain blur (so non-iOS ports still blur, just without the colour
+    /// transform). Ports that support the full material override this.
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float sat, float scale, float offset) {
+        return blurRegion(graphics, x, y, width, height, radius);
+    }
+
     /// Renders an Apple SF Symbol to an image. Default returns null (only iOS
     /// implements this); callers fall back to the Material icon font.
     public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {

@@ -92,6 +92,17 @@ let SPECS: [Spec] = [
     Spec(component: "GlassPanelRed",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "ff3b30"),
     Spec(component: "GlassPanelGrad",  kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "gradient"),
     Spec(component: "GlassPanelPhoto", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "photo"),
+    // Reverse-engineering patches: solid grays + RGB primaries through the real
+    // UIVisualEffectView, so the host can fit the glass colour transform (the glass
+    // output over a solid == the transform of that colour, blur being a no-op).
+    Spec(component: "GlassCharK00", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "000000"),
+    Spec(component: "GlassCharK40", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "404040"),
+    Spec(component: "GlassCharK80", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "808080"),
+    Spec(component: "GlassCharKC0", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "c0c0c0"),
+    Spec(component: "GlassCharKFF", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "ffffff"),
+    Spec(component: "GlassCharR",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "ff0000"),
+    Spec(component: "GlassCharG",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "00ff00"),
+    Spec(component: "GlassCharB",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "0000ff"),
     Spec(component: "TabsGeom",        kind: "ios_uitabbar",    states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
 ]
 
