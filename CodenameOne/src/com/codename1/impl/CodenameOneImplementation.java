@@ -3543,6 +3543,12 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Renders an Apple SF Symbol to an image. Default returns null (only iOS
+    /// implements this); callers fall back to the Material icon font.
+    public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {
+        return null;
+    }
+
     private boolean checkIntersection(Object g, int y0, int x1, int x2, int y1, int y2, int[] intersections, int intersectionsCount) {
         if (y0 > y1 && y0 < y2 || y0 > y2 && y0 < y1) {
             if (y1 == y2) {

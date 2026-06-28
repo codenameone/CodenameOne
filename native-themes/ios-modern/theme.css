@@ -49,6 +49,10 @@
 
     includeNativeBool: false;
     darkModeBool: true;
+    /* When true, FontImage.createSFOrMaterial renders real Apple SF Symbols on
+       iOS (falling back to the Material icon font elsewhere / when a symbol is
+       missing). Set false to force the Material font everywhere. */
+    iosSFSymbolsBool: false;
     commandBehavior: Native;
     ios7StatusBarHack: true;
     paintsTitleBarBool: true;

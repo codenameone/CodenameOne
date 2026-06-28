@@ -874,9 +874,66 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
     data2[1] = (int)img.size.height;
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    
+
     POOL_END();
     return (JAVA_LONG) ((BRIDGE_CAST void*)glu);
+}
+
+// Renders an Apple SF Symbol (iOS 13+) into a tinted UIImage and wraps it in a
+// GLUIImage peer, mirroring createImageNSData. Returns 0 when SF Symbols are
+// unavailable or the named symbol does not exist; the caller falls back to the
+// Material icon font. widthHeight[0/1] receive the image size in PIXELS.
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_String_int_float_int_int_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_INT color, JAVA_FLOAT size, JAVA_INT weight, JAVA_OBJECT n2)
+{
+    if (@available(iOS 13.0, *)) {
+        POOL_BEGIN();
+        NSString* nameStr = toNSString(CN1_THREAD_STATE_PASS_ARG name);
+        if (nameStr == nil) {
+            POOL_END();
+            return 0;
+        }
+        // `size` arrives in CN1 device pixels (the same units as the Material glyph
+        // it replaces). UIImage symbol point size is in POINTS, so divide by the
+        // screen scale; the rendered bitmap is then ~`size` pixels tall, matching.
+        CGFloat scale = [UIScreen mainScreen].scale;
+        if (scale < 1) { scale = 1; }
+        CGFloat pointSize = size / scale;
+        UIImageSymbolConfiguration* cfg = [UIImageSymbolConfiguration configurationWithPointSize:pointSize weight:(weight >= 1 ? UIImageSymbolWeightBold : UIImageSymbolWeightRegular)];
+        UIImage* sym = [UIImage systemImageNamed:nameStr withConfiguration:cfg];
+        if (sym == nil) {
+            POOL_END();
+            return 0;
+        }
+        UIColor* c = [UIColor colorWithRed:((color >> 16) & 0xff) / 255.0 green:((color >> 8) & 0xff) / 255.0 blue:(color & 0xff) / 255.0 alpha:1.0];
+        // Flatten the (template) symbol tinted with the colour into a real RGBA
+        // bitmap -- imageWithTintColor alone left it a template that drew black
+        // through the GL image path.
+        CGSize szPt = sym.size;
+        UIGraphicsImageRendererFormat* rfmt = [UIGraphicsImageRendererFormat defaultFormat];
+        rfmt.scale = scale;
+        rfmt.opaque = NO;
+        UIGraphicsImageRenderer* rndr = [[UIGraphicsImageRenderer alloc] initWithSize:szPt format:rfmt];
+        UIImage* flat = [rndr imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull rc) {
+            [c set];
+            UIImage* templ = [sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            [templ drawInRect:CGRectMake(0, 0, szPt.width, szPt.height)];
+        }];
+#ifndef NEW_CODENAME_ONE_VM
+        org_xmlvm_runtime_XMLVMArray* intArray = n2;
+        JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+        JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+#endif
+        data2[0] = (int)(flat.size.width * flat.scale);
+        data2[1] = (int)(flat.size.height * flat.scale);
+
+        GLUIImage* glu = [[GLUIImage alloc] initWithImage:flat];
+
+        POOL_END();
+        return (JAVA_LONG) ((BRIDGE_CAST void*)glu);
+    } else {
+        return 0;
+    }
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)

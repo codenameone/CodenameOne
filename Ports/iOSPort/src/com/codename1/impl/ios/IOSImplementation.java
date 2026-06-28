@@ -1796,6 +1796,20 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {
+        int[] wh = new int[2];
+        long peer = nativeInstance.nativeCreateSFSymbol(name, color, sizePixels, weight, wh);
+        if (peer == 0) {
+            return null;
+        }
+        NativeImage n = new NativeImage("SF Symbol " + name);
+        n.peer = peer;
+        n.width = wh[0];
+        n.height = wh[1];
+        return Image.createImage(n);
+    }
+
+    @Override
     public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
         if (radius <= 0f || width <= 0 || height <= 0) {
             return true;
