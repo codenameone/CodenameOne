@@ -164,7 +164,7 @@ public class Initializr extends Lifecycle {
             }
             String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
-            ProjectOptions options = currentOptions(includeLocalizationBundles, previewLanguage, javaVersion);
+            ProjectOptions options = downloadOptions(includeLocalizationBundles, previewLanguage, javaVersion);
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
 
@@ -199,16 +199,27 @@ public class Initializr extends Lifecycle {
         }, "initializr-storage-cleanup").start();
     }
 
+    // Options that drive the LIVE PREVIEW only. The preview mock-up reflects the
+    // website's current light/dark chrome (via darkMode) so a dark-host visitor
+    // still sees a dark, natively-styled preview. This is purely cosmetic: the
+    // preview is styled with the initializr's own UIIDs and never compiles the
+    // generated theme.css. Downloads use downloadOptions() instead.
     private ProjectOptions currentOptions(boolean[] includeLocalizationBundles,
                                           ProjectOptions.PreviewLanguage[] previewLanguage,
                                           ProjectOptions.JavaVersion[] javaVersion) {
-        // The initializr UI no longer exposes a theme picker, so every generated
-        // project ships the barebones default theme. That theme.css already adapts
-        // to the device's light/dark setting at runtime via an
-        // @media (prefers-color-scheme: dark) block, so we must NOT bake the
-        // website's current dark/light state into the download -- doing so used to
-        // emit hard-coded dark colors at top-level scope that then broke light mode
-        // for anyone who opened the project.
+        ProjectOptions.ThemeMode mode = darkMode ? ProjectOptions.ThemeMode.DARK : ProjectOptions.ThemeMode.LIGHT;
+        return new ProjectOptions(mode, ProjectOptions.Accent.DEFAULT, true,
+                includeLocalizationBundles[0], previewLanguage[0], javaVersion[0], "");
+    }
+
+    // Options for the generated DOWNLOAD. The UI no longer exposes a theme
+    // picker, so every project ships the barebones default theme regardless of
+    // the website's current dark/light chrome. Baking the host state in here is
+    // what used to emit top-level "Initializr Theme Overrides" that broke light
+    // mode; the default theme.css adapts to the device at runtime on its own.
+    private ProjectOptions downloadOptions(boolean[] includeLocalizationBundles,
+                                           ProjectOptions.PreviewLanguage[] previewLanguage,
+                                           ProjectOptions.JavaVersion[] javaVersion) {
         return new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT, true,
                 includeLocalizationBundles[0], previewLanguage[0], javaVersion[0], "");
     }
