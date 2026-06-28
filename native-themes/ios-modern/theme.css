@@ -543,7 +543,7 @@ TabsContainer {
        pill's left/right edges like native. */
     backdrop-filter: blur(40px);
     padding: 0.5mm 0.5mm 0.5mm 0.5mm;
-    margin: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0 1mm 0.5mm 1mm;
     cn1-background-type: cn1-pill-border;
 }
 
@@ -562,12 +562,12 @@ Tab {
     background-color: transparent;
     /* Moderate padding: enough to spread the three items toward the native pill
        width without an over-tall/over-wide pill. */
-    padding: 0.78mm 3.3mm 0.78mm 3.3mm;
+    padding: 0.78mm 3.8mm 0.78mm 3.8mm;
     /* Same margin as Tab.selected/pressed so selecting only TOGGLES the capsule
        background -- it must not change the cell geometry. Small margins so the
        selected capsule nearly reaches the pill edges (native): minimal top/bottom
        + thin left/right. */
-    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
     font-family: "native:MainRegular";
     font-size: 1.8mm;
     text-align: center;
@@ -579,13 +579,13 @@ Tab.selected {
     color: var(--accent-color, #007aff);
     background-color: rgba(255,255,255,0.85);
     cn1-background-type: cn1-pill-border;
-    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
 Tab.pressed {
     color: var(--accent-color, #007aff);
     background-color: rgba(255,255,255,0.4);
     cn1-background-type: cn1-pill-border;
-    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
 
 SelectedTab {
@@ -593,7 +593,7 @@ SelectedTab {
     color: var(--accent-color, #007aff);
     background-color: rgba(255,255,255,0.85);
     cn1-background-type: cn1-pill-border;
-    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
 
@@ -618,7 +618,7 @@ TabIcon.pressed { background-color: transparent; }
    plain. This is the CN1 approximation of a UIVisualEffectView; tuned later. */
 GlassPanel {
     background-color: rgba(255,255,255,0.5);
-    cn1-background-type: cn1-round-border;
+    border-radius: 2.8mm;
     backdrop-filter: blur(40px);
     padding: 0;
     margin: 1mm;
@@ -895,9 +895,9 @@ PopupContent {
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.5); cn1-background-type: cn1-pill-border; margin: 0.35mm 0.4mm 0.35mm 0.4mm; }
-    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; margin: 0.35mm 0.4mm 0.35mm 0.4mm; }
-    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.5); cn1-background-type: cn1-pill-border; margin: 0.35mm 0.4mm 0.35mm 0.4mm; }
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.5); cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.5); cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
     UnselectedTab { color: #ebebf5; }
 
     /* Dark overrides for the icon-only UIID. Background stays transparent
@@ -909,7 +909,7 @@ PopupContent {
 
     /* Dark glass panel: a translucent dark tint so the backdrop reads through as
        Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */
-    GlassPanel { background-color: rgba(40,40,44,0.5); cn1-background-type: cn1-round-border; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
+    GlassPanel { background-color: rgba(40,40,44,0.5); border-radius: 2.8mm; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
 
     /* Animated indicator inherits the dark-mode accent. */
     TabIndicator { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }

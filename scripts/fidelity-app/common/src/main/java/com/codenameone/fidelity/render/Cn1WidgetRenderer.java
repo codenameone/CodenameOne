@@ -207,9 +207,9 @@ public final class Cn1WidgetRenderer {
             unS.setBgTransparency(0);
             // Bigger icons (the native tab item is icon-dominant); the label font is
             // cut in the theme so the overall item roughly doubles toward native size.
-            Image star = FontImage.createMaterial(FontImage.MATERIAL_STAR, selS, 4.6f);
-            Image search = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, unS, 4.6f);
-            Image more = FontImage.createMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 4.6f);
+            Image star = FontImage.createMaterial(FontImage.MATERIAL_STAR, selS, 4.1f);
+            Image search = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, unS, 4.1f);
+            Image more = FontImage.createMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 4.1f);
             tabs.addTab("Featured", star, star, new Container());
             tabs.addTab("Search", search, search, new Container());
             tabs.addTab("More", more, more, new Container());
