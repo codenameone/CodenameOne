@@ -586,6 +586,11 @@ void collectThreadResources(struct ThreadLocalData *current)
     }
 }
 static void gcMarkDrain(CODENAME_ONE_THREAD_STATE);
+// Parallel variant of gcMarkDrain: fans the transitive mark-drain out across a small
+// pool of worker threads. Falls back to the serial gcMarkDrain when only one marker
+// is configured. Defined further down (after gcMarkDrain). See the big comment block
+// at the worklist declarations for the design and the invariants it preserves.
+static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE);
 
 /**
  * A simple concurrent mark algorithm that traverses the currently running threads
@@ -721,7 +726,14 @@ void codenameOneGCMark() {
                 // silently deadlock. Earlier attempts at this drain hung at app startup
                 // because the overflow rescan path had a cursor-reset bug; with that fixed
                 // below, the drain runs to completion in O(reachable) time.
-                gcMarkDrain(d);
+                //
+                // The drain is fanned out across a worker pool (gcMarkDrainParallel).
+                // This still satisfies snapshot-at-the-beginning: the roots were already
+                // pushed onto the worklist serially above (while this thread is paused),
+                // and gcMarkDrainParallel does not return until the entire reachable set
+                // is marked -- it just marks it faster. With a single configured marker
+                // it degrades to the serial gcMarkDrain and is byte-for-byte identical.
+                gcMarkDrainParallel(d);
                 if(!agressiveAllocator) {
                     t->threadBlockedByGC = JAVA_FALSE;
                 } else {
@@ -1269,10 +1281,121 @@ static JAVA_BOOLEAN gcMarkWorklistOverflow = JAVA_FALSE;
 // the overflow-rescan loop to detect a fixed point: if a rescan+drain pass marks
 // nothing new, the reachable set is fully closed under "marked" and we're done --
 // otherwise we'd spin forever re-pushing the same marked-and-already-scanned
-// objects when the marked set is larger than the worklist.
+// objects when the marked set is larger than the worklist. Only touched on the
+// serial path (gcMarkLocalBuf == 0); the parallel workers never run the rescan, and
+// writing it from many workers would be a benign-value-but-still-reported data race.
 static JAVA_BOOLEAN gcMarkFoundUnmarkedChildInPass = JAVA_FALSE;
 
+// ===================== Parallel mark drain =====================
+//
+// The transitive drain (popping objects and running their per-class mark functions,
+// which push reference fields back onto the worklist) is the dominant cost of a mark
+// cycle, and it is embarrassingly parallel: marking is already type-specialized and
+// the only shared mutable state is (a) each object's mark bit and (b) the worklist.
+//
+// We parallelize ONLY the drain, leaving codenameOneGCMark's per-thread park / root
+// snapshot / aggressive-allocator handling exactly as it was. The roots are pushed
+// onto the worklist serially while the mutator thread is paused (snapshot-at-the-
+// beginning, invariant #1), then gcMarkDrainParallel marks the whole reachable set
+// before the thread is released -- the workers just do it faster.
+//
+// Correctness rests on three things:
+//  * The mark bit is claimed with an atomic compare-and-swap (gcMarkObject), so for
+//    any object exactly one worker wins the unmarked->marked transition and exactly
+//    one worker pushes it. No double-push, no double-scan, no torn mark bit.
+//  * The shared worklist is guarded by gcMarkWorklistMutex. Workers pop a BATCH under
+//    the lock and buffer the children they produce in a thread-local buffer, flushing
+//    in batches, so the lock is taken ~once per CN1_GC_MARK_BATCH objects.
+//  * Termination = worklist empty AND every worker idle, tracked by gcMarkActiveWorkers
+//    under the lock. A worker stays "active" from the moment it pops work until, after
+//    flushing everything it produced, it observes the global worklist empty; only then
+//    does it go idle. So the count hits zero only when no in-hand or global work
+//    remains anywhere -- a worker that produces new work re-wakes the idle ones.
+//
+// The bounded explicit worklist (invariant #2, no recursion) and the overflow->heap-
+// rescan fixed point (invariant #3) are preserved: on overflow the parallel region
+// still drains to empty (marked-but-unscanned objects are dropped from the worklist
+// but stay marked) and then gcMarkDrainParallel finishes with one serial gcMarkDrain,
+// which runs the rescan fixed point exactly as before.
+//
+// CN1_GC_MARK_THREADS overrides the worker count at compile time (-D...); when it is
+// not set the count is min(4, online-cpus - 1) computed at runtime. A count of 1 (the
+// historical behavior) takes the serial path with no pool, no atomics and no locks.
+#ifndef CN1_GC_MARK_BATCH
+#define CN1_GC_MARK_BATCH 64
+#endif
+#ifndef CN1_GC_MARK_LOCAL_CAP
+#define CN1_GC_MARK_LOCAL_CAP 256
+#endif
+
+// Per-worker production buffer. While a thread is acting as a parallel mark worker its
+// gcMarkLocalBuf points here (on that worker's stack); gcMarkWorklistPush appends to it
+// and flushes to the shared worklist in batches. When NULL the thread is on the serial
+// path and pushes straight to the shared worklist with no locking (single-threaded by
+// construction: root snapshot, the serial drain, the nursery promote drain). Being a
+// thread-local pointer it also doubles as the per-thread "am I a parallel worker?" flag
+// that gcMarkObject uses to choose the atomic mark-claim path.
+struct gcMarkLocalBuffer {
+    int count;
+    struct gcMarkWorklistEntry entries[CN1_GC_MARK_LOCAL_CAP];
+};
+static __thread struct gcMarkLocalBuffer* gcMarkLocalBuf = 0;
+
+// Worklist / termination state (guarded by gcMarkWorklistMutex during a parallel drain)
+static pthread_mutex_t gcMarkWorklistMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  gcMarkWorklistCond  = PTHREAD_COND_INITIALIZER;
+static int gcMarkActiveWorkers = 0;
+static JAVA_BOOLEAN gcMarkDone = JAVA_FALSE;
+static struct ThreadLocalData* gcMarkThreadState = 0; // 'd' passed through to mark functions
+
+// Pool dispatch / completion handshake (guarded by gcMarkCtlMutex)
+static pthread_mutex_t gcMarkCtlMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  gcMarkCtlCond  = PTHREAD_COND_INITIALIZER;
+static unsigned long gcMarkGeneration = 0;     // bumped to dispatch a drain
+static int gcMarkWorkersFinished = 0;          // helpers that completed the current generation
+static int gcMarkPoolSize = 0;                 // number of spawned helper threads (= count - 1)
+static int gcMarkThreadCount = 0;              // total markers incl. the GC thread (resolved once)
+static JAVA_BOOLEAN gcMarkPoolReady = JAVA_FALSE;
+
+// Append a worker's local production buffer to the shared worklist. On overflow the
+// surplus entries are dropped -- they are already MARKED (their mark bit was claimed
+// before the push) so dropping only defers their field scan to the serial rescan, which
+// is exactly the existing overflow contract.
+static void gcMarkFlushLocal(struct gcMarkLocalBuffer* lb) {
+    if(lb->count == 0) {
+        return;
+    }
+    pthread_mutex_lock(&gcMarkWorklistMutex);
+    int appended = 0;
+    for(int i = 0 ; i < lb->count ; i++) {
+        if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
+            gcMarkWorklistOverflow = JAVA_TRUE;
+            break;
+        }
+        gcMarkWorklist[gcMarkWorklistTop] = lb->entries[i];
+        gcMarkWorklistTop++;
+        appended++;
+    }
+    if(appended > 0) {
+        pthread_cond_broadcast(&gcMarkWorklistCond);
+    }
+    pthread_mutex_unlock(&gcMarkWorklistMutex);
+    lb->count = 0;
+}
+
 static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
+    struct gcMarkLocalBuffer* lb = gcMarkLocalBuf;
+    if(lb != 0) {
+        // Parallel worker: buffer locally, flush in batches (see gcMarkFlushLocal).
+        if(lb->count >= CN1_GC_MARK_LOCAL_CAP) {
+            gcMarkFlushLocal(lb);
+        }
+        lb->entries[lb->count].obj = obj;
+        lb->entries[lb->count].force = force;
+        lb->count++;
+        return;
+    }
+    // Serial path: identical to the original single-threaded push.
     if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
         gcMarkWorklistOverflow = JAVA_TRUE;
         return;
@@ -1309,8 +1432,31 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     }
 #endif
 
+    int markVal = currentGcMarkValue;
+
+    // Parallel worker path: claim the object's mark bit with an atomic CAS so exactly
+    // one worker transitions it unmarked->marked and pushes it (no double-scan, no torn
+    // mark bit). 'force' is never set on the parallel path -- the per-thread roots are
+    // pushed with force==FALSE and mark functions propagate that -- so the force/
+    // recursionKey re-scan (which writes __codenameOneReferenceCount and is rare) stays
+    // entirely on the serial path below, keeping the parallel region race-free.
+    if(gcMarkLocalBuf != 0) {
+        int old = __atomic_load_n(&obj->__codenameOneGcMark, __ATOMIC_RELAXED);
+        if(old == markVal) {
+            return; // already marked this cycle
+        }
+        if(__sync_bool_compare_and_swap(&obj->__codenameOneGcMark, old, markVal)) {
+            if(obj->__codenameOneParentClsReference->markFunction != 0) {
+                gcMarkWorklistPush(obj, force);
+            }
+        }
+        // else: another worker won the claim and is responsible for pushing it.
+        return;
+    }
+
+    // Serial path: byte-for-byte the original behavior (single writer, plain store).
     // if this is a Class object or already marked this should be ignored
-    if(obj->__codenameOneGcMark == currentGcMarkValue) {
+    if(obj->__codenameOneGcMark == markVal) {
         if(force) {
             if(obj->__codenameOneReferenceCount == recursionKey) {
                 return;
@@ -1322,7 +1468,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         }
         return;
     }
-    obj->__codenameOneGcMark = currentGcMarkValue;
+    obj->__codenameOneGcMark = markVal;
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
     if(obj->__codenameOneParentClsReference->markFunction != 0) {
         gcMarkWorklistPush(obj, force);
@@ -1601,7 +1747,18 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN 
     if(obj == JAVA_NULL) {
         return;
     }
-    obj->__codenameOneGcMark = currentGcMarkValue;
+#ifdef CN1_NURSERY
+    // The minor collection reuses array mark functions to walk arrays for promotion;
+    // there the array's mark bit is NOT claimed through gcMarkObject, so set it as the
+    // pre-existing code did.
+    if(threadStateData->nurseryPromoting) {
+        obj->__codenameOneGcMark = currentGcMarkValue;
+    }
+#endif
+    // In the concurrent GC drain (serial or parallel) this array's mark bit was already
+    // claimed atomically by the gcMarkObject that enqueued it. We must NOT rewrite it
+    // here: a redundant non-atomic store would race with other workers reading the bit
+    // (and with the winning worker's CAS) under ThreadSanitizer.
     JAVA_ARRAY arr = (JAVA_ARRAY)obj;
     if(arr->length > 0) {
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)arr->data;
@@ -1661,6 +1818,169 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
                 }
             }
         }
+    }
+}
+
+// Resolve the total number of markers (the GC thread + helper threads). Computed once.
+static int gcMarkResolveThreadCount() {
+#ifdef CN1_GC_MARK_THREADS
+    int n = CN1_GC_MARK_THREADS;
+#else
+    long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+    int n = (int)(ncpu - 1);
+    if(n > 4) {
+        n = 4;
+    }
+#endif
+    if(n < 1) {
+        n = 1;
+    }
+    return n;
+}
+
+// The body each marker (GC thread + helpers) runs for one parallel drain. Pops batches
+// from the shared worklist, runs their mark functions (which push children into this
+// thread's local buffer), flushes, and repeats until the worklist is empty and every
+// marker is idle. See the design note at the worklist declarations.
+static void gcMarkWorkerDrainLoop() {
+    struct gcMarkLocalBuffer localBuf;
+    localBuf.count = 0;
+    gcMarkLocalBuf = &localBuf;
+    struct gcMarkWorklistEntry batch[CN1_GC_MARK_BATCH];
+    struct ThreadLocalData* d = gcMarkThreadState;
+
+    pthread_mutex_lock(&gcMarkWorklistMutex);
+    for(;;) {
+        if(gcMarkWorklistTop > 0) {
+            int n = gcMarkWorklistTop;
+            if(n > CN1_GC_MARK_BATCH) {
+                n = CN1_GC_MARK_BATCH;
+            }
+            gcMarkWorklistTop -= n;
+            memcpy(batch, &gcMarkWorklist[gcMarkWorklistTop], n * sizeof(struct gcMarkWorklistEntry));
+            pthread_mutex_unlock(&gcMarkWorklistMutex);
+
+            for(int i = 0 ; i < n ; i++) {
+                JAVA_OBJECT obj = batch[i].obj;
+                gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+                if(fp != 0) {
+                    fp(d, obj, batch[i].force);
+                }
+            }
+            gcMarkFlushLocal(&localBuf);
+
+            pthread_mutex_lock(&gcMarkWorklistMutex);
+            continue;
+        }
+        // No work in hand and the global worklist is empty: this marker goes idle.
+        gcMarkActiveWorkers--;
+        if(gcMarkActiveWorkers == 0) {
+            // Empty worklist AND every marker idle => the reachable set is fully drained.
+            gcMarkDone = JAVA_TRUE;
+            pthread_cond_broadcast(&gcMarkWorklistCond);
+            break;
+        }
+        while(gcMarkWorklistTop == 0 && !gcMarkDone) {
+            pthread_cond_wait(&gcMarkWorklistCond, &gcMarkWorklistMutex);
+        }
+        if(gcMarkDone) {
+            break;
+        }
+        // Work appeared (another marker produced children) -- become active again.
+        gcMarkActiveWorkers++;
+    }
+    pthread_mutex_unlock(&gcMarkWorklistMutex);
+    gcMarkLocalBuf = 0;
+}
+
+// Helper-thread entry point. Sleeps on the control condition until the GC thread bumps
+// the generation to dispatch a drain, participates, then reports completion. Lives for
+// the lifetime of the process (like the GC thread itself).
+static void* gcMarkWorkerMain(void* arg) {
+    unsigned long myGen = 0;
+    for(;;) {
+        pthread_mutex_lock(&gcMarkCtlMutex);
+        while(gcMarkGeneration == myGen) {
+            pthread_cond_wait(&gcMarkCtlCond, &gcMarkCtlMutex);
+        }
+        myGen = gcMarkGeneration;
+        pthread_mutex_unlock(&gcMarkCtlMutex);
+
+        gcMarkWorkerDrainLoop();
+
+        pthread_mutex_lock(&gcMarkCtlMutex);
+        gcMarkWorkersFinished++;
+        pthread_cond_broadcast(&gcMarkCtlCond);
+        pthread_mutex_unlock(&gcMarkCtlMutex);
+    }
+    return 0;
+}
+
+// Lazily create the helper pool. Only ever called from the GC thread (single-threaded),
+// so no synchronization is needed around the one-time setup.
+static void gcMarkPoolEnsure() {
+    if(gcMarkPoolReady) {
+        return;
+    }
+    gcMarkThreadCount = gcMarkResolveThreadCount();
+    gcMarkPoolSize = gcMarkThreadCount - 1;
+    for(int i = 0 ; i < gcMarkPoolSize ; i++) {
+        pthread_t tid;
+        if(pthread_create(&tid, 0, gcMarkWorkerMain, 0) == 0) {
+            pthread_detach(tid);
+        } else {
+            // Could not spawn a helper; fall back to fewer markers (at least the GC thread).
+            gcMarkPoolSize = i;
+            gcMarkThreadCount = i + 1;
+            break;
+        }
+    }
+    gcMarkPoolReady = JAVA_TRUE;
+}
+
+// Parallel transitive drain. The worklist has already been seeded with roots (serially,
+// while the relevant mutator thread is paused). Dispatches the helper pool, participates
+// on the GC thread, waits for everyone to finish, then -- only if the worklist overflowed
+// -- runs one serial gcMarkDrain to execute the heap-rescan fixed point (invariant #3).
+static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
+    gcMarkPoolEnsure();
+    if(gcMarkThreadCount <= 1) {
+        // Single marker configured: behave exactly like before -- no pool, no atomics.
+        gcMarkDrain(threadStateData);
+        return;
+    }
+
+    gcMarkThreadState = threadStateData;
+
+    // Reset termination state. Safe to touch unlocked here: the previous generation's
+    // helpers have all reported finished (we waited below) and are parked on the control
+    // condition, and the GC thread is the only one running between generations.
+    pthread_mutex_lock(&gcMarkWorklistMutex);
+    gcMarkActiveWorkers = gcMarkThreadCount; // GC thread + helpers
+    gcMarkDone = JAVA_FALSE;
+    pthread_mutex_unlock(&gcMarkWorklistMutex);
+
+    // Dispatch the helpers.
+    pthread_mutex_lock(&gcMarkCtlMutex);
+    gcMarkWorkersFinished = 0;
+    gcMarkGeneration++;
+    pthread_cond_broadcast(&gcMarkCtlCond);
+    pthread_mutex_unlock(&gcMarkCtlMutex);
+
+    // The GC thread participates as one marker.
+    gcMarkWorkerDrainLoop();
+
+    // Wait for the helpers to finish this generation before returning (so no helper is
+    // still touching mark bits when the caller proceeds to release threads / sweep).
+    pthread_mutex_lock(&gcMarkCtlMutex);
+    while(gcMarkWorkersFinished < gcMarkPoolSize) {
+        pthread_cond_wait(&gcMarkCtlCond, &gcMarkCtlMutex);
+    }
+    pthread_mutex_unlock(&gcMarkCtlMutex);
+
+    // Overflow safety net: finish deferred field scans with the serial rescan fixed point.
+    if(gcMarkWorklistOverflow) {
+        gcMarkDrain(threadStateData);
     }
 }
 
