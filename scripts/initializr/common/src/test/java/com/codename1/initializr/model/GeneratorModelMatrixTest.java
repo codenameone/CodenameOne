@@ -176,16 +176,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(claudeStub, ".agent-skills/codename-one/SKILL.md",
                 "Claude stub should redirect to the canonical skill content");
 
-        // Java 17 projects no longer ship the legacy UWP/Windows native module.
-        // Both the win/ source tree and the <profile id="win"> block in the root pom
-        // should be absent.
-        for (String path : entries.keySet()) {
-            assertFalse(path.startsWith("win/") || path.startsWith("win\\"),
-                    "Java 17 projects should not bundle the win/ module — found: " + path);
-        }
+        // The win/ module is the native win32 target (not the retired UWP module),
+        // so Java 17 projects ship it just like Java 8 projects do.
+        assertNotNull(entries.get("win/pom.xml"),
+                "Java 17 projects should bundle the win32 (win/) module");
         String rootPom = getText(entries, "pom.xml");
-        assertFalse(rootPom.indexOf("<id>win</id>") >= 0,
-                "Java 17 root pom should not contain the Windows-module activation profile");
+        assertContains(rootPom, "<id>win</id>",
+                "Java 17 root pom should retain the win32 module activation profile");
     }
 
     private void validateLegacyJava8Generation() throws Exception {
@@ -220,12 +217,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertNull(entries.get("AGENTS.md"),
                 "Java 8 projects should not bundle the AGENTS.md root pointer (Java 17-only)");
 
-        // Legacy Java 8 projects keep the win/ module — only Java 17 projects drop it.
+        // Both Java 8 and Java 17 projects ship the native win32 (win/) module.
         assertNotNull(entries.get("win/pom.xml"),
-                "Legacy Java 8 projects should retain the win/ module");
+                "Java 8 projects should retain the win32 (win/) module");
         String rootPom = getText(entries, "pom.xml");
         assertContains(rootPom, "<id>win</id>",
-                "Legacy Java 8 root pom should retain the Windows-module activation profile");
+                "Java 8 root pom should retain the win32 module activation profile");
     }
 
     private void validateJava17DefaultRegressionFixes() throws Exception {
@@ -296,6 +293,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
         String themeCss = getText(entries, "common/src/main/css/theme.css");
         assertContains(themeCss, "useLargerTextScaleBool: true;", "Barebones templates should default useLargerTextScaleBool to true");
+        assertContains(themeCss, "@media (prefers-color-scheme: dark)", "Default theme should adapt to dark mode out of the box");
+        assertFalse(themeCss.indexOf("Initializr Theme Overrides") >= 0, "Default theme must not carry baked-in top-level theme overrides");
     }
 
     private static byte[] createProjectZip(IDE ide, Template template, String appName, String packageName) throws IOException {
