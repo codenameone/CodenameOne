@@ -570,13 +570,23 @@ extern int nThreadsToKill;
 
 JAVA_BOOLEAN hasAgressiveAllocator;
 
+#ifndef CN1_DISABLE_BIBOP
+extern void cn1BibopRetireThreadPages();
+#endif
+
 // the thread just died, mark its remaining resources
 void collectThreadResources(struct ThreadLocalData *current)
 {
+#ifndef CN1_DISABLE_BIBOP
+    // Retire this (dying) thread's current BiBOP pages so their slots become
+    // collectable. Runs on the dying thread, so its __thread current pages are
+    // reachable here.
+    cn1BibopRetireThreadPages();
+#endif
     if(current->utf8Buffer != 0) {
         free(current->utf8Buffer);
         current->utf8Buffer = 0;
-    } 
+    }
     for(int heapTrav = 0 ; heapTrav < current->heapAllocationSize ; heapTrav++) {
         JAVA_OBJECT obj = (JAVA_OBJECT)current->pendingHeapAllocations[heapTrav];
         if(obj) {
@@ -921,8 +931,17 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
  * since it always runs from the same thread and concurrent work doesn't matter
  * it can just delete everything it finds
  */
+#ifndef CN1_DISABLE_BIBOP
+static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE);
+#endif
 void codenameOneGCSweep() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+#ifndef CN1_DISABLE_BIBOP
+    // Reclaim dead slots on retired BiBOP pages (rebuild per-page free-lists from
+    // the header epoch marks). Runs first, on the GC thread, with no marking in
+    // flight and no mutator owning these pages.
+    cn1BibopSweep(threadStateData);
+#endif
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
     preSweepCount(threadStateData);
 #endif
@@ -1074,6 +1093,369 @@ int mallocWhileSuspended = 0;
 BOOL isAppSuspended = 0;
 #endif
 
+#ifndef CN1_DISABLE_BIBOP
+// =========================================================================
+// BiBOP: non-moving segregated-fits page heap + mark-sweep for SMALL non-array
+// objects. Objects NEVER move (stable addresses, real pointers, real array
+// offsets / SIMD alignment preserved). Arrays and objects larger than
+// CN1_BIBOP_MAX_OBJECT keep the legacy calloc + allObjectsInHeap + table-sweep
+// path verbatim. Gate the whole thing off with -DCN1_DISABLE_BIBOP for A/B.
+//
+// LIVENESS SOURCE OF TRUTH = the per-object header epoch mark
+// (__codenameOneGcMark), exactly as the legacy collector. gcMarkObject is
+// therefore UNCHANGED and works uniformly on page slots and table objects: a
+// page slot has the same header layout as any object. We deliberately did NOT
+// introduce a separate per-page mark bitmap; reusing the proven epoch + grace
+// semantics (mark==-1 => grace; mark < cur-1 => dead) eliminates an entire
+// class of mark-path races (no new claim path, no bitmap/epoch skew) and is
+// what makes the "bit-identical + TSan-clean" gates reachable. The win is the
+// dropped per-object registration (no placeObjectInHeapCollection, small
+// objects absent from the giant allObjectsInHeap table) + word-free-list sweep.
+//
+// PAGE LIFECYCLE (a page is in exactly ONE role at a time):
+//   FREE pool      empty page, reusable for any size class
+//   PARTIAL pool   swept page w/ free slots AND some live objects (per class)
+//   OWNED          a single thread bump/free-list allocates from it (NOT swept)
+//   SWEEP stack    retired page (full, or from a dead thread) awaiting sweep
+// Transitions: alloc pulls PARTIAL|FREE -> OWNED (under bibopMutex); a full
+// OWNED page is retired -> SWEEP stack (under bibopMutex); the sweep snapshots
+// the SWEEP stack via an atomic head-swap and routes each page to FREE/PARTIAL.
+// A page is NEVER simultaneously allocated-into and swept (hard point #2).
+//
+// HARD POINT #1 (allocate-during-GC / new objects survive): a freshly
+// allocated slot gets header mark = -1, and the sweep gives mark==-1 the same
+// one-cycle grace the legacy table sweep does (sets it to currentGcMarkValue).
+// New objects also live on the thread's OWNED current page, which the
+// concurrent sweep never touches (only retired pages are swept) -- mirroring
+// how legacy new objects sit in pendingHeapAllocations until a paused mark.
+//
+// HARD POINT #2 (sweep vs mutator alloc on same page): the sweep only ever
+// processes pages it took off the SWEEP stack (retired, owner==0). The owning
+// thread's current page is never on that stack, so its free-list / bump cursor
+// are never touched by the sweep. No data race on a page's free-list/cursor.
+//
+// HARD POINT #3 (no page-table lookup race): there is NO page table. Address ->
+// page is never needed on a hot path: gcMarkObject uses the header (no lookup),
+// the sweep walks pages it already holds, and free() of a page slot never
+// happens (slots are recycled into the page free-list, identified by the
+// __heapPosition==-3 sentinel). The only cross-thread page structures are the
+// pools/stack (bibopMutex) and the append-only all-pages registry used by the
+// overflow rescan (atomic head, release/acquire) -- both lock/atomic safe.
+//
+// OVERFLOW RESCAN (invariant #3): if the mark worklist overflows, a marked
+// object whose mark-function has not yet run must be re-discovered. Legacy
+// rescans allObjectsInHeap; we additionally rescan every page slot via the
+// all-pages registry. Concurrent reads are race-free because (a) page bump
+// cursors are published with release / read with acquire, and (b) a slot's
+// header fields are only dereferenced when its (atomically read) mark equals
+// the current cycle -- which is impossible for a slot a mutator is mid-
+// initializing (its mark transitions oldDead/FREE -> -1, never through cur).
+// =========================================================================
+
+#include <stdatomic.h>
+
+#ifndef CN1_BIBOP_PAGE_SIZE
+#define CN1_BIBOP_PAGE_SIZE (64*1024)
+#endif
+#ifndef CN1_BIBOP_MAX_OBJECT
+#define CN1_BIBOP_MAX_OBJECT 512
+#endif
+// Bytes bump/free-list-allocated through BiBOP since the last GC that force a
+// collection so RSS stays bounded even for an all-small-object workload (these
+// objects bypass the legacy per-thread heapAllocationSize GC trigger).
+#ifndef CN1_BIBOP_GC_TRIGGER_BYTES
+#define CN1_BIBOP_GC_TRIGGER_BYTES (24*1024*1024)
+#endif
+// Header mark sentinel for a slot sitting on a page free-list (distinct from
+// -1 "fresh", and from any real epoch >= 1). The free-list link is stored in
+// the slot's first pointer word (the __codenameOneParentClsReference slot),
+// which a free slot does not otherwise use.
+#define CN1_BIBOP_FREE_MARK (-7)
+#define CN1_BIBOP_HEAP_POS   (-3)
+
+// Size classes (slot sizes, 16-aligned). size <= CN1_BIBOP_MAX_OBJECT maps to
+// the smallest class >= size; everything else takes the legacy path.
+static const int cn1BibopClassSize[] = {
+    32, 48, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512
+};
+#define CN1_BIBOP_NUM_CLASSES ((int)(sizeof(cn1BibopClassSize)/sizeof(int)))
+static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
+
+typedef struct CN1BibopPage {
+    struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
+    struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
+    int classIndex;
+    int slotSize;
+    int slotCount;
+    int firstSlotOffset;                  // byte offset of slot 0 from page base
+    _Atomic int bumpIndex;                // next slot to bump-allocate (published)
+    void* freeList;                       // intrusive free-list head (slot ptr)
+    int freeCount;
+    JAVA_BOOLEAN owned;
+} CN1BibopPage;
+
+static CN1BibopPage* _Atomic bibopAllPages = 0;   // registry head (atomic)
+static CN1BibopPage* bibopFreePool = 0;           // bibopMutex
+static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
+static CN1BibopPage* _Atomic bibopSweepStack = 0; // Treiber-ish (push CAS / swap)
+static pthread_mutex_t bibopMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
+static _Atomic long bibopBytesSinceGc = 0;
+
+// Per-thread current page per size class. Only ever touched by the owning
+// thread (allocation) and by that same thread on death (collectThreadResources
+// runs on the dying thread), so __thread is correct and the GC never needs to
+// reach into it -- retired pages are handed to the GC via the global stack.
+static __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+
+static void cn1BibopDoInit() {
+    int ci = 0;
+    for(int s = 0 ; s <= CN1_BIBOP_MAX_OBJECT ; s++) {
+        while(ci < CN1_BIBOP_NUM_CLASSES && cn1BibopClassSize[ci] < s) {
+            ci++;
+        }
+        cn1BibopSizeToClass[s] = (signed char)(ci < CN1_BIBOP_NUM_CLASSES ? ci : -1);
+    }
+    for(int i = 0 ; i < CN1_BIBOP_NUM_CLASSES ; i++) {
+        bibopPartialPool[i] = 0;
+    }
+}
+
+static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
+    int slotSize = cn1BibopClassSize[ci];
+    // slot 0 starts after the page header, rounded up to 16-byte alignment so
+    // every slot is at least 16-aligned (matches/exceeds calloc's guarantee).
+    int hdr = (int)((sizeof(CN1BibopPage) + 15) & ~((size_t)15));
+    p->classIndex = ci;
+    p->slotSize = slotSize;
+    p->firstSlotOffset = hdr;
+    p->slotCount = (CN1_BIBOP_PAGE_SIZE - hdr) / slotSize;
+    atomic_store_explicit(&p->bumpIndex, 0, memory_order_relaxed);
+    p->freeList = 0;
+    p->freeCount = 0;
+    p->owned = JAVA_FALSE;
+}
+
+static CN1BibopPage* cn1BibopNewPage(int ci) {
+    void* mem = 0;
+    if(posix_memalign(&mem, CN1_BIBOP_PAGE_SIZE, CN1_BIBOP_PAGE_SIZE) != 0 || mem == 0) {
+        return 0;
+    }
+    CN1BibopPage* p = (CN1BibopPage*)mem;
+    cn1BibopFormatPage(p, ci);
+    // Publish into the append-only registry: set nextAll (release) BEFORE the
+    // head CAS so a concurrent rescan that reads the new head (acquire) sees a
+    // fully-linked node.
+    CN1BibopPage* head = atomic_load_explicit(&bibopAllPages, memory_order_relaxed);
+    do {
+        atomic_store_explicit(&p->nextAll, head, memory_order_relaxed);
+    } while(!atomic_compare_exchange_weak_explicit(&bibopAllPages, &head, p,
+                memory_order_release, memory_order_relaxed));
+    return p;
+}
+
+static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
+    return (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)i * p->slotSize);
+}
+
+// Trigger a full GC if BiBOP allocation volume since the last collection has
+// crossed the threshold (these objects don't feed the legacy heapAllocationSize
+// trigger). Mirrors codenameOneGcMalloc's simple self-triggering branch.
+static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
+    if(gcCurrentlyRunning || constantPoolObjects == 0 || threadStateData->nativeAllocationMode) {
+        return;
+    }
+    if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_TRIGGER_BYTES) {
+        threadStateData->nativeAllocationMode = JAVA_TRUE;
+        java_lang_System_gc__(threadStateData);
+        threadStateData->nativeAllocationMode = JAVA_FALSE;
+    }
+}
+
+// Retire the thread's current page for class ci (if any) onto the global SWEEP
+// stack and adopt a PARTIAL (preferred) or FREE page, formatting a fresh one
+// only as a last resort. Runs on the owning thread.
+static CN1BibopPage* cn1BibopAcquirePage(int ci) {
+    pthread_mutex_lock(&bibopMutex);
+    CN1BibopPage* old = bibopCurrent[ci];
+    if(old != 0) {
+        old->owned = JAVA_FALSE;
+        // push onto the SWEEP stack (single producer here holds bibopMutex, but
+        // the sweep swaps the head atomically, so use an atomic CAS push).
+        CN1BibopPage* sh = atomic_load_explicit(&bibopSweepStack, memory_order_relaxed);
+        do {
+            old->nextPool = sh;
+        } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, old,
+                    memory_order_release, memory_order_relaxed));
+        bibopCurrent[ci] = 0;
+    }
+    CN1BibopPage* np = bibopPartialPool[ci];
+    if(np != 0) {
+        bibopPartialPool[ci] = np->nextPool;
+    } else if(bibopFreePool != 0) {
+        np = bibopFreePool;
+        bibopFreePool = np->nextPool;
+        cn1BibopFormatPage(np, ci);
+    }
+    pthread_mutex_unlock(&bibopMutex);
+    if(np == 0) {
+        np = cn1BibopNewPage(ci);
+        if(np == 0) {
+            return 0;
+        }
+    }
+    np->owned = JAVA_TRUE;
+    np->nextPool = 0;
+    bibopCurrent[ci] = np;
+    return np;
+}
+
+// Initialize a freshly-claimed slot's header EXACTLY like codenameOneGcMalloc,
+// publishing the mark field LAST with an atomic release store so a concurrent
+// overflow-rescan never observes a half-initialized object as live (its mark
+// goes oldDead/FREE -> -1, never through the current epoch). Only the object
+// body (after the fixed header) is zeroed, never the mark word, so there is no
+// plain-write-vs-atomic-read race on the mark.
+static inline void cn1BibopInitSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o, int size, struct clazz* parent) {
+    int hdr = (int)sizeof(struct JavaObjectPrototype);
+    if(size > hdr) {
+        memset((char*)o + hdr, 0, size - hdr);
+    }
+    o->__codenameOneParentClsReference = parent;
+    o->__codenameOneReferenceCount = 1;
+    o->__codenameOneThreadData = 0;
+    o->__ownerThread = threadStateData;
+    o->__heapPosition = CN1_BIBOP_HEAP_POS;
+#ifdef DEBUG_GC_ALLOCATIONS
+    o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
+    o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
+#endif
+    __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+}
+
+// Allocate a small non-array object from the per-thread page for its size class.
+// Returns 0 only if pages cannot be obtained (caller falls back to the heap).
+static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    pthread_once(&bibopOnce, cn1BibopDoInit);
+    int ci = cn1BibopSizeToClass[size];
+    if(ci < 0) {
+        return 0;
+    }
+    CN1BibopPage* p = bibopCurrent[ci];
+    JAVA_OBJECT o = 0;
+    for(;;) {
+        if(p != 0) {
+            if(p->freeList != 0) {
+                o = (JAVA_OBJECT)p->freeList;
+                p->freeList = *(void**)o;
+                p->freeCount--;
+                break;
+            }
+            int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+            if(bi < p->slotCount) {
+                o = cn1BibopSlot(p, bi);
+                cn1BibopInitSlot(threadStateData, o, size, parent);
+                // publish the new cursor with release AFTER the slot (incl. its
+                // mark) is fully initialized.
+                atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+                atomic_fetch_add_explicit(&bibopBytesSinceGc, p->slotSize, memory_order_relaxed);
+                return o;
+            }
+        }
+        // Need a fresh/partial page. This is the rare slow path (~once per page).
+        cn1BibopMaybeGc(threadStateData);
+        p = cn1BibopAcquirePage(ci);
+        if(p == 0) {
+            return 0; // out of pages -> legacy heap path
+        }
+        // loop: allocate from the freshly-acquired page (free-list or bump).
+    }
+    // free-list slot path
+    cn1BibopInitSlot(threadStateData, o, size, parent);
+    atomic_fetch_add_explicit(&bibopBytesSinceGc, p->slotSize, memory_order_relaxed);
+    return o;
+}
+
+// Run finalizer + free monitor for a dead page slot (does NOT free() the slot;
+// the slot is recycled into the page free-list by the caller). Mirrors
+// freeAndFinalize / codenameOneGcFree minus the free().
+static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+    finalizerFunctionPointer ptr = (finalizerFunctionPointer)o->__codenameOneParentClsReference->finalizerFunction;
+    if(ptr != 0) {
+        ptr(threadStateData, o);
+    }
+    if(o->__codenameOneThreadData) {
+        free(o->__codenameOneThreadData);
+        o->__codenameOneThreadData = 0;
+    }
+}
+
+// Sweep all retired pages. Runs on the GC thread AFTER mark completes; the
+// pages it processes are off the SWEEP stack (owner==0), so no mutator is
+// allocating into them and no marking is in flight -> plain header access.
+static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
+    CN1BibopPage* list = atomic_exchange_explicit(&bibopSweepStack, (CN1BibopPage*)0, memory_order_acquire);
+    while(list != 0) {
+        CN1BibopPage* page = list;
+        list = page->nextPool;
+        int n = atomic_load_explicit(&page->bumpIndex, memory_order_relaxed);
+        void* fl = 0;
+        int freeCount = 0;
+        int liveCount = 0;
+        for(int i = 0 ; i < n ; i++) {
+            JAVA_OBJECT o = cn1BibopSlot(page, i);
+            int m = o->__codenameOneGcMark;
+            if(m == CN1_BIBOP_FREE_MARK) {
+                *(void**)o = fl; fl = o; freeCount++;
+            } else if(m == -1) {
+                // fresh, never marked -> one cycle of grace (legacy parity)
+                o->__codenameOneGcMark = currentGcMarkValue;
+                liveCount++;
+            } else if(m < currentGcMarkValue - 1) {
+                cn1BibopReclaimSlot(threadStateData, o);
+                o->__codenameOneGcMark = CN1_BIBOP_FREE_MARK;
+                *(void**)o = fl; fl = o; freeCount++;
+            } else {
+                liveCount++;
+            }
+        }
+        page->freeList = fl;
+        page->freeCount = freeCount;
+        pthread_mutex_lock(&bibopMutex);
+        if(liveCount == 0) {
+            page->nextPool = bibopFreePool;
+            bibopFreePool = page;
+        } else {
+            page->nextPool = bibopPartialPool[page->classIndex];
+            bibopPartialPool[page->classIndex] = page;
+        }
+        pthread_mutex_unlock(&bibopMutex);
+    }
+    atomic_store_explicit(&bibopBytesSinceGc, 0, memory_order_relaxed);
+}
+
+// (The overflow-rescan helpers cn1BibopRescanStart / cn1BibopRescanStep live
+// further down, next to gcMarkDrain, because they use the mark worklist.)
+
+// Called on the dying thread (collectThreadResources): retire all of its
+// current pages so their slots become collectable.
+void cn1BibopRetireThreadPages() {
+    pthread_once(&bibopOnce, cn1BibopDoInit);
+    for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
+        CN1BibopPage* old = bibopCurrent[ci];
+        if(old != 0) {
+            old->owned = JAVA_FALSE;
+            CN1BibopPage* sh = atomic_load_explicit(&bibopSweepStack, memory_order_relaxed);
+            do {
+                old->nextPool = sh;
+            } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, old,
+                        memory_order_release, memory_order_relaxed));
+            bibopCurrent[ci] = 0;
+        }
+    }
+}
+#endif /* CN1_DISABLE_BIBOP */
+
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     if(isAppSuspended) {
         mallocWhileSuspended += size;
@@ -1094,6 +1476,19 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         JAVA_OBJECT nurseryObj = cn1NurseryAlloc(threadStateData, size, parent);
         if(nurseryObj != JAVA_NULL) {
             return nurseryObj;
+        }
+    }
+#endif
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+    // Small NON-ARRAY objects: serve from the per-thread BiBOP page heap, which
+    // skips placeObjectInHeapCollection / allObjectsInHeap entirely. Arrays and
+    // objects larger than the biggest size class fall through to the legacy
+    // calloc + table-registration path below. 0 => pages unavailable, fall back.
+    if(parent != 0 && !parent->isArray && size <= CN1_BIBOP_MAX_OBJECT &&
+       constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
+        JAVA_OBJECT bibopObj = cn1BibopAlloc(threadStateData, size, parent);
+        if(bibopObj != JAVA_NULL) {
+            return bibopObj;
         }
     }
 #endif
@@ -1216,6 +1611,14 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 }
 
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+#ifndef CN1_DISABLE_BIBOP
+    // A BiBOP page slot must never be free()'d -- it is reclaimed in place into
+    // its page free-list by cn1BibopSweep. This is a defensive guard; no legacy
+    // path should reach here with a page slot (they are not in allObjectsInHeap).
+    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+        return;
+    }
+#endif
     if(obj->__codenameOneThreadData) {
         free(obj->__codenameOneThreadData);
         obj->__codenameOneThreadData = 0;
@@ -1770,14 +2173,58 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN 
     }
 }
 
+#ifndef CN1_DISABLE_BIBOP
+// ---- BiBOP overflow rescan (see the module header up top). Only engaged AFTER
+// the mark worklist has overflowed, so the common (no-overflow) path pays
+// nothing. Resumable cursor over the append-only all-pages registry. Only ever
+// driven from the serial gcMarkDrain, so the static cursor is race-free. ----
+static CN1BibopPage* bibopRescanPage = 0;
+static int bibopRescanSlot = 0;
+static void cn1BibopRescanStart() {
+    bibopRescanPage = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    bibopRescanSlot = 0;
+}
+// Push every currently-marked page object whose class has a mark function,
+// resuming where it left off when the worklist fills. Returns JAVA_TRUE once the
+// whole registry has been scanned. A slot's header is dereferenced only when its
+// (atomically read) mark equals the current cycle, which never holds for a slot
+// a mutator is mid-initializing (its mark goes oldDead/FREE -> -1, not via cur).
+static JAVA_BOOLEAN cn1BibopRescanStep() {
+    while(bibopRescanPage != 0) {
+        CN1BibopPage* p = bibopRescanPage;
+        int n = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+        while(bibopRescanSlot < n) {
+            if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
+                return JAVA_FALSE; // worklist full; caller drains and resumes
+            }
+            JAVA_OBJECT o = cn1BibopSlot(p, bibopRescanSlot);
+            bibopRescanSlot++;
+            int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+            if(m == currentGcMarkValue && o->__codenameOneParentClsReference->markFunction != 0) {
+                gcMarkWorklistPush(o, JAVA_FALSE);
+            }
+        }
+        bibopRescanPage = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+        bibopRescanSlot = 0;
+    }
+    return JAVA_TRUE;
+}
+#endif
+
 // Pops worklist entries and runs their mark functions. On overflow, rescans the live
 // heap to push every marked-but-unscanned object so its children get visited (the
 // children's pushes are what overflowed in the first place). The rescan uses a cursor
 // that resumes across batches -- restarting from iter=0 on every batch would just
 // re-push the same first WORKLIST_SIZE marked objects forever while later indices got
 // starved, leaving their children unmarked and freeing reachable memory at sweep.
+// BiBOP page slots are NOT in allObjectsInHeap, so once an overflow is seen the rescan
+// additionally walks the page registry (cn1BibopRescan*) under the same fixed point.
 static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
     int rescanCursor = 0;
+#ifndef CN1_DISABLE_BIBOP
+    JAVA_BOOLEAN bibopActive = JAVA_FALSE;
+    JAVA_BOOLEAN bibopDone = JAVA_TRUE;
+#endif
     while(JAVA_TRUE) {
         while(gcMarkWorklistTop > 0) {
             gcMarkWorklistTop--;
@@ -1789,15 +2236,26 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
             }
         }
         int total = currentSizeOfAllObjectsInHeap;
+#ifndef CN1_DISABLE_BIBOP
+        // First time we observe an overflow, start also rescanning page slots.
+        if(gcMarkWorklistOverflow && !bibopActive) {
+            bibopActive = JAVA_TRUE;
+            bibopDone = JAVA_FALSE;
+            cn1BibopRescanStart();
+        }
+        JAVA_BOOLEAN scanDone = (rescanCursor >= total) && bibopDone;
+#else
+        JAVA_BOOLEAN scanDone = (rescanCursor >= total);
+#endif
         // Done when the worklist drained without re-overflow AND we've finished a full
         // sweep of the heap (cursor at end) AND nothing new got marked during the most
         // recent sweep. Without the cursor==total check, we'd return while there are
         // still marked objects past `cursor` whose mark functions haven't been called.
-        if(!gcMarkWorklistOverflow && rescanCursor >= total) {
+        if(!gcMarkWorklistOverflow && scanDone) {
             return;
         }
         gcMarkWorklistOverflow = JAVA_FALSE;
-        if(rescanCursor >= total) {
+        if(scanDone) {
             if(!gcMarkFoundUnmarkedChildInPass) {
                 // We finished a full heap sweep, drained the resulting pushes, and the
                 // drain marked nothing new. Fixed point.
@@ -1808,6 +2266,12 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
             // their mark functions called too.
             rescanCursor = 0;
             gcMarkFoundUnmarkedChildInPass = JAVA_FALSE;
+#ifndef CN1_DISABLE_BIBOP
+            if(bibopActive) {
+                cn1BibopRescanStart();
+                bibopDone = JAVA_FALSE;
+            }
+#endif
         }
         while(rescanCursor < total && gcMarkWorklistTop < CN1_GC_MARK_WORKLIST_SIZE) {
             JAVA_OBJECT o = allObjectsInHeap[rescanCursor];
@@ -1818,6 +2282,13 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
                 }
             }
         }
+#ifndef CN1_DISABLE_BIBOP
+        // Once the table is exhausted, continue the single linear rescan space into
+        // the page registry (resumes its own cursor when the worklist refills).
+        if(bibopActive && rescanCursor >= total && !bibopDone) {
+            bibopDone = cn1BibopRescanStep();
+        }
+#endif
     }
 }
 
