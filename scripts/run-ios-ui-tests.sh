@@ -435,18 +435,37 @@ if [ -z "$SIM_DESTINATION" ]; then
     SHOW_DEST_LOG="$ARTIFACTS_DIR/xcodebuild-showdestinations.log"
     xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
       > "$SHOW_DEST_LOG" 2>&1 || true
-    if grep -q "not installed" "$SHOW_DEST_LOG"; then
+    # The active Xcode is missing the iOS Simulator platform when -showdestinations
+    # reports it "not installed" OR lists no iOS Simulator destination at all. The
+    # latter happens on runners whose selected Xcode only has the tvOS platform
+    # installed: the scheme enumerates only Apple TV destinations even though
+    # `simctl` can boot an iOS device belonging to a *different* Xcode's runtime,
+    # so building -- even against that device's id= -- fails with "Unable to find
+    # a destination matching ... { platform:iOS Simulator }". The top-of-script
+    # runtime probe doesn't catch this because simctl's runtime list is global and
+    # already shows the other Xcode's iOS runtime. Download the iOS platform for
+    # the active Xcode and re-run discovery.
+    if grep -q "not installed" "$SHOW_DEST_LOG" || ! grep -q "platform:iOS Simulator" "$SHOW_DEST_LOG"; then
       if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
-        ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
+        ri_log "No iOS simulator platform for the active Xcode; downloading via xcodebuild -downloadPlatform iOS"
         xcodebuild -downloadPlatform iOS || true
         xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
           > "$SHOW_DEST_LOG" 2>&1 || true
+        SELECTED_DESTINATION="$(auto_select_destination || true)"
+        if [ -n "${SELECTED_DESTINATION:-}" ]; then
+          SIM_DESTINATION="$SELECTED_DESTINATION"
+          ri_log "Auto-selected simulator destination after platform download '$SIM_DESTINATION'"
+        fi
       else
-        ri_log "Destinations report missing platforms. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
+        ri_log "Destinations report no iOS simulator platform. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
       fi
     fi
-    if grep -q "not installed" "$SHOW_DEST_LOG"; then
-      ri_log "No eligible simulator destinations reported by xcodebuild. See $SHOW_DEST_LOG" >&2
+    # Bail with a clear error only if the iOS platform is still absent after the
+    # download attempt. If it is now present but no concrete device was
+    # auto-selected, fall through to the simctl fallback below.
+    if [ -z "$SIM_DESTINATION" ] && \
+       { grep -q "not installed" "$SHOW_DEST_LOG" || ! grep -q "platform:iOS Simulator" "$SHOW_DEST_LOG"; }; then
+      ri_log "No iOS simulator platform available for the active Xcode. See $SHOW_DEST_LOG" >&2
       exit 3
     fi
   fi
