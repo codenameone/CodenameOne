@@ -199,3 +199,24 @@ components:
     tile_width_mm: 60
     tile_height_mm: 16
     states: normal
+
+  # Ladder rungs: a glass capsule + ONE element, identical authored geometry on
+  # both sides over flat grey. GlassText isolates the centred text label; GlassIcon
+  # isolates the icon glyph -- each on top of the matched glass capsule.
+  - id: GlassText
+    cn1_uiid: GlassText
+    native: ios_glass_text
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassIcon
+    cn1_uiid: GlassText
+    native: ios_glass_icon
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal

@@ -61,6 +61,7 @@ public final class Cn1WidgetRenderer {
                 || "Dialog".equals(id) || "Spinner".equals(id)
                 || "TabsGeom".equals(id)                       // geometry-isolation: Tabs over a flat backdrop
                 || "TabOne".equals(id)                         // minimal: one text-only tab, flat backdrop
+                || "GlassText".equals(id) || "GlassIcon".equals(id) // ladder rungs: glass + one element
                 || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
     }
 
@@ -187,6 +188,31 @@ public final class Cn1WidgetRenderer {
             // The container fills the tile (minus its 1mm theme/runner margin).
             Container panel = new Container(new BorderLayout());
             panel.setUIID("GlassPanel");
+            c = panel;
+        } else if ("GlassText".equals(id)) {
+            // Ladder rung 1: a glass capsule (cn1-pill-border) filling the tile minus
+            // 1mm, with one centred text label. Identical authored geometry to the
+            // native ios_glass_text, so only the text + glass tint differ.
+            Container panel = new Container(new BorderLayout());
+            panel.setUIID("GlassText");
+            Label l = new Label("Tab");
+            l.setUIID("GlassTextLabel");
+            panel.add(BorderLayout.CENTER, l);
+            c = panel;
+        } else if ("GlassIcon".equals(id)) {
+            // Ladder rung 2: same glass capsule with one centred icon (SF or Material
+            // per iosSFSymbolsBool) so the icon glyph is isolated against the native
+            // SF star.fill.
+            Container panel = new Container(new BorderLayout());
+            panel.setUIID("GlassText");
+            int icColor = dark ? 0xffffff : 0x000000;
+            com.codename1.ui.plaf.Style icS = new com.codename1.ui.plaf.Style();
+            icS.setFgColor(icColor);
+            icS.setBgTransparency(0);
+            Label l = new Label();
+            l.setUIID("GlassTextLabel");
+            l.setIcon(FontImage.createSFOrMaterial(FontImage.MATERIAL_STAR, icS, 4.1f));
+            panel.add(BorderLayout.CENTER, l);
             c = panel;
         } else if ("TabOne".equals(id)) {
             // Minimal isolation case: a tab bar with ONE text-only tab (no icon,

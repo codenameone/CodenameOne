@@ -533,7 +533,8 @@ public class FidelityDeviceRunner {
     /// The glass-panel isolation widgets (plain GlassPanel-UIID containers that
     /// fill the tile minus a 1mm inset, each over a different backdrop). iOS only.
     private boolean isGlassPanelKind(String compId) {
-        return "ios".equals(platform) && compId != null && compId.startsWith("GlassPanel");
+        return "ios".equals(platform) && compId != null
+                && (compId.startsWith("GlassPanel") || "GlassText".equals(compId) || "GlassIcon".equals(compId));
     }
 
     /// Full-width-but-thin iOS widgets (slider, progress) that span the tile width

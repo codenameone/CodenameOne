@@ -1880,35 +1880,54 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (rw <= 0 || rh <= 0) {
             return true;
         }
-        // Read a region PADDED by the blur radius on all sides (clamped to the image)
-        // so the Gaussian blur has real backdrop to sample at the panel edges. Without
-        // this the blur fades to transparency at the patch border, revealing the
-        // backdrop underneath as a dark vignette / feathered halo (very visible on the
-        // bright light material). We blur the padded buffer then crop back to the panel
-        // rect, which is equivalent to a clamp-to-extent blur.
-        int pad = (int) Math.ceil(radius);
-        int px0 = Math.max(0, rx - pad), py0 = Math.max(0, ry - pad);
-        int px1 = Math.min(target.width, rx + rw + pad), py1 = Math.min(target.height, ry + rh + pad);
-        int pw = px1 - px0, ph = py1 - py0;
-        int[] prgb = new int[pw * ph];
-        getRGB(target, prgb, 0, px0, py0, pw, ph);
+        // Build a buffer PADDED by the full blur radius on every side and fill the
+        // out-of-component area with EDGE-REPLICATED backdrop pixels. CIGaussianBlur
+        // fades to transparency at its buffer edge; without a full radius of margin
+        // (e.g. when the component sits within ~1mm of the tile edge, less than the
+        // blur radius) that fade reaches into the component and feathers its edge,
+        // making the glass read smaller than native's crisp panel. Replicating the
+        // edge gives the blur a clean clamp-to-extent margin so the component edge
+        // stays crisp. We blur the padded buffer then crop the centre back out.
+        // CIGaussianBlur's kernel spreads ~3*radius, so the buffer-edge fade reaches
+        // that far in. Pad by 3*radius of replicated backdrop so the fade is fully
+        // contained outside the component and its own edge stays crisp like native.
+        int pad = (int) Math.ceil(radius) * 3 + 1;
+        int bw = rw + 2 * pad, bh = rh + 2 * pad;
+        // Available (clamped) slice of the real backdrop around the component.
+        int ax0 = Math.max(0, rx - pad), ay0 = Math.max(0, ry - pad);
+        int ax1 = Math.min(target.width, rx + rw + pad), ay1 = Math.min(target.height, ry + rh + pad);
+        int aw = ax1 - ax0, ah = ay1 - ay0;
+        int[] avail = new int[aw * ah];
+        getRGB(target, avail, 0, ax0, ay0, aw, ah);
+        // Padded buffer origin in absolute coords is (rx-pad, ry-pad); sample the
+        // available slice with edge clamping to replicate beyond the tile.
+        int[] prgb = new int[bw * bh];
+        for (int by = 0; by < bh; by++) {
+            int ay = (ry - pad + by) - ay0;
+            if (ay < 0) ay = 0; else if (ay >= ah) ay = ah - 1;
+            int arow = ay * aw, brow = by * bw;
+            for (int bx = 0; bx < bw; bx++) {
+                int ax = (rx - pad + bx) - ax0;
+                if (ax < 0) ax = 0; else if (ax >= aw) ax = aw - 1;
+                prgb[brow + bx] = avail[arow + ax];
+            }
+        }
         // Reverse-engineered iOS UIVisualEffectView material: an affine colour
         // transform (saturation boost + scale + offset floor) of the backdrop before
         // blurring (this is the backdrop-filter path only).
         glassMaterialInPlace(prgb, sat, scale, offset);
         NativeImage blurredPadded = new NativeImage("backdrop-filter glass");
-        blurredPadded.peer = nativeInstance.gausianBlurImage(createImageFromARGB(prgb, pw, ph), radius);
-        blurredPadded.width = pw;
-        blurredPadded.height = ph;
-        // Crop the blurred padded buffer back to the panel rect, then mask to the host
-        // component's rounded/pill shape AFTER the blur (masking before would feather
-        // the edge -- the blur bleeds the transparent corners inward).
-        int[] pbargb = new int[pw * ph];
-        getRGB(blurredPadded, pbargb, 0, 0, 0, pw, ph);
-        int offX = rx - px0, offY = ry - py0;
+        blurredPadded.peer = nativeInstance.gausianBlurImage(createImageFromARGB(prgb, bw, bh), radius);
+        blurredPadded.width = bw;
+        blurredPadded.height = bh;
+        // Crop the blurred padded buffer back to the panel rect (the component sits at
+        // offset (pad,pad) in the padded buffer), then mask to the host component's
+        // rounded/pill shape AFTER the blur (masking before would feather the edge).
+        int[] pbargb = new int[bw * bh];
+        getRGB(blurredPadded, pbargb, 0, 0, 0, bw, bh);
         int[] out = new int[rw * rh];
         for (int yy = 0; yy < rh; yy++) {
-            System.arraycopy(pbargb, (yy + offY) * pw + offX, out, yy * rw, rw);
+            System.arraycopy(pbargb, (yy + pad) * bw + pad, out, yy * rw, rw);
         }
         if (cornerRadius != 0f) {
             applyRoundedMask(out, rw, rh, cornerRadius);

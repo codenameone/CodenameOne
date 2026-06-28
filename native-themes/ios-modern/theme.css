@@ -656,6 +656,29 @@ GlassPanel {
     margin: 1mm;
 }
 
+/* GlassText / GlassIcon ladder rungs: a glass CAPSULE (cn1-pill-border, so the
+   glassRegion shape mask is radius h/2 -- matching the native capsule) filling
+   the tile minus 1mm, holding one centred element. The container colour drives
+   the light/dark glass-material pick (like GlassPanel); the child label/icon
+   carries the visible primary-label colour. */
+GlassText {
+    color: #3c3c43;
+    background-color: transparent;
+    cn1-background-type: cn1-pill-border;
+    backdrop-filter: blur(40px);
+    padding: 0;
+    margin: 1mm;
+}
+GlassTextLabel {
+    color: #000000;
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 1.8mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+
 SideNavigationPanel { background-color: #ffffff; padding: 0; margin: 0; }
 
 SideCommand {
@@ -942,6 +965,8 @@ PopupContent {
     /* Dark glass panel: a translucent dark tint so the backdrop reads through as
        Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */
     GlassPanel { color: #ebebf5; background-color: transparent; border-radius: 2.8mm; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
+    GlassText { color: #ebebf5; background-color: transparent; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
+    GlassTextLabel { color: #ffffff; background-color: transparent; font-family: "native:MainRegular"; font-size: 1.8mm; text-align: center; padding: 0; margin: 0; }
 
     /* Animated indicator inherits the dark-mode accent. */
     TabIndicator { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }

@@ -27,6 +27,7 @@ let CAPTURE_SCALE: CGFloat = PX_PER_MM / PT_PER_MM   // ~2.824
 let GLASS_KINDS: Set<String> = [
     "ios_uibutton_system", "ios_uibutton_plain", "ios_uibutton_filled",
     "ios_uinavbar", "ios_uitabbar", "ios_uitabbar_one",
+    "ios_glass_text", "ios_glass_icon",
 ]
 // Genuinely full-width widgets that stretch to fill their tile on both sides
 // (the CN1 harness fills these too). Content-sized controls -- buttons, switch,
@@ -105,6 +106,12 @@ let SPECS: [Spec] = [
     Spec(component: "GlassCharB",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "0000ff"),
     Spec(component: "TabsGeom",        kind: "ios_uitabbar",    states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
     Spec(component: "TabOne",          kind: "ios_uitabbar_one", states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
+    // Ladder rungs: a glass capsule (radius h/2) filling the tile minus 1mm, with
+    // a single centred element. Identical authored geometry on both sides so each
+    // rung isolates ONE element -- the centred text, then the icon -- on top of the
+    // (already matched) glass capsule, over flat grey.
+    Spec(component: "GlassText",       kind: "ios_glass_text",  states: ["normal"], wMM: 60, hMM: 14, backdrop: "808080"),
+    Spec(component: "GlassIcon",       kind: "ios_glass_icon",  states: ["normal"], wMM: 60, hMM: 14, backdrop: "808080"),
 ]
 
 // Minimal data source/delegate for the reference UIPickerView (5 string rows).
@@ -313,17 +320,50 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
         // Bare Liquid Glass panel (no content) for the glass-blend isolation tests.
         // iOS 26 exposes the real glass material via UIGlassEffect; earlier OSes
         // fall back to the closest thin material blur.
-        let effectView: UIVisualEffectView
-        if #available(iOS 26.0, *) {
-            effectView = UIVisualEffectView(effect: UIGlassEffect())
-        } else {
-            effectView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
-        }
+        let effectView = makeGlassView()
         effectView.layer.cornerRadius = 8
         effectView.clipsToBounds = true
         return effectView
+    case "ios_glass_text":
+        // Ladder rung 1: glass capsule + a single centred text label. System font
+        // sized to match CN1's tab font (1.8mm). Primary label colour.
+        let v = makeGlassView()
+        let label = UILabel()
+        label.text = "Tab"
+        label.font = .systemFont(ofSize: 1.8 * PT_PER_MM)
+        label.textColor = .label
+        label.translatesAutoresizingMaskIntoConstraints = false
+        v.contentView.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: v.contentView.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: v.contentView.centerYAnchor),
+        ])
+        return v
+    case "ios_glass_icon":
+        // Ladder rung 2: glass capsule + a single centred SF symbol, primary label
+        // colour, point size matched to CN1's tab icon (4.1mm).
+        let v = makeGlassView()
+        let cfg = UIImage.SymbolConfiguration(pointSize: 4.1 * PT_PER_MM)
+        let iv = UIImageView(image: UIImage(systemName: "star.fill", withConfiguration: cfg))
+        iv.tintColor = .label
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        v.contentView.addSubview(iv)
+        NSLayoutConstraint.activate([
+            iv.centerXAnchor.constraint(equalTo: v.contentView.centerXAnchor),
+            iv.centerYAnchor.constraint(equalTo: v.contentView.centerYAnchor),
+        ])
+        return v
     default:
         return nil
+    }
+}
+
+// Shared Liquid Glass effect view (iOS 26 UIGlassEffect, else thin material blur).
+func makeGlassView() -> UIVisualEffectView {
+    if #available(iOS 26.0, *) {
+        return UIVisualEffectView(effect: UIGlassEffect())
+    } else {
+        return UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
     }
 }
 
@@ -388,6 +428,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                         // the CN1 GlassPanel's 1mm margin.
                         let inset = 1.0 * PT_PER_MM
                         control.frame = container.bounds.insetBy(dx: inset, dy: inset)
+                    } else if spec.kind == "ios_glass_text" || spec.kind == "ios_glass_icon" {
+                        // Glass CAPSULE filling the tile minus 1mm: corner radius = half
+                        // the height so it matches the CN1 cn1-pill-border capsule exactly.
+                        let inset = 1.0 * PT_PER_MM
+                        control.frame = container.bounds.insetBy(dx: inset, dy: inset)
+                        control.layer.cornerRadius = control.frame.height / 2
+                        control.clipsToBounds = true
                     } else if FILL_KINDS.contains(spec.kind) {
                         control.frame = CGRect(x: 0, y: 0, width: wPt, height: hPt)
                     } else {
