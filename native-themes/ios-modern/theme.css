@@ -534,16 +534,15 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: rgba(255,255,255,0.5);
+    background-color: rgba(255,255,255,0.52);
     color: #3c3c43;
-    /* Liquid Glass floating tab pill: a LIGHT frost (0.5) so the live backdrop
-       blur clearly shows through and reads as glass -- a heavier 0.78 tint painted
-       over the blur and looked nearly opaque on device. The selected item gets a
-       brighter sub-capsule (Tab.selected) on top for the layered glass-on-glass. */
+    /* Liquid Glass floating tab pill: a moderate frost (0.52) so the blurred
+       backdrop tints through and reads as glass, while the brighter selected
+       sub-capsule (Tab.selected) stands out (layered glass-on-glass). Thin
+       horizontal padding so the tab cells / selected capsule reach close to the
+       pill's left/right edges like native. */
     backdrop-filter: blur(40px);
-    padding: 1mm;
-    /* Native glass pill is large (~85% tile width, near-full height); thin margins
-       + tall padding let the CN1 pill grow to match. */
+    padding: 0.5mm 0.5mm 0.5mm 0.5mm;
     margin: 0.5mm 1mm 0.5mm 1mm;
     cn1-background-type: cn1-pill-border;
 }
@@ -563,11 +562,12 @@ Tab {
     background-color: transparent;
     /* Moderate padding: enough to spread the three items toward the native pill
        width without an over-tall/over-wide pill. */
-    padding: 1.1mm 3.8mm 1.1mm 3.8mm;
+    padding: 0.78mm 3.3mm 0.78mm 3.3mm;
     /* Same margin as Tab.selected/pressed so selecting only TOGGLES the capsule
-       background -- it must not change the cell geometry (otherwise the selected
-       item shifts down/over vs the unselected ones). */
-    margin: 0.8mm 0.8mm 0.8mm 0.8mm;
+       background -- it must not change the cell geometry. Small margins so the
+       selected capsule nearly reaches the pill edges (native): minimal top/bottom
+       + thin left/right. */
+    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
     font-family: "native:MainRegular";
     font-size: 1.8mm;
     text-align: center;
@@ -577,23 +577,23 @@ Tab {
    layered "glass on glass" highlight, like the native UITabBar. */
 Tab.selected {
     color: var(--accent-color, #007aff);
-    background-color: rgba(255,255,255,0.5);
+    background-color: rgba(255,255,255,0.85);
     cn1-background-type: cn1-pill-border;
-    margin: 0.8mm 0.8mm 0.8mm 0.8mm;
+    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
 }
 Tab.pressed {
     color: var(--accent-color, #007aff);
-    background-color: rgba(255,255,255,0.35);
+    background-color: rgba(255,255,255,0.4);
     cn1-background-type: cn1-pill-border;
-    margin: 0.8mm 0.8mm 0.8mm 0.8mm;
+    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
 }
 
 SelectedTab {
     cn1-derive: Tab;
     color: var(--accent-color, #007aff);
-    background-color: rgba(255,255,255,0.5);
+    background-color: rgba(255,255,255,0.85);
     cn1-background-type: cn1-pill-border;
-    margin: 0.8mm 0.8mm 0.8mm 0.8mm;
+    margin: 0.35mm 0.4mm 0.35mm 0.4mm;
 }
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
 
@@ -882,9 +882,9 @@ PopupContent {
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.16); cn1-background-type: cn1-pill-border; margin: 0.8mm 0.8mm 0.8mm 0.8mm; }
-    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.1); cn1-background-type: cn1-pill-border; margin: 0.8mm 0.8mm 0.8mm 0.8mm; }
-    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.16); cn1-background-type: cn1-pill-border; margin: 0.8mm 0.8mm 0.8mm 0.8mm; }
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.5); cn1-background-type: cn1-pill-border; margin: 0.35mm 0.4mm 0.35mm 0.4mm; }
+    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; margin: 0.35mm 0.4mm 0.35mm 0.4mm; }
+    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.5); cn1-background-type: cn1-pill-border; margin: 0.35mm 0.4mm 0.35mm 0.4mm; }
     UnselectedTab { color: #ebebf5; }
 
     /* Dark overrides for the icon-only UIID. Background stays transparent
