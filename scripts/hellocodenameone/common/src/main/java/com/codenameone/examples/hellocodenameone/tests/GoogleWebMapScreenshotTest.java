@@ -115,8 +115,11 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
     /// then run onReady. Captures as soon as the real map has rendered, so a fast
     /// runner finishes quickly; the attempt budget (500ms * attempts) is the
     /// worst-case deadline. On timeout we deliberately do NOT capture -- a blank
-    /// or blocked map should fail loudly (the harness records missing_actual)
-    /// rather than be baselined.
+    /// or blocked map should fail loudly (missing_actual) rather than be
+    /// baselined -- but we MUST still dispose the map: the Google Maps JS keeps a
+    /// requestAnimationFrame / tile-loading loop alive, and leaving it running
+    /// starves the main thread and desyncs LATER tests' captures (a downstream
+    /// screenshot then differs). The onReady path disposes via its callback.
     private void waitForMapReady(final Form form, final NativeMap map,
                                  final int attemptsLeft, final Runnable onReady) {
         boolean ready;
@@ -134,6 +137,11 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         if (attemptsLeft <= 0) {
             System.out.println(
                     "CN1SS:INFO:test=GoogleWebMap status=FAILED reason=tiles-never-loaded");
+            try {
+                map.dispose();
+            } catch (Throwable t) {
+                // best effort -- still report done so the suite advances
+            }
             done();
             return;
         }
