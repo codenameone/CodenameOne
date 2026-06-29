@@ -1559,7 +1559,9 @@ void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(CN1_THREAD_STATE
 // Extracts the rich pointer detail (tool type, pressure, Apple Pencil tilt and contact size)
 // from a UITouch and forwards it to Java just before the pointer event is dispatched, so the
 // cross-platform stylus and pressure APIs work on iOS. Invoked from both the view controller
-// touch handlers and the CN1TapGestureRecognizer.
+// touch handlers and the CN1TapGestureRecognizer. UITouch is unavailable on
+// watchOS, so the helper (and its callers) are compiled out there.
+#if !TARGET_OS_WATCH
 void cn1CapturePointerMetadata(UITouch* touch) {
     if (touch == nil) {
         return;
@@ -1595,6 +1597,7 @@ void cn1CapturePointerMetadata(UITouch* touch) {
     }
     com_codename1_impl_ios_IOSImplementation_pointerMetadataCallback___int_float_float_float_float(CN1_THREAD_GET_STATE_PASS_ARG pointerType, pressure, tiltX, tiltY, contactSize);
 }
+#endif // !TARGET_OS_WATCH
 
 void pointerPressed(int* x, int* y, int length) {
     if(length == 1) {

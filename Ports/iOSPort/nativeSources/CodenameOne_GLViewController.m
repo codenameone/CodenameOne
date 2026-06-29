@@ -488,7 +488,9 @@ void deinitVMImpl() {
 extern void pointerPressed(int* x, int* y, int length);
 extern void pointerDragged(int* x, int* y, int length);
 extern void pointerReleased(int* x, int* y, int length);
+#if !TARGET_OS_WATCH
 extern void cn1CapturePointerMetadata(UITouch* touch);
+#endif
 extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
 extern void pinchMagnifyCallback(float scale, int x, int y);
 extern void rotationGestureCallback(float radians, int x, int y);
@@ -3318,8 +3320,8 @@ bool lockDrawing;
 #endif
 }
 
-- (void)cn1HandlePinch:(UIPinchGestureRecognizer *)recognizer {
 #if TARGET_OS_MACCATALYST
+- (void)cn1HandlePinch:(UIPinchGestureRecognizer *)recognizer {
     if (recognizer.state == UIGestureRecognizerStateChanged) {
         CGPoint loc = [recognizer locationInView:self.view];
         float scale = (float)recognizer.scale;
@@ -3329,8 +3331,8 @@ bool lockDrawing;
             recognizer.scale = 1.0;
         }
     }
-#endif
 }
+#endif
 
 - (void)cn1InstallRotationRecognizer {
 #if TARGET_OS_MACCATALYST
@@ -3347,8 +3349,8 @@ bool lockDrawing;
 #endif
 }
 
-- (void)cn1HandleRotation:(UIRotationGestureRecognizer *)recognizer {
 #if TARGET_OS_MACCATALYST
+- (void)cn1HandleRotation:(UIRotationGestureRecognizer *)recognizer {
     if (recognizer.state == UIGestureRecognizerStateChanged) {
         CGPoint loc = [recognizer locationInView:self.view];
         float radians = (float)recognizer.rotation;
@@ -3358,8 +3360,8 @@ bool lockDrawing;
             recognizer.rotation = 0;
         }
     }
-#endif
 }
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1transformMatrix;
