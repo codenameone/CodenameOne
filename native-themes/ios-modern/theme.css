@@ -130,9 +130,15 @@
        selection. Off by default in the framework (so existing apps
        don't suddenly animate); on by default in the modern native
        theme. Duration 200ms matches Material 3's reference. */
-    tabsAnimatedIndicatorBool: true;
-    tabsAnimatedIndicatorDurationInt: 200;
+    /* iOS 26 tab bars use a sliding CAPSULE selection indicator, not the Material 3
+       underline -- so the underline is off and the capsule is on. */
+    tabsAnimatedIndicatorBool: false;
+    tabsAnimatedIndicatorDurationInt: 250;
     tabsAnimatedIndicatorThicknessMm: 1;
+    /* iOS 26 sliding selection capsule: a single Liquid Glass blob behind the
+       selected tab that tweens between tabs on selection change. Replaces the
+       per-tab selected fill (which is transparent above). */
+    tabsSelectionCapsuleBool: true;
     /* Modern arc-spinner pull-to-refresh. Replaces the legacy
        rotating-arrow + text stack with a thin circular arc whose sweep
        grows as the user pulls, then spins continuously while the
@@ -636,10 +642,12 @@ Tab {
    glass blob), sitting on a more translucent bar -- so the glass material/refraction/
    specular belongs HERE, not on the outer bar. backdrop-filter makes this the glass
    hero; the bar (TabsContainer) is dialled down to a plainer translucent surface. */
+/* The selected-tab background is drawn by the single sliding selection capsule
+   (Tabs.paintSelectionCapsule, tabsSelectionCapsuleBool) so it can tween between
+   tabs -- so the per-tab selected fill is transparent. */
 Tab.selected {
     color: var(--accent-color, #007aff);
     background-color: transparent;
-    backdrop-filter: blur(30px);
     cn1-background-type: cn1-pill-border;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
@@ -654,7 +662,6 @@ SelectedTab {
     cn1-derive: Tab;
     color: var(--accent-color, #007aff);
     background-color: transparent;
-    backdrop-filter: blur(30px);
     cn1-background-type: cn1-pill-border;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
@@ -982,9 +989,9 @@ PopupContent {
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; backdrop-filter: blur(30px); cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
     Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
-    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: transparent; backdrop-filter: blur(30px); cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: transparent; cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
     UnselectedTab { color: #ebebf5; }
 
     /* Dark overrides for the icon-only UIID. Background stays transparent

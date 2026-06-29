@@ -144,6 +144,10 @@ public class Tabs extends Container {
     // underline drawn under the currently-selected tab tweens its
     // x/width between the previous and new tabs on selection change.
     private boolean animatedIndicator;
+    // iOS 26 sliding selection capsule: a single Liquid Glass blob behind the
+    // selected tab that slides between tabs on selection change (reuses the
+    // indicator motion below). Opt in via `tabsSelectionCapsuleBool`.
+    private boolean selectionCapsule;
     private int animatedIndicatorDurationMs = 200;
     private int animatedIndicatorThicknessMm = 1; // 1mm-tall underline
     private Motion indicatorAnimMotion;
@@ -181,6 +185,10 @@ public class Tabs extends Container {
         tabsContainer = new Container() {
             @Override
             public void paint(Graphics g) {
+                // The iOS 26 selection capsule is a single Liquid Glass blob that
+                // slides between tabs; paint it BEHIND the tab content (after the bar
+                // background, before the icons/labels) so the glyphs sit on top of it.
+                paintSelectionCapsule(g);
                 super.paint(g);
                 paintBottomDivider(g);
                 paintAnimatedIndicator(g);
@@ -240,6 +248,7 @@ public class Tabs extends Container {
         setUIIDFinal("Tabs");
         // Opt-in animated indicator (Material 3 NavigationBar style).
         animatedIndicator = getUIManager().isThemeConstant("tabsAnimatedIndicatorBool", false);
+        selectionCapsule = getUIManager().isThemeConstant("tabsSelectionCapsuleBool", false);
         animatedIndicatorDurationMs = getUIManager().getThemeConstant("tabsAnimatedIndicatorDurationInt", 200);
         BorderLayout bd = (BorderLayout) super.getLayout();
         if (bd != null) {
@@ -1395,7 +1404,7 @@ public class Tabs extends Container {
     }
 
     private void startIndicatorAnimation(int fromIndex, int toIndex) {
-        if (!animatedIndicator || tabsContainer == null) {
+        if ((!animatedIndicator && !selectionCapsule) || tabsContainer == null) {
             return;
         }
         if (fromIndex < 0 || fromIndex >= tabsContainer.getComponentCount()
@@ -1456,6 +1465,63 @@ public class Tabs extends Container {
         g.fillRect(tabsContainer.getX(), y, tabsContainer.getWidth(), thickness);
         g.setColor(oldColor);
         g.setAlpha(oldAlpha);
+    }
+
+    /// Draws the iOS 26 sliding selection capsule -- a single Liquid Glass blob
+    /// behind the selected tab that tweens between tabs on selection change (reusing
+    /// the indicator motion). Painted BEHIND the tab content so the icon/label sit on
+    /// top. Opt in with `tabsSelectionCapsuleBool`. The glass material is rendered via
+    /// Graphics.glassRegion when `glassMaterialBool` is set (iOS); other platforms get
+    /// a translucent rounded-capsule fallback. The selected tab's own background must
+    /// be transparent so only this single capsule shows.
+    void paintSelectionCapsule(Graphics g) {
+        if (!selectionCapsule || tabsContainer == null || tabsContainer.getComponentCount() == 0) {
+            return;
+        }
+        if (activeComponent < 0 || activeComponent >= tabsContainer.getComponentCount()) {
+            return;
+        }
+        int x;
+        int w;
+        if (indicatorAnimMotion != null) {
+            int v = indicatorAnimMotion.getValue();    // 0..100
+            x = indicatorFromX + ((indicatorToX - indicatorFromX) * v / 100);
+            w = indicatorFromW + ((indicatorToW - indicatorFromW) * v / 100);
+        } else {
+            Component a = tabsContainer.getComponentAt(activeComponent);
+            x = a.getX();
+            w = a.getWidth();
+        }
+        int inset = Display.getInstance().convertToPixels(0.35f);
+        int capX = tabsContainer.getInnerX() + x;
+        int capY = tabsContainer.getInnerY() + inset;
+        int capH = tabsContainer.getInnerHeight() - 2 * inset;
+        if (w <= 0 || capH <= 0) {
+            return;
+        }
+        // Dark/light by the bar's fg luma -- the TabsContainer fg is distinguishable
+        // (text-secondary), unlike the accent-blue selected-tab fg.
+        int fg = tabsContainer.getStyle().getFgColor();
+        int fgLuma = (int) (0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff));
+        boolean dark = fgLuma > 128;
+        if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
+            float sat = dark ? 2.5f : 1.95f;
+            float scale = dark ? 0.238f : 0.303f;
+            float offset = dark ? 28.4f : 174.3f;
+            // The selection is the glass hero: a touch more specular than the bar.
+            g.glassRegion(capX, capY, w, capH, 30f, -1f, sat, scale, offset, 0.4f, 0.6f);
+        } else {
+            int oldA = g.getAlpha();
+            int oldC = g.getColor();
+            boolean aa = g.isAntiAliased();
+            g.setAntiAliased(true);
+            g.setColor(dark ? 0x8e8e93 : 0xffffff);
+            g.setAlpha(dark ? 120 : 205);
+            g.fillRoundRect(capX, capY, w, capH, capH, capH);
+            g.setAntiAliased(aa);
+            g.setColor(oldC);
+            g.setAlpha(oldA);
+        }
     }
 
     /// Draws the animated indicator inside `tabsContainer`'s paint flow. Called
