@@ -1838,7 +1838,21 @@ bindNative([
   if (typeof jvm.invokeHostNative !== "function") {
     return null;
   }
-  const value = yield jvm.invokeHostNative("__cn1_build_version__", []);
+  // Preserve the original @JSBody's null-safe contract. That script returned
+  // null whenever document was unreadable (always, in the worker) and
+  // getBuildVersion() then fell back to the AppVersion property -- it never
+  // threw. This binding replaced it with a host call, but browser_bridge.js
+  // ships from the translator artifact while port.js ships fresh from source,
+  // so a host bundle predating the __cn1_build_version__ handler rejects the
+  // call with "Unhandled host call". getBuildVersion() runs during boot inside
+  // the synchronous getArrayBufferInputStream (cache-busting ?v=), so that
+  // error would propagate out and abort app init. Swallow it and fall back.
+  let value;
+  try {
+    value = yield jvm.invokeHostNative("__cn1_build_version__", []);
+  } catch (err) {
+    return null;
+  }
   return value == null ? null : jvm.createStringLiteral(String(value));
 });
 
