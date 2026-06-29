@@ -183,10 +183,20 @@ jobs:
       - name: Bundle built CN1 + iOS port artifacts
         run: |
           set -euo pipefail
+          # Include codenameone-tools (the workspace tools dir holding
+          # tools/env.sh) alongside the built tree. It is produced by
+          # setup-workspace in this job and consumed by every dependent build
+          # script (build-ios-app.sh etc. read ${TMPDIR}/codenameone-tools/
+          # tools/env.sh, TMPDIR=runner.temp). It had its own evictable cache
+          # too; when that cache was evicted mid-queue the dependent builds
+          # failed with "Workspace tools not found" even after the cn1-built
+          # restore succeeded. Bundling it into the same artifact makes the
+          # whole handoff eviction-proof.
           tar -C / -cf "$RUNNER_TEMP/cn1-built-bundle.tar" \
             "${HOME#/}/.m2/repository/com/codenameone" \
             "${GITHUB_WORKSPACE#/}/Themes" \
-            "${GITHUB_WORKSPACE#/}/Ports/iOSPort/nativeSources"
+            "${GITHUB_WORKSPACE#/}/Ports/iOSPort/nativeSources" \
+            "${RUNNER_TEMP#/}/codenameone-tools"
           ls -la "$RUNNER_TEMP/cn1-built-bundle.tar"
 
       - name: Upload built CN1 + iOS port bundle
