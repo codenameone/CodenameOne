@@ -1,33 +1,56 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.io.Util;
 import com.codename1.maps.LatLng;
 import com.codename1.maps.NativeMap;
 import com.codename1.maps.WebMapProvider;
 import com.codename1.maps.spi.MapProviderRegistry;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 
-import java.io.InputStream;
-
 /// Visual confirmation that the cross-platform web map provider
-/// ({@link com.codename1.maps.WebMapProvider}, Google Maps JavaScript SDK in a
-/// {@link com.codename1.ui.BrowserComponent}) renders. This is the path that
-/// lets *any* platform show Google Maps -- including the ones with no native
-/// Google SDK -- so it doubles as the cross-platform fallback smoke test.
+/// ({@link com.codename1.maps.WebMapProvider} -> {@link com.codename1.ui.BrowserComponent})
+/// renders into a peer and composites into the captured frame. This is the
+/// path that lets *any* platform show a web map -- including the ones with no
+/// native map SDK.
 ///
-/// Like the (now-removed) native Apple provider test it frames the Italian peninsula
-/// at a regional zoom (stable geography, strong land/water contrast, no
-/// street-level churn) and uses a lenient `.tolerance` so live tile/label noise
-/// does not fail CI while a blocked/blank map still does.
+/// Determinism: the original version loaded the **live** Google Maps JavaScript
+/// SDK over the network and pixel-compared the result against a golden. That is
+/// fundamentally non-deterministic -- tiles/labels shift run-to-run, and on a
+/// slow CI runner the live map had not painted a single tile within the timeout
+/// and the test captured a blank page (a guaranteed mismatch). No tolerance can
+/// make a live third-party map deterministic.
 ///
-/// The Google JavaScript API needs a key. CI writes the `GOOGLE_MAPS_API_KEY`
-/// secret to `google-maps-key.txt` on the classpath before the build; when that
-/// resource is absent (local builds, forks, no secret) the test skips rather
-/// than baseline an error overlay.
+/// So this exercises the *identical* provider/peer path with a fixed,
+/// self-contained offline HTML document (solid colour regions only -- no
+/// network, no web fonts, no images, no animation), giving a byte-stable
+/// capture. It still fails loudly on the real regression this guards: a blank
+/// or un-composited web peer (the page renders distinct land/water/road blocks;
+/// a blank capture differs across essentially the whole frame).
 public class GoogleWebMapScreenshotTest extends BaseTest {
+
+    /// Self-contained, network-free "map-like" page: a green land background, a
+    /// blue water band, two white roads and a darker-green park. Axis-aligned
+    /// solid fills keep anti-aliasing (and therefore cross-runner-GPU variance)
+    /// to a handful of edge pixels. No text/fonts (their rendering varies by
+    /// backend), no external resources, no requestAnimationFrame loop.
+    private static final String OFFLINE_MAP_HTML =
+            "<!DOCTYPE html><html><head>"
+            + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            + "<style>"
+            + "html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#a8d5a8}"
+            + ".b{position:absolute}"
+            + ".water{left:0;top:56%;width:100%;height:44%;background:#7fb2e5}"
+            + ".park{left:58%;top:8%;width:28%;height:26%;background:#6fbf73}"
+            + ".road{background:#ffffff}"
+            + ".rv{left:18%;top:0;width:5%;height:56%}"
+            + ".rh{left:0;top:30%;width:100%;height:4%}"
+            + "</style></head><body>"
+            + "<div class=\"b water\"></div>"
+            + "<div class=\"b park\"></div>"
+            + "<div class=\"b road rv\"></div>"
+            + "<div class=\"b road rh\"></div>"
+            + "</body></html>";
 
     @Override
     public boolean runTest() {
@@ -56,18 +79,11 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             done();
             return true;
         }
-        String key = readKey();
-        if (key == null || key.length() == 0) {
-            System.out.println(
-                    "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=no-api-key");
-            done();
-            return true;
-        }
-        // Register the web Google provider and force it for this map only; the
-        // provider was resolved by the NativeMap constructor synchronously, so
-        // restoring the default order right after leaves later tests (e.g. the
-        // native Apple provider test) untouched.
-        MapProviderRegistry.register(WebMapProvider.google(key));
+        // Force the web provider for this map only with a fixed offline page. The
+        // empty-key default would make the provider report unavailable, so pass a
+        // dummy non-empty key; the offline template has no {key} token to expand.
+        MapProviderRegistry.register(
+                new WebMapProvider("web", "offline", OFFLINE_MAP_HTML));
         MapProviderRegistry.setProviderOrder(new String[]{"web"});
         final NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
         MapProviderRegistry.setProviderOrder(null);
@@ -77,27 +93,15 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             done();
             return true;
         }
-        // Build the form by hand (rather than createForm) so we control what
-        // happens AFTER the capture: the Google Maps JS keeps a continuous
-        // requestAnimationFrame / tile-loading loop alive for the life of the
-        // page. If left running it starves the iOS main thread for the rest of
-        // the suite and desyncs later tests' capture timing (a downstream test
-        // then screenshots a stale form). So once we have our shot we dispose
-        // the web view, which blanks the page and stops that loop.
         Form form = new Form("Google Web Map", new BorderLayout()) {
             @Override
             protected void onShowCompleted() {
                 final Form self = this;
-                // Let the Google Maps JS load and paint tiles from the network
-                // (well over the native-map settle), capture, then dispose.
-                // 8s was enough on a healthy runner but not on a starved CI box
-                // (88s simulator boot, 450s suite execution), where the live map
-                // had not painted a single tile yet and we captured a blank grey
-                // page -- a ~66% mismatch the test (correctly) rejects as a blank
-                // map. 22s gives the network load real headroom (~3x the boot
-                // slowdown that runner showed) while still sitting under the 30s
-                // native test timeout.
-                UITimer.timer(22000, false, self, () ->
+                // The offline page renders immediately (no network). A short,
+                // fixed settle is enough for BrowserComponent.setPage to load and
+                // for the peer to composite; determinism comes from the fixed
+                // content, not from waiting for the network.
+                UITimer.timer(3000, false, self, () ->
                         captureWhenSettled(self, "GoogleWebMap", () -> {
                             map.dispose();
                             done();
@@ -111,31 +115,12 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
 
     /// The map is a native peer (BrowserComponent) view. On the iOS Metal
     /// backend the screenshot has been seen to capture solid black -- the
-    /// peer's web-view layer not composited into the captured frame in time
-    /// (the same reason the desktop/Mac-native runner is skipped above, though
-    /// iOS does composite it most of the time). Force a repaint and a short
-    /// extra present window before the capture so the composited frame includes
-    /// the loaded map. Opt-in hook; default is 0 for every other test.
+    /// peer's web-view layer not composited into the captured frame in time.
+    /// Force a repaint and a short extra present window before the capture so the
+    /// composited frame includes the rendered page. Opt-in hook; default is 0
+    /// for every other test.
     @Override
     protected long extraSettleBeforeCaptureMillis() {
         return 1200;
-    }
-
-    private String readKey() {
-        try {
-            InputStream is = Display.getInstance().getResourceAsStream(
-                    getClass(), "/google-maps-key.txt");
-            if (is == null) {
-                return null;
-            }
-            try {
-                byte[] data = Util.readInputStream(is);
-                return new String(data, "UTF-8").trim();
-            } finally {
-                is.close();
-            }
-        } catch (Throwable t) {
-            return null;
-        }
     }
 }
