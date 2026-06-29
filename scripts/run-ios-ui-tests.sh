@@ -431,19 +431,41 @@ fallback_sim_destination() {
 create_ios_sim_destination() {
   command -v xcrun >/dev/null 2>&1 || return
   command -v python3 >/dev/null 2>&1 || return
-  local runtime device_type new_id
-  runtime="$(xcrun simctl list -j runtimes available 2>/dev/null | python3 -c 'import json,sys
-rs=[r for r in json.load(sys.stdin).get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]
-rs.sort(key=lambda r: r.get("version",""), reverse=True)
-print(rs[0]["identifier"] if rs else "")' 2>/dev/null || true)"
-  device_type="$(xcrun simctl list -j devicetypes 2>/dev/null | python3 -c 'import json,sys
-ts=[t["identifier"] for t in json.load(sys.stdin).get("devicetypes",[]) if "iPhone" in t.get("name","")]
-ts.sort(reverse=True)
-print(ts[0] if ts else "")' 2>/dev/null || true)"
+  local pair runtime device_type new_id
+  # Pick the newest available iOS runtime AND a device type that runtime
+  # *actually supports* (from its supportedDeviceTypes). A naive alphabetical
+  # pick of all iPhone device types selects "iPhone Xs Max" ("X" > "1"), which is
+  # too old for a current runtime, so `simctl create` fails with "Unable to
+  # create a device for device type: ... runtime: iOS 26.x". Prefer the
+  # highest-numbered plain iPhone among the runtime's supported types.
+  pair="$(xcrun simctl list -j runtimes available 2>/dev/null | python3 -c '
+import json,sys,re
+data=json.load(sys.stdin)
+rs=[r for r in data.get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]
+rs.sort(key=lambda r: [int(x) for x in re.findall(r"\d+", r.get("version","0"))][:3], reverse=True)
+if not rs:
+    sys.exit(0)
+rt=rs[0]
+dts=[d for d in rt.get("supportedDeviceTypes",[]) if "iPhone" in d.get("name","")]
+def num(d):
+    m=re.search(r"iPhone (\d+)", d.get("name",""))
+    return int(m.group(1)) if m else -1
+dts.sort(key=num, reverse=True)
+if dts:
+    print(rt["identifier"]+"|"+dts[0]["identifier"])
+' 2>/dev/null || true)"
+  runtime="${pair%%|*}"
+  device_type="${pair##*|}"
+  [ -z "$pair" ] && return
   [ -z "$runtime" ] && return
   [ -z "$device_type" ] && return
   new_id="$(xcrun simctl create "cn1-ui-tests" "$device_type" "$runtime" 2>/dev/null || true)"
-  [ -n "$new_id" ] && printf 'platform=iOS Simulator,id=%s\n' "$new_id"
+  # simctl prints just the UDID on success; on failure the error text can reach
+  # stdout. Only emit a destination when it is a real UDID (hex + dashes, no
+  # spaces) so a failed create can never be booted as a garbage "id".
+  if [[ "$new_id" =~ ^[0-9A-Fa-f-]+$ ]]; then
+    printf 'platform=iOS Simulator,id=%s\n' "$new_id"
+  fi
 }
 
 

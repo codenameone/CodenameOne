@@ -99,20 +99,35 @@ for runtime, devs in data.get("devices", {}).items():
     ri_log "Reusing existing iPhone simulator $EXISTING_ID"
     DESTINATION="platform=iOS Simulator,id=$EXISTING_ID"
   else
-    LATEST_RUNTIME="$(xcrun simctl list -j runtimes available 2>/dev/null \
-      | python3 -c 'import json,sys
-runtimes=[r for r in json.load(sys.stdin).get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]
-runtimes.sort(key=lambda r: r.get("version",""), reverse=True)
-print(runtimes[0]["identifier"] if runtimes else "")' 2>/dev/null || true)"
-    LATEST_DEVICE_TYPE="$(xcrun simctl list -j devicetypes 2>/dev/null \
-      | python3 -c 'import json,sys
-types=[t["identifier"] for t in json.load(sys.stdin).get("devicetypes",[]) if "iPhone" in t.get("name","")]
-types.sort(reverse=True)
-print(types[0] if types else "")' 2>/dev/null || true)"
-    if [ -n "$LATEST_RUNTIME" ] && [ -n "$LATEST_DEVICE_TYPE" ]; then
+    # Pick the newest iOS runtime AND a device type it actually supports (from
+    # supportedDeviceTypes). A naive alphabetical pick selects "iPhone Xs Max"
+    # ("X" > "1"), too old for a current runtime, so `simctl create` fails with
+    # "Unable to create a device ...". Emit "<runtime>|<deviceType>".
+    RT_DT="$(xcrun simctl list -j runtimes available 2>/dev/null \
+      | python3 -c '
+import json,sys,re
+data=json.load(sys.stdin)
+rs=[r for r in data.get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]
+rs.sort(key=lambda r: [int(x) for x in re.findall(r"\d+", r.get("version","0"))][:3], reverse=True)
+if not rs:
+    sys.exit(0)
+rt=rs[0]
+dts=[d for d in rt.get("supportedDeviceTypes",[]) if "iPhone" in d.get("name","")]
+def num(d):
+    m=re.search(r"iPhone (\d+)", d.get("name",""))
+    return int(m.group(1)) if m else -1
+dts.sort(key=num, reverse=True)
+if dts:
+    print(rt["identifier"]+"|"+dts[0]["identifier"])
+' 2>/dev/null || true)"
+    LATEST_RUNTIME="${RT_DT%%|*}"
+    LATEST_DEVICE_TYPE="${RT_DT##*|}"
+    if [ -n "$RT_DT" ] && [ -n "$LATEST_RUNTIME" ] && [ -n "$LATEST_DEVICE_TYPE" ]; then
       ri_log "Creating throwaway simulator (device=$LATEST_DEVICE_TYPE runtime=$LATEST_RUNTIME)"
       NEW_ID="$(xcrun simctl create "cn1-native-tests" "$LATEST_DEVICE_TYPE" "$LATEST_RUNTIME" 2>/dev/null || true)"
-      if [ -n "$NEW_ID" ]; then
+      # Only accept a real UDID (hex + dashes) so a failed create's error text
+      # on stdout is never used as the device id.
+      if [[ "$NEW_ID" =~ ^[0-9A-Fa-f-]+$ ]]; then
         DESTINATION="platform=iOS Simulator,id=$NEW_ID"
       fi
     fi
