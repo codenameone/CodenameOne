@@ -124,6 +124,11 @@ public class Tabs extends Container {
     private EventDispatcher selectionListener;
     private boolean tabsFillRows;
     private boolean tabsGridLayout;
+    // Equal-width tab cells (each = row width / tab count), like a native UITabBar --
+    // so a longer label can't widen its cell and shove the others over. Opt in via
+    // `tabsEqualWidthBool`. Uses a non-scrolling GridLayout so cells fill the row
+    // width evenly (plain grid sizes to the widest cell and overflows).
+    private boolean tabsEqualWidth;
     private int textPosition = -1;
     private boolean changeTabOnFocus;
     private boolean changeTabContainerStyleOnFocus;
@@ -294,6 +299,7 @@ public class Tabs extends Container {
         int tabPlace = manager.getThemeConstant("tabPlacementInt", -1);
         tabsFillRows = manager.isThemeConstant("tabsFillRowsBool", false);
         tabsGridLayout = manager.isThemeConstant("tabsGridBool", false);
+        tabsEqualWidth = manager.isThemeConstant("tabsEqualWidthBool", false);
         changeTabOnFocus = manager.isThemeConstant("changeTabOnFocusBool", false);
         BorderLayout bd = (BorderLayout) super.getLayout();
         if (bd != null) {
@@ -1729,6 +1735,16 @@ public class Tabs extends Container {
 
     private void setTabsLayout(int tabPlacement) {
         if (tabPlacement == TOP || tabPlacement == BOTTOM) {
+            // Equal-width cells filling the row (native UITabBar even spacing): a
+            // NON-scrolling GridLayout divides the row width into equal columns, so a
+            // longer label can't widen its cell. (A scrolling grid sizes to the widest
+            // cell and overflows; fill-rows leaves cells content-sized.)
+            if (tabsEqualWidth) {
+                tabsContainer.setLayout(new GridLayout(1, Math.max(1, getTabCount())));
+                tabsContainer.setScrollableX(false);
+                tabsContainer.setScrollableY(false);
+                return;
+            }
             if (tabsFillRows) {
                 FlowLayout f = new FlowLayout();
                 f.setFillRows(true);

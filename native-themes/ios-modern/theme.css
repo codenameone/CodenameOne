@@ -111,6 +111,11 @@
     tabPlacementInt: 2;
     tabsFillRowsBool: true;
     tabsGridBool: true;
+    /* EQUAL-width tab cells: native iOS spaces tabs evenly, so the longer "Featured"
+       label must not widen its cell and shove the others right. Neither fill (content-
+       sized) nor grid (sizes to widest, overflows) gives pill/N cells, so the Tabs
+       layout equalizes tab widths when this is on. */
+    tabsEqualWidthBool: true;
     /* Native iOS 26: content scrolls UNDER the translucent floating tab pill so
        the glass blurs real content. tabsOnTopBool makes the content pane fill the
        full height (BorderLayout TOTAL_BELOW) with the pill overlaying the bottom,
@@ -623,9 +628,10 @@ TabsContainerHost {
 Tab {
     color: #3c3c43;
     background-color: transparent;
-    /* Moderate padding: enough to spread the three items toward the native pill
-       width without an over-tall/over-wide pill. */
-    padding: 0.78mm 3.8mm 0.78mm 3.8mm;
+    /* With equal-width cells (tabsEqualWidthBool) the GridLayout sizes every cell to
+       the widest tab's content + this padding, so the padding sets the cell (and pill)
+       width. Trimmed to land the cells on native's ~244px spacing. */
+    padding: 0.78mm 2.9mm 0.78mm 2.9mm;
     /* Same margin as Tab.selected/pressed so selecting only TOGGLES the capsule
        background -- it must not change the cell geometry. Small margins so the
        selected capsule nearly reaches the pill edges (native): minimal top/bottom
