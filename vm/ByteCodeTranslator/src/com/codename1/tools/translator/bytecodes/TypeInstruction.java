@@ -195,9 +195,12 @@ public class TypeInstruction extends Instruction {
                     b.append("); /* NEW stack-allocated */\n");
                     break;
                 }
-                b.append("PUSH_POINTER(__NEW_");
+                // CN1_FAST_NEW inlines the BiBOP bump fast-path at the allocation
+                // site (Lever 1, -DCN1_INLINE_ALLOC); with the flag off it expands
+                // verbatim to __NEW_<type>(threadStateData).
+                b.append("PUSH_POINTER(CN1_FAST_NEW(");
                 b.append(type);
-                b.append("(threadStateData)); /* NEW */\n");
+                b.append(")); /* NEW */\n");
                 break;
             case Opcodes.ANEWARRAY:
                 if(type.startsWith("[")) {

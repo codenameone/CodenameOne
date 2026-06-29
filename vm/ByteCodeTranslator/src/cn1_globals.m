@@ -1245,28 +1245,23 @@ BOOL isAppSuspended = 0;
 // the slot's first pointer word (the __codenameOneParentClsReference slot),
 // which a free slot does not otherwise use.
 #define CN1_BIBOP_FREE_MARK (-7)
+// CN1_BIBOP_HEAP_POS is defined in cn1_globals.h (shared with the inlined
+// bump fast path); keep the .m self-consistent if the header changes.
+#ifndef CN1_BIBOP_HEAP_POS
 #define CN1_BIBOP_HEAP_POS   (-3)
+#endif
 
 // Size classes (slot sizes, 16-aligned). size <= CN1_BIBOP_MAX_OBJECT maps to
 // the smallest class >= size; everything else takes the legacy path.
+// CN1_BIBOP_NUM_CLASSES is fixed in cn1_globals.h (must equal this array length).
 static const int cn1BibopClassSize[] = {
     32, 48, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512
 };
-#define CN1_BIBOP_NUM_CLASSES ((int)(sizeof(cn1BibopClassSize)/sizeof(int)))
+_Static_assert(sizeof(cn1BibopClassSize)/sizeof(int) == CN1_BIBOP_NUM_CLASSES,
+               "cn1BibopClassSize length must match CN1_BIBOP_NUM_CLASSES in cn1_globals.h");
 static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
 
-typedef struct CN1BibopPage {
-    struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
-    struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
-    int classIndex;
-    int slotSize;
-    int slotCount;
-    int firstSlotOffset;                  // byte offset of slot 0 from page base
-    _Atomic int bumpIndex;                // next slot to bump-allocate (published)
-    void* freeList;                       // intrusive free-list head (slot ptr)
-    int freeCount;
-    JAVA_BOOLEAN owned;
-} CN1BibopPage;
+// struct CN1BibopPage is defined in cn1_globals.h (shared with the inlined bump).
 
 static CN1BibopPage* _Atomic bibopAllPages = 0;   // registry head (atomic)
 static CN1BibopPage* bibopFreePool = 0;           // bibopMutex
@@ -1274,13 +1269,15 @@ static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
 static CN1BibopPage* _Atomic bibopSweepStack = 0; // Treiber-ish (push CAS / swap)
 static pthread_mutex_t bibopMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
-static _Atomic long bibopBytesSinceGc = 0;
+// Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
+_Atomic long bibopBytesSinceGc = 0;
 
 // Per-thread current page per size class. Only ever touched by the owning
 // thread (allocation) and by that same thread on death (collectThreadResources
 // runs on the dying thread), so __thread is correct and the GC never needs to
 // reach into it -- retired pages are handed to the GC via the global stack.
-static __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+// Non-static: the inlined bump fast path (cn1_globals.h) reads bibopCurrent[ci].
+__thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 
 static void cn1BibopDoInit() {
     int ci = 0;

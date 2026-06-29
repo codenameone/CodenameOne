@@ -1074,6 +1074,123 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
 #define CODENAME_ONE_THREAD_STATE struct ThreadLocalData* threadStateData
 
+// =========================================================================
+// LEVER 1: inlined BiBOP bump fast-path (alloc fast-path, perf-tier1)
+//
+// The escaping `new X()` path is, at codenameOneGcMalloc, an OUT-OF-LINE cross
+// translation-unit call (per-class .c -> cn1_globals.c, no LTO in this build),
+// which clang therefore cannot inline. This block exposes the minimal BiBOP
+// bump surface to every TU so the common case (per-thread current page has a
+// free bump slot for this object's size class) can be emitted INLINE at the
+// allocation site -- pointer-bump + header stamp, no call -- exactly mirroring
+// HotSpot's inlined-TLAB-bump + slow-path-call. The size-class index is a
+// compile-time constant per type (sizeof(struct obj__X) is known to clang), so
+// CN1_BIBOP_CIDX folds to a literal; an oversized type folds the fast path away
+// entirely and falls straight to the slow path.
+//
+// The bump replicates cn1BibopAlloc's bump branch BIT-FOR-BIT (relaxed load of
+// bumpIndex, init the slot with the mark published LAST via an atomic-release
+// store, release-store the new cursor AFTER the slot is fully initialized,
+// relaxed add to bibopBytesSinceGc). Same memory ordering => the concurrent-GC
+// overflow-rescan / sweep correctness argument is unchanged. The free-list and
+// page-acquire cases stay on the slow path (codenameOneGcMalloc). isAppSuspended
+// handling stays on the slow path too; a suspended-app bibop alloc still
+// succeeds and bibopBytesSinceGc still drives collection, so the only behavioural
+// delta is a delayed GC-thread restart while suspended (no checksum/leak impact).
+//
+// Gated by -DCN1_INLINE_ALLOC. OFF => CN1_FAST_NEW(X) is exactly __NEW_X.
+// =========================================================================
+#ifndef CN1_BIBOP_PAGE_SIZE
+#define CN1_BIBOP_PAGE_SIZE (64*1024)
+#endif
+#ifndef CN1_BIBOP_MAX_OBJECT
+#define CN1_BIBOP_MAX_OBJECT 512
+#endif
+#ifndef CN1_BIBOP_HEAP_POS
+#define CN1_BIBOP_HEAP_POS (-3)
+#endif
+// Slot sizes (16-aligned); a size maps to the smallest class >= size.
+#define CN1_BIBOP_NUM_CLASSES 15
+// Compile-time size -> class-index. With a constant `sz` (sizeof(...)) clang
+// folds the whole chain to an int literal (or -1 for oversized => fast path
+// dead-code-eliminated, slow path only).
+#define CN1_BIBOP_CIDX(sz) ( \
+  (sz)<=32?0:(sz)<=48?1:(sz)<=64?2:(sz)<=80?3:(sz)<=96?4:(sz)<=112?5: \
+  (sz)<=128?6:(sz)<=160?7:(sz)<=192?8:(sz)<=224?9:(sz)<=256?10: \
+  (sz)<=320?11:(sz)<=384?12:(sz)<=448?13:(sz)<=512?14:-1)
+
+typedef struct CN1BibopPage {
+    struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
+    struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
+    int classIndex;
+    int slotSize;
+    int slotCount;
+    int firstSlotOffset;                  // byte offset of slot 0 from page base
+    _Atomic int bumpIndex;                // next slot to bump-allocate (published)
+    void* freeList;                       // intrusive free-list head (slot ptr)
+    int freeCount;
+    JAVA_BOOLEAN owned;
+} CN1BibopPage;
+
+// Per-thread current page per size class; defined in cn1_globals.m. Touched only
+// by the owning thread (alloc) and by that same thread on death.
+extern __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+extern _Atomic long bibopBytesSinceGc;
+extern int allocationsSinceLastGC;
+extern long long totalAllocations;
+
+// Inlined bump fast path. Returns 0 (slow path: page full / free-list present /
+// ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
+static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+    if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
+    CN1BibopPage* p = bibopCurrent[ci];
+    if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
+                        constantPoolObjects != (JAVA_OBJECT*)0 &&
+                        !threadStateData->nativeAllocationMode, 1)) {
+        int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+        if(__builtin_expect(bi < p->slotCount, 1)) {
+            JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
+            int hdr = (int)sizeof(struct JavaObjectPrototype);
+            if(size > hdr) {
+                memset((char*)o + hdr, 0, size - hdr);
+            }
+            o->__codenameOneParentClsReference = parent;
+            o->__codenameOneReferenceCount = 1;
+            o->__codenameOneThreadData = 0;
+            o->__ownerThread = threadStateData;
+            o->__heapPosition = CN1_BIBOP_HEAP_POS;
+#ifdef DEBUG_GC_ALLOCATIONS
+            o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
+            o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
+#endif
+            __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
+            atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+            atomic_fetch_add_explicit(&bibopBytesSinceGc, p->slotSize, memory_order_relaxed);
+            // keep the legacy GC-trigger counters in step with the slow path so
+            // collection cadence is unchanged (these are plain globals, raced
+            // exactly as in codenameOneGcMalloc today).
+            allocationsSinceLastGC += size;
+            totalAllocations += size;
+            return o;
+        }
+    }
+    return (JAVA_OBJECT)0;
+}
+
+// CN1_FAST_NEW(X): inlined alloc + static-init guard for a NEW of concrete type
+// X. The static initializer is invoked only when the class isn't initialised yet
+// (the bump fast path can be reached for a class whose <clinit> hasn't run,
+// because bibopCurrent[] is shared across all classes of the same size class).
+#ifdef CN1_INLINE_ALLOC
+#define CN1_FAST_NEW(X) ({ \
+    if(__builtin_expect(!class__##X.initialized, 0)) __STATIC_INITIALIZER_##X(threadStateData); \
+    JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
+    if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
+    __cn1fo; })
+#else
+#define CN1_FAST_NEW(X) __NEW_##X(threadStateData)
+#endif
+
 #define CN1_THREAD_STATE_SINGLE_ARG CODENAME_ONE_THREAD_STATE
 #define CN1_THREAD_STATE_MULTI_ARG CODENAME_ONE_THREAD_STATE,
 #define CN1_THREAD_STATE_PASS_ARG threadStateData,
