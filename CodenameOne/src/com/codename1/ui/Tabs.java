@@ -1419,6 +1419,19 @@ public class Tabs extends Container {
         }
         Component fromTab = tabsContainer.getComponentAt(fromIndex);
         Component toTab = tabsContainer.getComponentAt(toIndex);
+        // The selection capsule fills the whole CELL (and hugs the pill edge for the
+        // first/last tab); the Material underline tracks the tab's own bounds. Pick the
+        // matching geometry so the resting and animated positions agree.
+        int[] from = new int[2];
+        int[] to = new int[2];
+        if (selectionCapsule) {
+            int cInset = selectionCapsuleInsetPx();
+            capsuleCellBounds(fromIndex, cInset, from);
+            capsuleCellBounds(toIndex, cInset, to);
+        } else {
+            from[0] = fromTab.getX(); from[1] = fromTab.getWidth();
+            to[0] = toTab.getX(); to[1] = toTab.getWidth();
+        }
         // If a motion is already in flight, start from the *current*
         // interpolated position, not from the previous tab -- otherwise
         // rapid double-clicks jump back to a stale baseline.
@@ -1427,11 +1440,11 @@ public class Tabs extends Container {
             indicatorFromX = indicatorFromX + ((indicatorToX - indicatorFromX) * v / 100);
             indicatorFromW = indicatorFromW + ((indicatorToW - indicatorFromW) * v / 100);
         } else {
-            indicatorFromX = fromTab.getX();
-            indicatorFromW = fromTab.getWidth();
+            indicatorFromX = from[0];
+            indicatorFromW = from[1];
         }
-        indicatorToX = toTab.getX();
-        indicatorToW = toTab.getWidth();
+        indicatorToX = to[0];
+        indicatorToW = to[1];
         indicatorAnimMotion = Motion.createEaseInOutMotion(0, 100, animatedIndicatorDurationMs);
         indicatorAnimMotion.start();
         Form f = getComponentForm();
@@ -1486,6 +1499,48 @@ public class Tabs extends Container {
         return def;
     }
 
+    /// The thin frost rim left around the selection capsule (tabSelInsetMm, default a hair).
+    private int selectionCapsuleInsetPx() {
+        float insetMm = 0.1f;
+        String iv = getUIManager().getThemeConstant("tabSelInsetMm", null);
+        if (iv != null) {
+            try {
+                insetMm = Float.parseFloat(iv.trim());
+            } catch (NumberFormatException ignore) {
+            }
+        }
+        return Display.getInstance().convertToPixels(insetMm);
+    }
+
+    /// Horizontal bounds of the selection capsule for tab `index`, in the
+    /// tabsContainer inner coordinate space (add getInnerX()). The capsule fills the
+    /// whole CELL -- midpoint-to-midpoint between neighbours -- and hugs the pill's
+    /// outer edge (minus the thin rim) for the first/last tab, like a native UITabBar.
+    /// out[0]=x, out[1]=w.
+    private void capsuleCellBounds(int index, int inset, int[] out) {
+        int n = tabsContainer.getComponentCount();
+        Component t = tabsContainer.getComponentAt(index);
+        int padLeft = tabsContainer.getInnerX() - tabsContainer.getX();
+        int padRight = (tabsContainer.getX() + tabsContainer.getWidth())
+                - (tabsContainer.getInnerX() + tabsContainer.getInnerWidth());
+        int left;
+        int right;
+        if (index <= 0) {
+            left = -padLeft + inset;                       // pill outer left edge
+        } else {
+            Component p = tabsContainer.getComponentAt(index - 1);
+            left = (p.getX() + p.getWidth() + t.getX()) / 2;   // midpoint to previous tab
+        }
+        if (index >= n - 1) {
+            right = tabsContainer.getInnerWidth() + padRight - inset;   // pill outer right edge
+        } else {
+            Component nx = tabsContainer.getComponentAt(index + 1);
+            right = (t.getX() + t.getWidth() + nx.getX()) / 2;          // midpoint to next tab
+        }
+        out[0] = left;
+        out[1] = right - left;
+    }
+
     /// Draws the iOS 26 sliding selection capsule -- a single Liquid Glass blob
     /// behind the selected tab that tweens between tabs on selection change (reusing
     /// the indicator motion). Painted BEHIND the tab content so the icon/label sit on
@@ -1500,6 +1555,10 @@ public class Tabs extends Container {
         if (activeComponent < 0 || activeComponent >= tabsContainer.getComponentCount()) {
             return;
         }
+        // The selection capsule should fill (almost) the full pill height like native --
+        // a large inset leaves a bright bar-frost band above/below it (reads as a
+        // separate inset pill / "ring"). Tunable via tabSelInsetMm (default a hair).
+        int inset = selectionCapsuleInsetPx();
         int x;
         int w;
         if (indicatorAnimMotion != null) {
@@ -1507,22 +1566,11 @@ public class Tabs extends Container {
             x = indicatorFromX + ((indicatorToX - indicatorFromX) * v / 100);
             w = indicatorFromW + ((indicatorToW - indicatorFromW) * v / 100);
         } else {
-            Component a = tabsContainer.getComponentAt(activeComponent);
-            x = a.getX();
-            w = a.getWidth();
+            int[] cb = new int[2];
+            capsuleCellBounds(activeComponent, inset, cb);
+            x = cb[0];
+            w = cb[1];
         }
-        // The selection capsule should fill (almost) the full pill height like native --
-        // a large inset leaves a bright bar-frost band above/below it (reads as a
-        // separate inset pill / "ring"). Tunable via tabSelInsetMm (default a hair).
-        float insetMm = 0.1f;
-        String iv = getUIManager().getThemeConstant("tabSelInsetMm", null);
-        if (iv != null) {
-            try {
-                insetMm = Float.parseFloat(iv.trim());
-            } catch (NumberFormatException ignore) {
-            }
-        }
-        int inset = Display.getInstance().convertToPixels(insetMm);
         // Span the OUTER pill height (not the padded inner box) so the capsule reaches
         // the pill edge like native -- using getInnerY()/Height() leaves the bar's
         // padding as a bright frost band above/below the capsule (the visible "ring").
