@@ -16,6 +16,17 @@
 #include <stdatomic.h>
 #include <stdint.h>
 
+// PHASE 3b DEFAULT ON: conservative native-stack GC as a real root source, paired
+// with object/instance frameless codegen (BytecodeMethod cn1.frameless.objects/
+// .instance, also default on). Validated bit-identical + GC-safe + MtStress
+// deterministic on arm64 macOS (the dev + iOS arch). Disable with
+// -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS (and run the translator with
+// -Dcn1.frameless.objects=false -Dcn1.frameless.instance=false) to revert to the
+// precise threadObjectStack GC.
+#ifndef CN1_DISABLE_CONSERVATIVE_GC_ROOTS
+#define CN1_CONSERVATIVE_GC_ROOTS
+#endif
+
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b: conservative native-stack scanning as a REAL GC root source. Needs
 // signal-based universal thread stopping (sig_atomic_t / sigaction / ucontext).

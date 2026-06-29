@@ -114,13 +114,14 @@ public class BytecodeMethod implements SignatureSet {
     // stopped thread's native stack. With this OFF, only primitive-only methods are
     // frameless (identical to the prior phase). Requires the conservative-GC runtime.
     private static final boolean FRAMELESS_OBJECTS_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.objects", "false"));
+            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.objects", "true"));
     // PHASE 3b: extend object-frameless to INSTANCE methods (receiver `this` becomes a
-    // conservatively-scanned C parameter). Separate sub-gate (-Dcn1.frameless.instance,
-    // default off) because it currently shows an intermittent multi-threaded GC-safety
-    // failure; static object-frameless is solid and stays the default object path.
+    // conservatively-scanned C parameter). Now DEFAULT ON: the intermittent multi-threaded
+    // failure that previously gated this off was a pre-existing Thread.start/join visibility
+    // race (alive set on the worker thread async after start() returned), fixed in
+    // java_lang_Thread_start__ (993331107); with it fixed, MtStress is 50/50 deterministic.
     private static final boolean FRAMELESS_INSTANCE_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.instance", "false"));
+            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.instance", "true"));
     private int methodOffset;
     private boolean forceVirtual;
     private boolean virtualOverriden;
