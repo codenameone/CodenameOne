@@ -615,6 +615,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-28T15:02:33+00:00"
       }
+    },
+    "seamless-crash-protection": {
+      "devto": {
+        "id": 4022932,
+        "url": "https://dev.to/codenameone/seamless-crash-protection-that-symbolicates-native-crashes-1l1h",
+        "syndicated_at": "2026-06-29T14:23:01+00:00"
+      }
     }
   }
 }
