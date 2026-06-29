@@ -50,6 +50,28 @@ ri_log "Injecting native notification tests into project at $PROJECT_DIR"
 "$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" "$APP_SCHEME"
 "$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" "$TEST_SCHEME"
 
+# Ensure the active Xcode actually has the iOS Simulator platform before we try
+# to build/run. Some GitHub runners select an Xcode that only has the tvOS
+# platform installed; -showdestinations then lists no iOS destination, and even
+# a concrete simctl device (which may belong to a *different* Xcode's runtime)
+# fails the build with "Unable to find a destination matching ...
+# { platform:iOS Simulator }". Download the iOS platform for the active Xcode
+# when it is absent. Mirrors run-ios-ui-tests.sh.
+DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-}"
+if [ -z "$DOWNLOAD_PLATFORMS" ] && [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
+  DOWNLOAD_PLATFORMS="true"
+fi
+DOWNLOAD_PLATFORMS="${DOWNLOAD_PLATFORMS:-false}"
+if ! xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TEST_SCHEME" -showdestinations 2>/dev/null \
+     | grep -q "platform:iOS Simulator"; then
+  if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
+    ri_log "No iOS simulator platform for the active Xcode; downloading via xcodebuild -downloadPlatform iOS"
+    xcodebuild -downloadPlatform iOS || true
+  else
+    ri_log "No iOS simulator platform for the active Xcode. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
+  fi
+fi
+
 ri_log "Discovering simulator destination for test scheme $TEST_SCHEME"
 DESTINATION="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TEST_SCHEME" -showdestinations 2>/dev/null \
   | sed -n 's/.*{ platform:iOS Simulator,.*id:\([^,}]*\).*/\1/p' \
