@@ -90,21 +90,33 @@
        fairly uniform (low scale). Measured native light bar ~236 over grey; the
        selected lens (Tabs.paintSelectionCapsule, TabSel* constants) then reads a touch
        DARKER than this. Dark bar keeps the panel default (~58, matches native ~51). */
-    TabsContainerGlassScaleLight: "0.3";
-    TabsContainerGlassOffsetLight: "198";
-    TabsContainerGlassSatLight: "1.2";
+    /* Bar = bright FROST that still passes the backdrop COLOURS through (native shows
+       the yellow/blue bleed): higher scale for backdrop variance, offset for the bright
+       floor (grey -> ~236 light / ~51 dark). NO refraction on the bar -- it is the flat
+       frosted surface; only the selected lens refracts. Double-refraction (bar + lens)
+       produced the "hole + offset layer" on the selected capsule. */
+    TabsContainerGlassScaleLight: "0.62";
+    TabsContainerGlassOffsetLight: "157";
+    TabsContainerGlassSatLight: "1.8";
+    TabsContainerGlassScaleDark: "0.3";
+    TabsContainerGlassOffsetDark: "13";
+    TabsContainerGlassSatDark: "2.5";
+    TabsContainerRefractLight: "0";
+    TabsContainerRefractDark: "0";
+    TabsContainerSpecularLight: "0.2";
+    TabsContainerSpecularDark: "0.2";
     /* Selected-capsule LENS material (Tabs.paintSelectionCapsule): near pass-through so
        it reads slightly darker than the bright bar in light (~216 vs 236) and a touch
        lighter than the dark bar (~83 vs 51), like the iOS 26 lens. */
     TabSelScaleLight: "0.85";
     TabSelOffsetLight: "0";
     TabSelSatLight: "1.3";
-    TabSelRefractLight: "0.4";
+    TabSelRefractLight: "0.2";
     TabSelSpecularLight: "0.35";
     TabSelScaleDark: "0.5";
     TabSelOffsetDark: "6";
     TabSelSatDark: "1.6";
-    TabSelRefractDark: "0.4";
+    TabSelRefractDark: "0.2";
     TabSelSpecularDark: "0.05";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
