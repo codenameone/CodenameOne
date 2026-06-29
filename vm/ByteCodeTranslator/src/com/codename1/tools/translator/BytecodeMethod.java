@@ -1251,6 +1251,28 @@ public class BytecodeMethod implements SignatureSet {
         return constructor;
     }
 
+    // LEVER B (perf-tier1): the inlinable-constructor plan, computed ONCE from the RAW
+    // instruction list at parse time (Parser.MethodVisitorWrapper.visitEnd, before any
+    // optimize() rewrites PUTFIELDs into folded Field ops). A new-site in another class
+    // looks this up at emit time -- decoupling the analysis (raw, deterministic) from
+    // the cross-class emission order. null == not an inlinable ctor.
+    private com.codename1.tools.translator.bytecodes.InlinableConstructor inlinableCtorPlan;
+    private boolean inlinableCtorComputed;
+
+    public void computeInlinableConstructorPlan() {
+        if (inlinableCtorComputed) {
+            return;
+        }
+        inlinableCtorComputed = true;
+        if (constructor) {
+            inlinableCtorPlan = com.codename1.tools.translator.bytecodes.InlinableConstructor.analyzeRaw(this, desc);
+        }
+    }
+
+    public com.codename1.tools.translator.bytecodes.InlinableConstructor getInlinableConstructorPlan() {
+        return inlinableCtorPlan;
+    }
+
     public String getMethodIdentifier() {
         StringBuilder b = new StringBuilder();
         b.append(clsName).append("_");

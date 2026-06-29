@@ -608,6 +608,8 @@ void collectThreadResources(struct ThreadLocalData *current)
     // collectable. Runs on the dying thread, so its __thread current pages are
     // reachable here.
     cn1BibopRetireThreadPages();
+    // LEVER A: flush any unaccounted per-thread bytes into the global GC trigger.
+    CN1_BIBOP_FLUSH_BYTES(current);
 #endif
     if(current->utf8Buffer != 0) {
         free(current->utf8Buffer);
@@ -1333,6 +1335,9 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 // crossed the threshold (these objects don't feed the legacy heapAllocationSize
 // trigger). Mirrors codenameOneGcMalloc's simple self-triggering branch.
 static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
+    // LEVER A: flush this thread's plain-add byte accumulator into the global atomic
+    // (once per page-acquire). No-op unless -DCN1_DEATOMIC_BYTES.
+    CN1_BIBOP_FLUSH_BYTES(threadStateData);
     if(gcCurrentlyRunning || constantPoolObjects == 0 || threadStateData->nativeAllocationMode) {
         return;
     }
@@ -1429,7 +1434,7 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
                 // publish the new cursor with release AFTER the slot (incl. its
                 // mark) is fully initialized.
                 atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-                atomic_fetch_add_explicit(&bibopBytesSinceGc, p->slotSize, memory_order_relaxed);
+                CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
                 return o;
             }
         }
@@ -1443,7 +1448,7 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     }
     // free-list slot path
     cn1BibopInitSlot(threadStateData, o, size, parent);
-    atomic_fetch_add_explicit(&bibopBytesSinceGc, p->slotSize, memory_order_relaxed);
+    CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
     return o;
 }
 

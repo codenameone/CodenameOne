@@ -167,8 +167,51 @@ public class Invoke extends Instruction {
         return null;
     }
 
+    // LEVER B (perf-tier1): re-entrancy guard for inlined-constructor #else emission.
+    private boolean emittingInlineCtorElse = false;
+    private InlinableConstructor inlineCtorPlan;
+    private boolean inlineCtorAnalyzed = false;
+
+    /**
+     * Lever B for the non-folded path: a void INVOKESPECIAL {@code <init>} whose args
+     * are all still on the operand stack. Emits the {@code #ifdef CN1_INLINE_CTOR}
+     * block (inlined field stores ON / ordinary call via re-entry OFF). Returns true
+     * if handled. See {@link InlinableConstructor}.
+     */
+    private boolean tryAppendInlinedConstructor(StringBuilder b) {
+        if (opcode != Opcodes.INVOKESPECIAL || !"<init>".equals(name)) {
+            return false;
+        }
+        List<ByteCodeMethodArg> args = getArgs();
+        if (!inlineCtorAnalyzed) {
+            inlineCtorAnalyzed = true;
+            inlineCtorPlan = InlinableConstructor.analyze(owner, desc);
+        }
+        if (inlineCtorPlan == null) {
+            return false;
+        }
+        int n = args.size();
+        String objExpr = "SP[-" + (n + 1) + "].data.o";
+        String[] argExprs = new String[n];
+        for (int j = 0; j < n; j++) {
+            argExprs[j] = "SP[-" + (n - j) + "].data." + args.get(j).getQualifier();
+        }
+        b.append("#ifdef CN1_INLINE_CTOR\n");
+        inlineCtorPlan.appendStores(b, objExpr, argExprs);
+        b.append("    SP -= ").append(n + 1).append(";\n");
+        b.append("#else\n");
+        emittingInlineCtorElse = true;
+        appendInstruction(b);
+        emittingInlineCtorElse = false;
+        b.append("#endif\n");
+        return true;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (!emittingInlineCtorElse && tryAppendInlinedConstructor(b)) {
+            return;
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             b.append("    POP_MANY_AND_PUSH_OBJ(cloneArray(PEEK_OBJ(1)), 1);\n");

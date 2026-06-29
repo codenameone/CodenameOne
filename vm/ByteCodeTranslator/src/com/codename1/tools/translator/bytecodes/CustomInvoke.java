@@ -353,8 +353,59 @@ public class CustomInvoke extends Instruction {
     }
     
     
+    // LEVER B (perf-tier1): re-entrancy guard. When emitting the #else branch of an
+    // inlined constructor we re-enter appendInstruction to emit the ordinary call;
+    // this flag stops it from inlining again (infinite recursion).
+    private boolean emittingInlineCtorElse = false;
+    private InlinableConstructor inlineCtorPlan;
+    private boolean inlineCtorAnalyzed = false;
+
+    /**
+     * If this is a void INVOKESPECIAL {@code <init>} whose target ctor is inlinable
+     * (Lever B) and whose args are all folded literals, emit a
+     * {@code #ifdef CN1_INLINE_CTOR} block: the inlined field stores in the ON branch,
+     * the ordinary out-of-line ctor call (via re-entry) in the OFF branch. Both pop
+     * the identical stack slots, so the SAME translated C is A/B-able by the clang
+     * {@code -DCN1_INLINE_CTOR} flag. Returns true if handled.
+     */
+    private boolean tryAppendInlinedConstructor(StringBuilder b) {
+        if (origOpcode != Opcodes.INVOKESPECIAL || !"<init>".equals(name) || getReturnValue() != null) {
+            return false;
+        }
+        List<ByteCodeMethodArg> args = getArgs();
+        // Inline via CustomInvoke only when every argument is already a literal; the
+        // object may still be on the operand stack (the freshly-NEW'd ref).
+        if (getNumLiteralArgs() != args.size()) {
+            return false;
+        }
+        if (!inlineCtorAnalyzed) {
+            inlineCtorAnalyzed = true;
+            inlineCtorPlan = InlinableConstructor.analyze(owner, desc);
+        }
+        if (inlineCtorPlan == null) {
+            return false;
+        }
+        String objExpr = targetObjectLiteral != null ? targetObjectLiteral : "SP[-1].data.o";
+        String[] argExprs = literalArgs != null ? literalArgs : new String[0];
+        int pop = targetObjectLiteral != null ? 0 : 1; // only the receiver may be on-stack
+        b.append("#ifdef CN1_INLINE_CTOR\n");
+        inlineCtorPlan.appendStores(b, objExpr, argExprs);
+        if (pop > 0) {
+            b.append("    SP -= ").append(pop).append(";\n");
+        }
+        b.append("#else\n");
+        emittingInlineCtorElse = true;
+        appendInstruction(b);
+        emittingInlineCtorElse = false;
+        b.append("#endif\n");
+        return true;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (!emittingInlineCtorElse && tryAppendInlinedConstructor(b)) {
+            return;
+        }
         if (getSimdAllocaMacro() != null) {
             StringBuilder expr = new StringBuilder();
             if (appendSimdAllocaExpression(expr)) {

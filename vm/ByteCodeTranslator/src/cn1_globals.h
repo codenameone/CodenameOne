@@ -963,6 +963,17 @@ struct ThreadLocalData {
     // 0 == not yet computed (lazily initialized once per thread on first use).
     JAVA_LONG nativeStackLimit;
 
+#ifdef CN1_DEATOMIC_BYTES
+    // LEVER A (perf-tier1): per-thread, plain-add accumulator for BiBOP allocation
+    // volume. Replaces the per-object atomic_fetch_add on the global bibopBytesSinceGc
+    // (which an uncontended single thread still pays as an arm64 exclusive-monitor RMW,
+    // and which bounces a cache line across threads). Flushed to the global atomic once
+    // per page-acquire (~64KB of allocation), so the GC-trigger cadence is unchanged to
+    // within (nthreads * page) -- negligible vs the 24MB trigger, and the trigger is a
+    // pure heuristic with NO correctness role (see CN1_BIBOP_FLUSH_BYTES).
+    JAVA_LONG bibopBytesLocal;
+#endif
+
 #ifdef CN1_ON_DEVICE_DEBUG
     // Per-frame pointer to a stack-allocated array of void* addresses, one per
     // JVM local slot in the current method. Populated by translator-emitted
@@ -1139,6 +1150,26 @@ extern _Atomic long bibopBytesSinceGc;
 extern int allocationsSinceLastGC;
 extern long long totalAllocations;
 
+// LEVER A (perf-tier1, -DCN1_DEATOMIC_BYTES): per-object BiBOP byte accounting.
+// CN1_BIBOP_ACCOUNT_BYTES is called once per allocation (inline fast path AND the
+// .m slow path); CN1_BIBOP_FLUSH_BYTES is called once per page-acquire (slow path)
+// and at thread death. The global bibopBytesSinceGc is read only by the GC-trigger
+// heuristic (cn1BibopMaybeGc) and reset to 0 by the sweep -- it has NO liveness/
+// correctness role -- so deferring the per-thread total into it via plain adds and
+// flushing it in bulk is safe; only the trigger cadence shifts (by < nthreads*page,
+// negligible vs the 24MB trigger, and already racy today). The bump cursor / mark
+// publication ordering is UNCHANGED (those are the GC-visible fields; see report).
+#ifdef CN1_DEATOMIC_BYTES
+#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { (ts)->bibopBytesLocal += (JAVA_LONG)(n); } while(0)
+#define CN1_BIBOP_FLUSH_BYTES(ts) do { \
+    if((ts)->bibopBytesLocal) { \
+        atomic_fetch_add_explicit(&bibopBytesSinceGc, (ts)->bibopBytesLocal, memory_order_relaxed); \
+        (ts)->bibopBytesLocal = 0; } } while(0)
+#else
+#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) atomic_fetch_add_explicit(&bibopBytesSinceGc, (n), memory_order_relaxed)
+#define CN1_BIBOP_FLUSH_BYTES(ts) do {} while(0)
+#endif
+
 // Inlined bump fast path. Returns 0 (slow path: page full / free-list present /
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
@@ -1165,7 +1196,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-            atomic_fetch_add_explicit(&bibopBytesSinceGc, p->slotSize, memory_order_relaxed);
+            CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
             // keep the legacy GC-trigger counters in step with the slow path so
             // collection cadence is unchanged (these are plain globals, raced
             // exactly as in codenameOneGcMalloc today).
