@@ -200,7 +200,15 @@
        native UITabBar icon size. SF renders at its natural per-symbol bounds for this
        point size (bigger than the nominal), so this is smaller than the Material value
        that preceded it. */
-    tabIconSizeMm: "4.1";
+    tabIconSizeMm: "3.75";
+    /* SF symbol tab-icon layout (IOSImplementation.createSFSymbolImage -> nativeCreateSFSymbol):
+       a taller-than-nominal UNIFORM icon slot so a tall glyph (star.fill) renders at its full
+       native height instead of being shrunk to the nominal size, with the glyph biased toward
+       the TOP of the slot (vBias < 50) so it sits high on the SF baseline like native's UITabBar
+       (the star extends above the shorter glyphs). slotPct = slot height as % of tabIconSizeMm;
+       vBias = glyph position in the slot as % (50 = centred). Tuned against the native golden. */
+    iosSFSlotPct: "115";
+    iosSFVBias: "50";
     switchThumbPaddingInt: 1;
     /* Native iOS UISwitch proportions: the thumb is a CIRCLE clearly inset inside
        the track (thumbScaleY < trackScaleY + a real inset), so the grey/green
@@ -674,7 +682,7 @@ Tab {
        size. Horizontal trimmed to land the cells on native's ~244px spacing; vertical
        raised so the pill matches native's height (~172px) -- a taller capsule pill also
        widens (its rounded ends scale with height). */
-    padding: 1.0mm 2.9mm 1.0mm 2.9mm;
+    padding: 0.65mm 2.9mm 1.35mm 2.9mm;
     /* Same margin as Tab.selected/pressed so selecting only TOGGLES the capsule
        background -- it must not change the cell geometry. Small margins so the
        selected capsule nearly reaches the pill edges (native): minimal top/bottom

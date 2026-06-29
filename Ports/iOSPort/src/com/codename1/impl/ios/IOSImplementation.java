@@ -1795,9 +1795,31 @@ public class IOSImplementation extends CodenameOneImplementation {
         return Image.createImage(n);
     }
 
+    /// Parses a theme-constant string as an int, returning {@code def} on null/blank/malformed.
+    private static int parseIntConstant(String v, int def) {
+        if (v == null) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(v.trim());
+        } catch (NumberFormatException nfe) {
+            return def;
+        }
+    }
+
     @Override
     public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {
-        int[] wh = new int[2];
+        // wh[0],[1] receive the rendered pixel w/h. wh[2],[3] pass optional layout
+        // tuning to the native render: a uniform icon SLOT height (percent of size)
+        // and the glyph's VERTICAL bias in that slot (percent; 50 = centred). This
+        // lets a native-style tab bar give a tall glyph (e.g. star.fill) a full-height
+        // slot positioned like UIKit's SF baseline instead of shrinking it to the
+        // nominal size. Defaults 100/50 reproduce the legacy centred behaviour, so
+        // non-tab icons are unaffected unless the theme opts in.
+        int[] wh = new int[4];
+        com.codename1.ui.plaf.UIManager uim = com.codename1.ui.plaf.UIManager.getInstance();
+        wh[2] = parseIntConstant(uim.getThemeConstant("iosSFSlotPct", "100"), 100);
+        wh[3] = parseIntConstant(uim.getThemeConstant("iosSFVBias", "50"), 50);
         long peer = nativeInstance.nativeCreateSFSymbol(name, color, sizePixels, weight, wh);
         if (peer == 0) {
             return null;
