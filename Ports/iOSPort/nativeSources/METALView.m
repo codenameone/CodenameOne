@@ -42,6 +42,147 @@ extern UIView *editingComponent;
 extern BOOL isVKBAlwaysOpen();
 extern void repaintUI();
 
+#include <math.h>
+
+// ---------------------------------------------------------------------------
+// Live-screen "Liquid Glass" material helpers. Faithful C ports of the proven
+// offscreen recipe in IOSImplementation (glassMaterialInPlace, sampleBilinear,
+// applyGlassOptics) so the running app produces the SAME glass as the fidelity
+// tiles. The whole pipeline runs in one top-down ARGB integer buffer (no
+// CIImage/CG round-trip) to avoid orientation ambiguity; glassScreenRegionX
+// below ties them together against the live screenTexture.
+// ---------------------------------------------------------------------------
+
+// One separable box-blur iteration (horizontal then vertical) of the given
+// radius via a sliding running-sum: O(w*h) REGARDLESS of radius, edge-clamped.
+static void glassBoxBlurOnce(uint32_t *buf, uint32_t *tmp, int w, int h, int r) {
+    if (r < 1) { return; }
+    float norm = 1.0f / (float)(2 * r + 1);
+    for (int y = 0; y < h; y++) {
+        uint32_t *row = buf + (size_t)y * w;
+        uint32_t *trow = tmp + (size_t)y * w;
+        int sr = 0, sg = 0, sb = 0;
+        for (int k = -r; k <= r; k++) {
+            int xx = k < 0 ? 0 : (k >= w ? w - 1 : k);
+            uint32_t p = row[xx]; sr += (p >> 16) & 0xff; sg += (p >> 8) & 0xff; sb += p & 0xff;
+        }
+        for (int x = 0; x < w; x++) {
+            trow[x] = 0xff000000u | ((uint32_t)(int)(sr * norm + 0.5f) << 16) | ((uint32_t)(int)(sg * norm + 0.5f) << 8) | (uint32_t)(int)(sb * norm + 0.5f);
+            int xo = x - r; if (xo < 0) xo = 0;
+            int xi = x + r + 1; if (xi >= w) xi = w - 1;
+            uint32_t po = row[xo], pi = row[xi];
+            sr += (int)((pi >> 16) & 0xff) - (int)((po >> 16) & 0xff);
+            sg += (int)((pi >> 8) & 0xff) - (int)((po >> 8) & 0xff);
+            sb += (int)(pi & 0xff) - (int)(po & 0xff);
+        }
+    }
+    for (int x = 0; x < w; x++) {
+        int sr = 0, sg = 0, sb = 0;
+        for (int k = -r; k <= r; k++) {
+            int yy = k < 0 ? 0 : (k >= h ? h - 1 : k);
+            uint32_t p = tmp[(size_t)yy * w + x]; sr += (p >> 16) & 0xff; sg += (p >> 8) & 0xff; sb += p & 0xff;
+        }
+        for (int y = 0; y < h; y++) {
+            buf[(size_t)y * w + x] = 0xff000000u | ((uint32_t)(int)(sr * norm + 0.5f) << 16) | ((uint32_t)(int)(sg * norm + 0.5f) << 8) | (uint32_t)(int)(sb * norm + 0.5f);
+            int yo = y - r; if (yo < 0) yo = 0;
+            int yi = y + r + 1; if (yi >= h) yi = h - 1;
+            uint32_t po = tmp[(size_t)yo * w + x], pi = tmp[(size_t)yi * w + x];
+            sr += (int)((pi >> 16) & 0xff) - (int)((po >> 16) & 0xff);
+            sg += (int)((pi >> 8) & 0xff) - (int)((po >> 8) & 0xff);
+            sb += (int)(pi & 0xff) - (int)(po & 0xff);
+        }
+    }
+}
+
+// Triple box blur ~ Gaussian of sigma ~= radius (Jarosz). RADIUS-INDEPENDENT cost
+// so the large (radius ~64px) nav/tab bar glass blurs stay cheap -- a true
+// Gaussian kernel here was hundreds of ms per call and timed the suite out.
+// Edge-clamped, in place. Alpha assumed opaque (backdrop) and kept at 0xff.
+static void glassGaussianBlur(uint32_t *buf, int w, int h, float radius) {
+    if (radius < 0.75f || w <= 0 || h <= 0) { return; }
+    int r = (int)(radius + 0.5f);
+    if (r < 1) { r = 1; }
+    uint32_t *tmp = (uint32_t *)malloc((size_t)w * (size_t)h * 4);
+    if (tmp == NULL) { return; }
+    glassBoxBlurOnce(buf, tmp, w, h, r);
+    glassBoxBlurOnce(buf, tmp, w, h, r);
+    glassBoxBlurOnce(buf, tmp, w, h, r);
+    free(tmp);
+}
+
+static inline int glassBilerp(int c00, int c10, int c01, int c11, float tx, float ty) {
+    float top = c00 + (c10 - c00) * tx;
+    float bot = c01 + (c11 - c01) * tx;
+    return (int)(top + (bot - top) * ty + 0.5f);
+}
+
+static uint32_t glassSampleBilinear(uint32_t *buf, int w, int h, float fx, float fy) {
+    if (fx < 0.0f) fx = 0.0f; else if (fx > w - 1) fx = w - 1;
+    if (fy < 0.0f) fy = 0.0f; else if (fy > h - 1) fy = h - 1;
+    int x0 = (int)fx, y0 = (int)fy;
+    int x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+    float tx = fx - x0, ty = fy - y0;
+    uint32_t p00 = buf[(size_t)y0 * w + x0], p10 = buf[(size_t)y0 * w + x1];
+    uint32_t p01 = buf[(size_t)y1 * w + x0], p11 = buf[(size_t)y1 * w + x1];
+    int r = glassBilerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, (p01 >> 16) & 0xff, (p11 >> 16) & 0xff, tx, ty);
+    int g = glassBilerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, (p01 >> 8) & 0xff, (p11 >> 8) & 0xff, tx, ty);
+    int b = glassBilerp(p00 & 0xff, p10 & 0xff, p01 & 0xff, p11 & 0xff, tx, ty);
+    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+}
+
+// Rounded-rect SDF mask + edge refraction + specular rim. Reads the blurred
+// padded buffer src (component at offset (pad,pad)), writes a PREMULTIPLIED
+// ARGB patch (rw x rh) with transparent corners. s = contentScaleFactor (logical
+// lengths -- cornerRadius, rim width -- scale to physical px). cornerRadius < 0
+// means capsule.
+static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *out,
+        int rw, int rh, float cornerRadius, float refract, float specular, float s) {
+    float hw = rw / 2.0f, hh = rh / 2.0f;
+    float minhh = hw < hh ? hw : hh;
+    float r;
+    if (cornerRadius < 0.0f) { r = minhh; }
+    else { r = cornerRadius * s; if (r > minhh) r = minhh; }
+    if (r < 0.0f) r = 0.0f;
+    float band = minhh * 0.6f;
+    float rimW = 3.0f * s;
+    for (int y = 0; y < rh; y++) {
+        float py = y + 0.5f;
+        for (int x = 0; x < rw; x++) {
+            float px = x + 0.5f;
+            float dx = fabsf(px - hw) - (hw - r);
+            float dy = fabsf(py - hh) - (hh - r);
+            float axx = dx > 0 ? dx : 0, ayy = dy > 0 ? dy : 0;
+            float outside = sqrtf(axx * axx + ayy * ayy);
+            float mxv = dx > dy ? dx : dy;
+            float inside = mxv < 0 ? mxv : 0;
+            float sdf = outside + inside - r;
+            float depth = -sdf;
+            if (depth <= 0.0f) { out[(size_t)y * rw + x] = 0; continue; }
+            float alpha = depth >= 1.0f ? 1.0f : depth;
+            float sx = x, sy = y;
+            if (refract > 0.0f && band > 0.0f && depth < band) {
+                float t = 1.0f - depth / band;
+                float distortion = 1.0f - sqrtf(fmaxf(0.0f, 1.0f - t * t));
+                sx = x - (px - hw) * distortion * refract;
+                sy = y - (py - hh) * distortion * refract;
+            }
+            uint32_t col = glassSampleBilinear(src, bw, bh, sx + pad, sy + pad);
+            int rr = (col >> 16) & 0xff, gg = (col >> 8) & 0xff, bb = col & 0xff;
+            if (specular > 0.0f && depth < rimW) {
+                float rim = 1.0f - depth / rimW;
+                float topBias = 0.55f + 0.45f * (1.0f - py / rh);
+                int add = (int)(specular * rim * topBias * 70.0f);
+                rr = rr + add > 255 ? 255 : rr + add;
+                gg = gg + add > 255 ? 255 : gg + add;
+                bb = bb + add > 255 ? 255 : bb + add;
+            }
+            int a = (int)(alpha * 255.0f);
+            int pr = rr * a / 255, pg = gg * a / 255, pb = bb * a / 255;
+            out[(size_t)y * rw + x] = ((uint32_t)a << 24) | ((uint32_t)pr << 16) | ((uint32_t)pg << 8) | (uint32_t)pb;
+        }
+    }
+}
+
 @implementation METALView
 
 @synthesize commandQueue;
@@ -673,6 +814,121 @@ extern BOOL isRetinaBug();
             CN1MetalDrawImage(blurredTex, 255, x, y, w, h);
         }
     }
+}
+
+// Live-screen "Liquid Glass" MATERIAL: the full backdrop-filter recipe matching
+// the offscreen IOSImplementation.glassRegion that drives the fidelity tiles.
+// 1) read a screenTexture region PADDED by 3*radius (edge-replicated so the blur
+//    never fades into the component edge), 2) apply the affine colour material,
+// 3) Gaussian-blur, 4) apply optics (rounded-rect SDF mask + edge refraction +
+// specular rim), 5) draw the pill-shaped translucent glass patch back over the
+// backdrop so the component's fill + foreground (queued next) paint on top. Runs
+// during the drain like blurScreenRegionX; one GPU sync per glass paint.
+- (void)glassScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius
+              cornerRadius:(float)cornerRadius sat:(float)sat scale:(float)scale
+                    offset:(float)offset refract:(float)refract specular:(float)specular {
+    if (self.screenTexture == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
+        return;
+    }
+    // CN1-logical -> framebuffer-pixel scale. NOT contentScaleFactor alone:
+    // scaleValue maps UIKit-points -> CN1-logical (1 in a normal app, but e.g. 3
+    // in the fidelity app which runs logical==physical pixel coords). The real
+    // logical->pixel ratio is contentScaleFactor/scaleValue (= 3/3 = 1 there,
+    // 3/1 = 3 in a normal retina app). Using raw contentScaleFactor triple-scaled
+    // the region in the fidelity app (wrong screenTexture slice + 3x radius).
+    float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
+    CGFloat s = self.contentScaleFactor / sv;
+    int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
+    int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
+    if (fx < 0) { fw += fx; fx = 0; }
+    if (fy < 0) { fh += fy; fy = 0; }
+    if (fx + fw > texW) { fw = texW - fx; }
+    if (fy + fh > texH) { fh = texH - fy; }
+    if (fw <= 0 || fh <= 0) { return; }
+    float rad = radius * (float)s;
+    int pad = (int)ceilf(rad) * 3 + 1;
+    int bw = fw + 2 * pad, bh = fh + 2 * pad;
+
+    // 1) End + commit the screen encoder so screenTexture holds the backdrop.
+    if (self.renderCommandEncoder != nil) {
+        CN1MetalEndFrame();
+        [self.renderCommandEncoder endEncoding];
+        self.renderCommandEncoder = nil;
+    }
+    id<MTLCommandBuffer> cb = self.commandBuffer;
+    self.commandBuffer = nil;
+    if (cb != nil) { [cb commit]; [cb waitUntilCompleted]; }
+
+    // 2) Blit the clamped padded region and read its bytes.
+    int ax0 = fx - pad; if (ax0 < 0) ax0 = 0;
+    int ay0 = fy - pad; if (ay0 < 0) ay0 = 0;
+    int ax1 = fx + fw + pad; if (ax1 > texW) ax1 = texW;
+    int ay1 = fy + fh + pad; if (ay1 > texH) ay1 = texH;
+    int aw = ax1 - ax0, ah = ay1 - ay0;
+    if (aw <= 0 || ah <= 0) { [self setFramebuffer]; return; }
+    id<MTLDevice> device = CN1MetalDevice();
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:aw height:ah mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    id<MTLCommandBuffer> blitCb = [self.commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [blitCb blitCommandEncoder];
+    [blit copyFromTexture:self.screenTexture sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(ax0, ay0, 0) sourceSize:MTLSizeMake(aw, ah, 1)
+                 toTexture:scratch destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+    [blitCb commit];
+    [blitCb waitUntilCompleted];
+    NSUInteger availRow = (NSUInteger)aw * 4;
+    uint8_t *avail = (uint8_t *)malloc(availRow * (NSUInteger)ah);
+    if (avail == NULL) { [self setFramebuffer]; return; }
+    [scratch getBytes:avail bytesPerRow:availRow fromRegion:MTLRegionMake2D(0, 0, aw, ah) mipmapLevel:0];
+
+    // 3) Edge-replicate into a padded buffer and apply the colour material.
+    uint32_t *prgb = (uint32_t *)malloc((size_t)bw * (size_t)bh * 4);
+    if (prgb == NULL) { free(avail); [self setFramebuffer]; return; }
+    for (int by = 0; by < bh; by++) {
+        int ay = (fy - pad + by) - ay0; if (ay < 0) ay = 0; else if (ay >= ah) ay = ah - 1;
+        for (int bx = 0; bx < bw; bx++) {
+            int axc = (fx - pad + bx) - ax0; if (axc < 0) axc = 0; else if (axc >= aw) axc = aw - 1;
+            uint8_t *p = avail + (size_t)ay * availRow + (size_t)axc * 4;
+            float bch = p[0], gch = p[1], rch = p[2];   // BGRA premult-first (backdrop opaque)
+            float lum = 0.2126f * rch + 0.7152f * gch + 0.0722f * bch;
+            float rr = (lum + (rch - lum) * sat) * scale + offset;
+            float gg = (lum + (gch - lum) * sat) * scale + offset;
+            float bb = (lum + (bch - lum) * sat) * scale + offset;
+            int ri = rr < 0 ? 0 : (rr > 255 ? 255 : (int)rr);
+            int gi = gg < 0 ? 0 : (gg > 255 ? 255 : (int)gg);
+            int bi = bb < 0 ? 0 : (bb > 255 ? 255 : (int)bb);
+            prgb[(size_t)by * bw + bx] = 0xff000000u | ((uint32_t)ri << 16) | ((uint32_t)gi << 8) | (uint32_t)bi;
+        }
+    }
+    free(avail);
+
+    // 4) Blur the padded material buffer, then optics -> premultiplied patch.
+    glassGaussianBlur(prgb, bw, bh, rad);
+    uint32_t *out = (uint32_t *)malloc((size_t)fw * (size_t)fh * 4);
+    if (out == NULL) { free(prgb); [self setFramebuffer]; return; }
+    glassApplyOptics(prgb, bw, bh, pad, out, fw, fh, cornerRadius, refract, specular, (float)s);
+    free(prgb);
+
+    // 5) Restart the screen encoder, then draw the glass patch back (display coords).
+    [self setFramebuffer];
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef bmp = CGBitmapContextCreate(out, fw, fh, 8, (size_t)fw * 4, cs,
+        kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+    CGImageRef outCg = bmp ? CGBitmapContextCreateImage(bmp) : NULL;
+    if (outCg != NULL) {
+        UIImage *glassImage = [UIImage imageWithCGImage:outCg];
+        id<MTLTexture> glassTex = CN1MetalTextureFromUIImage(glassImage);
+        if (glassTex != nil) { CN1MetalDrawImage(glassTex, 255, x, y, w, h); }
+        CGImageRelease(outCg);
+    }
+    if (bmp != NULL) { CGContextRelease(bmp); }
+    CGColorSpaceRelease(cs);
+    free(out);
 }
 
 - (BOOL)presentFramebuffer

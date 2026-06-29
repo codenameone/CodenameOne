@@ -35,6 +35,25 @@
     width = w;
     height = h;
     radius = r;
+    glass = NO;
+    return self;
+}
+
+-(id)initWithGlassArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r
+          cornerRadius:(float)cr sat:(float)st scale:(float)sc offset:(float)of
+               refract:(float)rf specular:(float)sp {
+    x = xpos;
+    y = ypos;
+    width = w;
+    height = h;
+    radius = r;
+    glass = YES;
+    cornerRadius = cr;
+    sat = st;
+    scale = sc;
+    offset = of;
+    refract = rf;
+    specular = sp;
     return self;
 }
 
@@ -42,7 +61,13 @@
 #if defined(CN1_USE_METAL) && !TARGET_OS_WATCH
     id view = [[CodenameOne_GLViewController instance] eaglView];
     if ([view isKindOfClass:[METALView class]]) {
-        [(METALView*)view blurScreenRegionX:x y:y w:width h:height radius:radius];
+        if (glass) {
+            [(METALView*)view glassScreenRegionX:x y:y w:width h:height radius:radius
+                                   cornerRadius:cornerRadius sat:sat scale:scale
+                                         offset:offset refract:refract specular:specular];
+        } else {
+            [(METALView*)view blurScreenRegionX:x y:y w:width h:height radius:radius];
+        }
     }
 #endif
     // GL / watchOS: no live-screen blur (the component still paints its

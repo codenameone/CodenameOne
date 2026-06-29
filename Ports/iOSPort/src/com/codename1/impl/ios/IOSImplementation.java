@@ -404,9 +404,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// renders through the actual Metal draw path (not an off-screen re-paint),
     /// so the screenshot remains a genuine test of the display pipeline.
     private void forceScreenRenderForCapture() {
-        if (!isDesktop()) {
-            return;
-        }
+        // Runs on desktop (Mac Catalyst) AND the iOS simulator/device: the native
+        // screenshot now reads the Metal screenTexture on ALL of them (see
+        // cn1_renderViewToContext), and a STATIC form's show() does not reliably
+        // re-drive a screen frame on any of them -- so without forcing a paint the
+        // texture holds a stale/empty frame and the capture comes back null (the
+        // cause of the fidelity suite's "screenshot returned null" timeouts). The
+        // force-render also drives the live backdrop-filter glass into the texture
+        // so the screenshot captures it. Driving a real EDT paint+flush every
+        // capture is correct everywhere (the capture reflects the current UI).
         final Runnable paintAndFlush = new Runnable() {
             @Override
             public void run() {
@@ -1884,10 +1890,15 @@ public class IOSImplementation extends CodenameOneImplementation {
             return true;
         }
         NativeGraphics ng = (NativeGraphics) graphics;
-        // Live screen path: the full colour-transform material is a follow-up; for
-        // now fall back to a plain in-place blur of the running screen region.
+        // Live screen path: queue a GlassRegion op carrying the full material
+        // params. During the drain it reads the already-drawn screenTexture region
+        // (padded + edge-replicated), applies the material, blurs, runs the optics
+        // (rounded-rect mask + refraction + specular rim) and draws the pill-shaped
+        // glass patch back -- the SAME recipe as the offscreen branch below, so a
+        // running app gets real Liquid Glass, not just a plain blur.
         if (ng.associatedImage == null) {
-            return blurRegion(graphics, x, y, width, height, radius);
+            nativeInstance.nativeGlassScreenRegion(x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
+            return true;
         }
         // Flush whatever has been painted into the image so its peer is current, read
         // the region behind us, apply the "Liquid Glass" affine colour material and

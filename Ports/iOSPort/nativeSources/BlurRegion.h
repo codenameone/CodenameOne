@@ -33,8 +33,20 @@
     int width;
     int height;
     float radius;
+    // When glass is YES this op runs the full Liquid Glass material recipe
+    // (glassScreenRegionX) carrying these params instead of a plain blur.
+    BOOL glass;
+    float cornerRadius;
+    float sat;
+    float scale;
+    float offset;
+    float refract;
+    float specular;
 }
 
 -(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r;
+-(id)initWithGlassArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r
+          cornerRadius:(float)cr sat:(float)st scale:(float)sc offset:(float)of
+               refract:(float)rf specular:(float)sp;
 
 @end

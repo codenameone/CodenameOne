@@ -254,7 +254,13 @@ public class FidelityDeviceRunner {
             }
         });
         settle();
-        emitTiles(wrappers, names);
+        // HONEST capture: screenshot the REAL on-screen render (what users actually see),
+        // not an offscreen paintComponent re-render. The offscreen path ran CSS
+        // backdrop-filter:blur via a mutable-image blur the LIVE Metal screen cannot do, so
+        // it passed while the running app showed no glass -- a false green. Capturing the live
+        // screen makes the suite tell the truth: glass widgets go red until the live-screen
+        // glass actually works. (emitTiles, the old offscreen path, is kept for reference.)
+        cropAndEmit(captureScreen(), wrappers, names, w, h);
     }
 
     // Render each tile into its OWN mutable Image via paintComponent, rather than
