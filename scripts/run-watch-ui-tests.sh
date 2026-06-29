@@ -77,6 +77,34 @@ if [ -z "$WATCH_UDID" ]; then
   WATCH_UDID="$(printf '%s\n' "$DEVLIST" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
 fi
 if [ -z "$WATCH_UDID" ]; then
+  # Xcode 26 on some macos-15 runner images ships without the watchOS Simulator
+  # runtime (the same lean-image issue run-ios-ui-tests.sh handles for iOS).
+  # Install it on demand and create a matching-model Apple Watch device (so the
+  # screen size matches the golden) so the run has a target. Gated on CI /
+  # XCODE_DOWNLOAD_PLATFORMS; never runs when a device is already present.
+  WATCH_DL="${XCODE_DOWNLOAD_PLATFORMS:-}"
+  if [ -z "$WATCH_DL" ] && [ "${GITHUB_ACTIONS:-false}" = "true" ]; then WATCH_DL="true"; fi
+  if [ "${WATCH_DL:-false}" = "true" ]; then
+    rw_log "No Apple Watch simulator; installing watchOS platform via xcodebuild -downloadPlatform watchOS"
+    xcodebuild -downloadPlatform watchOS || true
+    WATCH_RT="$(xcrun simctl list -j runtimes available 2>/dev/null | python3 -c 'import json,sys
+rs=[r for r in json.load(sys.stdin).get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.watchOS-")]
+rs.sort(key=lambda r:r.get("version",""),reverse=True)
+print(rs[0]["identifier"] if rs else "")' 2>/dev/null || true)"
+    WATCH_DT="$(xcrun simctl list -j devicetypes 2>/dev/null | WMP="$WATCH_MODEL_PREF" python3 -c 'import json,sys,os
+pref=os.environ.get("WMP","")
+ts=[t["identifier"] for t in json.load(sys.stdin).get("devicetypes",[]) if "Apple Watch" in t.get("name","") and pref in t.get("name","")]
+print(ts[0] if ts else "")' 2>/dev/null || true)"
+    if [ -n "$WATCH_RT" ] && [ -n "$WATCH_DT" ]; then
+      rw_log "Creating Apple Watch simulator ($WATCH_DT on $WATCH_RT)"
+      xcrun simctl create "cn1-watch-tests" "$WATCH_DT" "$WATCH_RT" >/dev/null 2>&1 || true
+      DEVLIST="$(xcrun simctl list devices available 2>/dev/null | grep -iE 'Apple Watch')"
+      WATCH_UDID="$(printf '%s\n' "$DEVLIST" | grep -i "$WATCH_MODEL_PREF" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+      [ -z "$WATCH_UDID" ] && WATCH_UDID="$(printf '%s\n' "$DEVLIST" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+    fi
+  fi
+fi
+if [ -z "$WATCH_UDID" ]; then
   rw_log "No Apple Watch simulator available. Install a watchOS runtime in Xcode."; exit 4
 fi
 rw_log "Watch simulators available:"; printf '%s\n' "$DEVLIST" | sed 's/^/  /' >&2
