@@ -1511,10 +1511,27 @@ public class Tabs extends Container {
             x = a.getX();
             w = a.getWidth();
         }
-        int inset = Display.getInstance().convertToPixels(0.35f);
+        // The selection capsule should fill (almost) the full pill height like native --
+        // a large inset leaves a bright bar-frost band above/below it (reads as a
+        // separate inset pill / "ring"). Tunable via tabSelInsetMm (default a hair).
+        float insetMm = 0.1f;
+        String iv = getUIManager().getThemeConstant("tabSelInsetMm", null);
+        if (iv != null) {
+            try {
+                insetMm = Float.parseFloat(iv.trim());
+            } catch (NumberFormatException ignore) {
+            }
+        }
+        int inset = Display.getInstance().convertToPixels(insetMm);
+        // Span the OUTER pill height (not the padded inner box) so the capsule reaches
+        // the pill edge like native -- using getInnerY()/Height() leaves the bar's
+        // padding as a bright frost band above/below the capsule (the visible "ring").
+        int padTopPx = tabsContainer.getInnerY() - tabsContainer.getY();
+        int padBotPx = (tabsContainer.getY() + tabsContainer.getHeight())
+                - (tabsContainer.getInnerY() + tabsContainer.getInnerHeight());
         int capX = tabsContainer.getInnerX() + x;
-        int capY = tabsContainer.getInnerY() + inset;
-        int capH = tabsContainer.getInnerHeight() - 2 * inset;
+        int capY = tabsContainer.getInnerY() - padTopPx + inset;
+        int capH = tabsContainer.getInnerHeight() + padTopPx + padBotPx - 2 * inset;
         if (w <= 0 || capH <= 0) {
             return;
         }

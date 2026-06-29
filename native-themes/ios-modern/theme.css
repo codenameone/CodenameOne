@@ -111,13 +111,13 @@
     TabSelScaleLight: "0.85";
     TabSelOffsetLight: "0";
     TabSelSatLight: "1.3";
-    TabSelRefractLight: "0.2";
-    TabSelSpecularLight: "0.35";
+    TabSelRefractLight: "0";
+    TabSelSpecularLight: "0";
     TabSelScaleDark: "0.5";
     TabSelOffsetDark: "6";
     TabSelSatDark: "1.6";
-    TabSelRefractDark: "0.2";
-    TabSelSpecularDark: "0.05";
+    TabSelRefractDark: "0";
+    TabSelSpecularDark: "0";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;
