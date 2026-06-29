@@ -67,7 +67,7 @@ public final class DevicePosture {
     /// The hinge runs horizontally, splitting the display into a top and a bottom half.
     public static final int FOLD_ORIENTATION_HORIZONTAL = 2;
 
-    private static DevicePosture instance;
+    private static final DevicePosture INSTANCE = new DevicePosture();
 
     private DevicePosture() {
     }
@@ -79,10 +79,7 @@ public final class DevicePosture {
     ///
     /// the shared device posture, never null
     public static DevicePosture getInstance() {
-        if (instance == null) {
-            instance = new DevicePosture();
-        }
-        return instance;
+        return INSTANCE;
     }
 
     /// True if the device is a foldable or dual screen device.
