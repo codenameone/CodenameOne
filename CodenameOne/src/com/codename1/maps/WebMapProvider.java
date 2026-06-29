@@ -25,6 +25,8 @@ package com.codename1.maps;
 import com.codename1.maps.spi.MapProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.util.SuccessCallback;
 
 import java.util.HashMap;
@@ -105,26 +107,35 @@ public class WebMapProvider implements MapProvider {
         html = replace(html, "{lat}", Double.toString(lat));
         html = replace(html, "{lon}", Double.toString(lon));
         html = replace(html, "{zoom}", Integer.toString(zoom));
-        BrowserComponent bc = new BrowserComponent();
+        final BrowserComponent bc = new BrowserComponent();
+        final Integer readyKey = Integer.valueOf(mapId);
+        // Bridge the map's readiness to Java once, event-style (a cheap Set flag,
+        // not a synchronous executeAndReturnString poll which routes through the
+        // costly invokeAndBlock on iOS). The bridge MUST be installed only after
+        // the page has loaded: doing it here, inline, runs execute() on a
+        // BrowserComponent whose native peer isn't initialised yet, so it blocks
+        // in invokeAndBlock and hangs the map's creation (the form never finishes
+        // showing -> the test produced no capture at all). Install it from the
+        // onLoad event, when the component is attached and ready. An in-page
+        // interval (runs cheaply in the browser) then watches the cn1mapReady
+        // flag the HTML sets on the SDK's 'tilesloaded' event and calls back into
+        // Java exactly once.
+        bc.addWebEventListener(BrowserComponent.onLoad, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                bc.addJSCallback(
+                        "window.cn1NotifyMapReady=function(){callback.onSuccess('ready');};"
+                        + "(function(){var t=setInterval(function(){"
+                        + "if(window.cn1mapReady===true){clearInterval(t);window.cn1NotifyMapReady();}"
+                        + "},200);})();",
+                        new SuccessCallback<BrowserComponent.JSRef>() {
+                            public void onSucess(BrowserComponent.JSRef value) {
+                                readyMapIds.add(readyKey);
+                            }
+                        });
+            }
+        });
         bc.setPage(html, "https://maps.example/");
         peers.put(Integer.valueOf(mapId), bc);
-        // Bridge the map's readiness to Java once, event-style, instead of
-        // polling it with a synchronous executeAndReturnString (which routes
-        // through invokeAndBlock on iOS and is far too costly to call in a
-        // loop). The HTML sets window.cn1mapReady on the SDK's 'tilesloaded'
-        // event; an in-page interval (cheap, runs in the browser) watches that
-        // flag and calls back into Java exactly once, flipping a plain Set entry.
-        final Integer readyKey = Integer.valueOf(mapId);
-        bc.addJSCallback(
-                "window.cn1NotifyMapReady=function(){callback.onSuccess('ready');};"
-                + "(function(){var t=setInterval(function(){"
-                + "if(window.cn1mapReady===true){clearInterval(t);window.cn1NotifyMapReady();}"
-                + "},200);})();",
-                new SuccessCallback<BrowserComponent.JSRef>() {
-                    public void onSucess(BrowserComponent.JSRef value) {
-                        readyMapIds.add(readyKey);
-                    }
-                });
         return bc;
     }
 
