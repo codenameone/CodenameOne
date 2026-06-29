@@ -159,6 +159,20 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
             float depth = -sdf;
             if (depth <= 0.0f) { out[(size_t)y * rw + x] = 0; continue; }
             float alpha = depth >= 1.0f ? 1.0f : depth;
+            // Bottom-edge feather for rectangular chrome bars (Toolbar/TitleArea,
+            // cornerRadius == 0): a native nav bar's glass fades into the content
+            // below instead of stopping at a hard rectangular edge. Ramp the glass
+            // alpha down over the bottom ~22% so the blurred bar blends into the
+            // sharp backdrop beneath it. Capsules (-1) and rounded panels (>0) keep
+            // their crisp shape (unaffected).
+            if (cornerRadius == 0.0f) {
+                float fb = rh * 0.22f;
+                if (fb > 1.0f && py > rh - fb) {
+                    float fade = (rh - py) / fb;
+                    if (fade < 0.0f) fade = 0.0f;
+                    alpha *= fade;
+                }
+            }
             float sx = x, sy = y;
             if (refract > 0.0f && band > 0.0f && depth < band) {
                 float t = 1.0f - depth / band;
