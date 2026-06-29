@@ -1653,6 +1653,21 @@ void cn1GcBuildRootSnapshots(void) {
     for(int i = 0 ; i < n ; i++) {
         cn1ConsExtAdd(allObjectsInHeap[i]);
     }
+    // A still-running LIGHTWEIGHT thread grows its pendingHeapAllocations lock-free in
+    // codenameOneGcMalloc / cn1AddPending: malloc tmp; memcpy; free(old); pending = tmp.
+    // Threads other than the one currently being scanned are NOT parked here, so reading
+    // their array without serialization is a use-after-free: the free() of the old array
+    // turns our read of th->pendingHeapAllocations[j] into a read of reclaimed memory, and
+    // the resulting garbage word is taken as a heap extent base -> SIGBUS in gcMarkObject.
+    // Take threadHeapMutex around the whole read loop; the realloc fast-paths now take the
+    // SAME mutex (for lightweight threads too) so the malloc/memcpy/free/swap is atomic wrt
+    // this read. The lock is acquired and RELEASED entirely here, before the caller signal-
+    // stops any thread, so no thread is ever frozen mid-realloc holding it (no deadlock);
+    // it is never inverted against lockCriticalSection (the migration path takes
+    // criticalSection THEN threadHeapMutex -- this path takes only threadHeapMutex); and
+    // the only libc-allocator calls under it (cn1ConsExtAdd's realloc) acquire the libc
+    // lock in the same order as the realloc fast-paths, so there is no lock cycle.
+    lockThreadHeapMutex();
     for(int ti = 0 ; ti < NUMBER_OF_SUPPORTED_THREADS ; ti++) {
         struct ThreadLocalData* th = allThreads[ti];
         if(th == 0 || th->pendingHeapAllocations == 0) continue;
@@ -1662,6 +1677,7 @@ void cn1GcBuildRootSnapshots(void) {
             if(o != JAVA_NULL && o->__heapPosition == -1) cn1ConsExtAdd(o);
         }
     }
+    unlockThreadHeapMutex();
     qsort(cn1ConsExt, cn1ConsExtN, sizeof(CN1ConsExtent), cn1ConsExtCmp);
 #ifndef CN1_DISABLE_BIBOP
     cn1ConsPgN = 0;
@@ -2090,18 +2106,21 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                     java_lang_System_gc__(threadStateData);
                     threadStateData->nativeAllocationMode = JAVA_FALSE;
                 }
-                if (!threadStateData->lightweightThread) {
-                    lockThreadHeapMutex();
-                }
+                // Serialize the grow-and-free against cn1GcBuildRootSnapshots, which reads
+                // this array from the GC thread while this (possibly lightweight, still-
+                // running) thread is NOT parked. The OLD guard skipped the lock for
+                // lightweight threads, so the GC could read pendingHeapAllocations right as
+                // free() reclaimed it -> use-after-free. Lock unconditionally; the snapshot
+                // reader takes the SAME mutex. Held only across malloc/memcpy/free/swap (no
+                // park, no signal-stop inside), so it cannot deadlock the GC.
+                lockThreadHeapMutex();
                 void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
                 memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
                 memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
                 threadStateData->threadHeapTotalSize *= 2;
                 free(threadStateData->pendingHeapAllocations);
                 threadStateData->pendingHeapAllocations = tmp;
-                if (!threadStateData->lightweightThread) {
-                    unlockThreadHeapMutex();
-                }
+                unlockThreadHeapMutex();
             }
         }
     }
@@ -2454,14 +2473,17 @@ static void cn1PromotePush(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
 // thread is paused, so registration never races the concurrent sweep/mark.
 static void cn1AddPending(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     if(threadStateData->heapAllocationSize >= threadStateData->threadHeapTotalSize) {
-        if (!threadStateData->lightweightThread) lockThreadHeapMutex();
+        // Same use-after-free as codenameOneGcMalloc: lock unconditionally (lightweight
+        // threads included) so the GC's cn1GcBuildRootSnapshots never reads this array
+        // mid-free. Held only across the grow; no park/signal-stop inside -> no deadlock.
+        lockThreadHeapMutex();
         void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
         memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
         memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
         threadStateData->threadHeapTotalSize *= 2;
         free(threadStateData->pendingHeapAllocations);
         threadStateData->pendingHeapAllocations = tmp;
-        if (!threadStateData->lightweightThread) unlockThreadHeapMutex();
+        unlockThreadHeapMutex();
     }
     threadStateData->pendingHeapAllocations[threadStateData->heapAllocationSize++] = o;
 }
