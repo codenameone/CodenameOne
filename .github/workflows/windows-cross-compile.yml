@@ -81,10 +81,24 @@ jobs:
         with: { distribution: 'temurin', java-version: '8' }
 
       - name: Install xwin + lay out the Windows SDK (x64)
+        env:
+          # Harden against transient crates.io / download flakes ("curl [16]
+          # HTTP2 framing layer", "[55] OpenSSL SSL_read unexpected eof"):
+          # force HTTP/1.1 and let cargo retry.
+          CARGO_NET_RETRY: "10"
+          CARGO_HTTP_MULTIPLEXING: "false"
         run: |
           set -e
-          cargo install xwin --version 0.9.0 --locked
-          xwin --accept-license --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk"
+          n=0
+          until [ "$n" -ge 3 ]; do
+            cargo install xwin --version 0.9.0 --locked \
+              && xwin --accept-license --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk" \
+              && break
+            n=$((n+1))
+            echo "xwin install/splat attempt $n failed; retrying after backoff..."
+            rm -rf "$RUNNER_TEMP/xwin-sdk"
+            sleep $((n*15))
+          done
           echo "Sysroot:"; ls "$RUNNER_TEMP/xwin-sdk"
           test -d "$RUNNER_TEMP/xwin-sdk/crt/include"
           test -f "$RUNNER_TEMP/xwin-sdk/sdk/include/um/d2d1.h"

@@ -141,20 +141,17 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      - name: Restore built CN1 + iOS port artifacts
-        # Use the exact key build-port saved against (published as a job
-        # output). Recomputing src_hash locally drifts whenever new
-        # source paths are added to the build-port hash without
-        # mirroring the change here, causing fail-on-cache-miss to
-        # blow up the entire packaging suite.
-        uses: actions/cache/restore@v4
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.m2/repository/com/codenameone
-            Themes
-            Ports/iOSPort/nativeSources
-          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
-          fail-on-cache-miss: true
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          # Replaces the evictable cn1-built cache restore with the artifact
+          # build-port handed off (not LRU-evicted, survives --failed re-runs).
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
 
       - name: Build sample iOS app
         id: build_ios_app

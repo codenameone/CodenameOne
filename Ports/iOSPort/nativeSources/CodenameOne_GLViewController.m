@@ -304,6 +304,21 @@ static CGSize cn1OrientationCorrectSize(UIView *view) {
 #else
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
     if (@available(iOS 13.0, *)) {
+        // An iOS app running on Apple Silicon ("Designed for iPad", reported by
+        // isiOSAppOnMac) is NOT a Mac Catalyst build -- TARGET_OS_MACCATALYST is
+        // false here -- yet it presents in a freely resizable Mac window. The
+        // orientation cross-check below assumes scene.interfaceOrientation agrees
+        // with the window's aspect once UIKit settles, the only disagreement being
+        // a transient mid-rotation snapshot on a physical iPad (issue #4767). On
+        // Mac the reported orientation and the window aspect diverge permanently,
+        // so the swap fires forever and lays the form out sideways into the window
+        // -- the squished initial presentation in issue #5278. Trust the raw
+        // bounds there, exactly as the Mac Catalyst / tvOS branch above does.
+        if (@available(iOS 14.0, *)) {
+            if ([[NSProcessInfo processInfo] isiOSAppOnMac]) {
+                return size;
+            }
+        }
         UIWindowScene *scene = view.window.windowScene;
         if (scene != nil) {
             UIInterfaceOrientation o = scene.interfaceOrientation;
