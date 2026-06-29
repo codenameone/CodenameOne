@@ -86,9 +86,26 @@
        Measured native light outer bar ~171 vs selected ~237; dark outer ~150. The
        earlier opaque floor (offset 200) washed the whole bar white and hid the
        selected capsule. */
-    TabsContainerGlassScaleLight: "0.45";
-    TabsContainerGlassOffsetLight: "140";
-    TabsContainerGlassSatLight: "1.4";
+    /* The BAR is the bright FROSTED surface (iOS 26): strongly toward white in light,
+       fairly uniform (low scale). Measured native light bar ~236 over grey; the
+       selected lens (Tabs.paintSelectionCapsule, TabSel* constants) then reads a touch
+       DARKER than this. Dark bar keeps the panel default (~58, matches native ~51). */
+    TabsContainerGlassScaleLight: "0.3";
+    TabsContainerGlassOffsetLight: "198";
+    TabsContainerGlassSatLight: "1.2";
+    /* Selected-capsule LENS material (Tabs.paintSelectionCapsule): near pass-through so
+       it reads slightly darker than the bright bar in light (~216 vs 236) and a touch
+       lighter than the dark bar (~83 vs 51), like the iOS 26 lens. */
+    TabSelScaleLight: "0.85";
+    TabSelOffsetLight: "0";
+    TabSelSatLight: "1.3";
+    TabSelRefractLight: "0.4";
+    TabSelSpecularLight: "0.35";
+    TabSelScaleDark: "0.5";
+    TabSelOffsetDark: "6";
+    TabSelSatDark: "1.6";
+    TabSelRefractDark: "0.4";
+    TabSelSpecularDark: "0.05";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;

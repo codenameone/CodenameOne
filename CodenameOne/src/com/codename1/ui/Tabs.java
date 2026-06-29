@@ -1473,6 +1473,19 @@ public class Tabs extends Container {
         g.setAlpha(oldAlpha);
     }
 
+    /// Resolves a selection-capsule glass parameter from a theme constant
+    /// (&lt;key&gt;Light / &lt;key&gt;Dark, quoted float), falling back to the default.
+    private float tabCapsuleParam(String key, boolean dark, float def) {
+        String v = getUIManager().getThemeConstant(key + (dark ? "Dark" : "Light"), null);
+        if (v != null) {
+            try {
+                return Float.parseFloat(v.trim());
+            } catch (NumberFormatException ignore) {
+            }
+        }
+        return def;
+    }
+
     /// Draws the iOS 26 sliding selection capsule -- a single Liquid Glass blob
     /// behind the selected tab that tweens between tabs on selection change (reusing
     /// the indicator motion). Painted BEHIND the tab content so the icon/label sit on
@@ -1511,11 +1524,17 @@ public class Tabs extends Container {
         int fgLuma = (int) (0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff));
         boolean dark = fgLuma > 128;
         if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
-            float sat = dark ? 2.5f : 1.95f;
-            float scale = dark ? 0.238f : 0.303f;
-            float offset = dark ? 28.4f : 174.3f;
-            // The selection is the glass hero: a touch more specular than the bar.
-            g.glassRegion(capX, capY, w, capH, 30f, -1f, sat, scale, offset, 0.4f, 0.6f);
+            // iOS 26: the BAR is the bright frosted surface; the SELECTED capsule is a
+            // translucent LENS that shows more of the backdrop (slightly darker than the
+            // bar in light, lighter in dark). So the lens material is near-pass-through
+            // (high scale, low offset) with refraction -- NOT the bright frost the bar
+            // uses. Theme-tunable via TabSel{Sat,Scale,Offset,Refract,Specular}{Light,Dark}.
+            float sat = tabCapsuleParam("TabSelSat", dark, dark ? 1.6f : 1.3f);
+            float scale = tabCapsuleParam("TabSelScale", dark, dark ? 0.85f : 0.88f);
+            float offset = tabCapsuleParam("TabSelOffset", dark, dark ? 38f : 8f);
+            float refract = tabCapsuleParam("TabSelRefract", dark, 0.4f);
+            float specular = tabCapsuleParam("TabSelSpecular", dark, 0.45f);
+            g.glassRegion(capX, capY, w, capH, 30f, -1f, sat, scale, offset, refract, specular);
         } else {
             int oldA = g.getAlpha();
             int oldC = g.getColor();
