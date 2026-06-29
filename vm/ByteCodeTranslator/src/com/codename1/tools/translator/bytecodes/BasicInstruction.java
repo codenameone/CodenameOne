@@ -719,8 +719,12 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.ARETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    // No frame to release -- the operand stack is a method-local array and
+                    // the object roots live in native C storage scanned conservatively.
+                    b.append("    return POP_OBJ();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_OBJ();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {

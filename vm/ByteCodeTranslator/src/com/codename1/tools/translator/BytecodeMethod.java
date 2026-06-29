@@ -107,6 +107,20 @@ public class BytecodeMethod implements SignatureSet {
     // legacy frame code byte-for-byte identical to before.
     private static final boolean FRAMELESS_ENABLED =
             "true".equalsIgnoreCase(System.getProperty("cn1.frameless", "true"));
+    // PHASE 3b: extend frameless codegen to OBJECT-BEARING methods (-Dcn1.frameless.objects,
+    // default off). Such a method keeps its object operand stack + object locals in a
+    // method-local C array on the native stack; the C runtime (built with
+    // -DCN1_CONSERVATIVE_GC_ROOTS) finds those roots by conservatively scanning each
+    // stopped thread's native stack. With this OFF, only primitive-only methods are
+    // frameless (identical to the prior phase). Requires the conservative-GC runtime.
+    private static final boolean FRAMELESS_OBJECTS_ENABLED =
+            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.objects", "false"));
+    // PHASE 3b: extend object-frameless to INSTANCE methods (receiver `this` becomes a
+    // conservatively-scanned C parameter). Separate sub-gate (-Dcn1.frameless.instance,
+    // default off) because it currently shows an intermittent multi-threaded GC-safety
+    // failure; static object-frameless is solid and stays the default object path.
+    private static final boolean FRAMELESS_INSTANCE_ENABLED =
+            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.instance", "false"));
     private int methodOffset;
     private boolean forceVirtual;
     private boolean virtualOverriden;
@@ -503,6 +517,46 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     /**
+     * Object-touching BasicInstruction opcodes that are safe inside an OBJECT-bearing
+     * frameless method (-Dcn1.frameless.objects). All are SP-relative or self-contained
+     * (no frame-variable references): the null constant, array loads/stores (which carry
+     * an array reference on the operand stack), arraylength, the object-shape stack
+     * shuffles, and primitive-array allocation. ARETURN is handled by its own frameless
+     * branch. Deliberately EXCLUDED for now: ATHROW, MONITORENTER, MONITOREXIT (monitors
+     * always arrive wrapped in a try/finally, which already disqualifies the method).
+     */
+    private static boolean isFramelessObjectOpcode(int op) {
+        switch (op) {
+            case Opcodes.ACONST_NULL:
+            case Opcodes.AALOAD:
+            case Opcodes.IALOAD:
+            case Opcodes.LALOAD:
+            case Opcodes.FALOAD:
+            case Opcodes.DALOAD:
+            case Opcodes.BALOAD:
+            case Opcodes.CALOAD:
+            case Opcodes.SALOAD:
+            case Opcodes.AASTORE:
+            case Opcodes.IASTORE:
+            case Opcodes.LASTORE:
+            case Opcodes.FASTORE:
+            case Opcodes.DASTORE:
+            case Opcodes.BASTORE:
+            case Opcodes.CASTORE:
+            case Opcodes.SASTORE:
+            case Opcodes.ARRAYLENGTH:
+            case Opcodes.ARETURN:
+            case Opcodes.DUP_X1:
+            case Opcodes.DUP_X2:
+            case Opcodes.DUP2_X1:
+            case Opcodes.DUP2_X2:
+            case Opcodes.NEWARRAY:
+                return true;
+        }
+        return false;
+    }
+
+    /**
      * Conservative whitelist deciding whether this method can use frameless
      * codegen. Runs on the RAW bytecode (before {@link #optimize} fuses opcodes
      * into opaque custom instructions). Eligible iff the method is a non-native,
@@ -522,19 +576,30 @@ public class BytecodeMethod implements SignatureSet {
         if (nativeMethod || abstractMethod || eliminated || synchronizedMethod || onDeviceDebug) {
             return false;
         }
+        // PHASE 3b: object args/return/locals are allowed only when object-frameless is on
+        // (their roots are then found by the conservative native-stack scan); otherwise the
+        // method must be primitive-only (the prior, GC-trivial frameless contract).
+        final boolean obj = FRAMELESS_OBJECTS_ENABLED;
         if (!staticMethod) {
-            return false;
+            // Instance methods are eligible only under object mode: their receiver
+            // `this` (__cn1ThisObject, a C parameter) is an object root found by the
+            // conservative native-stack scan. Constructors are deferred (super-call /
+            // field-init / partially-constructed-receiver semantics need more care).
+            if (!obj || !FRAMELESS_INSTANCE_ENABLED || constructor
+                    || methodName.equals("__INIT__") || methodName.equals("__CLINIT__")) {
+                return false;
+            }
         }
-        if (!returnType.isVoid() && returnType.getQualifier() == 'o') {
+        if (!returnType.isVoid() && returnType.getQualifier() == 'o' && !obj) {
             return false;
         }
         for (ByteCodeMethodArg arg : arguments) {
-            if (arg.getQualifier() == 'o') {
+            if (arg.getQualifier() == 'o' && !obj) {
                 return false;
             }
         }
         for (LocalVariable lv : localVariables) {
-            if (lv.getQualifier() == 'o') {
+            if (lv.getQualifier() == 'o' && !obj) {
                 return false;
             }
         }
@@ -546,8 +611,31 @@ public class BytecodeMethod implements SignatureSet {
             if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof LocalVariable) {
                 continue;
             }
-            if (i instanceof Field || i instanceof TypeInstruction || i instanceof MultiArray) {
-                return false;
+            if (i instanceof Field) {
+                // GETFIELD/PUTFIELD/GETSTATIC/PUTSTATIC are SP-based; safe under object mode.
+                if (!obj) {
+                    return false;
+                }
+                hasRealInstruction = true;
+                continue;
+            }
+            if (i instanceof TypeInstruction) {
+                if (!obj) {
+                    return false;
+                }
+                switch (i.getOpcode()) {
+                    case Opcodes.NEW:
+                    case Opcodes.ANEWARRAY:
+                    case Opcodes.CHECKCAST:
+                    case Opcodes.INSTANCEOF:
+                        hasRealInstruction = true;
+                        continue;
+                    default:
+                        return false;
+                }
+            }
+            if (i instanceof MultiArray) {
+                return false; // MULTIANEWARRAY -- deferred (expand later)
             }
             if (i instanceof IInc) {
                 hasRealInstruction = true;
@@ -570,8 +658,17 @@ public class BytecodeMethod implements SignatureSet {
                     case Opcodes.DSTORE:
                         hasRealInstruction = true;
                         continue;
+                    case Opcodes.ALOAD:
+                    case Opcodes.ASTORE:
+                        // object local slot -> lives in the method-local frame array,
+                        // scanned conservatively. Only legal under object mode.
+                        if (!obj) {
+                            return false;
+                        }
+                        hasRealInstruction = true;
+                        continue;
                     default:
-                        return false; // ALOAD / ASTORE -> object slot
+                        return false;
                 }
             }
             if (i instanceof Jump) {
@@ -591,8 +688,17 @@ public class BytecodeMethod implements SignatureSet {
                     case Opcodes.GOTO:
                         hasRealInstruction = true;
                         continue;
+                    case Opcodes.IF_ACMPEQ:
+                    case Opcodes.IF_ACMPNE:
+                    case Opcodes.IFNULL:
+                    case Opcodes.IFNONNULL:
+                        if (!obj) {
+                            return false;
+                        }
+                        hasRealInstruction = true;
+                        continue;
                     default:
-                        return false; // IF_ACMP*, IFNULL, IFNONNULL, JSR
+                        return false; // JSR
                 }
             }
             if (i instanceof Ldc) {
@@ -601,9 +707,22 @@ public class BytecodeMethod implements SignatureSet {
                     hasRealInstruction = true;
                     continue;
                 }
-                return false; // String / Class / Type constant -> object
+                if (obj) {
+                    // String / Class / Type constant -> object pushed onto the local
+                    // operand array; a constant-pool object, kept alive independently.
+                    hasRealInstruction = true;
+                    continue;
+                }
+                return false;
             }
             if (i instanceof Invoke) {
+                if (obj) {
+                    // Any invoke (virtual/special/interface/static/dynamic, any descriptor):
+                    // arguments are popped from the local SP and passed as explicit C params,
+                    // so the call is self-contained on the method-local operand array.
+                    hasRealInstruction = true;
+                    continue;
+                }
                 if (i.getOpcode() != Opcodes.INVOKESTATIC) {
                     return false;
                 }
@@ -614,11 +733,15 @@ public class BytecodeMethod implements SignatureSet {
                 continue;
             }
             if (i instanceof BasicInstruction) {
-                if (!isFramelessBasicOpcode(i.getOpcode())) {
-                    return false;
+                if (isFramelessBasicOpcode(i.getOpcode())) {
+                    hasRealInstruction = true;
+                    continue;
                 }
-                hasRealInstruction = true;
-                continue;
+                if (obj && isFramelessObjectOpcode(i.getOpcode())) {
+                    hasRealInstruction = true;
+                    continue;
+                }
+                return false;
             }
             // Any other instruction type (CustomInvoke/CustomJump/CustomIntruction/
             // ArithmeticExpression are produced only by optimize and must not appear
@@ -1401,16 +1524,21 @@ public class BytecodeMethod implements SignatureSet {
             fastMethodStackPrimitiveOnly = usePrimitiveFastFrame;
             if(!barebone) {
                 if(frameless) {
-                    // Primitive-only static frame: the operand stack lives in a
+                    // Frameless frame: the operand stack + object locals live in a
                     // method-local C array (no slice of the global threadObjectStack,
                     // no per-call memset, no callStack/threadObjectStack offset
-                    // bookkeeping). Keep the class-init check that every static method
-                    // carries, then guard the native C stack since this frame does not
-                    // bump the call-depth counter.
-                    String framelessCls = clsName.replace('/', '_').replace('$', '_');
-                    b.append("    if (!class__").append(framelessCls);
-                    b.append(".initialized) __STATIC_INITIALIZER_").append(framelessCls);
-                    b.append("(threadStateData);\n");
+                    // bookkeeping). Object roots (operand array, object locals, and
+                    // `this`/__cn1ThisObject for instance methods) live in native C
+                    // storage found by the conservative native-stack scan. Static
+                    // methods keep their class-init check; instance methods don't carry
+                    // one (the receiver already forced the class to initialize). Then
+                    // guard the native C stack since this frame does not bump call depth.
+                    if (staticMethod) {
+                        String framelessCls = clsName.replace('/', '_').replace('$', '_');
+                        b.append("    if (!class__").append(framelessCls);
+                        b.append(".initialized) __STATIC_INITIALIZER_").append(framelessCls);
+                        b.append("(threadStateData);\n");
+                    }
                     b.append("    DEFINE_METHOD_STACK_FRAMELESS(");
                     b.append(maxStack);
                     b.append(", ");

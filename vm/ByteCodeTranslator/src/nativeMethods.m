@@ -1379,6 +1379,20 @@ struct ThreadLocalData* getThreadLocalData() {
         i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
         
         i->blocks = malloc(500 * sizeof(struct TryBlock));
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+        // PHASE 3b: record this thread's pthread handle + TLS self pointer so the GC can
+        // signal-stop it and the async-signal-safe stop handler can find its state.
+        i->gcPthread = pthread_self();
+        i->gcPthreadValid = JAVA_TRUE;
+        i->gcParkCaptured = JAVA_FALSE;
+        i->gcStackPointerAtPark = 0;
+        i->gcSigStopRequest = 0;
+        i->gcSigStopped = 0;
+        i->gcSigRelease = 0;
+        i->gcSigStackPointer = 0;
+        i->gcSigRegsLen = 0;
+        cn1TlsSelf = i;
+#endif
         pthread_setspecific(threadIdKey, i);
         
         if(!allThreads) {

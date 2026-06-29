@@ -628,11 +628,31 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE);
 // at the worklist declarations for the design and the invariants it preserves.
 static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE);
 
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// PHASE 3b forward declarations (definitions live after the BiBOP block because the
+// resolver reuses the BiBOP page structures). These make the conservative native-stack
+// scan a REAL root source for object-bearing FRAMELESS frames. See the big block below.
+static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* t);
+static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE);
+static void cn1GcSignalStopThreads(struct ThreadLocalData* self);
+static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
+#ifdef CN1_CONSERVATIVE_GC_SELFCHECK
+// Transient ⊇ self-check (NOT in the shipping path): asserts every precise object
+// root on a paused thread's object stack is also resolved by the conservative scan.
+static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize);
+#endif
+#endif
+
 /**
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
 void codenameOneGCMark() {
     currentGcMarkValue++;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // PHASE 3b: ensure the universal thread-stop signal handler is installed (idempotent,
+    // first GC only). Used to stop+scan threads we cannot cooperatively park.
+    cn1GcInstallSignalHandler();
+#endif
     init_gc_thresholds();
     hasAgressiveAllocator = JAVA_FALSE;
     struct ThreadLocalData* d = getThreadLocalData();
@@ -657,6 +677,13 @@ void codenameOneGCMark() {
                 // wait for the thread to pause so we can traverse its stack but not for native threads where
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                    // PHASE 3b: demand a FRESH native-stack capture this round. Only a
+                    // thread that actually parks at a safepoint (CN1_GC_PARK_CAPTURE)
+                    // re-raises this; a stale capture from a previous cycle is never
+                    // reused (the scanner falls back to a signal-stop instead).
+                    t->gcParkCaptured = JAVA_FALSE;
+#endif
                     t->threadBlockedByGC = JAVA_TRUE;
                     int totalwait = 0;
                     long now = time(0);
@@ -751,6 +778,21 @@ void codenameOneGCMark() {
                         //marked++;
                     }
                 }
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                // PHASE 3b HYBRID GC: in ADDITION to the precise threadObjectStack scan
+                // above (which still covers legacy frames), conservatively scan this
+                // thread's native C stack [sp, base) + its register snapshot and MARK
+                // every resolved live object. This is the ONLY root source for object-
+                // bearing FRAMELESS frames, whose object refs live in native C locals /
+                // the method-local operand array rather than threadObjectStack. A given
+                // object is reachable from whichever frame holds it, so the boundary
+                // between a legacy caller and a frameless callee (or vice versa) is
+                // covered: the conservative scan walks the WHOLE native stack regardless.
+                cn1GcScanThreadNativeStack(d, t);
+#ifdef CN1_CONSERVATIVE_GC_SELFCHECK
+                cn1GcSelfCheckThreadStack(t, stackSize);
+#endif
+#endif
                 markStatics(d);
                 // Drain the worklist before unblocking the thread so that every object
                 // transitively reachable from this thread's roots is fully marked while the
@@ -785,6 +827,12 @@ void codenameOneGCMark() {
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
         gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter], JAVA_TRUE);
     }
+
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // PHASE 3b: scan the GC thread's OWN native stack last -- a root could be live only
+    // in a GC-thread C local. Marks for real; the drain below propagates it.
+    cn1GcScanOwnStack(d);
+#endif
 
     // Drain the worklist that the calls above populated. gcMarkObject no longer recurses
     // through reference fields, so we need an explicit drain pass before sweep runs.
@@ -1482,6 +1530,426 @@ void cn1BibopRetireThreadPages() {
 }
 #endif /* CN1_DISABLE_BIBOP */
 
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// =========================================================================
+// PHASE 3b: conservative native-C-stack scanning AS A REAL GC ROOT SOURCE.
+//
+// WHY: object-bearing FRAMELESS methods (BytecodeMethod.isFramelessEligible with
+// -Dcn1.frameless.objects) keep their object operand stack + object locals in a
+// method-LOCAL C array (cn1_frameless_frame) on the native C stack, NOT in the
+// side-allocated threadObjectStack the precise collector walks. Their object roots
+// are therefore invisible to the precise scan. To keep those objects alive we make
+// the GC additionally walk each stopped thread's native C stack [sp, stackBase) +
+// its register snapshot and mark every word that resolves to a live heap object.
+// The collector is now HYBRID: precise threadObjectStack scan (legacy frames) PLUS
+// conservative native-stack scan (frameless frames). An object is reachable from
+// whichever frame holds it; the conservative scan covers the whole native stack so
+// the legacy<->frameless caller/callee boundary is never a gap.
+//
+// (a) cn1ConservativeResolve(word) -> base of the live heap object the word points
+//     into (interior pointers included) or JAVA_NULL, dereferencing nothing it has
+//     not first proven to be a registered heap address:
+//       * BiBOP small objects: (w & ~(PAGE-1)) is the candidate page base; confirm
+//         it is a registered page by binary-searching a snapshot of bibopAllPages;
+//         map the interior word to its slot; liveness = slot not on the page
+//         free-list (mark != FREE) and header sentinel intact.
+//       * large/array objects (allObjectsInHeap + every thread's pending): a sorted,
+//         non-overlapping [lo,hi) extent table; array element blocks are covered so
+//         an interior element pointer resolves to the array base.
+//       * garbage robustness: bounds-checked before any deref; unaligned/tagged words
+//         rejected (filters tagged-Integer immediates whose bit0 is set).
+// (b) cn1ConservativeMarkRange([lo,hi)): read every aligned word, resolve, gcMarkObject
+//     it for REAL (serial worklist push -- lock-free in the GC-thread context). Marks
+//     a SUPERSET of the precise set: nothing live is freed; at most a little floating
+//     garbage (a stale stack slot's referent) is retained one cycle until the frame is
+//     reused. Measured <0.3% over live (Phase 2).
+//
+// THREAD STOPPING (every thread that can hold a frameless root must be scanned):
+//   * COOPERATIVE (lightweight Java threads -- the common case, proven in Phase 3a):
+//     a thread that pauses at an allocation safepoint runs CN1_GC_PARK_CAPTURE in the
+//     parking frame (setjmp flushes callee-saved regs into a scanned jmp_buf; records
+//     the parked SP). The GC already waits for threadActive==FALSE, so the capture is
+//     complete and the whole live call chain (including any frameless frame above the
+//     safepoint) is resident in [sp, base).
+//   * SIGNAL (genuine native threads the GC does not park, OR validation forcing via
+//     CN1_GC_SIGNAL_STOP=1): pthread_kill(thread, SIGUSR2); the async-signal-safe
+//     handler captures the interrupted SP + a raw copy of the ucontext register file
+//     and spins on a release flag (store + spin only -- no malloc/lock). LOCK SAFETY:
+//     the resolver snapshot (which reallocs) is rebuilt BEFORE the thread is stopped,
+//     so the GC never reallocs while a thread is frozen mid-malloc.
+// =========================================================================
+
+// SIGUSR2 is used so SIGUSR1 stays free for app/JNI use.
+#define CN1_GC_STOP_SIGNAL SIGUSR2
+
+// ---- large/array snapshot: sorted by low address, non-overlapping extents ----
+typedef struct { char* lo; char* hi; JAVA_OBJECT base; } CN1ConsExtent;
+static CN1ConsExtent* cn1ConsExt = 0;
+static int cn1ConsExtN = 0, cn1ConsExtCap = 0;
+
+#ifndef CN1_DISABLE_BIBOP
+// ---- BiBOP page snapshot: sorted by page base ----
+typedef struct { char* base; int firstSlotOffset; int slotSize; int slotCount; int bumpIndex; } CN1ConsPage;
+static CN1ConsPage* cn1ConsPg = 0;
+static int cn1ConsPgN = 0, cn1ConsPgCap = 0;
+#endif
+
+// Per-thread current ThreadLocalData, readable async-signal-safely from the stop
+// handler (a plain TLS load). Set in getThreadLocalData (nativeMethods.m).
+__thread struct ThreadLocalData* cn1TlsSelf = 0;
+static volatile sig_atomic_t cn1GcSignalHandlerInstalled = 0;
+static int cn1GcSignalStopMode = -1;  // -1 = uninit; 0 = cooperative+signal-for-native; 1 = signal-for-all
+
+static void cn1ConsExtAdd(JAVA_OBJECT o) {
+    if(o == JAVA_NULL) return;
+    struct clazz* cls = o->__codenameOneParentClsReference;
+    if(cls == 0) return;
+    char* base = (char*)o;
+    char* hi;
+    if(cls->isArray) {
+        JAVA_ARRAY a = (JAVA_ARRAY)o;
+        char* hdrEnd = base + sizeof(struct JavaArrayPrototype);
+        char* dataEnd = hdrEnd;
+        if(a->data != 0 && a->length > 0 && a->primitiveSize > 0) {
+            dataEnd = (char*)a->data + (long)a->length * a->primitiveSize;
+        }
+        hi = hdrEnd > dataEnd ? hdrEnd : dataEnd;
+    } else {
+        hi = base + sizeof(struct JavaObjectPrototype); // header only (instance size not recorded)
+    }
+    if(cn1ConsExtN == cn1ConsExtCap) {
+        cn1ConsExtCap = cn1ConsExtCap ? cn1ConsExtCap * 2 : 4096;
+        cn1ConsExt = (CN1ConsExtent*)realloc(cn1ConsExt, cn1ConsExtCap * sizeof(CN1ConsExtent));
+    }
+    cn1ConsExt[cn1ConsExtN].lo = base;
+    cn1ConsExt[cn1ConsExtN].hi = hi;
+    cn1ConsExt[cn1ConsExtN].base = o;
+    cn1ConsExtN++;
+}
+
+static int cn1ConsExtCmp(const void* a, const void* b) {
+    char* la = ((const CN1ConsExtent*)a)->lo;
+    char* lb = ((const CN1ConsExtent*)b)->lo;
+    return (la > lb) - (la < lb);
+}
+
+#ifndef CN1_DISABLE_BIBOP
+static int cn1ConsPgCmp(const void* a, const void* b) {
+    char* la = ((const CN1ConsPage*)a)->base;
+    char* lb = ((const CN1ConsPage*)b)->base;
+    return (la > lb) - (la < lb);
+}
+#endif
+
+// Rebuild the resolver index. MUST be called while no thread we are about to scan is
+// signal-stopped (it reallocs -> would deadlock against a thread frozen mid-malloc).
+// O(allObjectsInHeap + pending + bibop pages) -- bounded by the heap the sweep already
+// walks, so one rebuild per scanned thread is within the GC's existing complexity.
+void cn1GcBuildRootSnapshots(void) {
+    cn1ConsExtN = 0;
+    int n = currentSizeOfAllObjectsInHeap;
+    for(int i = 0 ; i < n ; i++) {
+        cn1ConsExtAdd(allObjectsInHeap[i]);
+    }
+    for(int ti = 0 ; ti < NUMBER_OF_SUPPORTED_THREADS ; ti++) {
+        struct ThreadLocalData* th = allThreads[ti];
+        if(th == 0 || th->pendingHeapAllocations == 0) continue;
+        int pn = th->heapAllocationSize;
+        for(int j = 0 ; j < pn ; j++) {
+            JAVA_OBJECT o = (JAVA_OBJECT)th->pendingHeapAllocations[j];
+            if(o != JAVA_NULL && o->__heapPosition == -1) cn1ConsExtAdd(o);
+        }
+    }
+    qsort(cn1ConsExt, cn1ConsExtN, sizeof(CN1ConsExtent), cn1ConsExtCmp);
+#ifndef CN1_DISABLE_BIBOP
+    cn1ConsPgN = 0;
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        if(cn1ConsPgN == cn1ConsPgCap) {
+            cn1ConsPgCap = cn1ConsPgCap ? cn1ConsPgCap * 2 : 256;
+            cn1ConsPg = (CN1ConsPage*)realloc(cn1ConsPg, cn1ConsPgCap * sizeof(CN1ConsPage));
+        }
+        cn1ConsPg[cn1ConsPgN].base = (char*)p;
+        cn1ConsPg[cn1ConsPgN].firstSlotOffset = p->firstSlotOffset;
+        cn1ConsPg[cn1ConsPgN].slotSize = p->slotSize;
+        cn1ConsPg[cn1ConsPgN].slotCount = p->slotCount;
+        cn1ConsPg[cn1ConsPgN].bumpIndex = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+        cn1ConsPgN++;
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+    }
+    qsort(cn1ConsPg, cn1ConsPgN, sizeof(CN1ConsPage), cn1ConsPgCmp);
+#endif
+}
+
+// (a) Resolve an arbitrary machine word to the base of the live heap object it points
+// into (interior pointers included), or JAVA_NULL.
+JAVA_OBJECT cn1ConservativeResolve(void* w) {
+    uintptr_t v = (uintptr_t)w;
+    if(v == 0) return JAVA_NULL;
+    if((v & (sizeof(void*) - 1)) != 0) return JAVA_NULL; // reject unaligned / tagged-Integer
+
+#ifndef CN1_DISABLE_BIBOP
+    if(cn1ConsPgN > 0) {
+        char* cand = (char*)(v & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
+        int lo = 0, hi = cn1ConsPgN - 1;
+        while(lo <= hi) {
+            int mid = (lo + hi) >> 1;
+            char* b = cn1ConsPg[mid].base;
+            if(b == cand) {
+                CN1ConsPage* pg = &cn1ConsPg[mid];
+                long off = (long)((char*)w - cand);
+                if(off < pg->firstSlotOffset) return JAVA_NULL;  // inside page header
+                int idx = (int)((off - pg->firstSlotOffset) / pg->slotSize);
+                if(idx < 0 || idx >= pg->bumpIndex || idx >= pg->slotCount) return JAVA_NULL;
+                JAVA_OBJECT o = (JAVA_OBJECT)(cand + pg->firstSlotOffset + (long)idx * pg->slotSize);
+                int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_RELAXED);
+                if(m == CN1_BIBOP_FREE_MARK) return JAVA_NULL;   // on the page free-list
+                if(o->__heapPosition != CN1_BIBOP_HEAP_POS) return JAVA_NULL;
+                return o;                                        // interior -> slot base
+            } else if(b < cand) lo = mid + 1; else hi = mid - 1;
+        }
+    }
+#endif
+
+    if(cn1ConsExtN > 0) {
+        int lo = 0, hi = cn1ConsExtN - 1, found = -1;
+        while(lo <= hi) {
+            int mid = (lo + hi) >> 1;
+            if(cn1ConsExt[mid].lo <= (char*)w) { found = mid; lo = mid + 1; }
+            else hi = mid - 1;
+        }
+        if(found >= 0 && (char*)w < cn1ConsExt[found].hi) {
+            return cn1ConsExt[found].base;                       // base or array interior
+        }
+    }
+    return JAVA_NULL;
+}
+
+// (b) Conservative range scan: read every aligned word in [lo,hi), resolve it, and MARK
+// it for real. gcMarkObject in the GC-thread serial context just pushes to the worklist
+// (no lock, no malloc), so this is safe to run while mutator threads are stopped.
+void cn1ConservativeMarkRange(CODENAME_ONE_THREAD_STATE, char* lo, char* hi) {
+    if(lo == 0 || hi == 0 || hi <= lo) return;
+    char* p = (char*)(((uintptr_t)lo + (sizeof(void*) - 1)) & ~((uintptr_t)(sizeof(void*) - 1)));
+    for(; p + sizeof(void*) <= hi ; p += sizeof(void*)) {
+        JAVA_OBJECT o = cn1ConservativeResolve(*(void**)p);
+        if(o != JAVA_NULL) {
+            gcMarkObject(threadStateData, o, JAVA_FALSE);
+        }
+    }
+}
+
+// Portable [high) stack base + size for a given pthread. Stacks grow DOWN, so the base
+// is the HIGH address and the live region is [sp, base).
+static char* cn1GcStackBase(pthread_t pt, size_t* outSize) {
+#if defined(__APPLE__)
+    void* base = pthread_get_stackaddr_np(pt);
+    size_t ssz = pthread_get_stacksize_np(pt);
+    *outSize = ssz;
+    return (char*)base;
+#elif defined(__linux__)
+    pthread_attr_t attr;
+    if(pthread_getattr_np(pt, &attr) != 0) { *outSize = 0; return 0; }
+    void* addr = 0; size_t ssz = 0;
+    pthread_attr_getstack(&attr, &addr, &ssz);  // addr = LOW end on Linux
+    pthread_attr_destroy(&attr);
+    *outSize = ssz;
+    return (char*)addr + ssz;                    // convert to HIGH base
+#else
+    *outSize = 0; return 0;
+#endif
+}
+
+// ---- async-signal-safe universal-stop handler ----------------------------------------
+// Only stores + spins. Captures the interrupted SP (from the ucontext when available,
+// else a handler local that is strictly deeper than the interrupted frame -- safe, it
+// only widens the scanned range) and a raw copy of the ucontext (its inline mcontext
+// holds the GPRs on macOS/Linux), then spins until the GC publishes gcSigRelease.
+static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
+    struct ThreadLocalData* t = cn1TlsSelf;
+    if(t == 0 || !t->gcSigStopRequest) return;
+    volatile int marker = 0;
+    void* sp = (void*)&marker;
+#if !defined(_WIN32)
+    if(ucv != 0) {
+        ucontext_t* uc = (ucontext_t*)ucv;
+#if defined(__APPLE__) && defined(__aarch64__)
+        if(uc->uc_mcontext) sp = (void*)uc->uc_mcontext->__ss.__sp;
+#elif defined(__APPLE__) && defined(__x86_64__)
+        if(uc->uc_mcontext) sp = (void*)uc->uc_mcontext->__ss.__rsp;
+#elif defined(__linux__) && defined(__x86_64__)
+        sp = (void*)uc->uc_mcontext.gregs[REG_RSP];
+#elif defined(__linux__) && defined(__aarch64__)
+        sp = (void*)uc->uc_mcontext.sp;
+#endif
+        size_t ulen = sizeof(ucontext_t);
+        if(ulen > sizeof(t->gcSigRegs)) ulen = sizeof(t->gcSigRegs);
+        memcpy(t->gcSigRegs, ucv, ulen);   // capture the interrupted GPRs as scannable data
+        t->gcSigRegsLen = (sig_atomic_t)ulen;
+    }
+#endif
+    t->gcSigStackPointer = sp;
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+    t->gcSigStopped = 1;
+    while(!t->gcSigRelease) { /* async-signal-safe spin */ }
+    t->gcSigStopped = 0;
+}
+
+void cn1GcInstallSignalHandler(void) {
+    if(cn1GcSignalHandlerInstalled) return;
+    if(cn1GcSignalStopMode < 0) {
+        const char* e = getenv("CN1_GC_SIGNAL_STOP");
+        cn1GcSignalStopMode = (e != 0 && e[0] == '1') ? 1 : 0;
+    }
+#if !defined(_WIN32)
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = cn1GcSignalHandler;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    sigaction(CN1_GC_STOP_SIGNAL, &sa, 0);
+#endif
+    cn1GcSignalHandlerInstalled = 1;
+}
+
+// Signal-stop one thread, returning its captured SP (or 0 on failure/timeout). The
+// resolver snapshot MUST already be built (we do not realloc after the thread freezes).
+static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
+#if !defined(_WIN32)
+    if(!t->gcPthreadValid) return 0;
+    t->gcSigRelease = 0;
+    t->gcSigStopped = 0;
+    t->gcSigRegsLen = 0;
+    t->gcSigStackPointer = 0;
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+    t->gcSigStopRequest = 1;
+    if(pthread_kill(t->gcPthread, CN1_GC_STOP_SIGNAL) != 0) { t->gcSigStopRequest = 0; return 0; }
+    // bounded wait for the handler to park
+    int spins = 0;
+    while(!t->gcSigStopped) {
+        if(++spins > 2000000) { /* ~timeout: could not stop */ break; }
+        if((spins & 1023) == 0) usleep(50);
+    }
+    if(!t->gcSigStopped) { t->gcSigStopRequest = 0; return 0; }
+    return (char*)t->gcSigStackPointer;
+#else
+    return 0;
+#endif
+}
+
+static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
+#if !defined(_WIN32)
+    t->gcSigRelease = 1;
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+    int spins = 0;
+    while(t->gcSigStopped) { if(++spins > 2000000) break; }
+    t->gcSigStopRequest = 0;
+#endif
+}
+
+// Scan ONE thread's native C stack [sp, base) + its register snapshot, marking every
+// resolved live object. threadStateData = the GC thread; t = the thread being scanned.
+static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* t) {
+    if(!t->gcPthreadValid) return;
+    size_t ssz = 0;
+    char* base = cn1GcStackBase(t->gcPthread, &ssz);
+    if(base == 0 || ssz == 0) return;
+
+    // Snapshot rebuilt BEFORE any signal-stop (realloc-while-frozen would deadlock).
+    cn1GcBuildRootSnapshots();
+
+    // Cooperative scan iff the thread published a FRESH capture this cycle (it parked at
+    // an allocation safepoint). This is the proven, race-free path for lightweight threads.
+    // The signal path is reserved for threads with no fresh capture (genuine native threads
+    // that the GC does not park) or the forced validation mode.
+    int useCoop = t->gcParkCaptured && t->gcStackPointerAtPark != 0 && cn1GcSignalStopMode == 0;
+    if(useCoop) {
+        char* sp = (char*)t->gcStackPointerAtPark;
+        if(sp >= base - (long)ssz && sp < base) {
+            cn1ConservativeMarkRange(threadStateData, sp, base);
+            cn1ConservativeMarkRange(threadStateData, (char*)&t->gcRegisterSnapshot,
+                                     (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
+            return;
+        }
+        // fall through to signal stop if the cooperative capture looked stale
+    }
+
+    // SIGNAL path: stop, scan, release. Used for native threads, for the forced
+    // CN1_GC_SIGNAL_STOP=1 validation mode, or as a fallback for a stale capture.
+    char* sp = cn1GcSignalStopOne(t);
+    if(sp == 0) {
+        // Could not stop the thread. If it is lightweight and cooperatively captured we
+        // can still fall back to that capture; otherwise this thread's frameless roots
+        // are at risk -- log once (honest gap).
+        if(t->gcParkCaptured && t->gcStackPointerAtPark != 0) {
+            char* csp = (char*)t->gcStackPointerAtPark;
+            if(csp >= base - (long)ssz && csp < base) {
+                cn1ConservativeMarkRange(threadStateData, csp, base);
+                cn1ConservativeMarkRange(threadStateData, (char*)&t->gcRegisterSnapshot,
+                                         (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
+            }
+        }
+        return;
+    }
+    if(sp >= base - (long)ssz && sp < base) {
+        cn1ConservativeMarkRange(threadStateData, sp, base);
+    }
+    if(t->gcSigRegsLen > 0) {
+        cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
+    }
+    cn1GcSignalReleaseOne(t);
+}
+
+// Scan the GC thread's OWN native stack (a root could be live only in a GC-thread C
+// local). flushes our callee-saved regs via setjmp into a scanned buffer.
+static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE) {
+    if(!threadStateData->gcPthreadValid) return;
+    jmp_buf ownRegs; (void)setjmp(ownRegs);
+    volatile void* spv = (void*)&spv;
+    char* sp = (char*)spv;
+    size_t ssz = 0;
+    char* base = cn1GcStackBase(threadStateData->gcPthread, &ssz);
+    if(base == 0 || ssz == 0) return;
+    if(sp < base - (long)ssz || sp >= base) return;
+    cn1GcBuildRootSnapshots();
+    cn1ConservativeMarkRange(threadStateData, sp, base);
+    cn1ConservativeMarkRange(threadStateData, (char*)&ownRegs, (char*)&ownRegs + sizeof(ownRegs));
+}
+
+static void cn1GcSignalStopThreads(struct ThreadLocalData* self) { (void)self; }
+static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self) { (void)self; }
+
+#ifdef CN1_CONSERVATIVE_GC_SELFCHECK
+// Transient ⊇ self-check (NOT shipped): every precise OBJECT root on a paused thread's
+// object stack must also be resolvable conservatively. A failure means an is-heap-
+// address / interior-pointer bug. Counts unmanaged (static/VM-singleton) roots that
+// live outside every GC region separately -- those are out of scope, never swept.
+static long long cn1SelfMiss = 0, cn1SelfChecked = 0, cn1SelfUnmanaged = 0;
+static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) {
+    cn1GcBuildRootSnapshots();
+    for(int i = 0 ; i < stackSize ; i++) {
+        struct elementStruct* e = &t->threadObjectStack[i];
+        if(e->type != CN1_TYPE_OBJECT) continue;
+        JAVA_OBJECT o = e->data.o;
+        if(o == JAVA_NULL || CN1_IS_TAGGED(o)) continue;
+        if(o->__codenameOneParentClsReference == 0 ||
+           o->__codenameOneParentClsReference == (&class__java_lang_Class)) continue;
+        cn1SelfChecked++;
+        JAVA_OBJECT r = cn1ConservativeResolve((void*)o);
+        if(r == JAVA_NULL) { cn1SelfUnmanaged++; continue; } // static/VM singleton, out of scope
+        if(r != o) {
+            cn1SelfMiss++;
+            fprintf(stderr, "[CONS-GC][SELFCHECK][MISS] precise root %p resolved to %p (class=%s)\n",
+                (void*)o, (void*)r,
+                (o->__codenameOneParentClsReference ? o->__codenameOneParentClsReference->clsName : "?"));
+        }
+    }
+    fprintf(stderr, "[CONS-GC][SELFCHECK] checked=%lld unmanaged=%lld MISS=%lld\n",
+        cn1SelfChecked, cn1SelfUnmanaged, cn1SelfMiss);
+}
+#endif
+#endif /* CN1_CONSERVATIVE_GC_ROOTS */
+
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     if(isAppSuspended) {
         mallocWhileSuspended += size;
@@ -1519,6 +1987,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
 #endif
     if(lowMemoryMode && !threadStateData->nativeAllocationMode) {
+        CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
         threadStateData->threadActive = JAVA_FALSE;
         usleep((JAVA_INT)(1000));
         while(threadStateData->threadBlockedByGC) {
@@ -1568,6 +2037,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     
     if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
         if(threadStateData->threadBlockedByGC && !threadStateData->nativeAllocationMode) {
+            CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
             threadStateData->threadActive = JAVA_FALSE;
             while(threadStateData->threadBlockedByGC) {
                 usleep(1000);
@@ -1582,6 +2052,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         
         
         if(threadStateData->heapAllocationSize > maxHeapSize && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
+            CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
             threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
@@ -1593,6 +2064,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                 threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
                 threadStateData->nativeAllocationMode = JAVA_FALSE;
+                CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
                 threadStateData->threadActive = JAVA_FALSE;
                 while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
                     if (get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
@@ -2098,6 +2570,7 @@ JAVA_OBJECT cn1NurseryAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* p
     // collection mutates it (corruption) or waits forever. A minor collection itself
     // keeps threadActive true throughout, so the GC never scans mid-collection.
     if(threadStateData->threadBlockedByGC && !threadStateData->nativeAllocationMode) {
+        CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
         threadStateData->threadActive = JAVA_FALSE;
         while(threadStateData->threadBlockedByGC) {
             usleep(1000);

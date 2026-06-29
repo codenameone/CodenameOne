@@ -16,6 +16,20 @@
 #include <stdatomic.h>
 #include <stdint.h>
 
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// PHASE 3b: conservative native-stack scanning as a REAL GC root source. Needs
+// signal-based universal thread stopping (sig_atomic_t / sigaction / ucontext).
+#include <signal.h>
+#if !defined(_WIN32)
+// macOS gates the ucontext routines behind _XOPEN_SOURCE; define it locally (only
+// affects which symbols are exposed, never computation) before pulling the header.
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+#include <ucontext.h>
+#endif
+#endif
+
 //#define DEBUG_GC_ALLOCATIONS
 
 #define NUMBER_OF_SUPPORTED_THREADS 1024
@@ -955,6 +969,31 @@ struct ThreadLocalData {
     int utf8BufferSize;
     JAVA_BOOLEAN threadKilled;      // we don't expect to see this in the GC
     JAVA_BOOLEAN interrupted;
+
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // PHASE 3b: state for conservatively scanning this thread's native C stack as a
+    // GC root source (so object-bearing FRAMELESS methods, whose object roots live in
+    // native C locals / the method-local operand array rather than threadObjectStack,
+    // are kept alive). Two stop mechanisms feed these:
+    //   (1) COOPERATIVE park: a lightweight thread that pauses at an allocation
+    //       safepoint runs CN1_GC_PARK_CAPTURE just before publishing threadActive=0.
+    //   (2) SIGNAL stop: the GC pthread_kills any thread it could not cooperatively
+    //       park; the async-signal-safe handler captures SP+regs and spins here.
+    pthread_t    gcPthread;              // pthread_self() of THIS thread (set at startup)
+    JAVA_BOOLEAN gcPthreadValid;         // gcPthread has been filled in
+    // cooperative-park capture
+    jmp_buf      gcRegisterSnapshot;     // setjmp flushes callee-saved regs -> scanned
+    void* volatile gcStackPointerAtPark; // SP-ish low bound captured at the park point
+    volatile JAVA_BOOLEAN gcParkCaptured;// a fresh cooperative capture exists this cycle
+    // signal-stop capture (async-signal-safe: handler only stores + spins)
+    volatile sig_atomic_t gcSigStopRequest; // GC sets 1 to ask the handler to park
+    volatile sig_atomic_t gcSigStopped;     // handler sets 1 once parked + captured
+    volatile sig_atomic_t gcSigRelease;      // GC sets 1 to release the spinning handler
+    void* volatile gcSigStackPointer;        // SP captured inside the signal handler
+    void* volatile gcSigStackBase;           // [sp,base) high bound (filled by GC/handler)
+    char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
+    volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
+#endif
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
@@ -1664,6 +1703,42 @@ extern JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JA
 
 extern void codenameOneGCMark();
 extern void codenameOneGCSweep();
+
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// PHASE 3b production conservative-root API. cn1ConservativeResolve maps an
+// arbitrary machine word to the base of the live heap object it points into
+// (interior pointers included) or JAVA_NULL, dereferencing nothing unproven.
+// cn1ConservativeMarkRange reads every aligned word in [lo,hi) and gcMarkObject's
+// what it resolves to -- a REAL root source (marks a superset of the precise set,
+// so nothing live is ever freed). cn1GcBuildRootSnapshots rebuilds the resolver's
+// page/extent index once per GC. cn1GcInstallSignalHandler installs the SIGUSR-based
+// universal thread-stop handler (idempotent). See the big block in cn1_globals.m.
+extern JAVA_OBJECT cn1ConservativeResolve(void* w);
+extern void cn1ConservativeMarkRange(CODENAME_ONE_THREAD_STATE, char* lo, char* hi);
+extern void cn1GcBuildRootSnapshots(void);
+extern void cn1GcInstallSignalHandler(void);
+// Per-thread self pointer, set at thread registration; read async-signal-safely by the
+// universal-stop handler.
+extern __thread struct ThreadLocalData* cn1TlsSelf;
+
+// Capture a parking mutator's native register file + native-stack low bound so the
+// concurrent GC can conservatively scan [sp, stackBase) for native-stack-held roots.
+// MUST be a macro so setjmp + the SP marker live in the PARKING frame itself: that
+// frame -- and the entire live mutator call chain above it (including any frameless
+// object frame whose roots are native-C locals) -- stays resident while the thread
+// spins in the GC-wait loop and the GC walks it. gcParkCaptured is published LAST,
+// and the GC only scans a thread after observing threadActive==FALSE (set right after
+// this macro), so it always reads a complete capture.
+#define CN1_GC_PARK_CAPTURE(ts) do { \
+        (void)setjmp((ts)->gcRegisterSnapshot); \
+        volatile void* cn1__sp = (void*)&cn1__sp; \
+        (ts)->gcStackPointerAtPark = (void*)cn1__sp; \
+        __atomic_thread_fence(__ATOMIC_RELEASE); \
+        (ts)->gcParkCaptured = JAVA_TRUE; \
+    } while(0)
+#else
+#define CN1_GC_PARK_CAPTURE(ts) do {} while(0)
+#endif
 
 typedef JAVA_OBJECT (*newInstanceFunctionPointer)(CODENAME_ONE_THREAD_STATE);
 typedef JAVA_OBJECT (*enumValueOfFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
