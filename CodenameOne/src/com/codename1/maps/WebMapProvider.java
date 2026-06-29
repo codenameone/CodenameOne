@@ -104,6 +104,27 @@ public class WebMapProvider implements MapProvider {
         return bc;
     }
 
+    /// Whether the web map for `mapId` has finished painting its tiles, i.e. the
+    /// SDK has fired its first `tilesloaded` event (see the readiness flag set in
+    /// the HTML template). Lets a caller wait for the real render rather than a
+    /// fixed delay. Returns false until the peer exists and the map is ready, or
+    /// if the readiness state can't be read.
+    public boolean isReady(int mapId) {
+        BrowserComponent bc = (BrowserComponent) peers.get(Integer.valueOf(mapId));
+        if (bc == null) {
+            return false;
+        }
+        try {
+            // Distinctive token avoids ambiguity with how a platform formats a
+            // bare boolean/string result.
+            String r = bc.executeAndReturnString(
+                    "(window.cn1mapReady===true)?'cn1ready':'cn1wait'");
+            return r != null && r.indexOf("cn1ready") >= 0;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     /// {@inheritDoc}
     @Override
     public void deinitialize(int mapId) {
@@ -292,7 +313,11 @@ public class WebMapProvider implements MapProvider {
             + "<body><div id=\"map\"></div><script>"
             + "function initMap(){window.cn1map=new google.maps.Map(document.getElementById('map'),"
             + "{center:{lat:{lat},lng:{lon}},zoom:{zoom},disableDefaultUI:true,"
-            + "gestureHandling:'none',clickableIcons:false});}"
+            + "gestureHandling:'none',clickableIcons:false});"
+            // Expose a readiness flag once the map has actually painted its
+            // tiles, so callers can wait for the real render instead of guessing
+            // a fixed delay (the screenshot test polls isReady(int)).
+            + "google.maps.event.addListenerOnce(window.cn1map,'tilesloaded',function(){window.cn1mapReady=true;});}"
             + "</script>"
             + "<script async src=\"https://maps.googleapis.com/maps/api/js?key={key}&callback=initMap\"></script>"
             + "</body></html>";
