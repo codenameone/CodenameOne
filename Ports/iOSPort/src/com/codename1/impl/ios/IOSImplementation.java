@@ -1456,6 +1456,31 @@ public class IOSImplementation extends CodenameOneImplementation {
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerDragged(singleDimensionX, singleDimensionY);
     }
+
+    /// Invoked from the native touch handler immediately before a pointer event to forward the
+    /// rich pointer detail (pointer type, pressure, Apple Pencil tilt and contact size) so the
+    /// cross-platform stylus and pressure APIs work on iOS. pointerType uses the
+    /// `com.codename1.ui.events.PointerEvent` TYPE_* constants.
+    public static void pointerMetadataCallback(int pointerType, float pressure, float tiltX, float tiltY, float contactSize) {
+        if (instance == null) {
+            return;
+        }
+        instance.setPointerEventMetadata(
+                com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY,
+                com.codename1.ui.events.PointerEvent.MASK_PRIMARY,
+                pointerType, pressure, tiltX, tiltY, contactSize, 0, false);
+    }
+
+    /// Invoked from the native trackpad / Magic Mouse / wheel scroll handler. Routes the scroll
+    /// through the shared wheel pipeline so that `com.codename1.ui.events.WheelEvent` is a single
+    /// universal scroll-gesture API across desktop, Android and iOS. The deltas come from a high
+    /// resolution device so the event is flagged as precise.
+    public static void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        instance.pointerWheelMoved(x, y, scrollX, scrollY, true, 0);
+    }
     
     protected void pointerPressed(final int[] x, final int[] y) {
         super.pointerPressed(x, y);

@@ -1,0 +1,180 @@
+== Device Input and Form Factors
+
+[[device-input-top-level-section,Device Input Section]]
+Codename One runs on a wide range of hardware, from phones and tablets to desktops, foldables,
+and devices driven by a mouse or a stylus. This chapter covers the cross-platform APIs that expose
+that hardware: rich pointer detail (mouse buttons, pen pressure and tilt, the pointing device
+type), the mouse wheel, foldable device posture, and multi-display / desktop-window awareness.
+
+All of these APIs are additive and degrade gracefully: on a device or platform that does not report
+a given capability the value falls back to a sensible default, so a single code base keeps working
+everywhere.
+
+=== Rich pointer events
+
+The classic `pointerPressed`, `pointerReleased` and `pointerDragged` callbacks carry only the x/y
+coordinates of the touch. Modern devices provide far more detail: which mouse button was used, the
+kind of pointing device (finger, mouse, stylus or eraser), the pressure applied, the stylus tilt,
+the contact area and the keyboard modifiers held at the time.
+
+That detail is exposed through the immutable
+https://www.codenameone.com/javadoc/com/codename1/ui/events/PointerEvent.html[`PointerEvent`]
+snapshot. There are two ways to read it.
+
+==== From an ActionEvent
+
+Any pointer listener receives an `ActionEvent`; call `getPointerEvent()` on it:
+
+[source,java]
+----
+myComponent.addPointerPressedListener(e -> {
+    PointerEvent pe = e.getPointerEvent();
+    if (pe.isSecondaryButton()) {
+        showContextMenu(pe.getX(), pe.getY());
+    }
+    System.out.println("pressure=" + pe.getPressure() + " type=" + pe.getPointerType());
+});
+----
+
+==== By polling
+
+When you are inside a pointer callback you can also poll the current values directly from `CN`
+(or `Display`), mirroring the existing `CN.isShiftKeyDown()` family:
+
+[source,java]
+----
+int button = CN.getPointerButton();      // PointerEvent.BUTTON_PRIMARY, BUTTON_SECONDARY, ...
+float pressure = CN.getPointerPressure(); // 0.0 - 1.0, defaults to 1.0
+boolean pen = CN.isStylusPointer();
+PointerEvent current = CN.getCurrentPointerEvent();
+----
+
+TIP: Values default safely. On a plain touch screen the button is `BUTTON_PRIMARY`, the pressure is
+`1.0` and the type is `TYPE_TOUCH` (or `TYPE_UNKNOWN` on ports that do not classify the device).
+
+=== Two and three button mice
+
+`PointerEvent.getButton()` returns one of `BUTTON_PRIMARY`, `BUTTON_SECONDARY`, `BUTTON_MIDDLE`,
+`BUTTON_BACK` or `BUTTON_FORWARD`. `CN.getPressedButtonMask()` returns a bitmask of every button
+currently held (`MASK_PRIMARY`, `MASK_SECONDARY`, ...), which is useful during a drag.
+
+For the common case of a context menu, use the unified `addContextMenuListener`. It fires for a
+secondary (right) mouse click, a stylus barrel button click and a long press, so the same code
+handles desktop and touch:
+
+[source,java]
+----
+label.addContextMenuListener(e -> {
+    e.consume(); // suppress the normal click/long-press handling
+    showMyContextMenu(e.getX(), e.getY());
+});
+----
+
+=== Mouse wheel and trackpad scrolling
+
+By default the mouse wheel and trackpad scroll a scrollable container automatically. To react to
+the wheel yourself - for example control plus wheel to zoom, or horizontal scrolling - add a
+`addMouseWheelListener`. The listener receives a
+https://www.codenameone.com/javadoc/com/codename1/ui/events/WheelEvent.html[`WheelEvent`];
+consuming it prevents the default scroll.
+
+[source,java]
+----
+canvas.addMouseWheelListener(e -> {
+    WheelEvent w = (WheelEvent) e;
+    if (w.isControlDown()) {
+        zoom(w.getDeltaY());
+        w.consume(); // do not scroll, we zoomed instead
+    }
+});
+----
+
+A positive `getDeltaY()` reveals content above (the user scrolled down); a positive `getDeltaX()`
+reveals content to the left. `isPrecise()` is true for high resolution devices such as trackpads.
+On the desktop simulator, hold shift while turning the wheel to produce horizontal scrolling.
+
+`WheelEvent` is a single universal scroll-gesture API: it is fed by the mouse wheel and trackpad on
+the desktop, by the wheel / external trackpad on Android, and by the trackpad, Magic Mouse and
+mouse wheel on iOS and iPadOS (captured natively and routed through the same pipeline). Continuous
+trackpad scrolling reports `isPrecise() == true`, while a notched wheel reports `false`.
+
+=== Stylus and pen support
+
+When a stylus is used (Apple Pencil, S-Pen, Surface Pen) the pointer type is `TYPE_STYLUS`, or
+`TYPE_ERASER` for the eraser end. The `PointerEvent` then also carries:
+
+* `getPressure()` - normalized pressure between `0.0` and `1.0`.
+* `getTiltX()` / `getTiltY()` - tilt in degrees (altitude and azimuth on iOS).
+* `getContactSize()` - normalized size of the contact area.
+
+For drawing surfaces a dedicated `addStylusListener` fires on press, drag and release only when the
+pointer is a stylus or eraser:
+
+[source,java]
+----
+drawingArea.addStylusListener(e -> {
+    PointerEvent pe = e.getPointerEvent();
+    float width = 1f + pe.getPressure() * 9f; // pressure controls stroke width
+    if (pe.isEraser()) {
+        erase(pe.getX(), pe.getY());
+    } else {
+        drawPoint(pe.getX(), pe.getY(), width);
+    }
+});
+----
+
+Pen hover (the pen moving above the screen without touching, available on devices such as the S-Pen
+and the M2 iPad with Apple Pencil) flows through the existing `pointerHover` callbacks; the snapshot
+reports `isHovering()` as true.
+
+=== Foldable devices and posture
+
+Foldable and dual screen devices (Galaxy Fold, Galaxy Flip, Pixel Fold, Surface Duo) change shape
+at runtime. Query the live posture through
+https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
+
+[source,java]
+----
+DevicePosture p = CN.getDevicePosture();
+if (p.isFoldable() && p.isTableTop()) {
+    // half-opened, hinge horizontal: put media on top, controls on the bottom half
+    layoutForTableTop(p.getFoldBounds(null));
+}
+----
+
+* `getPosture()` - `POSTURE_FLAT`, `POSTURE_HALF_OPENED`, `POSTURE_CLOSED` or `POSTURE_UNKNOWN`.
+* `getHingeAngle()` - hinge angle in degrees (`-1` when unknown).
+* `getFoldOrientation()` - `FOLD_ORIENTATION_VERTICAL`, `FOLD_ORIENTATION_HORIZONTAL` or `FOLD_ORIENTATION_NONE`.
+* `getFoldBounds(Rectangle)` - the region the hinge occludes, in display coordinates, or null when
+  there is no separating fold. Treat it like `Form.getSafeArea()`: keep interactive content out of
+  it, or split a master and detail layout across the two halves.
+
+React to fold changes with a posture listener:
+
+[source,java]
+----
+CN.addPostureListener(e -> relayoutForPosture(CN.getDevicePosture()));
+----
+
+NOTE: To exercise this in the desktop simulator, the JavaSE port lets you drive a simulated posture
+programmatically via `JavaSEPort.setSimulatedFoldable(true)`,
+`JavaSEPort.setSimulatedPosture(DevicePosture.POSTURE_HALF_OPENED)` and the matching
+`setSimulatedFoldOrientation` / `setSimulatedHingeAngle` helpers.
+
+On Android the real fold posture is read from `androidx.window`. That dependency is *opt-in* so it
+never bloats apps that do not use foldables: add the build hint `android.foldableSupport=true` to
+pull it in (the version can be overridden with `android.windowVersion`). The core port talks to
+`androidx.window` purely through reflection, so without the build hint every posture query simply
+reports "not foldable". Android reports posture, fold orientation and the hinge bounds; the hinge
+*angle* is not exposed by `androidx.window`, so `getHingeAngle()` returns `-1` there.
+
+=== Desktop windowing and external displays
+
+Some mobile devices run in a desktop windowing mode where the app shares the screen with other
+windows: Samsung DeX, Android desktop windowing and iPad Stage Manager. `CN.isDesktopMode()`
+reports this. It is distinct from `CN.isDesktop()`, which reports a genuine desktop platform
+(Windows, macOS or Linux).
+
+`CN.getDisplayCount()` returns the number of attached displays and `CN.isExternalDisplayConnected()`
+is a convenience for `getDisplayCount() > 1`. On the desktop port these reflect the real monitors
+attached to the machine.

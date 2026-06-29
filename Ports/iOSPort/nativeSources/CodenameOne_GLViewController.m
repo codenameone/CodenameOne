@@ -488,6 +488,8 @@ void deinitVMImpl() {
 extern void pointerPressed(int* x, int* y, int length);
 extern void pointerDragged(int* x, int* y, int length);
 extern void pointerReleased(int* x, int* y, int length);
+extern void cn1CapturePointerMetadata(UITouch* touch);
+extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
 extern void screenSizeChanged(int width, int height);
 extern void keyPressedNative(int keyCode);
 extern void keyReleasedNative(int keyCode);
@@ -2795,6 +2797,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     updateDisplayMetricsFromView(self.view);
     [self cn1InstallStatusBarTapProxy];
     [self cn1InstallHoverRecognizer];
+    [self cn1InstallScrollRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -2809,6 +2812,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     updateDisplayMetricsFromView(self.view);
     [self cn1InstallStatusBarTapProxy];
     [self cn1InstallHoverRecognizer];
+    [self cn1InstallScrollRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -3196,6 +3200,49 @@ bool lockDrawing;
             break;
         default:
             break;
+    }
+}
+
+// Trackpad / Magic Mouse / mouse wheel scroll support. A pan recognizer with
+// maximumNumberOfTouches == 0 only fires for indirect-pointer scrolling (no
+// finger on the glass), so it never competes with the touch / tap recognizers.
+// allowedScrollTypesMask == all picks up both discrete (wheel) and continuous
+// (trackpad) scrolling. The scroll delta is routed through the same wheel
+// pipeline as the desktop and Android ports so WheelEvent is one universal
+// scroll-gesture API across every platform. Requires iOS 13.4+.
+- (void)cn1InstallScrollRecognizer {
+#if !TARGET_OS_TV
+    if (@available(iOS 13.4, *)) {
+        UIPanGestureRecognizer *scroll = [[UIPanGestureRecognizer alloc]
+                                          initWithTarget:self
+                                                  action:@selector(cn1HandleScroll:)];
+        scroll.allowedScrollTypesMask = UIScrollTypeMaskAll;
+        scroll.maximumNumberOfTouches = 0;
+        scroll.cancelsTouchesInView = NO;
+        scroll.delaysTouchesBegan = NO;
+        scroll.delaysTouchesEnded = NO;
+        [self.view addGestureRecognizer:scroll];
+#ifndef CN1_USE_ARC
+        [scroll release];
+#endif
+    }
+#endif
+}
+
+- (void)cn1HandleScroll:(UIPanGestureRecognizer *)recognizer API_AVAILABLE(ios(13.4)) {
+    if (recognizer.state == UIGestureRecognizerStateBegan
+            || recognizer.state == UIGestureRecognizerStateChanged) {
+        CGPoint loc = [recognizer locationInView:self.view];
+        CGPoint t = [recognizer translationInView:self.view];
+        int dx = (int)(t.x * scaleValue);
+        int dy = (int)(t.y * scaleValue);
+        if (dx != 0 || dy != 0) {
+            // A scroll pan is a drag-like gesture, so the translation maps
+            // directly onto the wheel delta (positive dy reveals content above).
+            pointerWheelMovedCallback((int)(loc.x * scaleValue), (int)(loc.y * scaleValue), dx, dy);
+            // Reset so each callback carries an incremental delta.
+            [recognizer setTranslation:CGPointZero inView:self.view];
+        }
     }
 }
 
@@ -4532,6 +4579,7 @@ BOOL prefersStatusBarHidden = NO;
         CN1lastTouchX = (int)point.x;
         CN1lastTouchY = (int)point.y;
     }
+    cn1CapturePointerMetadata(touch);
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();
 }
@@ -4598,6 +4646,7 @@ BOOL prefersStatusBarHidden = NO;
     if(!isVKBAlwaysOpen()) {
         [self foldKeyboard:point];
     }
+    cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
 }
@@ -4640,6 +4689,7 @@ BOOL prefersStatusBarHidden = NO;
         //CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
         [self foldKeyboard:point];
     }
+    cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
 }
@@ -4659,6 +4709,7 @@ BOOL prefersStatusBarHidden = NO;
     int xArray[[touchesArray count]];
     int yArray[[touchesArray count]];
     CGPoint point = [touch locationInView:self.view];
+    cn1CapturePointerMetadata(touch);
     if([touchesArray count] > 1) {
         for(int iter = 0 ; iter < [touchesArray count] ; iter++) {
             UITouch* currentTouch = [touchesArray objectAtIndex:iter];

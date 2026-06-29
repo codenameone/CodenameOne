@@ -319,6 +319,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BridgeBulkTransferGuardTest(),
             new VPNDetectionAPITest(),
             new CallDetectionAPITest(),
+            new DeviceInputApiTest(),
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),

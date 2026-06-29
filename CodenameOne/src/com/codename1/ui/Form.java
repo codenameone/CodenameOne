@@ -3105,6 +3105,11 @@ public class Form extends Container {
                 return;
             }
         }
+        // a long press is the touch equivalent of a right click: surface it as a context menu request
+        Component ctxCmp = resolveInputComponent(x, y);
+        if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
+            return;
+        }
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) { //NOPMD CompareObjectsWithEquals
                 LeadUtil.longPointerPress(focused, x, y);
@@ -3402,9 +3407,40 @@ public class Form extends Container {
     }
 
 
+    /// Resolves the component under the given coordinates for device-input listener dispatch
+    /// (context menu, stylus), mirroring the resolution used for normal pointer dispatch.
+    private Component resolveInputComponent(int x, int y) {
+        Container actual = getActualPane(formLayeredPane, x, y);
+        if (actual == null) {
+            return null;
+        }
+        Component cmp = actual.getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
+        return cmp;
+    }
+
     /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
+        // Device-input dispatch happens here, at the form level, so it works uniformly for every
+        // component (including ones such as Button that override pointerPressed without calling
+        // super). A secondary (right / stylus barrel) button press is a context menu request; if a
+        // listener consumes it the normal press is suppressed. Stylus presses are also surfaced
+        // here so addStylusListener fires regardless of the target component.
+        if (Display.getInstance().getPointerButton() == com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY) {
+            Component ctxCmp = resolveInputComponent(x, y);
+            if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
+                return;
+            }
+        }
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveInputComponent(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerPressed, x, y);
+            }
+        }
         currentPointerPress = new Object();
         // a press (the start of a click or drag) dismisses any tooltip so it can't linger
         // over a drag image or get stranded when the gesture rebuilds the UI
@@ -3594,6 +3630,12 @@ public class Form extends Container {
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveInputComponent(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
+            }
+        }
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
@@ -3913,6 +3955,12 @@ public class Form extends Container {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveInputComponent(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
+            }
+        }
         try {
             Component origPressedCmp = pressedCmp;
             setRippleMotion(null);

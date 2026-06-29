@@ -2306,6 +2306,85 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return false;
     }
+
+    // Foldable device simulation controls. The desktop simulator is not foldable, but these
+    // settable fields let developers exercise the foldable / device posture APIs from the
+    // simulator and from unit tests.
+    private static boolean simulatedFoldable;
+    private static int simulatedPosture = com.codename1.ui.DevicePosture.POSTURE_FLAT;
+    private static int simulatedFoldOrientation = com.codename1.ui.DevicePosture.FOLD_ORIENTATION_VERTICAL;
+    private static int simulatedHingeAngle = 180;
+
+    /// Enables or disables foldable device simulation in the desktop simulator.
+    public static void setSimulatedFoldable(boolean foldable) {
+        simulatedFoldable = foldable;
+        Display.getInstance().postureChanged();
+    }
+
+    /// Sets the simulated fold posture (a `com.codename1.ui.DevicePosture` POSTURE_* constant).
+    public static void setSimulatedPosture(int posture) {
+        simulatedPosture = posture;
+        Display.getInstance().postureChanged();
+    }
+
+    /// Sets the simulated fold orientation (a `com.codename1.ui.DevicePosture` FOLD_ORIENTATION_* constant).
+    public static void setSimulatedFoldOrientation(int orientation) {
+        simulatedFoldOrientation = orientation;
+        Display.getInstance().postureChanged();
+    }
+
+    /// Sets the simulated hinge angle in degrees (0 closed, 180 flat).
+    public static void setSimulatedHingeAngle(int angle) {
+        simulatedHingeAngle = angle;
+        Display.getInstance().postureChanged();
+    }
+
+    @Override
+    public boolean isFoldable() {
+        return simulatedFoldable;
+    }
+
+    @Override
+    public int getDevicePosture() {
+        return simulatedFoldable ? simulatedPosture : com.codename1.ui.DevicePosture.POSTURE_UNKNOWN;
+    }
+
+    @Override
+    public int getHingeAngle() {
+        return simulatedFoldable ? simulatedHingeAngle : -1;
+    }
+
+    @Override
+    public int getFoldOrientation() {
+        return simulatedFoldable ? simulatedFoldOrientation : com.codename1.ui.DevicePosture.FOLD_ORIENTATION_NONE;
+    }
+
+    @Override
+    public boolean isPostureSeparating() {
+        return simulatedFoldable && simulatedPosture == com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED;
+    }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getFoldBounds(com.codename1.ui.geom.Rectangle rect) {
+        if (!simulatedFoldable || simulatedFoldOrientation == com.codename1.ui.DevicePosture.FOLD_ORIENTATION_NONE) {
+            return null;
+        }
+        int w = getDisplayWidthImpl();
+        int h = getDisplayHeightImpl();
+        if (simulatedFoldOrientation == com.codename1.ui.DevicePosture.FOLD_ORIENTATION_VERTICAL) {
+            return new com.codename1.ui.geom.Rectangle(w / 2 - 1, 0, 2, h);
+        }
+        return new com.codename1.ui.geom.Rectangle(0, h / 2 - 1, w, 2);
+    }
+
+    @Override
+    public int getDisplayCount() {
+        try {
+            return java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices().length;
+        } catch (Throwable t) {
+            return 1;
+        }
+    }
     
     private static void dumpSwingHierarchy(java.awt.Component root, String indent) {
         System.out.println(indent + root.getName()+" "+root.getClass() + " "+root.getBounds());
@@ -3017,6 +3096,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         if (testRecorder != null) {
                             testRecorder.eventPointerPressed(x, y);
                         }
+                        updatePointerMetadata(e, true);
                         JavaSEPort.this.pointerPressed(x, y);
                     }
                 } else {
@@ -3081,6 +3161,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         if (testRecorder != null) {
                             testRecorder.eventPointerReleased(x, y);
                         }
+                        updatePointerMetadata(e, true);
                         JavaSEPort.this.pointerReleased(x, y);
                     }
                 }
@@ -3118,6 +3199,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         if (testRecorder != null && hasDragStarted(x, y)) {
                             testRecorder.eventPointerDragged(x, y);
                         }
+                        updatePointerMetadata(e, false);
                         JavaSEPort.this.pointerDragged(x, y);
                     }
                 }
@@ -3140,6 +3222,64 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean isPinchZoom(MouseEvent e) {
             return ((e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0)
                     || ((e.getModifiers() & MouseEvent.SHIFT_MASK) != 0);
+        }
+
+        /// Translates the AWT mouse button and keyboard modifier state into the cross-platform
+        /// pointer metadata so that the simulator can exercise the multi-button mouse APIs.
+        /// When useButton is true the triggering button is read from getButton (valid for press
+        /// and release); for drag events the button is derived from the held button mask instead.
+        private void updatePointerMetadata(MouseEvent e, boolean useButton) {
+            int mask = 0;
+            int mods = e.getModifiersEx();
+            if ((mods & InputEvent.BUTTON1_DOWN_MASK) != 0) {
+                mask |= com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+            }
+            if ((mods & InputEvent.BUTTON2_DOWN_MASK) != 0) {
+                mask |= com.codename1.ui.events.PointerEvent.MASK_MIDDLE;
+            }
+            if ((mods & InputEvent.BUTTON3_DOWN_MASK) != 0) {
+                mask |= com.codename1.ui.events.PointerEvent.MASK_SECONDARY;
+            }
+            int button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+            if (useButton) {
+                switch (e.getButton()) {
+                    case MouseEvent.BUTTON2:
+                        button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+                        break;
+                    case MouseEvent.BUTTON3:
+                        button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+                        break;
+                    default:
+                        button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+                        break;
+                }
+            } else {
+                if ((mask & com.codename1.ui.events.PointerEvent.MASK_SECONDARY) != 0) {
+                    button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+                } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_MIDDLE) != 0) {
+                    button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+                }
+            }
+            JavaSEPort.this.setPointerEventMetadata(button, mask,
+                    com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, modifierMask(e), false);
+        }
+
+        /// Builds the cross-platform keyboard modifier mask from an AWT input event.
+        private int modifierMask(InputEvent e) {
+            int modifiers = 0;
+            if (e.isShiftDown()) {
+                modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_SHIFT;
+            }
+            if (e.isControlDown()) {
+                modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_CONTROL;
+            }
+            if (e.isAltDown()) {
+                modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_ALT;
+            }
+            if (e.isMetaDown()) {
+                modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_META;
+            }
+            return modifiers;
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
         private Cursor defaultCursor = Cursor.getDefaultCursor();        
@@ -3429,8 +3569,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // Hand the wheel scroll to the shared CodenameOneImplementation
                 // gesture so every port maps the wheel the same way; it replays
                 // the press/drag/release across EDT cycles and tracks
-                // isScrollWheeling() for us.
-                pointerWheelMoved(x, y, 0, units);
+                // isScrollWheeling() for us. Holding shift turns the wheel into a
+                // horizontal scroll, matching the convention on desktop platforms,
+                // and high resolution (trackpad) deltas are flagged as precise.
+                boolean precise = e.getPreciseWheelRotation() != e.getWheelRotation();
+                int modifiers = modifierMask(e);
+                if (e.isShiftDown()) {
+                    pointerWheelMoved(x, y, units, 0, precise, modifiers);
+                } else {
+                    pointerWheelMoved(x, y, 0, units, precise, modifiers);
+                }
             }
         }
         

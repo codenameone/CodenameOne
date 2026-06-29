@@ -1556,6 +1556,46 @@ void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(CN1_THREAD_STATE
 
 
 
+// Extracts the rich pointer detail (tool type, pressure, Apple Pencil tilt and contact size)
+// from a UITouch and forwards it to Java just before the pointer event is dispatched, so the
+// cross-platform stylus and pressure APIs work on iOS. Invoked from both the view controller
+// touch handlers and the CN1TapGestureRecognizer.
+void cn1CapturePointerMetadata(UITouch* touch) {
+    if (touch == nil) {
+        return;
+    }
+    int pointerType = 1; // PointerEvent.TYPE_TOUCH
+    float pressure = 1.0f;
+    float tiltX = 0.0f;
+    float tiltY = 0.0f;
+    float contactSize = 0.0f;
+    if (@available(iOS 9.0, *)) {
+        if (touch.type == UITouchTypeStylus) {
+            pointerType = 3; // PointerEvent.TYPE_STYLUS
+            CGFloat maxForce = touch.maximumPossibleForce;
+            if (maxForce > 0) {
+                pressure = (float)(touch.force / maxForce);
+            }
+            tiltX = (float)((M_PI_2 - touch.altitudeAngle) * 180.0 / M_PI);
+            tiltY = (float)([touch azimuthAngleInView:nil] * 180.0 / M_PI);
+        } else {
+            CGFloat maxForce = touch.maximumPossibleForce;
+            if (maxForce > 0 && touch.force > 0) {
+                pressure = (float)(touch.force / maxForce);
+            }
+        }
+    }
+    if (@available(iOS 13.4, *)) {
+        if (touch.type == UITouchTypeIndirectPointer) {
+            pointerType = 2; // PointerEvent.TYPE_MOUSE
+        }
+    }
+    if (touch.majorRadius > 0) {
+        contactSize = (float)touch.majorRadius;
+    }
+    com_codename1_impl_ios_IOSImplementation_pointerMetadataCallback___int_float_float_float_float(CN1_THREAD_GET_STATE_PASS_ARG pointerType, pressure, tiltX, tiltY, contactSize);
+}
+
 void pointerPressed(int* x, int* y, int length) {
     if(length == 1) {
         com_codename1_impl_ios_IOSImplementation_pointerPressedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x[0], y[0]);
@@ -1649,6 +1689,10 @@ void pointerHoverNative(int x, int y) {
 
 void pointerHoverReleasedNative(int x, int y) {
     com_codename1_impl_ios_IOSImplementation_pointerHoverReleasedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y);
+}
+
+void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
+    com_codename1_impl_ios_IOSImplementation_pointerWheelMovedCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y, scrollX, scrollY);
 }
 
 void stringEdit(int finished, int cursorPos, NSString* text) {
