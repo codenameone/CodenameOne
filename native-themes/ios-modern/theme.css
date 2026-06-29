@@ -110,17 +110,22 @@
     tabSelInsetMm: "0.6";
     /* Selected-capsule LENS material (Tabs.paintSelectionCapsule): near pass-through so
        it reads slightly darker than the bright bar in light (~216 vs 236) and a touch
-       lighter than the dark bar (~83 vs 51), like the iOS 26 lens. */
-    TabSelScaleLight: "0.85";
+       lighter than the dark bar (~83 vs 51), like the iOS 26 lens. Scale tuned so the
+       capsule lands on native's flat 216 (236*0.915); specular 0 keeps it flat (native's
+       selection capsule has no visible rim -- a rim left a darker edge band / "ring"). */
+    TabSelScaleLight: "0.915";
     TabSelOffsetLight: "0";
     TabSelSatLight: "1.3";
     TabSelRefractLight: "0";
-    TabSelSpecularLight: "0.1";
-    TabSelScaleDark: "0.5";
-    TabSelOffsetDark: "6";
+    TabSelSpecularLight: "0";
+    /* Dark selection capsule is a LIGHTER lens over the dark bar (native bar ~51 ->
+       capsule ~83, i.e. +32). scale 1.0 + offset 32 lifts it above the bar instead of
+       sinking below it (0.5/6 sank it to ~31, an inverted darker lens). */
+    TabSelScaleDark: "1.0";
+    TabSelOffsetDark: "32";
     TabSelSatDark: "1.6";
     TabSelRefractDark: "0";
-    TabSelSpecularDark: "0.12";
+    TabSelSpecularDark: "0";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;
@@ -689,16 +694,23 @@ Tab {
 /* The selected-tab background is drawn by the single sliding selection capsule
    (Tabs.paintSelectionCapsule, tabsSelectionCapsuleBool) so it can tween between
    tabs -- so the per-tab selected fill is transparent. */
+/* The selected tab paints NO background of its own -- the single sliding glass
+   selection capsule (Tabs.paintSelectionCapsule) is the only selection visual.
+   A cn1-pill-border here painted a SECOND, smaller, brighter pill on top of the
+   capsule, leaving the capsule's material as a darker "ring" around it (the gap
+   the native bar does not have). Omit the background-type so it stays transparent. */
 Tab.selected {
     color: var(--accent-color, #007aff);
     background-color: transparent;
-    cn1-background-type: cn1-pill-border;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
+/* Pressed paints NO background pill either -- the selected tab is drawn pressed
+   (CN1 renders the active RadioButton armed), so a pressed fill here became a
+   second 40%-white pill on top of the glass capsule (the inner-pill "ring"). The
+   capsule is the only selection visual; a press just keeps the capsule. */
 Tab.pressed {
     color: var(--accent-color, #007aff);
-    background-color: rgba(255,255,255,0.4);
-    cn1-background-type: cn1-pill-border;
+    background-color: transparent;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
 
@@ -706,7 +718,6 @@ SelectedTab {
     cn1-derive: Tab;
     color: var(--accent-color, #007aff);
     background-color: transparent;
-    cn1-background-type: cn1-pill-border;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
@@ -1033,9 +1044,11 @@ PopupContent {
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
-    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
-    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: transparent; cn1-background-type: cn1-pill-border; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    /* No per-tab background -- the sliding glass capsule is the only selection visual
+       (a cn1-pill-border here double-painted a brighter inner pill / dark ring). */
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
     UnselectedTab { color: #ebebf5; }
 
     /* Dark overrides for the icon-only UIID. Background stays transparent
