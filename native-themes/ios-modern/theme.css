@@ -639,7 +639,11 @@ TabsContainer {
        horizontal padding so the tab cells / selected capsule reach close to the
        pill's left/right edges like native. */
     backdrop-filter: blur(40px);
-    padding: 0.5mm 0.5mm 0.5mm 0.5mm;
+    /* Horizontal end-padding widens the pill at its rounded ends WITHOUT moving the tab
+       centres (the pill grows symmetrically and the content shifts by the same amount,
+       cancelling) -- this is how native's first/last cells get extra width. Tuned so the
+       pill width matches native (~773px). */
+    padding: 0.5mm 1.3mm 0.5mm 1.3mm;
     margin: 0 1mm 0.5mm 1mm;
     cn1-background-type: cn1-pill-border;
 }
@@ -659,8 +663,10 @@ Tab {
     background-color: transparent;
     /* With equal-width cells (tabsEqualWidthBool) the GridLayout sizes every cell to
        the widest tab's content + this padding, so the padding sets the cell (and pill)
-       width. Trimmed to land the cells on native's ~244px spacing. */
-    padding: 0.78mm 2.9mm 0.78mm 2.9mm;
+       size. Horizontal trimmed to land the cells on native's ~244px spacing; vertical
+       raised so the pill matches native's height (~172px) -- a taller capsule pill also
+       widens (its rounded ends scale with height). */
+    padding: 1.0mm 2.9mm 1.0mm 2.9mm;
     /* Same margin as Tab.selected/pressed so selecting only TOGGLES the capsule
        background -- it must not change the cell geometry. Small margins so the
        selected capsule nearly reaches the pill edges (native): minimal top/bottom
