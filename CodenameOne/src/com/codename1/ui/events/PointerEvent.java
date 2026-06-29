@@ -265,6 +265,7 @@ public final class PointerEvent {
         return (modifiers & MODIFIER_META) != 0;
     }
 
+    @Override
     public String toString() {
         return "PointerEvent[x=" + x + ", y=" + y + ", button=" + button + ", buttonMask=" + buttonMask
                 + ", type=" + pointerType + ", pressure=" + pressure + ", tiltX=" + tiltX + ", tiltY=" + tiltY

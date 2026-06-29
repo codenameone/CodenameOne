@@ -993,7 +993,7 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `l`: the listener to add
-    public static void addPostureListener(com.codename1.ui.events.ActionListener l) {
+    public static void addPostureListener(ActionListener l) {
         Display.getInstance().addPostureListener(l);
     }
 
@@ -1002,7 +1002,7 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `l`: the listener to remove
-    public static void removePostureListener(com.codename1.ui.events.ActionListener l) {
+    public static void removePostureListener(ActionListener l) {
         Display.getInstance().removePostureListener(l);
     }
 

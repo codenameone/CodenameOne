@@ -30,6 +30,7 @@ import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -3429,7 +3430,7 @@ public class Form extends Container {
         // super). A secondary (right / stylus barrel) button press is a context menu request; if a
         // listener consumes it the normal press is suppressed. Stylus presses are also surfaced
         // here so addStylusListener fires regardless of the target component.
-        if (Display.getInstance().getPointerButton() == com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY) {
+        if (Display.getInstance().getPointerButton() == PointerEvent.BUTTON_SECONDARY) {
             Component ctxCmp = resolveInputComponent(x, y);
             if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
                 return;

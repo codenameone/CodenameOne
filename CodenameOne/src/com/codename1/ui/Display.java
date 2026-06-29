@@ -64,6 +64,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
+import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
@@ -289,7 +290,7 @@ public final class Display extends CN1Constants {
     private boolean recursivePointerReleaseB;
     private int pointerX;
     private int pointerY;
-    private com.codename1.ui.events.PointerEvent currentPointerEvent;
+    private PointerEvent currentPointerEvent;
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
     private long longKeyPressTime;
@@ -1979,8 +1980,8 @@ public final class Display extends CN1Constants {
     ///
     /// #### Returns
     ///
-    /// the current `com.codename1.ui.events.PointerEvent`, never null
-    public com.codename1.ui.events.PointerEvent getCurrentPointerEvent() {
+    /// the current `PointerEvent`, never null
+    public PointerEvent getCurrentPointerEvent() {
         if (currentPointerEvent != null) {
             return currentPointerEvent;
         }
@@ -1988,18 +1989,18 @@ public final class Display extends CN1Constants {
     }
 
     /// The mouse button associated with the current pointer event, one of the
-    /// `com.codename1.ui.events.PointerEvent` `BUTTON_*` constants.
+    /// `PointerEvent` `BUTTON_*` constants.
     public int getPointerButton() {
         return impl.getPointerButton();
     }
 
     /// A bitmask of the mouse buttons currently held down, built from the
-    /// `com.codename1.ui.events.PointerEvent` `MASK_*` constants.
+    /// `PointerEvent` `MASK_*` constants.
     public int getPressedButtonMask() {
         return impl.getPointerButtonMask();
     }
 
-    /// The current pointing device type, one of the `com.codename1.ui.events.PointerEvent` `TYPE_*`
+    /// The current pointing device type, one of the `PointerEvent` `TYPE_*`
     /// constants (finger, mouse, stylus or eraser).
     public int getPointerType() {
         return impl.getPointerType();
@@ -2029,8 +2030,8 @@ public final class Display extends CN1Constants {
     /// True if the current pointer is a stylus or pen (Apple Pencil, S-Pen and similar).
     public boolean isStylusPointer() {
         int t = impl.getPointerType();
-        return t == com.codename1.ui.events.PointerEvent.TYPE_STYLUS
-                || t == com.codename1.ui.events.PointerEvent.TYPE_ERASER;
+        return t == PointerEvent.TYPE_STYLUS
+                || t == PointerEvent.TYPE_ERASER;
     }
 
     /// Dispatches a mouse wheel event to the component under the given coordinates. Invoked by the
@@ -4574,6 +4575,7 @@ public final class Display extends CN1Constants {
     public void postureChanged() {
         if (postureListeners != null && postureListeners.hasListeners()) {
             callSerially(new Runnable() {
+                @Override
                 public void run() {
                     postureListeners.fireActionEvent(new ActionEvent(DevicePosture.getInstance(),
                             ActionEvent.Type.PostureChange));
