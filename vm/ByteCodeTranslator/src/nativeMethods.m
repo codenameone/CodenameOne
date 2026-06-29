@@ -1785,6 +1785,18 @@ void* threadRunner(void *x)
 JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
     // disable reference counting on the thread object to prevent the gap between thread start and actual thread running
     th->__codenameOneReferenceCount = 999999;
+    // Mark the thread alive HERE, on the calling thread, before the worker is
+    // spawned. Previously `alive` was set inside runImpl, which runs on the new
+    // worker thread asynchronously after start() returns. That left a window in
+    // which a caller that did start() then join() could observe isAlive()==false
+    // (worker not yet scheduled) and have join() return immediately -- before any
+    // of the worker's writes were published -- producing nondeterministic results
+    // (the MtStress "DONE 0"). Setting it synchronously here, in program order
+    // before start() returns, guarantees a subsequent join()/isAlive() on the
+    // same thread sees the thread as alive until the worker clears the flag under
+    // the monitor (runImpl: synchronized{ alive=false; notifyAll(); }), which also
+    // establishes the happens-before that publishes the worker's results.
+    set_field_java_lang_Thread_alive(JAVA_TRUE, th);
     pthread_t pt;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
