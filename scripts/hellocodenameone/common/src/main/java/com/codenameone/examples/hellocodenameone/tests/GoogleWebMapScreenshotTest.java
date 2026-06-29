@@ -79,6 +79,21 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             done();
             return true;
         }
+        // Baseline only on the mobile ports that ship a golden for this test
+        // (iOS + Android). It was implicitly limited to those before: it skipped
+        // wherever the Google Maps API key was absent, i.e. every platform
+        // except the iOS/Android CI jobs that inject the secret. Now that the
+        // page is offline (no key needed) it would otherwise also run on the
+        // Linux GTK / Windows / JS / JavaSE screenshot suites, which have no
+        // golden -- streaming an ungolden'd capture that fails their gate
+        // (missing_expected). Gate explicitly to the two ports we baseline.
+        String platform = com.codename1.ui.CN.getPlatformName();
+        if (!"ios".equals(platform) && !"and".equals(platform)) {
+            System.out.println(
+                    "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=platform-" + platform);
+            done();
+            return true;
+        }
         // Force the web provider for this map only with a fixed offline page. The
         // empty-key default would make the provider report unavailable, so pass a
         // dummy non-empty key; the offline template has no {key} token to expand.
