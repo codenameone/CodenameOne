@@ -978,9 +978,11 @@ PopupContent {
     Button { color: #ffffff; background-color: rgba(20,20,24,0.36); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
     Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); cn1-background-type: cn1-pill-border; }
     Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); cn1-background-type: cn1-pill-border; }
-    /* Dark clearGlass FlatButton: lighter dark capsule, blue label. */
-    FlatButton { color: #ffffff; background-color: rgba(255,255,255,0.18); border: 0.25mm solid rgba(255,255,255,0.4); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
-    FlatButton.pressed { color: #ffffff; background-color: rgba(255,255,255,0.3); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; }
+    /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
+       pill with DARK text in BOTH appearances (native ref). White text flipped it
+       to the dark "charcoal" material; dark text uses the light pass-through frost. */
+    FlatButton { color: #000000; background-color: rgba(255,255,255,0.32); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
+    FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.52); border: 0.25mm solid rgba(255,255,255,0.85); cn1-background-type: cn1-pill-border; }
 
     RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
     RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
