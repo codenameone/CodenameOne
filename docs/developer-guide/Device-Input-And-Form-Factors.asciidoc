@@ -95,7 +95,30 @@ On the desktop simulator, hold shift while turning the wheel to produce horizont
 `WheelEvent` is a single universal scroll-gesture API: it's fed by the mouse wheel and trackpad on
 the desktop, by the wheel / external trackpad on Android, and by the trackpad, Magic Mouse and
 mouse wheel on iOS and iPadOS (captured natively and routed through the same pipeline). Continuous
-trackpad scrolling reports `isPrecise() == true`, while a notched wheel reports `false`.
+trackpad scrolling reports `isPrecise() == true`, while a notched wheel reports `false`. On the
+Apple Watch the Digital Crown also feeds this same pipeline, so a list scrolls under the crown and a
+mouse wheel listener receives the crown as a `WheelEvent`.
+
+=== Trackpad gestures (magnify and rotate)
+
+Beyond scrolling, the macOS trackpad reports magnify (pinch) and rotate gestures. Override
+`pinch(float scale)` to zoom and `rotation(float radians)` to rotate; both return true to mark the
+gesture as handled. `pinch` is also driven by a two finger pinch on touch screens, so the same code
+works on mobile and the Mac.
+
+[source,java]
+----
+Container photo = new Container() {
+    protected boolean pinch(float scale) {
+        zoom(scale);                 // trackpad pinch or two finger pinch
+        return true;
+    }
+    protected boolean rotation(float radians) {
+        rotate(radians);             // trackpad two finger rotate
+        return true;
+    }
+};
+----
 
 === Stylus and pen support
 
@@ -155,17 +178,15 @@ React to fold changes with a posture listener:
 CN.addPostureListener(e -> relayoutForPosture(CN.getDevicePosture()));
 ----
 
-NOTE: To exercise this in the desktop simulator, the JavaSE port lets you drive a simulated posture
-programmatically via `JavaSEPort.setSimulatedFoldable(true)`,
-`JavaSEPort.setSimulatedPosture(DevicePosture.POSTURE_HALF_OPENED)` and the matching
-`setSimulatedFoldOrientation` / `setSimulatedHingeAngle` helpers.
+To exercise this in the desktop simulator, use the *Simulate -> Foldable* menu: enable foldable
+mode, then pick a posture (flat, half-opened or closed), the fold orientation (vertical or
+horizontal) and the hinge angle. The running app receives the same posture changes and listener
+callbacks it would on a real foldable device.
 
-On Android the real fold posture is read from `androidx.window`. That dependency is *opt-in* so it
-never bloats apps that don't use foldables: add the build hint `android.foldableSupport=true` to
-pull it in (the version can be overridden with `android.windowVersion`). The core port talks to
-`androidx.window` purely through reflection, so without the build hint every posture query simply
-reports "not foldable." Android reports posture, fold orientation and the hinge bounds; the hinge
-*angle* isn't exposed by `androidx.window`, so `getHingeAngle()` returns `-1` there.
+Foldable support on Android is opt-in so it never adds weight to apps that don't use it. Enable it
+with the `android.foldableSupport=true` build hint (the version can be overridden with
+`android.windowVersion`). Note that the hinge *angle* isn't available on Android, so
+`getHingeAngle()` returns `-1` there.
 
 === Desktop windowing and external displays
 
@@ -177,3 +198,11 @@ reports this. It's distinct from `CN.isDesktop()`, which reports a genuine deskt
 `CN.getDisplayCount()` returns the number of attached displays and `CN.isExternalDisplayConnected()`
 is a convenience for `getDisplayCount() > 1`. On the desktop port these reflect the real monitors
 attached to the machine.
+
+=== Apple TV remote
+
+On Apple TV the Siri Remote is delivered through the standard key handling, so the same
+`keyPressed`/`keyReleased` and game-key code you write for other platforms works on the TV. The
+directional buttons map to the arrow / game keys, the click maps to enter (fire), the menu button
+maps to the back key, and play/pause maps to the media play/pause key. No TV specific API is
+required.

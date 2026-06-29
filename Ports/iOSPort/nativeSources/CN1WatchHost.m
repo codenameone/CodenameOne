@@ -32,6 +32,7 @@ extern void cn1_watch_paintFrame(void);         // drain the op queue -> render 
 extern void cn1_watch_pointerPressed(int x, int y);
 extern void cn1_watch_pointerDragged(int x, int y);
 extern void cn1_watch_pointerReleased(int x, int y);
+extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
 
 static CN1WatchHost *sharedHostInstance = nil;
 
@@ -118,14 +119,14 @@ static CN1WatchHost *sharedHostInstance = nil;
 #pragma mark - Input
 
 - (void)crownRotatedBy:(CGFloat)crownDelta {
-    // Map crown rotation to a vertical scroll drag at the horizontal center.
-    // The watch UI treats a press/drag/release sequence (with movement) as a
-    // scroll, vs a press/release at the same point as a tap.
+    // Route the Digital Crown through the cross-platform wheel pipeline so it is the same universal
+    // scroll-gesture input as a mouse wheel or trackpad: it scrolls the component under the center
+    // of the watch face and is also delivered to any mouse wheel listeners as a WheelEvent. A
+    // positive crown delta reveals content above (scrolls down), matching the wheel convention.
     needsDisplay = YES;
     int cx = _renderingView != nil ? [_renderingView logicalWidth] / 2 : 0;
-    cn1_watch_pointerPressed(cx, 0);
-    cn1_watch_pointerDragged(cx, (int)(-crownDelta));
-    cn1_watch_pointerReleased(cx, (int)(-crownDelta));
+    int cy = _renderingView != nil ? [_renderingView logicalHeight] / 2 : 0;
+    pointerWheelMovedCallback(cx, cy, 0, (int)(-crownDelta));
 }
 
 - (void)tapAtX:(int)x y:(int)y {

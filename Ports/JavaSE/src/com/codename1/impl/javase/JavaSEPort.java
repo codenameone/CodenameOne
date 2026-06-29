@@ -5876,6 +5876,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final JMenu nfcMenu = installNfcSimulationMenu(simulateMenu, pref);
 
+        final JMenu foldableMenu = installFoldableSimulationMenu(simulateMenu, pref);
+
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
         // top of Toolbar created by Toolbar.initTitleBarStatus). The native
@@ -6387,6 +6389,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(pushSim);
         simulateMenu.add(biometricMenu);
         simulateMenu.add(nfcMenu);
+        simulateMenu.add(foldableMenu);
         simulateMenu.add(statusBarTapDiag);
         simulateMenu.addSeparator();
         simulateMenu.add(darkLightModeMenu);
@@ -7679,6 +7682,107 @@ public class JavaSEPort extends CodenameOneImplementation {
         nfcMenu.add(deactivate);
 
         return nfcMenu;
+    }
+
+    /// Builds the Simulate -> Foldable submenu so developers can exercise the
+    /// com.codename1.ui.DevicePosture API in the desktop simulator: toggle foldable mode, pick a
+    /// posture and fold orientation, and set the hinge angle. Selections are persisted and applied
+    /// through the JavaSEPort simulated-posture state, which fires the same posture-change events an
+    /// app would receive on a real foldable device.
+    private JMenu installFoldableSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        JMenu foldableMenu = new JMenu("Foldable");
+
+        // Apply any persisted selections to the simulator state up front.
+        boolean enabled = pref.getBoolean("FoldableSim.enabled", false);
+        int posture = pref.getInt("FoldableSim.posture", com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED);
+        int orientation = pref.getInt("FoldableSim.orientation", com.codename1.ui.DevicePosture.FOLD_ORIENTATION_VERTICAL);
+        int hinge = pref.getInt("FoldableSim.hingeAngle", 180);
+        simulatedPosture = posture;
+        simulatedFoldOrientation = orientation;
+        simulatedHingeAngle = hinge;
+        simulatedFoldable = enabled;
+
+        final JCheckBoxMenuItem enable = new JCheckBoxMenuItem("Enable foldable device", enabled);
+        enable.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                pref.putBoolean("FoldableSim.enabled", enable.isSelected());
+                setSimulatedFoldable(enable.isSelected());
+            }
+        });
+        foldableMenu.add(enable);
+        foldableMenu.addSeparator();
+
+        // Posture radio group.
+        JMenu postureMenu = new JMenu("Posture");
+        ButtonGroup postureGroup = new ButtonGroup();
+        final int[] postureValues = {
+            com.codename1.ui.DevicePosture.POSTURE_FLAT,
+            com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED,
+            com.codename1.ui.DevicePosture.POSTURE_CLOSED
+        };
+        String[] postureLabels = {"Flat (open)", "Half-opened", "Closed"};
+        for (int i = 0; i < postureValues.length; i++) {
+            final int value = postureValues[i];
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(postureLabels[i], posture == value);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    pref.putInt("FoldableSim.posture", value);
+                    setSimulatedPosture(value);
+                }
+            });
+            postureGroup.add(item);
+            postureMenu.add(item);
+        }
+        foldableMenu.add(postureMenu);
+
+        // Fold orientation radio group.
+        JMenu orientationMenu = new JMenu("Fold orientation");
+        ButtonGroup orientationGroup = new ButtonGroup();
+        final int[] orientationValues = {
+            com.codename1.ui.DevicePosture.FOLD_ORIENTATION_VERTICAL,
+            com.codename1.ui.DevicePosture.FOLD_ORIENTATION_HORIZONTAL
+        };
+        String[] orientationLabels = {"Vertical (splits left/right)", "Horizontal (splits top/bottom)"};
+        for (int i = 0; i < orientationValues.length; i++) {
+            final int value = orientationValues[i];
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(orientationLabels[i], orientation == value);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    pref.putInt("FoldableSim.orientation", value);
+                    setSimulatedFoldOrientation(value);
+                }
+            });
+            orientationGroup.add(item);
+            orientationMenu.add(item);
+        }
+        foldableMenu.add(orientationMenu);
+
+        // Hinge angle dialog.
+        final JMenuItem hingeItem = new JMenuItem("Set hinge angle...");
+        hingeItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String def = String.valueOf(pref.getInt("FoldableSim.hingeAngle", 180));
+                String val = JOptionPane.showInputDialog(canvas,
+                        "Hinge angle in degrees (0 closed - 180 flat):", def);
+                if (val == null) {
+                    return;
+                }
+                try {
+                    int angle = Math.max(0, Math.min(180, Integer.parseInt(val.trim())));
+                    pref.putInt("FoldableSim.hingeAngle", angle);
+                    setSimulatedHingeAngle(angle);
+                } catch (NumberFormatException nfe) {
+                    JOptionPane.showMessageDialog(canvas, "Please enter a whole number between 0 and 180.");
+                }
+            }
+        });
+        foldableMenu.add(hingeItem);
+
+        return foldableMenu;
     }
 
     private static byte[] parseHex(String hex) {

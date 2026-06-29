@@ -1481,7 +1481,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         instance.pointerWheelMoved(x, y, scrollX, scrollY, true, 0);
     }
-    
+
+    /// Invoked from the native magnify (pinch) gesture recognizer, used by the Mac Catalyst trackpad
+    /// pinch and the iOS two finger pinch. Routes to the cross-platform pinch gesture dispatch.
+    public static void pinchMagnifyCallback(float scale, int x, int y) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().fireMagnifyGesture(x, y, scale);
+    }
+
+    /// Invoked from the native rotation gesture recognizer (Mac Catalyst trackpad rotate / iOS two
+    /// finger rotate). Routes to the cross-platform rotation gesture dispatch.
+    public static void rotationGestureCallback(float radians, int x, int y) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().fireRotationGesture(x, y, radians);
+    }
+
     protected void pointerPressed(final int[] x, final int[] y) {
         super.pointerPressed(x, y);
     }

@@ -571,6 +571,15 @@ public class WindowsImplementation extends CodenameOneImplementation {
         // not pump or drain on its own (it is not the window's owning thread).
     }
 
+    // Flags the next dispatched pointer event as coming from a mouse so the cross-platform
+    // PointerEvent type is correct on this desktop port. The native event protocol does not yet
+    // distinguish mouse buttons, so the button defaults to primary.
+    private void markMousePointer() {
+        setPointerEventMetadata(com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY,
+                com.codename1.ui.events.PointerEvent.MASK_PRIMARY,
+                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+    }
+
     private void drainInput() {
         while (WindowsNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
@@ -579,12 +588,15 @@ public class WindowsImplementation extends CodenameOneImplementation {
             int key = eventScratch[3];
             switch (type) {
                 case EVENT_POINTER_PRESSED:
+                    markMousePointer();
                     pointerPressed(x, y);
                     break;
                 case EVENT_POINTER_RELEASED:
+                    markMousePointer();
                     pointerReleased(x, y);
                     break;
                 case EVENT_POINTER_DRAGGED:
+                    markMousePointer();
                     pointerDragged(x, y);
                     break;
                 case EVENT_KEY_PRESSED:

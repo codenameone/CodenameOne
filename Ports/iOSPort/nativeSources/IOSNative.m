@@ -1695,6 +1695,14 @@ void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
     com_codename1_impl_ios_IOSImplementation_pointerWheelMovedCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y, scrollX, scrollY);
 }
 
+void pinchMagnifyCallback(float scale, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_pinchMagnifyCallback___float_int_int(CN1_THREAD_GET_STATE_PASS_ARG scale, x, y);
+}
+
+void rotationGestureCallback(float radians, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_rotationGestureCallback___float_int_int(CN1_THREAD_GET_STATE_PASS_ARG radians, x, y);
+}
+
 void stringEdit(int finished, int cursorPos, NSString* text) {
     com_codename1_impl_ios_IOSImplementation_editingUpdate___java_lang_String_int_boolean(CN1_THREAD_GET_STATE_PASS_ARG
                                                                                           fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text), cursorPos, finished != 0

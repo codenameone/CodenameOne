@@ -188,4 +188,39 @@ class DeviceInputListenersTest extends UITestBase {
         custom.setPointerEvent(explicit);
         assertSame(explicit, custom.getPointerEvent());
     }
+
+    @FormTest
+    void magnifyAndRotationGesturesDispatchToComponent() {
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
+        final AtomicReference<Float> scaleGot = new AtomicReference<Float>();
+        final AtomicReference<Float> radiansGot = new AtomicReference<Float>();
+        Container gestureCmp = new Container() {
+            @Override
+            protected boolean pinch(float scale) {
+                scaleGot.set(scale);
+                return true;
+            }
+
+            @Override
+            protected boolean rotation(float radians) {
+                radiansGot.set(radians);
+                return true;
+            }
+        };
+        gestureCmp.setPreferredSize(new Dimension(200, 120));
+        form.add(BorderLayout.CENTER, gestureCmp);
+        form.revalidate();
+
+        int x = gestureCmp.getAbsoluteX() + gestureCmp.getWidth() / 2;
+        int y = gestureCmp.getAbsoluteY() + gestureCmp.getHeight() / 2;
+
+        Display.getInstance().fireMagnifyGesture(x, y, 1.5f);
+        assertNotNull(scaleGot.get(), "magnify gesture should reach the component pinch callback");
+        assertEquals(1.5f, scaleGot.get(), 0.0001f);
+
+        Display.getInstance().fireRotationGesture(x, y, 0.25f);
+        assertNotNull(radiansGot.get(), "rotation gesture should reach the component rotation callback");
+        assertEquals(0.25f, radiansGot.get(), 0.0001f);
+    }
 }

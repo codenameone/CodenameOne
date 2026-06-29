@@ -5078,6 +5078,21 @@ public class Component implements Animation, StyleListener, Editable {
         return false;
     }
 
+    /// Invoked when a rotation (twist) gesture occurs over this component, such as a two finger
+    /// trackpad rotation on macOS or a two finger rotate on a touch screen. Override to rotate
+    /// content. Returning true marks the gesture as handled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radians`: the incremental rotation in radians since the previous callback; positive is clockwise
+    ///
+    /// #### Returns
+    ///
+    /// false by default, true if the rotation is handled
+    protected boolean rotation(float radians) {
+        return false;
+    }
+
     /// returns true if pinch will block drag and drop
     public boolean isPinchBlocksDragAndDrop() {
         return pinchBlocksDragAndDrop;

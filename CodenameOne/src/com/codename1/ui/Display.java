@@ -2073,6 +2073,66 @@ public final class Display extends CN1Constants {
         return cmp.fireMouseWheelEvent(we);
     }
 
+    /// Dispatches a magnify (pinch) gesture to the component under the given coordinates, walking up
+    /// the hierarchy until a component handles it. Invoked by the implementation for native
+    /// trackpad / multi touch magnify gestures; routes to `com.codename1.ui.Component#pinch(float)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the gesture x position in display pixels
+    ///
+    /// - `y`: the gesture y position in display pixels
+    ///
+    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
+    public void fireMagnifyGesture(int x, int y, float scale) {
+        Form f = getCurrent();
+        if (f == null) {
+            return;
+        }
+        Component cmp;
+        try {
+            cmp = f.getComponentAt(x, y);
+        } catch (Throwable t) {
+            cmp = null;
+        }
+        while (cmp != null) {
+            if (cmp.pinch(scale)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
+    /// Dispatches a rotation (twist) gesture to the component under the given coordinates, walking
+    /// up the hierarchy until a component handles it. Invoked by the implementation for native
+    /// trackpad / multi touch rotation gestures; routes to `com.codename1.ui.Component#rotation(float)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the gesture x position in display pixels
+    ///
+    /// - `y`: the gesture y position in display pixels
+    ///
+    /// - `radians`: the incremental rotation in radians, positive is clockwise
+    public void fireRotationGesture(int x, int y, float radians) {
+        Form f = getCurrent();
+        if (f == null) {
+            return;
+        }
+        Component cmp;
+        try {
+            cmp = f.getComponentAt(x, y);
+        } catch (Throwable t) {
+            cmp = null;
+        }
+        while (cmp != null) {
+            if (cmp.rotation(radians)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
     /// Pushes a key press event with the given keycode into Codename One
     ///
     /// #### Parameters

@@ -1578,6 +1578,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 nativeCallSerially(new Runnable() {
                     public void run() {
                         try {
+                            applyMouseMetadata(me);
                             HTML5Implementation.this.pointerPressed(new int[]{x}, new int[]{y});
                         } finally {
                             completePressInFlight();
@@ -1631,6 +1632,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
+                applyMouseMetadata(me);
 
                 final Runnable releaseDispatch = new Runnable() {
                     public void run() {
@@ -1738,6 +1740,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 });
                 if (touchDecision.shouldFirePointerPressed()) {
                     installBacksideHooksInUserInteraction();
+                    applyTouchMetadata();
                     nativeCallSerially(new Runnable() {
 
                         @Override
@@ -2665,6 +2668,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={}, script="return window.cn1WheelMultiplier || 1.0")
     private static native double wheelMultiplier();
     
+    /// Records the mouse button and pointer type for the next dispatched pointer event so the
+    /// cross-platform PointerEvent / context-menu APIs work in the browser. DOM mouse buttons are
+    /// 0 (left), 1 (middle), 2 (right).
+    private void applyMouseMetadata(MouseEvent me) {
+        int button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        int mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+        switch (me.getButton()) {
+            case 1:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+                mask = com.codename1.ui.events.PointerEvent.MASK_MIDDLE;
+                break;
+            case 2:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+                mask = com.codename1.ui.events.PointerEvent.MASK_SECONDARY;
+                break;
+            default:
+                break;
+        }
+        setPointerEventMetadata(button, mask, com.codename1.ui.events.PointerEvent.TYPE_MOUSE,
+                1f, 0, 0, 0, 0, false);
+    }
+
+    /// Flags the next dispatched pointer event as a finger touch.
+    private void applyTouchMetadata() {
+        setPointerEventMetadata(com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY,
+                com.codename1.ui.events.PointerEvent.MASK_PRIMARY,
+                com.codename1.ui.events.PointerEvent.TYPE_TOUCH, 1f, 0, 0, 0, 0, false);
+    }
+
     public void mouseWheelMoved(WheelEvent e) {
         NormalizedWheelEvent ne = normalizeWheelEvent(e);
         
@@ -2683,6 +2715,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final int dx = -(int)(ne.getPixelX() * getDevicePixelRatio() * wheelMultiplier());
         final int dy = -(int)(ne.getPixelY() * getDevicePixelRatio() * wheelMultiplier());
         //debugLog("dx="+dx+"; dy="+dy);
+        // Give mouse wheel listeners a chance to handle (and consume) the wheel before the default
+        // scroll gesture, so WheelEvent is the same universal scroll API used on desktop and mobile.
+        if (Display.getInstance().fireMouseWheelEvent(x, y, dx, dy, true, 0)) {
+            return;
+        }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 scrollWheeling = true;
