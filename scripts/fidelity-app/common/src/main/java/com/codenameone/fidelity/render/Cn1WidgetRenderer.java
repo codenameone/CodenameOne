@@ -241,11 +241,20 @@ public final class Cn1WidgetRenderer {
             com.codename1.ui.plaf.Style unS = new com.codename1.ui.plaf.Style();
             unS.setFgColor(unselColor);
             unS.setBgTransparency(0);
-            // Bigger icons (the native tab item is icon-dominant); the label font is
-            // cut in the theme so the overall item roughly doubles toward native size.
-            Image star = FontImage.createSFOrMaterial(FontImage.MATERIAL_STAR, selS, 4.1f);
-            Image search = FontImage.createSFOrMaterial(FontImage.MATERIAL_SEARCH, unS, 4.1f);
-            Image more = FontImage.createSFOrMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, 4.1f);
+            // Icon size in mm, theme-tunable (tabIconSizeMm) so SF/Material tab icons
+            // can be matched to native without rebuilding. SF symbols render at their
+            // natural per-symbol bounds for this point size, so this is the nominal
+            // em size, not a forced pixel height.
+            float tabIconMm;
+            try {
+                tabIconMm = Float.parseFloat(com.codename1.ui.plaf.UIManager.getInstance()
+                        .getThemeConstant("tabIconSizeMm", "4.1").trim());
+            } catch (NumberFormatException nfe) {
+                tabIconMm = 4.1f;
+            }
+            Image star = FontImage.createSFOrMaterial(FontImage.MATERIAL_STAR, selS, tabIconMm);
+            Image search = FontImage.createSFOrMaterial(FontImage.MATERIAL_SEARCH, unS, tabIconMm);
+            Image more = FontImage.createSFOrMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, tabIconMm);
             tabs.addTab("Featured", star, star, new Container());
             tabs.addTab("Search", search, search, new Container());
             tabs.addTab("More", more, more, new Container());

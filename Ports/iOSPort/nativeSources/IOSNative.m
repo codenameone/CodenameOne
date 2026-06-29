@@ -905,10 +905,21 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
             return 0;
         }
         UIColor* c = [UIColor colorWithRed:((color >> 16) & 0xff) / 255.0 green:((color >> 8) & 0xff) / 255.0 blue:(color & 0xff) / 255.0 alpha:1.0];
-        // Flatten the (template) symbol tinted with the colour into a real RGBA
-        // bitmap -- imageWithTintColor alone left it a template that drew black
-        // through the GL image path.
-        CGSize szPt = sym.size;
+        // Flatten the (template) symbol, tinted, into a real RGBA bitmap. SF symbols are
+        // sized by point size (a shared font metric), so each glyph keeps its true
+        // per-symbol extent -- the ellipsis is naturally short (small dots), the star
+        // taller -- exactly as UIKit renders them. But to be a drop-in icon set (uniform
+        // slots, like UIKit lays out tab items) we composite each glyph at its NATURAL
+        // proportions, vertically centred, into a canvas of UNIFORM height = `size` px.
+        // Without a uniform height, a short glyph (ellipsis) makes a shorter tab cell and
+        // the row misaligns. The glyph is only scaled DOWN to fit (never stretched), so
+        // proportions are preserved; width stays the glyph's natural width.
+        CGFloat canvasHpt = size / scale;            // -> `size` device px tall
+        CGFloat k = sym.size.height > canvasHpt ? (canvasHpt / sym.size.height) : 1.0;
+        CGFloat glyphWpt = sym.size.width * k;
+        CGFloat glyphHpt = sym.size.height * k;
+        CGSize szPt = CGSizeMake(glyphWpt, canvasHpt);
+        CGFloat glyphYpt = (canvasHpt - glyphHpt) / 2.0;   // vertical centre
         UIGraphicsImageRendererFormat* rfmt = [UIGraphicsImageRendererFormat defaultFormat];
         rfmt.scale = scale;
         rfmt.opaque = NO;
@@ -916,7 +927,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
         UIImage* flat = [rndr imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull rc) {
             [c set];
             UIImage* templ = [sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            [templ drawInRect:CGRectMake(0, 0, szPt.width, szPt.height)];
+            [templ drawInRect:CGRectMake(0, glyphYpt, glyphWpt, glyphHpt)];
         }];
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* intArray = n2;

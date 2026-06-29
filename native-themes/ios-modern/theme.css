@@ -100,7 +100,7 @@
     /* When true, FontImage.createSFOrMaterial renders real Apple SF Symbols on
        iOS (falling back to the Material icon font elsewhere / when a symbol is
        missing). Set false to force the Material font everywhere. */
-    iosSFSymbolsBool: false;
+    iosSFSymbolsBool: true;
     commandBehavior: Native;
     ios7StatusBarHack: true;
     paintsTitleBarBool: true;
@@ -148,6 +148,11 @@
        rounded shape. Declaring TabIcon as transparent below means only
        the glyph itself paints. */
     tabIconUIID: TabIcon;
+    /* Tab icon nominal size (mm), tunable so the SF/Material tab glyphs match the
+       native UITabBar icon size. SF renders at its natural per-symbol bounds for this
+       point size (bigger than the nominal), so this is smaller than the Material value
+       that preceded it. */
+    tabIconSizeMm: "4.1";
     switchThumbPaddingInt: 1;
     /* Native iOS UISwitch proportions: the thumb is a CIRCLE clearly inset inside
        the track (thumbScaleY < trackScaleY + a real inset), so the grey/green
