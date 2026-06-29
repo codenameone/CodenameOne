@@ -658,3 +658,8 @@ dylibs?
 Zimperium
 Promon
 DeviceCheck
+
+# Device input / form-factor terms (Device-Input-And-Form-Factors.asciidoc)
+foldables?
+bitmask
+DeX

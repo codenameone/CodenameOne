@@ -6,9 +6,8 @@ and devices driven by a mouse or a stylus. This chapter covers the cross-platfor
 that hardware: rich pointer detail (mouse buttons, pen pressure and tilt, the pointing device
 type), the mouse wheel, foldable device posture, and multi-display / desktop-window awareness.
 
-All of these APIs are additive and degrade gracefully: on a device or platform that does not report
-a given capability the value falls back to a sensible default, so a single code base keeps working
-everywhere.
+These APIs are additive: on a device or platform that doesn't report a given capability the value
+falls back to a sensible default, so a single code base keeps working everywhere.
 
 === Rich pointer events
 
@@ -38,7 +37,7 @@ myComponent.addPointerPressedListener(e -> {
 
 ==== By polling
 
-When you are inside a pointer callback you can also poll the current values directly from `CN`
+When you're inside a pointer callback you can also poll the current values directly from `CN`
 (or `Display`), mirroring the existing `CN.isShiftKeyDown()` family:
 
 [source,java]
@@ -49,8 +48,8 @@ boolean pen = CN.isStylusPointer();
 PointerEvent current = CN.getCurrentPointerEvent();
 ----
 
-TIP: Values default safely. On a plain touch screen the button is `BUTTON_PRIMARY`, the pressure is
-`1.0` and the type is `TYPE_TOUCH` (or `TYPE_UNKNOWN` on ports that do not classify the device).
+TIP: Values have safe defaults. On a plain touch screen the button is `BUTTON_PRIMARY`, the pressure
+is `1.0` and the type is `TYPE_TOUCH` (or `TYPE_UNKNOWN` on ports that don't classify the device).
 
 === Two and three button mice
 
@@ -93,7 +92,7 @@ A positive `getDeltaY()` reveals content above (the user scrolled down); a posit
 reveals content to the left. `isPrecise()` is true for high resolution devices such as trackpads.
 On the desktop simulator, hold shift while turning the wheel to produce horizontal scrolling.
 
-`WheelEvent` is a single universal scroll-gesture API: it is fed by the mouse wheel and trackpad on
+`WheelEvent` is a single universal scroll-gesture API: it's fed by the mouse wheel and trackpad on
 the desktop, by the wheel / external trackpad on Android, and by the trackpad, Magic Mouse and
 mouse wheel on iOS and iPadOS (captured natively and routed through the same pipeline). Continuous
 trackpad scrolling reports `isPrecise() == true`, while a notched wheel reports `false`.
@@ -162,17 +161,17 @@ programmatically via `JavaSEPort.setSimulatedFoldable(true)`,
 `setSimulatedFoldOrientation` / `setSimulatedHingeAngle` helpers.
 
 On Android the real fold posture is read from `androidx.window`. That dependency is *opt-in* so it
-never bloats apps that do not use foldables: add the build hint `android.foldableSupport=true` to
+never bloats apps that don't use foldables: add the build hint `android.foldableSupport=true` to
 pull it in (the version can be overridden with `android.windowVersion`). The core port talks to
 `androidx.window` purely through reflection, so without the build hint every posture query simply
-reports "not foldable". Android reports posture, fold orientation and the hinge bounds; the hinge
-*angle* is not exposed by `androidx.window`, so `getHingeAngle()` returns `-1` there.
+reports "not foldable." Android reports posture, fold orientation and the hinge bounds; the hinge
+*angle* isn't exposed by `androidx.window`, so `getHingeAngle()` returns `-1` there.
 
 === Desktop windowing and external displays
 
 Some mobile devices run in a desktop windowing mode where the app shares the screen with other
 windows: Samsung DeX, Android desktop windowing and iPad Stage Manager. `CN.isDesktopMode()`
-reports this. It is distinct from `CN.isDesktop()`, which reports a genuine desktop platform
+reports this. It's distinct from `CN.isDesktop()`, which reports a genuine desktop platform
 (Windows, macOS or Linux).
 
 `CN.getDisplayCount()` returns the number of attached displays and `CN.isExternalDisplayConnected()`
