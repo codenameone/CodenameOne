@@ -95,8 +95,8 @@
        floor (grey -> ~236 light / ~51 dark). NO refraction on the bar -- it is the flat
        frosted surface; only the selected lens refracts. Double-refraction (bar + lens)
        produced the "hole + offset layer" on the selected capsule. */
-    TabsContainerGlassScaleLight: "0.62";
-    TabsContainerGlassOffsetLight: "157";
+    TabsContainerGlassScaleLight: "1.0";
+    TabsContainerGlassOffsetLight: "108";
     TabsContainerGlassSatLight: "1.8";
     TabsContainerGlassScaleDark: "0.3";
     TabsContainerGlassOffsetDark: "13";
@@ -112,12 +112,12 @@
     TabSelOffsetLight: "0";
     TabSelSatLight: "1.3";
     TabSelRefractLight: "0";
-    TabSelSpecularLight: "0";
+    TabSelSpecularLight: "0.22";
     TabSelScaleDark: "0.5";
     TabSelOffsetDark: "6";
     TabSelSatDark: "1.6";
     TabSelRefractDark: "0";
-    TabSelSpecularDark: "0";
+    TabSelSpecularDark: "0.12";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;
