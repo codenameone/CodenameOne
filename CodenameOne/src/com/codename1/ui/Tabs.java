@@ -1599,7 +1599,12 @@ public class Tabs extends Container {
             float offset = tabCapsuleParam("TabSelOffset", dark, dark ? 38f : 8f);
             float refract = tabCapsuleParam("TabSelRefract", dark, 0.4f);
             float specular = tabCapsuleParam("TabSelSpecular", dark, 0.45f);
-            g.glassRegion(capX, capY, w, capH, 30f, -1f, sat, scale, offset, refract, specular);
+            // Small blur radius: the capsule sits on the ALREADY-blurred bar, so it only
+            // re-tints it. A large radius re-blurs the bar->backdrop edge where the
+            // capsule reaches the pill end, smearing a ~40px "gray gap"; native's
+            // selection edge is crisp. Tunable via tabSelBlurPx.
+            float capsuleBlur = tabCapsuleParam("tabSelBlurPx", dark, 2.5f);
+            g.glassRegion(capX, capY, w, capH, capsuleBlur, -1f, sat, scale, offset, refract, specular);
         } else {
             int oldA = g.getAlpha();
             int oldC = g.getColor();
