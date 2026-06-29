@@ -93,10 +93,13 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
                 // before capturing, rather than guessing a fixed delay -- a slow
                 // CI runner otherwise snapped a blank grey frame before any tile
                 // loaded (the flake that previously failed this test). Poll up to
-                // ~20s (well under the 30s native-test timeout); if the tiles
-                // never load (blocked network / rejected key) fail loudly instead
-                // of baselining a blank map.
-                waitForMapReady(self, map, 40, () ->
+                // ~22s (the load headroom the old blind wait needed on the
+                // slowest runner; still under the 30s native-test timeout). The
+                // readiness check is a cheap Java flag (set once by an in-page
+                // JS->Java bridge), so polling is free; we capture as soon as the
+                // map paints. If the tiles never load (blocked network / rejected
+                // key) fail loudly instead of baselining a blank map.
+                waitForMapReady(self, map, 44, () ->
                         captureWhenSettled(self, "GoogleWebMap", () -> {
                             map.dispose();
                             done();

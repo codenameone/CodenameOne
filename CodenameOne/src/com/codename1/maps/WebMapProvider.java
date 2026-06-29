@@ -25,9 +25,12 @@ package com.codename1.maps;
 import com.codename1.maps.spi.MapProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
+import com.codename1.util.SuccessCallback;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /// A cross-platform [MapProvider] that hosts a JavaScript map SDK (Google Maps
 /// JS, Azure Maps, ...) inside a [BrowserComponent]. Because it relies only on
@@ -46,6 +49,10 @@ public class WebMapProvider implements MapProvider {
     private final String apiKey;
     private final String htmlTemplate;
     private final Map peers = new HashMap();
+    /// mapIds whose web map has fired its first 'tilesloaded' (see createPeer's
+    /// JS bridge). A plain Set read so isReady(int) is a cheap, non-blocking
+    /// check -- never a synchronous JS round-trip on the EDT.
+    private final Set readyMapIds = new HashSet();
 
     /// Creates a web provider.
     ///
@@ -101,33 +108,38 @@ public class WebMapProvider implements MapProvider {
         BrowserComponent bc = new BrowserComponent();
         bc.setPage(html, "https://maps.example/");
         peers.put(Integer.valueOf(mapId), bc);
+        // Bridge the map's readiness to Java once, event-style, instead of
+        // polling it with a synchronous executeAndReturnString (which routes
+        // through invokeAndBlock on iOS and is far too costly to call in a
+        // loop). The HTML sets window.cn1mapReady on the SDK's 'tilesloaded'
+        // event; an in-page interval (cheap, runs in the browser) watches that
+        // flag and calls back into Java exactly once, flipping a plain Set entry.
+        final Integer readyKey = Integer.valueOf(mapId);
+        bc.addJSCallback(
+                "window.cn1NotifyMapReady=function(){callback.onSuccess('ready');};"
+                + "(function(){var t=setInterval(function(){"
+                + "if(window.cn1mapReady===true){clearInterval(t);window.cn1NotifyMapReady();}"
+                + "},200);})();",
+                new SuccessCallback<BrowserComponent.JSRef>() {
+                    public void onSucess(BrowserComponent.JSRef value) {
+                        readyMapIds.add(readyKey);
+                    }
+                });
         return bc;
     }
 
     /// Whether the web map for `mapId` has finished painting its tiles, i.e. the
-    /// SDK has fired its first `tilesloaded` event (see the readiness flag set in
-    /// the HTML template). Lets a caller wait for the real render rather than a
-    /// fixed delay. Returns false until the peer exists and the map is ready, or
-    /// if the readiness state can't be read.
+    /// SDK has fired its first `tilesloaded` event. Lets a caller wait for the
+    /// real render rather than a fixed delay. Cheap and non-blocking: reads a
+    /// Set updated by the one-shot JS->Java readiness bridge in createPeer.
     public boolean isReady(int mapId) {
-        BrowserComponent bc = (BrowserComponent) peers.get(Integer.valueOf(mapId));
-        if (bc == null) {
-            return false;
-        }
-        try {
-            // Distinctive token avoids ambiguity with how a platform formats a
-            // bare boolean/string result.
-            String r = bc.executeAndReturnString(
-                    "(window.cn1mapReady===true)?'cn1ready':'cn1wait'");
-            return r != null && r.indexOf("cn1ready") >= 0;
-        } catch (Throwable t) {
-            return false;
-        }
+        return readyMapIds.contains(Integer.valueOf(mapId));
     }
 
     /// {@inheritDoc}
     @Override
     public void deinitialize(int mapId) {
+        readyMapIds.remove(Integer.valueOf(mapId));
         BrowserComponent bc = (BrowserComponent) peers.remove(Integer.valueOf(mapId));
         if (bc != null) {
             try {
