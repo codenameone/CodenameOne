@@ -112,11 +112,17 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             @Override
             protected void onShowCompleted() {
                 final Form self = this;
-                // The offline page renders immediately (no network). A short,
-                // fixed settle is enough for BrowserComponent.setPage to load and
-                // for the peer to composite; determinism comes from the fixed
-                // content, not from waiting for the network.
-                UITimer.timer(3000, false, self, () ->
+                // The offline page paints instantly (no network), but the native
+                // web-view PEER still has to be composited into the captured
+                // frame, and that is backend- and runner-speed-sensitive: the
+                // legacy OpenGL ES backend captured solid black at a 3s settle on
+                // a starved CI runner (the iOS Metal + Android backends composited
+                // fine at 3s). The original live-map version waited 22s and
+                // composited on GL, so give the peer comparable headroom here --
+                // the fixed content means the captured pixels are identical
+                // whatever the wait, so this only affects reliability, not the
+                // golden. Stays under the 30s native-test timeout.
+                UITimer.timer(20000, false, self, () ->
                         captureWhenSettled(self, "GoogleWebMap", () -> {
                             map.dispose();
                             done();
