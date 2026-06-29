@@ -7306,6 +7306,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    private AndroidMotionSensorManager motionSensorManager;
+
+    @Override
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        if (motionSensorManager == null) {
+            Context ctx = getContext();
+            if (ctx == null) {
+                return null;
+            }
+            motionSensorManager = new AndroidMotionSensorManager(ctx);
+        }
+        return motionSensorManager;
+    }
+
     private String fixAttachmentPath(String attachment) {
         com.codename1.io.File cn1File = new com.codename1.io.File(attachment);
         File mediaStorageDir = new File(new File(getContext().getCacheDir(), "intent_files"), "Attachment");

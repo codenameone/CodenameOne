@@ -209,6 +209,20 @@ public final class IOSNative {
 
     native void vibrate(int duration);
 
+    native boolean isMotionSensorSupported(int type);
+
+    native void startMotionSensor(int type, int rateMillis);
+
+    native void stopMotionSensor(int type);
+
+    native boolean hasMotionData(int type);
+
+    native float getMotionSensorX(int type);
+
+    native float getMotionSensorY(int type);
+
+    native float getMotionSensorZ(int type);
+
     native int getAudioDuration(long peer);
 
     native void playAudio(long peer);

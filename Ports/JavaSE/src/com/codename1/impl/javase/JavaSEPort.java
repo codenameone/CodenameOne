@@ -881,6 +881,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private ComponentTreeInspector componentTreeInspector;
     private static PerformanceMonitor perfMonitor;
     static LocationSimulation locSimulation;
+    static MotionSimulation motionSimulation;
+    private JavaSEMotionSensorManager motionSensorManager;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
     private static boolean useAppFrame = computeUseAppFrame();
@@ -5632,6 +5634,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(locationSim);
 
+        JMenuItem motionSim = new JMenuItem("Motion / Gesture Simulation");
+        motionSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if(motionSimulation == null) {
+                        motionSimulation = new MotionSimulation();
+                }
+                motionSimulation.setVisible(true);
+            }
+        });
+        simulateMenu.add(motionSim);
+
         JMenuItem pushSim = new JMenuItem("Push Simulation");
         pushSim.addActionListener(new ActionListener() {
             @Override
@@ -6236,6 +6250,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(appArg);
         simulateMenu.addSeparator();
         simulateMenu.add(locationSim);
+        simulateMenu.add(motionSim);
         simulateMenu.add(pushSim);
         simulateMenu.add(biometricMenu);
         simulateMenu.add(nfcMenu);
@@ -13764,6 +13779,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             
         };
+    }
+
+    @Override
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        // Motion simulation is only meaningful in the simulator, not in the
+        // designer or a plain JavaSE deployment.
+        if(portraitSkin == null) {
+            return null;
+        }
+        if(motionSensorManager == null) {
+            motionSensorManager = new JavaSEMotionSensorManager();
+        }
+        return motionSensorManager;
     }
 
     @Override
