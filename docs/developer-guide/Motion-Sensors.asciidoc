@@ -57,7 +57,7 @@ Each sensor is identified by a `TYPE_*` constant on `MotionSensorManager`. The t
 |Azimuth, pitch and roll, in radians.
 |===
 
-Readings use a single convention across every port: the x axis points to the right, the y axis points up, and the z axis points out of the screen toward the user, with the device held upright in portrait. At rest, face up, the accelerometer reports about `+9.81` on the z axis.
+Readings use a single convention across every port: the x-axis points to the right, the y-axis points up, and the z-axis points out of the screen toward the user, with the device held upright in portrait. At rest, face up, the accelerometer reports about `+9.81` on the z-axis.
 
 === Detecting gestures
 
