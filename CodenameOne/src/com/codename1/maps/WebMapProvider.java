@@ -121,6 +121,7 @@ public class WebMapProvider implements MapProvider {
         // flag the HTML sets on the SDK's 'tilesloaded' event and calls back into
         // Java exactly once.
         bc.addWebEventListener(BrowserComponent.onLoad, new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 bc.addJSCallback(
                         "window.cn1NotifyMapReady=function(){callback.onSuccess('ready');};"
@@ -128,6 +129,7 @@ public class WebMapProvider implements MapProvider {
                         + "if(window.cn1mapReady===true){clearInterval(t);window.cn1NotifyMapReady();}"
                         + "},200);})();",
                         new SuccessCallback<BrowserComponent.JSRef>() {
+                            @Override
                             public void onSucess(BrowserComponent.JSRef value) {
                                 readyMapIds.add(readyKey);
                             }
