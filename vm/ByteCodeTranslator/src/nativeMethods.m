@@ -1368,7 +1368,11 @@ struct ThreadLocalData* getThreadLocalData() {
 #endif
 
         i->callStackOffset = 0;
-        
+
+        // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
+        // limit not yet computed" -- it is filled in lazily on first frameless entry.
+        i->nativeStackLimit = 0;
+
         i->pendingHeapAllocations = malloc(PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         memset(i->pendingHeapAllocations, 0, PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         i->heapAllocationSize = 0;

@@ -930,6 +930,14 @@ struct ThreadLocalData {
     int* callStackMethod;
     int callStackOffset;
 
+    // Native C-stack low-water mark used by frameless methods (see
+    // CN1_FRAMELESS_SOE_GUARD). Frameless primitive-only methods don't bump
+    // callStackOffset, so the call-depth limit can't catch their native C-stack
+    // recursion; this per-thread limit lets the guard throw a catchable
+    // StackOverflowError instead of overrunning the stack into a SIGSEGV.
+    // 0 == not yet computed (lazily initialized once per thread on first use).
+    JAVA_LONG nativeStackLimit;
+
 #ifdef CN1_ON_DEVICE_DEBUG
     // Per-frame pointer to a stack-allocated array of void* addresses, one per
     // JVM local slot in the current method. Populated by translator-emitted
@@ -1582,6 +1590,46 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 #define CN1_FAST_RETURN_RELEASE() \
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread; \
     threadStateData->callStackOffset--;
+
+// === Frameless frame (primitive-only static methods) ========================
+// A method whose frame holds ZERO object references contributes no GC roots, so
+// the precise collector has nothing to scan there and the per-call frame can be
+// eliminated. The operand stack + locals live in a method-LOCAL C-stack array --
+// NOT a slice of the global threadObjectStack -- so there is no per-call memset,
+// no threadObjectStack offset bump/restore, no callStack class/method push, and
+// no callStackOffset bump. The method body (PUSH/POP/SP ops, arithmetic, calls)
+// is emitted byte-for-byte unchanged; it just operates on this local SP. Frame
+// elimination is GC-trivial here -- it changes nothing the collector sees.
+#define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) \
+    struct elementStruct cn1_frameless_frame[(localsStackSize) + (stackSize)]; \
+    struct elementStruct* locals = &cn1_frameless_frame[0]; \
+    struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
+    struct elementStruct* SP = &stack[spPosition];
+
+// Headroom (bytes) kept below the end of the native C stack: enough to detect the
+// overflow and still build + throw the StackOverflowError without overrunning.
+#define CN1_FRAMELESS_STACK_GUARD_BAND (256 * 1024)
+
+// Computes (lazily, once per thread) ThreadLocalData.nativeStackLimit. Defined in
+// cn1_globals.m so the hot header stays free of pthread stack-introspection.
+extern void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE);
+
+// Stack-overflow guard emitted at the top of every frameless method. Frameless
+// frames don't bump callStackOffset, so the 1024-depth call-limit can't protect
+// them; deep non-tail recursion (e.g. fib) would otherwise blow the native C
+// stack into a SIGSEGV. Compare the current frame address against the per-thread
+// low-water mark and throw a catchable StackOverflowError before that happens.
+// Cost on the hot path: one load + a predicted-not-taken branch. `retval` is the
+// method's default return ('' for void, 0 for primitives); throwException normally
+// longjmps, so the return is just the unreachable fall-through the compiler needs.
+#define CN1_FRAMELESS_SOE_GUARD(retval) \
+    do { \
+        if (__builtin_expect(threadStateData->nativeStackLimit == 0, 0)) { cn1ComputeNativeStackLimit(threadStateData); } \
+        if (__builtin_expect((JAVA_LONG)(intptr_t)__builtin_frame_address(0) < threadStateData->nativeStackLimit, 0)) { \
+            throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData)); \
+            return retval; \
+        } \
+    } while(0)
 
 
 #if defined(__APPLE__) && defined(__OBJC__)

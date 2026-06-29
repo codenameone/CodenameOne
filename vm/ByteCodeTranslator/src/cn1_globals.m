@@ -480,6 +480,32 @@ extern long gcThreadId;
 void gcReleaseObj(JAVA_OBJECT o) {
 }
 
+// Lazily computes the per-thread native C-stack low-water mark consulted by
+// CN1_FRAMELESS_SOE_GUARD. On Apple/macOS/iOS pthread exposes the stack base and
+// size directly; elsewhere we fall back to anchoring off the current frame with a
+// generous (8MB) assumed stack. The guard band is subtracted so there is room to
+// build + throw the StackOverflowError once the limit is crossed.
+void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
+#if defined(__APPLE__) || defined(__MACH__)
+    void* stackBase = pthread_get_stackaddr_np(pthread_self());
+    size_t stackSize = pthread_get_stacksize_np(pthread_self());
+    threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)stackBase
+            - (JAVA_LONG)stackSize
+            + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+#else
+    // Portable fallback: pthread stack introspection is unavailable, so anchor off
+    // the current frame and assume an 8MB stack below it.
+    threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)__builtin_frame_address(0)
+            - (JAVA_LONG)(8L * 1024L * 1024L)
+            + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+#endif
+    // Guard against a degenerate (0) result, which would re-trigger computation
+    // every call; if introspection yielded nothing usable, disable the limit.
+    if (threadStateData->nativeStackLimit == 0) {
+        threadStateData->nativeStackLimit = 1;
+    }
+}
+
 // memory map of all the heap objects which we can walk over to delete/deallocate
 // unused objects
 JAVA_OBJECT* allObjectsInHeap = 0; 

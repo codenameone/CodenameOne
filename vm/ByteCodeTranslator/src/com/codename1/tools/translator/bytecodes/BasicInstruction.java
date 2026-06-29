@@ -635,8 +635,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.IRETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return SP[-1].data.i;\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return SP[-1].data.i;\n");
 //                    b.append(maxLocals);
 //                    b.append(", stack, locals, methodBlockOffset); \n    return SP[-1].data.i;\n");
@@ -657,8 +659,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.LRETURN:
                 appendSynchronized(b);
-                                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return POP_LONG();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_LONG();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {
@@ -675,8 +679,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.FRETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return POP_FLOAT();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_FLOAT();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {
@@ -693,8 +699,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.DRETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return POP_DOUBLE();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_DOUBLE();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {
@@ -734,7 +742,9 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    return;\n");
                     break;
                 }
-                if(TryCatch.isTryCatchInMethod()) {
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return;\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return;\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {

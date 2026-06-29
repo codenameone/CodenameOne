@@ -53,6 +53,12 @@ public class LineNumber extends Instruction {
 
     @Override
     public void appendInstruction(StringBuilder b) {
+        // Frameless methods don't bump callStackOffset, so a per-line
+        // __CN1_DEBUG_INFO store (which writes callStackLine[callStackOffset - 1])
+        // would clobber the caller's call-stack slot. Suppress it entirely.
+        if(getMethod() != null && getMethod().isFrameless()) {
+            return;
+        }
         if(hasInstructions && (getMethod() == null || !getMethod().isDisableDebugInfo())) {
             b.append(elidable ? "    __CN1_DEBUG_INFO_NT(" : "    __CN1_DEBUG_INFO(");
             b.append(line);
