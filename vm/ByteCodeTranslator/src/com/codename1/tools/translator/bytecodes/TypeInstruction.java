@@ -186,11 +186,7 @@ public class TypeInstruction extends Instruction {
                     b.append(stackAllocId);
                     b.append(".__codenameOneGcMark = -1; __cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__ownerThread = threadStateData; __cn1stk_");
-                    b.append(stackAllocId);
-                    b.append(".__heapPosition = -1; __cn1stk_");
-                    b.append(stackAllocId);
-                    b.append(".__codenameOneReferenceCount = 1; PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
+                    b.append(".__heapPosition = -1; PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
                     b.append(stackAllocId);
                     b.append("); /* NEW stack-allocated */\n");
                     break;

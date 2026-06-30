@@ -136,11 +136,7 @@ struct clazz {
     DEBUG_GC_VARIABLES
     // these first  fields aren't really used but they allow us to treat a clazz as an object
     struct clazz *__codenameOneParentClsReference;
-    int __codenameOneReferenceCount;
-    
-    void* __codenameOneThreadData;
     int __codenameOneGcMark;
-    void* __ownerThread;
     int __heapPosition;
 
     void* finalizerFunction;
@@ -182,20 +178,14 @@ struct clazz {
 struct JavaObjectPrototype {
     DEBUG_GC_VARIABLES
     struct clazz *__codenameOneParentClsReference;
-    int __codenameOneReferenceCount;
-    void* __codenameOneThreadData;
     int __codenameOneGcMark;
-    void* __ownerThread;
     int __heapPosition;
 };
 
 struct JavaArrayPrototype {
     DEBUG_GC_VARIABLES
     struct clazz *__codenameOneParentClsReference;
-    int __codenameOneReferenceCount;
-    void* __codenameOneThreadData;
     int __codenameOneGcMark;
-    void* __ownerThread;
     int __heapPosition;
     int length;
     int dimensions;
@@ -1170,6 +1160,10 @@ extern _Atomic long bibopBytesSinceGc;
 // been freed by cn1BibopReclaimSlot. No-op for non-BiBOP objects.
 extern void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj);
 #endif
+// Monitor side table (relocated __codenameOneThreadData out of the per-object header).
+extern void* cn1MonitorDataGet(JAVA_OBJECT o);
+extern void cn1MonitorDataSet(JAVA_OBJECT o, void* data);
+extern void* cn1MonitorDataRemove(JAVA_OBJECT o);
 extern int allocationsSinceLastGC;
 extern long long totalAllocations;
 
@@ -1221,10 +1215,8 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
                 memset((char*)o + hdr, 0, size - hdr);
             }
             o->__codenameOneParentClsReference = parent;
-            o->__codenameOneReferenceCount = 1;
-            o->__codenameOneThreadData = 0;
-            // __ownerThread is write-only dead state (the size-class-index repurposing
-            // was an unmerged patch); no reader exists, so the per-object store is dropped.
+            // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the
+            // header (force-visited / monitor side tables); no per-object stores.
             o->__heapPosition = CN1_BIBOP_HEAP_POS;
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
@@ -1583,7 +1575,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
             /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
             char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1Alignment - 1); \
             JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
-            *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, 0, 0, 0, __cn1StackLength, 1, (primitiveSize), 0}; \
+            *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, __cn1StackLength, 1, (primitiveSize), 0}; \
             if (__cn1ActualSize > 0) { \
                 char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
                 __cn1Data += sizeof(void*); \

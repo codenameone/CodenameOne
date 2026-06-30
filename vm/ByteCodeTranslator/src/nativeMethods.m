@@ -311,7 +311,7 @@ static size_t cn1_utf8_decode_replace(const uint8_t* src, size_t len, JAVA_ARRAY
  * The class representing classes
  */
 struct clazz ClazzClazz = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_start_offset, "java.lang.Class", JAVA_FALSE, 0, 0, JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_start_offset, "java.lang.Class", JAVA_FALSE, 0, 0, JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 
@@ -700,13 +700,9 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, className);
     if(newline == JAVA_NULL) {
         newline = newStringFromCString(threadStateData, "\n");
-        newline->__codenameOneReferenceCount = 999999;
         dot = newStringFromCString(threadStateData, ".");
-        dot->__codenameOneReferenceCount = 999999;
         colon = newStringFromCString(threadStateData, ":");
-        colon->__codenameOneReferenceCount = 999999;
         indent = newStringFromCString(threadStateData, "    at ");
-        indent->__codenameOneReferenceCount = 999999;
         removeObjectFromHeapCollection(threadStateData, newline);
         removeObjectFromHeapCollection(threadStateData, dot);
         removeObjectFromHeapCollection(threadStateData, colon);
@@ -768,7 +764,6 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
     }
     JAVA_OBJECT o = java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, bld);
-    o->__codenameOneReferenceCount = 0;
     return o;
 }
 
@@ -1512,17 +1507,20 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     // pthread_mutex_init() has run on it -- and then pthread_mutex_lock() an
     // uninitialized mutex. On ARM's weak memory model that hangs forever (observed as the
     // EDT wedged in monitorEnter while logging an exception, which freezes the whole app).
-    // Build the struct fully, init its mutex/condition, and only then publish the pointer.
-    struct CN1ThreadData* data = (struct CN1ThreadData*)__atomic_load_n(&obj->__codenameOneThreadData, __ATOMIC_ACQUIRE);
+    // Build the struct fully, init its mutex/condition, and only then publish into the
+    // monitor side table. The table's own mutex (taken by Get/Set) supplies the
+    // acquire/release ordering the header atomics used to provide, so a thread that reads
+    // the entry from the table always sees the fully-initialized mutex.
+    struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
     if(!data) {
         lockCriticalSection();
-        data = (struct CN1ThreadData*)obj->__codenameOneThreadData;
+        data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
         if(!data) {
             data = malloc(sizeof(struct CN1ThreadData));
             memset(data, 0, sizeof(struct CN1ThreadData));
             pthread_mutex_init(&data->__codenameOneMutex, NULL);
             pthread_cond_init(&data->__codenameOneCondition, NULL);
-            __atomic_store_n(&obj->__codenameOneThreadData, data, __ATOMIC_RELEASE);
+            cn1MonitorDataSet(obj, data);
 #if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_BIBOP_NO_FASTSWEEP)
             // If obj is a BiBOP slot, flag that a monitor now needs freeing at reclaim so
             // the O(1) all-dead page shortcut is suppressed until it is freed.
@@ -1575,12 +1573,13 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     if(CN1_IS_TAGGED(obj)) { return; } // tagged Integer has no header/monitor; unlock is a NOP
     //printf("Unlocked mutex %i ", (int)obj->__codenameOneMutex);
     // remove the ownership of the thread
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter--;
-    if(((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter > 0) {
+    struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
+    data->counter--;
+    if(data->counter > 0) {
         return;
     }
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = 0;
-    int err = pthread_mutex_unlock(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
+    data->ownerThread = 0;
+    int err = pthread_mutex_unlock(&data->__codenameOneMutex);
     if(err != 0) {
         printf("Error with unlock %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", err, EINVAL, ETIMEDOUT, EPERM);
     }
@@ -1630,17 +1629,18 @@ JAVA_VOID monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG timeout, JAVA_INT nanos) {
     //printf("Waiting on mutex %i with timeout %i started", (int)obj->__codenameOneMutex, (int)timeout);
     threadStateData->threadActive = JAVA_FALSE;
-    
+
+    struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
     int counter;
-    counter = ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter;
-    
+    counter = data->counter;
+
     // remove the ownership of the thread
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = 0;
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter = 0;
+    data->ownerThread = 0;
+    data->counter = 0;
 
     int errCode = 0;
     if(timeout == 0 && nanos == 0) {
-        errCode = pthread_cond_wait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
+        errCode = pthread_cond_wait(&data->__codenameOneCondition, &data->__codenameOneMutex);
         if(errCode != 0) {
             printf("Error with wait %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", errCode, EINVAL, ETIMEDOUT, EPERM);
         }
@@ -1654,9 +1654,9 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
             ts.tv_nsec -= 1000000000;
             ts.tv_sec++;
         }
-        pthread_cond_timedwait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex, &ts);
+        pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
-    
+
     while(threadStateData->threadBlockedByGC) {
         struct timeval   tv;
         gettimeofday(&tv, NULL);
@@ -1667,12 +1667,12 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
             ts.tv_nsec -= 1000000000;
             ts.tv_sec++;
         }
-        pthread_cond_timedwait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex, &ts);
+        pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
-    
+
     // restore the ownership of the thread
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = threadStateData->threadId;
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter = counter;
+    data->ownerThread = threadStateData->threadId;
+    data->counter = counter;
     
     threadStateData->threadActive = JAVA_TRUE;
     //printf("Waiting on mutex %i with timeout %i finished", (int)obj->__codenameOneMutex, (int)timeout);
@@ -1680,12 +1680,12 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
 
 JAVA_VOID java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     //printf("Notifying mutex %i", (int)obj->__codenameOneMutex);
-    pthread_cond_signal(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition);
+    pthread_cond_signal(&((struct CN1ThreadData*)cn1MonitorDataGet(obj))->__codenameOneCondition);
 }
 
 JAVA_VOID java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     //printf("Notifying all mutex threads %i", (int)obj->__codenameOneMutex);
-    pthread_cond_broadcast(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition);
+    pthread_cond_broadcast(&((struct CN1ThreadData*)cn1MonitorDataGet(obj))->__codenameOneCondition);
 }
 
 JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_INT p) {
@@ -1788,8 +1788,6 @@ void* threadRunner(void *x)
 }
 
 JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
-    // disable reference counting on the thread object to prevent the gap between thread start and actual thread running
-    th->__codenameOneReferenceCount = 999999;
     // Mark the thread alive HERE, on the calling thread, before the worker is
     // spawned. Previously `alive` was set inside runImpl, which runs on the new
     // worker thread asynchronously after start() returns. That left a window in

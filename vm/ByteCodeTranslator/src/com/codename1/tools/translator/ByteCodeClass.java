@@ -605,9 +605,9 @@ public class ByteCodeClass {
         // object fields so class will be compatible to object
         
         if(clsName.equals("java_lang_Class")) {
-            b.append("  DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, ");
+            b.append("  DEBUG_GC_INIT 0, 0, 0, ");
         } else {
-            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, ");
+            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 0, 0, ");
         }
         // finalizerFunction: null unless a real finalize() exists in the hierarchy (the
         // __FINALIZER_<class> chain is still emitted for classes that DO, so subclass
@@ -713,9 +713,9 @@ public class ByteCodeClass {
             b.append("__");
             b.append(clsName);
             if(clsName.equals("java_lang_Class")) {
-                b.append(" = {\n DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n DEBUG_GC_INIT 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             } else {
-                b.append(" = {\n DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n DEBUG_GC_INIT &class__java_lang_Class, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             }
             b.append(iter);
             b.append("_id_");
@@ -1829,10 +1829,7 @@ public class ByteCodeClass {
         // reference to the class, reference counter for the arc portion of the GC
         // and a mutex for synchronization code
         b.append("    DEBUG_GC_VARIABLES\n    struct clazz *__codenameOneParentClsReference;\n");
-        b.append("    int __codenameOneReferenceCount;\n");
-        b.append("    void* __codenameOneThreadData;\n");
         b.append("    int __codenameOneGcMark;\n");
-        b.append("    void* __ownerThread;\n");
         b.append("    int __heapPosition;\n");
 
         

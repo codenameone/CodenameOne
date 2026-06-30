@@ -203,99 +203,99 @@ static void init_gc_thresholds() {
 //#define DEBUG_GC_OBJECTS_IN_HEAP
 
 struct clazz class_array1__JAVA_BOOLEAN = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_BOOLEAN = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 2, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 2, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_BOOLEAN = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 3, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 3, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_CHAR = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_CHAR, "char[]", JAVA_TRUE, 1, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_CHAR, "char[]", JAVA_TRUE, 1, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_CHAR = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_CHAR, "char[]", JAVA_TRUE, 2, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_CHAR, "char[]", JAVA_TRUE, 2, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_CHAR = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_CHAR, "char[]", JAVA_TRUE, 3, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_CHAR, "char[]", JAVA_TRUE, 3, &class__java_lang_Character, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_BYTE = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 1, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 1, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_BYTE = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 2, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 2, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_BYTE = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 3, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_BYTE, "byte[]", JAVA_TRUE, 3, &class__java_lang_Byte, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_SHORT = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_SHORT, "short[]", JAVA_TRUE, 1, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_SHORT, "short[]", JAVA_TRUE, 1, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_SHORT = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_SHORT, "short[]", JAVA_TRUE, 2, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_SHORT, "short[]", JAVA_TRUE, 2, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_SHORT = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_SHORT, "short[]", JAVA_TRUE, 3, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_SHORT, "short[]", JAVA_TRUE, 3, &class__java_lang_Short, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_INT = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_INT, "int[]", JAVA_TRUE, 1, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_INT, "int[]", JAVA_TRUE, 1, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_INT = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_INT, "int[]", JAVA_TRUE, 2, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_INT, "int[]", JAVA_TRUE, 2, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_INT = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_INT, "int[]", JAVA_TRUE, 3, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_INT, "int[]", JAVA_TRUE, 3, &class__java_lang_Integer, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_LONG = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_LONG, "long[]", JAVA_TRUE, 1, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_LONG, "long[]", JAVA_TRUE, 1, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_LONG = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_LONG, "long[]", JAVA_TRUE, 2, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_LONG, "long[]", JAVA_TRUE, 2, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_LONG = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_LONG, "long[]", JAVA_TRUE, 3, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_LONG, "long[]", JAVA_TRUE, 3, &class__java_lang_Long, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_FLOAT = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 1, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 1, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_FLOAT = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 2, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 2, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_FLOAT = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 3, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_FLOAT, "float[]", JAVA_TRUE, 3, &class__java_lang_Float, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array1__JAVA_DOUBLE = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array2__JAVA_DOUBLE = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 struct clazz class_array3__JAVA_DOUBLE = {
-   DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+   DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 
@@ -648,8 +648,12 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize);
 /**
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
+extern int recursionKey; // force-mark pass epoch (defined below, near gcMarkObject)
 void codenameOneGCMark() {
     currentGcMarkValue++;
+    // Bump the force-mark pass epoch so the force-visited side table's prior-cycle entries
+    // read as not-visited (relocated from the old per-object __codenameOneReferenceCount).
+    recursionKey++;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // PHASE 3b: ensure the universal thread-stop signal handler is installed (idempotent,
     // first GC only). Used to stop+scan threads we cannot cooperatively park.
@@ -1492,10 +1496,8 @@ static inline void cn1BibopInitSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o, in
         memset((char*)o + hdr, 0, size - hdr);
     }
     o->__codenameOneParentClsReference = parent;
-    o->__codenameOneReferenceCount = 1;
-    o->__codenameOneThreadData = 0;
-    // __ownerThread: write-only dead state, no reader exists -- store dropped (parity
-    // with the inlined cn1BibopFastAlloc fast path).
+    // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the header
+    // (force-visited / monitor side tables); no per-object stores.
     o->__heapPosition = CN1_BIBOP_HEAP_POS;
 #ifdef DEBUG_GC_ALLOCATIONS
     o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
@@ -1553,6 +1555,67 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     return o;
 }
 
+// ---- Monitor side table (relocated __codenameOneThreadData out of the object header) ----
+// The lazily-attached per-object monitor (CN1ThreadData*) is NULL on virtually every
+// object, so storing it in every header wasted 8 bytes/object. It now lives in an
+// address-keyed chained hash map; only objects that are actually monitorEnter'd ever
+// get an entry. All ops take a single dedicated mutex (monitor ops are rare relative to
+// allocation). Lock discipline: callers NEVER hold this mutex across lockCriticalSection
+// or across a blocking pthread_mutex_lock(data->mutex) -- the data pointer is copied out
+// and the table mutex released first -- so there is no inversion with the GC critical
+// section (which only ever takes the table mutex AFTER it, during reclaim/free).
+struct CN1MonitorEntry { JAVA_OBJECT key; void* data; struct CN1MonitorEntry* next; };
+#define CN1_MON_BUCKETS 4096
+static struct CN1MonitorEntry* cn1MonitorBuckets[CN1_MON_BUCKETS];
+static pthread_mutex_t cn1MonitorTableMutex = PTHREAD_MUTEX_INITIALIZER;
+
+static inline unsigned cn1MonHash(JAVA_OBJECT o) {
+    uintptr_t p = (uintptr_t)o;
+    p >>= 4; // objects are at least 16-byte aligned
+    return (unsigned)((p ^ (p >> 16)) & (CN1_MON_BUCKETS - 1));
+}
+
+// Lookup: returns the attached CN1ThreadData* (or 0). Safe for concurrent callers.
+void* cn1MonitorDataGet(JAVA_OBJECT o) {
+    unsigned h = cn1MonHash(o);
+    pthread_mutex_lock(&cn1MonitorTableMutex);
+    struct CN1MonitorEntry* e = cn1MonitorBuckets[h];
+    void* r = 0;
+    while(e) { if(e->key == o) { r = e->data; break; } e = e->next; }
+    pthread_mutex_unlock(&cn1MonitorTableMutex);
+    return r;
+}
+
+// Insert or overwrite the monitor for o.
+void cn1MonitorDataSet(JAVA_OBJECT o, void* data) {
+    unsigned h = cn1MonHash(o);
+    pthread_mutex_lock(&cn1MonitorTableMutex);
+    struct CN1MonitorEntry* e = cn1MonitorBuckets[h];
+    while(e) { if(e->key == o) { e->data = data; pthread_mutex_unlock(&cn1MonitorTableMutex); return; } e = e->next; }
+    e = (struct CN1MonitorEntry*)malloc(sizeof(struct CN1MonitorEntry));
+    e->key = o; e->data = data; e->next = cn1MonitorBuckets[h];
+    cn1MonitorBuckets[h] = e;
+    pthread_mutex_unlock(&cn1MonitorTableMutex);
+}
+
+// Remove o's entry and return its data (or 0 if none). The caller frees the data.
+void* cn1MonitorDataRemove(JAVA_OBJECT o) {
+    unsigned h = cn1MonHash(o);
+    pthread_mutex_lock(&cn1MonitorTableMutex);
+    struct CN1MonitorEntry** pp = &cn1MonitorBuckets[h];
+    void* r = 0;
+    while(*pp) {
+        if((*pp)->key == o) {
+            struct CN1MonitorEntry* d = *pp;
+            r = d->data; *pp = d->next; free(d);
+            break;
+        }
+        pp = &(*pp)->next;
+    }
+    pthread_mutex_unlock(&cn1MonitorTableMutex);
+    return r;
+}
+
 // Run finalizer + free monitor for a dead page slot (does NOT free() the slot;
 // the slot is recycled into the page free-list by the caller). Mirrors
 // freeAndFinalize / codenameOneGcFree minus the free().
@@ -1561,9 +1624,9 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     if(ptr != 0) {
         ptr(threadStateData, o);
     }
-    if(o->__codenameOneThreadData) {
-        free(o->__codenameOneThreadData);
-        o->__codenameOneThreadData = 0;
+    void* md = cn1MonitorDataRemove(o);
+    if(md) {
+        free(md);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // Balance the increment in cn1BibopNoteMonitorAttached. codenameOneGcFree (the
         // large/heap path) early-returns for BiBOP slots, so this is the ONLY site that
@@ -1668,7 +1731,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 o->__codenameOneGcMark = V;
                 liveCount++;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-                if(o->__codenameOneParentClsReference->finalizerFunction != 0 || o->__codenameOneThreadData != 0) needsReclaim = JAVA_TRUE;
+                if(o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
             } else if(m < V - 1) {
                 cn1BibopReclaimSlot(threadStateData, o);
@@ -1677,18 +1740,23 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             } else {
                 liveCount++;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-                if(o->__codenameOneParentClsReference->finalizerFunction != 0 || o->__codenameOneThreadData != 0) needsReclaim = JAVA_TRUE;
+                if(o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
             }
         }
         page->freeList = fl;
         page->freeCount = freeCount;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
+        // The monitor (CN1ThreadData) no longer lives in the object header, so the
+        // per-slot "has a monitor" test is gone. Conservatively flag any page that still
+        // has survivors while ANY BiBOP monitor is live globally: this can never miss a
+        // monitored survivor (over-approximation only suppresses a future O(1) shortcut,
+        // never a needed reclaim) and keeps the dead-monitor freeing exactly as before.
+        if(monitorsLive && liveCount > 0) needsReclaim = JAVA_TRUE;
         // Refresh the per-page facts for the next sweep. gcGraceEpoch = V is a safe upper
         // bound on every survivor's epoch (survivors are at V from grace/mark-this-cycle,
         // or at V-1 from aging) so the all-dead test (gcGraceEpoch < V-1) can never fire
-        // while a live/grace object remains. needsReclaim reflects only the actual
-        // survivors of THIS walk (dead slots were just reclaimed).
+        // while a live/grace object remains.
         page->gcAllocedSinceSweep = JAVA_FALSE;
         page->gcNeedsReclaim = needsReclaim;
         page->gcGraceEpoch = V;
@@ -2241,9 +2309,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
     o->__codenameOneParentClsReference = parent;
     o->__codenameOneGcMark = -1;
-    o->__ownerThread = threadStateData;
     o->__heapPosition = -1;
-    o->__codenameOneReferenceCount = 1;
 #ifdef DEBUG_GC_ALLOCATIONS
     o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
     o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
@@ -2334,9 +2400,11 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         return;
     }
 #endif
-    if(obj->__codenameOneThreadData) {
-        free(obj->__codenameOneThreadData);
-        obj->__codenameOneThreadData = 0;
+    {
+        void* md = cn1MonitorDataRemove(obj);
+        if(md) {
+            free(md);
+        }
     }
 #ifdef CN1_NURSERY
     // A promoted nursery object lives inside an arena block; never free() it -- just
@@ -2361,7 +2429,46 @@ typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj
 
 //JAVA_OBJECT* recursionBlocker = 0;
 //int recursionBlockerPosition = 0;
+// recursionKey is the force-mark "pass epoch". It used to be a constant (1) compared
+// against the per-object __codenameOneReferenceCount; that field has been relocated out
+// of the header into the force-visited side table below. recursionKey is now bumped once
+// per GC cycle (in codenameOneGCMark) so a stale table entry from a previous cycle reads
+// as not-visited, and no per-pass clearing is needed.
 int recursionKey = 1;
+
+// ---- Force-visited side table (relocated __codenameOneReferenceCount recursion guard) ----
+// The force-mark re-scan (gcMarkObject with force=JAVA_TRUE on an already-marked object)
+// needs a per-object "already force-visited THIS pass" flag to terminate on cyclic
+// already-marked subgraphs. It used to live in __codenameOneReferenceCount. It now lives
+// here, keyed by object pointer, storing the recursionKey epoch of the last force visit.
+// The force re-scan runs ONLY on the serial GC-mark path (the parallel worker path returns
+// before ever touching this), so no locking is required.
+struct CN1FVEntry { JAVA_OBJECT key; int epoch; struct CN1FVEntry* next; };
+#define CN1_FV_BUCKETS 4096
+static struct CN1FVEntry* cn1FVBuckets[CN1_FV_BUCKETS];
+
+static inline unsigned cn1FVHash(JAVA_OBJECT o) {
+    uintptr_t p = (uintptr_t)o; p >>= 4;
+    return (unsigned)((p ^ (p >> 16)) & (CN1_FV_BUCKETS - 1));
+}
+
+// Returns 1 if obj was already force-visited at the current `key` epoch (caller should
+// skip re-traversal); otherwise records this visit and returns 0.
+static int cn1ForceVisitedTestAndSet(JAVA_OBJECT obj, int key) {
+    unsigned h = cn1FVHash(obj);
+    struct CN1FVEntry* e = cn1FVBuckets[h];
+    while(e) {
+        if(e->key == obj) {
+            if(e->epoch == key) return 1;
+            e->epoch = key; return 0;
+        }
+        e = e->next;
+    }
+    e = (struct CN1FVEntry*)malloc(sizeof(struct CN1FVEntry));
+    e->key = obj; e->epoch = key; e->next = cn1FVBuckets[h];
+    cn1FVBuckets[h] = e;
+    return 0;
+}
 
 // Iterative mark using an explicit worklist. The previous implementation recursed
 // through reference fields, building one C stack frame per Java reference traversed.
@@ -2593,10 +2700,9 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // if this is a Class object or already marked this should be ignored
     if(obj->__codenameOneGcMark == markVal) {
         if(force) {
-            if(obj->__codenameOneReferenceCount == recursionKey) {
+            if(cn1ForceVisitedTestAndSet(obj, recursionKey)) {
                 return;
             }
-            obj->__codenameOneReferenceCount = recursionKey;
             if(obj->__codenameOneParentClsReference->markFunction != 0) {
                 gcMarkWorklistPush(obj, force);
             }
@@ -2857,9 +2963,7 @@ JAVA_OBJECT cn1NurseryAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* p
     memset(o, 0, size);
     o->__codenameOneParentClsReference = parent;
     o->__codenameOneGcMark = -1;
-    o->__ownerThread = threadStateData;
     o->__heapPosition = -1;
-    o->__codenameOneReferenceCount = 1;
     return o;
 }
 
@@ -3370,7 +3474,6 @@ void initConstantPool() {
         //jStringSize += length * sizeof(JAVA_ARRAY_CHAR) + sizeof(struct JavaArrayPrototype) + sizeof(struct obj__java_lang_String);
         JAVA_OBJECT oo = newStringFromCString(threadStateData, constantPool[iter]);
         tmpConstantPoolObjects[iter] = oo;
-        tmpConstantPoolObjects[iter]->__codenameOneReferenceCount = 999999;
        // java_util_ArrayList_add___java_lang_Object_R_boolean(threadStateData, internedStrings, oo);
     }
     #if defined(__OBJC__)
@@ -3398,8 +3501,6 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
         utf8String = newStringFromCString(threadStateData, "UTF-8");
         removeObjectFromHeapCollection(threadStateData, utf8String);
         removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)utf8String)->java_lang_String_value);
-        ((struct obj__java_lang_String*)utf8String)->java_lang_String_value->__codenameOneReferenceCount = 999999;
-        utf8String->__codenameOneReferenceCount = 999999;
     }
     JAVA_OBJECT s = __NEW_java_lang_String(threadStateData);
     const char* chars = [str UTF8String];
@@ -3424,8 +3525,6 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
         utf8String = newStringFromCString(threadStateData, "UTF-8");
         removeObjectFromHeapCollection(threadStateData, utf8String);
         removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)utf8String)->java_lang_String_value);
-        ((struct obj__java_lang_String*)utf8String)->java_lang_String_value->__codenameOneReferenceCount = 999999;
-        utf8String->__codenameOneReferenceCount = 999999;
     }
 
     JAVA_ARRAY byteArray = (JAVA_ARRAY)java_lang_String_getBytes___java_lang_String_R_byte_1ARRAY(threadStateData, str, utf8String);
