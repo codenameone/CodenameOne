@@ -1184,12 +1184,21 @@ extern long long totalAllocations;
 // publication ordering is UNCHANGED (those are the GC-visible fields; see report).
 #ifndef CN1_DISABLE_DEATOMIC_BYTES
 #define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { (ts)->bibopBytesLocal += (JAVA_LONG)(n); } while(0)
+// Flush the per-thread byte accumulator AND, in the same bulk step, the
+// isHighFrequencyGC heuristic counters (allocationsSinceLastGC/totalAllocations) --
+// which used to be two global stores per object on the hot path. Coarsening them to
+// once-per-page-acquire is fine: both are pure heuristics with no correctness role.
 #define CN1_BIBOP_FLUSH_BYTES(ts) do { \
-    if((ts)->bibopBytesLocal) { \
-        atomic_fetch_add_explicit(&bibopBytesSinceGc, (ts)->bibopBytesLocal, memory_order_relaxed); \
+    JAVA_LONG __bl = (ts)->bibopBytesLocal; \
+    if(__bl) { \
+        atomic_fetch_add_explicit(&bibopBytesSinceGc, __bl, memory_order_relaxed); \
+        allocationsSinceLastGC += (int)__bl; \
+        totalAllocations += __bl; \
         (ts)->bibopBytesLocal = 0; } } while(0)
 #else
-#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) atomic_fetch_add_explicit(&bibopBytesSinceGc, (n), memory_order_relaxed)
+#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { \
+    atomic_fetch_add_explicit(&bibopBytesSinceGc, (n), memory_order_relaxed); \
+    allocationsSinceLastGC += (int)(n); totalAllocations += (n); } while(0)
 #define CN1_BIBOP_FLUSH_BYTES(ts) do {} while(0)
 #endif
 
@@ -1206,12 +1215,16 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
             int hdr = (int)sizeof(struct JavaObjectPrototype);
             if(size > hdr) {
+                // NOT removable: skipping this is ~2x SLOWER -- uninitialized ref
+                // fields get scanned during the mark==-1 grace window and retain
+                // floating garbage. The body zero is load-bearing, not overhead.
                 memset((char*)o + hdr, 0, size - hdr);
             }
             o->__codenameOneParentClsReference = parent;
             o->__codenameOneReferenceCount = 1;
             o->__codenameOneThreadData = 0;
-            o->__ownerThread = threadStateData;
+            // __ownerThread is write-only dead state (the size-class-index repurposing
+            // was an unmerged patch); no reader exists, so the per-object store is dropped.
             o->__heapPosition = CN1_BIBOP_HEAP_POS;
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
@@ -1227,11 +1240,9 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             p->gcAllocedSinceSweep = JAVA_TRUE;
 #endif
             CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
-            // keep the legacy GC-trigger counters in step with the slow path so
-            // collection cadence is unchanged (these are plain globals, raced
-            // exactly as in codenameOneGcMalloc today).
-            allocationsSinceLastGC += size;
-            totalAllocations += size;
+            // allocationsSinceLastGC / totalAllocations (the isHighFrequencyGC heuristic)
+            // are now bumped in bulk by CN1_BIBOP_FLUSH_BYTES once per page-acquire, not
+            // per object -- removing two global-counter stores from the hot path.
             return o;
         }
     }

@@ -1494,7 +1494,8 @@ static inline void cn1BibopInitSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o, in
     o->__codenameOneParentClsReference = parent;
     o->__codenameOneReferenceCount = 1;
     o->__codenameOneThreadData = 0;
-    o->__ownerThread = threadStateData;
+    // __ownerThread: write-only dead state, no reader exists -- store dropped (parity
+    // with the inlined cn1BibopFastAlloc fast path).
     o->__heapPosition = CN1_BIBOP_HEAP_POS;
 #ifdef DEBUG_GC_ALLOCATIONS
     o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
