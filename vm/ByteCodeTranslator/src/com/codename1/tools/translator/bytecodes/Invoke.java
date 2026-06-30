@@ -196,7 +196,7 @@ public class Invoke extends Instruction {
         for (int j = 0; j < n; j++) {
             argExprs[j] = "SP[-" + (n - j) + "].data." + args.get(j).getQualifier();
         }
-        b.append("#ifdef CN1_INLINE_CTOR\n");
+        b.append("#ifndef CN1_DISABLE_INLINE_CTOR\n");
         inlineCtorPlan.appendStores(b, objExpr, argExprs);
         b.append("    SP -= ").append(n + 1).append(";\n");
         b.append("#else\n");

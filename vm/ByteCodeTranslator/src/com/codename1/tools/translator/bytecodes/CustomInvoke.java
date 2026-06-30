@@ -388,7 +388,7 @@ public class CustomInvoke extends Instruction {
         String objExpr = targetObjectLiteral != null ? targetObjectLiteral : "SP[-1].data.o";
         String[] argExprs = literalArgs != null ? literalArgs : new String[0];
         int pop = targetObjectLiteral != null ? 0 : 1; // only the receiver may be on-stack
-        b.append("#ifdef CN1_INLINE_CTOR\n");
+        b.append("#ifndef CN1_DISABLE_INLINE_CTOR\n");
         inlineCtorPlan.appendStores(b, objExpr, argExprs);
         if (pop > 0) {
             b.append("    SP -= ").append(pop).append(";\n");

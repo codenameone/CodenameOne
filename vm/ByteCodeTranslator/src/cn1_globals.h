@@ -963,7 +963,7 @@ struct ThreadLocalData {
     // 0 == not yet computed (lazily initialized once per thread on first use).
     JAVA_LONG nativeStackLimit;
 
-#ifdef CN1_DEATOMIC_BYTES
+#ifndef CN1_DISABLE_DEATOMIC_BYTES
     // LEVER A (perf-tier1): per-thread, plain-add accumulator for BiBOP allocation
     // volume. Replaces the per-object atomic_fetch_add on the global bibopBytesSinceGc
     // (which an uncontended single thread still pays as an arm64 exclusive-monitor RMW,
@@ -1159,7 +1159,7 @@ extern long long totalAllocations;
 // flushing it in bulk is safe; only the trigger cadence shifts (by < nthreads*page,
 // negligible vs the 24MB trigger, and already racy today). The bump cursor / mark
 // publication ordering is UNCHANGED (those are the GC-visible fields; see report).
-#ifdef CN1_DEATOMIC_BYTES
+#ifndef CN1_DISABLE_DEATOMIC_BYTES
 #define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { (ts)->bibopBytesLocal += (JAVA_LONG)(n); } while(0)
 #define CN1_BIBOP_FLUSH_BYTES(ts) do { \
     if((ts)->bibopBytesLocal) { \
@@ -1212,7 +1212,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // X. The static initializer is invoked only when the class isn't initialised yet
 // (the bump fast path can be reached for a class whose <clinit> hasn't run,
 // because bibopCurrent[] is shared across all classes of the same size class).
-#ifdef CN1_INLINE_ALLOC
+#ifndef CN1_DISABLE_INLINE_ALLOC
 #define CN1_FAST_NEW(X) ({ \
     if(__builtin_expect(!class__##X.initialized, 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
