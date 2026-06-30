@@ -198,16 +198,30 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
         return out;
     }
 
-    /// A source frame: the digit (index+1) drawn large over a ramping grey
-    /// background (30..210) so the decoded frames are both numerically labelled
-    /// and brightness-distinct after lossy compression.
+    /// One distinct, saturated colour per frame so the six decoded frames are
+    /// telling apart by hue (red, orange, yellow, green, blue, violet) -- the
+    /// solid colour blocks survive 4:2:0 chroma subsampling cleanly.
+    private static final int[] FRAME_COLORS = {
+        0xE53935, // 1 red
+        0xFB8C00, // 2 orange
+        0xFDD835, // 3 yellow
+        0x43A047, // 4 green
+        0x1E88E5, // 5 blue
+        0x8E24AA, // 6 violet
+    };
+
+    /// A source frame: the digit (index+1) drawn large over that frame's
+    /// distinct colour, so the decoded frames are both numerically labelled and
+    /// colour-coded after lossy compression.
     private static Image makeDigitFrame(int index) {
-        int grey = 30 + index * 36; // 30,66,102,138,174,210
-        int bg = 0xff000000 | (grey << 16) | (grey << 8) | grey;
+        int rgb = FRAME_COLORS[index % FRAME_COLORS.length];
+        int bg = 0xff000000 | rgb;
         Image img = Image.createImage(VW, VH, bg);
         Graphics g = img.getGraphics();
 
-        int ink = grey < 128 ? 0xffffff : 0x000000;
+        int r = (rgb >> 16) & 0xff, gg2 = (rgb >> 8) & 0xff, b = rgb & 0xff;
+        int luma = (r * 30 + gg2 * 59 + b * 11) / 100;
+        int ink = luma < 140 ? 0xffffff : 0x000000;
         String s = String.valueOf(index + 1);
         Font font = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
         int tw = Math.max(1, font.stringWidth(s));
