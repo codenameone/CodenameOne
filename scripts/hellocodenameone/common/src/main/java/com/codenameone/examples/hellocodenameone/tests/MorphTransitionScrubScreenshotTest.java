@@ -8,27 +8,33 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 
-/// Snapshot-mode {@link MorphTransition} that also tweens the named target's
-/// rotation, scale and opacity, driven through the scrub API
-/// (`MorphTransition#setProgress(double)`) rather than the animation clock.
+/// Demonstrates that a **named-component** {@link MorphTransition} (the legacy
+/// "morph the component called X from one form to the next" case) is now
+/// scrubbable: every frame of the grid is produced by stepping the transition
+/// to its progress fraction with `MorphTransition#setProgress(double)` rather
+/// than letting the animation clock drive it.
 ///
-/// Same card layout as {@link MorphTransitionTest} / {@link MorphTransitionSnapshotTest}
-/// (a red tile in the bottom-left expanding across the top) but the captured
-/// snapshot is additionally rotated up to 20 degrees, scaled to 1.1x and faded
-/// to 70% as it travels -- the position / size morph composed with the new
-/// per-target transforms.
-public class MorphTransitionScaleRotateScreenshotTest extends AbstractTransitionScreenshotTest {
+/// A cyan "card" tile in the bottom-left of the source form morphs into a wide
+/// card across the top of the destination form. Because the whole sweep is
+/// rendered through the (live, non-snapshot) transition, the card is visible
+/// travelling across all six frames -- the deterministic, scrub-driven
+/// counterpart to the clock-driven {@link MorphTransitionTest}. The companion
+/// {@link MorphElementMorphScreenshotTest} covers the same scrub API applied to
+/// an arbitrary rendered element with opacity / rotation / scale.
+public class MorphTransitionScrubScreenshotTest extends AbstractTransitionScreenshotTest {
 
-    private static final String CARD_NAME = "morph-card-rotate";
+    private static final String CARD_NAME = "morph-card-scrub";
 
     @Override
     protected Transition createTransition(int duration) {
-        return MorphTransition.create(duration)
-                .snapshotMode(true)
-                .morph(CARD_NAME)
-                .rotation(CARD_NAME, 0f, 20f)
-                .scale(CARD_NAME, 1f, 1.1f)
-                .opacity(CARD_NAME, 1f, 0.7f);
+        return MorphTransition.create(duration).morph(CARD_NAME);
+    }
+
+    @Override
+    protected boolean paintBookendDirectly(int frameIndex) {
+        // Render every frame through the scrubbed transition so the card is
+        // shown travelling end to end, not just at the bookends.
+        return false;
     }
 
     @Override
@@ -41,14 +47,14 @@ public class MorphTransitionScaleRotateScreenshotTest extends AbstractTransition
         form.setLayout(new BorderLayout());
         Style cps = form.getContentPane().getAllStyles();
         cps.setBgTransparency(255);
-        cps.setBgColor(0x1f4068);
+        cps.setBgColor(0x0f3a3a);
         cps.setFgColor(0xffffff);
 
         Label card = new Label("Card");
         card.setName(CARD_NAME);
         Style cs = card.getAllStyles();
-        cs.setBgColor(0xef4444);
-        cs.setFgColor(0xffffff);
+        cs.setBgColor(0x22d3ee);
+        cs.setFgColor(0x062b2b);
         cs.setBgTransparency(255);
         cs.setPadding(8, 8, 8, 8);
         cs.setMargin(20, 4, 4, 20);
@@ -63,14 +69,14 @@ public class MorphTransitionScaleRotateScreenshotTest extends AbstractTransition
         form.setLayout(new BorderLayout());
         Style cps = form.getContentPane().getAllStyles();
         cps.setBgTransparency(255);
-        cps.setBgColor(0x9c1d1d);
+        cps.setBgColor(0x134e4a);
         cps.setFgColor(0xffffff);
 
         Label card = new Label("Card (expanded)");
         card.setName(CARD_NAME);
         Style cs = card.getAllStyles();
-        cs.setBgColor(0xef4444);
-        cs.setFgColor(0xffffff);
+        cs.setBgColor(0x22d3ee);
+        cs.setFgColor(0x062b2b);
         cs.setBgTransparency(255);
         cs.setPadding(20, 20, 8, 8);
 

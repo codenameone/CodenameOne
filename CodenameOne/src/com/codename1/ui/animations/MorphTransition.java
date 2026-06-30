@@ -870,10 +870,15 @@ public final class MorphTransition extends Transition {
         Motion hMotion;
 
         // Optional opacity / rotation / scale tweens (identity by default).
-        float fromOpacity = 1f, toOpacity = 1f;
-        float fromRotation = 0f, toRotation = 0f;
-        float fromScale = 1f, toScale = 1f;
-        float curOpacity = 1f, curRotation = 0f, curScale = 1f;
+        float fromOpacity = 1f;
+        float toOpacity = 1f;
+        float fromRotation = 0f;
+        float toRotation = 0f;
+        float fromScale = 1f;
+        float toScale = 1f;
+        float curOpacity = 1f;
+        float curRotation = 0f;
+        float curScale = 1f;
 
         /// Snapshot-mode capture of `source` at its original bounds, clipped
         /// to its own size. Populated in `MorphTransition#captureSnapshot`
@@ -972,16 +977,31 @@ public final class MorphTransition extends Transition {
     public static final class MorphElement {
         Image image;
         private Component component;
-        private float fromX, fromY, fromW, fromH;
-        private float toX, toY, toW, toH;
-        private boolean fromSet, toSet;
-        private float fromOpacity = 1f, toOpacity = 1f;
-        private float fromRotation = 0f, toRotation = 0f;
-        private float fromScale = 1f, toScale = 1f;
+        private float fromX;
+        private float fromY;
+        private float fromW;
+        private float fromH;
+        private float toX;
+        private float toY;
+        private float toW;
+        private float toH;
+        private boolean fromSet;
+        private boolean toSet;
+        private float fromOpacity = 1f;
+        private float toOpacity = 1f;
+        private float fromRotation = 0f;
+        private float toRotation = 0f;
+        private float fromScale = 1f;
+        private float toScale = 1f;
 
         // Current interpolated state, updated by the owning transition.
-        float curX, curY, curW, curH;
-        float curOpacity = 1f, curRotation = 0f, curScale = 1f;
+        float curX;
+        float curY;
+        float curW;
+        float curH;
+        float curOpacity = 1f;
+        float curRotation = 0f;
+        float curScale = 1f;
 
         private MorphElement() {
         }
