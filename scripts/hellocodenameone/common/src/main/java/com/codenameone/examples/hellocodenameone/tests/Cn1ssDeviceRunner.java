@@ -313,6 +313,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StringApiTest(),
             new TimeApiTest(),
             new NanoTimeApiTest(),
+            new MotionSensorDeviceTest(),
             new CryptoApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),

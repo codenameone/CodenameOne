@@ -73,6 +73,9 @@
 #endif
 #import <MediaPlayer/MediaPlayer.h>
 #import <CoreLocation/CoreLocation.h>
+#if !TARGET_OS_TV
+#import <CoreMotion/CoreMotion.h>
+#endif
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
 #import <CoreText/CoreText.h>
@@ -2524,6 +2527,175 @@ void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD
 extern void vibrateDevice();
 void com_codename1_impl_ios_IOSNative_vibrate___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT duration) {
     vibrateDevice();
+}
+
+// ---- CoreMotion backed motion sensors (com.codename1.sensors) ----
+// These constants mirror MotionSensorManager.TYPE_*. iOS exposes the raw
+// accelerometer, gyroscope and magnetometer natively; the core derives the
+// gravity, linear acceleration and orientation values from them.
+#define CN1_MOTION_ACCELEROMETER 1
+#define CN1_MOTION_GYROSCOPE 4
+#define CN1_MOTION_MAGNETOMETER 5
+#define CN1_MOTION_G 9.80665
+
+#if !TARGET_OS_TV
+static CMMotionManager *cn1MotionManager = nil;
+static CMMotionManager *cn1GetMotionManager() {
+    if(cn1MotionManager == nil) {
+        cn1MotionManager = [[CMMotionManager alloc] init];
+    }
+    return cn1MotionManager;
+}
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if TARGET_OS_TV
+    return JAVA_FALSE;
+#else
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            return m.accelerometerAvailable ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_GYROSCOPE:
+            return m.gyroAvailable ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_MAGNETOMETER:
+            return m.magnetometerAvailable ? JAVA_TRUE : JAVA_FALSE;
+        default:
+            return JAVA_FALSE;
+    }
+#endif
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
+}
+
+void com_codename1_impl_ios_IOSNative_startMotionSensor___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_INT rateMillis) {
+#if !TARGET_OS_TV
+    CMMotionManager *m = cn1GetMotionManager();
+    NSTimeInterval interval = ((double)rateMillis) / 1000.0;
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            m.accelerometerUpdateInterval = interval;
+            [m startAccelerometerUpdates];
+            break;
+        case CN1_MOTION_GYROSCOPE:
+            m.gyroUpdateInterval = interval;
+            [m startGyroUpdates];
+            break;
+        case CN1_MOTION_MAGNETOMETER:
+            m.magnetometerUpdateInterval = interval;
+            [m startMagnetometerUpdates];
+            break;
+        default:
+            break;
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_stopMotionSensor___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if !TARGET_OS_TV
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            [m stopAccelerometerUpdates];
+            break;
+        case CN1_MOTION_GYROSCOPE:
+            [m stopGyroUpdates];
+            break;
+        case CN1_MOTION_MAGNETOMETER:
+            [m stopMagnetometerUpdates];
+            break;
+        default:
+            break;
+    }
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if TARGET_OS_TV
+    return JAVA_FALSE;
+#else
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            return m.accelerometerData != nil ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_GYROSCOPE:
+            return m.gyroData != nil ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_MAGNETOMETER:
+            return m.magnetometerData != nil ? JAVA_TRUE : JAVA_FALSE;
+        default:
+            return JAVA_FALSE;
+    }
+#endif
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
+}
+
+#if !TARGET_OS_TV
+// axis: 0 = x, 1 = y, 2 = z
+static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER: {
+            CMAccelerometerData *d = m.accelerometerData;
+            if(d == nil) {
+                return 0;
+            }
+            CMAcceleration a = d.acceleration;
+            double v = (axis == 0) ? a.x : (axis == 1 ? a.y : a.z);
+            // CoreMotion reports G units with gravity negative when face up;
+            // negate and scale to m/s^2 so the convention matches the API
+            // (at rest, face up, z reports +9.81).
+            return (JAVA_FLOAT)(-v * CN1_MOTION_G);
+        }
+        case CN1_MOTION_GYROSCOPE: {
+            CMGyroData *d = m.gyroData;
+            if(d == nil) {
+                return 0;
+            }
+            CMRotationRate r = d.rotationRate;
+            double v = (axis == 0) ? r.x : (axis == 1 ? r.y : r.z);
+            return (JAVA_FLOAT)v;
+        }
+        case CN1_MOTION_MAGNETOMETER: {
+            CMMagnetometerData *d = m.magnetometerData;
+            if(d == nil) {
+                return 0;
+            }
+            CMMagneticField f = d.magneticField;
+            double v = (axis == 0) ? f.x : (axis == 1 ? f.y : f.z);
+            return (JAVA_FLOAT)v;
+        }
+        default:
+            return 0;
+    }
+}
+#else
+static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
+    return 0;
+}
+#endif
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorX___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 0);
+}
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorX___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 0);
+}
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorY___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 1);
+}
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorY___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 1);
+}
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorZ___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 2);
+}
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorZ___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 2);
 }
 
 // Peer Component methods

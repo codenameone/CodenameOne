@@ -6988,6 +6988,17 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific motion sensor entry point. Default
+    /// implementation returns {@code null}; ports that expose the device motion
+    /// hardware override this to return a cached manager. Application code
+    /// should use
+    /// {@link com.codename1.sensors.MotionSensorManager#getInstance()} instead
+    /// of calling this directly --- it transparently substitutes a no-op
+    /// manager when the port returns {@code null}.
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        return null;
+    }
+
     /// Returns the port-specific biometric authentication entry point. Default
     /// implementation returns {@code null}; ports that support biometrics
     /// override this to return a cached singleton. Application code should
