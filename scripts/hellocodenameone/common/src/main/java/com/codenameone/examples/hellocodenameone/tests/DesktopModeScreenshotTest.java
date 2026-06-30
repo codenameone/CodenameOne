@@ -108,11 +108,14 @@ public class DesktopModeScreenshotTest extends BaseTest {
     /// The 30-row scrollable form is heavy enough that on the iOS Metal backend
     /// its first frame is occasionally presented just after the capture fires,
     /// so Display.screenshot() reads the previous test's framebuffer and this
-    /// test "captures the wrong form". Force a repaint and a short extra settle
-    /// so the DesktopMode form is fully presented before the screenshot.
+    /// test "captures the wrong form". Force a repaint and an extra settle so the
+    /// DesktopMode form is fully presented before the screenshot. 700ms still lost
+    /// the race on a starved CI runner (the capture showed the preceding
+    /// MutableImageClip form), so use the same 1500ms margin the OrientationLock
+    /// test relies on for its post-rotation present.
     @Override
     protected long extraSettleBeforeCaptureMillis() {
-        return 700;
+        return 1500;
     }
 
     @Override
