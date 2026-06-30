@@ -120,24 +120,11 @@ static JAVA_LONG cn1ReaderOpen(const wchar_t* url) {
     st->audioChannels = -1;
     st->stride = 0;
 
-    // Configure the video stream to deliver RGB32 (BGRA byte order), top-down.
+    // Configure the video stream to deliver RGB32 (BGRA byte order).
     ComPtr<IMFMediaType> rgbType;
     if (SUCCEEDED(MFCreateMediaType(&rgbType))) {
         rgbType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
         rgbType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
-        // RGB32 is delivered bottom-up by default in Media Foundation, so the
-        // decoded frames came out vertically flipped. Pin the frame size and a
-        // positive MF_MT_DEFAULT_STRIDE to request a top-down layout, matching
-        // Codename One's top-down RGBA convention.
-        UINT32 nativeW = 0, nativeH = 0;
-        ComPtr<IMFMediaType> nativeType;
-        if (SUCCEEDED(reader->GetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_VIDEO_STREAM, &nativeType))) {
-            MFGetAttributeSize(nativeType.Get(), MF_MT_FRAME_SIZE, &nativeW, &nativeH);
-        }
-        if (nativeW > 0 && nativeH > 0) {
-            MFSetAttributeSize(rgbType.Get(), MF_MT_FRAME_SIZE, nativeW, nativeH);
-            rgbType->SetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32) (nativeW * 4));
-        }
         if (SUCCEEDED(reader->SetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_VIDEO_STREAM, NULL, rgbType.Get()))) {
             st->hasVideo = true;
             ComPtr<IMFMediaType> current;
@@ -230,13 +217,16 @@ static JAVA_OBJECT cn1ReaderFrameAt(CODENAME_ONE_THREAD_STATE, CN1VideoReader* s
             int w = st->width;
             int h = st->height;
             LONG stride = st->stride != 0 ? st->stride : (LONG) w * 4;
-            bool bottomUp = stride < 0;
-            LONG absStride = bottomUp ? -stride : stride;
+            // Media Foundation hands back RGB32 bottom-up in the contiguous
+            // buffer (image row 0 lives at the END), so flip vertically to
+            // produce Codename One's top-down RGBA. Use the absolute stride;
+            // the actual row pitch may be padded beyond w*4.
+            LONG absStride = stride < 0 ? -stride : stride;
             result = allocArray(threadStateData, w * h * 4, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
             if (result != JAVA_NULL) {
                 BYTE* out = (BYTE*) (*(JAVA_ARRAY) result).data;
                 for (int y = 0; y < h; y++) {
-                    int srcRow = bottomUp ? (h - 1 - y) : y;
+                    int srcRow = h - 1 - y;
                     BYTE* src = data + (size_t) srcRow * absStride;
                     BYTE* dst = out + (size_t) y * w * 4;
                     for (int x = 0; x < w; x++) {
@@ -350,10 +340,6 @@ static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int hei
     videoIn->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
     videoIn->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
     videoIn->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
-    // Declare the input rows as top-down (positive stride) so Media Foundation
-    // does not treat our top-down RGBA frames as bottom-up RGB32 and store them
-    // vertically flipped.
-    videoIn->SetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32) (width * 4));
     MFSetAttributeSize(videoIn.Get(), MF_MT_FRAME_SIZE, width, height);
     MFSetAttributeRatio(videoIn.Get(), MF_MT_FRAME_RATE, fpsNum, fpsDen);
     MFSetAttributeRatio(videoIn.Get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
@@ -505,16 +491,22 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterFrame___long_byte_
     }
     BYTE* rgba = (BYTE*) (*(JAVA_ARRAY) rgbaObj).data;
     DWORD len = (DWORD) (w * h * 4);
-    // RGBA (Java) -> RGB32/BGRA (MF input)
+    // RGBA (Java, top-down) -> RGB32/BGRA (MF input). Media Foundation treats
+    // RGB32 input as bottom-up, so write our rows reversed: buffer row 0 must be
+    // the image's bottom row for the encoder to store the frame right-side-up.
     BYTE* bgra = (BYTE*) malloc(len);
     if (bgra == NULL) {
         return;
     }
-    for (int i = 0; i < w * h; i++) {
-        bgra[i * 4] = rgba[i * 4 + 2];
-        bgra[i * 4 + 1] = rgba[i * 4 + 1];
-        bgra[i * 4 + 2] = rgba[i * 4];
-        bgra[i * 4 + 3] = rgba[i * 4 + 3];
+    for (int y = 0; y < h; y++) {
+        const BYTE* srcRow = rgba + (size_t) (h - 1 - y) * w * 4;
+        BYTE* dstRow = bgra + (size_t) y * w * 4;
+        for (int x = 0; x < w; x++) {
+            dstRow[x * 4] = srcRow[x * 4 + 2];
+            dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
+            dstRow[x * 4 + 2] = srcRow[x * 4];
+            dstRow[x * 4 + 3] = srcRow[x * 4 + 3];
+        }
     }
     LONGLONG dur = st->frameRate > 0 ? (LONGLONG) (CN1_HNS_PER_SEC / st->frameRate) : (CN1_HNS_PER_SEC / 30);
     cn1WriterWriteSample(st, st->videoStream, bgra, len, (LONGLONG) ptsMs * CN1_HNS_PER_MS, dur);
