@@ -101,7 +101,10 @@ class AndroidVideoReader extends VideoReader {
                     } catch (Exception ex) {
                         try {
                             frameRate = fmt.getFloat(MediaFormat.KEY_FRAME_RATE);
-                        } catch (Exception ignored) {
+                        } catch (Exception floatEx) {
+                            // KEY_FRAME_RATE is occasionally stored as neither an
+                            // int nor a float; leave frameRate at its default.
+                            com.codename1.io.Log.p("VideoReader: unreadable KEY_FRAME_RATE for " + mime);
                         }
                     }
                 } else if (mime.startsWith("audio/")) {
@@ -114,7 +117,8 @@ class AndroidVideoReader extends VideoReader {
                     }
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            com.codename1.io.Log.e(ex);
         } finally {
             extractor.release();
         }
@@ -321,7 +325,8 @@ class AndroidVideoReader extends VideoReader {
     public void close() throws IOException {
         try {
             retriever.release();
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            com.codename1.io.Log.e(ex);
         }
     }
 }
