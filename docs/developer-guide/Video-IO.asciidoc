@@ -1,0 +1,95 @@
+== Video encoding & decoding (VideoIO)
+
+The https://www.codenameone.com/javadoc/com/codename1/media/VideoIO.html[VideoIO] API
+is to video what the
+https://www.codenameone.com/javadoc/com/codename1/ui/util/ImageIO.html[ImageIO] API is
+to still images, but it goes deeper. It uses the platform's *native* codecs to:
+
+1. *Encode* application rendered frames and audio into a standard video file, with deep
+   control over dimensions, frame rate, codec, bitrate, key frame interval and the audio
+   track.
+2. *Decode* an existing clip into *frame accurate* RGBA frames and PCM audio.
+
+TIP: The decode side is something the
+https://www.codenameone.com/javadoc/com/codename1/media/Media.html[Media] player API
+deliberately does not provide. `Media` is a player: its `setTime()` snaps to key frames
+and gives no exact frame guarantee. `VideoReader`, by contrast, decodes the precise frame
+at a requested time, which is what you need when you want to read an imported clip (for
+example a screen recording) frame by frame.
+
+`VideoIO` is supported on iOS, macOS, Android, Windows, Linux, JavaScript and the desktop
+simulator. It is *not* available on the TV, Watch or Car targets.
+
+=== Checking for support
+
+As with other optional platform features, always gate usage with `isSupported()`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/videoio/VideoIOSnippets.java[tag=support,indent=0]
+----
+
+NOTE: On the desktop simulator `VideoIO` is backed by an `ffmpeg`/`ffprobe` binary. The
+simulator bundles one automatically; if `isSupported()` returns `false` on the desktop,
+make sure `ffmpeg` is on your `PATH` or set the `ffmpeg.dir` system property.
+
+=== Encoding a video
+
+Build a `VideoWriter` with a
+https://www.codenameone.com/javadoc/com/codename1/media/VideoWriterBuilder.html[VideoWriterBuilder],
+then push frames and (optionally) audio. Because every frame is an ordinary
+https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] that you draw into,
+you have complete control over the pixels - render charts, overlays, transformed camera
+frames, generated animation, anything.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/videoio/VideoIOSnippets.java[tag=encode,indent=0]
+----
+
+To add an audio track, enable it on the builder (`.hasAudio(true)`) and push interleaved
+16 bit PCM with `VideoWriter.writeAudio(...)`, or hand it an
+https://www.codenameone.com/javadoc/com/codename1/media/AudioBuffer.html[AudioBuffer].
+
+=== Decoding a video frame by frame
+
+`VideoReader` exposes the clip's duration, dimensions and frame rate, a frame accurate
+`frameAt(long)` and a variable-to-constant frame rate resampler `readFrames(fps, callback)`
+that walks the whole clip emitting evenly spaced frames:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/videoio/VideoIOSnippets.java[tag=decode,indent=0]
+----
+
+The audio track, when present, is decoded to interleaved PCM:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/videoio/VideoIOSnippets.java[tag=audio,indent=0]
+----
+
+=== Discovering available codecs
+
+The set of codecs is device dependent. Enumerate it to pick the best one (and to detect
+hardware accelerated encoders):
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/videoio/VideoIOSnippets.java[tag=codecs,indent=0]
+----
+
+=== Platform support
+
+[cols="2,5", options="header"]
+|===
+|Platform |Backend
+
+|iOS / macOS |AVFoundation (`AVAssetReader` / `AVAssetWriter`, hardware H.264/HEVC)
+|Android |`MediaCodec` + `MediaMuxer` / `MediaExtractor` + `MediaMetadataRetriever`
+|JavaScript |HTML5 `<video>` + `<canvas>` (decoding; encoding is not yet wired)
+|Windows |Media Foundation (`IMFSourceReader` / `IMFSinkWriter`)
+|Linux |GStreamer (`appsrc` / `appsink`)
+|Simulator |`ffmpeg` / `ffprobe`
+|TV / Watch / Car |Not supported (`isSupported()` returns `false`)
+|===

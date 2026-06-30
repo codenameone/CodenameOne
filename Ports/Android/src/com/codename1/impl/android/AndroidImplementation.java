@@ -7118,7 +7118,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return os;
     }
 
-    private String removeFilePrefix(String file) {
+    static String removeFilePrefix(String file) {
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
@@ -9919,6 +9919,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return l10n;
     }
     private com.codename1.ui.util.ImageIO imIO;
+
+    private com.codename1.media.VideoIO videoIO;
+    private boolean videoIOResolved;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (!videoIOResolved) {
+            videoIOResolved = true;
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                videoIO = new AndroidVideoIO();
+            }
+        }
+        return videoIO;
+    }
 
     @Override
     public com.codename1.ui.util.ImageIO getImageIO() {

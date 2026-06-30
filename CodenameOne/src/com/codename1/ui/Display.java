@@ -46,6 +46,7 @@ import com.codename1.share.ShareResult;
 import com.codename1.share.ShareResultListener;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.media.VideoIO;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.NotificationChannelBuilder;
@@ -5644,6 +5645,17 @@ public final class Display extends CN1Constants {
     /// the image IO instance or null if image IO isn't supported for the given platform
     public ImageIO getImageIO() {
         return impl.getImageIO();
+    }
+
+    /// Returns the video IO instance for video encoding and frame accurate decoding, or
+    /// null if video IO isn't supported on the given platform. See
+    /// `com.codename1.media.VideoIO`.
+    ///
+    /// #### Returns
+    ///
+    /// the video IO instance or null if unsupported
+    public VideoIO getVideoIO() {
+        return impl.getVideoIO();
     }
 
     /// Gets the recording mime type for the returned Media from the

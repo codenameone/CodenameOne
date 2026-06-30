@@ -87,6 +87,8 @@ include::In-Car-Experiences.asciidoc[]
 
 include::Miscellaneous-Features.asciidoc[]
 
+include::Video-IO.asciidoc[]
+
 include::performance.asciidoc[]
 
 include::Testing-with-JUnit.adoc[]

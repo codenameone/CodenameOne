@@ -97,6 +97,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // every test ends up in the jar regardless, and the platform-specific
     // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
+            // VideoIO cross-platform coverage: encodes a 6-frame counting clip with
+            // audio, decodes the frames back and verifies the count order + PCM levels.
+            // Assertion test (no screenshot); SKIPs where the platform can't encode.
+            new VideoIORoundTripTest(),
             new MainScreenScreenshotTest(),
             // Advertising API: renders a banner + native-ad feed via the
             // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.

@@ -42,6 +42,31 @@ public final class LinuxNative {
     /** Writes a line to the native debug log (OutputDebugString + stderr). */
     public static native void nativeLog(String message);
 
+    /* ------------------------------------------------------------- VideoIO */
+    /** True when the GStreamer runtime backing VideoIO is available (libgstreamer-1.0 loadable). */
+    public static native boolean videoBackendAvailable();
+    // Reader (filesrc ! decodebin ! videoconvert ! appsink). The peer owns the pipeline.
+    public static native long videoReaderOpen(String path);
+    public static native int videoReaderWidth(long peer);
+    public static native int videoReaderHeight(long peer);
+    public static native long videoReaderDuration(long peer);
+    public static native float videoReaderFrameRate(long peer);
+    public static native boolean videoReaderHasVideo(long peer);
+    public static native boolean videoReaderHasAudio(long peer);
+    public static native int videoReaderAudioSampleRate(long peer);
+    public static native int videoReaderAudioChannels(long peer);
+    /** Frame accurate decode (accurate seek + appsink pull) to width*height*4 RGBA bytes, or null. */
+    public static native byte[] videoReaderFrameAt(long peer, long ms);
+    /** Decodes the whole audio track to interleaved signed 16-bit little-endian PCM, or null. */
+    public static native byte[] videoReaderReadAudio(long peer);
+    public static native void videoReaderClose(long peer);
+    // Writer (appsrc ! videoconvert ! x264enc/x265enc ! mp4mux ! filesink). Streaming.
+    public static native long videoWriterOpen(String outPath, boolean hevc, int width, int height, float fps,
+            int videoBitRate, int gop, boolean hasAudio, int audioBitRate, int sampleRate, int channels);
+    public static native void videoWriterFrame(long peer, byte[] rgba, int width, int height, long ptsMs);
+    public static native void videoWriterAudio(long peer, byte[] pcm, int sampleRate, int channels, long ptsMs);
+    public static native boolean videoWriterClose(long peer);
+
     /**
      * True when the CN1_FAULT_SELFTEST environment variable is set. Read via the
      * Win32 environment (the clean target does not translate System.getenv), it

@@ -5459,7 +5459,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     
-    
+
+    private com.codename1.media.VideoIO videoIO;
+    private boolean videoIOResolved;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (!videoIOResolved) {
+            videoIOResolved = true;
+            try {
+                videoIO = new HTML5VideoIO();
+            } catch (Throwable t) {
+                videoIO = null;
+            }
+        }
+        return videoIO;
+    }
+
     @Override
     public ImageIO getImageIO() {
         return new ImageIO(){

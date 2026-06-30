@@ -14919,6 +14919,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         return imIO;
     }
 
+    private com.codename1.media.VideoIO videoIO;
+    private boolean videoIOResolved;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (!videoIOResolved) {
+            videoIOResolved = true;
+            if (com.codename1.impl.javase.ffmpeg.FFMPEGVideoIO.isAvailable()) {
+                videoIO = new com.codename1.impl.javase.ffmpeg.FFMPEGVideoIO();
+            }
+        }
+        return videoIO;
+    }
+
     @Override
     protected int getDragAutoActivationThreshold() {
         return 10000;
