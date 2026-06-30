@@ -343,6 +343,42 @@ static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
     return TRUE;
 }
 
+/* Touchpad pinch / rotate (GDK_TOUCHPAD_PINCH, libinput). scale is cumulative
+ * relative to the gesture's BEGIN, so we forward the incremental multiplier;
+ * angle_delta is already a per-event delta in degrees, forwarded as incremental
+ * radians. These map to Display.fireMagnifyGesture / fireRotationGesture, the
+ * same hooks the macOS trackpad drives. Delivered through the generic "event"
+ * signal, so we return FALSE for anything else to leave other handlers intact. */
+static double cn1PinchLastScale = 1.0;
+
+static gboolean cn1OnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointer data) {
+    (void) widget;
+    (void) data;
+    if (e->type != GDK_TOUCHPAD_PINCH) {
+        return FALSE;
+    }
+    GdkEventTouchpadPinch* pe = (GdkEventTouchpadPinch*) e;
+    if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_BEGIN) {
+        cn1PinchLastScale = pe->scale > 0 ? pe->scale : 1.0;
+    } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_UPDATE) {
+        int x = (int) pe->x;
+        int y = (int) pe->y;
+        if (pe->scale > 0 && cn1PinchLastScale > 0) {
+            double inc = pe->scale / cn1PinchLastScale;
+            cn1PinchLastScale = pe->scale;
+            if (inc != 1.0) {
+                cn1LinuxPushEvent(CN1_EVENT_PINCH, x, y, (int) (inc * CN1_GESTURE_FIXED + 0.5));
+            }
+        }
+        if (pe->angle_delta != 0.0) {
+            double rad = pe->angle_delta * G_PI / 180.0;
+            cn1LinuxPushEvent(CN1_EVENT_ROTATE, x, y,
+                    (int) (rad * CN1_GESTURE_FIXED + (rad >= 0 ? 0.5 : -0.5)));
+        }
+    }
+    return TRUE;
+}
+
 static gboolean cn1OnScroll(GtkWidget* widget, GdkEventScroll* e, gpointer data) {
     (void) widget;
     (void) data;
@@ -490,7 +526,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     gtk_widget_set_events(cn1DrawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_POINTER_MOTION_MASK |
             GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_SCROLL_MASK | GDK_TOUCH_MASK |
-            GDK_STRUCTURE_MASK);
+            GDK_TOUCHPAD_GESTURE_MASK | GDK_STRUCTURE_MASK);
     gtk_widget_set_can_focus(cn1DrawingArea, TRUE);
 
     /* A GtkOverlay layers a transparent, pass-through GtkFixed over the drawing
@@ -510,6 +546,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     g_signal_connect(cn1DrawingArea, "button-release-event", G_CALLBACK(cn1OnButton), 0);
     g_signal_connect(cn1DrawingArea, "motion-notify-event", G_CALLBACK(cn1OnMotion), 0);
     g_signal_connect(cn1DrawingArea, "touch-event", G_CALLBACK(cn1OnTouch), 0);
+    g_signal_connect(cn1DrawingArea, "event", G_CALLBACK(cn1OnGenericEvent), 0);
     g_signal_connect(cn1Window, "key-press-event", G_CALLBACK(cn1OnKey), 0);
     g_signal_connect(cn1Window, "key-release-event", G_CALLBACK(cn1OnKey), 0);
     g_signal_connect(cn1DrawingArea, "scroll-event", G_CALLBACK(cn1OnScroll), 0);

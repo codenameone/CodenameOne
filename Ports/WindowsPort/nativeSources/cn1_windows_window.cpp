@@ -379,6 +379,55 @@ static int cn1WinTouchFlag(void) {
     return 0;
 }
 
+#ifdef WM_GESTURE
+/* macOS-style trackpad / touchscreen pinch and rotate via the Win32 gesture API.
+ * GID_ZOOM reports the absolute distance between the fingers and GID_ROTATE the
+ * absolute angle (radians); we forward the incremental scale / radians since the
+ * cross-platform pinch() / rotation() callbacks expect deltas like the Mac. */
+static double cn1WinZoomLast = 0.0;
+static double cn1WinRotateLast = 0.0;
+
+static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
+    GESTUREINFO gi;
+    ZeroMemory(&gi, sizeof(gi));
+    gi.cbSize = sizeof(gi);
+    if (!GetGestureInfo((HGESTUREINFO) lParam, &gi)) {
+        return 0;
+    }
+    int handled = 0;
+    POINT pt;
+    pt.x = gi.ptsLocation.x;
+    pt.y = gi.ptsLocation.y;
+    ScreenToClient(hwnd, &pt);
+    if (gi.dwID == GID_ZOOM) {
+        double dist = (double) gi.ullArguments;
+        if (gi.dwFlags & GF_BEGIN) {
+            cn1WinZoomLast = dist;
+        } else if (cn1WinZoomLast > 0.0 && dist > 0.0) {
+            double scale = dist / cn1WinZoomLast;
+            cn1WinZoomLast = dist;
+            cn1WinPushEvent(CN1_EVENT_PINCH, pt.x, pt.y, (int) (scale * CN1_GESTURE_FIXED + 0.5));
+        }
+        handled = 1;
+    } else if (gi.dwID == GID_ROTATE) {
+        if (gi.dwFlags & GF_BEGIN) {
+            cn1WinRotateLast = 0.0;
+        } else {
+            double angle = GID_ROTATE_ANGLE_FROM_ARGUMENT(gi.ullArguments);
+            double delta = angle - cn1WinRotateLast;
+            cn1WinRotateLast = angle;
+            cn1WinPushEvent(CN1_EVENT_ROTATE, pt.x, pt.y,
+                    (int) (delta * CN1_GESTURE_FIXED + (delta >= 0 ? 0.5 : -0.5)));
+        }
+        handled = 1;
+    }
+    if (handled) {
+        CloseGestureInfoHandle((HGESTUREINFO) lParam);
+    }
+    return handled;
+}
+#endif
+
 /* ------------------------------------------------------------- window proc */
 
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -435,6 +484,13 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             }
             return 0;
         }
+#ifdef WM_GESTURE
+        case WM_GESTURE:
+            if (cn1WinHandleGesture(hwnd, lParam)) {
+                return 0;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
+#endif
         case WM_MOUSEWHEEL:
         case WM_MOUSEHWHEEL: {
             /* The wheel message reports the cursor in SCREEN coordinates; the

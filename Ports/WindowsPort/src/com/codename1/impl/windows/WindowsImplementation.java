@@ -69,6 +69,12 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int EVENT_CLOSE = 7;
     private static final int EVENT_MOUSE_WHEEL = 8;
     private static final int EVENT_MOUSE_HWHEEL = 9;
+    private static final int EVENT_PINCH = 10;
+    private static final int EVENT_ROTATE = 11;
+
+    // The native gesture events encode their float (incremental scale / radians) as
+    // an int in 1/10000 units; see CN1_GESTURE_FIXED in cn1_windows.h.
+    private static final float GESTURE_FIXED = 10000f;
 
     // One mouse-wheel notch is WHEEL_DELTA (120). Windows defaults to scrolling
     // three lines per notch; * 5 then converted through the screen DPI gives a
@@ -648,6 +654,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     // A positive horizontal notch tilts right (scrolls content
                     // left), i.e. drags the finger left -> negative scrollX.
                     pointerWheelMoved(x, y, -wheelUnits(key), 0);
+                    break;
+                case EVENT_PINCH:
+                    // key is the incremental scale multiplier in 1/10000 units.
+                    Display.getInstance().fireMagnifyGesture(x, y, key / GESTURE_FIXED);
+                    break;
+                case EVENT_ROTATE:
+                    // key is the incremental rotation in 1/10000 radians.
+                    Display.getInstance().fireRotationGesture(x, y, key / GESTURE_FIXED);
                     break;
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();

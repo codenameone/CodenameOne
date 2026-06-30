@@ -94,8 +94,18 @@ typedef enum {
      * signed wheel delta in WHEEL_DELTA (120) units. The EDT turns it into a
      * synthetic scroll gesture (see WindowsImplementation.drainInput). */
     CN1_EVENT_MOUSE_WHEEL = 8,
-    CN1_EVENT_MOUSE_HWHEEL = 9
+    CN1_EVENT_MOUSE_HWHEEL = 9,
+    /* Trackpad pinch / rotate: x/y are the gesture's client coordinates and
+     * keyCode is the incremental value in 1/10000 units -- an incremental scale
+     * multiplier for PINCH (10000 == scale 1.0) and incremental radians for
+     * ROTATE. drainInput decodes these into Display.fireMagnifyGesture /
+     * fireRotationGesture, the same hooks the macOS trackpad drives. */
+    CN1_EVENT_PINCH = 10,
+    CN1_EVENT_ROTATE = 11
 } CN1EventType;
+
+/* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
+#define CN1_GESTURE_FIXED 10000
 
 typedef struct {
     JAVA_INT type;

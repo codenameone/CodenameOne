@@ -62,8 +62,18 @@ typedef enum {
     CN1_EVENT_SIZE_CHANGED = 6,
     CN1_EVENT_CLOSE = 7,
     CN1_EVENT_MOUSE_WHEEL = 8,
-    CN1_EVENT_MOUSE_HWHEEL = 9
+    CN1_EVENT_MOUSE_HWHEEL = 9,
+    /* Touchpad pinch / rotate: x/y are the gesture's widget coordinates and
+     * keyCode is the incremental value in 1/10000 units -- an incremental scale
+     * multiplier for PINCH (10000 == scale 1.0) and incremental radians for
+     * ROTATE. drainInput decodes these into Display.fireMagnifyGesture /
+     * fireRotationGesture, the same hooks the macOS trackpad drives. */
+    CN1_EVENT_PINCH = 10,
+    CN1_EVENT_ROTATE = 11
 } CN1EventType;
+
+/* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
+#define CN1_GESTURE_FIXED 10000
 
 /* For pointer (pressed/released/dragged) events the otherwise-unused keyCode
  * field carries the pointer metadata: the low bits are a button bitmask that

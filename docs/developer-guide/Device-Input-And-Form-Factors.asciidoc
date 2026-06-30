@@ -105,10 +105,20 @@ mouse wheel listener receives the crown as a `WheelEvent`.
 
 === Trackpad gestures (magnify and rotate)
 
-Beyond scrolling, the macOS trackpad reports magnify (pinch) and rotate gestures. Override
+Beyond scrolling, the trackpad reports magnify (pinch) and rotate gestures. Override
 `pinch(float scale)` to zoom and `rotation(float radians)` to rotate; both return true to mark the
 gesture as handled. `pinch` is also driven by a two finger pinch on touch screens, so the same code
-works on mobile and the Mac.
+works on mobile and the desktop.
+
+The trackpad gestures are wired on every desktop port: the macOS trackpad, the Windows touch screen
+and gesture-capable touchpads (through the system `WM_GESTURE` messages), and the Linux touchpad
+(through the GTK touchpad gesture events). `scale` is an incremental zoom factor (just above or below
+`1.0`) and `radians` is the incremental rotation since the previous callback, so accumulate them to
+track the total.
+
+NOTE: A Windows precision touchpad usually reports a pinch as control plus wheel rather than a system
+gesture, so it also arrives through the universal wheel API. Handle that case with a
+`addMouseWheelListener` that checks `isControlDown()` (shown above) if you target those devices.
 
 [source,java]
 ----
