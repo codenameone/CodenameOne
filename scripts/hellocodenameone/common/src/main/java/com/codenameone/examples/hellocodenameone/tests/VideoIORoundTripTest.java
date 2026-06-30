@@ -57,6 +57,9 @@ public class VideoIORoundTripTest extends BaseTest {
                 runRoundTrip();
             }
         }, "cn1-videoio-roundtrip");
+        // Daemon so a slow/blocked native media call (e.g. a GStreamer pipeline that never
+        // reaches EOS on a codec-less host) can never keep the suite process alive.
+        worker.setDaemon(true);
         worker.start();
         return true;
     }

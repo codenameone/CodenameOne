@@ -49,18 +49,11 @@ open class HelloCodenameOne : Lifecycle() {
         } catch (t: Throwable) {
             System.out.println("CN1SS:CARPLAY_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
         }
-        // Diagnostic for the VideoIO encode/decode API (com.codename1.media.VideoIO). The
-        // VideoIORoundTripTest registered in Cn1ssDeviceRunner does the real cross-platform
-        // exercise (encode 6 frames + audio, decode + verify), which is also what makes the
-        // build compile the native backends: AVFoundation on iOS/Mac, MediaCodec on Android,
-        // Media Foundation on Windows, GStreamer on Linux and WebCodecs/HTML5 on JavaScript.
-        try {
-            val videoSupported = com.codename1.media.VideoIO.isSupported()
-            val encoders = if (videoSupported) com.codename1.media.VideoIO.getVideoIO().availableEncoders.size else 0
-            System.out.println("CN1SS:VIDEOIO_DIAG supported=$videoSupported encoders=$encoders")
-        } catch (t: Throwable) {
-            System.out.println("CN1SS:VIDEOIO_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
-        }
+        // NOTE: VideoIO is exercised by VideoIORoundTripTest (registered LAST in
+        // Cn1ssDeviceRunner), not here. Touching the native media stack (AVFoundation on
+        // iOS/Mac, GStreamer on Linux, ...) at startup perturbs the display color space and
+        // contends with rendering, which shifts the screenshot baselines -- so the only
+        // VideoIO activity must happen after every screenshot has been captured.
         try {
             NativeInterfaceLanguageValidator.validate()
         } catch (t: Throwable) {

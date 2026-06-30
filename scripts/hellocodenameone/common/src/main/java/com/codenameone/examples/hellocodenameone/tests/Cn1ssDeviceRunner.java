@@ -97,10 +97,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // every test ends up in the jar regardless, and the platform-specific
     // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
-            // VideoIO cross-platform coverage: encodes a 6-frame counting clip with
-            // audio, decodes the frames back and verifies the count order + PCM levels.
-            // Assertion test (no screenshot); SKIPs where the platform can't encode.
-            new VideoIORoundTripTest(),
             new MainScreenScreenshotTest(),
             // Advertising API: renders a banner + native-ad feed via the
             // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.
@@ -339,7 +335,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // Inert on phone/tablet ports (plain Toolbar + hamburger side menu + faded scrollbar);
             // on the Mac native build it enables desktop mode (commands move to the native menu
             // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
-            new DesktopModeScreenshotTest()
+            new DesktopModeScreenshotTest(),
+            // VideoIO cross-platform coverage: encodes a 6-frame counting clip with audio,
+            // decodes the frames back and verifies the count order + PCM levels. Assertion
+            // test (no screenshot); SKIPs where the platform can't encode. Deliberately LAST:
+            // its background encode/decode worker drives the native media stack (AVFoundation
+            // / MediaCodec / Media Foundation / GStreamer / WebCodecs), which can perturb the
+            // display color space (macOS) or contend with GTK/Cairo rendering (Linux musl).
+            // Running it after every screenshot leaves all baselines untouched.
+            new VideoIORoundTripTest()
     };
 
     private static BaseTest prependedTest;
