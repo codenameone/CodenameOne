@@ -120,11 +120,24 @@ static JAVA_LONG cn1ReaderOpen(const wchar_t* url) {
     st->audioChannels = -1;
     st->stride = 0;
 
-    // Configure the video stream to deliver RGB32 (BGRA byte order).
+    // Configure the video stream to deliver RGB32 (BGRA byte order), top-down.
     ComPtr<IMFMediaType> rgbType;
     if (SUCCEEDED(MFCreateMediaType(&rgbType))) {
         rgbType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
         rgbType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
+        // RGB32 is delivered bottom-up by default in Media Foundation, so the
+        // decoded frames came out vertically flipped. Pin the frame size and a
+        // positive MF_MT_DEFAULT_STRIDE to request a top-down layout, matching
+        // Codename One's top-down RGBA convention.
+        UINT32 nativeW = 0, nativeH = 0;
+        ComPtr<IMFMediaType> nativeType;
+        if (SUCCEEDED(reader->GetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_VIDEO_STREAM, &nativeType))) {
+            MFGetAttributeSize(nativeType.Get(), MF_MT_FRAME_SIZE, &nativeW, &nativeH);
+        }
+        if (nativeW > 0 && nativeH > 0) {
+            MFSetAttributeSize(rgbType.Get(), MF_MT_FRAME_SIZE, nativeW, nativeH);
+            rgbType->SetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32) (nativeW * 4));
+        }
         if (SUCCEEDED(reader->SetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_VIDEO_STREAM, NULL, rgbType.Get()))) {
             st->hasVideo = true;
             ComPtr<IMFMediaType> current;
@@ -337,6 +350,10 @@ static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int hei
     videoIn->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
     videoIn->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
     videoIn->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+    // Declare the input rows as top-down (positive stride) so Media Foundation
+    // does not treat our top-down RGBA frames as bottom-up RGB32 and store them
+    // vertically flipped.
+    videoIn->SetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32) (width * 4));
     MFSetAttributeSize(videoIn.Get(), MF_MT_FRAME_SIZE, width, height);
     MFSetAttributeRatio(videoIn.Get(), MF_MT_FRAME_RATE, fpsNum, fpsDen);
     MFSetAttributeRatio(videoIn.Get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
