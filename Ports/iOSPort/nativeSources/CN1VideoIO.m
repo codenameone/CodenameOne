@@ -166,9 +166,9 @@ static JAVA_LONG cn1FrameAt(CN1VideoReaderState* st, JAVA_LONG ms) {
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGContextRef ctx = CGBitmapContextCreate(buffer, w, h, 8, stride, cs,
             kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-    // Flip so memory row 0 == top of image (CG origin is bottom-left).
-    CGContextTranslateCTM(ctx, 0, h);
-    CGContextScaleCTM(ctx, 1.0, -1.0);
+    // Draw straight: a raw CGBitmapContext already stores row 0 == top of the
+    // image, so CGContextDrawImage yields top-down RGBA. (An extra CTM flip here
+    // mirrored the frames vertically -- decoded video came out upside down.)
     CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
     CGContextRelease(ctx);
     CGColorSpaceRelease(cs);
