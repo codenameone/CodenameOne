@@ -1523,6 +1523,11 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             pthread_mutex_init(&data->__codenameOneMutex, NULL);
             pthread_cond_init(&data->__codenameOneCondition, NULL);
             __atomic_store_n(&obj->__codenameOneThreadData, data, __ATOMIC_RELEASE);
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_BIBOP_NO_FASTSWEEP)
+            // If obj is a BiBOP slot, flag that a monitor now needs freeing at reclaim so
+            // the O(1) all-dead page shortcut is suppressed until it is freed.
+            cn1BibopNoteMonitorAttached(obj);
+#endif
         }
         unlockCriticalSection();
         err = pthread_mutex_lock(&data->__codenameOneMutex);

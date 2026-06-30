@@ -520,6 +520,29 @@ public class ByteCodeClass {
         return false;
     }
 
+    // True iff this class OR any ancestor actually declares a finalize() override, i.e.
+    // the emitted __FINALIZER_<class> chain runs real user code (not just the empty
+    // Object finalizer). Used to decide whether the clazz.finalizerFunction pointer is
+    // worth emitting: a class with no real finalizer anywhere in its hierarchy gets a
+    // null pointer, so freeAndFinalize / cn1BibopReclaimSlot (both guard `ptr != 0`)
+    // skip a no-op indirect call -- and the BiBOP sweep can treat such a page's dead
+    // slots as needing no per-slot reclaim work. Conservative on an unresolved base.
+    private boolean hasRealFinalizerInHierarchy() {
+        ByteCodeClass c = this;
+        while(c != null) {
+            if(c.hasFinalizer()) {
+                return true;
+            }
+            if(c.baseClassObject == null) {
+                // root (Object: baseClass==null) -> no real finalizer; otherwise the base
+                // is unresolved -> assume it might declare one.
+                return c.baseClass != null;
+            }
+            c = c.baseClassObject;
+        }
+        return false;
+    }
+
     private boolean isInterfaceInHierarchy(String className) {
         if (clsName.equals(className)) {
             return true;
@@ -582,11 +605,19 @@ public class ByteCodeClass {
         // object fields so class will be compatible to object
         
         if(clsName.equals("java_lang_Class")) {
-            b.append("  DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, &__FINALIZER_");
+            b.append("  DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, ");
         } else {
-            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, &__FINALIZER_");
+            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, ");
         }
-        b.append(clsName);
+        // finalizerFunction: null unless a real finalize() exists in the hierarchy (the
+        // __FINALIZER_<class> chain is still emitted for classes that DO, so subclass
+        // chaining is unaffected).
+        if(hasRealFinalizerInHierarchy()) {
+            b.append("&__FINALIZER_");
+            b.append(clsName);
+        } else {
+            b.append("0");
+        }
         b.append(" ,0 , &__GC_MARK_");
         b.append(clsName);
         

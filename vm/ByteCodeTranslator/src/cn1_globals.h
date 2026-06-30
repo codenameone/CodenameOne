@@ -1141,12 +1141,35 @@ typedef struct CN1BibopPage {
     void* freeList;                       // intrusive free-list head (slot ptr)
     int freeCount;
     JAVA_BOOLEAN owned;
+    // ---- O(live-pages) sweep bookkeeping (perf-tier1, gated by CN1_BIBOP_NO_FASTSWEEP)
+    // These let cn1BibopSweep reclaim an all-dead page or skip an all-live (in-grace)
+    // page in O(1) -- without the per-slot walk -- whenever it can PROVE the page is
+    // homogeneous. The fields are always present (so the struct layout is identical in
+    // A/B builds); only the writes/reads are gated. See cn1BibopSweep for the proof.
+    JAVA_BOOLEAN gcAllocedSinceSweep;     // any alloc into the page since last sweep/reset
+                                          // (owner-thread single-writer; published to the
+                                          //  GC via the sweep-stack release-push)
+    JAVA_BOOLEAN gcNeedsReclaim;          // a survivor carries a finalizer or monitor ->
+                                          //  dead slots must reach cn1BibopReclaimSlot
+                                          //  (recomputed at every full walk)
+    _Atomic int gcLastMarkedEpoch;        // currentGcMarkValue stamped by gcMarkObject when
+                                          //  a slot on this page is marked live (relaxed;
+                                          //  idempotent across parallel markers)
+    int gcGraceEpoch;                     // upper bound on survivor epochs as of the last
+                                          //  full walk (GC-thread only)
 } CN1BibopPage;
 
 // Per-thread current page per size class; defined in cn1_globals.m. Touched only
 // by the owning thread (alloc) and by that same thread on death.
 extern __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 extern _Atomic long bibopBytesSinceGc;
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+// Called from monitorEnter (any thread) when a monitor (CN1ThreadData) is freshly
+// attached to a heap object. If the object is a BiBOP slot it bumps a global live-monitor
+// count so the O(1) all-dead page shortcut is suppressed until every BiBOP monitor has
+// been freed by cn1BibopReclaimSlot. No-op for non-BiBOP objects.
+extern void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj);
+#endif
 extern int allocationsSinceLastGC;
 extern long long totalAllocations;
 
@@ -1196,6 +1219,13 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+            // Mark the page dirty so the O(1) sweep never treats a page that still has
+            // fresh mark==-1 (grace-candidate) slots as homogeneous. Single plain store
+            // to the already-hot page header; published to the GC by the eventual
+            // retire release-push.
+            p->gcAllocedSinceSweep = JAVA_TRUE;
+#endif
             CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
             // keep the legacy GC-trigger counters in step with the slow path so
             // collection cadence is unchanged (these are plain globals, raced

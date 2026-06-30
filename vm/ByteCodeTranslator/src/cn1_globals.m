@@ -1274,6 +1274,18 @@ static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
 _Atomic long bibopBytesSinceGc = 0;
 
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+// Number of live monitors (lazily-malloc'd CN1ThreadData) currently attached to BiBOP
+// slots. Incremented (seq_cst, globally visible) by cn1BibopNoteMonitorAttached when
+// monitorEnter first attaches a monitor to a BiBOP object; decremented by
+// cn1BibopReclaimSlot when it free()s one. While > 0 the sweep's O(1) all-dead shortcut
+// is suppressed, so every dead monitored slot is guaranteed to reach cn1BibopReclaimSlot
+// (the only place a BiBOP monitor is freed). This sidesteps the cross-thread visibility
+// problem of a per-page flag: a monitor can be attached by ANY thread to a survivor on a
+// page it does not own, with no happens-before to that page's later retire-push.
+static _Atomic int cn1BibopLiveMonitors = 0;
+#endif
+
 // Per-thread current page per size class. Only ever touched by the owning
 // thread (allocation) and by that same thread on death (collectThreadResources
 // runs on the dying thread), so __thread is correct and the GC never needs to
@@ -1307,6 +1319,12 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeList = 0;
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+    p->gcAllocedSinceSweep = JAVA_FALSE;
+    p->gcNeedsReclaim = JAVA_FALSE;
+    atomic_store_explicit(&p->gcLastMarkedEpoch, 0, memory_order_relaxed);
+    p->gcGraceEpoch = 0;
+#endif
 }
 
 // Raw 64KB page memory comes from large arenas -- one posix_memalign per
@@ -1510,6 +1528,9 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
                 // publish the new cursor with release AFTER the slot (incl. its
                 // mark) is fully initialized.
                 atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+                p->gcAllocedSinceSweep = JAVA_TRUE;
+#endif
                 CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
                 return o;
             }
@@ -1524,6 +1545,9 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     }
     // free-list slot path
     cn1BibopInitSlot(threadStateData, o, size, parent);
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+    p->gcAllocedSinceSweep = JAVA_TRUE;
+#endif
     CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
     return o;
 }
@@ -1539,21 +1563,100 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     if(o->__codenameOneThreadData) {
         free(o->__codenameOneThreadData);
         o->__codenameOneThreadData = 0;
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+        // Balance the increment in cn1BibopNoteMonitorAttached. codenameOneGcFree (the
+        // large/heap path) early-returns for BiBOP slots, so this is the ONLY site that
+        // frees a BiBOP monitor -> the count is exactly balanced.
+        atomic_fetch_sub_explicit(&cn1BibopLiveMonitors, 1, memory_order_seq_cst);
+#endif
     }
 }
+
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
+    if(obj != JAVA_NULL && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+        atomic_fetch_add_explicit(&cn1BibopLiveMonitors, 1, memory_order_seq_cst);
+    }
+}
+#endif
 
 // Sweep all retired pages. Runs on the GC thread AFTER mark completes; the
 // pages it processes are off the SWEEP stack (owner==0), so no mutator is
 // allocating into them and no marking is in flight -> plain header access.
 static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     CN1BibopPage* list = atomic_exchange_explicit(&bibopSweepStack, (CN1BibopPage*)0, memory_order_acquire);
+    int V = currentGcMarkValue;  // stable during the sweep (mark done, not yet incremented)
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+    // Snapshot once: if ANY BiBOP object currently carries a monitor, suppress the O(1)
+    // all-dead shortcut this whole sweep so dead monitored slots are full-walked and
+    // their monitor freed. Safe to cache: a homogeneous all-dead page's slots are
+    // unreachable (not marked this cycle, aged >=2 cycles), so no mutator can hold a
+    // reference to monitorEnter one during this sweep; any concurrent attach is to a live
+    // object on some OTHER page and is observed by the next sweep.
+    int monitorsLive = atomic_load_explicit(&cn1BibopLiveMonitors, memory_order_seq_cst) > 0;
+#endif
     while(list != 0) {
         CN1BibopPage* page = list;
         list = page->nextPool;
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+        // ---- O(1) page decision (no per-slot walk). -------------------------------
+        // A page is HOMOGENEOUS when every occupied slot is a dead-or-graced object
+        // sitting at a single (upper-bounded) epoch. That holds iff:
+        //   * !gcAllocedSinceSweep  -> nothing was allocated into it since its last
+        //       sweep, so it has NO fresh mark==-1 grace-candidate slots; and
+        //   * gcLastMarkedEpoch != V -> nothing on it was marked THIS cycle, so it holds
+        //       no live (reachable) object -- a reachable object is always marked, so an
+        //       unmarked-this-cycle occupant is unreachable garbage in grace-aging; and
+        //   * !gcNeedsReclaim       -> no survivor carries a finalizer (monitors handled
+        //       by the global monitorsLive gate); and
+        //   * freeList == 0         -> the page is full (defensive: a homogeneous page
+        //       can only reach here full -- a partial page, once adopted, is always
+        //       allocated into before re-retire, which sets gcAllocedSinceSweep).
+        // gcGraceEpoch is the upper bound on survivor epochs as of the last full walk.
+        if(page->gcAllocedSinceSweep == JAVA_FALSE &&
+           page->gcNeedsReclaim == JAVA_FALSE &&
+           page->freeList == 0 &&
+           atomic_load_explicit(&page->gcLastMarkedEpoch, memory_order_relaxed) != V) {
+            int graceEpoch = page->gcGraceEpoch;
+            if(graceEpoch >= V - 1) {
+                // STILL IN GRACE -> all occupants survive this cycle. The full walk would
+                // grace/keep them and route the full all-live page to partialPool; do
+                // exactly that without a walk. Leave gcGraceEpoch UNCHANGED so the page
+                // ages and a later cycle re-evaluates it (-> all-dead) rather than pinning
+                // the garbage forever.
+                pthread_mutex_lock(&bibopMutex);
+                page->nextPool = bibopPartialPool[page->classIndex];
+                bibopPartialPool[page->classIndex] = page;
+                pthread_mutex_unlock(&bibopMutex);
+                continue;
+            } else if(!monitorsLive) {
+                // AGED PAST GRACE (even the youngest survivor at gcGraceEpoch < V-1 is
+                // dead) and no BiBOP monitor exists to free -> the full walk would
+                // reclaim every slot (no finalizers) and route the page to freePool,
+                // where it is reformatted on reuse. Byte-identical outcome WITHOUT
+                // touching a single slot: just reset the page and pool it.
+                atomic_store_explicit(&page->bumpIndex, 0, memory_order_relaxed);
+                page->freeList = 0;
+                page->freeCount = 0;
+                page->gcAllocedSinceSweep = JAVA_FALSE;
+                page->gcNeedsReclaim = JAVA_FALSE;
+                pthread_mutex_lock(&bibopMutex);
+                page->nextPool = bibopFreePool;
+                bibopFreePool = page;
+                pthread_mutex_unlock(&bibopMutex);
+                continue;
+            }
+            // else: all-dead but a BiBOP monitor is live -> fall through to the full walk
+            // so the dead monitored slot(s) reach cn1BibopReclaimSlot.
+        }
+#endif
         int n = atomic_load_explicit(&page->bumpIndex, memory_order_relaxed);
         void* fl = 0;
         int freeCount = 0;
         int liveCount = 0;
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+        JAVA_BOOLEAN needsReclaim = JAVA_FALSE;
+#endif
         for(int i = 0 ; i < n ; i++) {
             JAVA_OBJECT o = cn1BibopSlot(page, i);
             int m = o->__codenameOneGcMark;
@@ -1561,18 +1664,34 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 *(void**)o = fl; fl = o; freeCount++;
             } else if(m == -1) {
                 // fresh, never marked -> one cycle of grace (legacy parity)
-                o->__codenameOneGcMark = currentGcMarkValue;
+                o->__codenameOneGcMark = V;
                 liveCount++;
-            } else if(m < currentGcMarkValue - 1) {
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+                if(o->__codenameOneParentClsReference->finalizerFunction != 0 || o->__codenameOneThreadData != 0) needsReclaim = JAVA_TRUE;
+#endif
+            } else if(m < V - 1) {
                 cn1BibopReclaimSlot(threadStateData, o);
                 o->__codenameOneGcMark = CN1_BIBOP_FREE_MARK;
                 *(void**)o = fl; fl = o; freeCount++;
             } else {
                 liveCount++;
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+                if(o->__codenameOneParentClsReference->finalizerFunction != 0 || o->__codenameOneThreadData != 0) needsReclaim = JAVA_TRUE;
+#endif
             }
         }
         page->freeList = fl;
         page->freeCount = freeCount;
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+        // Refresh the per-page facts for the next sweep. gcGraceEpoch = V is a safe upper
+        // bound on every survivor's epoch (survivors are at V from grace/mark-this-cycle,
+        // or at V-1 from aging) so the all-dead test (gcGraceEpoch < V-1) can never fire
+        // while a live/grace object remains. needsReclaim reflects only the actual
+        // survivors of THIS walk (dead slots were just reclaimed).
+        page->gcAllocedSinceSweep = JAVA_FALSE;
+        page->gcNeedsReclaim = needsReclaim;
+        page->gcGraceEpoch = V;
+#endif
         pthread_mutex_lock(&bibopMutex);
         if(liveCount == 0) {
             page->nextPool = bibopFreePool;
@@ -2413,6 +2532,22 @@ extern void cn1NurseryPromote(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
 struct JavaObjectPrototype cn1TaggedProxy = { .__codenameOneParentClsReference = &class__java_lang_Integer };
 #endif
 
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_BIBOP_NO_FASTSWEEP)
+// Stamp the BiBOP page of a just-marked-live object with the current epoch so the sweep
+// knows the page had a live slot THIS cycle (-> must full-walk, never O(1) all-dead).
+// Relaxed + idempotent: every parallel marker that newly marks a slot on this page stores
+// the same value; the GC-thread sweep reads it after the mark-pool join barrier.
+static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal) {
+    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+        CN1BibopPage* pg = (CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
+        atomic_store_explicit(&pg->gcLastMarkedEpoch, markVal, memory_order_relaxed);
+    }
+}
+#define CN1_BIBOP_STAMP_MARKED(o, m) cn1BibopStampMarked((o), (m))
+#else
+#define CN1_BIBOP_STAMP_MARKED(o, m) do {} while(0)
+#endif
+
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
@@ -2444,6 +2579,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
             return; // already marked this cycle
         }
         if(__sync_bool_compare_and_swap(&obj->__codenameOneGcMark, old, markVal)) {
+            CN1_BIBOP_STAMP_MARKED(obj, markVal);
             if(obj->__codenameOneParentClsReference->markFunction != 0) {
                 gcMarkWorklistPush(obj, force);
             }
@@ -2467,6 +2603,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         return;
     }
     obj->__codenameOneGcMark = markVal;
+    CN1_BIBOP_STAMP_MARKED(obj, markVal);
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
     if(obj->__codenameOneParentClsReference->markFunction != 0) {
         gcMarkWorklistPush(obj, force);
