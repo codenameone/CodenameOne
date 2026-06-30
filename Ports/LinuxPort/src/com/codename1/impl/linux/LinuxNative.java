@@ -146,6 +146,12 @@ public final class LinuxNative {
     public static native boolean pollEvent(int[] out);
 
     /**
+     * True when the default seat has a touchscreen device, used for
+     * {@code Display.isTouchScreen()}.
+     */
+    public static native boolean isTouchDevice();
+
+    /**
      * Parks the calling (main) thread to keep the process alive in headless
      * screenshot mode, where there is no window message loop. The EDT exits the
      * process via {@link #headlessTick()} once the screenshot has been written.

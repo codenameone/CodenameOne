@@ -5675,6 +5675,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 >= Configuration.SCREENLAYOUT_SIZE_LARGE;
     }
 
+    // Foldable / device posture, backed by androidx.window via reflection. The androidx.window
+    // dependency is only present when the app opts in with the android.foldableSupport build hint;
+    // when absent these all degrade safely to "not foldable". The tracker is started lazily so it
+    // only spins up for apps that query the posture APIs.
+    @Override
+    public boolean isFoldable() {
+        AndroidFoldablePosture.start(getActivity());
+        return AndroidFoldablePosture.isFoldable();
+    }
+
+    @Override
+    public int getDevicePosture() {
+        AndroidFoldablePosture.start(getActivity());
+        return AndroidFoldablePosture.getPosture();
+    }
+
+    @Override
+    public int getFoldOrientation() {
+        AndroidFoldablePosture.start(getActivity());
+        return AndroidFoldablePosture.getFoldOrientation();
+    }
+
+    @Override
+    public boolean isPostureSeparating() {
+        AndroidFoldablePosture.start(getActivity());
+        return AndroidFoldablePosture.isSeparating();
+    }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getFoldBounds(com.codename1.ui.geom.Rectangle rect) {
+        AndroidFoldablePosture.start(getActivity());
+        return AndroidFoldablePosture.getFoldBounds(rect);
+    }
+
     private Boolean watchCache;
 
     @Override

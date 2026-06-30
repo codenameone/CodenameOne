@@ -623,7 +623,9 @@ public class CodenameOneView {
             isPeer = !Sheet.isSheetVisibleAt(primaryX, primaryY);
         }
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
-    
+
+        updatePointerMetadata(event, false);
+
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (x == null) {
@@ -668,6 +670,7 @@ public class CodenameOneView {
         }
         final int x = (int) event.getX();
         final int y = (int) event.getY();
+        updatePointerMetadata(event, true);
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_HOVER_ENTER:
                 this.implementation.pointerHoverPressed(x, y);
@@ -680,6 +683,127 @@ public class CodenameOneView {
                 return true;
         }
         return false;
+    }
+
+    /**
+     * Routes Android generic motion events into Codename One. This captures the
+     * mouse wheel and trackpad scroll axes (vertical and horizontal) from
+     * external pointing devices (BT mouse, Chromebook trackpad, DeX) which are
+     * not delivered through onTouchEvent.
+     */
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        if (this.implementation.getCurrentForm() == null) {
+            return false;
+        }
+        if (event.getActionMasked() == MotionEvent.ACTION_SCROLL) {
+            float vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+            float hscroll = event.getAxisValue(MotionEvent.AXIS_HSCROLL);
+            if (vscroll == 0 && hscroll == 0) {
+                return false;
+            }
+            int x = (int) event.getX();
+            int y = (int) event.getY();
+            // A positive scrollY reveals content above (drag down); Android reports a
+            // positive VSCROLL when scrolling away from the user, so negate to match.
+            int step = this.implementation.convertToPixels(20, true);
+            int scrollY = Math.round(-vscroll * step);
+            int scrollX = Math.round(-hscroll * step);
+            this.implementation.pointerWheelMoved(x, y, scrollX, scrollY, true, motionModifierMask(event));
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Translates the Android MotionEvent tool type, pressure, contact size, tilt
+     * and button state into the cross-platform pointer metadata so the
+     * multi-button mouse and stylus APIs work on Android. When hovering is true
+     * the metadata is flagged as a hover (no contact).
+     */
+    private void updatePointerMetadata(MotionEvent event, boolean hovering) {
+        int toolType;
+        try {
+            toolType = event.getToolType(0);
+        } catch (Throwable t) {
+            toolType = MotionEvent.TOOL_TYPE_UNKNOWN;
+        }
+        int type;
+        switch (toolType) {
+            case MotionEvent.TOOL_TYPE_STYLUS:
+                type = com.codename1.ui.events.PointerEvent.TYPE_STYLUS;
+                break;
+            case MotionEvent.TOOL_TYPE_ERASER:
+                type = com.codename1.ui.events.PointerEvent.TYPE_ERASER;
+                break;
+            case MotionEvent.TOOL_TYPE_MOUSE:
+                type = com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+                break;
+            case MotionEvent.TOOL_TYPE_FINGER:
+                type = com.codename1.ui.events.PointerEvent.TYPE_TOUCH;
+                break;
+            default:
+                type = com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN;
+                break;
+        }
+        float pressure = event.getPressure(0);
+        if (pressure <= 0) {
+            pressure = 1f;
+        }
+        float contactSize = event.getSize(0);
+        float tiltX = (float) Math.toDegrees(event.getAxisValue(MotionEvent.AXIS_TILT, 0));
+
+        int buttonState = event.getButtonState();
+        int mask = 0;
+        if ((buttonState & MotionEvent.BUTTON_PRIMARY) != 0) {
+            mask |= com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+        }
+        if ((buttonState & MotionEvent.BUTTON_SECONDARY) != 0) {
+            mask |= com.codename1.ui.events.PointerEvent.MASK_SECONDARY;
+        }
+        if ((buttonState & MotionEvent.BUTTON_TERTIARY) != 0) {
+            mask |= com.codename1.ui.events.PointerEvent.MASK_MIDDLE;
+        }
+        if ((buttonState & MotionEvent.BUTTON_BACK) != 0) {
+            mask |= com.codename1.ui.events.PointerEvent.MASK_BACK;
+        }
+        if ((buttonState & MotionEvent.BUTTON_FORWARD) != 0) {
+            mask |= com.codename1.ui.events.PointerEvent.MASK_FORWARD;
+        }
+        int button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        if ((mask & com.codename1.ui.events.PointerEvent.MASK_SECONDARY) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_MIDDLE) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_BACK) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_BACK;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_FORWARD) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
+        } else if (mask == 0) {
+            mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+        }
+        this.implementation.setPointerEventMetadata(button, mask, type, pressure, tiltX, 0, contactSize,
+                motionModifierMask(event), hovering);
+    }
+
+    /**
+     * Builds the cross-platform keyboard modifier mask from an Android MotionEvent meta state.
+     */
+    private int motionModifierMask(MotionEvent event) {
+        int meta = event.getMetaState();
+        int modifiers = 0;
+        if ((meta & android.view.KeyEvent.META_SHIFT_ON) != 0) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_SHIFT;
+        }
+        if ((meta & android.view.KeyEvent.META_CTRL_ON) != 0) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_CONTROL;
+        }
+        if ((meta & android.view.KeyEvent.META_ALT_ON) != 0) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_ALT;
+        }
+        if ((meta & android.view.KeyEvent.META_META_ON) != 0) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_META;
+        }
+        return modifiers;
     }
 
     public AndroidGraphics getGraphics() {

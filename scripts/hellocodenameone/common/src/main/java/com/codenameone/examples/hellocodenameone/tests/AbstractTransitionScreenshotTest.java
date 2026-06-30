@@ -96,20 +96,47 @@ public abstract class AbstractTransitionScreenshotTest extends AbstractAnimation
 
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
-        if (frameIndex == 0) {
-            // Pre-animation: paint the source as the user would see it just
-            // before triggering the transition.
-            sourceForm.paintComponent(g, true);
+        if (paintBookendDirectly(frameIndex)) {
+            if (frameIndex == 0) {
+                // Pre-animation: paint the source as the user would see it just
+                // before triggering the transition.
+                sourceForm.paintComponent(g, true);
+            } else {
+                // Post-animation: paint the destination as the user would see it
+                // after the transition finishes.
+                destForm.paintComponent(g, true);
+            }
             return;
         }
-        if (frameIndex == LAST_FRAME_INDEX) {
-            // Post-animation: paint the destination as the user would see it
-            // after the transition finishes.
-            destForm.paintComponent(g, true);
-            return;
-        }
-        transition.animate();
+        advanceTransition(progress);
         transition.paint(g);
+    }
+
+    /// The transition under test (valid between `prepareCapture` and
+    /// `finishCapture`). Exposed so subclasses can drive it themselves in
+    /// `#advanceTransition(double)`.
+    protected final Transition getTransition() {
+        return transition;
+    }
+
+    /// Whether the given frame is painted as a direct source / destination
+    /// snapshot (the default "before" / "after" bookends) instead of being
+    /// driven through the transition. Override to return `false` so every frame
+    /// goes through `#advanceTransition(double)` + `transition.paint(...)` --
+    /// useful for a fully scrubbable transition where you want the whole sweep
+    /// rendered by the transition itself.
+    protected boolean paintBookendDirectly(int frameIndex) {
+        return frameIndex == 0 || frameIndex == LAST_FRAME_INDEX;
+    }
+
+    /// Advances the transition to the given progress fraction before it is
+    /// painted. The default drives it from the animation clock via `animate()`
+    /// (the legacy behaviour, deterministic because the base class pins
+    /// `AnimationTime`). A scrubbable transition such as `MorphTransition` can
+    /// override this to step deterministically to `progress`, e.g.
+    /// `((MorphTransition) getTransition()).setProgress(progress)`.
+    protected void advanceTransition(double progress) {
+        transition.animate();
     }
 
     protected String getSourceTitle() {

@@ -1767,6 +1767,23 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // Foldable / dual-screen support. The com.codename1.ui.DevicePosture API reads the device
+        // fold posture through androidx.window using reflection, so the gradle dependency is added
+        // ONLY when the app opts in with the build hint android.foldableSupport=true. Apps that do
+        // not use the foldable APIs get zero added weight. The version can be overridden with
+        // android.windowVersion.
+        boolean useFoldableSupport = "true".equals(request.getArg("android.foldableSupport", "false"));
+        if (useFoldableSupport) {
+            if (!request.getArg("gradleDependencies", "").contains("androidx.window:window")) {
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"androidx.window:window:" +
+                                request.getArg("android.windowVersion", "1.3.0") + "\"\n"
+                );
+            }
+        }
+
 
 
         // if a flag is declared we don't want the default play flag to be true

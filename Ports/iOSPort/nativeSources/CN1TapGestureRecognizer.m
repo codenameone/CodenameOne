@@ -32,6 +32,7 @@
 extern void pointerPressedC(int* x, int* y, int length);
 extern void pointerDraggedC(int* x, int* y, int length);
 extern void pointerReleasedC(int* x, int* y, int length);
+extern void cn1CapturePointerMetadata(UITouch* touch);
 extern NSMutableArray* touchesArray;
 extern int CN1lastTouchX;
 extern int CN1lastTouchY;
@@ -169,6 +170,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         CN1lastTouchX = (int)point.x;
         CN1lastTouchY = (int)point.y;
     }
+    cn1CapturePointerMetadata(touch);
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();
 }
@@ -200,6 +202,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         return;
     }
     CGPoint point = [touch locationInView:ctrl.view];
+    cn1CapturePointerMetadata(touch);
     if([touchesArray count] > 1) {
         for(int iter = 0 ; iter < [touchesArray count] ; iter++) {
             UITouch* currentTouch = [touchesArray objectAtIndex:iter];
@@ -264,6 +267,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         //CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
         [ctrl foldKeyboard:point];
     }
+    cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     self.state = UIGestureRecognizerStateEnded;
     POOL_END();
@@ -308,6 +312,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if(!isVKBAlwaysOpen()) {
         [ctrl foldKeyboard:point];
     }
+    cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     self.state = UIGestureRecognizerStateCancelled;
     POOL_END();

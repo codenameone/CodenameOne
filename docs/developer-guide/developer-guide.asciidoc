@@ -75,6 +75,8 @@ include::Game-Assets.asciidoc[]
 
 include::Events.asciidoc[]
 
+include::Device-Input-And-Form-Factors.asciidoc[]
+
 include::io.asciidoc[]
 
 include::Push-Notifications.asciidoc[]
@@ -100,6 +102,9 @@ include::Advertising.asciidoc[]
 include::Crash-Protection.asciidoc[]
 
 include::Analytics.asciidoc[]
+
+include::Commerce.asciidoc[]
+
 
 include::Monetization.asciidoc[]
 

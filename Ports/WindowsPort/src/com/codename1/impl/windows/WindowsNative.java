@@ -144,6 +144,12 @@ public final class WindowsNative {
     public static native boolean pollEvent(int[] out);
 
     /**
+     * True when an integrated or external touch digitizer is present, used for
+     * {@code Display.isTouchScreen()} (queries GetSystemMetrics(SM_DIGITIZER)).
+     */
+    public static native boolean isTouchDevice();
+
+    /**
      * Parks the calling (main) thread to keep the process alive in headless
      * screenshot mode, where there is no window message loop. The EDT exits the
      * process via {@link #headlessTick()} once the screenshot has been written.

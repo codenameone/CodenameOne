@@ -261,6 +261,9 @@ public class Component implements Animation, StyleListener, Editable {
     EventDispatcher pointerDraggedListeners;
     EventDispatcher dragFinishedListeners;
     EventDispatcher longPressListeners;
+    EventDispatcher contextMenuListeners;
+    EventDispatcher mouseWheelListeners;
+    EventDispatcher stylusListeners;
     boolean isUnselectedStyle;
     /// A flag used by `Container#paintElevatedPane(Graphics)` to turn off rendering of elevated components
     /// when rendering the non-elevated pane.
@@ -5075,6 +5078,21 @@ public class Component implements Animation, StyleListener, Editable {
         return false;
     }
 
+    /// Invoked when a rotation (twist) gesture occurs over this component, such as a two finger
+    /// trackpad rotation on macOS or a two finger rotate on a touch screen. Override to rotate
+    /// content. Returning true marks the gesture as handled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radians`: the incremental rotation in radians since the previous callback; positive is clockwise
+    ///
+    /// #### Returns
+    ///
+    /// false by default, true if the rotation is handled
+    protected boolean rotation(float radians) {
+        return false;
+    }
+
     /// returns true if pinch will block drag and drop
     public boolean isPinchBlocksDragAndDrop() {
         return pinchBlocksDragAndDrop;
@@ -6451,6 +6469,159 @@ public class Component implements Animation, StyleListener, Editable {
             longPressListeners = new EventDispatcher();
         }
         longPressListeners.addListener(l);
+    }
+
+    /// Adds a listener that is notified when the user requests a context menu on this component.
+    /// A context menu request is triggered by a secondary (right) mouse button click, a stylus
+    /// barrel button click or a long press, giving touch and desktop a single unified callback.
+    /// The delivered `com.codename1.ui.events.ActionEvent` carries the pointer location and, via
+    /// `com.codename1.ui.events.ActionEvent#getPointerEvent()`, the button and pointer type detail.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: callback to receive context menu requests
+    public void addContextMenuListener(ActionListener l) {
+        if (contextMenuListeners == null) {
+            contextMenuListeners = new EventDispatcher();
+        }
+        contextMenuListeners.addListener(l);
+    }
+
+    /// Removes a context menu listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: callback to remove
+    public void removeContextMenuListener(ActionListener l) {
+        if (contextMenuListeners != null) {
+            contextMenuListeners.removeListener(l);
+        }
+    }
+
+    /// Adds a listener that is notified when the mouse wheel (or a trackpad scroll gesture) is
+    /// moved while the pointer is over this component. The delivered event is a
+    /// `com.codename1.ui.events.WheelEvent` exposing the scroll deltas and modifiers. Consuming the
+    /// event with `com.codename1.ui.events.ActionEvent#consume()` prevents the default scrolling
+    /// behavior, which is useful for gestures such as control plus wheel to zoom.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: callback to receive wheel events
+    public void addMouseWheelListener(ActionListener l) {
+        if (mouseWheelListeners == null) {
+            mouseWheelListeners = new EventDispatcher();
+        }
+        mouseWheelListeners.addListener(l);
+    }
+
+    /// Removes a mouse wheel listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: callback to remove
+    public void removeMouseWheelListener(ActionListener l) {
+        if (mouseWheelListeners != null) {
+            mouseWheelListeners.removeListener(l);
+        }
+    }
+
+    /// Adds a listener that is notified for stylus and pen interactions (Apple Pencil, S-Pen,
+    /// Surface Pen and similar) on this component. The listener fires on press, drag and release
+    /// when the pointer type is a stylus or eraser. The delivered event carries the full pointer
+    /// detail via `com.codename1.ui.events.ActionEvent#getPointerEvent()` including pressure and tilt.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: callback to receive stylus events
+    public void addStylusListener(ActionListener l) {
+        if (stylusListeners == null) {
+            stylusListeners = new EventDispatcher();
+        }
+        stylusListeners.addListener(l);
+    }
+
+    /// Removes a stylus listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: callback to remove
+    public void removeStylusListener(ActionListener l) {
+        if (stylusListeners != null) {
+            stylusListeners.removeListener(l);
+        }
+    }
+
+    /// Fires a context menu request to the registered listeners walking up the component hierarchy
+    /// until a listener consumes the event. Returns true if a listener consumed the request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the pointer x coordinate
+    ///
+    /// - `y`: the pointer y coordinate
+    ///
+    /// #### Returns
+    ///
+    /// true if a listener consumed the context menu request
+    boolean fireContextMenu(int x, int y) {
+        Component c = this;
+        while (c != null) {
+            if (c.contextMenuListeners != null && c.contextMenuListeners.hasListeners()) {
+                ActionEvent ev = new ActionEvent(c, ActionEvent.Type.PointerReleased, x, y);
+                ev.setPointerEvent(Display.impl.buildPointerEvent(x, y, false));
+                c.contextMenuListeners.fireActionEvent(ev);
+                if (ev.isConsumed()) {
+                    return true;
+                }
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
+
+    /// Dispatches a mouse wheel event to the registered listeners walking up the component
+    /// hierarchy until a listener consumes the event. Returns true if a listener consumed it,
+    /// in which case the default scrolling behavior should be skipped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the wheel event to dispatch
+    ///
+    /// #### Returns
+    ///
+    /// true if a listener consumed the wheel event
+    boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
+        Component c = this;
+        while (c != null) {
+            if (c.mouseWheelListeners != null && c.mouseWheelListeners.hasListeners()) {
+                c.mouseWheelListeners.fireActionEvent(ev);
+                if (ev.isConsumed()) {
+                    return true;
+                }
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
+
+    /// Fires a stylus event of the given type when this component (or a parent) has stylus
+    /// listeners and the current pointer is a stylus or eraser.
+    void fireStylusEvent(ActionEvent.Type type, int x, int y) {
+        if (!Display.getInstance().isStylusPointer()) {
+            return;
+        }
+        Component c = this;
+        while (c != null) {
+            if (c.stylusListeners != null && c.stylusListeners.hasListeners()) {
+                ActionEvent ev = new ActionEvent(c, type, x, y);
+                ev.setPointerEvent(Display.impl.buildPointerEvent(x, y, false));
+                c.stylusListeners.fireActionEvent(ev);
+                if (ev.isConsumed()) {
+                    return;
+                }
+            }
+            c = c.getParent();
+        }
     }
 
     /// Invoked to draw the ripple effect overlay in Android where the finger of the user causes a growing
