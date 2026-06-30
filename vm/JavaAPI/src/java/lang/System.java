@@ -142,9 +142,9 @@ public final class System {
         synchronized(LOCK) {
             LOCK.notify();
         }
-        try {
-            Thread.sleep(2);
-        } catch(InterruptedException er) {}
+        // EXPERIMENT: Thread.sleep(2) here yielded ~2ms to the GC thread on every
+        // trigger -- an allocation-churn workload triggers GC every CN1_BIBOP_GC_TRIGGER
+        // bytes, so that sleep is pure mutator stall. Removed for A/B (-DCN1_GC_SLEEP off).
     }
     
     private native static void gcLight();

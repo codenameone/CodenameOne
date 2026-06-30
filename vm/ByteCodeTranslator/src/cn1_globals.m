@@ -1309,9 +1309,52 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->owned = JAVA_FALSE;
 }
 
-static CN1BibopPage* cn1BibopNewPage(int ci) {
+// Raw 64KB page memory comes from large arenas -- one posix_memalign per
+// CN1_BIBOP_ARENA_PAGES pages -- instead of one syscall per page. Under
+// allocation churn the free pool drains faster than the concurrent sweep refills
+// it, so cn1BibopNewPage was hitting posix_memalign -> mach_vm_map (a kernel
+// trap) per 64KB page (~17% of an alloc-heavy benchmark, profiled). A 64KB-
+// aligned arena yields 64KB-aligned pages (the mask-to-page resolve is
+// unaffected), the arena is lazily faulted (RSS tracks touched pages, not the
+// reservation), and BiBOP never free()s a page (swept pages are pooled), so the
+// interior arena pointers are never individually released. Disable for A/B with
+// -DCN1_BIBOP_NO_ARENA.
+#ifndef CN1_BIBOP_ARENA_PAGES
+#define CN1_BIBOP_ARENA_PAGES 64   /* 64 * 64KB = 4MB reserved per kernel mmap */
+#endif
+static char* bibopArenaBase = 0;
+static size_t bibopArenaUsed = 0;
+static size_t bibopArenaCap = 0;
+static pthread_mutex_t bibopArenaMutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void* cn1BibopRawPage(void) {
+#ifdef CN1_BIBOP_NO_ARENA
     void* mem = 0;
-    if(posix_memalign(&mem, CN1_BIBOP_PAGE_SIZE, CN1_BIBOP_PAGE_SIZE) != 0 || mem == 0) {
+    if(posix_memalign(&mem, CN1_BIBOP_PAGE_SIZE, CN1_BIBOP_PAGE_SIZE) != 0) return 0;
+    return mem;
+#else
+    pthread_mutex_lock(&bibopArenaMutex);
+    if(bibopArenaBase == 0 || bibopArenaUsed + CN1_BIBOP_PAGE_SIZE > bibopArenaCap) {
+        size_t sz = (size_t)CN1_BIBOP_PAGE_SIZE * CN1_BIBOP_ARENA_PAGES;
+        void* mem = 0;
+        if(posix_memalign(&mem, CN1_BIBOP_PAGE_SIZE, sz) != 0 || mem == 0) {
+            pthread_mutex_unlock(&bibopArenaMutex);
+            return 0;
+        }
+        bibopArenaBase = (char*)mem;
+        bibopArenaUsed = 0;
+        bibopArenaCap = sz;
+    }
+    void* p = bibopArenaBase + bibopArenaUsed;
+    bibopArenaUsed += CN1_BIBOP_PAGE_SIZE;
+    pthread_mutex_unlock(&bibopArenaMutex);
+    return p;
+#endif
+}
+
+static CN1BibopPage* cn1BibopNewPage(int ci) {
+    void* mem = cn1BibopRawPage();
+    if(mem == 0) {
         return 0;
     }
     CN1BibopPage* p = (CN1BibopPage*)mem;
@@ -1334,18 +1377,51 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 // Trigger a full GC if BiBOP allocation volume since the last collection has
 // crossed the threshold (these objects don't feed the legacy heapAllocationSize
 // trigger). Mirrors codenameOneGcMalloc's simple self-triggering branch.
+// Adaptive-backpressure ceiling. The old design paced every mutator a fixed
+// Thread.sleep(2) on each GC trigger (in System.gc()), which is pure stall when
+// the concurrent collector is keeping up -- on allocate-and-drop churn that was
+// the dominant cost (objectAllocation 54ms -> 18ms once removed). But removing it
+// unconditionally let the mutator outrun the collector and balloon RSS to ~2GB.
+// Instead, pace PROPORTIONALLY: only when uncollected BiBOP volume since the last
+// GC exceeds this hard cap does the mutator wait for the collector to catch up,
+// bounding RSS. When the collector keeps up (bytes stays near the trigger) this
+// never waits. Disable with -DCN1_BIBOP_NO_PACING for A/B.
+#ifndef CN1_BIBOP_GC_HARD_CAP
+#define CN1_BIBOP_GC_HARD_CAP (CN1_BIBOP_GC_TRIGGER_BYTES * 3)
+#endif
 static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // LEVER A: flush this thread's plain-add byte accumulator into the global atomic
     // (once per page-acquire). No-op unless -DCN1_DEATOMIC_BYTES.
     CN1_BIBOP_FLUSH_BYTES(threadStateData);
-    if(gcCurrentlyRunning || constantPoolObjects == 0 || threadStateData->nativeAllocationMode) {
+    if(constantPoolObjects == 0 || threadStateData->nativeAllocationMode) {
         return;
     }
-    if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_TRIGGER_BYTES) {
+    if(!gcCurrentlyRunning &&
+       atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_TRIGGER_BYTES) {
         threadStateData->nativeAllocationMode = JAVA_TRUE;
         java_lang_System_gc__(threadStateData);
         threadStateData->nativeAllocationMode = JAVA_FALSE;
     }
+#ifndef CN1_BIBOP_NO_PACING
+    // Backpressure: bound RSS when the collector falls behind. This wait MUST be a
+    // GC safepoint -- otherwise the collector blocks waiting for this spinning
+    // thread to become scannable and never advances, so bibopBytesSinceGc never
+    // resets and the spin livelocks (observed as an MtStress hang). Mark the thread
+    // inactive (as the legacy alloc-path park does) so the collector can scan/pass
+    // it; restore on exit. Bounded spin with a safety cap so a dead/stuck GC
+    // degrades to RSS growth, never a permanent hang.
+    if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_HARD_CAP &&
+       get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
+        threadStateData->threadActive = JAVA_FALSE;
+        int spins = 0;
+        while(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_HARD_CAP &&
+              get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
+              spins++ < 200000) {
+            usleep(50);
+        }
+        threadStateData->threadActive = JAVA_TRUE;
+    }
+#endif
 }
 
 // Retire the thread's current page for class ci (if any) onto the global SWEEP
