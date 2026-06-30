@@ -24,6 +24,11 @@
  * Foundation: IMFSourceReader for frame-accurate decoding to RGBA, IMFSinkWriter
  * for H.264/HEVC + AAC encoding. The mf/mfplat/mfreadwrite/mfuuid libraries are
  * already linked by the generated Windows CMakeLists (see ByteCodeTranslator).
+ *
+ * This file deliberately avoids the C++ standard library (<string> etc.): the
+ * always-compiled native sources are built with clang-cl against the xwin MSVC
+ * SDK whose <yvals_core.h> rejects the toolchain's Clang version (STL1000), so
+ * we use plain wchar_t buffers / malloc instead.
  */
 #include <windows.h>
 #include <mfapi.h>
@@ -33,27 +38,11 @@
 #include <wrl/client.h>
 #include <stdlib.h>
 #include <string.h>
-#include <string>
 #include "cn1_windows.h"
 
 using Microsoft::WRL::ComPtr;
 
 extern struct clazz class_array1__JAVA_BYTE;
-
-// stringToUTF8 is provided by the ParparVM runtime (declared via cn1_windows.h).
-// utf8ToWide is file-local static elsewhere, so keep our own copy here.
-static std::wstring cn1Utf8ToWide(const char* s) {
-    if (s == NULL) {
-        return std::wstring();
-    }
-    int len = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
-    if (len <= 0) {
-        return std::wstring();
-    }
-    std::wstring out((size_t) (len - 1), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, s, -1, &out[0], len);
-    return out;
-}
 
 // 100-ns units used by Media Foundation timestamps.
 static const LONGLONG CN1_HNS_PER_MS = 10000LL;
@@ -68,14 +57,18 @@ static void cn1EnsureMF() {
     }
 }
 
-static std::wstring cn1StripFileWide(const char* utf8) {
-    std::string s = utf8 ? utf8 : "";
-    if (s.rfind("file://", 0) == 0) {
-        s = s.substr(7);
-    } else if (s.rfind("file:", 0) == 0) {
-        s = s.substr(5);
+// Strips a file: prefix and converts the UTF-8 path to a wide string in the
+// caller-supplied buffer (no std::wstring; avoids pulling in the MSVC STL).
+static void cn1StripFileWide(const char* utf8, wchar_t* out, int outLen) {
+    const char* s = utf8 ? utf8 : "";
+    if (strncmp(s, "file://", 7) == 0) {
+        s += 7;
+    } else if (strncmp(s, "file:", 5) == 0) {
+        s += 5;
     }
-    return cn1Utf8ToWide(s.c_str());
+    if (MultiByteToWideChar(CP_UTF8, 0, s, -1, out, outLen) == 0 && outLen > 0) {
+        out[0] = L'\0';
+    }
 }
 
 struct CN1VideoReader {
@@ -104,14 +97,14 @@ struct CN1VideoWriter {
 // --------------------------------------------------------------------------
 // Reader
 // --------------------------------------------------------------------------
-static JAVA_LONG cn1ReaderOpen(const std::wstring& url) {
+static JAVA_LONG cn1ReaderOpen(const wchar_t* url) {
     cn1EnsureMF();
     ComPtr<IMFAttributes> attrs;
     MFCreateAttributes(&attrs, 1);
     attrs->SetUINT32(MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING, TRUE);
 
     ComPtr<IMFSourceReader> reader;
-    if (FAILED(MFCreateSourceReaderFromURL(url.c_str(), attrs.Get(), &reader))) {
+    if (FAILED(MFCreateSourceReaderFromURL(url, attrs.Get(), &reader))) {
         return 0;
     }
 
@@ -253,7 +246,8 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     if (!st->hasAudio) {
         return JAVA_NULL;
     }
-    std::string pcm;
+    unsigned char* pcm = NULL;
+    size_t pcmLen = 0, pcmCap = 0;
     for (;;) {
         DWORD streamFlags = 0;
         LONGLONG timestamp = 0;
@@ -274,31 +268,43 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
         BYTE* data = NULL;
         DWORD maxLen = 0, curLen = 0;
         if (SUCCEEDED(buffer->Lock(&data, &maxLen, &curLen))) {
-            pcm.append((const char*) data, curLen);
+            if (pcmLen + curLen > pcmCap) {
+                size_t newCap = (pcmLen + curLen) * 2;
+                unsigned char* grown = (unsigned char*) realloc(pcm, newCap);
+                if (grown != NULL) {
+                    pcm = grown;
+                    pcmCap = newCap;
+                }
+            }
+            if (pcm != NULL && pcmLen + curLen <= pcmCap) {
+                memcpy(pcm + pcmLen, data, curLen);
+                pcmLen += curLen;
+            }
             buffer->Unlock();
         }
     }
-    if (pcm.empty()) {
-        return JAVA_NULL;
+    JAVA_OBJECT result = JAVA_NULL;
+    if (pcm != NULL && pcmLen > 0) {
+        result = allocArray(threadStateData, (int) pcmLen, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+        if (result != JAVA_NULL) {
+            memcpy((*(JAVA_ARRAY) result).data, pcm, pcmLen);
+        }
     }
-    JAVA_OBJECT result = allocArray(threadStateData, (int) pcm.size(), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-    if (result != JAVA_NULL) {
-        memcpy((*(JAVA_ARRAY) result).data, pcm.data(), pcm.size());
-    }
+    free(pcm);
     return result;
 }
 
 // --------------------------------------------------------------------------
 // Writer
 // --------------------------------------------------------------------------
-static JAVA_LONG cn1WriterOpen(const std::wstring& url, bool hevc, int width, int height, float fps,
+static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int height, float fps,
         int videoBitRate, int gop, bool hasAudio, int audioBitRate, int sampleRate, int channels) {
     cn1EnsureMF();
     UINT32 fpsNum = (UINT32) (fps <= 0 ? 30 : (UINT32) (fps + 0.5f));
     UINT32 fpsDen = 1;
 
     ComPtr<IMFSinkWriter> writer;
-    if (FAILED(MFCreateSinkWriterFromURL(url.c_str(), NULL, NULL, &writer))) {
+    if (FAILED(MFCreateSinkWriterFromURL(url, NULL, NULL, &writer))) {
         return 0;
     }
 
@@ -424,7 +430,9 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_videoSupportsHEVC___R_bool
 }
 
 JAVA_LONG com_codename1_impl_windows_WindowsNative_videoReaderOpen___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT pathObj) {
-    return cn1ReaderOpen(cn1StripFileWide(stringToUTF8(threadStateData, pathObj)));
+    wchar_t wpath[2048];
+    cn1StripFileWide(stringToUTF8(threadStateData, pathObj), wpath, 2048);
+    return cn1ReaderOpen(wpath);
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_videoReaderWidth___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
@@ -467,8 +475,10 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoReaderClose___long(CODEN
 JAVA_LONG com_codename1_impl_windows_WindowsNative_videoWriterOpen___java_lang_String_boolean_int_int_float_int_int_boolean_int_int_int_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT pathObj, JAVA_BOOLEAN hevc, JAVA_INT width, JAVA_INT height, JAVA_FLOAT fps,
         JAVA_INT videoBitRate, JAVA_INT gop, JAVA_BOOLEAN hasAudio, JAVA_INT audioBitRate, JAVA_INT sampleRate, JAVA_INT channels) {
-    return cn1WriterOpen(cn1StripFileWide(stringToUTF8(threadStateData, pathObj)), hevc != JAVA_FALSE,
-            width, height, fps, videoBitRate, gop, hasAudio != JAVA_FALSE, audioBitRate, sampleRate, channels);
+    wchar_t wpath[2048];
+    cn1StripFileWide(stringToUTF8(threadStateData, pathObj), wpath, 2048);
+    return cn1WriterOpen(wpath, hevc != JAVA_FALSE, width, height, fps, videoBitRate, gop,
+            hasAudio != JAVA_FALSE, audioBitRate, sampleRate, channels);
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterFrame___long_byte_1ARRAY_int_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_OBJECT rgbaObj, JAVA_INT w, JAVA_INT h, JAVA_LONG ptsMs) {
@@ -480,6 +490,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterFrame___long_byte_
     DWORD len = (DWORD) (w * h * 4);
     // RGBA (Java) -> RGB32/BGRA (MF input)
     BYTE* bgra = (BYTE*) malloc(len);
+    if (bgra == NULL) {
+        return;
+    }
     for (int i = 0; i < w * h; i++) {
         bgra[i * 4] = rgba[i * 4 + 2];
         bgra[i * 4 + 1] = rgba[i * 4 + 1];
