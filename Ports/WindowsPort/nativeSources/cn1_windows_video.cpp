@@ -217,16 +217,17 @@ static JAVA_OBJECT cn1ReaderFrameAt(CODENAME_ONE_THREAD_STATE, CN1VideoReader* s
             int w = st->width;
             int h = st->height;
             LONG stride = st->stride != 0 ? st->stride : (LONG) w * 4;
-            // Media Foundation hands back RGB32 bottom-up in the contiguous
-            // buffer (image row 0 lives at the END), so flip vertically to
-            // produce Codename One's top-down RGBA. Use the absolute stride;
-            // the actual row pitch may be padded beyond w*4.
-            LONG absStride = stride < 0 ? -stride : stride;
+            // Media Foundation's H.264/HEVC decode delivers RGB32 top-down here,
+            // so read straight (only honour an explicit negative stride). The
+            // encoder side compensates for MF's bottom-up RGB32 *input* by
+            // flipping there; flipping here as well would just cancel out.
+            bool bottomUp = stride < 0;
+            LONG absStride = bottomUp ? -stride : stride;
             result = allocArray(threadStateData, w * h * 4, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
             if (result != JAVA_NULL) {
                 BYTE* out = (BYTE*) (*(JAVA_ARRAY) result).data;
                 for (int y = 0; y < h; y++) {
-                    int srcRow = h - 1 - y;
+                    int srcRow = bottomUp ? (h - 1 - y) : y;
                     BYTE* src = data + (size_t) srcRow * absStride;
                     BYTE* dst = out + (size_t) y * w * 4;
                     for (int x = 0; x < w; x++) {
