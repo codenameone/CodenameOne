@@ -28,6 +28,14 @@
 #include "xmlvm.h"
 #include "java_lang_String.h"
 #import "CodenameOne_GLViewController.h"
+
+// watchOS lacks the AVFoundation video classes (AVAssetReader / AVAssetWriter /
+// AVAssetImageGenerator and the AVVideoCodecType* constants are all
+// API_UNAVAILABLE(watchos)), and VideoIO is not supported on the Watch target
+// (IOSImplementation.getVideoIO() returns null there). Build the real backend on
+// every other target; on watchOS emit stub entry points below so the shared
+// translated IOSNative bytecode still links.
+#if !TARGET_OS_WATCH
 #import <AVFoundation/AVFoundation.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
@@ -547,3 +555,59 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoWriterClose___long(CN1_THREAD
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoWriterClose___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) {
     return cn1WriterClose(WRITER(peer));
 }
+
+#else
+// --------------------------------------------------------------------------
+// watchOS stub entry points. VideoIO is unsupported on the Watch
+// (IOSImplementation.getVideoIO() returns null), so these are never invoked at
+// runtime; they exist solely to satisfy the linker for the shared translated
+// IOSNative bytecode that references them.
+// --------------------------------------------------------------------------
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoSupportsHEVC__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) { return JAVA_FALSE; }
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoSupportsHEVC___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) { return JAVA_FALSE; }
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderOpen___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) { return 0; }
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderOpen___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) { return 0; }
+
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderWidth___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderWidth___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderHeight___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderHeight___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderDuration___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderDuration___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_videoReaderFrameRate___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_videoReaderFrameRate___long_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoReaderHasVideo___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return JAVA_FALSE; }
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoReaderHasVideo___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return JAVA_FALSE; }
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoReaderHasAudio___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return JAVA_FALSE; }
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoReaderHasAudio___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return JAVA_FALSE; }
+
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderAudioSampleRate___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return -1; }
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderAudioSampleRate___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return -1; }
+
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderAudioChannels___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return -1; }
+JAVA_INT com_codename1_impl_ios_IOSNative_videoReaderAudioChannels___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return -1; }
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderFrameAt___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer, JAVA_LONG ms) { return 0; }
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderFrameAt___long_long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer, JAVA_LONG ms) { return 0; }
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderReadAudio___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoReaderReadAudio___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return 0; }
+
+void com_codename1_impl_ios_IOSNative_videoReaderClose___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { }
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoWriterOpen___java_lang_String_int_int_float_boolean_int_int_boolean_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_INT width, JAVA_INT height, JAVA_FLOAT fps, JAVA_BOOLEAN hevc, JAVA_INT bitRate, JAVA_INT gop, JAVA_BOOLEAN hasAudio, JAVA_INT sampleRate, JAVA_INT channels, JAVA_INT audioBitRate) { return 0; }
+JAVA_LONG com_codename1_impl_ios_IOSNative_videoWriterOpen___java_lang_String_int_int_float_boolean_int_int_boolean_int_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_INT width, JAVA_INT height, JAVA_FLOAT fps, JAVA_BOOLEAN hevc, JAVA_INT bitRate, JAVA_INT gop, JAVA_BOOLEAN hasAudio, JAVA_INT sampleRate, JAVA_INT channels, JAVA_INT audioBitRate) { return 0; }
+
+void com_codename1_impl_ios_IOSNative_videoWriterAddFrame___long_byte_1ARRAY_int_int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer, JAVA_OBJECT rgba, JAVA_INT w, JAVA_INT h, JAVA_LONG ptsMs) { }
+void com_codename1_impl_ios_IOSNative_videoWriterAddAudio___long_byte_1ARRAY_int_int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer, JAVA_OBJECT pcm, JAVA_INT sampleRate, JAVA_INT channels, JAVA_LONG ptsMs) { }
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoWriterClose___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return JAVA_FALSE; }
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_videoWriterClose___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_LONG peer) { return JAVA_FALSE; }
+
+#endif

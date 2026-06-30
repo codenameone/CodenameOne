@@ -9766,6 +9766,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public com.codename1.media.VideoIO getVideoIO() {
+        if (isWatch() || isTV()) {
+            // AVFoundation's video classes (AVAssetReader / AVAssetWriter /
+            // AVAssetImageGenerator) are unavailable on watchOS, and VideoIO is
+            // not supported on the TV target, so report no support there.
+            return null;
+        }
         if (videoIO == null) {
             videoIO = new com.codename1.media.VideoIO() {
                 @Override
