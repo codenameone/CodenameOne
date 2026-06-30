@@ -126,6 +126,28 @@
     TabSelSatDark: "1.6";
     TabSelRefractDark: "0";
     TabSelSpecularDark: "0";
+    /* iOS 26 selection-DROP lens (Tabs.paintSelectionCapsule -> Graphics.lensRegion).
+       The distortion is keyed to the travel envelope: a faint bulge (RestMag) when
+       settled, growing to a strong magnify + chromatic aberration mid-flight so the
+       glyphs smear with a blue fringe only while the drop moves, like native. Tint
+       recolours the dark glyph to the accent ONLY inside the drop. */
+    tabSelLensMagnifyPct: "118";
+    tabSelLensRestMagPct: "108";
+    tabSelLensAberrationPct: "2";
+    tabSelLensTintPct: "100";
+    tabSelLensOverflowPct: "18";
+    tabSelBubbleWidthPct: "96";
+    tabSelStretchPct: "32";
+    tabSelGrowPct: "14";
+    tabSelSquashHPct: "18";
+    tabSelSquashWPct: "16";
+    tabSelLiftMm: "0.5";
+    /* The drop is anchored at the bar bottom and bulges UP; a tiny overhang past the bar
+       bottom (downBias) reads like native without a hollow white bulge below the bar. */
+    tabSelDownBiasMm: "0.3";
+    /* Whole-bar swell at the very start: OFF for now -- a uniform magnify pass leaves a
+       faint distortion ring in the bar's surroundings. Needs a real content scale. */
+    tabSelBarGrowPct: "0";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;
@@ -175,7 +197,7 @@
     /* iOS 26 tab bars use a sliding CAPSULE selection indicator, not the Material 3
        underline -- so the underline is off and the capsule is on. */
     tabsAnimatedIndicatorBool: false;
-    tabsAnimatedIndicatorDurationInt: 250;
+    tabsAnimatedIndicatorDurationInt: 480;
     tabsAnimatedIndicatorThicknessMm: 1;
     /* iOS 26 sliding selection capsule: a single Liquid Glass blob behind the
        selected tab that tweens between tabs on selection change. Replaces the
@@ -646,35 +668,39 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: transparent;
+    /* Floating WHITE glass capsule (native iOS 26 bar): a translucent white fill over
+       the blurred backdrop so it reads as a distinct white pill even over light-grey
+       content, not a near-invisible frost. The blur still lets colour bleed through. */
+    background-color: rgba(255,255,255,0.82);
     color: #3c3c43;
-    /* Liquid Glass floating tab pill: a moderate frost (0.52) so the blurred
-       backdrop tints through and reads as glass, while the brighter selected
-       sub-capsule (Tab.selected) stands out (layered glass-on-glass). Thin
-       horizontal padding so the tab cells / selected capsule reach close to the
-       pill's left/right edges like native. */
     backdrop-filter: blur(40px);
     /* Horizontal end-padding widens the pill at its rounded ends WITHOUT moving the tab
        centres (the pill grows symmetrically and the content shifts by the same amount,
        cancelling) -- this is how native's first/last cells get extra width. Tuned so the
        pill width matches native (~773px). */
     padding: 0.5mm 1.3mm 0.5mm 1.3mm;
-    margin: 0 1mm 0.5mm 1mm;
+    /* Bigger side margins -> a narrower, clearly-centred floating capsule with the tabs
+       grouped centrally (native), instead of a near-full-width bar spread to the edges. */
+    margin: 0 7mm 1mm 7mm;
     cn1-background-type: cn1-pill-border;
 }
 
 /* Transparent wrapper that holds the floating tab pill and absorbs the bottom
-   safe-area inset. The negative bottom margin pulls the whole bar down toward the
-   home indicator so the pill sits close to the bottom (native iOS 26) instead of
-   floating a full safe-area height above it; the pill keeps its own shape. */
+   safe-area inset. (A negative bottom margin was tried to pull the bar toward the
+   home indicator, but CN1's Style.setMargin rejects negatives -- it threw on every
+   Tabs construction and dropped this style. Use 0; the pill keeps its own shape.) */
 TabsContainerHost {
     background-color: transparent;
     padding: 0;
-    margin: 0 0 -4mm 0;
+    margin: 0;
 }
 
 Tab {
-    color: #3c3c43;
+    /* Dark glyph: the selection-drop LENS supplies the blue (only inside the drop), so
+       the selected colour lives in the lens, not here -- this fixes both old+new tabs
+       reading blue mid-morph. Dark enough (lum < the lens tint key ~55) that a tab the
+       drop passes over tints too (half-blue during travel). */
+    color: #2c2c2e;
     background-color: transparent;
     /* With equal-width cells (tabsEqualWidthBool) the GridLayout sizes every cell to
        the widest tab's content + this padding, so the padding sets the cell (and pill)
@@ -707,7 +733,7 @@ Tab {
    capsule, leaving the capsule's material as a darker "ring" around it (the gap
    the native bar does not have). Omit the background-type so it stays transparent. */
 Tab.selected {
-    color: var(--accent-color, #007aff);
+    color: #2c2c2e;                 /* dark; the lens drop colours it blue */
     background-color: transparent;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
@@ -716,14 +742,14 @@ Tab.selected {
    second 40%-white pill on top of the glass capsule (the inner-pill "ring"). The
    capsule is the only selection visual; a press just keeps the capsule. */
 Tab.pressed {
-    color: var(--accent-color, #007aff);
+    color: #2c2c2e;                 /* dark; the lens drop colours it blue */
     background-color: transparent;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
 
 SelectedTab {
     cn1-derive: Tab;
-    color: var(--accent-color, #007aff);
+    color: #2c2c2e;                 /* dark; the lens drop colours it blue */
     background-color: transparent;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }

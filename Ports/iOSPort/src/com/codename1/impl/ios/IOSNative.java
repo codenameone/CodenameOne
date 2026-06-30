@@ -83,6 +83,9 @@ public final class IOSNative {
     // recipe -- material + blur + rounded-rect mask + refraction + specular),
     // matching the offscreen IOSImplementation.glassRegion. Enqueued in paint order.
     native void nativeGlassScreenRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular);
+    // Queues a live-screen iOS 26 selection-drop LENS op (magnify + chromatic
+    // aberration + dark->accent tint over the painted content). See lensScreenRegionX.
+    native void nativeLensScreenRegion(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);
     // Renders an Apple SF Symbol to a GLUIImage peer (iOS 13+). Returns 0 when the
     // symbol is unavailable; writes the pixel width/height into widthHeight[0]/[1].
     native long nativeCreateSFSymbol(String name, int color, float size, int weight, int[] widthHeight);

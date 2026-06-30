@@ -42,11 +42,21 @@
     float offset;
     float refract;
     float specular;
+    // When lens is YES this op runs the iOS 26 selection-drop LENS
+    // (lensScreenRegionX) carrying these params instead of blur/glass.
+    BOOL lens;
+    float magnify;
+    float aberration;
+    int tintColor;
+    float tintStrength;
 }
 
 -(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r;
 -(id)initWithGlassArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r
           cornerRadius:(float)cr sat:(float)st scale:(float)sc offset:(float)of
                refract:(float)rf specular:(float)sp;
+-(id)initWithLensArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h
+         cornerRadius:(float)cr magnify:(float)mg aberration:(float)ab
+            tintColor:(int)tc tintStrength:(float)ts;
 
 @end

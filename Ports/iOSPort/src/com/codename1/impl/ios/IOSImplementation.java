@@ -1974,6 +1974,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
 
+    @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // Live screen only: queue the iOS 26 selection-drop LENS op carrying the
+        // params. During the drain it reads the already-painted content (bar +
+        // black glyphs) UNDER the drop and magnifies + chromatically aberrates +
+        // dark->accent tints it. The offscreen-image path (rare now that the
+        // fidelity capture renders live) has no lens -- return false to fall back.
+        if (ng.associatedImage == null) {
+            nativeInstance.nativeLensScreenRegion(x, y, width, height, cornerRadius, magnify, aberration, tintColor, tintStrength);
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Applies the Liquid Glass OPTICS to the blurred, colour-transformed backdrop
      * (src, the bw x bh padded buffer; the component occupies rw x rh at offset

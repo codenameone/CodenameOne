@@ -2239,6 +2239,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl
 #endif
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl
+(int x, int y, int width, int height, float cornerRadius, float magnify,
+ float aberration, int tintColor, float tintStrength) {
+    BlurRegion* f = [[BlurRegion alloc] initWithLensArgs:x ypos:y w:width h:height
+                                            cornerRadius:cornerRadius magnify:magnify
+                                              aberration:aberration tintColor:tintColor tintStrength:tintStrength];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 (float angle, int x, int y) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");

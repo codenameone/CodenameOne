@@ -1157,6 +1157,14 @@ void com_codename1_impl_ios_IOSNative_nativeGlassScreenRegion___int_int_int_int_
     POOL_END();
 }
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);
+void com_codename1_impl_ios_IOSNative_nativeLensScreenRegion___int_int_int_int_float_float_float_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5, JAVA_FLOAT n6, JAVA_FLOAT n7, JAVA_INT n8, JAVA_FLOAT n9)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9);
+    POOL_END();
+}
+
 void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int]

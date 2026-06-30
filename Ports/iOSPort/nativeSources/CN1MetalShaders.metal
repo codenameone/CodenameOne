@@ -333,6 +333,114 @@ fragment float4 cn1_fs_multistop_gradient(
     return cn1_grad_sample_stops(t, stopCount, positions, colors);
 }
 
+// --------- iOS-26 selection-DROP LENS pipeline ---------
+// GPU equivalent of METALView.m glassApplyLens / JavaSEPort.applyLensBuffer. Samples a
+// blitted copy of the bar region (texture(0), fw x fh px) and warps + tints + lights it
+// per pixel, fully on the GPU so the morph runs at frame rate (no CPU readback). texcoord
+// 0..1 over the drop quad. Outputs PREMULTIPLIED (premultiplied-alpha blend over the bar).
+// Constants MUST stay in sync with glassApplyLens.
+constant float LENS_MAG_FLAT      = 0.75;
+constant float LENS_TINT_HI       = 150.0;
+constant float LENS_TINT_LO       = 55.0;
+constant float LENS_LIFT_COEF     = 0.40;
+constant float LENS_GLARE         = 0.09;
+constant float LENS_RIM           = 0.06;
+constant float LENS_RIM_W         = 0.06;
+constant float LENS_REFRACT       = 0.16;
+constant float LENS_EDGE_SHADOW   = 0.12;
+constant float LENS_RIM_SCALE     = 0.84;
+constant float3 LENS_GLASS_TINT   = float3(188.0, 216.0, 255.0); // 0xbcd8ff, 0..255
+constant float LENS_GLASS_TINT_STR = 0.10;
+constant float LENS_SAT_BOOST     = 1.32;
+
+static inline float cn1_lens_smoothstep(float a, float b, float x) {
+    float t = clamp((x - a) / (b - a), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+fragment float4 cn1_fs_lens(
+    VertexOutTextured in [[stage_in]],
+    constant float4 &p0 [[buffer(0)]],   // fw, fh, magnify, aberration
+    constant float4 &p1 [[buffer(1)]],   // tintR, tintG, tintB (0..1), tintStrength
+    constant float4 &p2 [[buffer(2)]],   // cornerRadiusPx (neg = capsule), unused...
+    texture2d<float> src [[texture(0)]])
+{
+    constexpr sampler smp(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
+    float fw = p0.x, fh = p0.y, magnify = p0.z, aberration = p0.w;
+    float3 tintc = p1.xyz * 255.0;
+    float tintStrength = p1.w;
+    float cornerRadius = p2.x;
+
+    float hw = fw * 0.5, hh = fh * 0.5;
+    float r = (cornerRadius < 0.0) ? min(hw, hh) : min(cornerRadius, min(hw, hh));
+    if (r < 0.0) r = 0.0;
+    float px = in.texcoord.x * fw - hw;
+    float py = in.texcoord.y * fh - hh;
+
+    // superellipse SDF -> depth (>0 inside)
+    float dxe = abs(px) - (hw - r);
+    float dye = abs(py) - (hh - r);
+    float ax = max(dxe, 0.0), ay = max(dye, 0.0);
+    float outside = sqrt(ax * ax + ay * ay);
+    float inside = min(max(dxe, dye), 0.0);
+    float depth = -(outside + inside - r);
+    if (depth <= 0.0) { return float4(0.0); }
+    float alpha = min(depth, 1.0);
+
+    float rd = min(1.0, sqrt((px * px) / (hw * hw) + (py * py) / (hh * hh)));
+    float liftMax = LENS_LIFT_COEF * (magnify - 1.0) * hh;
+    float glassAmt = cn1_lens_smoothstep(1.085, 1.25, magnify);
+
+    float edge = cn1_lens_smoothstep(LENS_MAG_FLAT, 1.0, rd);
+    float rimScale = 1.0 + (LENS_RIM_SCALE - 1.0) * glassAmt;
+    float mag = magnify + (rimScale - magnify) * edge;
+    mag = max(mag, 0.2);
+    float abr = aberration * edge;
+    float magR = max(mag * (1.0 - abr), 0.05), magB = max(mag * (1.0 + abr), 0.05);
+    float lift = liftMax * (1.0 - rd * rd);
+    float refr = 1.0 + LENS_REFRACT * glassAmt * cn1_lens_smoothstep(0.70, 1.0, rd);
+
+    float2 cR = float2((hw + (px / magR) * refr) / fw, (hh + (py / magR) * refr + lift) / fh);
+    float2 cG = float2((hw + (px / mag)  * refr) / fw, (hh + (py / mag)  * refr + lift) / fh);
+    float2 cB = float2((hw + (px / magB) * refr) / fw, (hh + (py / magB) * refr + lift) / fh);
+    float sr = src.sample(smp, cR).r * 255.0;
+    float sg = src.sample(smp, cG).g * 255.0;
+    float sb = src.sample(smp, cB).b * 255.0;
+
+    float lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+    float t = tintStrength * cn1_lens_smoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+    float fr = sr + (tintc.r - sr) * t;
+    float fg = sg + (tintc.g - sg) * t;
+    float fb = sb + (tintc.b - sb) * t;
+
+    float gt = LENS_GLASS_TINT_STR * glassAmt;
+    fr += (LENS_GLASS_TINT.r - fr) * gt;
+    fg += (LENS_GLASS_TINT.g - fg) * gt;
+    fb += (LENS_GLASS_TINT.b - fb) * gt;
+
+    float sl = 0.2126 * fr + 0.7152 * fg + 0.0722 * fb;
+    fr = sl + (fr - sl) * LENS_SAT_BOOST;
+    fg = sl + (fg - sl) * LENS_SAT_BOOST;
+    fb = sl + (fb - sl) * LENS_SAT_BOOST;
+
+    float gx = px / hw, gy = (py + 0.42 * hh) / hh;
+    float glare = LENS_GLARE * glassAmt * exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
+    float rimW = max(2.0, LENS_RIM_W * hh);
+    float rim = depth < rimW ? (1.0 - depth / rimW) * LENS_RIM : 0.0;
+    float bright = glare + rim;
+    fr += bright * (255.0 - fr);
+    fg += bright * (255.0 - fg);
+    fb += bright * (255.0 - fb);
+
+    float esW = max(2.0, 0.13 * min(hw, hh));
+    if (depth < esW) {
+        float es = (1.0 - depth / esW) * LENS_EDGE_SHADOW * glassAmt;
+        fr *= (1.0 - es); fg *= (1.0 - es); fb *= (1.0 - es);
+    }
+    fr = clamp(fr, 0.0, 255.0); fg = clamp(fg, 0.0, 255.0); fb = clamp(fb, 0.0, 255.0);
+    return float4(fr / 255.0 * alpha, fg / 255.0 * alpha, fb / 255.0 * alpha, alpha);
+}
+
 // Gaussian blur is implemented via MPSImageGaussianBlur on the host side
 // (CN1Metalcompat.m) rather than a hand-rolled fragment shader. MPS picks
 // the kernel width automatically from sigma and stays accurate across the

@@ -84,6 +84,8 @@
 - (void)glassScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius
               cornerRadius:(float)cornerRadius sat:(float)sat scale:(float)scale
                     offset:(float)offset refract:(float)refract specular:(float)specular;
+- (void)lensScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h cornerRadius:(float)cornerRadius
+                  magnify:(float)magnify aberration:(float)aberration tintColor:(int)tintColor tintStrength:(float)tintStrength;
 -(void)presentPreservedFrameIfNeeded;
 -(void)updateFrameBufferSize:(int)w h:(int)h;
 -(void)textFieldDidChange;

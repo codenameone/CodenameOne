@@ -197,6 +197,125 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
     }
 }
 
+// CPU REFERENCE for the iOS-26 selection-drop lens, kept in sync with
+// JavaSEPort.applyLensBuffer and the cn1_fs_lens Metal shader (the live device path is
+// the GPU shader -- see lensScreenRegionX -- so this is no longer called; it is retained
+// as the readable reference for the optics and for the host-side numeric cross-check).
+// Superellipse (rounded-rect / capsule when cornerRadius<0) AA mask; PREMULTIPLIED out.
+static inline float glassSmoothstep(float a, float b, float x) {
+    float t = (x - a) / (b - a);
+    if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
+    return t * t * (3.0f - 2.0f * t);
+}
+
+// Lens optics constants -- MUST stay in sync with JavaSEPort.applyLensBuffer so the
+// simulator and the device render the identical drop. See that method for the
+// per-effect rationale.
+#define LENS_MAG_FLAT       0.75f   // uniform-magnify fraction of the (elliptical) radius
+#define LENS_TINT_HI        150.0f  // luminance >= HI: no tint
+#define LENS_TINT_LO        55.0f   // luminance <= LO: full dark->accent tint
+#define LENS_LIFT_COEF      0.40f   // upward pull of the content under the drop
+#define LENS_GLARE          0.09f   // specular sheen strength
+#define LENS_RIM            0.06f   // edge-rim brightness
+#define LENS_RIM_W          0.06f   // rim band width (fraction of half-height)
+#define LENS_REFRACT        0.16f   // edge lensing: content bends at the rim
+#define LENS_EDGE_SHADOW    0.12f   // soft dark band just inside the rim
+#define LENS_RIM_SCALE      0.84f   // periphery shrinks (< 1) while the centre enlarges
+#define LENS_GLASS_TINT     0xbcd8ff /* faint cool-blue cast through the whole glass */
+#define LENS_GLASS_TINT_STR 0.10f
+#define LENS_SAT_BOOST      1.32f   // push the tinted blue glyph more vivid
+
+__attribute__((unused))
+static void glassApplyLens(uint32_t *src, int rw, int rh, uint32_t *out,
+        float cornerRadius, float magnify, float aberration, int tintColor,
+        float tintStrength, float s) {
+    float hw = rw / 2.0f, hh = rh / 2.0f;
+    float minhh = hw < hh ? hw : hh;
+    float r;
+    if (cornerRadius < 0.0f) { r = minhh; }
+    else { r = cornerRadius * s; if (r > minhh) r = minhh; }
+    if (r < 0.0f) r = 0.0f;
+    int tr = (tintColor >> 16) & 0xff, tg = (tintColor >> 8) & 0xff, tb = tintColor & 0xff;
+    int gtR = (LENS_GLASS_TINT >> 16) & 0xff, gtG = (LENS_GLASS_TINT >> 8) & 0xff, gtB = LENS_GLASS_TINT & 0xff;
+    float liftMax = LENS_LIFT_COEF * (magnify - 1.0f) * hh;
+    // The 3D-glass cues belong to the morph droplet, not the settled pill -- fade them
+    // out by how magnified the drop is, so a resting selection is a flat subtle pill.
+    float glassAmt = glassSmoothstep(1.085f, 1.25f, magnify);
+    for (int y = 0; y < rh; y++) {
+        float py = (y + 0.5f) - hh;
+        for (int x = 0; x < rw; x++) {
+            float px = (x + 0.5f) - hw;
+            float dxe = fabsf(px) - (hw - r);
+            float dye = fabsf(py) - (hh - r);
+            float axx = dxe > 0 ? dxe : 0, ayy = dye > 0 ? dye : 0;
+            float outside = sqrtf(axx * axx + ayy * ayy);
+            float mxv = dxe > dye ? dxe : dye;
+            float inside = mxv < 0 ? mxv : 0;
+            float depth = -(outside + inside - r);
+            if (depth <= 0.0f) { out[(size_t)y * rw + x] = 0; continue; }
+            float alpha = depth >= 1.0f ? 1.0f : depth;
+            float rd = sqrtf((px * px) / (hw * hw) + (py * py) / (hh * hh));   // elliptical 0..1
+            if (rd > 1.0f) rd = 1.0f;
+            // Centre ENLARGES (magnify); periphery SHRINKS toward RIM_SCALE (< 1) so the
+            // bar/other tabs seen through the drop read minified while the central glyph
+            // stays big. No shrink when settled (rimScale -> 1 as glassAmt -> 0).
+            float edge = glassSmoothstep(LENS_MAG_FLAT, 1.0f, rd);
+            float rimScale = 1.0f + (LENS_RIM_SCALE - 1.0f) * glassAmt;
+            float mag = magnify + (rimScale - magnify) * edge;
+            if (mag < 0.2f) mag = 0.2f;
+            float ab = aberration * edge;
+            float magR = mag * (1.0f - ab), magB = mag * (1.0f + ab);
+            if (magR < 0.05f) magR = 0.05f;
+            if (magB < 0.05f) magB = 0.05f;
+            float lift = liftMax * (1.0f - rd * rd);                            // upward pull
+            float refr = 1.0f + LENS_REFRACT * glassAmt * glassSmoothstep(0.70f, 1.0f, rd);
+            int sr = (glassSampleBilinear(src, rw, rh, hw + (px / magR) * refr, hh + (py / magR) * refr + lift) >> 16) & 0xff;
+            int sg = (glassSampleBilinear(src, rw, rh, hw + (px / mag) * refr, hh + (py / mag) * refr + lift) >> 8) & 0xff;
+            int sb = glassSampleBilinear(src, rw, rh, hw + (px / magB) * refr, hh + (py / magB) * refr + lift) & 0xff;
+            float lum = 0.2126f * sr + 0.7152f * sg + 0.0722f * sb;
+            float t = tintStrength * glassSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+            float fr = sr + (tr - sr) * t;
+            float fg = sg + (tg - sg) * t;
+            float fb = sb + (tb - sb) * t;
+            // faint cool tint through the whole glass (fades when settled)
+            float gt = LENS_GLASS_TINT_STR * glassAmt;
+            fr += (gtR - fr) * gt;
+            fg += (gtG - fg) * gt;
+            fb += (gtB - fb) * gt;
+            // saturation boost: vivid blue glyph, neutral greys barely touched
+            float sl = 0.2126f * fr + 0.7152f * fg + 0.0722f * fb;
+            fr = sl + (fr - sl) * LENS_SAT_BOOST;
+            fg = sl + (fg - sl) * LENS_SAT_BOOST;
+            fb = sl + (fb - sl) * LENS_SAT_BOOST;
+            // 3D glass: specular glare near the top + a bright edge rim
+            float gx = px / hw, gy = (py + 0.42f * hh) / hh;
+            float glare = LENS_GLARE * glassAmt * expf(-(gx * gx * 1.15f + gy * gy * 2.6f) * 2.1f);
+            float rimW = LENS_RIM_W * hh; if (rimW < 2.0f) rimW = 2.0f;
+            float rim = depth < rimW ? (1.0f - depth / rimW) * LENS_RIM : 0.0f;
+            float bright = glare + rim;
+            if (bright > 0.0f) {
+                fr += bright * (255.0f - fr);
+                fg += bright * (255.0f - fg);
+                fb += bright * (255.0f - fb);
+            }
+            // soft dark band just inside the rim (glass depth), morph-only
+            float esW = 0.13f * minhh; if (esW < 2.0f) esW = 2.0f;
+            if (depth < esW) {
+                float es = (1.0f - depth / esW) * LENS_EDGE_SHADOW * glassAmt;
+                fr *= (1.0f - es);
+                fg *= (1.0f - es);
+                fb *= (1.0f - es);
+            }
+            if (fr < 0.0f) fr = 0.0f; else if (fr > 255.0f) fr = 255.0f;
+            if (fg < 0.0f) fg = 0.0f; else if (fg > 255.0f) fg = 255.0f;
+            if (fb < 0.0f) fb = 0.0f; else if (fb > 255.0f) fb = 255.0f;
+            int a = (int)(alpha * 255.0f);
+            int pr = (int)fr * a / 255, pg = (int)fg * a / 255, pb = (int)fb * a / 255;
+            out[(size_t)y * rw + x] = ((uint32_t)a << 24) | ((uint32_t)pr << 16) | ((uint32_t)pg << 8) | (uint32_t)pb;
+        }
+    }
+}
+
 @implementation METALView
 
 @synthesize commandQueue;
@@ -943,6 +1062,75 @@ extern BOOL isRetinaBug();
     if (bmp != NULL) { CGContextRelease(bmp); }
     CGColorSpaceRelease(cs);
     free(out);
+}
+
+// Live-screen iOS 26 selection "drop" LENS. Unlike glassScreenRegionX (a frosted
+// blur behind the content) this is painted OVER the bar + the black glyphs and
+// reads them back: it magnifies, chromatically aberrates and dark->accent tints
+// the live content beneath it (see glassApplyLens). No padding/blur -- the lens
+// samples within its own bounds. Runs during the drain like the glass op.
+- (void)lensScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h cornerRadius:(float)cornerRadius
+                  magnify:(float)magnify aberration:(float)aberration tintColor:(int)tintColor tintStrength:(float)tintStrength {
+    if (self.screenTexture == nil || w <= 0 || h <= 0) {
+        return;
+    }
+    float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
+    CGFloat s = self.contentScaleFactor / sv;
+    int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
+    int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
+    if (fx < 0) { fw += fx; fx = 0; }
+    if (fy < 0) { fh += fy; fy = 0; }
+    if (fx + fw > texW) { fw = texW - fx; }
+    if (fy + fh > texH) { fh = texH - fy; }
+    if (fw <= 0 || fh <= 0) { return; }
+
+    // GPU LENS: blit the bar region to a scratch texture and draw the drop quad with the
+    // cn1_fs_lens shader sampling it -- entirely on the GPU. The old path read the region
+    // back to the CPU (2x waitUntilCompleted stalls + getBytes + a UIImage->texture upload)
+    // EVERY frame, capping the morph at ~6fps; this keeps it at frame rate.
+    //
+    // 1) End the current render encoder so the bar draws are flushed into screenTexture, but
+    //    KEEP the frame's command buffer: the blit + lens draw go on the SAME buffer so the
+    //    GPU executes bar-draw -> blit -> lens-draw in order (Metal tracks texture hazards),
+    //    with no CPU sync.
+    if (self.renderCommandEncoder != nil) {
+        CN1MetalEndFrame();
+        [self.renderCommandEncoder endEncoding];
+        self.renderCommandEncoder = nil;
+    }
+    if (self.commandBuffer == nil) {
+        // A prior op already committed it; screenTexture holds the bar, so a fresh buffer is fine.
+        self.commandBuffer = [self.commandQueue commandBuffer];
+    }
+
+    // 2) Scratch texture (Private = GPU-only; ShaderRead for the fragment sample).
+    id<MTLDevice> device = CN1MetalDevice();
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:fw height:fh mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    if (scratch == nil) { [self setFramebuffer]; return; }
+
+    // 3) Blit the bar region screenTexture -> scratch on the frame's command buffer.
+    id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
+    [blit copyFromTexture:self.screenTexture sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(fx, fy, 0) sourceSize:MTLSizeMake(fw, fh, 1)
+                 toTexture:scratch destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+
+    // 4) Restart a render encoder on the SAME command buffer (loadAction Load preserves the
+    //    bar) and re-publish it to the CN1Metalcompat draw layer.
+    [self createRenderPassDescriptor];
+    if (self.renderPassDescriptor == nil) { return; }
+    self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+    [self.renderCommandEncoder setViewport:(MTLViewport){ 0.0, 0.0, (double)framebufferWidth, (double)framebufferHeight, 0.0, 1.0 }];
+    CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
+
+    // 5) Draw the lens quad sampling scratch (cornerRadius logical -> physical px; < 0 = capsule).
+    float crPx = cornerRadius < 0.0f ? -1.0f : cornerRadius * (float)s;
+    CN1MetalDrawLens(scratch, x, y, w, h, fw, fh, magnify, aberration, tintColor, tintStrength, crPx);
 }
 
 - (BOOL)presentFramebuffer

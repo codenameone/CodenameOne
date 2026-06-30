@@ -57,11 +57,32 @@
     return self;
 }
 
+-(id)initWithLensArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h
+         cornerRadius:(float)cr magnify:(float)mg aberration:(float)ab
+            tintColor:(int)tc tintStrength:(float)ts {
+    x = xpos;
+    y = ypos;
+    width = w;
+    height = h;
+    glass = NO;
+    lens = YES;
+    cornerRadius = cr;
+    magnify = mg;
+    aberration = ab;
+    tintColor = tc;
+    tintStrength = ts;
+    return self;
+}
+
 -(void)execute {
 #if defined(CN1_USE_METAL) && !TARGET_OS_WATCH
     id view = [[CodenameOne_GLViewController instance] eaglView];
     if ([view isKindOfClass:[METALView class]]) {
-        if (glass) {
+        if (lens) {
+            [(METALView*)view lensScreenRegionX:x y:y w:width h:height
+                                  cornerRadius:cornerRadius magnify:magnify
+                                   aberration:aberration tintColor:tintColor tintStrength:tintStrength];
+        } else if (glass) {
             [(METALView*)view glassScreenRegionX:x y:y w:width h:height radius:radius
                                    cornerRadius:cornerRadius sat:sat scale:scale
                                          offset:offset refract:refract specular:specular];

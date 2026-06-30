@@ -3550,6 +3550,13 @@ public abstract class CodenameOneImplementation {
         return blurRegion(graphics, x, y, width, height, radius);
     }
 
+    /// In-place iOS 26 selection-drop LENS (magnify + chromatic aberration +
+    /// dark-&gt;accent tint over the painted content). Default unsupported; the iOS
+    /// port overrides it. Returns false so callers can fall back (e.g. to a tint).
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        return false;
+    }
+
     /// Renders an Apple SF Symbol to an image. Default returns null (only iOS
     /// implements this); callers fall back to the Material icon font.
     public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {

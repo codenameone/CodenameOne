@@ -10420,12 +10420,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    // Maps a mutable image's raw Graphics2D back to its backing BufferedImage so the
+    // in-place region ops (blurRegion / lensRegion) can read+write the destination
+    // when drawing off-screen (headless glass/lens rendering, e.g. the capture probe).
+    // WeakHashMap: entries clear when the Graphics2D is GC'd with its CN1 Graphics.
+    private final java.util.Map<Object, BufferedImage> mutableImageGraphics =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<Object, BufferedImage>());
+
     public Object getNativeGraphics(Object image) {
         /*
          * NativeScreenGraphics n = new NativeScreenGraphics(); n.sourceImage =
          * (BufferedImage)image; return n;
          */
-        return ((BufferedImage) image).getGraphics();
+        java.awt.Graphics g = ((BufferedImage) image).getGraphics();
+        mutableImageGraphics.put(g, (BufferedImage) image);
+        return g;
     }
 
     /**
@@ -16134,11 +16143,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                     dest = ng.sourceImage;   // mutable image target (fidelity tiles, blur-to-image)
                     scale = 1.0;
                 } else if (canvas != null && canvas.edtBuffer != null) {
-                    dest = canvas.edtBuffer;  // simulator screen buffer (rendered at retinaScale)
-                    scale = retinaScale;
+                    dest = canvas.edtBuffer;  // simulator screen buffer
+                    // edtBuffer = displayWidth * zoomLevel (device scaled to window), NOT
+                    // displayWidth * retinaScale -- retinaScale put the region off-buffer.
+                    scale = (double) dest.getWidth() / getDisplayWidthImpl();
                 } else {
                     return false;
                 }
+            } else if (mutableImageGraphics.containsKey(graphics)) {
+                dest = mutableImageGraphics.get(graphics);   // off-screen mutable image
+                scale = 1.0;
             } else {
                 return false;   // raw Graphics2D with no readable backing buffer
             }
@@ -16171,6 +16185,214 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
  
+    // iOS-26 tab selection-DROP lens constants (shared shape with METALView.m
+    // glassApplyLens). Uniform magnification in the central MAG_FLAT fraction of the
+    // radius, smooth falloff to 1.0 at the rim; chromatic aberration at the rim only;
+    // a SHARP luminance key so only dark glyphs tint (the grey pill stays grey).
+    private static final double LENS_MAG_FLAT = 0.75;
+    private static final double LENS_TINT_HI = 150;
+    private static final double LENS_TINT_LO = 55;
+    // The drop LIFTS the content under it upward (like a magnifying droplet pulling the
+    // glyph up) -- this is the "tabs grow/rise" in the native morph, not just magnify.
+    // Lift is proportional to (magnify-1) so it tracks the travel bump, peaks at centre.
+    private static final double LENS_LIFT_COEF = 0.40;
+    // The drop is a 3D GLASS droplet: a soft specular GLARE (light sheen) near the top,
+    // and a bright EDGE RIM that defines the glass boundary. Without these it reads as a
+    // flat tinted pill, not glass.
+    private static final double LENS_GLARE = 0.09;     // specular sheen strength
+    private static final double LENS_RIM = 0.06;       // edge-rim brightness
+    private static final double LENS_RIM_W = 0.06;     // rim band width (fraction of half-height)
+    private static final double LENS_REFRACT = 0.16;   // edge lensing: content bends at the rim
+    private static final double LENS_EDGE_SHADOW = 0.12; // soft dark band at the inner edge (glass depth)
+    // The periphery (bar / other tabs seen through the drop) is slightly SHRUNK while the
+    // central glyph stays enlarged -- mag falls from `magnify` at the centre to RIM_SCALE
+    // (<1) at the rim. And the glass carries a faint cool TINT inside it.
+    private static final double LENS_RIM_SCALE = 0.84;
+    private static final int LENS_GLASS_TINT = 0xbcd8ff;   // faint cool-blue glass cast
+    private static final double LENS_GLASS_TINT_STR = 0.10;
+    // The selected glyph seen through the drop reads MORE vivid/saturated than a flat
+    // tint -- native's selected blue is punchy. Boost chroma around the pixel luminance:
+    // coloured pixels (the blue glyph) push further from grey; neutral greys (the bar)
+    // are barely touched, so only the glyph gets more saturated.
+    private static final double LENS_SAT_BOOST = 1.32;
+
+    @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height,
+            float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+        try {
+            BufferedImage dest;
+            double scale;
+            if (graphics instanceof NativeScreenGraphics) {
+                NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+                if (ng.sourceImage != null) {
+                    dest = ng.sourceImage;
+                    scale = 1.0;
+                } else if (canvas != null && canvas.edtBuffer != null) {
+                    dest = canvas.edtBuffer;
+                    // edtBuffer = displayWidth * zoomLevel (the sim renders the device
+                    // scaled to fit the window), NOT displayWidth * retinaScale -- using
+                    // retinaScale put the region off-buffer so the op silently no-op'd.
+                    scale = (double) dest.getWidth() / getDisplayWidthImpl();
+                } else {
+                    return false;
+                }
+            } else if (mutableImageGraphics.containsKey(graphics)) {
+                dest = mutableImageGraphics.get(graphics);   // off-screen mutable image
+                scale = 1.0;
+            } else {
+                return false;
+            }
+            int rx = (int) Math.round(x * scale);
+            int ry = (int) Math.round(y * scale);
+            int rw = (int) Math.round(width * scale);
+            int rh = (int) Math.round(height * scale);
+            int dw = dest.getWidth(), dh = dest.getHeight();
+            if (rx < 0) { rw += rx; rx = 0; }
+            if (ry < 0) { rh += ry; ry = 0; }
+            if (rx + rw > dw) { rw = dw - rx; }
+            if (ry + rh > dh) { rh = dh - ry; }
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            int[] src = dest.getRGB(rx, ry, rw, rh, null, 0, rw);
+            int[] out = new int[rw * rh];
+            applyLensBuffer(src, out, rw, rh, cornerRadius * scale, magnify, aberration, tintColor, tintStrength);
+            dest.setRGB(rx, ry, rw, rh, out, 0, rw);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /// In-place lens over a copied ARGB region. cornerRadius < 0 -> capsule. Mirrors
+    /// METALView.m glassApplyLens so the simulator and device agree.
+    private static void applyLensBuffer(int[] src, int[] out, int rw, int rh,
+            double cornerRadius, double magnify, double aberration, int tintColor, double tintStrength) {
+        double hw = rw / 2.0, hh = rh / 2.0;
+        double r = cornerRadius < 0 ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
+        if (r < 0) r = 0;
+        int tr = (tintColor >> 16) & 0xff, tg = (tintColor >> 8) & 0xff, tb = tintColor & 0xff;
+        double liftMax = LENS_LIFT_COEF * (magnify - 1.0) * hh;   // upward pull, bump-driven
+        // The 3D-glass cues (edge refraction / edge shadow / glare) belong to the MORPH
+        // droplet, not the settled pill -- scale them by how magnified the drop is so a
+        // resting selection stays a flat subtle pill.
+        double glassAmt = lensSmoothstep(1.085, 1.25, magnify);
+        for (int yy = 0; yy < rh; yy++) {
+            double py = yy + 0.5 - hh;
+            for (int xx = 0; xx < rw; xx++) {
+                double px = xx + 0.5 - hw;
+                double dxe = Math.abs(px) - (hw - r);
+                double dye = Math.abs(py) - (hh - r);
+                double axx = Math.max(dxe, 0), ayy = Math.max(dye, 0);
+                double outside = Math.sqrt(axx * axx + ayy * ayy);
+                double inside = Math.min(Math.max(dxe, dye), 0);
+                double depth = -(outside + inside - r);
+                if (depth <= 0) { out[yy * rw + xx] = src[yy * rw + xx]; continue; }
+                double alpha = Math.min(depth, 1.0);
+                double rd = Math.min(1.0, Math.sqrt((px * px) / (hw * hw) + (py * py) / (hh * hh)));
+                double edge = lensSmoothstep(LENS_MAG_FLAT, 1.0, rd);
+                // Centre ENLARGES (magnify); periphery SHRINKS (mag -> RIM_SCALE < 1) so the
+                // bar / other tabs seen through the drop read slightly minified, while the
+                // central glyph stays big. No shrink when settled (scaled by glassAmt).
+                double rimScale = 1.0 + (LENS_RIM_SCALE - 1.0) * glassAmt;
+                double mag = magnify + (rimScale - magnify) * edge;
+                if (mag < 0.2) mag = 0.2;
+                double abr = aberration * edge;
+                double magR = mag * (1 - abr), magB = mag * (1 + abr);
+                if (magR < 0.05) magR = 0.05;
+                if (magB < 0.05) magB = 0.05;
+                // Sample from LOWER in the source (+lift) so the content appears LIFTED
+                // up; strongest at the drop centre, smooth to 0 at the rim.
+                double lift = liftMax * (1 - rd * rd);
+                // EDGE LENSING: near the rim the content bends outward (refraction band),
+                // like the curved edge of a real glass droplet -- the centre stays flat.
+                double refr = 1.0 + LENS_REFRACT * glassAmt * lensSmoothstep(0.70, 1.0, rd);
+                int sr = (lensSample(src, rw, rh, hw + (px / magR) * refr, hh + (py / magR) * refr + lift) >> 16) & 0xff;
+                int sg = (lensSample(src, rw, rh, hw + (px / mag) * refr, hh + (py / mag) * refr + lift) >> 8) & 0xff;
+                int sb = lensSample(src, rw, rh, hw + (px / magB) * refr, hh + (py / magB) * refr + lift) & 0xff;
+                double lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+                double t = tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+                double fr = sr + (tr - sr) * t;
+                double fg = sg + (tg - sg) * t;
+                double fb = sb + (tb - sb) * t;
+                // Faint cool TINT through the whole glass (the drop is slightly coloured
+                // inside, not clear). Fades out when settled (glassAmt).
+                double gt = LENS_GLASS_TINT_STR * glassAmt;
+                fr += (((LENS_GLASS_TINT >> 16) & 0xff) - fr) * gt;
+                fg += (((LENS_GLASS_TINT >> 8) & 0xff) - fg) * gt;
+                fb += ((LENS_GLASS_TINT & 0xff) - fb) * gt;
+                // SATURATION boost: push coloured pixels (the blue glyph) away from their
+                // own grey so the selected blue reads vivid like native; near-neutral greys
+                // (the bar) move negligibly. Always on so the settled blue is vivid too.
+                double sl = 0.2126 * fr + 0.7152 * fg + 0.0722 * fb;
+                fr = sl + (fr - sl) * LENS_SAT_BOOST;
+                fg = sl + (fg - sl) * LENS_SAT_BOOST;
+                fb = sl + (fb - sl) * LENS_SAT_BOOST;
+                // 3D GLASS: a soft specular GLARE near the top (an elliptical sheen) plus
+                // a bright EDGE RIM (small `depth` = near the boundary) so the drop reads
+                // as a raised glass droplet, not a flat tint. Both lift the colour toward
+                // white.
+                double gx = px / hw, gy = (py + 0.42 * hh) / hh;
+                double glare = LENS_GLARE * glassAmt * Math.exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
+                double rimW = Math.max(2.0, LENS_RIM_W * hh);
+                double rim = depth < rimW ? (1.0 - depth / rimW) * LENS_RIM : 0;
+                double bright = glare + rim;
+                if (bright > 0) {
+                    fr += bright * (255 - fr);
+                    fg += bright * (255 - fg);
+                    fb += bright * (255 - fb);
+                }
+                // EDGE SHADOW: a soft dark band just inside the rim (the glass casts a
+                // shadow at its edge) -- gives the droplet depth instead of a flat cutout.
+                double esW = Math.max(2.0, 0.13 * Math.min(hw, hh));
+                if (depth < esW) {
+                    double es = (1.0 - depth / esW) * LENS_EDGE_SHADOW * glassAmt;
+                    fr *= (1 - es);
+                    fg *= (1 - es);
+                    fb *= (1 - es);
+                }
+                int fri = fr < 0 ? 0 : (fr > 255 ? 255 : (int) fr);
+                int fgi = fg < 0 ? 0 : (fg > 255 ? 255 : (int) fg);
+                int fbi = fb < 0 ? 0 : (fb > 255 ? 255 : (int) fb);
+                fr = fri; fg = fgi; fb = fbi;
+                int orig = src[yy * rw + xx];
+                int or = (orig >> 16) & 0xff, og = (orig >> 8) & 0xff, ob = orig & 0xff;
+                int mr = (int) (or + (fr - or) * alpha);
+                int mg = (int) (og + (fg - og) * alpha);
+                int mb = (int) (ob + (fb - ob) * alpha);
+                out[yy * rw + xx] = (orig & 0xff000000) | (mr << 16) | (mg << 8) | mb;
+            }
+        }
+    }
+
+    private static double lensSmoothstep(double a, double b, double x) {
+        double t = (x - a) / (b - a);
+        t = t < 0 ? 0 : (t > 1 ? 1 : t);
+        return t * t * (3 - 2 * t);
+    }
+
+    private static int lensSample(int[] buf, int w, int h, double fx, double fy) {
+        if (fx < 0) fx = 0; else if (fx > w - 1) fx = w - 1;
+        if (fy < 0) fy = 0; else if (fy > h - 1) fy = h - 1;
+        int x0 = (int) fx, y0 = (int) fy;
+        int x1 = Math.min(x0 + 1, w - 1), y1 = Math.min(y0 + 1, h - 1);
+        double tx = fx - x0, ty = fy - y0;
+        int p00 = buf[y0 * w + x0], p10 = buf[y0 * w + x1];
+        int p01 = buf[y1 * w + x0], p11 = buf[y1 * w + x1];
+        int r = lensBil((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, (p01 >> 16) & 0xff, (p11 >> 16) & 0xff, tx, ty);
+        int g = lensBil((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, (p01 >> 8) & 0xff, (p11 >> 8) & 0xff, tx, ty);
+        int b = lensBil(p00 & 0xff, p10 & 0xff, p01 & 0xff, p11 & 0xff, tx, ty);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static int lensBil(int a, int b, int c, int d, double tx, double ty) {
+        double top = a + (b - a) * tx, bot = c + (d - c) * tx;
+        return (int) (top + (bot - top) * ty);
+    }
+
     class NativeImage extends Image {
 
         public NativeImage(BufferedImage nativeImage) {
