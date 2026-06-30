@@ -12,13 +12,13 @@ to still images, but it goes deeper. It uses the platform's *native* codecs to:
 
 TIP: The decode side is something the
 https://www.codenameone.com/javadoc/com/codename1/media/Media.html[Media] player API
-deliberately does not provide. `Media` is a player: its `setTime()` snaps to key frames
+doesn't provide. `Media` is a player: its `setTime()` snaps to key frames
 and gives no exact frame guarantee. `VideoReader`, by contrast, decodes the precise frame
 at a requested time, which is what you need when you want to read an imported clip (for
 example a screen recording) frame by frame.
 
 `VideoIO` is supported on iOS, macOS, Android, Windows, Linux, JavaScript and the desktop
-simulator. It is *not* available on the TV, Watch or Car targets.
+simulator. It's *not* available on the TV, Watch or Car targets.
 
 === Checking for support
 
