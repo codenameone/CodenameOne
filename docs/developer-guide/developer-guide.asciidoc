@@ -99,6 +99,9 @@ include::Crash-Protection.asciidoc[]
 
 include::Analytics.asciidoc[]
 
+include::Commerce.asciidoc[]
+
+
 include::Monetization.asciidoc[]
 
 include::App-Review.asciidoc[]

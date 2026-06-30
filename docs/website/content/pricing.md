@@ -71,3 +71,25 @@ Codename One never reads or persists the unscrubbed crash payload — emails are
 
 ### Can I disable Crash Protection on specific platforms?
 Yes. Per-platform opt-outs are independent of the master switch — set e.g. `codename1.crashProtection.and.enabled=false` to skip Android while still capturing iOS / Mac / Linux / Windows crashes.
+
+### What is Commerce?
+Commerce is an optional managed service for apps that sell in-app purchases or subscriptions. It validates store receipts server-side, normalizes the subscription lifecycle across Apple and Google into one state machine (renewals, cancellations, refunds, billing retries, grace periods), forwards lifecycle webhooks to your backend, and gives you a revenue console with MRR, churn, cohorts and LTV. Your app then asks one store-agnostic question — *does this user have this entitlement right now?* It's available on every plan, including Free.
+
+### Do I need Commerce to sell in-app purchases? Is it required?
+**No. Commerce is 100% optional.** In-app purchases and subscriptions work without it through the standard Codename One `Purchase` API — purchases always go through the platform store. If you prefer to validate receipts and track subscription state yourself, you can run your own home-grown server and never touch Commerce at all. Commerce exists only to save you from building and operating that receipt-validation/state-tracking server yourself; it is a convenience, never a gate on selling.
+
+### What does Commerce cost?
+Nothing extra — it's part of your existing plan, charged as a flat subscription. Codename One does not take a percentage of your sales and never touches your money (the stores, or your own payment processor for physical goods, handle that). What varies by plan is the monthly *validated transaction volume*:
+
+- **Free:** $200 / month
+- **Basic:** $10,000 / month
+- **Pro:** $200,000 / month
+- **Enterprise:** unlimited
+
+Volume is measured in validated transactions normalized to USD via daily exchange rates, per developer seat (not per app).
+
+### What happens if I exceed my Commerce volume cap?
+It degrades, it never blocks. Once you pass the monthly cap, the service stops server-validating and stops metering for the rest of the month, and the device SDK automatically falls back to store-direct — the store-signed receipt still grants the entitlement locally. **A real purchase is never rejected.** You simply lose the server cross-check and console reporting until the next month (or until you move to a higher plan).
+
+### How do I turn Commerce on?
+It's on by default for cloud builds — there's nothing to wire up, since it reuses the build key your app already carries. Drive purchases through `CommerceManager`, connect your store credentials and notification URLs with the guided **Setup** wizard in the console, and gate features with `CommerceManager.isEntitled("...")`. See the [Developer Guide](/developer-guide) for the full Commerce chapter. To opt out entirely, set the `commerce.cloud.enabled=false` build hint.
