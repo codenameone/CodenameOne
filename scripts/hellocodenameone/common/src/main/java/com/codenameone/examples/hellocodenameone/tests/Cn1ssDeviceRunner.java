@@ -339,6 +339,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // on the Mac native build it enables desktop mode (commands move to the native menu
             // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
             new DesktopModeScreenshotTest(),
+            // VideoIO animation screenshot: encodes a 6-frame counting clip (digits
+            // 1..6), decodes it back with the video decoder, and lays the decoded
+            // frames out as a 2x3 grid -- so a decode regression is visible. Placed
+            // after the last normal screenshot because its native encode/decode can
+            // perturb the display colour space / contend with rendering; it captures
+            // its OWN (off-screen) grid, leaving every other baseline untouched.
+            // SKIPs (no screenshot) where the platform cannot encode (iOS simulator,
+            // unsupported targets). Pixel verification lives in VideoIORoundTripTest.
+            new VideoIODecodedFramesScreenshotTest(),
             // VideoIO cross-platform coverage: encodes a 6-frame counting clip with audio,
             // decodes the frames back and verifies the count order + PCM levels. Assertion
             // test (no screenshot); SKIPs where the platform can't encode. Deliberately LAST:
