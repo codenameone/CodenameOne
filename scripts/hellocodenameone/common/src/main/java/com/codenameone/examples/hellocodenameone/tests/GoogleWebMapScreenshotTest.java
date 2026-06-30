@@ -88,16 +88,18 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             @Override
             protected void onShowCompleted() {
                 final Form self = this;
-                // Let the Google Maps JS load and paint tiles from the network
-                // (well over the native-map settle), capture, then dispose.
-                // 8s was enough on a healthy runner but not on a starved CI box
-                // (88s simulator boot, 450s suite execution), where the live map
-                // had not painted a single tile yet and we captured a blank grey
-                // page -- a ~66% mismatch the test (correctly) rejects as a blank
-                // map. 22s gives the network load real headroom (~3x the boot
-                // slowdown that runner showed) while still sitting under the 30s
-                // native test timeout.
-                UITimer.timer(22000, false, self, () ->
+                // Wait for the live Google Maps SDK to actually paint its tiles
+                // (NativeMap.isMapReady() reflects the map's 'tilesloaded' event)
+                // before capturing, rather than guessing a fixed delay -- a slow
+                // CI runner otherwise snapped a blank grey frame before any tile
+                // loaded (the flake that previously failed this test). Poll up to
+                // ~22s (the load headroom the old blind wait needed on the
+                // slowest runner; still under the 30s native-test timeout). The
+                // readiness check is a cheap Java flag (set once by an in-page
+                // JS->Java bridge), so polling is free; we capture as soon as the
+                // map paints. If the tiles never load (blocked network / rejected
+                // key) fail loudly instead of baselining a blank map.
+                waitForMapReady(self, map, 44, () ->
                         captureWhenSettled(self, "GoogleWebMap", () -> {
                             map.dispose();
                             done();
@@ -107,6 +109,44 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         form.add(BorderLayout.CENTER, map);
         form.show();
         return true;
+    }
+
+    /// Poll until the live web map reports its tiles painted (map.isMapReady()),
+    /// then run onReady. Captures as soon as the real map has rendered, so a fast
+    /// runner finishes quickly; the attempt budget (500ms * attempts) is the
+    /// worst-case deadline. On timeout we deliberately do NOT capture -- a blank
+    /// or blocked map should fail loudly (missing_actual) rather than be
+    /// baselined -- but we MUST still dispose the map: the Google Maps JS keeps a
+    /// requestAnimationFrame / tile-loading loop alive, and leaving it running
+    /// starves the main thread and desyncs LATER tests' captures (a downstream
+    /// screenshot then differs). The onReady path disposes via its callback.
+    private void waitForMapReady(final Form form, final NativeMap map,
+                                 final int attemptsLeft, final Runnable onReady) {
+        boolean ready;
+        try {
+            ready = map.isMapReady();
+        } catch (Throwable t) {
+            ready = false;
+        }
+        if (ready) {
+            // One short extra beat so the last tiles' compositing settles before
+            // the capture (the same peer-compositing lag extraSettle covers).
+            UITimer.timer(1000, false, form, onReady);
+            return;
+        }
+        if (attemptsLeft <= 0) {
+            System.out.println(
+                    "CN1SS:INFO:test=GoogleWebMap status=FAILED reason=tiles-never-loaded");
+            try {
+                map.dispose();
+            } catch (Throwable t) {
+                // best effort -- still report done so the suite advances
+            }
+            done();
+            return;
+        }
+        UITimer.timer(500, false, form, () ->
+                waitForMapReady(form, map, attemptsLeft - 1, onReady));
     }
 
     /// The map is a native peer (BrowserComponent) view. On the iOS Metal

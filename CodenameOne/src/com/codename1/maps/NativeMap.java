@@ -559,6 +559,18 @@ public class NativeMap extends Container implements MapSurface {
         return !isFallback();
     }
 
+    /// Whether the native map has finished its initial render. For the web
+    /// provider this reflects the Google Maps `tilesloaded` event, so a caller
+    /// (e.g. a screenshot test) can wait for the real map to paint instead of a
+    /// fixed delay. Providers without an async-readiness signal report ready
+    /// once their peer exists.
+    public boolean isMapReady() {
+        if (provider instanceof WebMapProvider) {
+            return ((WebMapProvider) provider).isReady(mapId);
+        }
+        return provider != null && peer != null;
+    }
+
     /// {@inheritDoc} Delegates to the embedded vector map when this `NativeMap`
     /// fell back to it; a real native provider loads its own tiles, so false.
     @Override

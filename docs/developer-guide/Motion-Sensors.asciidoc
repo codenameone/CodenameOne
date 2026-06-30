@@ -1,0 +1,107 @@
+== Motion Sensors
+
+The `com.codename1.sensors` package exposes the device motion hardware through a single entry point, `MotionSensorManager`, and layers high-level gesture detection on top of the raw sensor stream. The raw sensors are the accelerometer, the gyroscope and the magnetometer. From those readings the framework derives the gravity vector, the linear acceleration and the device orientation, and it recognizes a set of common gestures: shake, flip, tilt, pick up and free fall.
+
+Gesture detection lives in the core rather than in each platform port. Any platform that reports an accelerometer therefore gets the full gesture set, with no per-device work.
+
+=== Reading a sensor
+
+`MotionSensorManager.getInstance()` always returns a manager. On a device without motion hardware every sensor reports as unsupported, so application code can call the API without a null check on the manager itself. `getSensor(int)` returns `null` when the requested sensor isn't available on the current device:
+
+[source,java]
+----
+MotionSensorManager m = MotionSensorManager.getInstance();
+MotionSensor accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
+if (accelerometer != null) {
+    accelerometer.addListener(new MotionSensorListener() {
+        public void motionReceived(MotionEvent evt) {
+            // x, y and z are in meters per second squared
+            label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
+            label.getParent().revalidate();
+        }
+    });
+}
+----
+
+Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
+
+[source,java]
+----
+accelerometer.removeListener(listener);
+----
+
+=== Sensor types
+
+Each sensor is identified by a `TYPE_*` constant on `MotionSensorManager`. The three hardware sensors map directly to the device. The gravity, linear acceleration and orientation values are derived in the core from the accelerometer (and the magnetometer, for the compass azimuth) when the platform doesn't report them on its own.
+
+[cols="1,3"]
+|===
+|Constant |Reading
+
+|`TYPE_ACCELEROMETER`
+|Acceleration including gravity, in meters per second squared.
+
+|`TYPE_LINEAR_ACCELERATION`
+|Acceleration with gravity removed, in meters per second squared.
+
+|`TYPE_GRAVITY`
+|The gravity vector on its own, in meters per second squared.
+
+|`TYPE_GYROSCOPE`
+|Rate of rotation around each axis, in radians per second.
+
+|`TYPE_MAGNETOMETER`
+|The ambient magnetic field, in microtesla.
+
+|`TYPE_ORIENTATION`
+|Azimuth, pitch and roll, in radians.
+|===
+
+Readings use a single convention across every port: the x-axis points to the right, the y-axis points up, and the z-axis points out of the screen toward the user, with the device held upright in portrait. At rest, face up, the accelerometer reports about `+9.81` on the z-axis.
+
+=== Detecting gestures
+
+Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The accelerometer powers on for the duration that a gesture listener stays registered:
+
+[source,java]
+----
+MotionSensorManager.getInstance().addGestureListener(GestureEvent.TYPE_SHAKE, new GestureListener() {
+    public void gestureDetected(GestureEvent evt) {
+        Dialog.show("Shaken", "You shook the device", "OK", null);
+    }
+});
+----
+
+The recognized gestures are:
+
+* `TYPE_SHAKE` -- the device was shaken back and forth.
+* `TYPE_FLIP_FACE_DOWN` and `TYPE_FLIP_FACE_UP` -- the device was turned screen down or screen up.
+* `TYPE_TILT_LEFT`, `TYPE_TILT_RIGHT`, `TYPE_TILT_FORWARD` and `TYPE_TILT_BACKWARD` -- the device crossed a tilt angle on the roll or pitch axis.
+* `TYPE_PICK_UP` -- the device was lifted from a resting position.
+* `TYPE_FREE_FALL` -- the device is falling (near weightlessness was detected).
+
+The detection thresholds suit most apps as shipped, and you can tune them when a gesture needs to be more or less sensitive:
+
+[source,java]
+----
+MotionSensorManager m = MotionSensorManager.getInstance();
+m.setShakeThreshold(15.0);     // require a more vigorous shake
+m.setTiltThreshold(0.5);       // tilt angle in radians
+m.setSamplingInterval(33);     // sample at about 30Hz for snappier gestures
+----
+
+A smaller sampling interval makes gestures more responsive at a higher battery cost. The value is clamped to the range 10ms through 1000ms.
+
+=== Device orientation
+
+`TYPE_ORIENTATION` is a derived sensor. Its event carries the azimuth, pitch and roll in radians, available through `getAzimuth()`, `getPitch()` and `getRoll()` on `MotionEvent`. Pitch and roll come from the gravity vector and need only the accelerometer. The azimuth is a compass heading and needs the magnetometer; on a device without one the azimuth stays at zero.
+
+=== Platform notes
+
+* *Android* -- backed by `android.hardware.SensorManager`. Android already reports its readings in the units and axis convention this API documents, so no conversion takes place.
+* *iOS* -- backed by CoreMotion (`CMMotionManager`). Add the build hint `ios.NSMotionUsageDescription` with a short sentence describing why the app reads motion data; iOS denies access to the motion hardware without it. The iOS Simulator doesn't expose an accelerometer, so the sensors report as unsupported there. Test motion features on a real device.
+* *Other ports* -- a port that doesn't implement the sensors returns an unsupported manager, so the API stays safe to call everywhere.
+
+=== Testing in the simulator
+
+The simulator can stand in for real hardware. Open *Simulate > Motion / Gesture Simulation* to show a small control window. The two sliders set the simulated device orientation, which the accelerometer reflects, and the buttons inject the motion needed to fire the shake, flip, pick up and free fall gestures. This lets you wire up and debug a gesture handler on the desktop before deploying to a device.

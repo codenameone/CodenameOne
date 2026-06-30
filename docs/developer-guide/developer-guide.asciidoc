@@ -85,6 +85,8 @@ include::Maps.asciidoc[]
 
 include::In-Car-Experiences.asciidoc[]
 
+include::Motion-Sensors.asciidoc[]
+
 include::Miscellaneous-Features.asciidoc[]
 
 include::Video-IO.asciidoc[]

@@ -3838,6 +3838,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    private IOSMotionSensorManager motionSensorManager;
+
+    @Override
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        synchronized (IOSImplementation.class) {
+            if (motionSensorManager == null) {
+                motionSensorManager = new IOSMotionSensorManager();
+            }
+            return motionSensorManager;
+        }
+    }
+
     /**
      * @inheritDoc
      */

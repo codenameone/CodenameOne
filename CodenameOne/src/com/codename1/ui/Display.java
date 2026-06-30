@@ -4510,6 +4510,15 @@ public final class Display extends CN1Constants {
         return impl.getLocationManager();
     }
 
+    /// Returns the platform motion sensor entry point or {@code null} when the
+    /// current port does not provide motion sensors. Prefer
+    /// {@link com.codename1.sensors.MotionSensorManager#getInstance()} in
+    /// application code --- it handles the fallback to a no-op manager when the
+    /// current port returns {@code null}.
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        return impl.getMotionSensorManager();
+    }
+
     /// Returns the platform biometric authentication entry point. Prefer
     /// {@link com.codename1.security.Biometrics#getInstance()} in application
     /// code --- it handles the fallback to a no-op stub when the current port

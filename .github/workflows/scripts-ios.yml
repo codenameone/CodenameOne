@@ -177,22 +177,20 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      - name: Restore built CN1 + iOS port artifacts
-        # Use the exact key build-port saved against (published as a job
-        # output). Recomputing the src_hash on this runner has been
-        # observed to produce a different value than build-port on the
-        # same SHA -- and even when the algorithm is identical, any new
-        # source path added to the hash here has to land in three
-        # places at once or the keys diverge. The same workaround
-        # protects the build-ios-metal job a few hundred lines below.
-        uses: actions/cache/restore@v4
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.m2/repository/com/codenameone
-            Themes
-            Ports/iOSPort/nativeSources
-          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
-          fail-on-cache-miss: true
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          # Replaces the evictable cn1-built cache restore with the artifact
+          # build-port handed off (not LRU-evicted, survives --failed re-runs).
+          # The tar was created relative to / so this restores
+          # ~/.m2/com/codenameone + Themes + Ports/iOSPort/nativeSources to
+          # their original absolute paths.
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
 
       - name: Force GL backend for hellocodenameone
         # IPhoneBuilder defaults ios.metal to true. The GL job exists to
@@ -362,22 +360,20 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      - name: Restore built CN1 + iOS port artifacts
-        # build-port (the reusable workflow at .github/workflows/_build-ios-port.yml)
-        # populates this cache with the iOS port artifact + native themes + cn1
-        # Use the exact key the build-port job saved against. Recomputing
-        # the hash on this runner has been observed to produce a different
-        # value than build-port on the same SHA (suspected: find traversal
-        # picks up runner-specific filesystem metadata), causing a spurious
-        # cache miss. Reusing the published key sidesteps that.
-        uses: actions/cache/restore@v4
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.m2/repository/com/codenameone
-            Themes
-            Ports/iOSPort/nativeSources
-          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
-          fail-on-cache-miss: true
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          # Replaces the evictable cn1-built cache restore with the artifact
+          # build-port handed off (not LRU-evicted, survives --failed re-runs).
+          # The tar was created relative to / so this restores
+          # ~/.m2/com/codenameone + Themes + Ports/iOSPort/nativeSources to
+          # their original absolute paths.
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
 
       - name: Install Metal Toolchain
         # Xcode 26+ requires the Metal Toolchain component to be downloaded
@@ -613,15 +609,17 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      - name: Restore built CN1 + iOS port artifacts
-        uses: actions/cache/restore@v4
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.m2/repository/com/codenameone
-            Themes
-            Ports/iOSPort/nativeSources
-          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
-          fail-on-cache-miss: true
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          # Replaces the evictable cn1-built cache restore with the artifact
+          # build-port handed off (not LRU-evicted, survives --failed re-runs).
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
 
       - name: Build sample iOS app (generates the watch target)
         id: build-ios-app
@@ -759,15 +757,17 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      - name: Restore built CN1 + iOS port artifacts
-        uses: actions/cache/restore@v4
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.m2/repository/com/codenameone
-            Themes
-            Ports/iOSPort/nativeSources
-          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
-          fail-on-cache-miss: true
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          # Replaces the evictable cn1-built cache restore with the artifact
+          # build-port handed off (not LRU-evicted, survives --failed re-runs).
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
 
       - name: Build sample iOS app (generates the tvOS target)
         id: build-ios-app
