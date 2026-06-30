@@ -65,6 +65,20 @@ typedef enum {
     CN1_EVENT_MOUSE_HWHEEL = 9
 } CN1EventType;
 
+/* For pointer (pressed/released/dragged) events the otherwise-unused keyCode
+ * field carries the pointer metadata: the low bits are a button bitmask that
+ * mirrors com.codename1.ui.events.PointerEvent.MASK_* (so a press/release carry
+ * the button that changed and a drag carries the buttons held down), and the
+ * high bits flag a touch digitizer so the Java side reports TYPE_TOUCH. A value
+ * of 0 means "no detail" and defaults to a primary mouse press.
+ * LinuxImplementation.drainInput decodes this. */
+#define CN1_PE_MASK_PRIMARY   1
+#define CN1_PE_MASK_SECONDARY 2
+#define CN1_PE_MASK_MIDDLE    4
+#define CN1_PE_MASK_BACK      8
+#define CN1_PE_MASK_FORWARD   16
+#define CN1_PE_TOUCH_FLAG     256
+
 /* Pushes one event onto the ring buffer (called from the GTK thread). */
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode);
 

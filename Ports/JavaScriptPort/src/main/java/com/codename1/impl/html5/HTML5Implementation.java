@@ -2668,26 +2668,55 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={}, script="return window.cn1WheelMultiplier || 1.0")
     private static native double wheelMultiplier();
     
-    /// Records the mouse button and pointer type for the next dispatched pointer event so the
-    /// cross-platform PointerEvent / context-menu APIs work in the browser. DOM mouse buttons are
-    /// 0 (left), 1 (middle), 2 (right).
+    /// Records the mouse button, button mask and keyboard modifiers for the next dispatched pointer
+    /// event so the cross-platform PointerEvent / context-menu APIs work in the browser. The DOM
+    /// {@code button} that changed is 0 (left), 1 (middle), 2 (right), 3 (back), 4 (forward); the DOM
+    /// {@code buttons} bitmask of held buttons aligns 1:1 with PointerEvent.MASK_* so it is used
+    /// directly (it drives the mask during a drag).
     private void applyMouseMetadata(MouseEvent me) {
-        int button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
-        int mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+        int button;
         switch (me.getButton()) {
             case 1:
                 button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
-                mask = com.codename1.ui.events.PointerEvent.MASK_MIDDLE;
                 break;
             case 2:
                 button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
-                mask = com.codename1.ui.events.PointerEvent.MASK_SECONDARY;
+                break;
+            case 3:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_BACK;
+                break;
+            case 4:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
                 break;
             default:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
                 break;
         }
+        // buttons is 0 on mouseup, so fall back to the single button that changed (1 << button).
+        int mask = me.getButtons();
+        if (mask == 0) {
+            mask = 1 << button;
+        }
         setPointerEventMetadata(button, mask, com.codename1.ui.events.PointerEvent.TYPE_MOUSE,
-                1f, 0, 0, 0, 0, false);
+                1f, 0, 0, 0, mouseModifiers(me), false);
+    }
+
+    /// Folds the DOM modifier-key flags into the PointerEvent.MODIFIER_* bitmask.
+    private int mouseModifiers(MouseEvent me) {
+        int modifiers = 0;
+        if (me.isShiftKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_SHIFT;
+        }
+        if (me.isCtrlKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_CONTROL;
+        }
+        if (me.isAltKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_ALT;
+        }
+        if (me.isMetaKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_META;
+        }
+        return modifiers;
     }
 
     /// Flags the next dispatched pointer event as a finger touch.
@@ -9361,13 +9390,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 cache = new HashMap<Character,Integer>();
                 charWidthCache.put(getCSS(), cache);
             }
-            Character ch = new Character(c);
+            Character ch = c;
             Integer i = cache.get(ch);
             if (i != null){
                 return i.intValue();
             }
             int w = graphics.charsWidth(this, new char[]{c},0,1);
-            cache.put(ch, new Integer(w));
+            cache.put(ch, w);
             return w;
         }
         
@@ -9384,7 +9413,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     return i.intValue();
                 }
                 int w = graphics.stringWidth(this, str);
-                cache.put(str, new Integer(w));
+                cache.put(str, w);
                 return w;
             } else {
                 return graphics.stringWidth(this, str);

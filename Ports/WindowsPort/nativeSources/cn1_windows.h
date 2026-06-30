@@ -104,6 +104,21 @@ typedef struct {
     JAVA_INT keyCode;
 } CN1Event;
 
+/* For pointer (pressed/released/dragged) events the otherwise-unused keyCode
+ * field carries the pointer metadata: the low bits are a button bitmask that
+ * mirrors com.codename1.ui.events.PointerEvent.MASK_* (so a press/release carry
+ * the button that changed and a drag carries the buttons held down), and the
+ * high bits flag a touch / pen digitizer so the Java side reports the right
+ * PointerEvent type. A value of 0 means "no detail" and defaults to a primary
+ * mouse press. WindowsImplementation.drainInput decodes this. */
+#define CN1_PE_MASK_PRIMARY   1
+#define CN1_PE_MASK_SECONDARY 2
+#define CN1_PE_MASK_MIDDLE    4
+#define CN1_PE_MASK_BACK      8
+#define CN1_PE_MASK_FORWARD   16
+#define CN1_PE_TOUCH_FLAG     256
+#define CN1_PE_PEN_FLAG       512
+
 #define CN1_EVENT_QUEUE_CAPACITY 1024
 
 /* --------------------------------------------------------------- graphics */

@@ -332,23 +332,109 @@ int cn1WinPollEvent(CN1Event* out) {
     return hasEvent;
 }
 
+/* ------------------------------------------------------------- input helpers */
+
+/* Bitmask (CN1_PE_MASK_*) of the mouse buttons currently held. Mouse capture is
+ * held while ANY button is down so a drag that starts inside the window keeps
+ * delivering WM_MOUSEMOVE after the cursor leaves it, and released only once the
+ * last button comes up. */
+static int cn1WinButtonMask = 0;
+
+static void cn1WinButtonDown(HWND hwnd, int mask) {
+    if (cn1WinButtonMask == 0) {
+        SetCapture(hwnd);
+    }
+    cn1WinButtonMask |= mask;
+}
+
+static void cn1WinButtonUp(HWND hwnd, int mask) {
+    cn1WinButtonMask &= ~mask;
+    if (cn1WinButtonMask == 0) {
+        ReleaseCapture();
+    }
+}
+
+/* Buttons currently held according to a WM_MOUSEMOVE wParam, used to label a
+ * drag with the right button(s). */
+static int cn1WinMoveMask(WPARAM wParam) {
+    int mask = 0;
+    if (wParam & MK_LBUTTON)  mask |= CN1_PE_MASK_PRIMARY;
+    if (wParam & MK_RBUTTON)  mask |= CN1_PE_MASK_SECONDARY;
+    if (wParam & MK_MBUTTON)  mask |= CN1_PE_MASK_MIDDLE;
+    if (wParam & MK_XBUTTON1) mask |= CN1_PE_MASK_BACK;
+    if (wParam & MK_XBUTTON2) mask |= CN1_PE_MASK_FORWARD;
+    return mask;
+}
+
+/* Windows promotes touch and pen input to ordinary mouse messages and tags the
+ * message's extra-info word with a signature (see GetMessageExtraInfo docs:
+ * MI_WP_SIGNATURE 0xFF515700, with bit 0x80 distinguishing pen from touch). We
+ * use it to flag the synthesized mouse event as a touch / pen so the
+ * cross-platform PointerEvent type is correct on touch-enabled PCs. */
+static int cn1WinTouchFlag(void) {
+    LONG_PTR extra = GetMessageExtraInfo();
+    if ((extra & 0xFFFFFF00) == 0xFF515700) {
+        return (extra & 0x80) ? CN1_PE_PEN_FLAG : CN1_PE_TOUCH_FLAG;
+    }
+    return 0;
+}
+
 /* ------------------------------------------------------------- window proc */
 
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_LBUTTONDOWN:
-            SetCapture(hwnd);
-            cn1WinPushEvent(CN1_EVENT_POINTER_PRESSED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 0);
+            cn1WinButtonDown(hwnd, CN1_PE_MASK_PRIMARY);
+            cn1WinPushEvent(CN1_EVENT_POINTER_PRESSED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    CN1_PE_MASK_PRIMARY | cn1WinTouchFlag());
             return 0;
         case WM_LBUTTONUP:
-            ReleaseCapture();
-            cn1WinPushEvent(CN1_EVENT_POINTER_RELEASED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 0);
+            cn1WinButtonUp(hwnd, CN1_PE_MASK_PRIMARY);
+            cn1WinPushEvent(CN1_EVENT_POINTER_RELEASED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    CN1_PE_MASK_PRIMARY | cn1WinTouchFlag());
             return 0;
-        case WM_MOUSEMOVE:
-            if ((wParam & MK_LBUTTON) != 0) {
-                cn1WinPushEvent(CN1_EVENT_POINTER_DRAGGED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 0);
+        case WM_RBUTTONDOWN:
+            cn1WinButtonDown(hwnd, CN1_PE_MASK_SECONDARY);
+            cn1WinPushEvent(CN1_EVENT_POINTER_PRESSED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    CN1_PE_MASK_SECONDARY | cn1WinTouchFlag());
+            return 0;
+        case WM_RBUTTONUP:
+            cn1WinButtonUp(hwnd, CN1_PE_MASK_SECONDARY);
+            cn1WinPushEvent(CN1_EVENT_POINTER_RELEASED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    CN1_PE_MASK_SECONDARY | cn1WinTouchFlag());
+            return 0;
+        case WM_MBUTTONDOWN:
+            cn1WinButtonDown(hwnd, CN1_PE_MASK_MIDDLE);
+            cn1WinPushEvent(CN1_EVENT_POINTER_PRESSED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    CN1_PE_MASK_MIDDLE | cn1WinTouchFlag());
+            return 0;
+        case WM_MBUTTONUP:
+            cn1WinButtonUp(hwnd, CN1_PE_MASK_MIDDLE);
+            cn1WinPushEvent(CN1_EVENT_POINTER_RELEASED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    CN1_PE_MASK_MIDDLE | cn1WinTouchFlag());
+            return 0;
+        case WM_XBUTTONDOWN: {
+            int xmask = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? CN1_PE_MASK_BACK : CN1_PE_MASK_FORWARD;
+            cn1WinButtonDown(hwnd, xmask);
+            cn1WinPushEvent(CN1_EVENT_POINTER_PRESSED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    xmask | cn1WinTouchFlag());
+            return TRUE; /* per WM_XBUTTON* contract */
+        }
+        case WM_XBUTTONUP: {
+            int xmask = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? CN1_PE_MASK_BACK : CN1_PE_MASK_FORWARD;
+            cn1WinButtonUp(hwnd, xmask);
+            cn1WinPushEvent(CN1_EVENT_POINTER_RELEASED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                    xmask | cn1WinTouchFlag());
+            return TRUE;
+        }
+        case WM_MOUSEMOVE: {
+            int moveMask = cn1WinMoveMask(wParam);
+            if (moveMask != 0) {
+                cn1WinPushEvent(CN1_EVENT_POINTER_DRAGGED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                        moveMask | cn1WinTouchFlag());
             }
             return 0;
+        }
         case WM_MOUSEWHEEL:
         case WM_MOUSEHWHEEL: {
             /* The wheel message reports the cursor in SCREEN coordinates; the
@@ -641,6 +727,27 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_screenDpi___R_int(CODENAME_ONE
         }
     }
     return (JAVA_INT) dpi;
+}
+
+/* True when an integrated or external touch digitizer is present, so the
+ * framework reports a touch device (Display.isTouchScreen()). SM_DIGITIZER bits
+ * cover touch and pen; we treat any reported touch capability as a touch
+ * device. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isTouchDevice___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    /* SM_DIGITIZER / NID_* / SM_MAXIMUMTOUCHES need Windows 7+ headers; guard so
+     * the port still builds against an older SDK target (reports no touch then). */
+#if defined(SM_DIGITIZER) && defined(NID_INTEGRATED_TOUCH) && defined(NID_EXTERNAL_TOUCH)
+    int caps = GetSystemMetrics(SM_DIGITIZER);
+    if ((caps & (NID_INTEGRATED_TOUCH | NID_EXTERNAL_TOUCH)) != 0) {
+        return JAVA_TRUE;
+    }
+#endif
+#if defined(SM_MAXIMUMTOUCHES)
+    if (GetSystemMetrics(SM_MAXIMUMTOUCHES) > 0) {
+        return JAVA_TRUE;
+    }
+#endif
+    return JAVA_FALSE;
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayHeight___R_int(CODENAME_ONE_THREAD_STATE) {

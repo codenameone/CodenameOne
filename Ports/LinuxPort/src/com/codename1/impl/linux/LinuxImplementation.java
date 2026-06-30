@@ -592,13 +592,36 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // not pump or drain on its own (it is not the window's owning thread).
     }
 
-    // Flags the next dispatched pointer event as coming from a mouse so the cross-platform
-    // PointerEvent type is correct on this desktop port. The native event protocol does not yet
-    // distinguish mouse buttons, so the button defaults to primary.
-    private void markMousePointer() {
-        setPointerEventMetadata(com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY,
-                com.codename1.ui.events.PointerEvent.MASK_PRIMARY,
-                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+    // High bit the native layer ORs into a pointer event's key field to flag a touch
+    // digitizer (see cn1_linux.h CN1_PE_TOUCH_FLAG); the low byte is the button
+    // bitmask (PointerEvent.MASK_*).
+    private static final int POINTER_BUTTON_BITS = 0xFF;
+    private static final int POINTER_TOUCH_FLAG = 256;
+
+    // Decodes the native pointer key field (button mask + touch flag) into the
+    // cross-platform PointerEvent metadata for the next dispatched pointer event, so
+    // the rich pointer / context-menu APIs report the real button and device type.
+    private void markPointer(int keyField) {
+        int mask = keyField & POINTER_BUTTON_BITS;
+        int type = (keyField & POINTER_TOUCH_FLAG) != 0
+                ? com.codename1.ui.events.PointerEvent.TYPE_TOUCH
+                : com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        int button;
+        if (mask == 0) {
+            mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+            button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_PRIMARY) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_SECONDARY) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_MIDDLE) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_BACK) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_BACK;
+        } else {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
+        }
+        setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
     }
 
     private void drainInput() {
@@ -609,15 +632,15 @@ public class LinuxImplementation extends CodenameOneImplementation {
             int key = eventScratch[3];
             switch (type) {
                 case EVENT_POINTER_PRESSED:
-                    markMousePointer();
+                    markPointer(key);
                     pointerPressed(x, y);
                     break;
                 case EVENT_POINTER_RELEASED:
-                    markMousePointer();
+                    markPointer(key);
                     pointerReleased(x, y);
                     break;
                 case EVENT_POINTER_DRAGGED:
-                    markMousePointer();
+                    markPointer(key);
                     pointerDragged(x, y);
                     break;
                 case EVENT_KEY_PRESSED:
@@ -2021,7 +2044,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isTouchDevice() {
-        return false;
+        return LinuxNative.isTouchDevice();
     }
 
     @Override

@@ -57,6 +57,10 @@ is `1.0` and the type is `TYPE_TOUCH` (or `TYPE_UNKNOWN` on ports that don't cla
 `BUTTON_BACK` or `BUTTON_FORWARD`. `CN.getPressedButtonMask()` returns a bitmask of every button
 currently held (`MASK_PRIMARY`, `MASK_SECONDARY`, ...), which is useful during a drag.
 
+The real button is reported on every desktop port - macOS, Windows and Linux - and in the browser,
+so the right, middle and (where the mouse has them) back and forward buttons are all distinguished.
+On a plain touch screen there is only the primary button.
+
 For the common case of a context menu, use the unified `addContextMenuListener`. It fires for a
 secondary (right) mouse click, a stylus barrel button click and a long press, so the same code
 handles desktop and touch:
@@ -148,6 +152,11 @@ drawingArea.addStylusListener(e -> {
 Pen hover (the pen moving above the screen without touching, available on devices such as the S-Pen
 and the M2 iPad with Apple Pencil) flows through the existing `pointerHover` callbacks; the snapshot
 reports `isHovering()` as true.
+
+Touch-enabled desktops are handled too: on a Windows or Linux PC with a touch screen the finger
+reports `TYPE_TOUCH`, and a Windows pen reports `TYPE_STYLUS`, so the same drawing and gesture code
+runs on a touch laptop as on a phone. `Display.getInstance().isTouchScreenDevice()` is true on those
+machines.
 
 === Foldable devices and posture
 
