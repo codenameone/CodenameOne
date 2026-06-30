@@ -1,9 +1,13 @@
 name: Check @since tags
 
-# Fails the build if any Java source under CodenameOne/src carries an @since
-# javadoc tag whose version does not correspond to an existing git tag in
-# this repository. Without this gate, prose can advertise APIs as available
-# in versions that never shipped (e.g. "@since 9.0").
+# Fails the build if a Java source carries an @since javadoc tag whose version
+# does not correspond to an existing git tag. Without this gate, prose can
+# advertise APIs as available in versions that never shipped (e.g. "@since 8.0"
+# when the latest release is 7.0.x). Scope: CodenameOne/src is checked strictly;
+# the CN1-authored implementation packages under Ports/ and maven/
+# (**/com/codename1/**) are checked leniently -- only a hallucinated current/
+# future release (leading component >= the latest released major) is rejected,
+# so adapted/vendored legacy refs like Java's "@since 1.3" are left alone.
 
 permissions:
   contents: read
@@ -15,6 +19,8 @@ on:
       - master
     paths:
       - 'CodenameOne/src/**/*.java'
+      - 'Ports/**/com/codename1/**/*.java'
+      - 'maven/**/com/codename1/**/*.java'
       - 'scripts/check-since-tags.sh'
       - '.github/workflows/check-since-tags.yml'
   push:
@@ -22,6 +28,8 @@ on:
       - master
     paths:
       - 'CodenameOne/src/**/*.java'
+      - 'Ports/**/com/codename1/**/*.java'
+      - 'maven/**/com/codename1/**/*.java'
       - 'scripts/check-since-tags.sh'
       - '.github/workflows/check-since-tags.yml'
 
