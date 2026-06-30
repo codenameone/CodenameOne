@@ -62,8 +62,32 @@ typedef enum {
     CN1_EVENT_SIZE_CHANGED = 6,
     CN1_EVENT_CLOSE = 7,
     CN1_EVENT_MOUSE_WHEEL = 8,
-    CN1_EVENT_MOUSE_HWHEEL = 9
+    CN1_EVENT_MOUSE_HWHEEL = 9,
+    /* Touchpad pinch / rotate: x/y are the gesture's widget coordinates and
+     * keyCode is the incremental value in 1/10000 units -- an incremental scale
+     * multiplier for PINCH (10000 == scale 1.0) and incremental radians for
+     * ROTATE. drainInput decodes these into Display.fireMagnifyGesture /
+     * fireRotationGesture, the same hooks the macOS trackpad drives. */
+    CN1_EVENT_PINCH = 10,
+    CN1_EVENT_ROTATE = 11
 } CN1EventType;
+
+/* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
+#define CN1_GESTURE_FIXED 10000
+
+/* For pointer (pressed/released/dragged) events the otherwise-unused keyCode
+ * field carries the pointer metadata: the low bits are a button bitmask that
+ * mirrors com.codename1.ui.events.PointerEvent.MASK_* (so a press/release carry
+ * the button that changed and a drag carries the buttons held down), and the
+ * high bits flag a touch digitizer so the Java side reports TYPE_TOUCH. A value
+ * of 0 means "no detail" and defaults to a primary mouse press.
+ * LinuxImplementation.drainInput decodes this. */
+#define CN1_PE_MASK_PRIMARY   1
+#define CN1_PE_MASK_SECONDARY 2
+#define CN1_PE_MASK_MIDDLE    4
+#define CN1_PE_MASK_BACK      8
+#define CN1_PE_MASK_FORWARD   16
+#define CN1_PE_TOUCH_FLAG     256
 
 /* Pushes one event onto the ring buffer (called from the GTK thread). */
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode);

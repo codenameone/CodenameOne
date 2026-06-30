@@ -2872,6 +2872,141 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    // -----------------------------------------------------------------------------------------
+    // Rich pointer metadata. Platform ports populate these fields from the native event right
+    // before they call one of the pointerPressed/Dragged/Released/Hover methods. The framework
+    // reads the current values when it dispatches the matching event, mirroring the way the
+    // modifier-key state above is exposed. Every value carries a safe default so ports that do
+    // not opt in keep behaving exactly as before.
+    private int currentPointerButton = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+    private int currentPointerButtonMask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+    private int currentPointerType = com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN;
+    private float currentPointerPressure = 1f;
+    private float currentPointerTiltX;
+    private float currentPointerTiltY;
+    private float currentPointerContactSize;
+    private int currentPointerModifiers;
+    private boolean currentPointerHovering;
+
+    /// Resets the rich pointer metadata back to its defaults. Ports may call this between
+    /// gestures so stale button or pressure values do not leak into unrelated events.
+    public void resetPointerEventMetadata() {
+        currentPointerButton = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        currentPointerButtonMask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+        currentPointerType = com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN;
+        currentPointerPressure = 1f;
+        currentPointerTiltX = 0;
+        currentPointerTiltY = 0;
+        currentPointerContactSize = 0;
+        currentPointerModifiers = 0;
+        currentPointerHovering = false;
+    }
+
+    /// Populates all of the rich pointer metadata in one call. Platform ports invoke this from
+    /// their native input handler immediately before dispatching a pointer event.
+    public void setPointerEventMetadata(int button, int buttonMask, int pointerType, float pressure,
+            float tiltX, float tiltY, float contactSize, int modifiers, boolean hovering) {
+        currentPointerButton = button;
+        currentPointerButtonMask = buttonMask;
+        currentPointerType = pointerType;
+        currentPointerPressure = pressure;
+        currentPointerTiltX = tiltX;
+        currentPointerTiltY = tiltY;
+        currentPointerContactSize = contactSize;
+        currentPointerModifiers = modifiers;
+        currentPointerHovering = hovering;
+    }
+
+    /// Sets the button and button mask for the next dispatched pointer event.
+    public void setPointerButton(int button, int buttonMask) {
+        currentPointerButton = button;
+        currentPointerButtonMask = buttonMask;
+    }
+
+    /// Sets the pointing device type (one of the `PointerEvent.TYPE_*` constants) for the next event.
+    public void setPointerType(int pointerType) {
+        currentPointerType = pointerType;
+    }
+
+    /// Sets the normalized pressure for the next dispatched pointer event.
+    public void setPointerPressure(float pressure) {
+        currentPointerPressure = pressure;
+    }
+
+    /// Sets the stylus tilt for the next dispatched pointer event.
+    public void setPointerTilt(float tiltX, float tiltY) {
+        currentPointerTiltX = tiltX;
+        currentPointerTiltY = tiltY;
+    }
+
+    /// Sets the normalized contact size for the next dispatched pointer event.
+    public void setPointerContactSize(float contactSize) {
+        currentPointerContactSize = contactSize;
+    }
+
+    /// Sets the keyboard modifier mask for the next dispatched pointer event.
+    public void setPointerModifiers(int modifiers) {
+        currentPointerModifiers = modifiers;
+    }
+
+    /// Sets whether the next dispatched pointer event is a hover (no contact).
+    public void setPointerHovering(boolean hovering) {
+        currentPointerHovering = hovering;
+    }
+
+    /// The button associated with the current pointer event, one of the `PointerEvent.BUTTON_*` constants.
+    public int getPointerButton() {
+        return currentPointerButton;
+    }
+
+    /// A bitmask of the buttons currently held, built from the `PointerEvent.MASK_*` constants.
+    public int getPointerButtonMask() {
+        return currentPointerButtonMask;
+    }
+
+    /// The current pointing device type, one of the `PointerEvent.TYPE_*` constants.
+    public int getPointerType() {
+        return currentPointerType;
+    }
+
+    /// The normalized pressure of the current pointer event between `0.0` and `1.0`.
+    public float getPointerPressure() {
+        return currentPointerPressure;
+    }
+
+    /// The stylus tilt across the x axis for the current pointer event, in degrees.
+    public float getPointerTiltX() {
+        return currentPointerTiltX;
+    }
+
+    /// The stylus tilt across the y axis for the current pointer event, in degrees.
+    public float getPointerTiltY() {
+        return currentPointerTiltY;
+    }
+
+    /// The normalized contact size of the current pointer event between `0.0` and `1.0`.
+    public float getPointerContactSize() {
+        return currentPointerContactSize;
+    }
+
+    /// The keyboard modifier mask held during the current pointer event.
+    public int getPointerModifiers() {
+        return currentPointerModifiers;
+    }
+
+    /// True if the current pointer event is a hover (no contact with the surface).
+    public boolean isPointerHovering() {
+        return currentPointerHovering;
+    }
+
+    /// Builds an immutable `PointerEvent` snapshot from the current metadata for the given coordinates.
+    /// Used by the framework when it dispatches a pointer event.
+    public com.codename1.ui.events.PointerEvent buildPointerEvent(int x, int y, boolean hovering) {
+        return new com.codename1.ui.events.PointerEvent(x, y, currentPointerButton, currentPointerButtonMask,
+                currentPointerType, currentPointerPressure, currentPointerTiltX, currentPointerTiltY,
+                currentPointerContactSize, currentPointerModifiers, hovering || currentPointerHovering);
+    }
+
     /// Subclasses should invoke this method, it delegates the event to the display and into
     /// Codename One.
     ///
@@ -5739,6 +5874,65 @@ public abstract class CodenameOneImplementation {
         return b != null && b.isConnected();
     }
 
+    /// True if the device is a foldable or dual screen device. False on the base implementation.
+    public boolean isFoldable() {
+        return false;
+    }
+
+    /// The current fold posture, one of the `com.codename1.ui.DevicePosture` `POSTURE_*` constants.
+    /// Defaults to `POSTURE_UNKNOWN`.
+    public int getDevicePosture() {
+        return com.codename1.ui.DevicePosture.POSTURE_UNKNOWN;
+    }
+
+    /// The current hinge angle in degrees between 0 and 180, or -1 when not reported.
+    public int getHingeAngle() {
+        return -1;
+    }
+
+    /// The orientation of the fold, one of the `com.codename1.ui.DevicePosture` `FOLD_ORIENTATION_*`
+    /// constants. Defaults to `FOLD_ORIENTATION_NONE`.
+    public int getFoldOrientation() {
+        return com.codename1.ui.DevicePosture.FOLD_ORIENTATION_NONE;
+    }
+
+    /// True if the fold currently separates the display into two distinct logical areas.
+    public boolean isPostureSeparating() {
+        return false;
+    }
+
+    /// Returns the bounds of the region occluded by the hinge in display coordinates, or null when
+    /// there is no separating fold.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: a rectangle to populate and return, or null to allocate a new one
+    ///
+    /// #### Returns
+    ///
+    /// the hinge bounds, or null when there is no separating fold
+    public Rectangle getFoldBounds(Rectangle rect) {
+        return null;
+    }
+
+    /// True if the application is currently running in a desktop windowing mode such as Samsung DeX,
+    /// Android desktop windowing or iPad Stage Manager, where the app shares the screen with other
+    /// windows and behaves like a desktop application. Distinct from `#isDesktop()` which reports a
+    /// genuine desktop platform. Defaults to false.
+    public boolean isDesktopMode() {
+        return false;
+    }
+
+    /// The number of displays (monitors or external screens) currently attached. Defaults to 1.
+    public int getDisplayCount() {
+        return 1;
+    }
+
+    /// True if an external or secondary display is currently attached. Defaults to false.
+    public boolean isExternalDisplayConnected() {
+        return getDisplayCount() > 1;
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns
@@ -8363,13 +8557,53 @@ public abstract class CodenameOneImplementation {
     /// - `scrollY`: vertical scroll amount in pixels; a positive value reveals
     /// content above, as if the finger were dragged down
     public void pointerWheelMoved(final int x, final int y, final int scrollX, final int scrollY) {
+        pointerWheelMoved(x, y, scrollX, scrollY, false, 0);
+    }
+
+    /// Richer entry point for wheel events that also carries whether the deltas come from a high
+    /// resolution device (a trackpad rather than a notched wheel) and the held keyboard modifiers.
+    /// Ports that can report these should call this overload. The framework first dispatches a
+    /// `com.codename1.ui.events.WheelEvent` to any mouse wheel listeners on the component under the
+    /// cursor; if a listener consumes it the default scrolling gesture is skipped, enabling
+    /// gestures such as control plus wheel to zoom.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: pointer x in display coordinates
+    ///
+    /// - `y`: pointer y in display coordinates
+    ///
+    /// - `scrollX`: horizontal scroll amount in pixels; a positive value reveals content to the left
+    ///
+    /// - `scrollY`: vertical scroll amount in pixels; a positive value reveals content above
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a trackpad
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers (the `PointerEvent` `MODIFIER_*` constants)
+    public void pointerWheelMoved(final int x, final int y, final int scrollX, final int scrollY,
+            final boolean precise, final int modifiers) {
         if (scrollX == 0 && scrollY == 0) {
             return;
         }
         final Display d = Display.getInstance();
-        // Quarter the gesture across four EDT cycles: a single press->drag(full)
-        // ->release would read as a fling and overshoot, whereas stepped drags let
-        // the scroll container settle the way a finger drag does.
+        // First give mouse wheel listeners a chance to handle (and consume) the event on the EDT.
+        // Only when no listener consumes it do we fall through to the default scrolling gesture.
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (d.fireMouseWheelEvent(x, y, scrollX, scrollY, precise, modifiers)) {
+                    return;
+                }
+                playWheelScrollGesture(d, x, y, scrollX, scrollY);
+            }
+        });
+    }
+
+    /// Plays the default scroll gesture for a wheel movement. Quarter the gesture across four EDT
+    /// cycles: a single press->drag(full)->release would read as a fling and overshoot, whereas
+    /// stepped drags let the scroll container settle the way a finger drag does. While it runs
+    /// `#isScrollWheeling` reports `true`.
+    private void playWheelScrollGesture(final Display d, final int x, final int y, final int scrollX, final int scrollY) {
         d.callSerially(new Runnable() {
             @Override
             public void run() {

@@ -1456,7 +1456,50 @@ public class IOSImplementation extends CodenameOneImplementation {
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerDragged(singleDimensionX, singleDimensionY);
     }
-    
+
+    /// Invoked from the native touch handler immediately before a pointer event to forward the
+    /// rich pointer detail (pointer type, pressure, Apple Pencil tilt and contact size) so the
+    /// cross-platform stylus and pressure APIs work on iOS. pointerType uses the
+    /// `com.codename1.ui.events.PointerEvent` TYPE_* constants.
+    public static void pointerMetadataCallback(int pointerType, float pressure, float tiltX, float tiltY, float contactSize) {
+        if (instance == null) {
+            return;
+        }
+        instance.setPointerEventMetadata(
+                com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY,
+                com.codename1.ui.events.PointerEvent.MASK_PRIMARY,
+                pointerType, pressure, tiltX, tiltY, contactSize, 0, false);
+    }
+
+    /// Invoked from the native trackpad / Magic Mouse / wheel scroll handler. Routes the scroll
+    /// through the shared wheel pipeline so that `com.codename1.ui.events.WheelEvent` is a single
+    /// universal scroll-gesture API across desktop, Android and iOS. The deltas come from a high
+    /// resolution device so the event is flagged as precise.
+    public static void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        instance.pointerWheelMoved(x, y, scrollX, scrollY, true, 0);
+    }
+
+    /// Invoked from the native magnify (pinch) gesture recognizer, used by the Mac Catalyst trackpad
+    /// pinch and the iOS two finger pinch. Routes to the cross-platform pinch gesture dispatch.
+    public static void pinchMagnifyCallback(float scale, int x, int y) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().fireMagnifyGesture(x, y, scale);
+    }
+
+    /// Invoked from the native rotation gesture recognizer (Mac Catalyst trackpad rotate / iOS two
+    /// finger rotate). Routes to the cross-platform rotation gesture dispatch.
+    public static void rotationGestureCallback(float radians, int x, int y) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().fireRotationGesture(x, y, radians);
+    }
+
     protected void pointerPressed(final int[] x, final int[] y) {
         super.pointerPressed(x, y);
     }

@@ -488,6 +488,12 @@ void deinitVMImpl() {
 extern void pointerPressed(int* x, int* y, int length);
 extern void pointerDragged(int* x, int* y, int length);
 extern void pointerReleased(int* x, int* y, int length);
+#if !TARGET_OS_WATCH
+extern void cn1CapturePointerMetadata(UITouch* touch);
+#endif
+extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
+extern void pinchMagnifyCallback(float scale, int x, int y);
+extern void rotationGestureCallback(float radians, int x, int y);
 extern void screenSizeChanged(int width, int height);
 extern void keyPressedNative(int keyCode);
 extern void keyReleasedNative(int keyCode);
@@ -524,6 +530,35 @@ extern void pointerHoverReleasedNative(int x, int y);
 #define CN1_IOS_KEY_F10         (-23478)
 #define CN1_IOS_KEY_F11         (-23479)
 #define CN1_IOS_KEY_F12         (-23480)
+
+// Codename One's Display.MEDIA_KEY_PLAY_PAUSE value, forwarded for the Apple TV remote play/pause.
+#define CN1_IOS_KEY_PLAY_PAUSE  (25)
+
+#if TARGET_OS_TV
+// Translate an Apple TV Siri Remote button (UIPressType) into the framework key code. The remote
+// delivers these via UIPress.type rather than UIPress.key. Menu maps to the back/escape key,
+// Select to enter, the directional buttons to the arrow keys and play/pause to the media key.
+static int cn1MapUIPressTypeToKeyCode(UIPressType type) {
+    switch (type) {
+        case UIPressTypeUpArrow:
+            return CN1_IOS_KEY_UP;
+        case UIPressTypeDownArrow:
+            return CN1_IOS_KEY_DOWN;
+        case UIPressTypeLeftArrow:
+            return CN1_IOS_KEY_LEFT;
+        case UIPressTypeRightArrow:
+            return CN1_IOS_KEY_RIGHT;
+        case UIPressTypeSelect:
+            return CN1_IOS_KEY_ENTER;
+        case UIPressTypeMenu:
+            return CN1_IOS_KEY_ESCAPE;
+        case UIPressTypePlayPause:
+            return CN1_IOS_KEY_PLAY_PAUSE;
+        default:
+            return 0;
+    }
+}
+#endif
 
 // Translate a UIKey from a hardware keyboard into the integer the framework
 // expects: a negative sentinel for non-printable keys, a unicode codepoint for
@@ -2795,6 +2830,9 @@ static CodenameOne_GLViewController *sharedSingleton;
     updateDisplayMetricsFromView(self.view);
     [self cn1InstallStatusBarTapProxy];
     [self cn1InstallHoverRecognizer];
+    [self cn1InstallScrollRecognizer];
+    [self cn1InstallPinchRecognizer];
+    [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -2809,6 +2847,9 @@ static CodenameOne_GLViewController *sharedSingleton;
     updateDisplayMetricsFromView(self.view);
     [self cn1InstallStatusBarTapProxy];
     [self cn1InstallHoverRecognizer];
+    [self cn1InstallScrollRecognizer];
+    [self cn1InstallPinchRecognizer];
+    [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -3084,10 +3125,15 @@ bool lockDrawing;
         NSMutableSet *passthrough = nil;
         for (UIPress *press in presses) {
             UIKey *key = press.key;
-            if (key == nil) {
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+#if TARGET_OS_TV
+            if (code == 0) {
+                code = cn1MapUIPressTypeToKeyCode(press.type);
+            }
+#endif
+            if (code == 0 && key == nil) {
                 continue;
             }
-            int code = cn1MapUIKeyToKeyCode(key);
             if (code != 0) {
                 keyPressedNative(code);
                 handled = YES;
@@ -3114,10 +3160,15 @@ bool lockDrawing;
         NSMutableSet *passthrough = nil;
         for (UIPress *press in presses) {
             UIKey *key = press.key;
-            if (key == nil) {
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+#if TARGET_OS_TV
+            if (code == 0) {
+                code = cn1MapUIPressTypeToKeyCode(press.type);
+            }
+#endif
+            if (code == 0 && key == nil) {
                 continue;
             }
-            int code = cn1MapUIKeyToKeyCode(key);
             if (code != 0) {
                 keyReleasedNative(code);
                 handled = YES;
@@ -3142,10 +3193,15 @@ bool lockDrawing;
     if (@available(iOS 13.4, *)) {
         for (UIPress *press in presses) {
             UIKey *key = press.key;
-            if (key == nil) {
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+#if TARGET_OS_TV
+            if (code == 0) {
+                code = cn1MapUIPressTypeToKeyCode(press.type);
+            }
+#endif
+            if (code == 0 && key == nil) {
                 continue;
             }
-            int code = cn1MapUIKeyToKeyCode(key);
             if (code != 0) {
                 keyReleasedNative(code);
             }
@@ -3198,6 +3254,114 @@ bool lockDrawing;
             break;
     }
 }
+
+// Trackpad / Magic Mouse / mouse wheel scroll support. A pan recognizer with
+// maximumNumberOfTouches == 0 only fires for indirect-pointer scrolling (no
+// finger on the glass), so it never competes with the touch / tap recognizers.
+// allowedScrollTypesMask == all picks up both discrete (wheel) and continuous
+// (trackpad) scrolling. The scroll delta is routed through the same wheel
+// pipeline as the desktop and Android ports so WheelEvent is one universal
+// scroll-gesture API across every platform. Requires iOS 13.4+.
+- (void)cn1InstallScrollRecognizer {
+#if !TARGET_OS_TV
+    if (@available(iOS 13.4, *)) {
+        UIPanGestureRecognizer *scroll = [[UIPanGestureRecognizer alloc]
+                                          initWithTarget:self
+                                                  action:@selector(cn1HandleScroll:)];
+        scroll.allowedScrollTypesMask = UIScrollTypeMaskAll;
+        scroll.maximumNumberOfTouches = 0;
+        scroll.cancelsTouchesInView = NO;
+        scroll.delaysTouchesBegan = NO;
+        scroll.delaysTouchesEnded = NO;
+        [self.view addGestureRecognizer:scroll];
+#ifndef CN1_USE_ARC
+        [scroll release];
+#endif
+    }
+#endif
+}
+
+- (void)cn1HandleScroll:(UIPanGestureRecognizer *)recognizer API_AVAILABLE(ios(13.4)) {
+    if (recognizer.state == UIGestureRecognizerStateBegan
+            || recognizer.state == UIGestureRecognizerStateChanged) {
+        CGPoint loc = [recognizer locationInView:self.view];
+        CGPoint t = [recognizer translationInView:self.view];
+        int dx = (int)(t.x * scaleValue);
+        int dy = (int)(t.y * scaleValue);
+        if (dx != 0 || dy != 0) {
+            // A scroll pan is a drag-like gesture, so the translation maps
+            // directly onto the wheel delta (positive dy reveals content above).
+            pointerWheelMovedCallback((int)(loc.x * scaleValue), (int)(loc.y * scaleValue), dx, dy);
+            // Reset so each callback carries an incremental delta.
+            [recognizer setTranslation:CGPointZero inView:self.view];
+        }
+    }
+}
+
+// Magnify (pinch) and rotation gesture recognizers for the Mac Catalyst trackpad. These are scoped
+// to Mac Catalyst on purpose: on iOS a two finger pinch already drives the existing multi-touch
+// Component pinch via pointerDragged, so installing a UIPinchGestureRecognizer there would double
+// apply it. On the Mac the trackpad pinch/rotate are not delivered as multi-touch, so these
+// recognizers give the "beyond the scroll wheel" trackpad gestures the desktop expects. Each maps
+// to the cross-platform Component pinch / rotation callbacks and resets its scale/rotation after
+// every callback so the delta is incremental.
+- (void)cn1InstallPinchRecognizer {
+#if TARGET_OS_MACCATALYST
+    UIPinchGestureRecognizer *pinch = [[UIPinchGestureRecognizer alloc]
+                                       initWithTarget:self
+                                               action:@selector(cn1HandlePinch:)];
+    pinch.cancelsTouchesInView = NO;
+    pinch.delaysTouchesBegan = NO;
+    pinch.delaysTouchesEnded = NO;
+    [self.view addGestureRecognizer:pinch];
+#ifndef CN1_USE_ARC
+    [pinch release];
+#endif
+#endif
+}
+
+#if TARGET_OS_MACCATALYST
+- (void)cn1HandlePinch:(UIPinchGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateChanged) {
+        CGPoint loc = [recognizer locationInView:self.view];
+        float scale = (float)recognizer.scale;
+        if (scale > 0) {
+            pinchMagnifyCallback(scale, (int)(loc.x * scaleValue), (int)(loc.y * scaleValue));
+            // Reset so each callback carries an incremental scale relative to 1.0.
+            recognizer.scale = 1.0;
+        }
+    }
+}
+#endif
+
+- (void)cn1InstallRotationRecognizer {
+#if TARGET_OS_MACCATALYST
+    UIRotationGestureRecognizer *rotate = [[UIRotationGestureRecognizer alloc]
+                                           initWithTarget:self
+                                                   action:@selector(cn1HandleRotation:)];
+    rotate.cancelsTouchesInView = NO;
+    rotate.delaysTouchesBegan = NO;
+    rotate.delaysTouchesEnded = NO;
+    [self.view addGestureRecognizer:rotate];
+#ifndef CN1_USE_ARC
+    [rotate release];
+#endif
+#endif
+}
+
+#if TARGET_OS_MACCATALYST
+- (void)cn1HandleRotation:(UIRotationGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateChanged) {
+        CGPoint loc = [recognizer locationInView:self.view];
+        float radians = (float)recognizer.rotation;
+        if (radians != 0) {
+            rotationGestureCallback(radians, (int)(loc.x * scaleValue), (int)(loc.y * scaleValue));
+            // Reset so each callback carries an incremental rotation.
+            recognizer.rotation = 0;
+        }
+    }
+}
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1transformMatrix;
@@ -4532,6 +4696,7 @@ BOOL prefersStatusBarHidden = NO;
         CN1lastTouchX = (int)point.x;
         CN1lastTouchY = (int)point.y;
     }
+    cn1CapturePointerMetadata(touch);
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();
 }
@@ -4598,6 +4763,7 @@ BOOL prefersStatusBarHidden = NO;
     if(!isVKBAlwaysOpen()) {
         [self foldKeyboard:point];
     }
+    cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
 }
@@ -4640,6 +4806,7 @@ BOOL prefersStatusBarHidden = NO;
         //CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
         [self foldKeyboard:point];
     }
+    cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
 }
@@ -4659,6 +4826,7 @@ BOOL prefersStatusBarHidden = NO;
     int xArray[[touchesArray count]];
     int yArray[[touchesArray count]];
     CGPoint point = [touch locationInView:self.view];
+    cn1CapturePointerMetadata(touch);
     if([touchesArray count] > 1) {
         for(int iter = 0 ; iter < [touchesArray count] ; iter++) {
             UITouch* currentTouch = [touchesArray objectAtIndex:iter];

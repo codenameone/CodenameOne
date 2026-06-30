@@ -924,6 +924,104 @@ public class CN extends CN1Constants {
         return Display.impl.isCarConnected();
     }
 
+    /// Returns a snapshot of the rich detail for the pointer event currently being dispatched such
+    /// as the mouse button, pointer type (finger/mouse/stylus), pressure and stylus tilt.
+    ///
+    /// #### Returns
+    ///
+    /// the current `com.codename1.ui.events.PointerEvent`, never null
+    public static com.codename1.ui.events.PointerEvent getCurrentPointerEvent() {
+        return Display.getInstance().getCurrentPointerEvent();
+    }
+
+    /// The mouse button associated with the current pointer event, one of the
+    /// `com.codename1.ui.events.PointerEvent` `BUTTON_*` constants.
+    public static int getPointerButton() {
+        return Display.impl.getPointerButton();
+    }
+
+    /// A bitmask of the mouse buttons currently held down, built from the
+    /// `com.codename1.ui.events.PointerEvent` `MASK_*` constants.
+    public static int getPressedButtonMask() {
+        return Display.impl.getPointerButtonMask();
+    }
+
+    /// The current pointing device type, one of the `com.codename1.ui.events.PointerEvent` `TYPE_*`
+    /// constants (finger, mouse, stylus or eraser).
+    public static int getPointerType() {
+        return Display.impl.getPointerType();
+    }
+
+    /// The normalized pressure of the current pointer event between `0.0` and `1.0`. Devices and
+    /// ports that do not report pressure return `1.0`.
+    public static float getPointerPressure() {
+        return Display.impl.getPointerPressure();
+    }
+
+    /// The stylus tilt across the x axis of the current pointer event in degrees, or `0` when not reported.
+    public static float getPointerTiltX() {
+        return Display.impl.getPointerTiltX();
+    }
+
+    /// The stylus tilt across the y axis of the current pointer event in degrees, or `0` when not reported.
+    public static float getPointerTiltY() {
+        return Display.impl.getPointerTiltY();
+    }
+
+    /// The normalized contact size of the current pointer event between `0.0` and `1.0`, or `0` when not reported.
+    public static float getPointerContactSize() {
+        return Display.impl.getPointerContactSize();
+    }
+
+    /// True if the current pointer is a stylus or pen (Apple Pencil, S-Pen and similar).
+    public static boolean isStylusPointer() {
+        return Display.getInstance().isStylusPointer();
+    }
+
+    /// True if the device is a foldable or dual screen device.
+    public static boolean isFoldable() {
+        return Display.impl.isFoldable();
+    }
+
+    /// Returns the live device fold posture. See `com.codename1.ui.DevicePosture`.
+    public static DevicePosture getDevicePosture() {
+        return DevicePosture.getInstance();
+    }
+
+    /// Adds a listener that is notified when the device is folded, unfolded or changes posture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public static void addPostureListener(ActionListener l) {
+        Display.getInstance().addPostureListener(l);
+    }
+
+    /// Removes a posture listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public static void removePostureListener(ActionListener l) {
+        Display.getInstance().removePostureListener(l);
+    }
+
+    /// True if the application is currently running in a desktop windowing mode such as Samsung DeX,
+    /// Android desktop windowing or iPad Stage Manager.
+    public static boolean isDesktopMode() {
+        return Display.impl.isDesktopMode();
+    }
+
+    /// Returns the number of displays (monitors or external screens) currently attached.
+    public static int getDisplayCount() {
+        return Display.impl.getDisplayCount();
+    }
+
+    /// True if an external or secondary display is currently attached.
+    public static boolean isExternalDisplayConnected() {
+        return Display.impl.isExternalDisplayConnected();
+    }
+
     /// Returns the size of the desktop hosting the application window when running on a desktop platform.
     ///
     /// #### Returns
