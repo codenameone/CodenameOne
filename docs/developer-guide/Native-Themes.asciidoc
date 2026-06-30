@@ -538,6 +538,88 @@ mode. Both modern themes set this; user themes that want dark
 mode also need to set it.
 |===
 
+=== iOS 26 Liquid Glass tab selection morph
+
+When the iOS modern theme renders `Tabs` as a bottom bar
+(`tabPlacementInt: 2`) the selected tab is marked by a *Liquid Glass
+drop* -- a frosted, magnifying glass capsule painted over the (dark)
+icons rather than a flat highlight. On a selection change the drop springs
+across to the new tab, elongating while it travels and settling with a
+small overshoot. The selected blue is supplied by the drop itself (a
+luminance-keyed dark->accent tint of the glyph beneath it), so the colour
+travels with the drop instead of snapping between tabs.
+
+image::img/ios-modern-tab-morph.gif[iOS 26 Liquid Glass tab selection morph,scaledwidth=70%]
+
+On iOS the drop is rendered live by a Metal fragment shader that samples
+the bar beneath it on the GPU, so the morph runs at frame rate with no
+screen read-back; other platforms and the simulator use the equivalent CPU
+lens. The effect is opt-in: the iOS modern theme sets
+`tabsSelectionCapsuleBool: true` and `glassMaterialBool: true`. Without the
+glass flag the capsule degrades to a plain translucent pill.
+
+The whole animation is tuned from theme constants -- redeclare any of them
+in your own `theme.css` to retune the drop:
+
+[cols="3,1,4", options="header"]
+|===
+|Constant |iOS modern |Effect
+
+|`@tabsSelectionCapsuleBool`
+|`true`
+|Master switch for the selection drop. Off falls back to the legacy
+colored underline indicator (`tabsAnimatedIndicatorBool`).
+
+|`@tabsAnimatedIndicatorDurationInt`
+|`480`
+|Morph duration in milliseconds. Lower is snappier.
+
+|`@tabSelLensMagnifyPct` / `@tabSelLensRestMagPct`
+|`118` / `108`
+|Magnification at the peak of travel vs. when settled (`100` = none). The
+drop magnifies more mid-flight, like a real lens passing over the glyphs.
+
+|`@tabSelLensTintColorInt` / `@tabSelLensTintPct`
+|`0x0a84ff` / `100`
+|The accent the dark glyph is tinted to inside the drop, and how strongly
+(`0`..`100`).
+
+|`@tabSelLensAberrationPct`
+|`2`
+|Chromatic aberration at the drop's rim (a faint blue/cyan fringe); `0`
+disables it.
+
+|`@tabSelBubbleWidthPct`
+|`96`
+|Drop width as a percentage of the tab cell. Narrower reads as a tighter
+droplet.
+
+|`@tabSelLensOverflowPct` / `@tabSelGrowPct`
+|`18` / `14`
+|How far the drop bulges past the bar at rest vs. the extra vertical grow
+at the peak of travel.
+
+|`@tabSelStretchPct`
+|`32`
+|Horizontal elongation while travelling -- the droplet stretches toward the
+direction of motion, then squashes back at the stop.
+
+|`@tabSelSquashHPct` / `@tabSelSquashWPct`
+|`18` / `16`
+|The settle squash: a brief extra height / reduced width as the drop
+decelerates onto the target tab.
+
+|`@tabSelLiftMm` / `@tabSelDownBiasMm`
+|`0.5` / `0`
+|Millimetres the content is lifted up inside the drop, and a vertical bias
+applied to the whole drop.
+|===
+
+NOTE: All `*Pct` values are relative -- `100` means "no change". The drop's
+glass cues (rim shrink, refraction, glare, edge shadow) fade out as it
+settles, so a resting selection reads as a calm frosted pill rather than a
+distorting lens.
+
 === Customizing in your own theme
 
 Your app's `theme.css` inherits from the installed native theme:

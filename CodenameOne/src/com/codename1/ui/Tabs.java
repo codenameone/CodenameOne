@@ -1536,19 +1536,6 @@ public class Tabs extends Container {
         g.setAlpha(oldAlpha);
     }
 
-    /// Resolves a selection-capsule glass parameter from a theme constant
-    /// (&lt;key&gt;Light / &lt;key&gt;Dark, quoted float), falling back to the default.
-    private float tabCapsuleParam(String key, boolean dark, float def) {
-        String v = getUIManager().getThemeConstant(key + (dark ? "Dark" : "Light"), null);
-        if (v != null) {
-            try {
-                return Float.parseFloat(v.trim());
-            } catch (NumberFormatException ignore) {
-            }
-        }
-        return def;
-    }
-
     /// Position easing for the selection bubble: an EVEN ease-in-out travel that reaches
     /// the target around t=0.78, then a small damped OVERSHOOT that settles by t=1 (the
     /// "stop" bounce). Not front-loaded like a plain ease-out-back. t in 0..1.
