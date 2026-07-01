@@ -7385,49 +7385,48 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG wbyteArr);
     return;
 #else
-#ifdef NEW_CODENAME_ONE_VM
-    struct ThreadLocalData* capturedThreadStateData = threadStateData;
-#endif
-
+    __block NSData *capturedPng = nil;
     void (^performCapture)(void) = ^{
-#ifdef NEW_CODENAME_ONE_VM
-        struct ThreadLocalData* threadStateData = capturedThreadStateData;
-#endif
         POOL_BEGIN();
         UIView *view = [CodenameOne_GLViewController instance].view;
         UIImage *img = cn1_captureView(view);
-        NSData *png = nil;
         if (img != nil) {
-            png = UIImagePNGRepresentation(img);
-        }
-
-        JAVA_OBJECT byteArr = JAVA_NULL;
-        if (png != nil) {
-            int len = (int)[png length];
-            if (len > 0) {
-#ifndef NEW_CODENAME_ONE_VM
-                org_xmlvm_runtime_XMLVMArray* arr = XMLVMArray_createSingleDimension(__CLASS_byte, len);
-                memcpy(arr->fields.org_xmlvm_runtime_XMLVMArray.array_, [png bytes], len);
-                byteArr = arr;
+            NSData *png = UIImagePNGRepresentation(img);
+            if (png != nil) {
+#ifdef CN1_USE_ARC
+                capturedPng = png;
 #else
-                enteringNativeAllocations();
-                JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG len);
-                memcpy(((JAVA_ARRAY)arr)->data, [png bytes], len);
-                finishedNativeAllocations();
-                byteArr = arr;
+                capturedPng = [png retain];
 #endif
             }
         }
-
-        com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG byteArr);
         POOL_END();
     };
 
-    if ([NSThread isMainThread]) {
-        performCapture();
-    } else {
-        dispatch_async(dispatch_get_main_queue(), performCapture);
+    cn1RunSyncOnMainQueue(performCapture);
+
+    JAVA_OBJECT byteArr = JAVA_NULL;
+    if (capturedPng != nil) {
+        int len = (int)[capturedPng length];
+        if (len > 0) {
+#ifndef NEW_CODENAME_ONE_VM
+            org_xmlvm_runtime_XMLVMArray* arr = XMLVMArray_createSingleDimension(__CLASS_byte, len);
+            memcpy(arr->fields.org_xmlvm_runtime_XMLVMArray.array_, [capturedPng bytes], len);
+            byteArr = arr;
+#else
+            enteringNativeAllocations();
+            JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG len);
+            memcpy(((JAVA_ARRAY)arr)->data, [capturedPng bytes], len);
+            finishedNativeAllocations();
+            byteArr = arr;
+#endif
+        }
     }
+#ifndef CN1_USE_ARC
+    [capturedPng release];
+#endif
+
+    com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG byteArr);
 #endif // TARGET_OS_WATCH
 }
 

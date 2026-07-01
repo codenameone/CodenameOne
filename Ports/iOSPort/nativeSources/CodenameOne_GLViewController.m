@@ -74,6 +74,25 @@
 #endif
 #include "java_lang_System.h"
 
+static char cn1MainQueueSpecificKey;
+
+static void cn1EnsureMainQueueSpecificKey(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        dispatch_queue_set_specific(dispatch_get_main_queue(), &cn1MainQueueSpecificKey,
+                                    &cn1MainQueueSpecificKey, NULL);
+    });
+}
+
+void cn1RunSyncOnMainQueue(void (^block)(void)) {
+    cn1EnsureMainQueueSpecificKey();
+    if ([NSThread isMainThread] || dispatch_get_specific(&cn1MainQueueSpecificKey) != NULL) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+
 #ifdef INCLUDE_GOOGLE_CONNECT
 #ifndef GOOGLE_SIGNIN
 #import <GoogleOpenSource/GoogleOpenSource.h>
@@ -4577,7 +4596,7 @@ BOOL prefersStatusBarHidden = NO;
     CGRect rect = CGRectMake(x, y, width, height);
     painted = NO;
 	//[self performSelectorOnMainThread:@selector(setNeedsDisplay) withObject:0 waitUntilDone:NO];
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    void (^flushBlock)(void) = ^{
         @synchronized([CodenameOne_GLViewController instance]) {
             if([currentTarget count] > 0) {
                 [currentTarget addObjectsFromArray:upcomingTarget];
@@ -4591,7 +4610,8 @@ BOOL prefersStatusBarHidden = NO;
         }
         //[self setNeedsDisplayInRect:rect];
         [self drawFrame:rect];
-    });
+    };
+    cn1RunSyncOnMainQueue(flushBlock);
     /*int timeout = 5;
      while (!painted && timeout > 0) {
      sleep(5);

@@ -32,6 +32,8 @@
 #import "ExecutableOp.h"
 #import "PaintOp.h"
 #import "GLUIImage.h"
+
+void cn1RunSyncOnMainQueue(void (^block)(void));
 // MessageUI (mail/SMS composer) is unavailable on watchOS, and on tvOS it ships
 // only a link stub with no composer headers; the email/SMS native methods are
 // guarded the same way in IOSNative.m, and the matching delegate conformances
