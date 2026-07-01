@@ -638,6 +638,7 @@ public class ByteCodeTranslator {
         includeFrameworks.add("MessageUI.framework");
         includeFrameworks.add("MediaPlayer.framework");
         includeFrameworks.add("AVFoundation.framework");
+        includeFrameworks.add("CoreText.framework");
         includeFrameworks.add("CoreVideo.framework");
         includeFrameworks.add("QuickLook.framework");
         //includeFrameworks.add("iAd.framework");
