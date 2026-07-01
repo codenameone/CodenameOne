@@ -2573,6 +2573,38 @@ image::img/components-mediaplayer-android.png[Video playback running on an Andro
 
 IMPORTANT: Video playback in the simulator will work with JavaFX enabled. This is the default for Java 8 or newer so recommend using that.
 
+=== Mixing PCM audio with AudioMixer
+
+`AudioBuffer` gives you access to raw interleaved PCM samples, and `WAVWriter` writes those samples to a WAV file.  When you need to combine several PCM clips before writing or playing them, use `AudioMixer`.
+
+`AudioMixer` creates a sample-accurate timeline on one sample clock.  Each track must use the same sample rate and channel count as the mixer.  Track offsets are supplied in milliseconds and are rounded to the nearest sample frame on the mixer clock; if you already know the exact frame position, use `addTrackAtFrame(...)`.
+
+[source,java]
+----
+AudioBuffer music = new AudioBuffer(musicPcm.length);
+music.copyFrom(44100, 2, musicPcm);
+
+AudioBuffer effect = new AudioBuffer(effectPcm.length);
+effect.copyFrom(44100, 2, effectPcm);
+
+AudioMixer mixer = new AudioMixer(44100, 2);
+mixer.addTrack(music, 0, 0.75f);       // Start immediately at 75% gain
+mixer.addTrack(effect, 250, 1.0f);     // Start 250 ms into the timeline
+
+AudioBuffer mixed = mixer.mix();
+float[] pcm = new float[mixed.getSize()];
+mixed.copyTo(pcm);
+
+WAVWriter writer = new WAVWriter(new File("mix.wav"), mixed.getSampleRate(), mixed.getNumChannels(), 16);
+try {
+    writer.write(pcm, 0, mixed.getSize());
+} finally {
+    writer.close();
+}
+----
+
+The mixed buffer is clipped to the normalized PCM range `[-1, 1]`, so it can be passed directly to `WAVWriter`.  The mixer does not resample or convert channel layouts; downsample or otherwise convert source buffers before adding them if they are not already on the target clock.
+
 === ImageViewer
 
 The https://www.codenameone.com/javadoc/com/codename1/components/ImageViewer.html[ImageViewer] allows you to inspect, zoom and pan into an image. It also allows swiping between images if
