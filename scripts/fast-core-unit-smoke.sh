@@ -18,5 +18,6 @@ mvn -pl core-unittests -am \
   -DunitTests=true \
   -Dmaven.javadoc.skip=true \
   -Dtest="$TEST_CLASS" \
+  -Dsurefire.failIfNoSpecifiedTests=false \
   -Plocal-dev-javase \
   test
