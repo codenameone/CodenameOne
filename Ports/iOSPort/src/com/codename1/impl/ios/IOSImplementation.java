@@ -9926,7 +9926,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         minimized = true;
         callInterruptionActive = true;
         if(instance.life != null) {
-            instance.life.applicationWillResignActive();
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationWillResignActive();
+                    }
+                }
+            });
         }
         instance.isActive = false;
     }
@@ -9976,10 +9982,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void applicationDidEnterBackground() {
         minimized = true;
         if(instance.life != null) {
-            instance.life.applicationDidEnterBackground();
-            if (instance.isEditingText()) {
-                instance.stopTextEditing();
-            }
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationDidEnterBackground();
+                        if (instance.isEditingText()) {
+                            instance.stopTextEditing();
+                        }
+                    }
+                }
+            });
         }
     }
     /**
@@ -10008,7 +10020,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void applicationWillEnterForeground() {
         minimized = false;
         if(instance.life != null) {
-            instance.life.applicationWillEnterForeground();
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationWillEnterForeground();
+                    }
+                }
+            });
         }
         
     }
@@ -10083,7 +10101,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private void callOnActive(Runnable r) {
         synchronized(onActiveListeners) {
             if (isActive) {
-                r.run();
+                safeCallSerially(r);
             } else {
                 onActiveListeners.add(r);
             }
@@ -10096,7 +10114,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public static void applicationDidBecomeActive() {
         callInterruptionActive = false;
-        ArrayList<Runnable> callbacks = null;
+        final ArrayList<Runnable> callbacks;
         synchronized(instance.onActiveListeners) {
             instance.isActive = true;
             callbacks = new ArrayList<Runnable>(instance.onActiveListeners.size());
@@ -10104,24 +10122,24 @@ public class IOSImplementation extends CodenameOneImplementation {
             callbacks.addAll(instance.onActiveListeners);
             instance.onActiveListeners.clear();
         }
-        for (Runnable callback : callbacks) {
-            callback.run();
-        }
         minimized = false;
-        if(instance.life != null) {
-            instance.life.applicationDidBecomeActive();
-        }
-        if(Display.getInstance() != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
+        safeCallSerially(new Runnable() {
+            @Override
+            public void run() {
+                for (Runnable callback : callbacks) {
+                    callback.run();
+                }
+                if(instance.life != null) {
+                    instance.life.applicationDidBecomeActive();
+                }
+                if(Display.getInstance() != null) {
                     Form f = Display.getInstance().getCurrent();
                     if(f != null) {
                         f.revalidate();
                     }
                 }
-            });
-        }
+            }
+        });
     }
     
     public static void paintNow() {

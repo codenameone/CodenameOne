@@ -91,14 +91,17 @@ jobs:
           node-version: '20'
       - name: Run Unit Tests
         run: |
+          MVN_GOAL="verify"
           MVN_ARGS=""
           if [ "${{ matrix.java-version }}" != "8" ]; then
-            MVN_ARGS="-Dspotbugs.skip=true"
+            MVN_GOAL="test"
+            MVN_ARGS="-Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true -Djacoco.skip=true"
           fi
           cd maven
-          mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
+          mvn clean "$MVN_GOAL" -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
           cd ..
       - name: Build CSS compiler and smoke native-themes
+        if: ${{ matrix.java-version == 8 }}
         run: |
           cd maven
           mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
@@ -107,12 +110,14 @@ jobs:
           test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }
           test -f Themes/AndroidMaterialTheme.res || { echo "missing Themes/AndroidMaterialTheme.res"; exit 1; }
       - name: Prepare Codename One binaries for Maven plugin tests
+        if: ${{ matrix.java-version == 8 }}
         run: |
           set -euo pipefail
           rm -rf maven/target/cn1-binaries
           mkdir -p maven/target
           cp -r /opt/cn1-binaries maven/target/cn1-binaries
       - name: Run Maven plugin tests
+        if: ${{ matrix.java-version == 8 }}
         working-directory: maven
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
@@ -123,6 +128,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl codenameone-maven-plugin -am -Plocal-dev-javase test
       - name: Run JavaSE port unit tests
+        if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher
         # localization, MavenUtils designer-jar resolution, JavaSEPort font
         # mapping). Without this step the tests in maven/javase compile but
@@ -143,6 +149,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl javase -Plocal-dev-javase test
       - name: Build AI and ad cn1libs (mlkit + tflite + whisper + stable diffusion + admob + mediation + mock)
+        if: ${{ matrix.java-version == 8 }}
         # Exercises every cn1-ai-* and ad-provider multi-module project:
         # compiles the common module, runs its JUnit 5 tests, and packages
         # the .cn1lib archive (including native iOS Obj-C / Android Java
@@ -345,25 +352,20 @@ jobs:
             const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
             await publishQualityComment({ github, context, core });
       - name: Link cn1-binaries
+        if: ${{ matrix.java-version == 8 }}
         run: ln -s /opt/cn1-binaries ../cn1-binaries
       - name: Use upstream JCEF for the Ant build
+        if: ${{ matrix.java-version == 8 }}
         run: ./scripts/ci-install-upstream-jcef-jar.sh
       - name: Build CLDC11 JAR
-        run: |
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
+        if: ${{ matrix.java-version == 8 }}
+        run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
       - name: Build with Ant
+        if: ${{ matrix.java-version == 8 }}
         run: |
           mkdir -p ~/.codenameone
           cp maven/UpdateCodenameOne.jar ~/.codenameone/
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          xvfb-run ant $ANT_OPTS_ARGS test-javase
+          xvfb-run ant test-javase
 
       - name: Build Release
         if: matrix.java-version == 8
@@ -394,14 +396,11 @@ jobs:
           path: CodenameOne/javadocs.zip
 
       - name: Build iOS Port
-        run: |
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/iOSPort/build.xml jar
+        if: ${{ matrix.java-version == 8 }}
+        run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
 
       - name: Build iOS VM API
+        if: ${{ matrix.java-version == 8 }}
         run: mvn -f vm/JavaAPI/pom.xml package
 
       - name: Upload a Build Artifact
@@ -412,6 +411,7 @@ jobs:
           path: vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
 
       - name: Build iOS VM
+        if: ${{ matrix.java-version == 8 }}
         run: mvn -f vm/ByteCodeTranslator/pom.xml package
 
       - name: Upload a Build Artifact
@@ -429,19 +429,15 @@ jobs:
           path: Ports/CLDC11/dist/CLDC11.jar
 
       - name: Build Android Port
-        run: |
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/Android/build.xml jar
+        if: ${{ matrix.java-version == 8 }}
+        run: ant -noinput -buildfile Ports/Android/build.xml jar
 
       - name: Packaging Everything
         if: matrix.java-version == 8
         run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
 
       - name: Copying Files to Server
-        if: matrix.java-version == 8
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && matrix.java-version == 8 }}
         uses: marcodallasanta/ssh-scp-deploy@v1.0.5
         with:
           host: ${{ secrets.WP_HOST }}

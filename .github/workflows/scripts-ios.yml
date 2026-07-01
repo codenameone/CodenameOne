@@ -253,7 +253,12 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests
-          path: artifacts
+          path: |
+            artifacts/ios-ui-tests
+            artifacts/*.log
+            artifacts/*-stats.txt
+            artifacts/vm_time.txt
+            artifacts/xcodebuild-list.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -515,7 +520,12 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests-metal
-          path: artifacts
+          path: |
+            artifacts/ios-ui-tests-metal
+            artifacts/*.log
+            artifacts/*-stats.txt
+            artifacts/vm_time.txt
+            artifacts/xcodebuild-list.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -664,7 +674,12 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: watch-ui-tests
-          path: artifacts
+          path: |
+            artifacts/watch-ui-tests
+            artifacts/*.log
+            artifacts/*-stats.txt
+            artifacts/vm_time.txt
+            artifacts/xcodebuild-list.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -812,6 +827,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: tv-ui-tests
-          path: artifacts
+          path: |
+            artifacts/tv-ui-tests
+            artifacts/*.log
+            artifacts/*-stats.txt
+            artifacts/vm_time.txt
+            artifacts/xcodebuild-list.txt
           if-no-files-found: warn
           retention-days: 14
