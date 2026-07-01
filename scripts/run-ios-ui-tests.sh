@@ -161,6 +161,32 @@ if [ -z "$REQUESTED_SCHEME" ]; then
   fi
 fi
 SCHEME="$REQUESTED_SCHEME"
+
+scheme_list_contains() {
+  local scheme_name="$1"
+  local listed="$2"
+  printf '%s\n' "$listed" | awk '
+    /^[[:space:]]+[[:graph:]].*/ {
+      sub(/^[[:space:]]+/, "", $0)
+      if ($0 == target) found=1
+    }
+    END { exit found ? 0 : 1 }
+  ' target="$scheme_name"
+}
+
+if [[ "$WORKSPACE_PATH" == *.xcworkspace ]] && [[ "$SCHEME" != *" ("* ]]; then
+  WORKSPACE_BASENAME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
+  XCODEBUILD_LIST="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -list 2>/dev/null || true)"
+  PROJECT_QUALIFIED_SCHEME="$SCHEME ($WORKSPACE_BASENAME project)"
+  WORKSPACE_QUALIFIED_SCHEME="$SCHEME ($WORKSPACE_BASENAME Workspace)"
+  if scheme_list_contains "$PROJECT_QUALIFIED_SCHEME" "$XCODEBUILD_LIST"; then
+    SCHEME="$PROJECT_QUALIFIED_SCHEME"
+    ri_log "Resolved ambiguous workspace scheme to $SCHEME"
+  elif scheme_list_contains "$WORKSPACE_QUALIFIED_SCHEME" "$XCODEBUILD_LIST"; then
+    SCHEME="$WORKSPACE_QUALIFIED_SCHEME"
+    ri_log "Resolved ambiguous workspace scheme to $SCHEME"
+  fi
+fi
 ri_log "Using scheme $SCHEME"
 
 # The golden-image directory defaults to scripts/ios/screenshots for the
@@ -200,11 +226,14 @@ else
   ri_log "WebSocket screenshot server did not start; relying on base64 fallback"
 fi
 
-# Patch scheme env vars to point to our runtime dirs
-SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
+# Patch scheme env vars to point to our runtime dirs. Use the requested scheme
+# filename, not an xcodebuild-disambiguated name like
+# "AppName (AppName project)".
+SCHEME_FILE_NAME="$REQUESTED_SCHEME"
+SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME_FILE_NAME.xcscheme"
 if [ ! -f "$SCHEME_FILE" ] && [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
   PROJECT_DIR="$(cd "$(dirname "$WORKSPACE_PATH")" && pwd)"
-  PROJECT_SCHEME_FILE="$PROJECT_DIR/$(basename "$WORKSPACE_PATH" .xcworkspace).xcodeproj/xcshareddata/xcschemes/$SCHEME.xcscheme"
+  PROJECT_SCHEME_FILE="$PROJECT_DIR/$(basename "$WORKSPACE_PATH" .xcworkspace).xcodeproj/xcshareddata/xcschemes/$SCHEME_FILE_NAME.xcscheme"
   if [ -f "$PROJECT_SCHEME_FILE" ]; then
     SCHEME_FILE="$PROJECT_SCHEME_FILE"
   fi
