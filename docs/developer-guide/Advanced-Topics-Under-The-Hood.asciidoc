@@ -2827,7 +2827,7 @@ Here is the "hello world" you created in Kotlin:
 include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.kt[tag=advanced-topics-under-the-hood-kotlin-002,indent=0]
 ----
 
-After building this, the build produces a directory that contains "com/mycompany/myapp/HelloKotlin.class".
+After building this, the build produces a directory that contains `com/mycompany/myapp/HelloKotlin.class`.
 
 It also produced a.jar file that contains this class.
 

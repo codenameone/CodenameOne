@@ -71,7 +71,7 @@ include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.ja
 
 Class-level `@RunOnEdt` also routes `@BeforeEach`/`@AfterEach` methods through the EDT. Method-level `@RunOnEdt` is scoped to that one `@Test`.
 
-Tests that only exercise pure model or utility code can omit `@RunOnEdt` and run on the JUnit worker thread — they are faster because nothing pumps the EDT.
+Tests that only exercise pure model or utility code can omit `@RunOnEdt` and run on the JUnit worker thread — they're faster because nothing pumps the EDT.
 
 === `@SimulatorProperty` / `@SimulatorProperties`
 
@@ -204,7 +204,7 @@ include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.sh
 
 === Side-by-side example
 
-The same "sign in, assert we land on Home" check, written both ways:
+The same "sign in, assert Home is shown" check, written both ways:
 
 .AbstractTest / `cn1:test`
 [source,java]

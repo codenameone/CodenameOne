@@ -228,7 +228,7 @@ The `submitReceipt()` method is a little more complex, as it needs to calculate 
 include::../demos/common/src/main/snippets/developer-guide/monetization.java[tag=monetization-java-012,indent=0]
 ----
 
-The main logic of this method involves iterating through all the existing receipts to find the *latest* current expiry date, so that when the user purchases a subscription, it's added onto the end of the current subscription (if one exists) rather than going from today's date. This enables users to safely renew their subscription before the subscription has expired.
+The main logic of this method involves iterating through all the existing receipts to find the *latest* current expiry date, so that when the user purchases a subscription, it's added onto the end of the current subscription (if one exists) rather than going from today's date. This enables users to renew their subscription before the subscription has expired.
 
 In the real-world, you would implement this logic on the server-side.
 
@@ -375,7 +375,7 @@ To aid in this process, Codename One provides a fully functional in-app purchase
 ----
 include::../demos/common/src/main/snippets/developer-guide/monetization.java[tag=monetization-java-018,indent=0]
 ----
-5. Add the `ios.plistInject` build hint to your project with the value "<key>NSAppTransportSecurity</key> <dict>     <key>NSAllowsArbitraryLoads</key>     <true/> </dict>".  This is so that you can use http urls in iOS.  Since you don't intend to fully publish this app, you can cut corners like this. If you were creating a real app, you would use proper secure URLs.
+5. Add the `ios.plistInject` build hint to your project with the value `<key>NSAppTransportSecurity</key> <dict>     <key>NSAllowsArbitraryLoads</key>     <true/> </dict>`.  This is so that you can use http urls in iOS.  Since you don't intend to fully publish this app, you can cut corners like this. If you were creating a real app, you would use proper secure URLs.
 
 ===== Setting up the server project
 
@@ -693,7 +693,7 @@ At this point, the service account *should* be active so you can try to check re
 
 ====== Testing receipt validation
 
-The `ReceiptsFacadeREST` class includes a flag to enable/disable play store validation. By default it's disabled. Let's enable it:
+The `ReceiptsFacadeREST` class includes a flag to enable/disable play store validation. By default it's disabled. Enable it:
 
 [source,java]
 ----

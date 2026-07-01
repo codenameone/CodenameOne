@@ -186,7 +186,7 @@ Server-side topic delivery is handled by the Codename One push server.
 
 === Simulator
 
-The JavaSE simulator implements all of the above so you can develop without a device. Use
+The JavaSE simulator implements all the above so you can develop without a device. Use
 the *Simulate -> Notifications and Background* menu to toggle the background constraints
 (network / charging / idle / battery), run scheduled work immediately, inspect registered
 channels, and inject shared content. Posted notifications appear in a panel at the top

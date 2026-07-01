@@ -113,7 +113,7 @@ include::../demos/common/src/main/snippets/developer-guide/authentication-and-id
 
 . In the Apple Developer portal, create a *Services ID* alongside your App ID. Enable "Sign in with Apple" for both.
 . Configure the Services ID's *Web Authentication Configuration* with the primary App ID and your redirect URI.
-. Generate an *AuthKey* private key in the Apple developer portal (`.p8` file). Apple does not allow public mobile clients to mint the `client_secret` JWT themselves; your backend must do it. See https://developer.apple.com/documentation/sign_in_with_apple/generate_and_validate_tokens[Apple's docs] for the JWT recipe.
+. Generate an *AuthKey* private key in the Apple developer portal (`.p8` file). Apple doesn't allow public mobile clients to mint the `client_secret` JWT themselves; your backend must do it. See https://developer.apple.com/documentation/sign_in_with_apple/generate_and_validate_tokens[Apple's docs] for the JWT recipe.
 
 === Google Sign-In
 
@@ -168,7 +168,7 @@ include::../demos/common/src/main/snippets/developer-guide/authentication-and-id
 
 === Firebase Authentication
 
-Firebase Auth is *not* an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
+Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
 
 [source,java]
 ----

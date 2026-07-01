@@ -213,7 +213,7 @@ include::../demos/common/src/main/snippets/developer-guide/security.java[tag=sec
 
 `isDeviceCompromised()` aggregates the same root/jailbreak/Frida signals as the launch gates plus emulator heuristics, but never terminates the app. On the simulator and unsupported ports it simply returns `false`.
 
-NOTE: If your security policy mandates a specific commercial Mobile Threat Defense (MTD) / RASP vendor (Zimperium, Promon SHIELD, etc.), you integrate that vendor's SDK through the standard `android.gradleDep` / `ios.pods` build hints -- Codename One's built-in checks complement, but do not claim to replace, a dedicated MTD product.
+NOTE: If your security policy mandates a specific commercial Mobile Threat Defense (MTD) / RASP vendor (Zimperium, Promon SHIELD, etc.), you integrate that vendor's SDK through the standard `android.gradleDep` / `ios.pods` build hints -- Codename One's built-in checks complement, but don't claim to replace, a dedicated MTD product.
 
 ==== Platform attestation: Google Play Integrity & Apple App Attest
 
@@ -258,7 +258,7 @@ For the screens that actually matter (PIN entry, transfer confirmation), mark th
 include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-016,indent=0]
 ----
 
-NOTE: Accessibility-service enumeration and `setSecureScreen()` are Android concepts; on iOS they are no-ops (iOS has no equivalent third-party accessibility-service threat model). Use `ios.disableScreenshots=true` to block screen capture on iOS as described in <<Disabling screenshots>>.
+NOTE: Accessibility-service enumeration and `setSecureScreen()` are Android concepts; on iOS they're no-ops (iOS has no equivalent third-party accessibility-service threat model). Use `ios.disableScreenshots=true` to block screen capture on iOS as described in <<Disabling screenshots>>.
 
 === Strong Android certificates
 
@@ -409,7 +409,7 @@ For RSA-signed tokens (RS256/384/512) and ECDSA-signed tokens (ES256/384/512), p
 include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-025,indent=0]
 ----
 
-WARNING: `Jwt.parse(token)` does not verify the signature -- you must call one of the `verify*` methods afterwards. Tokens with an `alg` header of `none` are rejected by `verify` unless you explicitly call `setVerifyAllowNoneAlgorithm(true)` on the parsed JWT. Accepting unsigned tokens is a critical security bug in almost every deployment, so leave it off unless you have decided that the transport is trusted.
+WARNING: `Jwt.parse(token)` doesn't verify the signature -- you must call one of the `verify*` methods afterwards. Tokens with an `alg` header of `none` are rejected by `verify` unless you explicitly call `setVerifyAllowNoneAlgorithm(true)` on the parsed JWT. Accepting unsigned tokens is a critical security bug in almost every deployment, so leave it off unless you have decided that the transport is trusted.
 
 ==== HOTP / TOTP one-time passwords
 
@@ -465,7 +465,7 @@ The maximum-compatibility settings -- 6 digits, 30 second step, SHA-1 -- are the
 include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-029,indent=0]
 ----
 
-*Server-side verification.* When your backend does the verification, the corresponding Java looks the same -- `Otp.verifyTotp(storedSecret, codeFromClient, 1)`. Make sure you rate-limit verification attempts (e.g. lock the account after 5 wrong codes within a minute) and log failures, since the 6-digit search space is small enough to be brute-forced without that.
+*Server-side verification.* When your backend does the verification, the corresponding Java looks the same -- `Otp.verifyTotp(storedSecret, codeFromClient, 1)`. Make sure you rate-limit verification attempts (for example, lock the account after 5 wrong codes within a minute) and log failures, since the 6-digit search space is small enough to be brute-forced without that.
 
 ==== OTP input widget
 

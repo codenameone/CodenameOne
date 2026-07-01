@@ -297,7 +297,7 @@ For example:
 include::../demos/common/src/main/snippets/developer-guide/graphics.java[tag=graphics-java-011,indent=0]
 ----
 
-=== Example: drawing an analog clock
+=== Example: Drawing an analog clock
 
 The following sections implement an analog clock component. This will show three key concepts
 in Codename One's graphics:
@@ -532,7 +532,7 @@ include::../demos/common/src/main/snippets/developer-guide/graphics.java[tag=gra
 
 Where would this rectangle be drawn on the screen?
 
-If you answered something like "10 pixels from the top, and 10 pixels from the left of the screen",
+If you answered something like "10 pixels from the top, and 10 pixels from the left of the screen,"
 you _might_ be right. It depends on whether the graphics has a translation or transform applied to it. If there is
 currently a translation of `(20,20)` (that's: 20 pixels to the right, and 20 pixels down), then the rectangle would be
 rendered at `(30, 30)`.

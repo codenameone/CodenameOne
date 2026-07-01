@@ -1633,7 +1633,7 @@ To enable in a custom theme:
 include::../demos/common/src/main/snippets/developer-guide/the-components-of-codename-one.css[tag=the-components-of-codename-one-css-001,indent=0]
 ----
 
-To toggle programmatically (e.g. add it to a Tabs instance whose theme
+To toggle programmatically (for example, add it to a Tabs instance whose theme
 hasn't enabled it):
 
 [source,java]

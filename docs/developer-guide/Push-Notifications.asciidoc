@@ -457,7 +457,7 @@ Push on iOS is much harder to handle than the Android version, but you simplifie
 
 iOS push needs two more P12 certificates.
 
-IMPORTANT: Please *notice* that these are *NOT* the signing certificates! +
+IMPORTANT: Please *notice* that these aren't the signing certificates! +
 They're *completely different certificates* that have nothing to do with the build process!
 
 The certificate wizard can generate these more push certificates and do a few other things if you check this flag in the end of the wizard:
