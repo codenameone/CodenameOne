@@ -2,7 +2,7 @@ name: _Build iOS port (reusable)
 
 # Reusable workflow that runs scripts/setup-workspace.sh + scripts/build-ios-port.sh
 # once per workflow run, populating shared caches that downstream test jobs (in
-# scripts-ios.yml, scripts-ios-native.yml, ios-packaging.yml) restore via the
+# scripts-ios.yml, ios-packaging.yml, and purchase-e2e.yml) restore via the
 # same cache keys.
 #
 # A separate "cn1-built" cache is keyed on the CN1 source hash with no restore-
@@ -10,7 +10,7 @@ name: _Build iOS port (reusable)
 # sequence is skipped — the iOS port artifact in ~/.m2/repository/com/codenameone
 # is already correct for the current source state.
 #
-# This cache is shared across all three iOS workflows on the same branch, so
+# This cache is shared across Apple/iOS workflows on the same branch, so
 # whichever workflow runs first populates it and the others skip the rebuild.
 
 on:

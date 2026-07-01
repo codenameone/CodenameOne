@@ -1,6 +1,6 @@
 # Mac native screenshot baselines
 
-Reference images for the Mac native build (`codename1.arg.macNative.enabled=true`). The `build-mac-native` job in [`.github/workflows/scripts-mac-native.yml`](../../../.github/workflows/scripts-mac-native.yml) compares `scripts/hellocodenameone` Mac Catalyst output against these PNGs via [`scripts/run-mac-native-ui-tests.sh`](../../run-mac-native-ui-tests.sh).
+Reference images for the Mac native build (`codename1.arg.macNative.enabled=true`). The `build-mac-native` job in [`.github/workflows/scripts-ios.yml`](../../../.github/workflows/scripts-ios.yml) compares `scripts/hellocodenameone` Mac Catalyst output against these PNGs via [`scripts/run-mac-native-ui-tests.sh`](../../run-mac-native-ui-tests.sh).
 
 ## Scope
 
