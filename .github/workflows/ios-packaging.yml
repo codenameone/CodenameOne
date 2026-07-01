@@ -9,6 +9,7 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'Ports/iOSPort/**'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-device-release-build.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/**'
@@ -23,6 +24,7 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'Ports/iOSPort/**'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-device-release-build.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/**'
@@ -48,7 +50,7 @@ jobs:
     runs-on: macos-15
     # Headroom for the single native xcodebuild compile of the translated app, which grew with
     # the gaming runtime added to core and is slower on the Xcode 26.3 / iOS 26.2 toolchain.
-    timeout-minutes: 75
+    timeout-minutes: 120
     # Exercises both CocoaPods and SPM in a single Xcode project. Catches
     # regressions in either dependency manager (each pathway runs end to end)
     # and additionally validates that they coexist correctly. Also turns on
@@ -157,6 +159,26 @@ jobs:
         id: build_ios_app
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
+
+      - name: Cache iOS device release derived data
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/cn1-ios-device-release-derived
+          key: ${{ runner.os }}-ios-device-release-derived-${{ steps.src_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-ios-device-release-derived-
+
+      - name: Build Release iOS device app without signing
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-device-release
+          CN1_IOS_DEVICE_DERIVED_DATA: ${{ runner.temp }}/cn1-ios-device-release-derived
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          ./scripts/run-ios-device-release-build.sh \
+            "${{ steps.build_ios_app.outputs.workspace }}" \
+            "${{ steps.build_ios_app.outputs.scheme }}"
+        timeout-minutes: 45
 
       - name: Cache iOS derived data
         uses: actions/cache@v5
