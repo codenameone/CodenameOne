@@ -102,8 +102,8 @@ if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
   ri_log "JAVA17_HOME not set correctly" >&2
   exit 3
 fi
-if ! command -v xcodebuild >/dev/null 2>&1; then
-  ri_log "xcodebuild not found" >&2
+if [ ! -x "$XCODEBUILD" ]; then
+  ri_log "xcodebuild not found at $XCODEBUILD" >&2
   exit 3
 fi
 if ! command -v xcrun >/dev/null 2>&1; then
@@ -119,7 +119,7 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 
-SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+SDK_LIST="$("$XCODEBUILD" -showsdks 2>/dev/null || true)"
 RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
 DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-}"
 if [ -z "$DOWNLOAD_PLATFORMS" ] && [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
@@ -130,9 +130,9 @@ ri_log "XCODE_DOWNLOAD_PLATFORMS=${DOWNLOAD_PLATFORMS}"
 
 if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator" || ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
   if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
-    ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
-    xcodebuild -downloadPlatform iOS || true
-    SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+    ri_log "Attempting to download missing iOS platform via $XCODEBUILD -downloadPlatform iOS"
+    "$XCODEBUILD" -downloadPlatform iOS || true
+    SDK_LIST="$("$XCODEBUILD" -showsdks 2>/dev/null || true)"
     RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
   else
     ri_log "Missing simulator SDKs/runtimes detected. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
@@ -224,7 +224,7 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-SIM_SDK_VERSION="$(xcodebuild -showsdks 2>/dev/null | awk '/iphonesimulator/ {print $NF}' | tail -n 1 | sed 's/iphonesimulator//')"
+SIM_SDK_VERSION="$("$XCODEBUILD" -showsdks 2>/dev/null | awk '/iphonesimulator/ {print $NF}' | tail -n 1 | sed 's/iphonesimulator//')"
 SIM_SDK_MAJOR="${SIM_SDK_VERSION%%.*}"
 case "$SIM_SDK_MAJOR" in
   ''|*[!0-9]*) SIM_SDK_MAJOR=20 ;;
@@ -278,7 +278,7 @@ normalize_destination() {
 auto_select_destination() {
   local show_dest rc=0 best_line="" best_key="" line payload platform id name os priority key part value
   set +e
-  show_dest="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
+  show_dest="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
   rc=$?
   set -e
 
@@ -480,7 +480,7 @@ if [ -z "$SIM_DESTINATION" ]; then
   else
     ri_log "Simulator auto-selection did not return a destination"
     SHOW_DEST_LOG="$ARTIFACTS_DIR/xcodebuild-showdestinations.log"
-    xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+    "$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
       > "$SHOW_DEST_LOG" 2>&1 || true
     # The active Xcode is missing the iOS Simulator platform when -showdestinations
     # reports it "not installed" OR lists no iOS Simulator destination at all. The
@@ -498,9 +498,9 @@ if [ -z "$SIM_DESTINATION" ]; then
     fi
     if [ "$IOS_PLATFORM_MISSING" = "true" ]; then
       if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
-        ri_log "No iOS simulator platform for the active Xcode; downloading via xcodebuild -downloadPlatform iOS"
-        xcodebuild -downloadPlatform iOS || true
-        xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+        ri_log "No iOS simulator platform for the active Xcode; downloading via $XCODEBUILD -downloadPlatform iOS"
+        "$XCODEBUILD" -downloadPlatform iOS || true
+        "$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
           > "$SHOW_DEST_LOG" 2>&1 || true
         SELECTED_DESTINATION="$(auto_select_destination || true)"
         if [ -n "${SELECTED_DESTINATION:-}" ]; then
@@ -605,7 +605,7 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
 XCODE_BUILD_CMD=(
-  xcodebuild
+  "$XCODEBUILD"
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH"
   -scheme "$SCHEME"
   -sdk iphonesimulator
@@ -639,7 +639,7 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
 
-BUILD_SETTINGS="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
+BUILD_SETTINGS="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
 if [ -z "$WRAPPER_NAME" ]; then
