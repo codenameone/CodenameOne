@@ -46,6 +46,7 @@ public interface TimedRecognitionCallback extends RecognitionCallback {
         /// Forwards partial timed results to the string-only partial callback.
         ///
         /// @param result partial timed recognition result
+        @Override
         public void onPartialResult(TranscriptionResult result) {
             onPartialResult(result == null ? "" : result.getText());
         }
@@ -55,6 +56,7 @@ public interface TimedRecognitionCallback extends RecognitionCallback {
         /// @param result final timed recognition result
         /// @param confidence confidence score from `0.0` to `1.0`, when available
         /// @param alternatives provider-specific alternative transcripts
+        @Override
         public void onResult(TranscriptionResult result, float confidence, String[] alternatives) {
             onResult(result == null ? "" : result.getText(), confidence, alternatives);
         }

@@ -46,8 +46,7 @@ public final class TranscriptionResult {
         }
         ArrayList<TranscriptionSegment> copy = new ArrayList<TranscriptionSegment>(segments.size());
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < segments.size(); i++) {
-            TranscriptionSegment s = segments.get(i);
+        for (TranscriptionSegment s : segments) {
             if (s == null) {
                 throw new IllegalArgumentException("segments must not contain null");
             }
@@ -104,8 +103,7 @@ public final class TranscriptionResult {
     /// @return WebVTT text using millisecond timestamps
     public String toVtt() {
         StringBuilder out = new StringBuilder("WEBVTT\n\n");
-        for (int i = 0; i < segments.size(); i++) {
-            TranscriptionSegment s = segments.get(i);
+        for (TranscriptionSegment s : segments) {
             out.append(formatTime(s.getStartTimeMs(), '.')).append(" --> ")
                     .append(formatTime(s.getEndTimeMs(), '.')).append('\n');
             out.append(normalizeCaptionText(s.getText()).replace("-->", "-- >")).append("\n\n");
