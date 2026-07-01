@@ -49,6 +49,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Install local Codename One Maven artifacts
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          xvfb-run -a mvn -B -ntp -f maven/pom.xml \
+            -pl core,javase,css-compiler,codenameone-maven-plugin \
+            -am install \
+            -Plocal-dev-javase \
+            -DskipTests \
+            -Dmaven.javadoc.skip=true
+
       - name: Build Codename One demos
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
@@ -419,7 +430,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload AsciiDoc linter report
-        if: always()
+        if: always() && env.ASCII_DOC_LINT_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-asciidoc-lint
@@ -447,7 +458,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload paragraph capitalization report
-        if: always()
+        if: always() && env.PARAGRAPH_CAP_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-paragraph-capitalization
@@ -455,7 +466,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload LanguageTool report
-        if: always()
+        if: always() && env.LANGUAGETOOL_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-languagetool
