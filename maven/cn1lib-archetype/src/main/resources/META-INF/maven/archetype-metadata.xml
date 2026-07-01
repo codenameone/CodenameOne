@@ -120,6 +120,17 @@
         </fileSet>
       </fileSets>
     </module>
+    <module id="${rootArtifactId}-linux" dir="linux" name="${rootArtifactId}-linux">
+      <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/c</directory>
+          <includes>
+            <include>**/*.c</include>
+            <include>**/*.h</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
     <module id="${rootArtifactId}-android" dir="android" name="${rootArtifactId}-android">
       <fileSets>
         <fileSet filtered="true" packaged="true" encoding="UTF-8">

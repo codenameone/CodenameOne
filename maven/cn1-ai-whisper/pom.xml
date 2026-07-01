@@ -28,6 +28,8 @@
         <module>android</module>
         <module>javase</module>
         <module>javascript</module>
+        <module>linux</module>
+        <module>win</module>
         <module>lib</module>
     </modules>
 </project>

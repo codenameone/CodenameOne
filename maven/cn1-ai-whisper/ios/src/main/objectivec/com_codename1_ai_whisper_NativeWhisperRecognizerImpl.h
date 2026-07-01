@@ -4,5 +4,7 @@
 }
 
 -(NSString*)transcribe:(NSString*)param param1:(NSString*)param1;
+-(NSString*)transcribeSegments:(NSString*)param param1:(NSString*)param1;
+-(NSString*)escapeSegmentText:(NSString*)text;
 -(BOOL)isSupported;
 @end
