@@ -3,6 +3,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.io.File;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.media.AudioBuffer;
+import com.codename1.media.AudioEffects;
 import com.codename1.media.AudioMixer;
 import com.codename1.media.WAVWriter;
 import com.codename1.ui.Display;
@@ -18,6 +19,7 @@ public class AudioMixerApiTest extends BaseTest {
     public boolean runTest() {
         try {
             AudioBuffer mixed = runMixVector();
+            runEffectsVector();
             if (!"HTML5".equals(Display.getInstance().getPlatformName())) {
                 runWavWriterRoundTrip(mixed);
             }
@@ -83,6 +85,32 @@ public class AudioMixerApiTest extends BaseTest {
         }, "odd interleaved sample count");
 
         return mixed;
+    }
+
+    private void runEffectsVector() {
+        assertSamples(new float[]{0.5f, -1.0f},
+                AudioEffects.gain(buffer(8000, 1, new float[]{0.25f, -0.75f}), 2.0f),
+                "gain PCM");
+        assertSamples(new float[]{0.5f, -1.0f},
+                AudioEffects.normalize(buffer(8000, 1, new float[]{0.25f, -0.5f}), 1.0f),
+                "normalized PCM");
+        assertSamples(new float[]{0.0f, 0.0f, 0.0f, 0.0f},
+                AudioEffects.equalize(buffer(8000, 1, new float[]{1.0f, -1.0f, 1.0f, -1.0f}),
+                        0.0f, 0.0f, 0.0f, 500.0f, 2000.0f),
+                "equalized mute PCM");
+        assertSamples(new float[]{0.0f, 0.0f, 0.25f, -0.25f},
+                AudioEffects.removeCenter(buffer(44100, 2, new float[]{
+                        0.8f, 0.8f,
+                        0.75f, 0.25f
+                })),
+                "center removed PCM");
+
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                AudioEffects.removeCenter(buffer(8000, 1, new float[]{0.1f}));
+            }
+        }, "center removal mono input");
     }
 
     private void runWavWriterRoundTrip(AudioBuffer mixed) throws Exception {

@@ -2573,11 +2573,36 @@ image::img/components-mediaplayer-android.png[Video playback running on an Andro
 
 IMPORTANT: Video playback in the simulator will work with JavaFX enabled. This is the default for Java 8 or newer so recommend using that.
 
-=== Mixing PCM audio with AudioMixer
+==== PCM audio buffers, mixing, and effects
 
-`AudioBuffer` gives you access to raw interleaved PCM samples, and `WAVWriter` writes those samples to a WAV file.  When you need to combine several PCM clips before writing or playing them, use `AudioMixer`.
+`AudioBuffer` stores raw interleaved float PCM samples in the `[-1, 1]` range, and `WAVWriter` writes those samples to a WAV file.  The portable source of PCM in Codename One is live microphone capture: create an `AudioBuffer` with `MediaManager.getAudioBuffer(...)`, then create a recorder with `MediaRecorderBuilder.redirectToAudioBuffer(true)`.  The builder's `path` value is the buffer key in this mode; it isn't a file path.
 
-`AudioMixer` creates a sample-accurate timeline on one sample clock.  Each track must use the same sample rate and channel count as the mixer.  Track offsets are supplied in milliseconds and are rounded to the nearest sample frame on the mixer clock; if you already know the exact frame position, use `addTrackAtFrame(...)`.
+[source,java]
+----
+String bufferKey = "voice-buffer";
+AudioBuffer livePcm = MediaManager.getAudioBuffer(bufferKey, true, 8192);
+livePcm.addCallback(buffer -> {
+    float[] frame = new float[buffer.getSize()];
+    buffer.copyTo(frame);
+    // Process or copy this frame before the next callback arrives.
+});
+
+Media recorder = MediaManager.createMediaRecorder(
+        new MediaRecorderBuilder()
+                .path(bufferKey)
+                .samplingRate(44100)
+                .audioChannels(1)
+                .redirectToAudioBuffer(true));
+recorder.play();
+
+// Later:
+recorder.cleanup();
+MediaManager.releaseAudioBuffer(bufferKey);
+----
+
+Codename One doesn't currently expose a portable decoder that converts an arbitrary prerecorded audio file, or the audio track inside a video file, into an `AudioBuffer`.  Use the normal `Media` APIs to play those files.  If you need offline PCM editing for AAC, MP3, MP4, or similar formats, decode them before passing samples to Codename One, or add a platform decoder API for that format.  The mixer and effects APIs below don't require native code once PCM samples are available.
+
+When you need to combine PCM clips before writing or playing them, use `AudioMixer`.  It creates a sample-accurate timeline on one sample clock.  Each track must use the same sample rate and channel count as the mixer.  Track offsets are supplied in milliseconds and are rounded to the nearest sample frame on the mixer clock; if you already know the exact frame position, use `addTrackAtFrame(...)`.
 
 [source,java]
 ----
@@ -2604,6 +2629,25 @@ try {
 ----
 
 The mixed buffer is clipped to the normalized PCM range `[-1, 1]`, so it can be passed directly to `WAVWriter`.  The mixer doesn't resample or convert channel layouts; downsample or otherwise convert source buffers before adding them if they're not already on the target clock.
+
+`AudioEffects` provides small platform-neutral PCM transforms that compose with the mixer:
+
+[source,java]
+----
+AudioBuffer voice = AudioEffects.normalize(livePcm, 0.9f);
+AudioBuffer brighter = AudioEffects.equalize(voice,
+        0.8f,  // low band gain
+        1.0f,  // mid band gain
+        1.25f  // high band gain
+);
+
+AudioBuffer karaoke = AudioEffects.removeCenter(stereoMusic);
+AudioBuffer voiceEnhanced = AudioEffects.midSide(stereoInterview, 1.4f, 0.6f);
+----
+
+`equalize(...)` is a simple three-band tone shaper for lightweight cleanup and demos.  `removeCenter(...)` and `midSide(...)` use classic stereo mid/side processing; they can reduce a centered vocal or enhance centered dialog only when the source is stereo and the voice is actually centered.  They aren't source-separation or noise-reduction APIs.
+
+PCM mixing and effects are good candidates for SIMD acceleration because they operate on large float arrays.  The public API is intentionally portable and scalar today; a SIMD-backed implementation can be added later without changing the mixer or effects calls.
 
 === ImageViewer
 
