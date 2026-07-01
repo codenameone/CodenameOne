@@ -68,10 +68,7 @@ o.createHelloComponent_ = function(callback) {
 // end::advanced-topics-under-the-hood-javascript-006[]
 
 // tag::advanced-topics-under-the-hood-javascript-007[]
-o.test__byte_boolean_char_short_int_long_float_double
-_java_lang_String_byte_1ARRAY_boolean_1ARRAY_char_1ARRAY
-_short_1ARRAY_int_1ARRAY_long_1ARRAY_float_1ARRAY_double
-_1ARRAY_com_codename1_ui_PeerComponent = function(param1, param2, param3, param4, param5, param6, param7, param8, param9, param10, param11, param12, param13, param14, param15, param16, param17, param18, callback) {
+o["test__byte_boolean_char_short_int_long_float_double_java_lang_String_byte_1ARRAY_boolean_1ARRAY_char_1ARRAY_short_1ARRAY_int_1ARRAY_long_1ARRAY_float_1ARRAY_double_1ARRAY_com_codename1_ui_PeerComponent"] = function(param1, param2, param3, param4, param5, param6, param7, param8, param9, param10, param11, param12, param13, param14, param15, param16, param17, param18, callback) {
     callback.error(new Error("Not implemented yet"));
 };
 // end::advanced-topics-under-the-hood-javascript-007[]
@@ -84,9 +81,8 @@ google.maps.event.addListener(this.map, 'bounds_changed', function() {
 // end::advanced-topics-under-the-hood-javascript-008[]
 
 // tag::advanced-topics-under-the-hood-javascript-009[]
-this.$GLOBAL$.com_codename1_googlemaps_MapContainer.fireMapChangeEvent__int_int_double_double;
 // end::advanced-topics-under-the-hood-javascript-009[]
 
 // tag::advanced-topics-under-the-hood-javascript-010[]
-this.$GLOBAL$.com_codename1_googlemaps_MapContainer.fireMapChangeEvent__int_int_double_double$async;
+var asyncFireMapChangeEvent = this.$GLOBAL$.com_codename1_googlemaps_MapContainer.fireMapChangeEvent__int_int_double_double$async;
 // end::advanced-topics-under-the-hood-javascript-010[]
