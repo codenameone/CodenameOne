@@ -1366,12 +1366,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedto
 ----
 
 
-.C# Version
-[source,csharp]
-----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.cs[tag=advanced-topics-under-the-hood-csharp-001,indent=0]
-----
-
 ==== Android native permissions
 
 Permissions in Codename One are seamless. Codename One traverses the bytecode and automatically assigns permissions to Android applications based on the API’s used by the developer.
@@ -1780,16 +1774,16 @@ The rule of thumb is that a build hint with a numeric or boolean value is always
 
 These build hints are probably of the "required" type:
 
-[source,java]
+[source,properties]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.java[tag=advanced-topics-under-the-hood-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-001,indent=0]
 ----
 
 These build hints should probably be appended:
 
-[source,java]
+[source,properties]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.java[tag=advanced-topics-under-the-hood-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-002,indent=0]
 ----
 
 .cn1lib Structure/File Format
@@ -1962,7 +1956,7 @@ Use `android.xapplication` to inject a dedicated bridge activity and bind the ac
 
 [source,properties]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-003,indent=0]
 ----
 
 Keep `codename1.arg.android.activity.launchMode=singleTask` on your main CN1 activity so app resume behavior is predictable.
