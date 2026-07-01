@@ -131,6 +131,10 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
         return new File(targetProjectDir(), "win");
     }
 
+    private File targetLinuxDir() {
+        return new File(targetProjectDir(), "linux");
+    }
+
     private File targetSrcDir() {
         return new File(targetCommonDir(), "src");
     }
@@ -315,6 +319,39 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
         }
     }
 
+    private void copyLinuxFiles() {
+        if (sourceNativeDir("linux").exists()) {
+            File srcDir = new File(targetLinuxDir(), path("src", "main", "c"));
+            File resDir = new File(targetLinuxDir(), path("src", "main", "resources"));
+            {
+                Copy copy = (Copy) antProject().createTask("copy");
+                copy.setTodir(srcDir);
+
+                FileSet files = new FileSet();
+                files.setProject(antProject());
+                files.setDir(sourceNativeDir("linux"));
+                files.setIncludes("**/*.c, *.c, **/*.h, *.h");
+                copy.addFileset(files);
+
+                copy.execute();
+            }
+
+            {
+                Copy copy = (Copy) antProject().createTask("copy");
+                copy.setTodir(resDir);
+
+                FileSet files = new FileSet();
+                files.setProject(antProject());
+                files.setDir(sourceNativeDir("linux"));
+                files.setExcludes("**/*.c, *.c, **/*.h, *.h");
+                copy.addFileset(files);
+
+                copy.execute();
+            }
+
+        }
+    }
+
     private File sourceCSSDir() {
         return new File(sourceProject, "css");
     }
@@ -450,6 +487,7 @@ public class GenerateCn1libProjectMojo extends AbstractMojo {
             copyIosFiles();
             copyJavascriptFiles();
             copyWinFiles();
+            copyLinuxFiles();
             copyJavaseFiles();
             copyCSSFiles();
 

@@ -153,6 +153,10 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         return new File(targetProjectDir(), "win");
     }
 
+    private File targetLinuxDir() {
+        return new File(targetProjectDir(), "linux");
+    }
+
     private File targetSrcDir() {
         return new File(targetCommonDir(), "src");
     }
@@ -395,6 +399,39 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 // port is retired, so never carry .cs sources over into the
                 // migrated project (not even as stray resources).
                 files.setExcludes("**/*.c, *.c, **/*.h, *.h, **/*.cs, *.cs");
+                copy.addFileset(files);
+
+                copy.execute();
+            }
+
+        }
+    }
+
+    private void copyLinuxFiles() {
+        if (sourceNativeDir("linux").exists()) {
+            File srcDir = new File(targetLinuxDir(), path("src", "main", "c"));
+            File resDir = new File(targetLinuxDir(), path("src", "main", "resources"));
+            {
+                Copy copy = (Copy) antProject().createTask("copy");
+                copy.setTodir(srcDir);
+                copy.setOverwrite(true);
+                FileSet files = new FileSet();
+                files.setProject(antProject());
+                files.setDir(sourceNativeDir("linux"));
+                files.setIncludes("**/*.c, *.c, **/*.h, *.h");
+                copy.addFileset(files);
+
+                copy.execute();
+            }
+
+            {
+                Copy copy = (Copy) antProject().createTask("copy");
+                copy.setTodir(resDir);
+                copy.setOverwrite(true);
+                FileSet files = new FileSet();
+                files.setProject(antProject());
+                files.setDir(sourceNativeDir("linux"));
+                files.setExcludes("**/*.c, *.c, **/*.h, *.h");
                 copy.addFileset(files);
 
                 copy.execute();
@@ -897,6 +934,7 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 copyIosFiles();
                 copyJavascriptFiles();
                 copyWinFiles();
+                copyLinuxFiles();
                 copyJavaseFiles();
                 copyCSSFiles();
                 copyCn1libs();

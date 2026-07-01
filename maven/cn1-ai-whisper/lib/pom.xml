@@ -75,5 +75,31 @@
                 </dependency>
             </dependencies>
         </profile>
+        <profile>
+            <id>linux</id>
+            <activation>
+                <property><name>codename1.platform</name><value>linux</value></property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-ai-whisper-linux</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>win</id>
+            <activation>
+                <property><name>codename1.platform</name><value>win</value></property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-ai-whisper-win</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
     </profiles>
 </project>
