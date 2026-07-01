@@ -58,7 +58,11 @@ jobs:
             -am install \
             -Plocal-dev-javase \
             -DskipTests \
-            -Dmaven.javadoc.skip=true
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.source.skip=true \
+            -Dspotbugs.skip=true \
+            -Dpmd.skip=true \
+            -Dcheckstyle.skip=true
 
       - name: Build Codename One demos
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
