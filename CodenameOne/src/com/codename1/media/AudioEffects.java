@@ -69,8 +69,8 @@ public final class AudioEffects {
         validatePeak(targetPeak);
         float[] pcm = copySamples(source);
         float peak = 0.0f;
-        for (int i = 0; i < pcm.length; i++) {
-            peak = Math.max(peak, Math.abs(pcm[i]));
+        for (float sample : pcm) {
+            peak = Math.max(peak, Math.abs(sample));
         }
         if (peak == 0.0f || peak == targetPeak) {
             return buffer(source.getSampleRate(), source.getNumChannels(), pcm);
