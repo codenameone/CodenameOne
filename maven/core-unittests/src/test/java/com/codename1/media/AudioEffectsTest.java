@@ -47,12 +47,17 @@ class AudioEffectsTest extends UITestBase {
         });
 
         AudioBuffer removed = AudioEffects.removeCenter(source);
+        AudioBuffer isolated = AudioEffects.isolateCenter(source);
         AudioBuffer enhanced = AudioEffects.midSide(source, 1.5f, 0.5f);
 
         assertSamples(new float[]{
                 0.0f, 0.0f,
                 0.25f, -0.25f
         }, removed);
+        assertSamples(new float[]{
+                0.8f, 0.8f,
+                0.5f, 0.5f
+        }, isolated);
         assertSamples(new float[]{
                 1.0f, 1.0f,
                 0.875f, 0.625f

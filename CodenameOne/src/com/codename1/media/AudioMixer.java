@@ -22,6 +22,8 @@
  */
 package com.codename1.media;
 
+import com.codename1.util.Simd;
+
 import java.util.ArrayList;
 
 /// Mixes multiple PCM tracks into a single `AudioBuffer`.
@@ -45,6 +47,7 @@ public class AudioMixer {
     private final ArrayList<Track> tracks = new ArrayList<Track>();
     private final int sampleRate;
     private final int numChannels;
+    private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
 
     /// Creates a new mixer locked to a single sample clock.
     ///
@@ -61,6 +64,33 @@ public class AudioMixer {
         }
         this.sampleRate = sampleRate;
         this.numChannels = numChannels;
+    }
+
+    /// Indicates whether the mixer should use SIMD-backed kernels when the
+    /// current platform supports them.
+    ///
+    /// #### Returns
+    ///
+    /// true when SIMD optimizations are enabled.
+    public static boolean isSimdOptimizationsEnabled() {
+        return simdOptimizationsEnabled;
+    }
+
+    /// Enables or disables SIMD-backed mixer optimizations.
+    ///
+    /// This only affects internal implementation choices; mixed samples and
+    /// clipping semantics are unchanged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to use SIMD where supported, false to force scalar loops.
+    public static void setSimdOptimizationsEnabled(boolean enabled) {
+        simdOptimizationsEnabled = enabled;
+    }
+
+    /// Restores the default SIMD optimization setting for this platform.
+    public static void resetSimdOptimizationsEnabled() {
+        simdOptimizationsEnabled = Simd.get().isSupported();
     }
 
     /// Gets the sample rate used by this mixer.
@@ -210,7 +240,7 @@ public class AudioMixer {
         if (offsetFrame + frameCount > Integer.MAX_VALUE / numChannels) {
             throw new IllegalArgumentException("Track output is too large for this mixer");
         }
-        float[] pcm = new float[len];
+        float[] pcm = allocFloat(len);
         System.arraycopy(pcmData, offset, pcm, 0, len);
         tracks.add(new Track(pcm, offsetFrame, frameCount, gain));
         return this;
@@ -248,19 +278,34 @@ public class AudioMixer {
     /// a new `AudioBuffer` containing the mixed PCM timeline.
     public AudioBuffer mix() {
         int outputSize = getOutputSize();
-        float[] output = new float[outputSize];
+        float[] output = allocFloat(outputSize);
         for (Track track : tracks) {
             int destOffset = track.offsetFrame * numChannels;
             for (int i = 0; i < track.pcm.length; i++) {
                 output[destOffset + i] += track.pcm[i] * track.gain;
             }
         }
-        for (int i = 0; i < output.length; i++) {
-            output[i] = clamp(output[i]);
+        if (shouldUseSimd(output.length)) {
+            Simd.get().clamp(output, output, -1.0f, 1.0f, 0, output.length);
+        } else {
+            for (int i = 0; i < output.length; i++) {
+                output[i] = clamp(output[i]);
+            }
         }
         AudioBuffer out = new AudioBuffer(output.length);
         out.copyFrom(sampleRate, numChannels, output);
         return out;
+    }
+
+    private static float[] allocFloat(int size) {
+        if (size >= 16) {
+            return Simd.get().allocFloat(size);
+        }
+        return new float[size];
+    }
+
+    private static boolean shouldUseSimd(int size) {
+        return simdOptimizationsEnabled && Simd.get().isSupported() && size >= 16;
     }
 
     private int framesFromMilliseconds(long offsetMs) {

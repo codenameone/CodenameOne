@@ -59,6 +59,8 @@ include::css.asciidoc[]
 
 include::The-Components-Of-Codename-One.asciidoc[]
 
+include::Media-And-Audio.asciidoc[]
+
 include::Animations.asciidoc[]
 
 include::The-EDT---Event-Dispatch-Thread.asciidoc[]
@@ -173,4 +175,3 @@ include::Maven-Appendix-Rich-Properties.adoc[]
 = Historical reference
 
 include::Working-with-UWP.asciidoc[]
-

@@ -22,6 +22,8 @@
  */
 package com.codename1.media;
 
+import com.codename1.util.Simd;
+
 /// Small PCM effects that operate on `AudioBuffer` data.
 ///
 /// The methods in this class are platform-neutral and work on interleaved
@@ -30,8 +32,37 @@ package com.codename1.media;
 public final class AudioEffects {
     private static final float DEFAULT_LOW_CUTOFF_HZ = 250.0f;
     private static final float DEFAULT_HIGH_CUTOFF_HZ = 4000.0f;
+    private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
 
     private AudioEffects() {
+    }
+
+    /// Indicates whether `AudioEffects` should use SIMD-backed kernels when
+    /// the current platform supports them. Scalar fallbacks are always used for
+    /// effects whose stateful filters don't map to the current SIMD API.
+    ///
+    /// #### Returns
+    ///
+    /// true when SIMD optimizations are enabled.
+    public static boolean isSimdOptimizationsEnabled() {
+        return simdOptimizationsEnabled;
+    }
+
+    /// Enables or disables SIMD-backed `AudioEffects` optimizations.
+    ///
+    /// This only changes internal implementation choices. It doesn't change
+    /// output format or API behavior.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to use SIMD where supported, false to force scalar loops.
+    public static void setSimdOptimizationsEnabled(boolean enabled) {
+        simdOptimizationsEnabled = enabled;
+    }
+
+    /// Restores the default SIMD optimization setting for this platform.
+    public static void resetSimdOptimizationsEnabled() {
+        simdOptimizationsEnabled = Simd.get().isSupported();
     }
 
     /// Applies gain to a PCM buffer.
@@ -48,9 +79,7 @@ public final class AudioEffects {
         validateBuffer(source);
         validateFinite(gain, "gain");
         float[] pcm = copySamples(source);
-        for (int i = 0; i < pcm.length; i++) {
-            pcm[i] = clamp(pcm[i] * gain);
-        }
+        applyGainInPlace(pcm, gain);
         return buffer(source.getSampleRate(), source.getNumChannels(), pcm);
     }
 
@@ -76,9 +105,7 @@ public final class AudioEffects {
             return buffer(source.getSampleRate(), source.getNumChannels(), pcm);
         }
         float gain = targetPeak / peak;
-        for (int i = 0; i < pcm.length; i++) {
-            pcm[i] = clamp(pcm[i] * gain);
-        }
+        applyGainInPlace(pcm, gain);
         return buffer(source.getSampleRate(), source.getNumChannels(), pcm);
     }
 
@@ -165,6 +192,24 @@ public final class AudioEffects {
         return midSide(source, 0.0f, 1.0f);
     }
 
+    /// Isolates center-panned content in a stereo buffer.
+    ///
+    /// This can be useful for centered dialog or vocals, but it isn't true
+    /// speech separation. It preserves only content common to the left and
+    /// right channels, so it requires a stereo source where the target content
+    /// is actually centered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: A stereo source buffer.
+    ///
+    /// #### Returns
+    ///
+    /// a new stereo buffer containing the center component.
+    public static AudioBuffer isolateCenter(AudioBuffer source) {
+        return midSide(source, 1.0f, 0.0f);
+    }
+
     /// Applies mid/side processing to a stereo buffer.
     ///
     /// Use a larger `midGain` and smaller `sideGain` for simple voice/dialog
@@ -200,9 +245,37 @@ public final class AudioEffects {
     }
 
     private static float[] copySamples(AudioBuffer source) {
-        float[] pcm = new float[source.getSize()];
+        float[] pcm = allocFloat(source.getSize());
         source.copyTo(pcm);
         return pcm;
+    }
+
+    private static float[] allocFloat(int size) {
+        if (size >= 16) {
+            return Simd.get().allocFloat(size);
+        }
+        return new float[size];
+    }
+
+    private static boolean shouldUseSimd(int size) {
+        return simdOptimizationsEnabled && Simd.get().isSupported() && size >= 16;
+    }
+
+    private static void applyGainInPlace(float[] pcm, float gain) {
+        if (shouldUseSimd(pcm.length)) {
+            Simd simd = Simd.get();
+            float[] gains = simd.allocFloat(pcm.length);
+            float[] multiplied = simd.allocFloat(pcm.length);
+            for (int i = 0; i < gains.length; i++) {
+                gains[i] = gain;
+            }
+            simd.mul(pcm, gains, multiplied, 0, pcm.length);
+            simd.clamp(multiplied, pcm, -1.0f, 1.0f, 0, pcm.length);
+            return;
+        }
+        for (int i = 0; i < pcm.length; i++) {
+            pcm[i] = clamp(pcm[i] * gain);
+        }
     }
 
     private static AudioBuffer buffer(int sampleRate, int channels, float[] pcm) {

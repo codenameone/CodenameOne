@@ -104,6 +104,12 @@ public class AudioMixerApiTest extends BaseTest {
                         0.75f, 0.25f
                 })),
                 "center removed PCM");
+        assertSamples(new float[]{0.8f, 0.8f, 0.5f, 0.5f},
+                AudioEffects.isolateCenter(buffer(44100, 2, new float[]{
+                        0.8f, 0.8f,
+                        0.75f, 0.25f
+                })),
+                "center isolated PCM");
 
         assertThrows(new Runnable() {
             @Override
