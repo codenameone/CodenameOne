@@ -160,20 +160,7 @@ accent-bearing UIID at once:
 
 [source,css]
 ----
-#Constants {
-    includeNativeBool: true;
-    darkModeBool: true;
-}
-
-/* Touch the four UIIDs that paint with primary / primary-container.
-   The role-as-rule pattern keeps brand changes localised. */
-Button { background-color: #00796b; }
-Button.pressed { background-color: #4db6ac; color: #00251a; }
-RaisedButton { background-color: #b2dfdb; color: #00251a; }
-RaisedButton.pressed { background-color: #80cbc4; }
-SelectedTab { color: #00796b; }
-BackCommand { color: #00796b; }
-TitleCommand { color: #00796b; }
+include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-001,indent=0]
 ----
 
 === iOS modern color palette
@@ -338,29 +325,7 @@ runtime overrides:
 
 [source,css]
 ----
-#Constants {
-    includeNativeBool: true;
-    darkModeBool: true;
-
-    /* Override the native theme's accent palette. The compiler picks
-       up these declarations from #Constants and exports them as
-       @accent-color / @accent-color-dark theme constants so every
-       UIID bound to var(--accent-color) in the parent native theme
-       picks them up at app launch - no per-UIID rule edit needed. */
-    --accent-color: #ff2d95;
-    --accent-color-dark: #ff2d95;
-    --accent-pressed-color: #c71a75;
-    --accent-pressed-color-dark: #c71a75;
-    --accent-on-color: #ffffff;
-
-    /* Material 3 RaisedButton uses a separate "container" tonal
-       pair; iOS ignores these (no bindings reference them) so it's
-       safe to set them unconditionally. */
-    --accent-container-color: #ff2d95;
-    --accent-container-color-dark: #ff2d95;
-    --accent-on-container-color: #ffffff;
-    --accent-on-container-color-dark: #ffffff;
-}
+include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-002,indent=0]
 ----
 
 Bindings that reference a constant you didn't override stay at
@@ -375,18 +340,7 @@ A/B tests - push the same constants through
 
 [source,java]
 ----
-Hashtable override = new Hashtable();
-override.put("@accent-color", "ff2d95");
-override.put("@accent-color-dark", "ff2d95");
-override.put("@accent-pressed-color", "c71a75");
-override.put("@accent-pressed-color-dark", "c71a75");
-override.put("@accent-on-color", "ffffff");
-override.put("@accent-container-color", "ff2d95");
-override.put("@accent-container-color-dark", "ff2d95");
-override.put("@accent-on-container-color", "ffffff");
-override.put("@accent-on-container-color-dark", "ffffff");
-UIManager.getInstance().addThemeProps(override);
-Form.getCurrentForm().refreshTheme();
+include::../demos/common/src/main/snippets/developer-guide/native-themes.java[tag=native-themes-java-001,indent=0]
 ----
 
 Values can be passed with or without the leading `#` and in any
@@ -544,21 +498,7 @@ Your app's `theme.css` inherits from the installed native theme:
 
 [source,css]
 ----
-#Constants {
-    includeNativeBool: true;
-    darkModeBool: true;
-}
-
-/* Tweak only what's different. Everything you do not redeclare
-   keeps coming from the native theme. */
-RaisedButton { background-color: #d81b60; }
-RaisedButton.pressed { background-color: #b71c5c; }
-RaisedButton.disabled { background-color: #ffd6e2; color: #ffffff; }
-
-@media (prefers-color-scheme: dark) {
-    RaisedButton { background-color: #ff80ab; color: #4a0026; }
-    RaisedButton.pressed { background-color: #f06292; }
-}
+include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-003,indent=0]
 ----
 
 The user's CSS is layered on top of the native theme at app launch,
@@ -580,14 +520,7 @@ theme's UIIDs and refine it:
 
 [source,css]
 ----
-DangerButton {
-    cn1-derive: RaisedButton;
-    background-color: #d32f2f;
-}
-DangerButton.pressed {
-    cn1-derive: RaisedButton;
-    background-color: #b71c1c;
-}
+include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-004,indent=0]
 ----
 
 `cn1-derive` works best when the relationship is *child refines

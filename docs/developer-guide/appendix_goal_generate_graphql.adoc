@@ -24,10 +24,7 @@ as `@Mapped` mappers and `@GrpcClient` clients).
 
 [source, bash]
 ----
-mvn -pl common cn1:generate-graphql \
-    -Dcn1.graphql.schema=schema.graphqls \
-    -Dcn1.graphql.operations=operations.graphql \
-    -Dcn1.graphql.basePackage=com.example.starwars
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-graphql.sh[tag=appendix-goal-generate-graphql-bash-001,indent=0]
 ----
 
 Configuration:
@@ -118,28 +115,7 @@ The `@GraphQLClient` interface looks like:
 
 [source, java]
 ----
-@GraphQLClient("https://api.example.com/graphql")
-public interface StarWarsApi {
-
-    @Query("query HeroName($episode: Episode) { hero(episode: $episode) { name } }")
-    void heroName(@Var("episode") Episode episode,
-                  @Header("Authorization") String bearerToken,
-                  OnComplete<GraphQLResponse<HeroNameData>> callback);
-
-    @Mutation("mutation AddReview($ep: Episode!, $review: ReviewInput!) { createReview(episode: $ep, review: $review) { stars } }")
-    void addReview(@Var("ep") Episode ep, @Var("review") ReviewInput review,
-                   @Header("Authorization") String bearerToken,
-                   OnComplete<GraphQLResponse<AddReviewData>> callback);
-
-    @Subscription("subscription OnReview($ep: Episode!) { reviewAdded(episode: $ep) { stars } }")
-    GraphQLSubscription onReview(@Var("ep") Episode ep,
-                                 @Header("Authorization") String bearerToken,
-                                 GraphQLSubscription.Handler<OnReviewData> handler);
-
-    static StarWarsApi of(String endpoint) {
-        return GraphQLClients.create(StarWarsApi.class, endpoint);
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-graphql.java[tag=appendix-goal-generate-graphql-java-001,indent=0]
 ----
 
 Call sites use the static factory.  Queries and mutations report through
@@ -147,14 +123,7 @@ an `OnComplete<GraphQLResponse<T>>`:
 
 [source, java]
 ----
-StarWarsApi api = StarWarsApi.of("https://api.example.com/graphql");
-api.heroName(Episode.JEDI, "Bearer " + token, response -> {
-    if (response.isOk()) {
-        renderHero(response.getData().hero().name());
-    } else {
-        showError(response.getResponseErrorMessage());
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-graphql.java[tag=appendix-goal-generate-graphql-java-002,indent=0]
 ----
 
 A subscription returns a `GraphQLSubscription` handle whose `cancel()`
@@ -162,18 +131,7 @@ ends the stream:
 
 [source, java]
 ----
-GraphQLSubscription sub = api.onReview(Episode.EMPIRE, "Bearer " + token,
-        new GraphQLSubscription.Handler<OnReviewData>() {
-            public void onNext(GraphQLResponse<OnReviewData> r) {
-                addReview(r.getData().reviewAdded().stars());
-            }
-            public void onError(GraphQLResponse<OnReviewData> r) {
-                showError(r.getResponseErrorMessage());
-            }
-            public void onComplete() { }
-        });
-// later:
-sub.cancel();
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-graphql.java[tag=appendix-goal-generate-graphql-java-003,indent=0]
 ----
 
 The `<Name>Impl` class that performs the request lives in

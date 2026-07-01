@@ -8,7 +8,7 @@ NOTE: If your project is using CSS it may not have a theme.res file, thus this g
 
 [source,bash]
 ----
-mvn cn1:designer
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-designer.sh[tag=appendix-goal-designer-bash-001,indent=0]
 ----
 
 This will open the Codename One designer.

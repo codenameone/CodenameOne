@@ -42,7 +42,7 @@ archetype generated:
 
 [source,properties]
 ----
-codename1.arg.android.onDeviceDebug=true
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.properties[tag=on-device-debugging-android-properties-001,indent=0]
 ----
 
 This flips the generated `AndroidManifest.xml` to
@@ -116,14 +116,13 @@ the real Android runtime.
 +
 [source,bash]
 ----
-adb pair 192.168.1.42:37051
-# When prompted, enter the 6-digit code shown on the device.
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.sh[tag=on-device-debugging-android-bash-001,indent=0]
 ----
 . Connect:
 +
 [source,bash]
 ----
-adb connect 192.168.1.42:5555
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.sh[tag=on-device-debugging-android-bash-002,indent=0]
 ----
 +
 The connect port is *not* the pairing port — it's the one shown on
@@ -133,8 +132,7 @@ the *Wireless debugging* screen above the *Pair device* button.
 +
 [source,bash]
 ----
-mvn cn1:android-on-device-debugging \
-    -Dcn1.android.onDeviceDebug.wireless=192.168.1.42:5555
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.sh[tag=on-device-debugging-android-bash-003,indent=0]
 ----
 
 ==== Android 10 and older
@@ -145,8 +143,7 @@ mvn cn1:android-on-device-debugging \
 +
 [source,bash]
 ----
-adb tcpip 5555
-adb connect 192.168.1.42:5555
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.sh[tag=on-device-debugging-android-bash-004,indent=0]
 ----
 . Unplug the cable, then run the debug session as normal.
 
@@ -159,19 +156,14 @@ Without the IntelliJ run configs, the same flow is two terminals:
 
 [source,bash]
 ----
-# Terminal 1 — build the APK once
-mvn cn1:buildAndroidOnDeviceDebug
-
-# Terminal 2 — install, launch, forward JDWP, tail logcat
-mvn cn1:android-on-device-debugging
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.sh[tag=on-device-debugging-android-bash-005,indent=0]
 ----
 
 Attach jdb (or another JDWP client) to the forwarded port:
 
 [source,bash]
 ----
-jdb -attach localhost:5005 \
-    -sourcepath src/main/java:$HOME/.m2/repository/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT-sources.jar
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.sh[tag=on-device-debugging-android-bash-006,indent=0]
 ----
 
 For VS Code (Debugger for Java extension), add a launch

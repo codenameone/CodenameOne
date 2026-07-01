@@ -22,38 +22,7 @@ Enabling push support in your application is a matter of implementing the `PushC
 
 [source,java]
 ----
-public class MyApplication implements PushCallback {
-
-    // ....
-
-    /**
-     * Invoked when the push notification occurs
-     *
-     * @param value the value of the push notification
-     */
-    public void push(String value) {
-        System.out.println("Received push message: "+value);
-    }
-
-    /**
-     * Invoked when push registration is complete to pass the device ID to the application.
-     *
-     * @param deviceId OS native push ID you should not use this value and instead use <code>Push.getPushKey()</code>
-     * @see Push#getPushKey()
-     */
-    public void registeredForPush(String deviceId) {
-        System.out.println("The Push ID for this device is "+Push.getPushKey());
-    }
-
-    /**
-     * Invoked to indicate an error occurred during registration for push notification
-     * @param error descriptive error string
-     * @param errorCode an error code
-     */
-    public void pushRegistrationError(String error, int errorCode) {
-        System.out.println("An error occurred during push registration.");
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-001,indent=0]
 ----
 
 
@@ -104,20 +73,7 @@ Example:
 
 [source,java]
 ----
-public void push(String message) {
-    if (isAudioMessage(message)) {
-        // Play audio asynchronously
-        playAudio(message, new Runnable() {
-            public void run() {
-                // Audio finished playing
-                Display.getInstance().notifyPushCompletion();
-            }
-        });
-    } else {
-        // For standard messages, we can notify immediately or let it timeout (safest to notify)
-        Display.getInstance().notifyPushCompletion();
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-002,indent=0]
 ----
 
 **How it works:**
@@ -150,9 +106,7 @@ Assuming your `push()` method looks like:
 
 [source,java]
 ----
-public void push(String value) {
-    System.out.println("Received push message: "+value);
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-003,indent=0]
 ----
 
 You should see the following output in your console:
@@ -328,19 +282,14 @@ The message body should be an XML string. A minimal example of a push type 99 th
 
 [source,xml]
 ----
-<push type="1" body="Hello World"><img src="https://exmaple.com/myimage.jpg"/></push>
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.xml[tag=push-notifications-xml-001,indent=0]
 ----
 
 To avoid hand-coding this XML you can use the `com.codename1.push.PushBuilder` helper which assembles the payload for you and returns the correct push type to send:
 
 [source,java]
 ----
-PushBuilder builder = new PushBuilder()
-        .type(1)
-        .body("Hello World")
-        .imageUrl("https://example.com/myimage.jpg");
-String payload = builder.build();
-int pushType = builder.getType(); // Will be 99 when image/category metadata is present
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-004,indent=0]
 ----
 
 You can then send `payload` as the message body with `pushType` as the type through the REST API, the `Push` helper, or any of the other examples below.
@@ -364,17 +313,7 @@ You can access more information about the push content using the `com.codename1.
 
 [source,java]
 ----
-public void push(String message) {
-    PushContent content = PushContent.get();
-    if (content != null) {
-        String title = content.getTitle();
-        String body = content.getBody();
-        String hiddenMeta = content.getMetaData();
-        String imageUrl = content.getImageUrl();
-        String replyText = content.getTextResponse();
-        // Use these values (title/body/hiddenMeta/imageUrl/replyText) as needed in your application logic.
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-005,indent=0]
 ----
 
 WARNING: Make sure to call `PushContent.get()` *once* inside your `push()` callback, and store the return value. `PushContent.get()` works like a queue of size=1, and it pops off the item from the front of the queue when it's called. If you call it twice, the second time will return `null`.
@@ -399,28 +338,7 @@ For example:
 
 [source,java]
 ----
-import com.codename1.push.PushAction;
-import com.codename1.push.PushActionCategory;
-import com.codename1.push.PushActionsProvider;
-...
-
-public class MyApplication implements PushCallback, PushActionsProvider {
-
-    ...
-
-    @Override
-    public PushActionCategory[] getPushActionCategories() {
-        return new PushActionCategory[]{
-            new PushActionCategory("invite", new PushAction[]{
-                new PushAction("yes," "Yes"),
-                new PushAction("no," "No"),
-                new PushAction("maybe," "Maybe"),
-                new PushAction("reply", "Reply", null, "Type your response...", "Send")
-            })
-
-        };
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-006,indent=0]
 ----
 
 In the above example, you create a single category, "invite" that has actions "yes," "no," "maybe," and a "reply" action that prompts the user for text input. A text-input action is enabled by providing either a placeholder, button text, or both when constructing the `PushAction`.
@@ -431,7 +349,7 @@ Now you can test your new category. In the push simulator, you can select Push T
 
 [source,xml]
 ----
-<push type="1" body="Would you like to come to a party?" category="invite"/>
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.xml[tag=push-notifications-xml-002,indent=0]
 ----
 
 .Push notification with "invite" category on the simulator will show dialog with buttons to select between the actions defined in the "invite" category.
@@ -454,21 +372,7 @@ For example:
 
 [source,java]
 ----
-public void push(String message) {
-    PushContent content = PushContent.get();
-    if (content != null) {
-        if ("invite".equals(content.getCategory())) {
-            if (content.getActionId() != null) {
-                System.out.println("The user selected the "+content.getActionId()+" action");
-                if (content.getTextResponse() != null) {
-                    System.out.println("They replied: "+content.getTextResponse());
-                }
-            } else {
-                System.out.println("The user clicked on the invite notification, but didn't select an action.");
-            }
-        }
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-007,indent=0]
 ----
 
 === Deploying Push-Enabled apps to device
@@ -625,7 +529,7 @@ You can send a push message in many ways for example: from another device or any
 
 [source,java]
 -----
-private static final String PUSH_TOKEN = "********-****-****-****-*************";
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-008,indent=0]
 -----
 
 The push token is a unique "key" that you can use to send push through your Codename One account. It allows you to send push messages without placing your Codename One email or password into your source files.
@@ -641,7 +545,7 @@ The instructions for extracting the API key for Google are <<push-bureaucracy-an
 
 [source,java]
 -----
-private static final String FCM_SERVER_API_KEY = "******************-********************";
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-009,indent=0]
 -----
 
 Historical UWP push credentials (SID/client secret) were used by the discontinued UWP target, which was removed in release 7.0.229.
@@ -655,7 +559,7 @@ This allows you to debug the push related functionality without risking the poss
 
 [source,java]
 -----
-private static final boolean ITUNES_PRODUCTION_PUSH = false;
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-010,indent=0]
 -----
 
 iOS needs a certificate to send a push, this allows you to prove to Apples push servers that you're who you claim to be (the author of the app).
@@ -666,10 +570,7 @@ You can get these two certificates (for development/App Store) through the certi
 
 [source,java]
 -----
-private static final String ITUNES_PRODUCTION_PUSH_CERT = "https://domain.com/linkToP12Prod.p12";
-private static final String ITUNES_PRODUCTION_PUSH_CERT_PASSWORD = "ProdPassword";
-private static final String ITUNES_DEVELOPMENT_PUSH_CERT = "https://domain.com/linkToP12Dev.p12";
-private static final String ITUNES_DEVELOPMENT_PUSH_CERT_PASSWORD = "DevPassword";
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-011,indent=0]
 -----
 
 ==== Sending a push message from Codename One
@@ -682,34 +583,14 @@ To send a message to another device use:
 
 [source,java]
 -----
-String cert = ITUNES_DEVELOPMENT_PUSH_CERT;
-String pass = ITUNES_DEVELOPMENT_PUSH_CERT_PASSWORD;
-if(ITUNES_PRODUCTION_PUSH) {
- cert = ITUNES_PRODUCTION_PUSH_CERT;
- pass = ITUNES_PRODUCTION_PUSH_CERT_PASSWORD;
-}
-
-PushBuilder builder = new PushBuilder()
-.type(102)
-.badge(5)
-.title("Hello World")
-.body("you've 5 new tasks")
-.metaData("taskListId=123");
-
-new Push(PUSH_TOKEN, builder.build(), deviceKey)
-.pushType(builder.getType())
-.apnsAuth(cert, pass, ITUNES_PRODUCTION_PUSH)
-.gcmAuth(FCM_SERVER_API_KEY)
-.wnsAuth(WNS_SID, WNS_CLIENT_SECRET)
-.send();
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-012,indent=0]
 -----
 
 The "builder" style API used in the above sample was added post Codename One 3.6 to ease the addition of new Push services. If you're building against Codename one 3.6 or earlier, you should use the static `Push.sendPushMessage()` instead as shown below:
 
 [source,java]
 ----
-Push.sendPushMessage(PUSH_TOKEN, `Hello World`,
-         ITUNES_PRODUCTION_PUSH, FCM_SERVER_API_KEY, cert, pass, 1, deviceKey));
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-013,indent=0]
 ----
 
 This will send the push message "Hello World" to the device with the key `deviceKey`. The `1` argument represents the standard push message type, which you discussed <<push-message-types-section,earlier>>.
@@ -733,33 +614,7 @@ You can thus send a push from Java EE using code like this:
 
 [source,java]
 -----
-HttpURLConnection connection = (HttpURLConnection)new URL("https://push.codenameone.com/push/push").openConnection();
-connection.setDoOutput(true);
-connection.setRequestMethod("POST");
-connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
-String cert = ITUNES_DEVELOPMENT_PUSH_CERT;
-String pass = ITUNES_DEVELOPMENT_PUSH_CERT_PASSWORD;
-if(ITUNES_PRODUCTION_PUSH) {
- cert = ITUNES_PRODUCTION_PUSH_CERT;
- pass = ITUNES_PRODUCTION_PUSH_CERT_PASSWORD;
-}
-String query = "token=" + PUSH_TOKEN +
- "&device=" + URLEncoder.encode(deviceId1, "UTF-8") +
- "&device=" + URLEncoder.encode(deviceId2, "UTF-8") +
- "&device=" + URLEncoder.encode(deviceId3, "UTF-8") +
- "&type=1" +
- "&auth=" + URLEncoder.encode(FCM_SERVER_API_KEY, "UTF-8") +
- "&certPassword=" + URLEncoder.encode(pass, "UTF-8") +
- "&cert=" + URLEncoder.encode(cert, "UTF-8") +
- "&body=" + URLEncoder.encode(MESSAGE_BODY, "UTF-8") +
- "&production=" + ITUNES_PRODUCTION_PUSH +
- "&sid=" + URLEncoder.encode(WNS_SID, "UTF-8") +
- "&client_secret=" + URLEncoder.encode(WNS_CLIENT_SECRET, "UTF-8");
-try (OutputStream output = connection.getOutputStream()) {
- output.write(query.getBytes("UTF-8"));
-}
-int c = connection.getResponseCode();
-// read response JSON
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-014,indent=0]
 -----
 
 Notice that you can send a push to 500 devices. To send in larger batches you need to split the push requests into 500 device batches.
@@ -772,20 +627,14 @@ If there is an error that isn't fatal such as quota exceeded etc. You will get a
 
 [source,JavaScript]
 -----
-{"error":"Error message"}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-001,indent=0]
 -----
 
 A normal response, will be an array with results:
 
 [source,JavaScript]
 -----
-[
- {"id"="deviceId","status"="error","message"="Invalid Device ID"},
- {"id"="cn1-gcm-nativegcmkey","status"="updateId", "newId"="cn1-gcm-newgcmkey"},
- {"id"="cn1-gcm-okgcmkey","status"="OK"},
- {"id"="cn1-gcm-errorkey","status"="error","message"="Server error message"},
- {"id"="cn1-ios-iphonekey","status"="inactive"},
-]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-002,indent=0]
 -----
 
 

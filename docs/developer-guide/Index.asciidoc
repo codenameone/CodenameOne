@@ -222,15 +222,7 @@ To create a new Codename One project visit https://www.codenameone.com/initializ
 
 [source,bash]
 ----
-mvn archetype:generate \
-  -DarchetypeGroupId=com.codenameone \
-  -DarchetypeArtifactId=cn1app-archetype \
-  -DarchetypeVersion=LATEST \
-  -DgroupId=YOUR_GROUP_ID \
-  -DartifactId=YOUR_ARTIFACT_ID \
-  -Dversion=1.0-SNAPSHOT \
-  -DmainName=YOUR_MAIN_NAME \
-  -DinteractiveMode=false
+include::../demos/common/src/main/snippets/developer-guide/index.sh[tag=index-bash-001,indent=0]
 ----
 
 This command generates a project in the current directory. The folder name matches the `artifactId` value. For example, specifying `-DartifactId=myapp` produces a project inside a new `myapp` directory.
@@ -302,12 +294,7 @@ After clicking finish in the new project wizard you have a `HelloWorld` project 
 
 [source,java,title='HelloWorld Class']
 ----
-public class HelloWorld { // <1>
-    private Form current; // <2>
-    private Resources theme; // <3>
-
-    // ... class methods ...
-}
+include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-001,indent=0]
 ----
 
 <1> This is the main class, it's the entry point to the app, notice it doesn't have a `main` method but rather callback which this guide covers soon
@@ -320,22 +307,7 @@ Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecy
 
 [source,java,title='HelloWorld init(Object)']
 ----
-public void init(Object context) { // <1>
-    updateNetworkThreadCount(2); // <2>
-    theme = UIManager.initFirstTheme("/theme"); // <3>
-    Toolbar.setGlobalToolbar(true); // <4>
-    Log.bindCrashProtection(true); // <5>
-    addNetworkErrorListener(err -> { // <6>
-        err.consume(); // <7>
-        if(err.getError() != null) { // <8>
-            Log.e(err.getError());
-        }
-        Log.sendLogAsync(); // <9>
-        Dialog.show("Connection Error", // <10>
-            "There was a networking error in the connection to " +
-            err.getConnectionRequest().getUrl(), "OK", null);
-    });
-}
+include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-002,indent=0]
 ----
 
 <1> `init` is the first of the four lifecycle methods. It's responsible for initialization of variables and values
@@ -364,15 +336,7 @@ In a cold start `init(Object)` is invoked followed by the `start()` method. For 
 
 [source,java,title='HelloWorld start()']
 ----
-public void start() {
-    if(current != null){ // <1>
-        current.show(); // <2>
-        return;
-    }
-    Form hi = new Form("Hi World", BoxLayout.y()); // <3>
-    hi.add(new Label("Hi World")); // <4>
-    hi.show(); // <5>
-}
+include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-003,indent=0]
 ----
 
 <1> If the app was minimized you don't want to do much, show the last `Form` of the application
@@ -424,16 +388,7 @@ Now that you have a general sense of the lifecycle lets look at the last two lif
 
 [source,java,title='HelloWorld stop() and destroy()']
 ----
-public void stop() { // <1>
-    current = getCurrentForm(); // <2>
-    if(current instanceof Dialog) { // <3>
-        ((Dialog)current).dispose();
-        current = getCurrentForm();
-    }
-}
-
-public void destroy() { // <4>
-}
+include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-004,indent=0]
 ----
 
 <1> `stop()` is invoked when the app is minimized or a different app is opened
@@ -595,74 +550,14 @@ The hello world Java source file looks like this (removed some comments and whit
 
 [source,java]
 ----
-public class MyApplication {
-    private Form current;
-    private Resources theme;
-
-    public void init(Object context) {
-        theme = UIManager.initFirstTheme("/theme");
-        Toolbar.setGlobalToolbar(true);
-        Log.bindCrashProtection(true);
-    }
-
-    public void start() {
-        if(current != null){
-            current.show();
-            return;
-        }
-        Form hi = new Form("Hi World", BoxLayout.y());
-        hi.add(new Label("Hi World"));
-        hi.show();
-    }
-
-    public void stop() {
-        current = getCurrentForm();
-        if(current instanceof Dialog) {
-            ((Dialog)current).dispose();
-            current = getCurrentForm();
-        }
-    }
-
-    public void destroy() {
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-005,indent=0]
 ----
 
 When you select that file and select the menu option #Code# -> #Convert Java file to Kotlin File# you should get this:
 
 [source,kotlin]
 ----
-class MyApplication {
-    private var current: Form? = null
-    private var theme: Resources? = null
-
-    fun init(context: Any) {
-        theme = UIManager.initFirstTheme("/theme")
-        Toolbar.setGlobalToolbar(true)
-        Log.bindCrashProtection(true)
-    }
-
-    fun start() {
-        if (current != null) {
-            current!!.show()
-            return
-        }
-        val hi = Form("Hi World", BoxLayout.y())
-        hi.add(Label("Hi World"))
-        hi.show()
-    }
-
-    fun stop() {
-        current = getCurrentForm()
-        if (current is Dialog) {
-            (current as Dialog).dispose()
-            current = getCurrentForm()
-        }
-    }
-
-    fun destroy() {
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/index.kt[tag=index-kotlin-001,indent=0]
 ----
 
 That's pretty familiar. The problem is that there are two bugs in the automatic conversion... That's the code for Kotlin behaves differently from standard Java.
@@ -671,7 +566,7 @@ The first problem is that Kotlin classes are final unless declared otherwise so 
 
 [source,kotlin]
 ----
-open class MyApplication
+include::../demos/common/src/main/snippets/developer-guide/index.kt[tag=index-kotlin-002,indent=0]
 ----
 
 This is essential as the build server will fail with weird errors related to instanceof.
@@ -684,36 +579,7 @@ The full working sample is:
 
 [source,kotlin]
 ----
-open class MyApplication {
-    private var current: Form? = null
-    private var theme: Resources? = null
-    fun init(context: Any?) {
-        theme = UIManager.initFirstTheme("/theme")
-        Toolbar.setGlobalToolbar(true)
-        Log.bindCrashProtection(true)
-    }
-
-    fun start() {
-        if (current != null) {
-            current!!.show()
-            return
-        }
-        val hi = Form("Hi World", BoxLayout.y())
-        hi.add(Label("Hi World"))
-        hi.show()
-    }
-
-    fun stop() {
-        current = getCurrentForm()
-        if (current is Dialog) {
-            (current as Dialog).dispose()
-            current = getCurrentForm()
-        }
-    }
-
-    fun destroy() {
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/index.kt[tag=index-kotlin-003,indent=0]
 ----
 
 Once all that's in place Kotlin should work. This should be possible for more JVM languages in the future.

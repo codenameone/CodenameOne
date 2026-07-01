@@ -1,0 +1,13 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::basics-xml-001[]
+<?xml version="1.0" encoding="UTF-8"?>
+
+<component type="Form" layout="FlowLayout" flowLayoutFillRows="false" flowLayoutAlign="1"
+flowLayoutValign="0"  title="My new title" name="MyForm">
+  <component type="Button" text="Button" name="Button_1" actionEvent="true">
+  </component>
+  <component type="Label" text="Hi World" name="Label_1">
+  </component>
+</component>
+// end::basics-xml-001[]

@@ -27,29 +27,12 @@ The cn1app archetype generates a `common/pom.xml` and `javase/pom.xml` that alre
 
 [source,xml,title='common/pom.xml']
 ----
-<dependencies>
-    <dependency>
-        <groupId>com.codenameone</groupId>
-        <artifactId>codenameone-javase</artifactId>
-        <scope>test</scope>
-    </dependency>
-    <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter</artifactId>
-        <version>5.9.3</version>
-        <scope>test</scope>
-    </dependency>
-</dependencies>
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.xml[tag=testing-with-junit-xml-001,indent=0]
 ----
 
 [source,xml,title='javase/pom.xml']
 ----
-<dependency>
-    <groupId>org.junit.jupiter</groupId>
-    <artifactId>junit-jupiter</artifactId>
-    <version>5.9.3</version>
-    <scope>test</scope>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.xml[tag=testing-with-junit-xml-002,indent=0]
 ----
 
 Tests live in `common/src/test/java`. Surefire only runs from the `javase` module — the `common` module keeps Surefire skipped (`<skipTests>true</skipTests>`) to avoid running each test twice, since `javase/pom.xml` mounts the same sources via `<testSourceDirectory>${project.basedir}/../common/src/test/java</testSourceDirectory>`.
@@ -58,39 +41,14 @@ Tests live in `common/src/test/java`. Surefire only runs from the `javase` modul
 
 [source,java]
 ----
-package com.example.myapp;
-
-import com.codename1.testing.junit.CodenameOneTest;
-import com.codename1.testing.junit.RunOnEdt;
-import com.codename1.ui.CN;
-import com.codename1.ui.Display;
-import com.codename1.ui.Form;
-
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-@CodenameOneTest
-class GreetingFormTest {
-
-    @Test
-    @RunOnEdt
-    void formShowsExpectedTitle() {
-        new Form("Hello").show();
-        assertEquals("Hello", Display.getInstance().getCurrent().getTitle());
-        assertTrue(CN.isEdt(), "@RunOnEdt method runs on the Codename One EDT");
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-001,indent=0]
 ----
 
 Run with:
 
 [source,bash]
 ----
-mvn -pl javase test                                     # all JUnit + cn1:test
-mvn -pl javase test -Dtest=GreetingFormTest             # one class
-mvn -pl javase test -Dtest=GreetingFormTest#formShowsExpectedTitle   # one method
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.sh[tag=testing-with-junit-bash-001,indent=0]
 ----
 
 === `@CodenameOneTest`
@@ -108,17 +66,7 @@ Place on a method (or on the class for all tests) when the body mutates UI state
 
 [source,java]
 ----
-@Test
-@RunOnEdt                           // body runs on the EDT
-void canMutateUiSafely() {
-    Form f = new Form("X");
-    f.add(new com.codename1.ui.Button("Tap"));
-    f.show();                       // safe -- we are on the EDT
-}
-
-@Test
-@RunOnEdt(timeoutMillis = 60000)    // default 30s; override for slow form builds
-void slowFormBuild() { /* ... */ }
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-002,indent=0]
 ----
 
 Class-level `@RunOnEdt` also routes `@BeforeEach`/`@AfterEach` methods through the EDT. Method-level `@RunOnEdt` is scoped to that one `@Test`.
@@ -131,18 +79,7 @@ Set a property visible to the simulator before the test runs.
 
 [source,java]
 ----
-@Test
-@SimulatorProperty(name = "feature.flag", value = "on")
-void appReadsFlagFromDisplayProperty() {
-    assertEquals("on", Display.getInstance().getProperty("feature.flag", null));
-}
-
-@Test
-@SimulatorProperties({
-    @SimulatorProperty(name = "user.tier",   value = "pro"),
-    @SimulatorProperty(name = "user.region", value = "eu")
-})
-void multipleAppProperties() { /* ... */ }
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-003,indent=0]
 ----
 
 The `scope` field selects where the value lands:
@@ -170,12 +107,7 @@ Loads a base theme resource and installs it through `UIManager.setThemeProps`, t
 
 [source,java]
 ----
-@Test @Theme(nativeTheme = NativeTheme.IOS_MODERN)        void rendersUnderIosModern()    { /* ... */ }
-@Test @Theme(nativeTheme = NativeTheme.IOS_FLAT)          void rendersUnderIosFlat()      { /* ... */ }
-@Test @Theme(nativeTheme = NativeTheme.IPHONE_PRE_FLAT)   void rendersUnderClassicIos()   { /* ... */ }
-@Test @Theme(nativeTheme = NativeTheme.ANDROID_MATERIAL)  void rendersUnderAndroid()      { /* ... */ }
-@Test @Theme(nativeTheme = NativeTheme.ANDROID_HOLO_LIGHT) void rendersUnderHoloLight()   { /* ... */ }
-@Test @Theme(nativeTheme = NativeTheme.ANDROID_LEGACY)    void rendersUnderAndroidLegacy(){ /* ... */ }
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-004,indent=0]
 ----
 
 The enum carries the resource path (`NativeTheme.IOS_MODERN.resourcePath()` returns `/iOSModernTheme.res`) and the simulator-menu label (`displayName()`), so test reports can render the same name a user sees in the simulator UI.
@@ -184,7 +116,7 @@ The enum carries the resource path (`NativeTheme.IOS_MODERN.resourcePath()` retu
 
 [source,java]
 ----
-@Test @Theme("/MyAppTheme.res")  void rendersAppTheme()  { /* ... */ }
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-005,indent=0]
 ----
 
 If both `nativeTheme` and `value` are set, `nativeTheme` wins. If neither is set, the annotation is a no-op.
@@ -195,8 +127,7 @@ Toggles dark/light mode via `Display.setDarkMode(Boolean)` and refreshes the act
 
 [source,java]
 ----
-@Test @DarkMode                     void mainFormIsLegibleInDark()  { /* ... */ }
-@Test @DarkMode(enabled = false)    void mainFormIsLegibleInLight() { /* ... */ }
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-006,indent=0]
 ----
 
 === `@LargerText`
@@ -205,16 +136,7 @@ Sets the accessibility text-scale multiplier — the same knob exposed by the si
 
 [source,java]
 ----
-@CodenameOneTest
-@LargerText                 // class-level: every test at 1.3x (AX2)
-class AccessibilityTest {
-
-    @Test void buttonsStillFit() { /* ... */ }
-
-    @Test
-    @LargerText(scale = 2.0f)    // method-level override: AX5
-    void buttonsAtExtremeScale() { /* ... */ }
-}
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-007,indent=0]
 ----
 
 `scale = 1.0f` restores the default size; common values mirror the menu's `1.3f` / `1.6f` / `2.0f` presets.
@@ -225,12 +147,7 @@ Forces the simulator into portrait or landscape for the test.
 
 [source,java]
 ----
-@Test
-@Orientation(Orientation.Value.LANDSCAPE)
-void formStillFitsInLandscape() {
-    assertFalse(Display.getInstance().isPortrait());
-    // ... layout assertions ...
-}
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-008,indent=0]
 ----
 
 This calls a non-persisting setter on `JavaSEPort` and sets an explicit-portrait flag honored by `Display.isPortrait()` — so unit-test JVMs (where the canvas inherits the host window's full size and would otherwise read landscape on every wide screen) get the expected orientation back.
@@ -241,8 +158,7 @@ Flips the look-and-feel into right-to-left mode (Arabic, Hebrew) via `UIManager.
 
 [source,java]
 ----
-@Test @RTL                          void mirrorsCorrectly()    { /* ... */ }
-@Test @RTL(enabled = false)         void restoresLtrLayout()   { /* ... */ }
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-009,indent=0]
 ----
 
 === Annotation resolution
@@ -251,18 +167,7 @@ When the same annotation appears at both the class and the method level, *method
 
 [source,java]
 ----
-@CodenameOneTest
-@LargerText(scale = 1.3f)        // class default
-@DarkMode                         // class default
-class LayoutTest {
-
-    @Test
-    @LargerText(scale = 2.0f)     // overrides class -> 2.0x for this test
-    void extremeScale() { /* runs at 2.0x scale + dark mode */ }
-
-    @Test
-    void defaultScale() { /* runs at 1.3x scale + dark mode */ }
-}
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-010,indent=0]
 ----
 
 === EDT semantics
@@ -294,10 +199,7 @@ They don't trip over each other. `mvn install` runs Surefire during the `test` p
 
 [source,bash]
 ----
-mvn -pl javase test                            # both runners
-mvn -pl javase test -DskipTests                # skip Surefire, cn1:test still runs
-mvn -pl javase test -Dtest=NoMatch             # filter Surefire to nothing,
-                                               # cn1:test still runs
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.sh[tag=testing-with-junit-bash-002,indent=0]
 ----
 
 === Side-by-side example
@@ -307,37 +209,13 @@ The same "sign in, assert we land on Home" check, written both ways:
 .AbstractTest / `cn1:test`
 [source,java]
 ----
-public class LoginNavTest extends com.codename1.testing.AbstractTest {
-    @Override public boolean shouldExecuteOnEDT() { return true; }
-
-    @Override public boolean runTest() throws Exception {
-        new MyApp().runApp();
-        TestUtils.waitForFormTitle("Login");
-        TestUtils.setText("usernameField", "alice");
-        TestUtils.clickButtonByLabel("Sign In");
-        TestUtils.waitForFormTitle("Home");
-        return TestUtils.screenshotTest("home-screen");
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-011,indent=0]
 ----
 
 .JUnit 5 / Surefire
 [source,java]
 ----
-@CodenameOneTest
-class LoginNavTest {
-
-    @Test
-    @RunOnEdt
-    void signingInLandsOnHome() throws Exception {
-        new MyApp().runApp();
-        TestUtils.waitForFormTitle("Login");
-        TestUtils.setText("usernameField", "alice");
-        TestUtils.clickButtonByLabel("Sign In");
-        TestUtils.waitForFormTitle("Home");
-        assertTrue(TestUtils.screenshotTest("home-screen"), "home screenshot regressed");
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java[tag=testing-with-junit-java-012,indent=0]
 ----
 
 The UI driving (`TestUtils.*`) is identical -- `TestUtils` is independent of the runner. What changes is the lifecycle plumbing: `shouldExecuteOnEDT()` + `runTest() returns boolean` becomes `@RunOnEdt` + `@Test void` + a standard assertion library.

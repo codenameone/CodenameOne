@@ -18,14 +18,7 @@ The fastest way to know whether the user is on WiFi, what SSID they joined, and 
 
 [source,java]
 ----
-import com.codename1.io.wifi.WiFi;
-
-if (WiFi.isInfoSupported()) {
-    String ssid = WiFi.getCurrentSSID();   // e.g. "Codename One"
-    String bssid = WiFi.getBSSID();        // "aa:bb:cc:11:22:33"
-    String gw = WiFi.getGateway();         // "192.168.1.1"
-    String ip = WiFi.getIp();              // "192.168.1.42"
-}
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-001,indent=0]
 ----
 
 Any of these calls may return `null` if the device isn't on WiFi, if the user denied a runtime permission, or if the platform never exposed the value to apps. The framework normalizes the wrapping that Android adds to the SSID and treats `<unknown ssid>` and the obfuscated BSSID `02:00:00:00:00:00` as `null`.
@@ -58,18 +51,7 @@ Scanning returns an array of `WiFiNetwork`s sorted by signal strength. The callb
 
 [source,java]
 ----
-WiFi.scan(new WiFiScanCallback() {
-    @Override
-    public void onScanComplete(WiFiNetwork[] networks, Throwable error) {
-        if (error != null) {
-            Log.e(error);
-            return;
-        }
-        for (WiFiNetwork n : networks) {
-            // n.getSSID(), n.getBSSID(), n.getRssi(), n.getSecurity()
-        }
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-002,indent=0]
 ----
 
 [NOTE]
@@ -85,17 +67,7 @@ To associate the device with a specific SSID:
 
 [source,java]
 ----
-WiFi.connect("MyAccessPoint", "s3cret!", WiFiSecurity.WPA_PSK,
-        new WiFiConnectCallback() {
-    @Override
-    public void onConnectResult(boolean connected, Throwable error) {
-        if (!connected) {
-            Log.e(error);
-            return;
-        }
-        // ssid is now joined
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-003,indent=0]
 ----
 
 * On Android 10+ the OS shows a system confirmation dialog with the SSID before joining; this dialog can't be bypassed.
@@ -116,35 +88,14 @@ On iOS the build pipeline also enables the `NetworkExtension.framework` and the 
 
 [source,java]
 ----
-import com.codename1.io.bonjour.BonjourBrowser;
-import com.codename1.io.bonjour.BonjourService;
-import com.codename1.io.bonjour.BonjourServiceListener;
-
-BonjourBrowser browser = BonjourBrowser.browse("_http._tcp.",
-        new BonjourServiceListener() {
-    @Override
-    public void onServiceResolved(BonjourService s) {
-        Log.p("Found " + s.getName() + " at " + s.getHost() + ":" + s.getPort());
-    }
-    @Override
-    public void onServiceLost(BonjourService s) { /* ... */ }
-    @Override
-    public void onBrowseError(Throwable t) { Log.e(t); }
-});
-
-// when done:
-browser.stop();
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-004,indent=0]
 ----
 
 To advertise an HTTP server you wrote on port 8080:
 
 [source,java]
 ----
-BonjourPublisher pub = BonjourPublisher.publish(
-        "My Server", "_http._tcp.", 8080, null);
-
-// later:
-pub.unpublish();
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-005,indent=0]
 ----
 
 ==== iOS requirements
@@ -174,15 +125,7 @@ If `javax.jmdns.JmDNS` is on the simulator classpath, browse calls dispatch thro
 
 [source,xml]
 ----
-<!-- in YOUR app's pom, NOT in the framework / common pom that gets shipped
-     to the device. The cn1app archetype's executable-jar profile is the
-     right place because it only applies when launching the simulator. -->
-<dependency>
-    <groupId>org.jmdns</groupId>
-    <artifactId>jmdns</artifactId>
-    <version>3.5.9</version>
-    <scope>runtime</scope>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.xml[tag=network-connectivity-xml-001,indent=0]
 ----
 
 [WARNING]
@@ -196,28 +139,14 @@ Subscribe to network type transitions (`WiFi <-> Cellular <-> Ethernet <-> None`
 
 [source,java]
 ----
-import com.codename1.io.NetworkManager;
-import com.codename1.io.NetworkTypeListener;
-
-NetworkManager.getInstance().addNetworkTypeListener(new NetworkTypeListener() {
-    @Override
-    public void onNetworkTypeChanged(int oldType, int newType, boolean vpnActive) {
-        if (newType == NetworkManager.NETWORK_TYPE_NONE) {
-            // offline -- queue uploads for later
-        }
-        if (vpnActive) {
-            // refuse to roam to corporate-only resources
-        }
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-006,indent=0]
 ----
 
 The current snapshot is available without subscribing:
 
 [source,java]
 ----
-int type = NetworkManager.getInstance().getCurrentNetworkType();
-boolean vpn = NetworkManager.getInstance().isVPNActive();
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-007,indent=0]
 ----
 
 The platform implementations are:
@@ -234,34 +163,7 @@ WiFi Direct lets two devices form a peer-to-peer link without an access point. T
 
 [source,java]
 ----
-import com.codename1.io.wifi.WiFiDirect;
-import com.codename1.io.wifi.WiFiDirectListener;
-import com.codename1.io.wifi.WiFiDirectPeer;
-
-if (!WiFiDirect.isSupported()) {
-    return;
-}
-
-WiFiDirect.startDiscovery(new WiFiDirectListener() {
-    @Override
-    public void onPeersAvailable(WiFiDirectPeer[] peers) {
-        for (WiFiDirectPeer p : peers) {
-            // p.getDeviceName(), p.getDeviceAddress(), p.getState()
-        }
-    }
-    @Override
-    public void onDiscoveryError(Throwable error) { Log.e(error); }
-});
-
-// later, with the user's chosen peer:
-WiFiDirect.connect(peer, new WiFiConnectCallback() {
-    @Override
-    public void onConnectResult(boolean connected, Throwable error) { /* ... */ }
-});
-
-// when finished:
-WiFiDirect.disconnect();
-WiFiDirect.stopDiscovery();
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-008,indent=0]
 ----
 
 The build pipeline injects `CHANGE_WIFI_STATE`, `ACCESS_WIFI_STATE`, `ACCESS_NETWORK_STATE`, `ACCESS_FINE_LOCATION` and `NEARBY_WIFI_DEVICES` automatically when `WiFiDirect` is on the classpath, plus a `<uses-feature android:name="android.hardware.wifi.direct"/>` declaration so devices without the radio can still install the app via Play Store filtering.
@@ -272,34 +174,7 @@ The USB API in `com.codename1.io.usb` lets the device act as a USB host and talk
 
 [source,java]
 ----
-import com.codename1.io.usb.Usb;
-import com.codename1.io.usb.UsbDevice;
-import com.codename1.io.usb.UsbDeviceListener;
-
-if (!Usb.isSupported()) { return; }
-
-Usb.addDeviceListener(new UsbDeviceListener() {
-    @Override
-    public void onDeviceAttached(UsbDevice d) {
-        if (d.getVendorId() == 0x0403 && d.getProductId() == 0x6001) {
-            Usb.requestPermission(d);
-        }
-    }
-    @Override
-    public void onDeviceDetached(UsbDevice d) { }
-    @Override
-    public void onPermissionResult(UsbDevice d, boolean granted) {
-        if (granted) {
-            try (InputStream in = Usb.openInputStream(d, 0x81);
-                 OutputStream out = Usb.openOutputStream(d, 0x02)) {
-                out.write("AT\r\n".getBytes());
-                byte[] buf = new byte[64];
-                int n = in.read(buf);
-                // ...
-            } catch (IOException e) { Log.e(e); }
-        }
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-009,indent=0]
 ----
 
 The build pipeline injects:
@@ -310,10 +185,7 @@ If you want the OS to launch your app when a matching device is plugged in, ship
 
 [source,xml]
 ----
-<!-- native/android/res/xml/device_filter.xml -->
-<resources>
-    <usb-device vendor-id="1027" product-id="24577" />
-</resources>
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.xml[tag=network-connectivity-xml-002,indent=0]
 ----
 
 [source]

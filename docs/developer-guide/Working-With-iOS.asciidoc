@@ -92,17 +92,7 @@ Notifications can either be set up as one-time or as repeating.
 
 [source,java]
 -----
-LocalNotification n = new LocalNotification();
-n.setId("demo-notification");
-n.setAlertBody("it's time to take a break and look at me");
-n.setAlertTitle("Break Time!");
-n.setAlertSound("beep-01a.mp3");
-
-Display.getInstance().scheduleLocalNotification(
- n,
- System.currentTimeMillis() + 10 * 1000, // fire date/time
- LocalNotification.REPEAT_MINUTE // Whether to repeat and what frequency
-);
+include::../demos/common/src/main/snippets/developer-guide/working-with-ios.java[tag=working-with-ios-java-001,indent=0]
 -----
 
 NOTE: On iOS, scheduling a local notification with an `id` that already exists now replaces the earlier scheduled notification with that same `id` instead of keeping duplicates.
@@ -119,7 +109,7 @@ The API for receiving/handling local notifications is also like push. Your appli
 
 [source,java]
 -----
-public void localNotificationReceived(String notificationId)
+include::../demos/common/src/main/snippets/developer-guide/working-with-ios.java[tag=working-with-ios-java-002,indent=0]
 -----
 
 The `notificationId` parameter will match the `id` value of the notification as set using `LocalNotification.setId()`.
@@ -128,30 +118,7 @@ The `notificationId` parameter will match the `id` value of the notification as 
 
 [source,java]
 -----
-public class BackgroundLocationDemo implements LocalNotificationCallback {
- //...
-
- public void init(Object context) {
- //...
- }
-
- public void start() {
- //...
-
- }
-
- public void stop() {
- //...
- }
-
- public void destroy() {
- //...
- }
-
- public void localNotificationReceived(String notificationId) {
- System.out.println("Received local notification "+notificationId);
- }
-}
+include::../demos/common/src/main/snippets/developer-guide/working-with-ios.java[tag=working-with-ios-java-003,indent=0]
 -----
 
 NOTE: `localNotificationReceived()` is called when the user responds to the notification by tapping on the alert. If the user doesn't click on the notification, then this event handler will never be fired.
@@ -162,7 +129,7 @@ Repeating notifications will continue until they're canceled by the app. You can
 
 [source,java]
 -----
-Display.getInstance().cancelLocalNotification(notificationId);
+include::../demos/common/src/main/snippets/developer-guide/working-with-ios.java[tag=working-with-ios-java-004,indent=0]
 -----
 
 Where `notificationId` is the string id that was set for the notification using `LocalNotification.setId()`.
@@ -236,7 +203,7 @@ You can disable the strict URL checks from Apple by using the venerable `ios.pli
 
 [source,xml]
 -----
-<key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+include::../demos/common/src/main/snippets/developer-guide/working-with-ios.xml[tag=working-with-ios-xml-001,indent=0]
 -----
 
 For example, it seems that Apple will reject your app if you include that and don't have a good reason.

@@ -15,9 +15,7 @@ The pure-vector `MapView` renders real maps with zero configuration and no API k
 
 [source,java]
 ----
-MapView map = new MapView();
-map.moveCamera(new LatLng(37.7749, -122.4194), 12);
-form.add(BorderLayout.CENTER, map);
+include::../demos/common/src/main/snippets/developer-guide/maps.java[tag=maps-java-001,indent=0]
 ----
 
 `LatLng` is the immutable WGS84 coordinate value type used throughout the API. The camera is described by a center `LatLng` and a fractional zoom level (the standard slippy-map scale where each whole increment doubles the scale).
@@ -30,35 +28,7 @@ Every map -- vector or native -- exposes the same operations through `MapSurface
 
 [source,java]
 ----
-// Camera
-map.setCameraPosition(new CameraPosition(new LatLng(48.8566, 2.3522), 11));
-map.moveCamera(new LatLng(48.8566, 2.3522), 11);
-map.setZoom(13);
-map.fitBounds(new MapBounds(new LatLng(48.8, 2.2), new LatLng(48.9, 2.4)), 24);
-
-// Markers
-Marker m = map.addMarker(new MarkerOptions(new LatLng(48.8584, 2.2945))
-        .icon(pinImage)
-        .title("Eiffel Tower")
-        .anchor(0.5f, 1.0f)
-        .onClick(e -> showDetails()));
-map.removeMarker(m);
-
-// Shapes
-map.addPolyline(new Polyline(routePoints).setStrokeColor(0xff5722).setStrokeWidth(6));
-map.addPolygon(new Polygon(areaPoints).setFillColor(0x803f51b5).setStrokeColor(0x3f51b5));
-map.addCircle(new Circle(new LatLng(48.85, 2.35), 500).setFillColor(0x804caf50));
-map.clearMapObjects();
-
-// Coordinate conversion and bounds
-Point pixel = map.latLngToScreen(new LatLng(48.85, 2.35));
-LatLng coord = map.screenToLatLng(120, 240);
-MapBounds visible = map.getVisibleRegion();
-
-// Events
-map.addTapListener((surface, location, x, y) -> placeMarker(location));
-map.addLongPressListener((surface, location, x, y) -> contextMenu(location));
-map.addCameraChangeListener((surface, camera) -> persist(camera));
+include::../demos/common/src/main/snippets/developer-guide/maps.java[tag=maps-java-002,indent=0]
 ----
 
 Marker icons are supplied as `EncodedImage` and anchored in normalized `(u, v)` image space (`0.5, 1.0` puts the pin tip on the location). When no icon is given, a marker draws the standard Material Design map pin. Polygon and circle fills accept an `0xAARRGGBB` color so you can make them translucent.
@@ -80,18 +50,7 @@ For a real app you point `MapView` at a hosted tile service. The simplest keyles
 
 [source,java]
 ----
-// Keyless, zero-config vector basemap (OpenStreetMap data via OpenFreeMap):
-MapView vector = new MapView(MvtTileSource.openFreeMap(), MapStyle.light());
-
-// A keyed hosted provider (e.g. MapTiler). {z}/{x}/{y} are the XYZ tile
-// coordinates and {key} is substituted from setApiKey(...):
-MapView branded = new MapView(
-        new MvtTileSource("https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key={key}", 0, 14)
-                .setApiKey(apiKey),
-        MapStyle.dark());
-
-// A keyless raster (image-tile) basemap, if you don't need vector styling:
-MapView raster = new MapView(RasterTileSource.openStreetMap());
+include::../demos/common/src/main/snippets/developer-guide/maps.java[tag=maps-java-003,indent=0]
 ----
 
 If the URL has no `{z}` token it's treated as a TileJSON document and the real tile-URL template (and min/max zoom) are resolved from it automatically, so you can paste a provider's TileJSON URL directly.
@@ -108,13 +67,7 @@ image::img/maps-dark.png[The same vector data rendered with the built-in dark st
 
 [source,java]
 ----
-NativeMap map = new NativeMap(new LatLng(37.7749, -122.4194), 12);
-map.addMarker(new MarkerOptions(new LatLng(37.7749, -122.4194)).title("San Francisco"));
-form.add(BorderLayout.CENTER, map);
-
-if (!map.isNativeMap()) {
-    // Running on the simulator (or a build without a provider) -> vector fallback.
-}
+include::../demos/common/src/main/snippets/developer-guide/maps.java[tag=maps-java-004,indent=0]
 ----
 
 image::img/maps-native.png[NativeMap backed by Apple MapKit (ios.maps.provider=apple),scaledwidth=40%]
@@ -141,7 +94,7 @@ When a provider is selected the build server injects that provider's implementat
 
 [source,java]
 ----
-NativeMap map = new NativeMap(new LatLng(0, 0), 4, fallbackTileSource, MapStyle.light());
+include::../demos/common/src/main/snippets/developer-guide/maps.java[tag=maps-java-005,indent=0]
 ----
 
 ==== Provider API keys
@@ -160,16 +113,14 @@ A native provider only renders on the platforms that ship its SDK. To show a pro
 
 [source,java]
 ----
-// Render Google Maps through its JavaScript SDK on any platform with a browser:
-MapProviderRegistry.register(WebMapProvider.google("YOUR_MAPS_JS_API_KEY"));
-NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
+include::../demos/common/src/main/snippets/developer-guide/maps.java[tag=maps-java-006,indent=0]
 ----
 
 Because it needs only a web view, the web provider (id `web`) is the natural last step before the pure-vector fallback in a provider chain. The order is fully customizable from code, so you can express per-platform preferences -- for example "try the native Google SDK, then the web map, then the vector `MapView`":
 
 [source,java]
 ----
-MapProviderRegistry.setProviderOrder(new String[]{"google", "web", "vector"});
+include::../demos/common/src/main/snippets/developer-guide/maps.java[tag=maps-java-007,indent=0]
 ----
 
 image::img/maps-web.png[Google Maps rendered cross-platform through WebMapProvider,scaledwidth=40%]

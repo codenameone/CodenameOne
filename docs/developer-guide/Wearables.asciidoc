@@ -31,16 +31,7 @@ and `isDesktop()` checks:
 
 [source,java]
 ----
-Form f = new Form(BoxLayout.y());
-if (CN.isWatch()) {
-    // Compact, single-column layout suited to a small round/square screen
-    f.add(new Label("Hi Watch"));
-    f.getToolbar().setVisible(false);
-} else {
-    // Full phone/tablet layout
-    f.add(new SpanLabel("Welcome to the full size application"));
-}
-f.show();
+include::../demos/common/src/main/snippets/developer-guide/wearables.java[tag=wearables-java-001,indent=0]
 ----
 
 On Android `isWatch()` is derived from `PackageManager.FEATURE_WATCH`
@@ -90,7 +81,7 @@ Set the build hint:
 
 [source,properties]
 ----
-watchNative.enabled=true
+include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-001,indent=0]
 ----
 
 Alternatively, declare a watch entry point and the watch slice is produced
@@ -98,7 +89,7 @@ automatically as part of the regular iOS build:
 
 [source,properties]
 ----
-codename1.watchMain=com.mycompany.myapp.MyWatchMain
+include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-002,indent=0]
 ----
 
 If you don't declare a distinct `watchMain`, the watch app reuses your phone
@@ -191,14 +182,14 @@ required -- you only need to mark the build as a watch app.
 
 [source,properties]
 ----
-android.wear=true
+include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-003,indent=0]
 ----
 
 This injects the watch hardware feature into the manifest:
 
 [source,xml]
 ----
-<uses-feature android:name="android.hardware.type.watch" android:required="true" />
+include::../demos/common/src/main/snippets/developer-guide/wearables.xml[tag=wearables-xml-001,indent=0]
 ----
 
 By default it also declares the app *standalone*, so it installs and runs
@@ -206,7 +197,7 @@ directly on the watch without a paired phone app:
 
 [source,xml]
 ----
-<meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
+include::../demos/common/src/main/snippets/developer-guide/wearables.xml[tag=wearables-xml-002,indent=0]
 ----
 
 Setting `android.wear=true` also raises the minimum SDK to API 23 (the Wear OS

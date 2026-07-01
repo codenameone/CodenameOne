@@ -10,24 +10,14 @@ Gesture detection lives in the core rather than in each platform port. Any platf
 
 [source,java]
 ----
-MotionSensorManager m = MotionSensorManager.getInstance();
-MotionSensor accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
-if (accelerometer != null) {
-    accelerometer.addListener(new MotionSensorListener() {
-        public void motionReceived(MotionEvent evt) {
-            // x, y and z are in meters per second squared
-            label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
-            label.getParent().revalidate();
-        }
-    });
-}
+include::../demos/common/src/main/snippets/developer-guide/motion-sensors.java[tag=motion-sensors-java-001,indent=0]
 ----
 
 Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
 
 [source,java]
 ----
-accelerometer.removeListener(listener);
+include::../demos/common/src/main/snippets/developer-guide/motion-sensors.java[tag=motion-sensors-java-002,indent=0]
 ----
 
 === Sensor types
@@ -65,11 +55,7 @@ Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The 
 
 [source,java]
 ----
-MotionSensorManager.getInstance().addGestureListener(GestureEvent.TYPE_SHAKE, new GestureListener() {
-    public void gestureDetected(GestureEvent evt) {
-        Dialog.show("Shaken", "You shook the device", "OK", null);
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/motion-sensors.java[tag=motion-sensors-java-003,indent=0]
 ----
 
 The recognized gestures are:
@@ -84,10 +70,7 @@ The detection thresholds suit most apps as shipped, and you can tune them when a
 
 [source,java]
 ----
-MotionSensorManager m = MotionSensorManager.getInstance();
-m.setShakeThreshold(15.0);     // require a more vigorous shake
-m.setTiltThreshold(0.5);       // tilt angle in radians
-m.setSamplingInterval(33);     // sample at about 30Hz for snappier gestures
+include::../demos/common/src/main/snippets/developer-guide/motion-sensors.java[tag=motion-sensors-java-004,indent=0]
 ----
 
 A smaller sampling interval makes gestures more responsive at a higher battery cost. The value is clamped to the range 10ms through 1000ms.

@@ -74,26 +74,7 @@ the game in `update(double)`, and the view draws the scene every frame.
 
 [source,java]
 ----
-class MyGame extends GameView {
-    final Sprite player = new Sprite(playerImage);
-
-    MyGame() {
-        getScene().add(player);
-        player.setPosition(160, 240);
-    }
-
-    protected void update(double dt) {
-        if (getInput().isGameKeyDown(Display.GAME_RIGHT)) {
-            player.setX(player.getX() + 200 * dt);   // 200 px/second
-        }
-    }
-}
-
-Form f = new Form("Game", new BorderLayout());
-MyGame game = new MyGame();
-f.add(BorderLayout.CENTER, game);
-f.show();
-game.start();
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-001,indent=0]
 ----
 
 The `dt` passed to `update` is the wall clock time since the previous frame.
@@ -109,10 +90,7 @@ call before or after the form is shown.
 
 [source,java]
 ----
-game.start();   // begin the loop
-game.pause();   // freeze game logic, keep rendering
-game.resume();  // continue
-game.stop();    // end the loop
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-002,indent=0]
 ----
 
 `setClearColor(int argb)` sets the background the view is cleared to each frame.
@@ -128,7 +106,7 @@ rendered positions between physics states:
 
 [source,java]
 ----
-game.setFixedTimestep(1.0 / 120.0);   // step physics at a steady 120Hz
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-003,indent=0]
 ----
 
 ==== Threading
@@ -159,9 +137,7 @@ to the `GameView`'s top left.
 
 [source,java]
 ----
-GameInput in = getInput();
-if (in.isGameKeyDown(Display.GAME_FIRE)) { fire(); }
-if (in.wasPointerPressed()) { spawnAt(in.getPointerX(), in.getPointerY()); }
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-004,indent=0]
 ----
 
 === On-screen touch controls
@@ -189,19 +165,7 @@ never recompute coordinates:
 
 [source,java]
 ----
-TouchControls c = getControls();
-
-// analog stick, bottom-left, 80px radius, 24px in from the safe-area edges
-c.addJoystick(80, TouchControls.LEFT, TouchControls.BOTTOM, 24);
-
-// a JUMP button, bottom-right, mapped to GAME_FIRE
-int jumpKey = Display.getInstance().getKeyCode(Display.GAME_FIRE);
-c.addButton(jumpKey, 55, TouchControls.RIGHT, TouchControls.BOTTOM, 30)
-        .setLabel("Jump").setColor(0xc0ff7043);
-
-// then read input exactly as you would for a keyboard:
-float ax = getInput().getAxisX();                 // analog steering
-boolean jump = getInput().wasKeyPressed(jumpKey);  // or GAME_UP, etc.
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-005,indent=0]
 ----
 
 The joystick (bottom-left) and JUMP button (bottom-right) are visible in the
@@ -228,12 +192,7 @@ default), and rotation and scale pivot around that anchor.
 
 [source,java]
 ----
-Sprite ship = new Sprite(shipImage);
-ship.setPosition(160, 240);
-ship.setRotation(45);          // degrees, clockwise
-ship.setScale(2f);
-ship.setAlpha(200);            // 0 (transparent) to 255 (opaque)
-getScene().add(ship);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-006,indent=0]
 ----
 
 `getBounds()` returns the axis aligned bounding box and `intersects(Sprite)` does a
@@ -252,10 +211,7 @@ You don't need a `GameView` to render sprites: a `SpriteRenderer` is itself a
 
 [source,java]
 ----
-SpriteRenderer r = new SpriteRenderer();
-r.getScene().add(mySprite);
-RenderView view = new RenderView(r).setContinuous(true);
-form.add(BorderLayout.CENTER, view);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-007,indent=0]
 ----
 
 ==== Sprite sheets and animation
@@ -270,11 +226,7 @@ it every frame, so adding it to the scene is all you need.
 
 [source,java]
 ----
-SpriteSheet sheet = new SpriteSheet(explosionImage, 64, 64);
-AnimatedSprite boom = new AnimatedSprite(
-        sheet, new int[]{0, 1, 2, 3, 4, 5}, 0.05); // 50ms per frame
-boom.setLooping(false);
-getScene().add(boom);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-008,indent=0]
 ----
 
 image::img/game-spritesheet.png[A six-frame run cycle laid out as a sprite sheet,640]
@@ -286,18 +238,7 @@ build the frames yourself, which is what `ScrollerGameSample`'s runner does:
 
 [source,java]
 ----
-AnimatedSprite hero = new AnimatedSprite(runFrames, 0.09);   // Image[6], 90ms each
-hero.play();
-getScene().add(hero);
-
-// in update(double dt):
-if (moving) {
-    hero.play();
-    hero.setScale(facing, 1);     // facing is -1 (left) or 1 (right)
-} else {
-    hero.pause();
-    hero.setCurrentFrame(0);      // standing pose
-}
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-009,indent=0]
 ----
 
 Setting a *negative scale* flips the sprite horizontally, so a single set of frames
@@ -327,14 +268,7 @@ the thin point reads exactly the same to the eye:
 
 [source,java]
 ----
-// in the card's per-frame animation; flip runs 0 -> 1 over ~0.4s
-flip += dt * 5;
-float sx = Math.abs(1f - 2f * (float) flip);   // 1 -> 0 -> 1
-if (flip >= 0.5 && !showingFace) {
-    showingFace = true;
-    sprite.setImage(face);     // swap sides while the card is edge-on
-}
-sprite.setScale(Math.max(0.05f, sx), 1f);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-010,indent=0]
 ----
 
 This is the same negative/positive scale trick the scroller uses to flip its
@@ -346,20 +280,7 @@ each card's bounding box:
 
 [source,java]
 ----
-protected void update(double dt) {
-    // ... advance flip animations, count down the mismatch timer ...
-    if (getInput().wasPointerPressed()) {
-        int px = getInput().getPointerX();
-        int py = getInput().getPointerY();
-        for (int i = 0; i < cards.length; i++) {
-            Rectangle b = cards[i].sprite.getBounds();
-            if (b.contains(px, py)) {
-                flipUp(cards[i]);
-                break;
-            }
-        }
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-011,indent=0]
 ----
 
 The rest of the sample is a small state machine living in plain fields: the
@@ -384,13 +305,7 @@ as 2:1 diamonds -- columns step right-and-down, rows step left-and-down:
 
 [source,java]
 ----
-private float tileCenterX(int r, int c) {
-    return originX + (c - r) * (tileW / 2f);
-}
-
-private float tileCenterY(int r, int c) {
-    return originY + (c + r) * (tileH / 2f);   // tileH = tileW / 2
-}
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-012,indent=0]
 ----
 
 *Picking is the inverse.* Because the mapping is linear it inverts with two
@@ -399,16 +314,7 @@ required:
 
 [source,java]
 ----
-private int[] pick(int px, int py) {
-    float a = (px - originX) / (tileW / 2f);   // = c - r
-    float b = (py - originY) / (tileH / 2f);   // = c + r
-    int c = Math.round((a + b) / 2f);
-    int r = Math.round((b - a) / 2f);
-    if (r < 0 || r >= N || c < 0 || c >= N) {
-        return null;                            // tap missed the board
-    }
-    return new int[]{r, c};
-}
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-013,indent=0]
 ----
 
 *Depth from z-order.* Cells further down the screen must draw over the cells
@@ -419,9 +325,7 @@ layers the sprites within a cell:
 
 [source,java]
 ----
-// shadow sits flat on the tile, the piece floats above it
-addDynamic(shadow, cx, cy + tileH * 0.10f, (r + c) * 4 + 1, 0.5, 0.5);
-addDynamic(piece,  cx, cy - tileH * 0.30f, (r + c) * 4 + 3, 0.5, 0.62);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-014,indent=0]
 ----
 
 That pair of lines is also the whole "3D height" illusion: the piece is drawn
@@ -466,15 +370,7 @@ that always faces the camera, so your existing 2D art keeps working in 3D:
 
 [source,java]
 ----
-getCamera()
-    .setPerspective(60, 0.1f, 500f)   // vertical FOV, near, far
-    .setPosition(0, 6, 12)            // eye
-    .setTarget(0, 0, 0);             // look-at
-
-Sprite tree = new Sprite(treeImage);
-tree.setPosition(0, 1, 0);            // world coordinates, y up
-tree.setSize(2, 4);                   // size is now in world units, not pixels
-getScene().add(tree);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-015,indent=0]
 ----
 
 World coordinates are right-handed with y up (the `com.codename1.gpu` convention),
@@ -492,18 +388,7 @@ runs once before the first frame:
 
 [source,java]
 ----
-protected void onSetup(GraphicsDevice device) {
-    Mesh cubeMesh = Primitives.cube(device, 1f);
-    Material gold = new Material(Material.Type.PHONG).setColor(0xffffcc33).setShininess(32);
-    crate = new Model(cubeMesh, gold).setPosition(0, 0.5f, 0);
-    addModel(crate);
-
-    getLight().setDirection(-1, -1, -0.5f);   // shade the lit material
-}
-
-protected void update(double dt) {
-    crate.setRotation(0, crate.getRotationY() + (float) (60 * dt), 0);  // spin
-}
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-016,indent=0]
 ----
 
 `onSetup` is also where you load real assets with `com.codename1.gpu.GltfLoader`
@@ -524,16 +409,7 @@ uploading it with `com.codename1.gpu.GraphicsDevice#createTexture(com.codename1.
 
 [source,java]
 ----
-Mesh ground = Primitives.quad(device, 64f);
-Texture grid = device.createTexture(makeGridImage());      // any Image you draw
-Material mat = new Material(Material.Type.LAMBERT)
-        .setColor(0xff3f7d4f).setTexture(grid);
-Model floor = new Model(ground, mat).setRotation(-90, 0, 0); // lay the quad flat
-addModel(floor);
-
-// one cube mesh, scaled into buildings of varying height:
-Model tower = new Model(cubeMesh, brick).setScale(1.5f, 4f, 1.5f).setPosition(9, 2, 0);
-addModel(tower);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-017,indent=0]
 ----
 
 For richer geometry, load glTF (`.glb`/`.gltf`) assets with
@@ -549,12 +425,7 @@ the same time.
 
 [source,java]
 ----
-SoundPool sfx = SoundPool.create(12);          // up to 12 simultaneous voices
-SoundEffect coin = sfx.load("/coin.wav");
-// ... in the game loop:
-coin.play();                                   // fire and forget
-int voice = coin.play(0.8f, -0.3f, 1.2f, 0);   // volume, pan, rate/pitch, loop
-sfx.setVolume(voice, 0.5f);                     // adjust a playing voice
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-018,indent=0]
 ----
 
 `play` returns a voice id (or `-1` if the pool is momentarily exhausted -- it never
@@ -578,13 +449,7 @@ engine can report completion, so guard with `isVoiceCompletionSupported()`:
 
 [source,java]
 ----
-if (sfx.isVoiceCompletionSupported()) {
-    sfx.setVoiceListener(new VoiceListener() {
-        public void onComplete(int voiceId) {
-            onEffectFinished(voiceId);
-        }
-    });
-}
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-019,indent=0]
 ----
 
 NOTE: Load your sounds once, up front -- ideally on a background thread with
@@ -614,18 +479,7 @@ objects, and step it once per frame from your `update`:
 
 [source,java]
 ----
-PhysicsWorld world = new PhysicsWorld(0, 900);   // gravity 900 px/s^2 downward
-
-// a STATIC floor that never moves
-world.createBox(160, 460, 320, 40, BodyType.STATIC);
-
-// a DYNAMIC crate affected by gravity and collisions
-PhysicsBody crate = world.createBox(160, 0, 32, 32, BodyType.DYNAMIC);
-crate.setRestitution(0.4f);   // bounciness
-crate.setFriction(0.5f);
-
-// in update(double dt):
-world.step((float) dt);
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-020,indent=0]
 ----
 
 Bodies come in three kinds, the
@@ -647,12 +501,7 @@ come from one piece of geometry:
 
 [source,java]
 ----
-GeneralPath ramp = new GeneralPath();
-ramp.moveTo(0, 0);
-ramp.lineTo(240, 0);
-ramp.lineTo(240, 80);
-ramp.closePath();
-world.createShape(40, 380, ramp, BodyType.STATIC);   // collide with exactly what you draw
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-021,indent=0]
 ----
 
 ==== Driving sprites from physics
@@ -664,12 +513,7 @@ rotation automatically (in pixels, screen space) -- and the scene draws it there
 
 [source,java]
 ----
-Sprite crateSprite = new Sprite(crateImage);
-crate.setLinkedSprite(crateSprite);
-getScene().add(crateSprite);
-
-// in update(double dt):
-world.step((float) dt);   // moves crate, which moves crateSprite, which the scene draws
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-022,indent=0]
 ----
 
 ==== Collisions
@@ -682,14 +526,7 @@ that until after `step` returns.
 
 [source,java]
 ----
-world.addContactListener(new ContactListener() {
-    public void beginContact(PhysicsContact c) {
-        Object a = c.getSpriteA();   // the linked sprites, if any
-        Object b = c.getSpriteB();
-        // e.g. flag the bodies for removal after this step
-    }
-    public void endContact(PhysicsContact c) { }
-});
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-023,indent=0]
 ----
 
 If you need a feature the wrapper doesn't expose, `PhysicsWorld.getNativeWorld()`
@@ -705,16 +542,7 @@ handle:
 
 [source,java]
 ----
-// a hinge the two bodies pivot around (anchor in pixels)
-world.createRevoluteJoint(bodyA, bodyB, pivotXpx, pivotYpx);
-// a fixed-length link, like a rod between two crates
-world.createDistanceJoint(bodyA, bodyB, ax, ay, bx, by, 0f, 0f);
-// drag a body toward the finger -- great for "pick up and throw"
-PhysicsJoint drag = world.createMouseJoint(ground, body, px, py, 1000f);
-// ... while the finger moves:
-drag.setTarget(getInput().getPointerX(), getInput().getPointerY());
-// ... on release:
-drag.destroy();
+include::../demos/common/src/main/snippets/developer-guide/game-development.java[tag=game-development-java-024,indent=0]
 ----
 
 `createWeldJoint` and `createPrismaticJoint` (a sliding axis) round out the set.

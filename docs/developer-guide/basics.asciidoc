@@ -57,8 +57,7 @@ and `setSameHeight` methods, for example:
 
 [source,java,title="setSameWidth/Height"]
 ----
-Component.setSameWidth(cmp1, cmp2, cmp3, cmp4);
-Component.setSameHeight(cmp5, cmp6, cmp7);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-001,indent=0]
 ----
 
 Codename One has a `setPreferredSize` method that lets developers explicitly request a component size. But, that caused many problems. For example, preferred size should change with device orientation or similar operations. The API also encouraged accidental hardcoding of UI values such as forcing pixel sizes. As a result, the method was deprecated.
@@ -108,15 +107,14 @@ When you add a `Component` to a `Container` with a regular layout you do so with
 
 [source,java,title='Adding to a Regular Container']
 ----
-Container cnt = new Container(BoxLayout.y());
-cnt.add(new Label("Just Added"));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-002,indent=0]
 ----
 
 This works great for regular layouts but might not for constraint based layouts. A constraint based layout accepts another argument. For example: `BorderLayout` needs a location for the `Component`:
 
 [source,java,title='Adding to a Regular Container']
 ----
-cnt.add(NORTH, new Label("Just Added"));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-003,indent=0]
 ----
 
 This line assumes you have an `import static com.codename1.ui.CN.*;` in the top of the file. In `BorderLayout` (which is a constraint based layout) placing an item in the `NORTH` places it in the top of the `Container`.
@@ -129,7 +127,7 @@ The `CN` class is a thin wrapper around features in `Display`, `NetworkManager`,
 
 [source,java]
 ----
-import static com.codename1.ui.CN.*;
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-004,indent=0]
 ----
 
 TIP: That's optional, if you don't like static imports you can just write `CN.` for every element
@@ -138,36 +136,35 @@ From that point on you can write code that looks like this:
 
 [source,java]
 ----
-callSerially(() -> runThisOnTheEDT());
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-005,indent=0]
 ----
 
 Instead of:
 
 [source,java]
 ----
-Display.getInstance().callSerially(() -> runThisOnTheEDT());
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-006,indent=0]
 ----
 
 The same applies for most network manager calls e.g.:
 
 [source,java]
 ----
-addToQueue(myConnectionRequest);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-007,indent=0]
 ----
 
 Instead of:
 
 [source,java]
 ----
-NetworkManager.getInstance().addToQueue(myConnectionRequest);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-008,indent=0]
 ----
 
 Some things were changed so you won't have too many conflicts for example, `Log.p` or `Log.e` would have been problematic so you now have:
 
 [source,java]
 ----
-log("my log message");
-log(myException);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-009,indent=0]
 ----
 
 Instead of `Display.getInstance().getCurrent()` you now have `getCurrentForm()` since `getCurrent()` is too generic. For most methods you should just be able to remove the `NetworkManager` or `Display` access and it should "just work."
@@ -187,13 +184,7 @@ Almost every layout allows you to `add` a component using many variants of the a
 
 [source,java,title='Versions of add']
 ----
-Container cnt = new Container(BoxLayout.y());
-cnt.add(new Label("Just Added")); // <1>
-cnt.addAll(new Label("Adding Multiple"), // <2>
-    new Label("Second One"));
-
-cnt.add(new Label("Chaining")). // <3>
-    add(new Label("Value"));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-010,indent=0]
 ----
 
 <1> Regular add
@@ -206,10 +197,7 @@ In the race to make code "`tighter`" you can make this even shorter. Most layout
 
 [source,java,title='Terse Syntax']
 ----
-Container boxY = BoxLayout.encloseY(cmp1, cmp2); // <1>
-Container boxX = BoxLayout.encloseX(cmp3, cmp4);
-Container flowCenter = FlowLayout. // <2>
-    encloseCenter(cmp5, cmp6);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-011,indent=0]
 ----
 
 <1> Most layouts have a version of enclose to encapsulate components within (((Encapsulate)))
@@ -228,25 +216,14 @@ link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.htm
 
 [source,java]
 ----
-Form hi = new Form("Flow Layout", new FlowLayout());
-hi.add(new Label("First")).
-    add(new Label("Second")).
-    add(new Label("Third")).
-    add(new Label("Fourth")).
-    add(new Label("Fifth"));
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-012,indent=0]
 ----
 
 Flow layout also supports terse syntax shorthand such as:
 
 [source,java]
 ----
-Container flowLayout = FlowLayout.encloseIn(
-        new Label("First"),
-        new Label("Second"),
-        new Label("Third"),
-        new Label("Fourth"),
-        new Label("Fifth")));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-013,indent=0]
 ----
 
 Flow layout can be aligned to the left (the default), to the <<flow-layout-center,center>>, or to the <<flow-layout-right,right>>. It can also be vertically aligned to the top (the default), <<flow-layout-center-middle,middle (center)>>, or bottom.
@@ -275,12 +252,7 @@ You can create a box layout Y using something like this:
 
 [source,java]
 ----
-Form hi = new Form("Box Y Layout", new BoxLayout(BoxLayout.Y_AXIS));
-hi.add(new Label("First")).
-    add(new Label("Second")).
-    add(new Label("Third")).
-    add(new Label("Fourth")).
-    add(new Label("Fifth"));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-014,indent=0]
 ----
 
 Which results in <<box-layout-y,this>>
@@ -293,11 +265,7 @@ Box layout also supports a shorter terse notation which you use here to <<box-la
 
 [source,java]
 ----
-Container box = BoxLayout.encloseX(new Label("First"),
-        new Label("Second"),
-        new Label("Third"),
-        new Label("Fourth"),
-        new Label("Fifth")));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-015,indent=0]
 ----
 
 [[box-layout-x]]
@@ -327,13 +295,7 @@ link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.h
 
 [source,java]
 ----
-Form hi = new Form("Border Layout", new BorderLayout());
-hi.add(BorderLayout.CENTER, new Label("Center")).
-    add(BorderLayout.SOUTH, new Label("South")).
-    add(BorderLayout.NORTH, new Label("North")).
-    add(BorderLayout.EAST, new Label("East")).
-    add(BorderLayout.WEST, new Label("West"));
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-016,indent=0]
 ----
 
 .The Constraints are Included in the `CN` class
@@ -345,14 +307,7 @@ For example:
 
 [source,java]
 ----
-Form hi = new Form("Border Layout", new BorderLayout());
-((BorderLayout)hi.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);
-hi.add(BorderLayout.CENTER, new Label("Center")).
-    add(BorderLayout.SOUTH, new Label("South")).
-    add(BorderLayout.NORTH, new Label("North")).
-    add(BorderLayout.EAST, new Label("East")).
-    add(BorderLayout.WEST, new Label("West"));
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-017,indent=0]
 ----
 
 Results in:
@@ -393,12 +348,7 @@ added turning the grid to a 3×2 grid implicitly and leaving one blank cell:
 
 [source,java]
 ----
-Form hi = new Form("Grid Layout 2×2", new GridLayout(2, 2));
-hi.add(new Label("First")).
-    add(new Label("Second")).
-    add(new Label("Third")).
-    add(new Label("Fourth")).
-    add(new Label("Fifth"));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-018,indent=0]
 ----
 
 .Grid Layout 2×2
@@ -421,11 +371,7 @@ of the same code in two orientations:
 
 [source,java]
 ----
-GridLayout.encloseIn(new Label("First"),
-    new Label("Second"),
-    new Label("Third"),
-    new Label("Fourth"),
-    new Label("Fifth")));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-019,indent=0]
 ----
 
 .Grid Layout autofit portrait
@@ -449,13 +395,7 @@ WARNING: Unlike `GridLayout` `TableLayout` won't implicitly add a row if the row
 
 [source,java]
 ----
-Form hi = new Form("Table Layout 2×2", new TableLayout(2, 2));
-hi.add(new Label("First")).
-    add(new Label("Second")).
-    add(new Label("Third")).
-    add(new Label("Fourth")).
-    add(new Label("Fifth"));
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-020,indent=0]
 ----
 
 .2×2 TableLayout with 5 elements, notice that the last element is missing
@@ -467,11 +407,7 @@ The default usage of the `encloseIn` method below uses the `setGrowHorizontally`
 
 [source,java]
 ----
-Container tl = TableLayout.encloseIn(2, new Label("First"),
-                new Label("Second"),
-                new Label("Third"),
-                new Label("Fourth"),
-                new Label("Fifth")));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-021,indent=0]
 ----
 
 .`TableLayout.encloseIn()` with default behavior of growing the last column
@@ -506,30 +442,7 @@ The <<table-layout-constraint-sample,table layout constraint sample>> tries to s
 [[table-layout-constraint-sample]]
 [source,java]
 ----
-TableLayout tl = new TableLayout(2, 3); // <1>
-Form hi = new Form("Table Layout Cons", tl);
-hi.setScrollable(false); // <2>
-hi.add(tl.createConstraint(). // <3>
-            widthPercentage(20),
-                new Label("AAA")).
-
-        add(tl.createConstraint(). // <4>
-            horizontalSpan(2).
-            heightPercentage(80).
-            verticalAlign(Component.CENTER).
-            horizontalAlign(Component.CENTER),
-                new Label("Span H")).
-
-        add(new Label("BBB")).
-
-        add(tl.createConstraint().
-            widthPercentage(60).
-            heightPercentage(20),
-                new Label("CCC")).
-
-        add(tl.createConstraint().
-            widthPercentage(20),
-                new Label("DDD"));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-022,indent=0]
 ----
 
 <1> You need the `TableLayout` instance to create constraints. A constraint must be created for every component and must be used with the same layout as the parent container
@@ -545,9 +458,7 @@ Here is the full code mentioned in item 3:
 [[full-code-tablelayout-constraint]]
 [source,java]
 ----
-TableLayout.Constraint cn = tl.createConstraint();
-cn.setWidthPercentage(20);
-hi.add(cn, new Label("AAA")).
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-023,indent=0]
 ----
 
 [[table-layout-constraints]]
@@ -562,19 +473,7 @@ For example: this is a sample usage of `TextModeLayout`:
 
 [source,java]
 ----
-TextModeLayout tl = new TextModeLayout(3, 2);
-Form f = new Form("Pixel Perfect", tl);
-TextComponent title = new TextComponent().label("Title");
-TextComponent price = new TextComponent().label("Price");
-TextComponent location = new TextComponent().label("Location");
-TextComponent description = new TextComponent().label("Description").multiline(true);
-
-f.add(tl.createConstraint().horizontalSpan(2), title);
-f.add(tl.createConstraint().widthPercentage(30), price);
-f.add(tl.createConstraint().widthPercentage(70), location);
-f.add(tl.createConstraint().horizontalSpan(2), description);
-f.setEditOnShow(title.getField());
-f.show();
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-024,indent=0]
 ----
 
 .TextModeLayout on iOS
@@ -606,8 +505,7 @@ The code to generate this UI is slightly complex and contains few relevant piece
 
 [source,java]
 ----
-hi.add(LayeredLayout.encloseIn(settingsLabel,
-        FlowLayout.encloseRight(close)));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-025,indent=0]
 ----
 
 You're doing three distinct things here:
@@ -622,22 +520,7 @@ This is the full source of the example for completeness:
 
 [source,java]
 ----
-Form hi = new Form("Layered Layout");
-int w = Math.min(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
-Button settingsLabel = new Button("");
-Style settingsStyle = settingsLabel.getAllStyles();
-settingsStyle.setFgColor(0xff);
-settingsStyle.setBorder(null);
-settingsStyle.setBgColor(0xff00);
-settingsStyle.setBgTransparency(255);
-settingsStyle.setFont(settingsLabel.getUnselectedStyle().getFont().derive(w / 3, Font.STYLE_PLAIN));
-FontImage.setMaterialIcon(settingsLabel, FontImage.MATERIAL_SETTINGS);
-Button close = new Button("");
-close.setUIID("Container");
-close.getAllStyles().setFgColor(0xff0000);
-FontImage.setMaterialIcon(close, FontImage.MATERIAL_CLOSE);
-hi.add(LayeredLayout.encloseIn(settingsLabel,
-        FlowLayout.encloseRight(close)));
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-026,indent=0]
 ----
 
 Forms have a built in layered layout that you can access through `getLayeredPane()`, this allows you to overlay elements on top of the content pane.
@@ -655,11 +538,7 @@ As an example, suppose you wanted to position a button in the lower right corner
 
 [source,java]
 ----
-Container cnt = new Container(new LayeredLayout());
-Button btn = new Button("Submit");
-LayeredLayout ll = (LayeredLayout)cnt.getLayout();
-cnt.add(btn);
-ll.setInsets(btn, "auto 0 0 auto");
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-027,indent=0]
 ----
 
 The result is:
@@ -670,7 +549,7 @@ The thing new here is this line:
 
 [source,java]
 ----
-ll.setInsets(btn, "auto 0 0 auto");
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-028,indent=0]
 ----
 
 This is called after `btn` has already been added to the container. It says that you want its insets to be "auto" on the top and left, and `0` on the right and bottom. This *insets* string follows the CSS notation of `top right bottom left` (that's: start on top and go clockwise), and the values of each inset may be provided in pixels (px), millimetres (mm), percent (%), or the special "auto" value. Like CSS, you can also specify the insets using a 1, 2, or 3 values. For example:
@@ -690,7 +569,7 @@ If one inset is fixed (that's: defined in px, mm, or %), and the opposite inset 
 
 [source,java]
 ----
-ll.setInsets(btn, "auto auto auto 5mm");
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-029,indent=0]
 ----
 
 Resulting in:
@@ -702,7 +581,7 @@ Move it to the right edge with:
 
 [source,java]
 ----
-ll.setInsets(btn, "auto 5mm auto auto");
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-030,indent=0]
 ----
 
 ===== `%` insets
@@ -733,14 +612,7 @@ For example, suppose you want to place a text field in the center of the form (b
 
 [source,java]
 ----
-Container cnt = new Container(new LayeredLayout());
-LayeredLayout ll = (LayeredLayout)cnt.getLayout();
-Button btn = new Button("Submit");
-TextField tf = new TextField();
-cnt.add(tf).add(btn);
-ll.setInsets(tf, "auto")
-  .setInsets(btn, "auto auto auto 0")
-  .setReferenceComponentLeft(btn, tf, 1f);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-031,indent=0]
 ----
 
 This would result in:
@@ -752,8 +624,7 @@ The two active lines here are the last two:
 
 [source,java]
 ----
-  .setInsets(btn, "auto auto auto 0") //<1>
-  .setReferenceComponentLeft(btn, tf, 1f); //<2>
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-032,indent=0]
 ----
 <1> Sets the left inset on `btn` to 0.
 <2> Links `btn`'s left inset to `tf` so that it's measured from the text field. The third parameter (`1.0`) is the reference position. This will either be `0` (meaning the reference point is the left edge of the text field), or `1` (meaning the reference point is the right edge of the text field). In this case you set a reference position of `1.0` because you want the button to be aligned to the text field's right edge.
@@ -802,51 +673,7 @@ To show `GridBagLayout` you ported http://docs.oracle.com/Java SE/tutorial/uiswi
 
 [source,java]
 ----
-Button button;
-hi.setLayout(new GridBagLayout());
-GridBagConstraints c = new GridBagConstraints();
-//natural height, maximum width
-c.fill = GridBagConstraints.HORIZONTAL;
-button = new Button("Button 1");
-c.weightx = 0.5;
-c.fill = GridBagConstraints.HORIZONTAL;
-c.gridx = 0;
-c.gridy = 0;
-hi.addComponent(c, button);
-
-button = new Button("Button 2");
-c.fill = GridBagConstraints.HORIZONTAL;
-c.weightx = 0.5;
-c.gridx = 1;
-c.gridy = 0;
-hi.addComponent(c, button);
-
-button = new Button("Button 3");
-c.fill = GridBagConstraints.HORIZONTAL;
-c.weightx = 0.5;
-c.gridx = 2;
-c.gridy = 0;
-hi.addComponent(c, button);
-
-button = new Button("Long-Named Button 4");
-c.fill = GridBagConstraints.HORIZONTAL;
-c.ipady = 40;      //make this component tall
-c.weightx = 0.0;
-c.gridwidth = 3;
-c.gridx = 0;
-c.gridy = 1;
-hi.addComponent(c, button);
-
-button = new Button("5");
-c.fill = GridBagConstraints.HORIZONTAL;
-c.ipady = 0;       //reset to default
-c.weighty = 1.0;   //request any extra vertical space
-c.anchor = GridBagConstraints.PAGE_END; //bottom of space
-c.insets = new Insets(10,0,0,0);  //top padding
-c.gridx = 1;       //aligned with button 2
-c.gridwidth = 2;   //2 columns wide
-c.gridy = 2;       //third row
-hi.addComponent(c, button);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-033,indent=0]
 ----
 
 Notice that because of the way gridbag works you didn't provide any terse syntax API for it although it should be possible.
@@ -866,70 +693,7 @@ Unlike any other layout manager `GroupLayout` adds the components into the conta
 
 [source,java]
 ----
-Form hi = new Form("GroupLayout");
-
-Label label1 = new Label();
-Label label2 = new Label();
-Label label3 = new Label();
-Label label4 = new Label();
-Label label5 = new Label();
-Label label6 = new Label();
-Label label7 = new Label();
-
-label1.setText("label1");
-
-label2.setText("label2");
-
-label3.setText("label3");
-
-label4.setText("label4");
-
-label5.setText("label5");
-
-label6.setText("label6");
-
-label7.setText("label7");
-
-GroupLayout layout = new GroupLayout(hi.getContentPane());
-hi.setLayout(layout);
-layout.setHorizontalGroup(
-    layout.createParallelGroup(GroupLayout.LEADING)
-    .add(layout.createSequentialGroup()
-        .addContainerGap()
-        .add(layout.createParallelGroup(GroupLayout.LEADING)
-            .add(layout.createSequentialGroup()
-                .add(label1, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(LayoutStyle.RELATED)
-                .add(layout.createParallelGroup(GroupLayout.LEADING)
-                    .add(label4, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-                    .add(label3, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-                    .add(label2, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)))
-            .add(label5, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-            .add(layout.createSequentialGroup()
-                .add(label6, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(LayoutStyle.RELATED)
-                .add(label7, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)))
-        .addContainerGap(296, Short.MAX_VALUE))
-);
-layout.setVerticalGroup(
-    layout.createParallelGroup(GroupLayout.LEADING)
-    .add(layout.createSequentialGroup()
-        .addContainerGap()
-        .add(layout.createParallelGroup(GroupLayout.TRAILING)
-            .add(label2, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-            .add(label1, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE))
-        .addPreferredGap(LayoutStyle.RELATED)
-        .add(label3, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-        .addPreferredGap(LayoutStyle.RELATED)
-        .add(label4, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-        .addPreferredGap(LayoutStyle.RELATED)
-        .add(label5, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-        .addPreferredGap(LayoutStyle.RELATED)
-        .add(layout.createParallelGroup(GroupLayout.LEADING)
-            .add(label6, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
-            .add(label7, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE))
-        .addContainerGap(150, Short.MAX_VALUE))
-);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-034,indent=0]
 ----
 
 .GroupLayout Matisse generated UI running in Codename One
@@ -952,16 +716,7 @@ The best reference for MiG would probably be its http://www.miglayout.com/QuickS
 
 [source,java]
 ----
-Form hi = new Form("MigLayout", new MigLayout("fillx,insets 0"));
-
-hi.add(new Label("First")).
-    add("span 2 2", new Label("Second")).  // The component will span 2×2 cells.
-    add("wrap", new Label("Third")).      // Wrap to next row
-    add(new Label("Forth")).
-    add("wrap", new Label("Fifth")).    // Note that it "jumps over" the occupied cells.
-    add(new Label("Sixth")).
-    add(new Label("Seventh"));
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-035,indent=0]
 ----
 
 .MiG layout sample ported to Codename One
@@ -988,7 +743,7 @@ For example: see this code where:
 
 [source,java,title='setUIID on TextField']
 ----
-nameText.setUIID("Label");
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-036,indent=0]
 ----
 
 This is a text field component (user input field) but it will look like a `Label`.
@@ -999,7 +754,7 @@ The UIID's translate the theme elements into a set of `Style` objects. These `St
 
 [source,java,title='setUIID on TextField']
 ----
-nameText.getAllStyles().setFgColor(0xff0000);
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-037,indent=0]
 ----
 
 The color is in hexadecimal `RRGGBB` format so `0xff00` would be green and `0xff0000` would be red.
@@ -1033,7 +788,7 @@ You load the theme file using this line of code in the `init(Object)` method in 
 
 [source,java,title='Theme Loading Code']
 ----
-theme = UIManager.initFirstTheme("/theme");
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-038,indent=0]
 ----
 
 In a CSS project this file is generated automatically from the stylesheet. Legacy applications that still edit the resource file by hand can continue to do so, but new projects should prefer the CSS workflow described below.
@@ -1066,7 +821,7 @@ Both goals accept a `className` parameter that points at the fully qualified cla
 
 [source,bash]
 ----
-mvn cn1:create-gui-form -DclassName=com.example.MyForm
+include::../demos/common/src/main/snippets/developer-guide/basics.sh[tag=basics-bash-001,indent=0]
 ----
 
 This generates two files inside the `common` module:
@@ -1080,7 +835,7 @@ To open the form in the GUI builder:
 
 [source,bash]
 ----
-mvn cn1:guibuilder -DclassName=com.example.MyForm
+include::../demos/common/src/main/snippets/developer-guide/basics.sh[tag=basics-bash-002,indent=0]
 ----
 
 The full goal reference, including every parameter, lives in <<create-gui-form>> and <<guibuilder>> in the Maven goals appendix.
@@ -1157,8 +912,7 @@ Once an event is bound the IDE will open to the event code for example:
 
 [source,java]
 ----
-public void onButton_1ActionEvent(com.codename1.ui.events.ActionEvent ev) {
-}
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-039,indent=0]
 ----
 
 TIP: Some IDEs generate the project source code after you explicitly build the project so if your code needs to access variables etc. try building first
@@ -1168,7 +922,7 @@ UI is represented as:
 
 [source,java]
 ----
-private com.codename1.ui.Button gui_Button_1 = new com.codename1.ui.Button();
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-040,indent=0]
 ----
 
 ===== Underlying XML
@@ -1185,90 +939,14 @@ You can edit the GUI file directly but changes won't map into the GUI builder un
 
 [source,xml]
 ----
-<?xml version="1.0" encoding="UTF-8"?>
-
-<component type="Form" layout="FlowLayout" flowLayoutFillRows="false" flowLayoutAlign="1"
-flowLayoutValign="0"  title="My new title" name="MyForm">
-  <component type="Button" text="Button" name="Button_1" actionEvent="true">
-  </component>
-  <component type="Label" text="Hi World" name="Label_1">
-  </component>
-</component>
+include::../demos/common/src/main/snippets/developer-guide/basics.xml[tag=basics-xml-001,indent=0]
 ----
 
 This format is simple. The file triggers the following Java source file:
 
 [source,java]
 ----
-package com.mycompany.myapp;
-
-/**
- * GUI builder created Form
- *
- * @author shai
- */
-public class MyForm extends com.codename1.ui.Form {
-
-    public MyForm() {
-        this(com.codename1.ui.util.Resources.getGlobalResources());
-    }
-
-    public MyForm(com.codename1.ui.util.Resources resourceObjectInstance) {
-        initGuiBuilderComponents(resourceObjectInstance);
-    }
-
-//-- DON'T EDIT BELOW THIS LINE!!!
-    private com.codename1.ui.Label gui_Label_1 = new com.codename1.ui.Label();
-    private com.codename1.ui.Button gui_Button_1 = new com.codename1.ui.Button();
-
-
-// <editor-fold defaultstate="collapsed" desc="Generated Code">
-    private void guiBuilderBindComponentListeners() {
-        EventCallbackClass callback = new EventCallbackClass();
-        gui_Button_1.addActionListener(callback);
-    }
-
-    class EventCallbackClass implements com.codename1.ui.events.ActionListener, com.codename1.ui.events.DataChangedListener {
-        private com.codename1.ui.Component cmp;
-        public EventCallbackClass(com.codename1.ui.Component cmp) {
-            this.cmp = cmp;
-        }
-
-        public EventCallbackClass() {
-        }
-
-        public void actionPerformed(com.codename1.ui.events.ActionEvent ev) {
-            com.codename1.ui.Component sourceComponent = ev.getComponent();
-            if(sourceComponent.getParent().getLeadParent() != null) {
-                sourceComponent = sourceComponent.getParent().getLeadParent();
-            }
-
-            if(sourceComponent == gui_Button_1) {
-                onButton_1ActionEvent(ev);
-            }
-        }
-
-        public void dataChanged(int type, int index) {
-        }
-    }
-    private void initGuiBuilderComponents(com.codename1.ui.util.Resources resourceObjectInstance) {
-        guiBuilderBindComponentListeners();
-        setLayout(new com.codename1.ui.layouts.FlowLayout());
-        setTitle("My new title");
-        setName("MyForm");
-        addComponent(gui_Label_1);
-        addComponent(gui_Button_1);
-        gui_Label_1.setText("Hi World");
-        gui_Label_1.setName("Label_1");
-        gui_Button_1.setText("Click Me");
-        gui_Button_1.setName("Button_1");
-    }// </editor-fold>
-
-//-- DON'T EDIT ABOVE THIS LINE!!!
-    public void onButton_1ActionEvent(com.codename1.ui.events.ActionEvent ev) {
-    }
-
-}
+include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-041,indent=0]
 ----
 
 WARNING: Don't touch the code within the don't EDIT comments...

@@ -34,14 +34,7 @@ Use the `cn1lib-archetype` for generating a new Codename One library project as 
 
 [source,bash]
 ----
-mvn archetype:generate \
-  -DarchetypeArtifactId=cn1lib-archetype \
-  -DarchetypeGroupId=com.codenameone \
-  -DarchetypeVersion=LATEST \
-  -DgroupId=com.example.mylib \
-  -DartifactId=mylib \
-  -Dversion=1.0-SNAPSHOT \
-  -DinteractiveMode=false
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.sh[tag=maven-creating-cn1libs-bash-001,indent=0]
 ----
 
 NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
@@ -54,15 +47,14 @@ You can run the `archetype:generate` goal with as many or few properties as you 
 
 [source,bash]
 ----
-mvn archetype:generate
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.sh[tag=maven-creating-cn1libs-bash-002,indent=0]
 ----
 
 And then follow the prompts. Or you could enter:
 
 [source, bash]
 ----
-mvn archetype:generate -DarchetypeGroupId=com.codenameone \
-  -DarchetypeArtifactId=cn1lib-archetype
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.sh[tag=maven-creating-cn1libs-bash-003,indent=0]
 ----
 
 NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
@@ -223,90 +215,7 @@ If you do a file listing on the project directory, it shows the following:
 
 [source,listing]
 ----
-Steves-Mac-Pro:MyFirstLibrary shannah$ find .
-.
-./tests
-./tests/pom.xml
-./tests/javase
-./tests/javase/pom.xml
-./tests/common
-./tests/common/codenameone_settings.properties
-./tests/common/pom.xml
-./tests/common/nbactions.xml
-./tests/common/src
-./tests/common/src/test
-./tests/common/src/test/java
-./tests/common/src/test/java/com
-./tests/common/src/test/java/com/example
-./tests/common/src/test/java/com/example/myfirstlib
-./tests/common/src/test/java/com/example/myfirstlib/MyFirstTest.java
-./tests/common/src/main
-./tests/common/src/main/css
-./tests/common/src/main/css/theme.css
-./tests/common/src/main/java
-./tests/common/src/main/java/com
-./tests/common/src/main/java/com/example
-./tests/common/src/main/java/com/example/myfirstlib
-./tests/common/src/main/java/com/example/myfirstlib/LibraryTests.java
-./tests/cn1libs
-./tests/.mvn
-./tests/.mvn/jvm.config
-./pom.xml
-./javase
-./javase/pom.xml
-./javase/src
-./javase/src/main
-./javase/src/main/java
-./javase/src/main/java/com
-./javase/src/main/java/com/example
-./javase/src/main/java/com/example/myfirstlib
-./ios
-./ios/pom.xml
-./ios/src
-./ios/src/main
-./ios/src/main/objectivec
-./common
-./common/codenameone_library_required.properties
-./common/pom.xml
-./common/codenameone_library_appended.properties
-./common/src
-./common/src/test
-./common/src/test/java
-./common/src/test/java/com
-./common/src/test/java/com/example
-./common/src/test/java/com/example/myfirstlib
-./common/src/test/java/com/example/myfirstlib/MyLibraryTest.java
-./common/src/main
-./common/src/main/css
-./common/src/main/css/theme.css
-./common/src/main/java
-./common/src/main/java/com
-./common/src/main/java/com/example
-./common/src/main/java/com/example/myfirstlib
-./common/src/main/java/com/example/myfirstlib/MyLibrary.java
-./android
-./android/pom.xml
-./android/src
-./android/src/main
-./android/src/main/java
-./android/src/main/java/com
-./android/src/main/java/com/example
-./android/src/main/java/com/example/myfirstlib
-./lib
-./lib/pom.xml
-./MyFirstLibrary.iml
-./javascript
-./javascript/pom.xml
-./javascript/src
-./javascript/src/main
-./javascript/src/main/javascript
-./.idea
-./.idea/encodings.xml
-./.idea/jarRepositories.xml
-./.idea/.gitignore
-./.idea/workspace.xml
-./.idea/misc.xml
-./.idea/compiler.xml
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.txt[tag=maven-creating-cn1libs-listing-001,indent=0]
 ----
 
 This may seem daunting at first, but it's important to realize that 99% of the time, you'll be working in the "common" module - most of the other stuff is boilerplate.
@@ -351,7 +260,7 @@ To build the library, run the "install" goal on the root module as follows:
 
 [source,bash]
 ----
-mvn install
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.sh[tag=maven-creating-cn1libs-bash-004,indent=0]
 ----
 
 ===== IntelliJ IDEA
@@ -391,13 +300,7 @@ Add a new class inside the "common/src/main/java" directory with package `com.ex
 
 [source,java]
 ----
-package com.example;
-
-public class HelloWorld {
-    public static void helloWorld() {
-        System.out.println("Hello world");
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java[tag=maven-creating-cn1libs-java-001,indent=0]
 ----
 
 Now build the library again. (See <<building-library>>).
@@ -417,7 +320,7 @@ The common/pom.xml file will have more than one `<dependencies>` tag, as it incl
 
 [source,xml]
 ----
-<!-- INJECT DEPENDENCIES -->
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.xml[tag=maven-creating-cn1libs-xml-001,indent=0]
 ----
 
 You should add your dependencies before this comment.
@@ -434,12 +337,7 @@ In this case you would add the following XML snippet to the `<dependencies>` sec
 
 [source,xml]
 ----
-<dependency>
-    <groupId>com.example</groupId>
-    <artifactId>mylib-lib</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <type>pom</type>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.xml[tag=maven-creating-cn1libs-xml-002,indent=0]
 ----
 
 IMPORTANT: Notice that you appended "-lib" to the `artifactId`. This is because you're including the "lib" module of your library project as the dependency, and not the root module. Also the `<type>pom</type>` is important as it indicates that this is a pom dependency - not a regular jar dependency.
@@ -448,7 +346,7 @@ Now try it out. Try adding the following code to your application project's main
 
 [source,java]
 ----
-com.example.HelloWorld.helloWorld();
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java[tag=maven-creating-cn1libs-java-002,indent=0]
 ----
 
 And build the project. The project should build OK, and if you run it, you should see that the `helloWorld()` method works as designed.
@@ -465,21 +363,7 @@ Each cn1lib ships a properties file at a well-known classpath location. The simu
 
 [source,properties]
 ----
-# META-INF/codenameone/simulator-hooks.properties
-name=Bluetooth
-namespace=bluetooth   # optional; defaults to slugified `name`
-
-# Each itemN is the action; the matching labelN is the menu text.
-# Items are positional — the loader reads item1, item2, item3, ... and
-# stops at the first missing index. Don't skip numbers.
-item1=com.example.bt.simulator.Hooks#toggleAdapter
-label1=Toggle adapter on/off
-
-item2=com.example.bt.simulator.Hooks#addDemoPeripheral
-label2=Add demo peripheral
-
-# Label omitted → API-only hook. Callable from tests, invisible in menu.
-item3=com.example.bt.simulator.Hooks#primeReadFailure
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.properties[tag=maven-creating-cn1libs-properties-001,indent=0]
 ----
 
 Required keys:
@@ -500,20 +384,7 @@ The simulator dispatches every action on the Codename One EDT through `Display.c
 
 [source,java]
 ----
-package com.example.bt.simulator;
-
-import com.codename1.components.ToastBar;
-import com.codename1.ui.Display;
-
-public final class Hooks {
-    public static void toggleAdapter() {
-        boolean next = !BluetoothSimulator.isEnabled();
-        BluetoothSimulator.setEnabled(next);
-        if (Display.isInitialized()) {
-            ToastBar.showInfoMessage("Bluetooth adapter " + (next ? "ON" : "OFF"));
-        }
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java[tag=maven-creating-cn1libs-java-003,indent=0]
 ----
 
 The `Display.isInitialized()` guard is a useful pattern when the same static methods are also called from JUnit tests that don't run inside a live CN1 simulator — the state mutation runs in both contexts, only the UI feedback is skipped.
@@ -526,20 +397,7 @@ Its `simulator-hooks.properties` looks like this:
 
 [source,properties]
 ----
-name=Bluetooth
-namespace=bluetooth
-
-item1=com.codename1.bluetoothle.BluetoothSimulatorHooks#toggleAdapter
-label1=Toggle adapter on/off
-
-item2=com.codename1.bluetoothle.BluetoothSimulatorHooks#addDemoPeripheral
-label2=Add demo peripheral
-
-item3=com.codename1.bluetoothle.BluetoothSimulatorHooks#switchToNativeBle
-label3=Switch backend → native BLE (real hardware)
-
-# API-only: used by the test suite but never displayed in the menu
-item4=com.codename1.bluetoothle.BluetoothSimulatorHooks#primeReadFailure
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.properties[tag=maven-creating-cn1libs-properties-002,indent=0]
 ----
 
 When the user runs an app that depends on `cn1-bluetooth`, the simulator's menu bar gets a *Bluetooth* menu with the three labeled items. Clicking *Add demo peripheral* drops a peripheral into the in-memory simulator that the running app can then scan for, connect to, and exchange data with — without any real hardware. `item4` is callable from tests via `CN.execute("bluetooth:item4")` but never shows up in the menu.
@@ -550,23 +408,7 @@ CN1 unit tests (`AbstractTest` subclasses run via `mvn cn1:test`) compile under 
 
 [source,java]
 ----
-import com.codename1.testing.AbstractTest;
-import com.codename1.ui.CN;
-
-public class BluetoothDemoTest extends AbstractTest {
-    @Override
-    public boolean runTest() throws Exception {
-        // Skip cleanly off-simulator: a real device has no hook registered
-        // and CN.canExecute will not return TRUE.
-        if (!Boolean.TRUE.equals(CN.canExecute("bluetooth:item2"))) {
-            return true;
-        }
-        // Seed the simulator — same effect as clicking "Add demo peripheral".
-        CN.execute("bluetooth:item2");
-        // ...now drive the public Bluetooth API as usual.
-        return true;
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java[tag=maven-creating-cn1libs-java-004,indent=0]
 ----
 
 A common pattern: ship label-bearing hooks for actions a developer might want to fire manually (toggle adapter, inject notification), and ship label-less hooks for test-only state setup (`primeReadFailure`, `seedFixture`) that would just clutter the menu.

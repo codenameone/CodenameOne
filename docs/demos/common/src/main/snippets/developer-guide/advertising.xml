@@ -1,0 +1,18 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::advertising-xml-001[]
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>cn1-admob-lib</artifactId>
+    <version>${cn1.version}</version>
+    <type>pom</type>
+</dependency>
+// end::advertising-xml-001[]
+
+// tag::advertising-xml-002[]
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>cn1-ads-mock</artifactId>
+    <version>${cn1.version}</version>
+</dependency>
+// end::advertising-xml-002[]

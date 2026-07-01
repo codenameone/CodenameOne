@@ -28,28 +28,7 @@ If your identity provider publishes a standard `.well-known/openid-configuration
 
 [source,java]
 ----
-import com.codename1.io.oidc.OidcClient;
-import com.codename1.io.oidc.OidcTokens;
-import com.codename1.util.SuccessCallback;
-
-OidcClient.discover("https://accounts.google.com").ready(new SuccessCallback<OidcClient>() {
-    public void onSucess(OidcClient client) {
-        client.setClientId("YOUR_CLIENT_ID")
-              .setRedirectUri("com.example.app:/oauth2redirect")
-              .setScopes("openid", "email", "profile");
-        client.authorize().ready(new SuccessCallback<OidcTokens>() {
-            public void onSucess(OidcTokens tokens) {
-                // tokens.getAccessToken() -- bearer for API calls
-                // tokens.getIdToken()      -- JWT with user identity claims
-                // tokens.getEmail()        -- convenience accessor
-            }
-        }).except(new SuccessCallback<Throwable>() {
-            public void onSucess(Throwable err) {
-                System.out.println("Sign-in failed: " + err.getMessage());
-            }
-        });
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-001,indent=0]
 ----
 
 That call:
@@ -92,16 +71,7 @@ The `androidx.browser:browser:1.8.0` Gradle dependency (for Custom Tabs) is adde
 
 [source,java]
 ----
-client.refreshIfExpired(60).ready(new SuccessCallback<OidcTokens>() {
-    public void onSucess(OidcTokens tokens) {
-        if (tokens == null) {
-            // No saved tokens, or they expired and we have no refresh token.
-            client.authorize();
-        } else {
-            // Reuse `tokens.getAccessToken()` -- still valid (refreshed if needed).
-        }
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-002,indent=0]
 ----
 
 If the saved access token is within 60 seconds of expiring and a refresh token is available, `refreshIfExpired` performs a refresh-token grant in the background and persists the new tokens.
@@ -124,15 +94,7 @@ ios.signinwithapple=true
 
 [source,java]
 ----
-AppleSignIn.getInstance().signIn("name email", new AppleSignInCallback() {
-    public void onSuccess(AppleSignInResult result) {
-        // result.getIdentityToken()  -- JWT to verify on your server
-        // result.getUserId()         -- stable opaque user id, use as PK
-        // result.getEmail()          -- may be a real or relay address
-    }
-    public void onError(String err) { ... }
-    public void onCancel()          { ... }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-003,indent=0]
 ----
 
 NOTE: Apple only returns the user's name and email on the *first* authorization. AppleSignIn persists those values in `Preferences` so the result is consistent on subsequent sign-ins.
@@ -143,11 +105,7 @@ Apple requires a separate *Services ID* (a "web client") for non-iOS environment
 
 [source,java]
 ----
-AppleSignIn.getInstance()
-    .withServiceId("com.example.appleweb")
-    .withRedirectUri("https://example.com/auth/apple/callback")
-    .withClientSecret(serverGeneratedJwt)
-    .signIn("name email", callback);
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-004,indent=0]
 ----
 
 [[apple-services-id-setup]]
@@ -163,16 +121,7 @@ AppleSignIn.getInstance()
 
 [source,java]
 ----
-GoogleConnect.getInstance().signIn(
-    "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
-    "com.example.app:/oauth2redirect",
-    "openid", "email", "profile"
-).ready(new SuccessCallback<OidcTokens>() {
-    public void onSucess(OidcTokens t) {
-        String email = t.getEmail();
-        String idToken = t.getIdToken();
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-005,indent=0]
 ----
 
 `signIn` works on iOS, Android, JavaSE and Web with the same code, against the *Web Application* OAuth 2.0 client ID from Google Cloud Console. The redirect URI you supply must match one of the *Authorized redirect URIs* configured for that client.
@@ -192,16 +141,7 @@ If you currently rely on `GoogleConnect.doLogin()` with the Google Sign-In SDK o
 
 [source,java]
 ----
-FacebookConnect.getInstance().signIn(
-    "FB_APP_ID",
-    "com.example.app:/oauth2redirect",
-    "public_profile", "email"
-).ready(new SuccessCallback<OidcTokens>() {
-    public void onSucess(OidcTokens t) {
-        String accessToken = t.getAccessToken(); // ID token will be null
-        // call https://graph.facebook.com/me with the access token for user data
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-006,indent=0]
 ----
 
 Facebook doesn't issue OpenID-Connect ID tokens for classic OAuth flows, so `getIdToken()` returns `null`. Read user profile fields via the Graph API.
@@ -212,17 +152,7 @@ Facebook doesn't issue OpenID-Connect ID tokens for classic OAuth flows, so `get
 
 [source,java]
 ----
-MicrosoftConnect.getInstance()
-    .withTenant("common")
-    .signIn(
-        "YOUR_ENTRA_CLIENT_ID",
-        "com.example.app:/oauth2redirect",
-        "openid", "email", "profile", "User.Read"
-    ).ready(new SuccessCallback<OidcTokens>() {
-        public void onSucess(OidcTokens t) {
-            // t.getAccessToken() is a Microsoft Graph access token
-        }
-    });
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-007,indent=0]
 ----
 
 NOTE: Apps that need broker (Microsoft Authenticator) support for Conditional Access can bundle the MSAL SDK manually and bypass `MicrosoftConnect`. For the vast majority of apps the system-browser flow is sufficient and lets the simulator and web port share the same code path.
@@ -231,18 +161,7 @@ NOTE: Apps that need broker (Microsoft Authenticator) support for Conditional Ac
 
 [source,java]
 ----
-Auth0Connect.getInstance()
-    .withDomain("dev-xyz.us.auth0.com")
-    .withAudience("https://api.example.com")        // optional
-    .signIn(
-        "YOUR_AUTH0_CLIENT_ID",
-        "com.example.app:/oauth2redirect",
-        "openid", "email", "profile"
-    ).ready(new SuccessCallback<OidcTokens>() {
-        public void onSucess(OidcTokens t) {
-            String idToken = t.getIdToken();
-        }
-    });
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-008,indent=0]
 ----
 
 `Auth0Connect` is the simplest of the providers because Auth0 is a clean OIDC provider; everything beyond `withDomain` is optional.
@@ -253,46 +172,21 @@ Firebase Auth is *not* an OIDC provider -- it issues Google-Identity-Toolkit-sty
 
 [source,java]
 ----
-FirebaseAuth.getInstance()
-    .withApiKey("YOUR_FIREBASE_WEB_API_KEY")
-    .signInWithEmailAndPassword("a@b.com", "hunter2")
-    .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
-        public void onSucess(FirebaseAuth.FirebaseUser u) {
-            String uid = u.getUid();
-            String firebaseIdToken = u.getIdToken();
-        }
-    });
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-009,indent=0]
 ----
 
 For federated sign-in (Google / Apple / Microsoft as Firebase providers), first obtain an ID token via the matching `*Connect` class, then swap it for a Firebase session:
 
 [source,java]
 ----
-GoogleConnect.getInstance().signIn(..., "openid", "email")
-    .ready(new SuccessCallback<OidcTokens>() {
-        public void onSucess(OidcTokens g) {
-            FirebaseAuth.getInstance().signInWithIdpIdToken(g.getIdToken(), "google.com")
-                .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
-                    public void onSucess(FirebaseAuth.FirebaseUser u) {
-                        // Firebase user is now signed in.
-                    }
-                });
-        }
-    });
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-010,indent=0]
 ----
 
 Refresh the Firebase session at app launch:
 
 [source,java]
 ----
-FirebaseAuth fa = FirebaseAuth.getInstance().withApiKey(KEY);
-if (!fa.isSignedIn()) {
-    fa.refresh().ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
-        public void onSucess(FirebaseAuth.FirebaseUser u) {
-            // u is null if no refresh token was stored
-        }
-    });
-}
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-011,indent=0]
 ----
 
 === Passkeys / WebAuthn
@@ -315,44 +209,7 @@ Pseudo-code (the actual HTTP calls depend on your server library):
 
 [source,java]
 ----
-import com.codename1.io.webauthn.PublicKeyCredential;
-import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
-import com.codename1.io.webauthn.PublicKeyCredentialRequestOptions;
-import com.codename1.io.webauthn.WebAuthnClient;
-import com.codename1.io.webauthn.WebAuthnException;
-import com.codename1.util.SuccessCallback;
-
-// Registration -- enroll a new passkey
-String challengeJson = myServer.startPasskeyRegistration(currentUserId); // PublicKeyCredentialCreationOptionsJSON
-PublicKeyCredentialCreationOptions opts =
-        PublicKeyCredentialCreationOptions.fromJson(challengeJson);
-
-WebAuthnClient.getInstance().create(opts)
-        .ready(new SuccessCallback<PublicKeyCredential>() {
-            public void onSucess(PublicKeyCredential cred) {
-                myServer.finishPasskeyRegistration(cred.toJson()); // server verifies + persists
-            }
-        })
-        .except(new SuccessCallback<Throwable>() {
-            public void onSucess(Throwable err) {
-                if (err instanceof WebAuthnException) {
-                    String code = ((WebAuthnException) err).getError();
-                    // "NotAllowedError" -- user dismissed the sheet
-                    // "not_supported"   -- platform lacks a passkey impl
-                    // ... etc.
-                }
-            }
-        });
-
-// Sign-in -- assert with an existing passkey
-String requestJson = myServer.startPasskeySignIn(); // PublicKeyCredentialRequestOptionsJSON
-WebAuthnClient.getInstance()
-        .get(PublicKeyCredentialRequestOptions.fromJson(requestJson))
-        .ready(new SuccessCallback<PublicKeyCredential>() {
-            public void onSucess(PublicKeyCredential cred) {
-                myServer.finishPasskeySignIn(cred.toJson()); // server verifies signature
-            }
-        });
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-012,indent=0]
 ----
 
 `PublicKeyCredential#toJson()` is in the W3C `RegistrationResponseJSON` / `AuthenticationResponseJSON` format, which every WebAuthn server library accepts as-is. On the server, verify the response with one of:
@@ -397,33 +254,7 @@ Android: nothing beyond the dependency that gets injected automatically. The ass
 
 [source,java]
 ----
-// Sign in with an existing passkey
-Auth0Connect.getInstance()
-    .withDomain("dev-xyz.us.auth0.com")
-    .signInWithPasskey(
-        "YOUR_AUTH0_CLIENT_ID",
-        "Username-Password-Authentication",   // connection / realm
-        "openid", "email", "profile", "offline_access")
-    .ready(new SuccessCallback<OidcTokens>() {
-        public void onSucess(OidcTokens t) {
-            String idToken = t.getIdToken();
-        }
-    });
-
-// Enroll a brand-new passkey for a new account
-Auth0Connect.getInstance()
-    .withDomain("dev-xyz.us.auth0.com")
-    .registerPasskey(
-        "YOUR_AUTH0_CLIENT_ID",
-        "Username-Password-Authentication",
-        "alice@example.com",
-        "Alice",
-        "openid", "email", "profile")
-    .ready(new SuccessCallback<OidcTokens>() {
-        public void onSucess(OidcTokens tokens) {
-            // user is signed in; passkey is enrolled for next time
-        }
-    });
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-013,indent=0]
 ----
 
 Enable *Passkeys* in the Auth0 dashboard (Authentication &#8594; Database &#8594; your connection &#8594; Authentication Methods &#8594; Passkey), and add *WebAuthn* to the application's *Grant Types*.
@@ -435,28 +266,7 @@ Enable *Passkeys* in the Auth0 dashboard (Authentication &#8594; Database &#8594
 
 [source,java]
 ----
-FirebaseAuth fa = FirebaseAuth.getInstance().withApiKey("YOUR_FIREBASE_WEB_API_KEY");
-
-// Sign in with a passkey already on this device
-fa.signInWithPasskey().ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
-    public void onSucess(FirebaseAuth.FirebaseUser u) {
-        String uid = u.getUid();
-        String firebaseIdToken = u.getIdToken();
-    }
-});
-
-// Enroll a new passkey for the currently signed-in user
-fa.signInWithEmailAndPassword(email, password)
-    .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
-        public void onSucess(FirebaseAuth.FirebaseUser u) {
-            fa.registerPasskey("Alice's iPhone")
-                .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
-                    public void onSucess(FirebaseAuth.FirebaseUser enrolled) {
-                        // Next launch can sign in with signInWithPasskey() alone
-                    }
-                });
-        }
-    });
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-014,indent=0]
 ----
 
 Passkey support requires the *Identity Platform* tier of Firebase Auth (the upgraded plan). The free Firebase Auth tier doesn't expose the passkey endpoints; the calls will fail with an HTTP 403. Check your project plan in the Firebase console under Build &#8594; Authentication &#8594; Settings &#8594; User account linking.
@@ -488,55 +298,21 @@ A typical legacy snippet:
 
 [source,java]
 ----
-Oauth2 oauth = new Oauth2(
-    "https://provider.example.com/oauth2/authorize",
-    "CLIENT_ID",
-    "https://example.com/callback",
-    "openid email",
-    "https://provider.example.com/oauth2/token",
-    "CLIENT_SECRET");
-oauth.showAuthentication(new ActionListener() {
-    public void actionPerformed(ActionEvent e) {
-        if (e.getSource() instanceof AccessToken) {
-            AccessToken t = (AccessToken) e.getSource();
-            // ...
-        }
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-015,indent=0]
 ----
 
 becomes:
 
 [source,java]
 ----
-OidcConfiguration cfg = OidcConfiguration.newBuilder()
-    .authorizationEndpoint("https://provider.example.com/oauth2/authorize")
-    .tokenEndpoint("https://provider.example.com/oauth2/token")
-    .build();
-OidcClient client = OidcClient.create(cfg)
-    .setClientId("CLIENT_ID")
-    .setClientSecret("CLIENT_SECRET")
-    .setRedirectUri("https://example.com/callback")
-    .setScopes("openid", "email");
-client.authorize().ready(new SuccessCallback<OidcTokens>() {
-    public void onSucess(OidcTokens t) {
-        AccessToken legacy = t.toAccessToken();  // for code that still expects AccessToken
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-016,indent=0]
 ----
 
 Or, if the provider exposes a discovery document:
 
 [source,java]
 ----
-OidcClient.discover("https://provider.example.com").ready(new SuccessCallback<OidcClient>() {
-    public void onSucess(OidcClient client) {
-        client.setClientId("CLIENT_ID")
-              .setRedirectUri("https://example.com/callback")
-              .setScopes("openid", "email");
-        client.authorize().ready(/* ... */);
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/authentication-and-identity.java[tag=authentication-and-identity-java-017,indent=0]
 ----
 
 `OidcTokens#toAccessToken()` returns a `com.codename1.io.AccessToken`, so callers that already deal in `AccessToken` (most subclasses of `com.codename1.social.Login`) can adopt `OidcClient` without changing their token type.

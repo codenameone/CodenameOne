@@ -8,9 +8,7 @@ Clones the current project as a new project with a different _groupId_, _artifac
 
 [source,bash]
 ----
-mvn cn1:clone \
-  -DgroupId=com.example.newgroup \
-  -DartifactId=newapp \
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-clone.sh[tag=appendix-goal-clone-bash-001,indent=0]
 ----
 
 NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)

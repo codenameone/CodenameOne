@@ -19,9 +19,7 @@ bootstrap class (the same splice pattern as `@Mapped` mappers).
 
 [source, bash]
 ----
-mvn -pl common cn1:generate-openapi \
-    -Dcn1.openapi.spec=petstore.json \
-    -Dcn1.openapi.basePackage=com.example.petstore
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.sh[tag=appendix-goal-generate-openapi-bash-001,indent=0]
 ----
 
 Configuration:
@@ -76,23 +74,7 @@ emitted method shape:
 
 [source, java]
 ----
-@RestClient
-public interface PetApi {
-
-    @GET("/pet/{petId}")
-    void getPetById(@Path("petId") Long petId,
-                    @Header("Authorization") String bearerToken,
-                    OnComplete<Response<com.example.petstore.model.Pet>> callback);
-
-    @POST("/pet")
-    void addPet(@Body com.example.petstore.model.Pet body,
-                @Header("Authorization") String bearerToken,
-                OnComplete<Response<com.example.petstore.model.Pet>> callback);
-
-    static PetApi of(String baseUrl) {
-        return RestClients.create(PetApi.class, baseUrl);
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.java[tag=appendix-goal-generate-openapi-java-001,indent=0]
 ----
 
 Model types are emitted as fully qualified names (the API interface
@@ -104,13 +86,7 @@ Call sites use the static factory:
 
 [source, java]
 ----
-PetApi api = PetApi.of("https://petstore3.swagger.io/api/v3");
-api.getPetById(123L, "MY_TOKEN", response -> {
-    if (response.getResponseCode() == 200) {
-        Pet pet = response.getResponseData();
-        renderPet(pet);
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.java[tag=appendix-goal-generate-openapi-java-002,indent=0]
 ----
 
 The `<Tag>ApiImpl` class that actually performs the HTTP call lives

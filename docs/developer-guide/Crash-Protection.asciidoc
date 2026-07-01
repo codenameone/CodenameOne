@@ -31,10 +31,7 @@ In your `Lifecycle.init`:
 
 [source,java]
 ----
-public void init(Object context) {
-    CrashProtection.install();
-    CrashProtection.setEnabled(true);  // default is false; user-controlled opt-in
-}
+include::../demos/common/src/main/snippets/developer-guide/crash-protection.java[tag=crash-protection-java-001,indent=0]
 ----
 
 `install()` registers the EDT error handler and (on Android) wires `Thread.UncaughtExceptionHandler`. It's idempotent and a no-op on the simulator. `setEnabled(boolean)` controls whether captured crashes actually get sent to the server -- the captured payload is always persisted locally first, so `setEnabled(true)` after the fact drains the buffer.

@@ -22,9 +22,7 @@ as `@Mapped` mappers).
 
 [source, bash]
 ----
-mvn -pl common cn1:generate-grpc \
-    -Dcn1.grpc.proto=helloworld.proto \
-    -Dcn1.grpc.basePackage=com.example.hello
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-grpc.sh[tag=appendix-goal-generate-grpc-bash-001,indent=0]
 ----
 
 Configuration:
@@ -78,35 +76,14 @@ The `@GrpcClient` interface looks like:
 
 [source, java]
 ----
-@GrpcClient("helloworld.Greeter")
-public interface GreeterGrpc {
-
-    @Rpc("SayHello")
-    void sayHello(HelloRequest request,
-                  @Header("Authorization") String bearerToken,
-                  OnComplete<GrpcResponse<HelloReply>> callback);
-
-    static GreeterGrpc of(String baseUrl) {
-        return GrpcClients.create(GreeterGrpc.class, baseUrl);
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-grpc.java[tag=appendix-goal-generate-grpc-java-001,indent=0]
 ----
 
 Call sites use the static factory:
 
 [source, java]
 ----
-GreeterGrpc g = GreeterGrpc.of("https://api.example.com");
-HelloRequest req = new HelloRequest();
-req.name = "world";
-g.sayHello(req, "Bearer " + token, response -> {
-    if (response.isOk()) {
-        renderGreeting(response.getResponseData().message);
-    } else {
-        showError("gRPC status " + response.getResponseCode()
-                  + ": " + response.getResponseErrorMessage());
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-grpc.java[tag=appendix-goal-generate-grpc-java-002,indent=0]
 ----
 
 The `<Service>GrpcImpl` class that actually performs the gRPC-Web

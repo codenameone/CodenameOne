@@ -35,23 +35,21 @@ There are two simple methods in the `Util` class:
 
 [source,java]
 ----
-public static String xorDecode(String s);
-public static String xorEncode(String s);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-001,indent=0]
 ----
 
 They use a simple xor based obfuscation to make a String less readable. For example, if you've code like this:
 
 [source,java]
 ----
-private static final String SECRET = "Don't let anyone see this....";
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-002,indent=0]
 ----
 
 You might be concerned about the secret, then this would make it slightly harder to find out:
 
 [source,java]
 ----
-// Don't let anyone see this....
-private static final String SECRET = Util.xorDecode("RW1tI3Ema219KmpidGFhdTFhdnE1Yn9xajQ1MjM=");
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-003,indent=0]
 ----
 
 Notice that this **isn't secure**, if you have a crucial value that must not be found you need to store it in the server. No alternative exists because everything that's sent to the client can be compromised by a determined hacker.
@@ -62,20 +60,7 @@ Codename One's built-in user-specific constants are obfuscated with this method.
 
 [source,java]
 ----
-Form hi = new Form("Encoder", BoxLayout.y());
-TextField bla = new TextField("", "Type Text Here", 20, TextArea.ANY);
-TextArea encoded = new TextArea();
-SpanLabel decoded = new SpanLabel();
-hi.addAll(bla, encoded, decoded);
-bla.addDataChangedListener((a, b) -> {
-    String s = bla.getText();
-    String e = Util.xorEncode(s);
-    encoded.setText(e);
-    decoded.setText(Util.xorDecode(e));
-    hi.getContentPane().animateLayout(100);
-});
-
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-004,indent=0]
 ----
 
 This allows you to type in the first text field and the second text area shows the encoded result. A text area is used so copy/paste is easy.
@@ -93,7 +78,7 @@ This is available by installing the bouncy castle cn1lib from the extensions men
 
 [source,java]
 ----
-EncryptedStorage.install("your-pass-encryption-key");
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-005,indent=0]
 ----
 
 TIP: You would want that code within your `init(Object)` method
@@ -107,20 +92,14 @@ This works through a new mechanism in storage where you can replace the storage 
 
 [source,java]
 ----
-Storage.setStorageInstance(new MyCustomStorageSubclass());
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-006,indent=0]
 ----
 
 You can leverage that knowledge to change the encryption password on the encryption storage using pseudo-code like this:
 
 [source,java]
 ----
-EncryptedStorage.install(oldKey);
-InputStream is = Storage.getInstance().createInputStream(storageFileName);
-byte[] data = Util.readInputStream(is);
-EncryptedStorage.install(newKey);
-OutputStream o = Storage.getInstance().createOutputStream("TestEncryption");
-o.write(data);
-o.close();
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-007,indent=0]
 ----
 
 NOTE: It isn't a good idea to replace storage objects when an app is running so this is purely for this special case...
@@ -139,10 +118,7 @@ Some values are too sensitive for `Storage` or `Preferences`, which are plaintex
 
 [source,java]
 ----
-SecureStorage ss = SecureStorage.getInstance();
-ss.set("auth.token", token);
-String token = ss.get("auth.token");   // null if absent
-ss.remove("auth.token");
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-008,indent=0]
 ----
 
 On a platform without a keychain the base implementation returns `false` / `null`, so treat a `null` read as "not available" and fall back accordingly.
@@ -153,8 +129,7 @@ Baking an API key (for example a Google Maps key) into your app is unsafe: anyon
 
 [source,java]
 ----
-// off the EDT -- the first call may hit the network:
-String mapsKey = Secrets.get("googlemaps.key");
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-009,indent=0]
 ----
 
 `get` returns the keychain-cached value when present, otherwise it fetches from the vault over TLS, caches it, and returns it. `refresh(name)` forces a fresh fetch (after you rotate the value server-side) and `clear(name)` drops the cached copy.
@@ -188,14 +163,14 @@ To block copy & paste globally use:
 
 [source,java]
 ----
-Display.getInstance().setProperty("blockCopyPaste", "true");
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-010,indent=0]
 ----
 
 To block copy & paste on a specific field do:
 
 [source,java]
 ----
-textCmp.putClientProperty("blockCopyPaste", Boolean.TRUE);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-011,indent=0]
 ----
 
 NOTE: Notice that the inverse of using `false` might not work as expected
@@ -210,11 +185,7 @@ For obvious reasons it's hard to accurately detect a jailbroken or rooted device
 
 [source,java]
 ----
-if(Display.getInstance().isJailbrokenDevice()) {
-    // probably jailbroken or rooted
-} else {
-   // probably not
-}
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-012,indent=0]
 ----
 
 Notice that this isn't right, you can't be 100% sure as there are no official ways to detect jailbreak. That's why it's crucial to encrypt everything and assume the device was compromised to begin with when dealing with sensitive data. Still it's worthwhile to use these APIs to make the life of an attacker a little bit harder.
@@ -237,16 +208,7 @@ When you'd rather respond in-app than be hard-killed -- for example to block onl
 
 [source,java]
 ----
-import com.codename1.security.DeviceIntegrity;
-
-if (DeviceIntegrity.isDeviceCompromised()) {
-    // root / jailbreak / Frida / emulator detected -- do not hard-exit,
-    // instead degrade: disable the transfer button, require step-up auth, etc.
-    for (String reason : DeviceIntegrity.getCompromiseReasons()) {
-        // reason is a machine-readable code: "root", "frida", "emulator", "jailbreak"
-        Log.p("Device compromise signal: " + reason);
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-013,indent=0]
 ----
 
 `isDeviceCompromised()` aggregates the same root/jailbreak/Frida signals as the launch gates plus emulator heuristics, but never terminates the app. On the simulator and unsupported ports it simply returns `false`.
@@ -266,20 +228,7 @@ The runtime API is identical on both platforms -- request a token bound to a fre
 
 [source,java]
 ----
-import com.codename1.security.DeviceIntegrity;
-
-// serverNonce is generated by, and round-tripped from, your backend so it can
-// detect replay. The returned token is opaque and MUST be verified server-side.
-DeviceIntegrity.requestIntegrityToken(serverNonce).onResult((token, err) -> {
-    if (err != null) {
-        // Attestation unavailable -- treat the device as untrusted /
-        // require an additional verification step before allowing the transfer.
-        return;
-    }
-    // POST `token` to your backend. The backend decrypts/validates the verdict
-    // with Google / Apple and decides whether to authorize the transfer.
-    authorizeTransferAfterServerVerification(token);
-});
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-014,indent=0]
 ----
 
 `DeviceIntegrity.isAttestationSupported()` reports whether attestation is available and was bundled into this build. On the simulator, on unsupported ports, or when the build hint is off, `requestIntegrityToken()` completes with an error rather than throwing.
@@ -299,25 +248,14 @@ At runtime you get the same information for granular control:
 
 [source,java]
 ----
-import com.codename1.security.DeviceIntegrity;
-
-// Enumerate the enabled accessibility services (component ids "pkg/.Service").
-String[] services = DeviceIntegrity.getEnabledAccessibilityServices();
-
-// True if any enabled service is outside your trusted allow-list.
-if (DeviceIntegrity.hasUntrustedAccessibilityService("com.google.android.marvin.talkback")) {
-    // Likely accessibility-abusing malware -- block the sensitive action.
-}
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-015,indent=0]
 ----
 
 For the screens that actually matter (PIN entry, transfer confirmation), mark them secure so the OS blocks screenshots, screen recording, and accessibility screen scraping while they're displayed:
 
 [source,java]
 ----
-// Entering a sensitive screen (Android FLAG_SECURE; no-op on iOS):
-DeviceIntegrity.setSecureScreen(true);
-// ... leaving it:
-DeviceIntegrity.setSecureScreen(false);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-016,indent=0]
 ----
 
 NOTE: Accessibility-service enumeration and `setSecureScreen()` are Android concepts; on iOS they are no-ops (iOS has no equivalent third-party accessibility-service threat model). Use `ios.disableScreenshots=true` to block screen capture on iOS as described in <<Disabling screenshots>>.
@@ -376,18 +314,7 @@ To do this you have a https://github.com/codenameone/SSLCertificateFingerprint/[
 
 [source,java]
 ----
-if(CheckCert.isCertCheckingSupported()) {
-    String f = CheckCert.getFingerprint(myHttpsURL);
-    if(validKeysList.contains(f)) {
-        // OK it's a good certificate proceed
-    } else {
-       if(Dialog.show("Security Warning", "WARNING: it is possible your commmunications are being tampered! We suggest quitting the app at once!", "Quit", "Continue")) {
-          Display.getInstance().exitApplication();
-       }
-    }
-} else {
-    // certificate fingerprint checking isn't supported on this platform... It's your decision whether to proceed or not
-}
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-017,indent=0]
 ----
 
 Notice that once connection is established you don't need to verify again for the current application run.
@@ -412,18 +339,7 @@ NOTE: Cryptographic operations only throw `com.codename1.security.CryptoExceptio
 
 [source,java]
 ----
-import com.codename1.security.Hash;
-
-// One-shot
-byte[] digest = Hash.sha256("hello".getBytes("UTF-8"));
-String hex    = Hash.toHex(digest);          // 64-character lowercase hex
-byte[] back   = Hash.fromHex(hex);           // round-trip helper
-
-// Streaming
-Hash h = Hash.create(Hash.SHA256);
-h.update(part1);
-h.update(part2);
-byte[] full = h.digest();                    // hash is reset after digest()
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-018,indent=0]
 ----
 
 The algorithm identifier strings (`Hash.MD5`, `Hash.SHA256`, etc.) are also accepted with or without dashes and in any case (`"sha256"` and `"SHA-256"` are equivalent).
@@ -434,15 +350,7 @@ The algorithm identifier strings (`Hash.MD5`, `Hash.SHA256`, etc.) are also acce
 
 [source,java]
 ----
-import com.codename1.security.Hmac;
-
-byte[] tag = Hmac.sha256(secret, message);
-
-// Streaming
-Hmac h = Hmac.create(Hash.SHA256, secret);
-h.update(part1);
-h.update(part2);
-byte[] tag2 = h.doFinal();
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-019,indent=0]
 ----
 
 When comparing authentication tags, use `Hmac.constantTimeEquals(a, b)` instead of `Arrays.equals(a, b)` -- the latter short-circuits on the first mismatch and is vulnerable to timing attacks.
@@ -453,11 +361,7 @@ When comparing authentication tags, use `Hmac.constantTimeEquals(a, b)` instead 
 
 [source,java]
 ----
-import com.codename1.security.SecureRandom;
-
-byte[] iv  = SecureRandom.bytes(12);      // 12-byte AES-GCM nonce
-int    pin = SecureRandom.intBelow(1_000_000);   // bias-free 6-digit code
-long   id  = SecureRandom.longBelow(1L << 53);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-020,indent=0]
 ----
 
 ==== Symmetric encryption (AES)
@@ -466,17 +370,7 @@ long   id  = SecureRandom.longBelow(1L << 53);
 
 [source,java]
 ----
-import com.codename1.security.Cipher;
-import com.codename1.security.KeyGenerator;
-import com.codename1.security.SecretKey;
-import com.codename1.security.SecureRandom;
-
-SecretKey key   = KeyGenerator.aes(256);
-byte[]    nonce = SecureRandom.bytes(12);
-byte[]    aad   = "v1".getBytes("UTF-8");
-
-byte[] ciphertext = Cipher.aesEncrypt(Cipher.AES_GCM, key, nonce, aad, plaintext);
-byte[] decrypted  = Cipher.aesDecrypt(Cipher.AES_GCM, key, nonce, aad, ciphertext);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-021,indent=0]
 ----
 
 The `Cipher` class exposes the standard JCE-style transformation strings as constants: `Cipher.AES_GCM`, `Cipher.AES_CBC_PKCS5`, `Cipher.AES_CBC`, and `Cipher.AES_ECB_PKCS5`. For GCM, the 16-byte authentication tag is appended to the ciphertext (matching the JCE convention). ECB is exposed only for interop with legacy systems -- it leaks structure and should never be used for new designs.
@@ -487,30 +381,14 @@ The `Cipher` class exposes the standard JCE-style transformation strings as cons
 
 [source,java]
 ----
-import com.codename1.security.Cipher;
-import com.codename1.security.KeyGenerator;
-import com.codename1.security.KeyPair;
-import com.codename1.security.Signature;
-
-// Generate a fresh RSA-2048 key pair (run on a background thread; key
-// generation can take a noticeable amount of time)
-KeyPair kp = KeyGenerator.rsa(2048);
-
-// Encrypt a small payload (e.g. wrap an AES key)
-byte[] sealed = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, kp.getPublicKey(), payload);
-byte[] opened = Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, kp.getPrivateKey(), sealed);
-
-// Sign / verify
-byte[] sig = Signature.sign(Signature.SHA256_WITH_RSA, kp.getPrivateKey(), data);
-boolean ok = Signature.verify(Signature.SHA256_WITH_RSA, kp.getPublicKey(), data, sig);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-022,indent=0]
 ----
 
 To use a key that was generated outside the app, feed the DER bytes to the static factory methods:
 
 [source,java]
 ----
-PublicKey  pub  = PublicKey.rsa(x509SpkiBytes);          // openssl rsa -pubout -outform DER
-PrivateKey priv = PrivateKey.rsa(pkcs8DerBytes);         // openssl pkcs8 -topk8 -nocrypt -outform DER
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-023,indent=0]
 ----
 
 The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WITH_RSA`, `SHA384_WITH_RSA`, `SHA512_WITH_RSA`, `SHA256_WITH_ECDSA`, `SHA384_WITH_ECDSA`, and `SHA512_WITH_ECDSA`.
@@ -521,33 +399,14 @@ The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WI
 
 [source,java]
 ----
-import com.codename1.security.Jwt;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-Map<String, Object> claims = new LinkedHashMap<String, Object>();
-claims.put("sub", "user-123");
-claims.put("exp", System.currentTimeMillis() / 1000 + 3600);
-
-// Sign with a shared secret (HS256)
-String token = Jwt.signHs256(claims, "secret".getBytes("UTF-8"));
-
-// Parse + verify
-Jwt parsed = Jwt.parse(token);
-if (!parsed.verifyHs256("secret".getBytes("UTF-8"))) {
-    throw new SecurityException("bad signature");
-}
-String subject = (String) parsed.getClaim("sub");
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-024,indent=0]
 ----
 
 For RSA-signed tokens (RS256/384/512) and ECDSA-signed tokens (ES256/384/512), pass the key to the dynamic overloads:
 
 [source,java]
 ----
-KeyPair kp   = KeyGenerator.rsa(2048);
-String  rs   = Jwt.sign(claims, kp.getPrivateKey(), Jwt.RS256);
-Jwt     read = Jwt.parse(rs);
-boolean ok   = read.verify(kp.getPublicKey());
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-025,indent=0]
 ----
 
 WARNING: `Jwt.parse(token)` does not verify the signature -- you must call one of the `verify*` methods afterwards. Tokens with an `alg` header of `none` are rejected by `verify` unless you explicitly call `setVerifyAllowNoneAlgorithm(true)` on the parsed JWT. Accepting unsigned tokens is a critical security bug in almost every deployment, so leave it off unless you have decided that the transport is trusted.
@@ -560,24 +419,14 @@ Shared secrets are commonly distributed as Base32 strings (the format embedded i
 
 [source,java]
 ----
-import com.codename1.security.Base32;
-import com.codename1.security.Otp;
-
-byte[] secret = Base32.decode("JBSWY3DPEHPK3PXP");
-
-// Generate the current 6-digit TOTP code (30-second step, SHA-1)
-String code = Otp.totp(secret);
-
-// Verify the code the user typed in, allowing one step of clock skew on
-// either side (so the previous, current, and next codes are all accepted)
-boolean ok = Otp.verifyTotp(secret, userInput, 1);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-026,indent=0]
 ----
 
 For HOTP, supply the counter explicitly and increment it after every successful authentication:
 
 [source,java]
 ----
-String code = Otp.hotp(secret, counter++, 6);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-027,indent=0]
 ----
 
 ==== Walkthrough: Adding two-factor authentication to a sign-in flow
@@ -593,20 +442,7 @@ The TOTP secret should be generated and stored on your *server*, not on the Code
 
 [source,java]
 ----
-import com.codename1.security.Otp;
-import com.codename1.security.SecureRandom;
-
-// 1. Generate (or fetch from your server) a 20-byte secret -- 160 bits is the
-//    de-facto standard for authenticator compatibility.
-byte[] secret = SecureRandom.bytes(20);
-
-// 2. Build the otpauth URI. The authenticator app stores the secret against
-//    the "Acme Bank: alice@example.com" label and tags it with the issuer
-//    so it can show "Acme Bank" next to the rotating code.
-String uri = Otp.otpauthUri("Acme Bank", "alice@example.com", secret);
-
-// 3. Render `uri` as a QR code and show it on screen for the user to scan.
-//    See "Rendering the QR code" below.
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-028,indent=0]
 ----
 
 [NOTE]
@@ -626,28 +462,7 @@ The maximum-compatibility settings -- 6 digits, 30 second step, SHA-1 -- are the
 
 [source,java]
 ----
-import com.codename1.components.OtpField;
-import com.codename1.security.Otp;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
-
-OtpField field = new OtpField(6);
-field.addCompleteListener(new ActionListener() {
-    public void actionPerformed(ActionEvent evt) {
-        String userInput = field.getText();
-        // tolerance=1 allows the previous, current, and next 30-second
-        // windows to compensate for clock skew between the device and the
-        // server. tolerance=0 is strict but unforgiving; tolerance=2 or 3
-        // is more permissive but increases the brute-force attack surface.
-        if (Otp.verifyTotp(secret, userInput, 1)) {
-            grantAccess();
-        } else {
-            field.clear();
-            Dialog.show("Invalid code", "Try again", "OK", null);
-        }
-    }
-});
-form.add(field);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-029,indent=0]
 ----
 
 *Server-side verification.* When your backend does the verification, the corresponding Java looks the same -- `Otp.verifyTotp(storedSecret, codeFromClient, 1)`. Make sure you rate-limit verification attempts (e.g. lock the account after 5 wrong codes within a minute) and log failures, since the 6-digit search space is small enough to be brute-forced without that.
@@ -658,21 +473,7 @@ form.add(field);
 
 [source,java]
 ----
-import com.codename1.components.OtpField;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
-
-OtpField otp = new OtpField(6);                  // 6 digits, numeric
-otp.addCompleteListener(new ActionListener() {
-    public void actionPerformed(ActionEvent evt) {
-        if (Otp.verifyTotp(secret, otp.getText(), 1)) {
-            // accepted
-        } else {
-            otp.clear();
-        }
-    }
-});
-form.add(otp);
+include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-030,indent=0]
 ----
 
 Style the boxes through the UIIDs `OtpField` (the container) and `OtpDigit` (each box). The component supports alphanumeric input via the two-argument constructor (`new OtpField(8, false)`), and pasting a full code into any one box distributes the characters across the remaining boxes automatically.

@@ -1,0 +1,20 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::game-assets-json-001[]
+{ "id": "player", "name": "Player", "kind": "actor",
+  "w": 28, "h": 32, "color": "#4D86FF", "unique": true,
+  "defaults": { "lives": 3, "jumpHeight": 96 } }
+// end::game-assets-json-001[]
+
+// tag::game-assets-json-002[]
+{
+  "id": "key",
+  "name": "Key",
+  "kind": "actor",
+  "w": 24,
+  "h": 24,
+  "color": "#E0C040",
+  "unique": false,
+  "defaults": { "opens": "door", "value": 1 }
+}
+// end::game-assets-json-002[]

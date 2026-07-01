@@ -8,28 +8,28 @@ You can place arbitrary files within the `src` directory of a Codename One proje
 
 [source,java]
 ----
-InputStream i = getClass().getResourceAsStream("/myFile");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-001,indent=0]
 ----
 
 This isn't guaranteed to work on all platforms and will probably fail on some. Instead, use something like:
 
 [source,java]
 ----
-InputStream i = Display.getInstance().getResourceAsStream(getClass(), "/myFile");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-002,indent=0]
 ----
 
 This isn't the limitation. You can't use hierarchies, so something like this fails:
 
 [source,java]
 ----
-InputStream i = Display.getInstance().getResourceAsStream(getClass(), "/res/myFile");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-003,indent=0]
 ----
 
 You can't use relative paths either, so this also fails (notice the missing first slash):
 
 [source,java]
 ----
-InputStream i = Display.getInstance().getResourceAsStream(getClass(), "myFile");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-004,indent=0]
 ----
 
 Those limitations exist for portability. iOS and Android handle resources differently, so supporting the full Java SE semantics is unrealistic.
@@ -50,56 +50,7 @@ The sample code below demonstrates listing storage content, adding and viewing e
 
 [source,java]
 ----
-Toolbar.setGlobalToolbar(true);
-Form hi = new Form("Storage", new BoxLayout(BoxLayout.Y_AXIS));
-hi.getToolbar().addCommandToRightBar("+", null, e -> {
-    TextField tf = new TextField("", "File Name", 20, TextField.ANY);
-    TextArea body = new TextArea(5, 20);
-    body.setHint("File Body");
-    Command ok = new Command("OK");
-    Command cancel = new Command("Cancel");
-    Command result = Dialog.show("File Name", BorderLayout.north(tf).add(BorderLayout.CENTER, body), ok, cancel);
-    if(ok == result) {
-        try(OutputStream os = Storage.getInstance().createOutputStream(tf.getText());) {
-            os.write(body.getText().getBytes("UTF-8"));
-            createFileEntry(hi, tf.getText());
-            hi.getContentPane().animateLayout(250);
-        } catch(IOException err) {
-            Log.e(err);
-        }
-    }
-});
-for(String file : Storage.getInstance().listEntries()) {
-    createFileEntry(hi, file);
-}
-hi.show();
-
-private void createFileEntry(Form hi, String file) {
-   Label fileField = new Label(file);
-   Button delete = new Button();
-   Button view = new Button();
-   FontImage.setMaterialIcon(delete, FontImage.MATERIAL_DELETE);
-   FontImage.setMaterialIcon(view, FontImage.MATERIAL_OPEN_IN_NEW);
-   Container content = BorderLayout.center(fileField);
-   int size = Storage.getInstance().entrySize(file);
-   content.add(BorderLayout.EAST, BoxLayout.encloseX(new Label(size + "bytes"), delete, view));
-   delete.addActionListener(e -> {
-       Storage.getInstance().deleteStorageFile(file);
-       content.setY(hi.getWidth());
-       hi.getContentPane().animateUnlayoutAndWait(150, 255);
-       hi.removeComponent(content);
-       hi.getContentPane().animateLayout(150);
-   });
-   view.addActionListener(e -> {
-       try(InputStream is = Storage.getInstance().createInputStream(file);) {
-           String s = Util.readToString(is, "UTF-8");
-           Dialog.show(file, s, "OK", null);
-       } catch(IOException err) {
-           Log.e(err);
-       }
-   });
-   hi.add(content);
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-005,indent=0]
 ----
 
 .List of files within the storage
@@ -114,14 +65,14 @@ image::img/storage-content.png[Content of a file added to the storage,scaledwidt
 
 [source,java]
 ----
-Preferences.set("token", myToken);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-006,indent=0]
 ----
 
 You can then read the token like this:
 
 [source,java]
 ----
-String token = Preferences.get("token", null);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-007,indent=0]
 ----
 
 The backing store filename defaults to `"codenameone.properties"`, but you can override it by calling `Preferences.setPreferencesLocation(String)` before your app touches the API. This is useful when you need separate preference namespaces per user or when you want to plug in an encrypted storage layer.
@@ -169,48 +120,7 @@ A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage
 
 [source,java]
 ----
-Form hi = new Form("FileSystemTree", new BorderLayout());
-TreeModel tm = new TreeModel() {
-    @Override
-    public Vector getChildren(Object parent) {
-        String[] files;
-        if(parent == null) {
-            files = FileSystemStorage.getInstance().getRoots();
-            return new Vector<Object>(Arrays.asList(files));
-        } else {
-            try {
-                files = FileSystemStorage.getInstance().listFiles((String)parent);
-            } catch(IOException err) {
-                Log.e(err);
-                files = new String[0];
-            }
-        }
-        String p = (String)parent;
-        Vector result = new Vector();
-        for(String s : files) {
-            result.add(p + s);
-        }
-        return result;
-    }
-
-    @Override
-    public boolean isLeaf(Object node) {
-        return !FileSystemStorage.getInstance().isDirectory((String)node);
-    }
-};
-Tree t = new Tree(tm) {
-    @Override
-    protected String childToDisplayLabel(Object child) {
-        String n = (String)child;
-        int pos = n.lastIndexOf("/");
-        if(pos < 0) {
-            return n;
-        }
-        return n.substring(pos);
-    }
-};
-hi.add(BorderLayout.CENTER, t);
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-008,indent=0]
 ----
 
 .Simple sample of a tree for the FileSystemStorage API
@@ -271,14 +181,14 @@ The https://www.codenameone.com/javadoc/com/codename1/db/Database.html[Database]
 
 [source,java]
 ----
-Database db = Display.getInstance().openOrCreate("databaseName");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-009,indent=0]
 ----
 
 Some SQLite apps ship with a "ready made" database. You allow you to replace the DB file by using the code:
 
 [source,java]
 ----
-String path = Display.getInstance().getDatabasePath("databaseName");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-010,indent=0]
 ----
 
 You can then use the `FileSystemStorage` class to write the content of your DB file into the path. Notice that it must be a valid SQLite file!
@@ -291,66 +201,7 @@ Working with a database is pretty trivial, the application logic below can send 
 
 [source,java]
 ----
-Toolbar.setGlobalToolbar(true);
-Style s = UIManager.getInstance().getComponentStyle("TitleCommand");
-FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_QUERY_BUILDER, s);
-Form hi = new Form("SQL Explorer", new BorderLayout());
-hi.getToolbar().addCommandToRightBar("", icon, (e) -> {
-    TextArea query = new TextArea(3, 80);
-    Command ok = new Command("Execute");
-    Command cancel = new Command("Cancel");
-    if(Dialog.show("Query", query, ok, cancel) == ok) {
-        Database db = null;
-        Cursor cur = null;
-        try {
-            db = Display.getInstance().openOrCreate("MyDB.db");
-            if(query.getText().startsWith("select")) {
-                cur = db.executeQuery(query.getText());
-                int columns = cur.getColumnCount();
-                hi.removeAll();
-                if(columns > 0) {
-                    boolean next = cur.next();
-                    if(next) {
-                        ArrayList<String[]> data = new ArrayList<>();
-                        String[] columnNames = new String[columns];
-                        for(int iter = 0 ; iter < columns ; iter++) {
-                            columnNames[iter] = cur.getColumnName(iter);
-                        }
-                        while(next) {
-                            Row currentRow = cur.getRow();
-                            String[] currentRowArray = new String[columns];
-                            for(int iter = 0 ; iter < columns ; iter++) {
-                                currentRowArray[iter] = currentRow.getString(iter);
-                            }
-                            data.add(currentRowArray);
-                            next = cur.next();
-                        }
-                        Object[][] arr = new Object[data.size()][];
-                        data.toArray(arr);
-                        hi.add(BorderLayout.CENTER, new Table(new DefaultTableModel(columnNames, arr)));
-                    } else {
-                        hi.add(BorderLayout.CENTER, "Query returned no results");
-                    }
-                } else {
-                    hi.add(BorderLayout.CENTER, "Query returned no results");
-                }
-            } else {
-                db.execute(query.getText());
-                hi.add(BorderLayout.CENTER, "Query completed successfully");
-            }
-            hi.revalidate();
-        } catch(IOException err) {
-            Log.e(err);
-            hi.removeAll();
-            hi.add(BorderLayout.CENTER, "Error: " + err);
-            hi.revalidate();
-        } finally {
-            Util.cleanup(db);
-            Util.cleanup(cur);
-        }
-    }
-});
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-011,indent=0]
 ----
 
 .Querying the temp demo generated by the SQLDemo application
@@ -373,35 +224,14 @@ You can send a get request to a URL using something like:
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false);
-request.addResponseListener((e) -> {
-    // process the response
-});
-
-// request will be handled asynchronously
-NetworkManager.getInstance().addToQueue(request);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-012,indent=0]
 ----
 
 Notice that you can also implement the same thing and much more by avoiding the response listener code and instead overriding the methods of the `ConnectionRequest` class which offers many points to override for example:
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false) {
-   protected void readResponse(InputStream input) {
-        // just read from the response input stream
-   }
-
-   protected void postResponse() {
-        // invoked on the EDT after processing is complete to allow the networking code
-        // to update the UI
-   }
-
-   protected void buildRequestBody(OutputStream os) {
-        // writes post data, by default this "just works" but if you want to write this
-       // manually then override this
-   }
-};
-NetworkManager.getInstance().addToQueue(request);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-013,indent=0]
 ----
 
 TIP: Notice that overriding `buildRequestBody(OutputStream)` will work for `POST` requests and will replace writing the arguments
@@ -412,10 +242,7 @@ IMPORTANT: You don't need to close the output/input streams passed to the reques
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false);
-// request will be handled synchronously
-NetworkManager.getInstance().addToQueueAndWait(request);
-byte[] resultOfRequest = request.getData();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-014,indent=0]
 ----
 
 Notice that in this case the `addToQueueAndWait` method returned after the connection completed. Also notice that this was totally legal to do on the EDT!
@@ -442,7 +269,7 @@ To update the number of threads use:
 
 [source,java]
 ----
-NetworkManager.getInstance().updateThreadCount(4);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-015,indent=0]
 ----
 
 All the callbacks in the `ConnectionRequest` occur on the network thread and *not on the EDT*!
@@ -457,10 +284,7 @@ IMPORTANT: Never change the UI from a `ConnectionRequest` callback. You can eith
 
 [source,java]
 ----
-NetworkManager nm = NetworkManager.getInstance();
-if (nm.isVPNDetectionSupported()) {
-    boolean vpnActive = nm.isVPNActive();
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-016,indent=0]
 ----
 
 IMPORTANT: This is a heuristic signal, not a security control.
@@ -490,8 +314,7 @@ If you continue your example from above you can do something like this:
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false);
-request.addArgument("MyArgName", value);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-017,indent=0]
 ----
 
 This will implicitly add a get argument with the content of `value`. Notice that you don't care what value is. It's implicitly HTTP encoded based on the get/post semantics. In this case it will use the get encoding since you passed `false` to the constructor.
@@ -500,8 +323,7 @@ A simpler implementation could do something like this:
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url +
-    "MyArgName=" + Util.encodeUrl(value), false);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-018,indent=0]
 ----
 
 This would be almost identical but doesn't provide the convenience for switching back and forth between `GET`/`POST` and it isn't as fluent.
@@ -516,8 +338,7 @@ For example, if you wish to have finer grained control over the submission proce
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false);
-request.setHttpMethod("HEAD");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-019,indent=0]
 ----
 
 ===== Headers
@@ -528,26 +349,21 @@ Some headers are built-in as direct APIs for example: content type is directly e
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, true);
-request.setContentType("text/xml");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-020,indent=0]
 ----
 
 You can also add any arbitrary header type you want, for example: a common use case is basic authorization where the authorization header includes the Base64 encoded user/password combination as such:
 
 [source,java]
 ----
-String authCode = user + ":" + password;
-String authHeader = "Basic " + Base64.encode(authCode.getBytes());
-request.addRequestHeader("Authorization", authHeader);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-021,indent=0]
 ----
 
 This can be tedious to do if you want all requests from your app to use this header. For this use case you can use:
 
 [source,java]
 ----
-String authCode = user + ":" + password;
-String authHeader = "Basic " + Base64.encode(authCode.getBytes());
-NetworkManager.getInstance().addDefaultHeader("Authorization", authHeader);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-022,indent=0]
 ----
 
 ===== Server headers
@@ -556,19 +372,7 @@ Server returned headers are a bit trickier to read. You need to subclass the con
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false) {
-    protected void readHeaders(Object connection) throws IOException {
-        String[] headerNames = getHeaderFieldNames(connection);
-        for(String headerName : headerNames) {
-            String headerValue = getHeader(headerName);
-            //....
-        }
-    }
-    protected void readResponse(InputStream input) {
-        // just read from the response input stream
-    }
-};
-NetworkManager.getInstance().addToQueue(request);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-023,indent=0]
 ----
 
 Here you can extract the headers one by one to handle complex headers such as cookies, authentication etc.
@@ -588,8 +392,7 @@ For example: to block all network errors from showing anything to the user you c
 
 [source,java]
 ----
-NetworkManager.getInstance().addToQueue(request);
-NetworkManager.getInstance().addErrorListener((e) -> e.consume());
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-024,indent=0]
 ----
 
 The error listener is invoked first with the https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html[NetworkEvent] matching the error. Consuming the event prevents it from propagating further down the chain into the `ConnectionRequest` callbacks.
@@ -598,17 +401,7 @@ You can also override the error callbacks of the various types in the request fo
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false) {
-    protected void handleErrorResponseCode(int code, String message) {
-        if(code == 444) {
-            // do something
-        }
-    }
-    protected void readResponse(InputStream input) {
-        // just read from the response input stream
-    }
-};
-NetworkManager.getInstance().addToQueue(request);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-025,indent=0]
 ----
 
 IMPORTANT: The error callback is triggered in the network thread! +
@@ -618,12 +411,7 @@ Another approach is to use the `setFailSilently(true)` method on the `Connection
 
 [source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(url, false);
-request.setFailSilently(true);
-NetworkManager.getInstance().addToQueueAndWait(request);
-if(request.getResponseCode() != 200) {
-    // probably an error...
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-026,indent=0]
 ----
 
 TIP: This code will work with the synchronous "AndWait" version of the method since the response code will take a while to return for the non-wait version.
@@ -646,8 +434,7 @@ By default `GZConnectionRequest` doesn't request gzipped data ( unzips it when i
 
 [source,java]
 ----
-GZConnectionRequest con = new GZConnectionRequest();
-con.addRequestHeader("Accept-Encoding", "gzip");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-027,indent=0]
 ----
 
 Do the rest as usual and you should have smaller responses from the servers.
@@ -660,10 +447,7 @@ You can always submit data in the `buildRequestBody` but this is flaky and has s
 
 [source,java]
 ----
-MultipartRequest request = new MultipartRequest();
-request.setUrl(url);
-request.addData("myFileName", fullPathToFile, "text/plain")
-NetworkManager.getInstance().addToQueue(request);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-028,indent=0]
 ----
 
 TIP: `MultipartRequest` is a `ConnectionRequest` most stuff you expect from there should work. Even addArgument etc.
@@ -672,22 +456,7 @@ Since you assume most developers reading this will be familiar with Java here is
 
 [source,java]
 ----
-@WebServlet(name = "UploadServlet", urlPatterns = {"/upload"})
-@MultipartConfig(fileSizeThreshold = 1024 * 1024 * 100, // 10 MB
-        maxFileSize = 1024 * 1024 * 150, // 50 MB
-        maxRequestSize = 1024 * 1024 * 200)      // 100 MB
-public class UploadServlet extends HttpServlet {
-
-    @Override
-    public void doPost(HttpServletRequest req, HttpServletResponse res)
-            throws ServletException, IOException {
-        Collection<Part> parts = req.getParts();
-        Part data = parts.iterator().next();
-        try(InputStream is = data.getInputStream();) {}
-            // store or do something with the input stream
-        }
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-029,indent=0]
 ----
 
 
@@ -705,20 +474,7 @@ To parse a CSV use the https://www.codenameone.com/javadoc/com/codename1/io/CSVP
 
 [source,java]
 ----
-Form hi = new Form("CSV Parsing", new BorderLayout());
-CSVParser parser = new CSVParser();
-try(Reader r = new CharArrayReader("1997,Ford,E350,\"Super, \"\"luxurious\"\" truck\"".toCharArray());) {
-    String[][] data = parser.parse(r);
-    String[] columnNames = new String[data[0].length];
-    for(int iter=  0 ; iter < columnNames.length ; iter++) {
-        columnNames[iter] = "Col " + (iter + 1);
-    }
-    TableModel tm = new DefaultTableModel(columnNames, data);
-    hi.add(BorderLayout.CENTER, new Table(tm));
-} catch(IOException err) {
-    Log.e(err);
-}
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-030,indent=0]
 ----
 
 .CSV parsing results, notice the escaped parentheses and comma
@@ -734,8 +490,7 @@ The JSON ("JavaScript Object Notation") format is popular on the web for passing
 
 [source,java]
 ----
-JSONParser parser = new JSONParser();
-Hashtable response = parser.parse(reader);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-031,indent=0]
 ----
 
 The response is a `Map` containing a nested hierarchy of `Collection` (`java.util.List`), Strings and numbers to represent the content of the submitted JSON. To extract the data from a specific path iterate the `Map` keys and recurs into it.
@@ -744,115 +499,14 @@ The sample below uses results from https://anapioficeandfire.com/[an API of ice 
 
 [source,JavaScript]
 ----
-[
-  {
-    "url": "http://www.anapioficeandfire.com/api/characters/13",
-    "name": "Chayle",
-    "culture": "",
-    "born": "",
-    "died": "In 299 AC, at Winterfell",
-    "titles": [
-      "Septon"
-    ],
-    "aliases": [],
-    "father": "",
-    "mother": "",
-    "spouse": "",
-    "allegiances": [],
-    "books": [
-      "http://www.anapioficeandfire.com/api/books/1",
-      "http://www.anapioficeandfire.com/api/books/2",
-      "http://www.anapioficeandfire.com/api/books/3"
-    ],
-    "povBooks": [],
-    "tvSeries": [],
-    "playedBy": []
-  },
-  {
-    "url": "http://www.anapioficeandfire.com/api/characters/14",
-    "name": "Gillam",
-    "culture": "",
-    "born": "",
-    "died": "",
-    "titles": [
-      "Brother"
-    ],
-    "aliases": [],
-    "father": "",
-    "mother": "",
-    "spouse": "",
-    "allegiances": [],
-    "books": [
-      "http://www.anapioficeandfire.com/api/books/5"
-    ],
-    "povBooks": [],
-    "tvSeries": [],
-    "playedBy": []
-  },
-  {
-    "url": "http://www.anapioficeandfire.com/api/characters/15",
-    "name": "High Septon",
-    "culture": "",
-    "born": "",
-    "died": "",
-    "titles": [
-      "High Septon",
-      "His High Holiness",
-      "Father of the Faithful",
-      "Voice of the Seven on Earth"
-    ],
-    "aliases": [
-      "The High Sparrow"
-    ],
-    "father": "",
-    "mother": "",
-    "spouse": "",
-    "allegiances": [],
-    "books": [
-      "http://www.anapioficeandfire.com/api/books/5",
-      "http://www.anapioficeandfire.com/api/books/8"
-    ],
-    "povBooks": [],
-    "tvSeries": [
-      "Season 5"
-    ],
-    "playedBy": [
-      "Jonathan Pryce"
-    ]
-  }
-]
+include::../demos/common/src/main/snippets/developer-guide/io.js[tag=io-javascript-001,indent=0]
 ----
 
 You will place that into a file named "anapioficeandfire.json" in the src directory to make the next sample simpler:
 
 [source,java]
 ----
-Form hi = new Form("JSON Parsing", new BoxLayout(BoxLayout.Y_AXIS));
-JSONParser json = new JSONParser();
-try(Reader r = new InputStreamReader(Display.getInstance().getResourceAsStream(getClass(), "/anapioficeandfire.json"), "UTF-8");) {
-    Map<String, Object> data = json.parseJSON(r);
-    java.util.List<Map<String, Object>> content = (java.util.List<Map<String, Object>>)data.get("root"); // <1>
-    for(Map<String, Object> obj : content) { // <2>
-        String url = (String)obj.get("url");
-        String name = (String)obj.get("name");
-        java.util.List<String> titles =  (java.util.List<String>)obj.get("titles"); // <3>
-        if(name == null || name.length() == 0) {
-            java.util.List<String> aliases = (java.util.List<String>)obj.get("aliases");
-            if(aliases != null && aliases.size() > 0) {
-                name = aliases.get(0);
-            }
-        }
-        MultiButton mb = new MultiButton(name);
-        if(titles != null && titles.size() > 0) {
-            mb.setTextLine2(titles.get(0));
-        }
-        mb.addActionListener((e) -> Display.getInstance().execute(url));
-        hi.add(mb);
-    }
-} catch(IOException err) {
-    Log.e(err);
-}
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-032,indent=0]
 ----
 
 <1> The `JSONParser` returns a `Map` which is great if the root object is a `Map` but sometimes its a list of elements (as is the case above). In this case a special case "root" element is created to contain the actual list of elements.
@@ -882,12 +536,7 @@ maps / lists where a build-time `Mapper` would be overkill, the
 
 [source,java]
 ----
-// One-shot encoding of any Map / List / String / Number / Boolean / null tree
-String json = JSONWriter.toJson(Map.of("name", "ada", "values", List.of(1, 2, 3)));
-
-// Streaming variants for large outputs (UTF-8)
-JSONWriter.toJson(value, writer);
-JSONWriter.toJson(value, outputStream);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-033,indent=0]
 ----
 
 For tiny request bodies the fluent builders are usually faster to read
@@ -895,15 +544,7 @@ than a `Map` literal:
 
 [source,java]
 ----
-String body = JSONWriter.object()
-        .put("email", email)
-        .put("password", password)
-        .toJson();
-
-String coords = JSONWriter.array()
-        .add(JSONWriter.object().put("lat", 37.7749).put("lng", -122.4194))
-        .add(JSONWriter.object().put("lat", 51.5074).put("lng",   -0.1278))
-        .toJson();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-034,indent=0]
 ----
 
 Strings are double-quoted with the standard backslash escapes for `"`,
@@ -920,8 +561,7 @@ The simplest usage of `XMLParser` looks a bit like this:
 
 [source,java]
 ----
-XMLParser parser = new XMLParser();
-Element elem = parser.parse(reader);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-035,indent=0]
 ----
 
 The https://www.codenameone.com/javadoc/com/codename1/xml/Element.html[Element] contains children and attributes. It represents a tag within the XML document and even the root document itself. You can iterate over the XML tree to extract the data from within the XML file.
@@ -947,41 +587,14 @@ https://developers.google.com/maps/documentation/geocoding/[Google Reverse Geoco
 
 [source,xml]
 ----
-<?xml version="1.0" encoding="UTF-8"?>
-<GeocodeResponse>
-  <status>OK</status>
-  <result> <!-- (irrelevant content removed) -->
-      <address_component>
-          <long_name>London</long_name>
-          <short_name>London</short_name>
-          <type>locality</type>
-          <type>political</type>
-      </address_component>
-      <!-- (irrelevant content removed) -->
-     <address_component>
-          <long_name>Ontario</long_name>
-          <short_name>ON</short_name>
-          <type>administrative_area_level_1</type>
-          <type>political</type>
-      </address_component>
-      <address_component>
-         <long_name>Canada</long_name>
-         <short_name>CA</short_name>
-         <type>country</type>
-         <type>political</type>
-      </address_component>
-  </result>
-</GeocodeResponse>
+include::../demos/common/src/main/snippets/developer-guide/io.xml[tag=io-xml-001,indent=0]
 ----
 
 You want to extract some data above into simpler string results. You can do this using:
 
 [source,java]
 ----
-Result result = Result.fromContent(input, Result.XML);
-String country = result.getAsString("/result/address_component[type='country']/long_name");
-String region = result.getAsString("/result/address_component[type='administrative_area_level_1']/long_name");
-String city = result.getAsString("/result/address_component[type='locality']/long_name");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-036,indent=0]
 ----
 
 If you're at all familiar with processing responses from webservices, you will notice that what would require many lines of code of selecting and testing nodes in regular java can now be done in a single line using the new path expressions.
@@ -998,149 +611,14 @@ To use the expression processor when calling a webservice, you could use somethi
 
 [source,java]
 ----
-Form hi = new Form("Location", new BoxLayout(BoxLayout.Y_AXIS));
-hi.add("Pinpointing Location");
-Display.getInstance().callSerially(() -> {
-    Location l = Display.getInstance().getLocationManager().getCurrentLocationSync();
-    ConnectionRequest request = new ConnectionRequest("http://maps.googleapis.com/maps/api/geocode/json", false) {
-        private String country;
-        private String region;
-        private String city;
-        private String json;
-
-        @Override
-        protected void readResponse(InputStream input) throws IOException {
-                Result result = Result.fromContent(input, Result.JSON);
-                country = result.getAsString("/results/address_components[types='country']/long_name");
-                region = result.getAsString("/results/address_components[types='administrative_area_level_1']/long_name");
-                city = result.getAsString("/results/address_components[types='locality']/long_name");
-                json = result.toString();
-        }
-
-        @Override
-        protected void postResponse() {
-            hi.removeAll();
-            hi.add(country);
-            hi.add(region);
-            hi.add(city);
-            hi.add(new SpanLabel(json));
-            hi.revalidate();
-        }
-    };
-    request.setContentType("application/json");
-    request.addRequestHeader("Accept", "application/json");
-    request.addArgument("sensor", "true");
-    request.addArgument("latlng", l.getLatitude() + "," + l.getLongitude());
-
-    NetworkManager.getInstance().addToQueue(request);
-});
-hi.show();
-[source,java]
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-037,indent=0]
 ----
 
 The returned JSON looks something like this (notice it's snipped because the data is too long):
 
 [source,JavaScript]
 ----
-{
-  "status": "OK",
-  "results": [
-    {
-      "place_id": "ChIJJ5T9-iFawokRTPGaOginEO4",
-      "formatted_address": "280 Broadway, New York, NY 10007, USA",
-      "address_components": [
-        {
-          "short_name": "280",
-          "types": ["street_number"],
-          "long_name": "280"
-        },
-        {
-          "short_name": "Broadway",
-          "types": ["route"],
-          "long_name": "Broadway"
-        },
-        {
-          "short_name": "Lower Manhattan",
-          "types": [
-            "neighborhood",
-            "political"
-          ],
-          "long_name": "Lower Manhattan"
-        },
-        {
-          "short_name": "Manhattan",
-          "types": [
-            "sublocality_level_1",
-            "sublocality",
-            "political"
-          ],
-          "long_name": "Manhattan"
-        },
-        {
-          "short_name": "New York",
-          "types": [
-            "locality",
-            "political"
-          ],
-          "long_name": "New York"
-        },
-        {
-          "short_name": "New York County",
-          "types": [
-            "administrative_area_level_2",
-            "political"
-          ],
-          "long_name": "New York County"
-        },
-        {
-          "short_name": "NY",
-          "types": [
-            "administrative_area_level_1",
-            "political"
-          ],
-          "long_name": "New York"
-        },
-        {
-          "short_name": "US",
-          "types": [
-            "country",
-            "political"
-          ],
-          "long_name": "United States"
-        },
-        {
-          "short_name": "10007",
-          "types": ["postal_code"],
-          "long_name": "10007"
-        },
-        {
-          "short_name": "1868",
-          "types": ["postal_code_suffix"],
-          "long_name": "1868"
-        }
-      ],
-      "types": ["street_address"],
-      "geometry": {
-        "viewport": {
-          "northeast": {
-            "lng": -74.0044642197085,
-            "lat": 40.7156470802915
-          },
-          "southwest": {
-            "lng": -74.0071621802915,
-            "lat": 40.7129491197085
-          }
-        },
-        "location_type": "ROOFTOP",
-        "location": {
-          "lng": -74.00581319999999,
-          "lat": 40.7142981
-        }
-      }
-    }
-    /* SNIPED the rest */
-  ]
-}
+include::../demos/common/src/main/snippets/developer-guide/io.js[tag=io-javascript-002,indent=0]
 ----
 
 .Running the geocode sample above in the simulator
@@ -1151,11 +629,7 @@ The XML processor handles global selections by using a double slash anywhere wit
 
 [source,java]
 ----
-// get all address_component names anywhere in the document with a type "political"
-String array[] = result.getAsStringArray("//address_component[type='political']/long_name");
-
-// get all types anywhere under the second result (dimension is 0-based)
-String array[] = result.getAsStringArray("/result[1]//type");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-038,indent=0]
 ----
 
 
@@ -1167,43 +641,14 @@ It's also possible to do some more complex expressions. You’ll use the followi
 
 [source,xml]
 ----
-<rankings type="aus" gender="male" date="2011-12-31">
-    <player id="1036" coretennisid="6752" rank="1"
-       delta="0" singlespoints="485000" doublespoints="675"
-       deductedpoints="0" totalpoints="485675">
-        <firstname>Bernard</firstname>
-        <lastname>Tomic</lastname>
-        <town>SOUTHPORT</town>
-        <state>QLD</state>
-        <dob>1992-10-21</dob>
-    </player>
-    <player id="2585" coretennisid="1500" rank="2"
-       delta="0" singlespoints="313500" doublespoints="12630"
-       deductedpoints="0" totalpoints="326130">
-        <firstname>Mathew</firstname>
-        <lastname>Ebden</lastname>
-        <town>CHURCHLANDS</town>
-        <state>WA</state>
-        <dob>1987-11-26</dob>
-    </player>
-    <player id="6457" coretennisid="287" rank="3"
-        delta="0" singlespoints="132500" doublespoints="1500"
-        deductedpoints="0" totalpoints="134000">
-       <firstname>Lleyton</firstname>
-       <lastname>Hewitt</lastname>
-       <town>EXETER</town>
-       <state>SA</state>
-       <dob>1981-02-24</dob>
-    </player>
-    <!-- ... etc ... -->
-</rankings>
+include::../demos/common/src/main/snippets/developer-guide/io.xml[tag=io-xml-002,indent=0]
 ----
 
 Above, if you want to select the IDs of all players that are ranked in the top 2, you can use an expression like:
 
 [source,java]
 ----
-int top2[] = result.getAsIntegerArray("//player[@rank < 3]/@id");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-039,indent=0]
 ----
 
 TIP: Notice above that the expression is using an attribute for selecting both rank and id. In JSON documents, if you try to select an attribute, it will look for a child node under the attribute name you ask for)
@@ -1212,9 +657,7 @@ If a document is ordered, you might want to select nodes by their position, for 
 
 [source,java]
 ----
-String first2[] = result.getAsStringArray("//player[position() < 3]/firstname");
-
-String secondLast = result.getAsString("//player[last() - 1]/firstName");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-040,indent=0]
 ----
 
 It's also possible to select parent nodes, by using the `..` expression. For example:
@@ -1222,14 +665,14 @@ It's also possible to select parent nodes, by using the `..` expression. For exa
 
 [source,java]
 ----
-int id = result.getAsInteger("//lastname[text()='Hewitt']/../@id");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-041,indent=0]
 ----
 
 Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the ID attribute from the player node. Or, you could get the same result from the following simpler statement:
 
 [source,java]
 ----
-int id = result.getAsInteger("//player[lastname='Hewitt']/@id");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-042,indent=0]
 ----
 
 It's also possible to nest expressions, for example:
@@ -1237,7 +680,7 @@ It's also possible to nest expressions, for example:
 
 [source,java]
 ----
-String id=result.getAsInteger("//player[//address[country/isocode='CA']]/@id");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-043,indent=0]
 ----
 
 In the above example, if the player node had an address object, you’d be selecting all players from Canada. This is a simple example of a nested expression, but they can get much more complex, which will be required as the documents themselves get more complex. +
@@ -1245,7 +688,7 @@ Moving on, to select a node based on the existence of an attribute:
 
 [source,java]
 ----
-int id[] = result.getAsIntegerArray("//player[@rank]/@id");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-044,indent=0]
 ----
 
 Above, you selected the IDs of all ranked players. Conversely, you can select the non-ranked players like this:
@@ -1253,7 +696,7 @@ Above, you selected the IDs of all ranked players. Conversely, you can select th
 
 [source,java]
 ----
-int id[] = result.getAsIntegerArray("//player[@rank=null]/@id");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-045,indent=0]
 ----
 
 NOTE: Logical not (!) operators aren't implemented)
@@ -1263,7 +706,7 @@ You can also select by the existence of a child node
 
 [source,java]
 ----
-int id[] = result.getAsIntegerArray("//player[middlename]/@id");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-046,indent=0]
 ----
 
 Above, you selected all players that have a middle name.<br/>
@@ -1322,7 +765,7 @@ download a `ConnectionRequest` to `Storage` using code like this:
 
 [source,java]
 ----
-request.downloadImageToStorage(url, (img) -> theImageIsHereDoSomethingWithIt(img));
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-047,indent=0]
 ----
 
 This effectively maps the `ConnectionRequest` directly to a https://www.codenameone.com/javadoc/com/codename1/util/SuccessCallback.html[SuccessCallback] for further processing.
@@ -1339,7 +782,7 @@ That's what the new method of `URLImage` does:
 
 [source,java]
 ----
-public static Image createCachedImage(String imageName, String url, Image placeholder, int resizeRule);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-048,indent=0]
 ----
 
 A few important things you need to notice about this method:
@@ -1357,21 +800,21 @@ The `Rest` API makes it easy to invoke a RESTful webservice without many of the 
 
 [source,java]
 ----
-Map<String, Object> jsonData = Rest.get(myUrl).getAsJsonMap().getResponseData();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-049,indent=0]
 ----
 
 For a lot of REST requests this will fail because you need to add an HTTP header indicating that you accept JSON results. You have a special case support for that:
 
 [source,java]
 ----
-Map<String, Object> jsonData = Rest.get(myUrl).acceptJson().getAsJsonMap().getResponseData();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-050,indent=0]
 ----
 
 POST requests use the same builder pattern:
 
 [source,java]
 ----
-Map<String, Object> jsonData = Rest.post(myUrl).body(bodyValueAsString).getAsJsonMap().getResponseData();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-051,indent=0]
 ----
 
 Notice the usage of post and the body builder method. MANY methods exist in the builder class that cover pretty much everything you would expect and then some when it comes to the needs of rest services.
@@ -1398,13 +841,7 @@ the array directly:
 
 [source,java]
 ----
-Rest.get("https://api.example.com/items")
-    .header("Authorization", "Bearer " + token)
-    .acceptJson()
-    .fetchAsJsonList(response -> {
-        List items = response.getResponseData();
-        renderItems(items);
-    });
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-052,indent=0]
 ----
 
 There is no separate builder for the ambiguous "object or array" case:
@@ -1420,35 +857,14 @@ directly:
 
 [source,java]
 ----
-// Model
-@Mapped
-public class Pet {
-    @JsonProperty("id")        public long id;
-    @JsonProperty("name")      public String name;
-    @JsonProperty("photoUrls") public List<String> photoUrls;
-}
-
-// Call site
-Rest.get(baseUrl + "/pet/" + petId)
-    .header("Authorization", "Bearer " + token)
-    .acceptJson()
-    .fetchAsMapped(Pet.class, response -> {
-        Pet pet = response.getResponseData();    // already typed -- no Map casts
-        renderPet(pet);
-    });
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-053,indent=0]
 ----
 
 For endpoints that return a list of DTOs, use `fetchAsMappedList`:
 
 [source,java]
 ----
-Rest.get(baseUrl + "/albums")
-    .header("Authorization", "Bearer " + token)
-    .acceptJson()
-    .fetchAsMappedList(Album.class, response -> {
-        List<Album> albums = response.getResponseData();
-        renderAlbums(albums);
-    });
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-054,indent=0]
 ----
 
 Both builders fall back to the untyped `fetchAsJsonMap` / `fetchAsJsonList`
@@ -1470,9 +886,7 @@ To get started you would need to sign up to http://twillo.com/[Twilio] and have 
 
 [source,java]
 ----
-String accountSID = "----------------";
-String authToken = "---------------";
-String fromPhone = "your Twilio phone number here";
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-055,indent=0]
 ----
 
 TIP: You can open a trial Twilio account and it tags all your SMS's. Notice you would need to use a You based number if you don't want to pay
@@ -1481,12 +895,7 @@ You can now send hello world as an SMS to the end user. Once this is in place se
 
 [source,java]
 ----
-Response<Map> result = Rest.post("https://api.twilio.com/2010-04-01/Accounts/" + accountSID + "/Messages.json").
-        queryParam("To", destinationPhone).
-        queryParam("From", fromPhone).
-        queryParam("Body", "Hello World").
-        basicAuth(accountSID, authToken)).
-        getAsJsonMap();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-056,indent=0]
 ----
 
 Notice that this is equivalent of this "curl" command:
@@ -1507,30 +916,7 @@ The result is in JSON form you ignore it since it isn't that important but it mi
 
 [source,JavaScript]
 ----
-{
-    "sid": "[sid value]",
-    "date_created": "Sat, 09 Sep 2017 19:47:30 +0000",
-    "date_updated": "Sat, 09 Sep 2017 19:47:30 +0000",
-    "date_sent": null,
-    "account_sid": "[sid value]",
-    "to": "[to phone number]",
-    "from": "[from phone number]",
-    "messaging_service_sid": null,
-    "body": "Sent from your Twilio trial account - Hello World",
-    "status": "queued",
-    "num_segments": "1",
-    "num_media": "0",
-    "direction": "outbound-api",
-    "api_version": "2010-04-01",
-    "price": null,
-    "price_unit": "USD",
-    "error_code": null,
-    "error_message": null,
-    "uri": "/2010-04-01/Accounts/[sid value]/Messages/SMe802d86b9f2246989c7c66e74b2d84ef.json",
-    "subresource_uris": {
-        "media": "/2010-04-01/Accounts/[sid value]/Messages/[message value]/Media.json"
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.js[tag=io-javascript-003,indent=0]
 ----
 
 Notice the error message entry which is null meaning there was no error, if there was an error you'd have a message there or an error code that isn't in the 200-210 range.
@@ -1539,14 +925,7 @@ This should display an error message to the user if there was a problem sending 
 
 [source,java]
 ----
-if(result.getResponseData() != null) {
-    String error = (String)result.getResponseData().get("error_message");
-    if(error != null) {
-        ToastBar.showErrorMessage(error);
-    }
-} else {
-    ToastBar.showErrorMessage("Error sending SMS: " + result.getResponseCode());
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-057,indent=0]
 ----
 
 
@@ -1591,17 +970,7 @@ You can now open the `GameOfThronesServiceServer.java` file in the server and it
 
 [source,java]
 ----
-public class GameOfThronesServiceServer {
-    public static String[] getBookNames() {
-        // your code goes here...
-        return null;
-    }
-
-    public static String[] getBookPovCharacters(String bookName) {
-        // your code goes here...
-        return null;
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-058,indent=0]
 ----
 
 All you need to do is fill in the code, for this example you will implement the first method for simplicity:
@@ -1609,37 +978,21 @@ All you need to do is fill in the code, for this example you will implement the 
 
 [source,java]
 ----
-public class GameOfThronesServiceServer {
-    public static String[] getBookNames() {
-        return new String[] {
-            "A Game of Thrones", "A Clash Of Kings", "A Storm Of Swords", "A Feast For Crows",
-            "A Dance With Dragons", "The Winds of Winter", "A Dream of Spring"
-        };
-    }
-
-    public static String[] getBookPovCharacters(String bookName) {
-        // your code goes here...
-        return null;
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-059,indent=0]
 ----
 
 Now lets open the client side code, in the `GameOfThronesService.java` file you see this
 
 [source,java]
 ----
-public class GameOfThronesService {
-    private static final String DESTINATION_URL = "http://localhost:8080/cn1proxy";
-
-//...
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-060,indent=0]
 ----
 
 The destination URL needs to point at the actual server which you will recall from the new project creation should include `HelloWebServiceWizard`. You can fix the URL to:
 
 [source,java]
 ----
-private static final String DESTINATION_URL = "http://localhost:8080/HelloWebServiceWizard/cn1proxy";
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-061,indent=0]
 ----
 
 You would need to update the host name of the server for running on a device otherwise the device would need to live within your internal network and point to your IP address.
@@ -1654,41 +1007,7 @@ You can pick either one of these approaches based on your personal preferences. 
 
 [source,java]
 ----
-Form hi = new Form("WebService Wizard", new BoxLayout(BoxLayout.Y_AXIS));
-Button getNamesSync = new Button("Get Names - Sync");
-Button getNamesASync = new Button("Get Names - ASync");
-hi.add(getNamesSync).add(getNamesASync);
-
-getNamesSync.addActionListener((e) -> {
-    try {
-        String[] books = GameOfThronesService.getBookNames();
-        hi.add("--- SYNC");
-        for(String b : books) {
-            hi.add(b);
-        }
-        hi.revalidate();
-    } catch(IOException err) {
-        Log.e(err);
-    }
-});
-
-getNamesASync.addActionListener((e) -> {
-    GameOfThronesService.getBookNamesAsync(new Callback<String[]>() {
-        @Override
-        public void onSucess(String[] value) {
-            hi.add("--- ASYNC");
-            for(String b : value) {
-                hi.add(b);
-            }
-            hi.revalidate();
-        }
-
-        @Override
-        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-            Log.e(err);
-        }
-    });
-});
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-062,indent=0]
 ----
 
 .The final result of the WebService Wizard code
@@ -1720,10 +1039,7 @@ There are many methods of interest to keep an eye for:
 
 [source,java]
 ----
-protected InputStream getCachedData() throws IOException;
-protected void cacheUnmodified() throws IOException;
-public void purgeCache();
-public static void purgeCacheDirectory() throws IOException;
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-063,indent=0]
 ----
 
 ==== getCachedData()
@@ -1763,20 +1079,7 @@ The `CachedDataService` will fetch data if it isn't cached locally and cache it.
 
 [source,java]
 ----
-CachedDataService.register();
-CachedData d = (CachedData)Storage.getInstance().readObject("LocallyCachedData");
-
-if(d == null) {
-  d = new CachedData();
-  d.setUrl("http://....");
-}
-// check if there is a new version of this on the server
-CachedDataService.updateData(d, new ActionListener() {
-    public void actionPerformed(ActionEvent ev) {
-        // invoked when/if the data arrives, we now have a fresh cache
-        Storage.getInstance().writeObject("LocallyCachedData", d);
-    }
-});
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-064,indent=0]
 ----
 
 
@@ -1797,10 +1100,7 @@ Externalizing an object such as h below should work fine:
 
 [source,java]
 ----
-Map<String, Object> h = new HashMap<>();
-h.put("Hi","World");
-h.put("data", new byte[] {(byte)1});
-Storage.getInstance().writeObject("Test", h);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-065,indent=0]
 ----
 
 For example, notice that some things aren’t polymorphic for example: if you will externalize a `String[]` you will get back an `Object[]`
@@ -1812,7 +1112,7 @@ Implementing the `Externalizable` interface is important when you want to store 
 
 [source,java]
 ----
-Util.register("MyClass", MyClass.class);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-066,indent=0]
 ----
 
 WARNING: You should do this early on in the app for example: in the `init(Object)` but you shouldn't do it in a static initializer within the object as that might never be invoked!
@@ -1821,10 +1121,7 @@ An `Externalizable` object *must* have a *default public constructor* and must i
 
 [source,java]
 ----
-public int getVersion();
-public void externalize(DataOutputStream out) throws IOException;
-public void internalize(int version, DataInputStream in) throws IOException;
-public String getObjectId();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-067,indent=0]
 ----
 
 The `getVersion()` method returns the current version of the object allowing the stored data to change its structure in the future (the version is then passed when internalizing the object). The object ID is a `String` uniquely representing the object;
@@ -1837,102 +1134,21 @@ Developers need to write the data of the object in the externalize method using 
 
 [source,java]
 ----
-public void externalize(DataOutputStream out) throws IOException {
-    out.writeUTF(name);
-    if(value != null) {
-        out.writeBoolean(true);
-        out.writeUTF(value);
-    } else {
-        out.writeBoolean(false);
-    }
-    if(domain != null) {
-        out.writeBoolean(true);
-        out.writeUTF(domain);
-    } else {
-        out.writeBoolean(false);
-    }
-    out.writeLong(expires);
-}
-
-public void internalize(int version, DataInputStream in) throws IOException {
-    name = in.readUTF();
-    if(in.readBoolean()) {
-        value = in.readUTF();
-    }
-    if(in.readBoolean()) {
-        domain = in.readUTF();
-    }
-    expires = in.readLong();
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-068,indent=0]
 ----
 
 Since strings might be null sometimes you also included convenience methods to implement such externalization. This effectively writes a boolean before writing the UTF to show whether the string is null:
 
 [source,java]
 ----
-public void externalize(DataOutputStream out) throws IOException {
-    Util.writeUTF(name, out);
-    Util.writeUTF(value, out);
-    Util.writeUTF(domain, out);
-    out.writeLong(expires);
-}
-
-public void internalize(int version, DataInputStream in) throws IOException {
-    name = Util.readUTF(in);
-    value = Util.readUTF(in);
-    domain = Util.readUTF(in);
-    expires = in.readLong();
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-069,indent=0]
 ----
 
 Assuming you added a new date field to the object you can do the following. Notice that a `Date` is a `long` value in Java that can be null. For completeness the full class is presented below:
 
 [source,java]
 ----
-public class MyClass implements Externalizable {
-    private static final int VERSION = 2;
-    private String name;
-    private String value;
-    private String domain;
-    private Date date;
-    private long expires;
-
-    public MyClass() {}
-
-    public int getVersion() {
-        return VERSION;
-    }
-
-    public String getObjectId() {
-        return "MyClass";
-    }
-
-    public void externalize(DataOutputStream out) throws IOException {
-        Util.writeUTF(name, out);
-        Util.writeUTF(value, out);
-        Util.writeUTF(domain, out);
-        if(date != null) {
-            out.writeBoolean(true);
-            out.writeLong(date.getTime());
-        } else {
-            out.writeBoolean(false);
-        }
-        out.writeLong(expires);
-    }
-
-    public void internalize(int version, DataInputStream in) throws IOException {
-        name = Util.readUTF(in);
-        value = Util.readUTF(in);
-        domain = Util.readUTF(in);
-        if(version > 1) {
-            boolean hasDate = in.readBoolean();
-            if(hasDate) {
-                date = new Date(in.readLong());
-            }
-        }
-        expires = in.readLong();
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-070,indent=0]
 ----
 
 Notice that you need to check for compatibility during the reading process as the writing process always writes the latest version of the data.
@@ -1943,9 +1159,7 @@ Codename One provides many tools to simplify the path between networking/IO & GU
 
 [source,java]
 ----
-InfiniteProgress ip = new InfiniteProgress();
-Dialog dlg = ip.showInifiniteBlocking();
-request.setDisposeOnCompletion(dlg);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-071,indent=0]
 ----
 
 The process of showing a progress bar for a long IO operation such as downloading is automatically mapped to the IO stream in Codename One using the https://www.codenameone.com/javadoc/com/codename1/components/SliderBridge.html[SliderBridge] class.
@@ -1956,20 +1170,7 @@ The `SliderBridge` class can bind a `ConnectionRequest` to a `Slider` and effect
 
 [source,java]
 ----
-Form hi = new Form("Download Progress", new BorderLayout());
-Slider progress = new Slider();
-Button download = new Button("Download");
-download.addActionListener((e) -> {
-    ConnectionRequest cr = new ConnectionRequest("https://www.codenameone.com/img/blog/new_icon.png", false);
-    SliderBridge.bindProgress(cr, progress);
-    NetworkManager.getInstance().addToQueueAndWait(cr);
-    if(cr.getResponseCode() == 200) {
-        hi.add(BorderLayout.CENTER, new ScaleImageLabel(EncodedImage.create(cr.getResponseData())));
-        hi.revalidate();
-    }
-});
-hi.add(BorderLayout.SOUTH, progress).add(BorderLayout.NORTH, download);
-hi.show();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-072,indent=0]
 ----
 
 .SliderBridge progress for downloading the image in the slow network mode
@@ -1983,8 +1184,7 @@ As part of the premium cloud features it's possible to invoke Log.sendLog() to e
 
 [source,java]
 ----
-Log.setReportingLevel(Log.REPORTING_DEBUG);
-DefaultCrashReporter.init(true, 2);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-073,indent=0]
 ----
 
 This code will send a log every 2 minutes to your email if anything was changed. You can place it within the init(Object) method of your application.
@@ -2008,114 +1208,7 @@ This simple example allows you to create a server and a client assuming the devi
 
 [source,java]
 ----
-public class MyApplication {
-    private Form current;
-
-    public void init(Object context) {
-        try {
-            Resources theme = Resources.openLayered("/theme");
-            UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
-        } catch(IOException e){
-            e.printStackTrace();
-        }
-    }
-
-    public void start() {
-        if(current != null){
-            current.show();
-            return;
-        }
-        final Form soc = new Form("Socket Test");
-        Button btn = new Button("Create Server");
-        Button connect = new Button("Connect");
-        final TextField host = new TextField("127.0.0.1");
-        btn.addActionListener((evt) -> {
-            soc.addComponent(new Label("Listening: " + Socket.getIP()));
-            soc.revalidate();
-            Socket.listen(5557, SocketListenerCallback.class);
-        });
-        connect.addActionListener((evt) -> {
-            Socket.connect(host.getText(), 5557, new SocketConnection() {
-                @Override
-                public void connectionError(int errorCode, String message) {
-                    System.out.println("Error");
-                }
-
-                @Override
-                public void connectionEstablished(InputStream is, OutputStream os) {
-                    try {
-                        int counter = 1;
-                        while(isConnected()) {
-                            os.write(("Hi: " + counter).getBytes());
-                            counter++;
-                            Thread.sleep(2000);
-                        }
-                    } catch(Exception err) {
-                        err.printStackTrace();
-                    }
-                }
-            });
-        });
-        soc.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-        soc.addComponent(btn);
-        soc.addComponent(connect);
-        soc.addComponent(host);
-        soc.show();
-    }
-
-    public static class SocketListenerCallback extends SocketConnection {
-        private Label connectionLabel;
-
-        @Override
-        public void connectionError(int errorCode, String message) {
-            System.out.println("Error");
-        }
-
-        private void updateLabel(final String t) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    if(connectionLabel == null) {
-                        connectionLabel = new Label(t);
-                        Display.getInstance().getCurrent().addComponent(connectionLabel);
-                    } else {
-                        connectionLabel.setText(t);
-                    }
-                    Display.getInstance().getCurrent().revalidate();
-                }
-            });
-        }
-
-        @Override
-        public void connectionEstablished(InputStream is, OutputStream os) {
-            try {
-                byte[] buffer = new byte[8192];
-                while(isConnected()) {
-                    int pending = is.available();
-                    if(pending > 0) {
-                        int size = is.read(buffer, 0, 8192);
-                        if(size == -1) {
-                            return;
-                        }
-                        if(size > 0) {
-                            updateLabel(new String(buffer, 0, size));
-                        }
-                    } else {
-                        Thread.sleep(50);
-                    }
-                }
-            } catch(Exception err) {
-                err.printStackTrace();
-            }
-        }
-    }
-
-    public void stop() {
-        current = Display.getInstance().getCurrent();
-    }
-
-    public void destroy() {
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-074,indent=0]
 ----
 
 === Properties
@@ -2125,35 +1218,7 @@ simple `Meeting` class like this:
 
 [source,java]
 ----
-public class Meeting {
-     private Date when;
-     private String subject;
-     private int attendance;
-
-     public Date getWhen() {
-        return when;
-    }
-
-     public String getSubject() {
-        return subject;
-     }
-
-     public int getAttendance() {
-        return attendance;
-     }
-
-     public void setWhen(Date when) {
-        this.when = when;
-    }
-
-     public void setSubject(String subject) {
-        this.subject  = subject;
-     }
-
-     public void setAttendance(int attendance) {
-        this.attendance = attendance;
-     }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-075,indent=0]
 ----
 
 That's a classic POJO and it's the force that underlies JavaBeans and a few tools in Java.
@@ -2186,17 +1251,7 @@ This is the same class as the one above written with properties:
 
 [source,java]
 ----
-public class Meeting implements PropertyBusinessObject {
-     public final Property<Date,Meeting> when = new Property<>("when");
-     public final Property<String,Meeting> subject = new Property<>("subject");
-     public final Property<Integer,Meeting>  attendance = new Property<>("attendance");
-     private final PropertyIndex idx = new PropertyIndex(this, "Meeting", when, subject, attendance);
-
-    @Override
-    public PropertyIndex getPropertyIndex() {
-        return idx;
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-076,indent=0]
 ----
 
 This looks a bit like a handful, so start with usage which might clarify a few things, then dig into the class itself.
@@ -2205,18 +1260,14 @@ When you used a POJO you did this:
 
 [source,java]
 ----
-Meeting meet = new Meeting();
-meet.setSubject("My Subject");
-Log.p(meet.getSubject());
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-077,indent=0]
 ----
 
 With properties you do this:
 
 [source,java]
 ----
-Meeting meet = new Meeting();
-meet.subject.set("My Subject");
-Log.p(meet.subject.get());
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-078,indent=0]
 ----
 
 ===== Encapsulation
@@ -2226,14 +1277,14 @@ you will notice the `final` keyword:
 
 [source,java]
 ----
-public final Property<String,Meeting> subject = new Property<>("subject");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-079,indent=0]
 ----
 
 This means that this code won't compile:
 
 [source,java]
 ----
-meet.subject = otherValue;
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-080,indent=0]
 ----
 
 All setting/getting must happen through the set/get methods and they can be replaced. For example: this is valid syntax
@@ -2241,14 +1292,7 @@ that prevents setting the property to null and defaults it to an empty string:
 
 [source,java]
 ----
-public final Property<String,Meeting> subject = new Property<>("subject", "") {
-     public Meeting set(String value) {
-         if(value == null) {
-            return Meeting.this;
-         }
-         return super.set(value);
-     }
-};
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-081,indent=0]
 ----
 
 NOTE: You will discuss the reason for returning the `Meeting` instance below
@@ -2268,7 +1312,7 @@ out any change made to the property:
 
 [source,java]
 ----
-meet.subject.addChangeListener((p) -> Log.p("New property value is: " + p.get()));
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-082,indent=0]
 ----
 
 ==== The cool stuff
@@ -2279,31 +1323,7 @@ For starters all the common methods of `Object` can be implemented with almost n
 
 [source,java]
 ----
-public class Meeting implements PropertyBusinessObject {
-     public final Property<Date,Meeting> when = new Property<>("when");
-     public final Property<String,Meeting> subject = new Property<>("subject");
-     public final Property<Integer,Meeting>  attendance = new Property<>("attendance");
-     private final PropertyIndex idx = new PropertyIndex(this, "Meeting", when, subject, attendance);
-
-    @Override
-    public PropertyIndex getPropertyIndex() {
-        return idx;
-    }
-
-    public String toString() {
-        return idx.toString();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj.getClass() == getClass() && idx.equals(((TodoTask)obj).getPropertyIndex());
-    }
-
-    @Override
-    public int hashCode() {
-        return idx.hashCode();
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-083,indent=0]
 ----
 
 This is easy thanks to introspection...
@@ -2313,14 +1333,14 @@ values from parsed JSON:
 
 [source,java]
 ----
-meet.getPropertyIndex().populateFromMap(jsonParsedData);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-084,indent=0]
 ----
 
 And vice versa:
 
 [source,java]
 ----
-String jsonString = meet.toJSON();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-085,indent=0]
 ----
 
 You also have a simple ORM solution that maps values to table columns and can create tables. It's no hibernate
@@ -2335,9 +1355,7 @@ You added a new syntax:
 
 [source,java]
 ----
-Meeting meet = new Meeting().
-        subject.set("My Subject").
-        when.set(new Date());
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-086,indent=0]
 ----
 
 That's why every property in the definition needed the `Meeting` generic and the set method returns the `Meeting`
@@ -2349,9 +1367,7 @@ Without this feature the code would look like this:
 
 [source,java]
 ----
-Meeting meet = new Meeting();
-meet.subject.set("My Subject");
-meet.when.set(new Date());
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-087,indent=0]
 ----
 
 
@@ -2363,30 +1379,7 @@ Suppose you have an object called `Contacts` which includes contact information 
 
 [source,java]
 ----
-public class Contact implements PropertyBusinessObject {
-    public final IntProperty<Contact> id  = new IntProperty<>("id");
-    public final Property<String, Contact> name = new Property<>("name");
-    public final Property<String, Contact> email = new Property<>("email");
-    public final Property<String, Contact> phone = new Property<>("phone");
-    public final Property<Date, Contact> dateOfBirth = new Property<>("dateOfBirth", Date.class);
-    public final Property<String, Contact> gender  = new Property<>("gender");
-    public final IntProperty<Contact> rank  = new IntProperty<>("rank");
-    public final PropertyIndex idx = new PropertyIndex(this, "Contact", id, name, email, phone, dateOfBirth, gender, rank);
-
-    @Override
-    public PropertyIndex getPropertyIndex() {
-        return idx;
-    }
-
-    public Contact() {
-        name.setLabel("Name");
-        email.setLabel("E-Mail");
-        phone.setLabel("Phone");
-        dateOfBirth.setLabel("Date Of Birth");
-        gender.setLabel("Gender");
-        rank.setLabel("Rank");
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-088,indent=0]
 ----
 
 Standard Java Objects can be serialized in Codename One by implementing the Codename One `Externalizable` interface. You also need to register the `Externalizable` object so the implementation will be aware of it. Codename One business objects are seamlessly `Externalizable` and you need to register them.
@@ -2395,16 +1388,14 @@ For example: you can do something like this in your `init(Object)` method:
 
 [source,java]
 ----
-new Contact().getPropertyIndex().registerExternalizable();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-089,indent=0]
 ----
 
 After you do that once you can write/read contacts from storage if you so want:
 
 [source,java]
 ----
-Storage.getInstance().writeObject("MyContact", contact);
-
-Contact readContact = (Contact)Storage.getInstance().readObject("MyContact");
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-090,indent=0]
 ----
 
 This will obviously also work for things like `List<Contact>` etc.
@@ -2417,23 +1408,7 @@ If you continue the example from above to show persistence to the SQL database y
 
 [source,java]
 ----
-private Database db;
-private SQLMap sm;
-public void init(Object context) {
-    theme = UIManager.initFirstTheme("/theme");
-    Toolbar.setGlobalToolbar(true);
-    Log.bindCrashProtection(true);
-
-    try {
-        Contact c = new Contact();
-        db = Display.getInstance().openOrCreate("propertiesdemo.db"); // <1>
-        sm = SQLMap.create(db); // <2>
-        sm.setPrimaryKeyAutoIncrement(c, c.id); // <3>
-        sm.createTable(c); // <4>
-    } catch(IOException err) {
-        Log.e(err);
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-091,indent=0]
 ----
 
 In the above code you do the following:
@@ -2449,34 +1424,28 @@ You can then add entries to the contact table using:
 
 [source,java]
 ----
-sm.insert(myContact);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-092,indent=0]
 ----
 
 You can update an entry using:
 
 [source,java]
 ----
-sm.update(myContact);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-093,indent=0]
 ----
 
 And delete an entry using:
 
 [source,java]
 ----
-sm.delete(myContact);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-094,indent=0]
 ----
 
 Listing the entries is more interesting:
 
 [source,java]
 ----
-List<PropertyBusinessObject> contacts = sm.select(c, c.name, true, 1000, 0);
-
-for(PropertyBusinessObject cc : contacts) {
-    Contact currentContact = (Contact)cc;
-
-   // ...
-}
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-095,indent=0]
 ----
 
 The arguments for the `select` method are:
@@ -2529,7 +1498,7 @@ Some objects make sense as global objects, you can use the `Preferences` API to 
 
 [source,java]
 ----
-PreferencesObject.create(settingsInstance).bind();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-096,indent=0]
 ----
 
 If settings has a property called `companyName` it would bind into `Preferences` under the `Settings.companyName` entry.
@@ -2538,10 +1507,7 @@ You can do some more elaborate bindings such as:
 
 [source,java]
 ----
-PreferencesObject.create(settingsInstance).
-    setPrefix("MySettings-").
-    setName(settingsInstance.companyName, "company").
-    bind();
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-097,indent=0]
 ----
 
 This would customize all entry keys to start with `MySettings-` instead of `Settings.`. This would also set the company name entry to `company` so in this case instead of `Settings.companyName` you'd have `MySettings-company`.
@@ -2552,8 +1518,7 @@ One of the bigger features of properties are their ability to bind UI to a prope
 
 [source,java]
 ----
-myNameTextField.setText(myNameTextField.getText());
-myNameTextField.addActionListener(e -> myContact.name.set(myNameTextField.getText()));
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-098,indent=0]
 ----
 
 That would work but what if you changed the property value, that wouldn't be reflected in the text field?
@@ -2564,15 +1529,14 @@ Binding makes this all seamless. For example: the code above can be written as:
 
 [source,java]
 ----
-UiBinding uib = new UiBinding();
-uib.bind(myNameTextField, myContact.name);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-099,indent=0]
 ----
 
 The cool thing is that this works with many component types and property types almost magically. Binding works by using an adapter class to convert the data to/from the component. The adapter itself works with a generic converter for example: this code:
 
 [source,java]
 ----
-uib.bind(myRankTextField, myContact.rank);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-100,indent=0]
 ----
 
 Seems like the one above but it takes a String that's returned by the text field and seamlessly converts it to the integer needed by rank. This also works in the other direction...
@@ -2581,45 +1545,7 @@ You can build a UI that would allow you to edit the `Contact` property in memory
 
 [source,java]
 ----
-Container resp = new Container(BoxLayout.y());
-UiBinding uib = new UiBinding();
-
-TextField nameTf = new TextField();
-uib.bind(c.name, nameTf);
-resp.add(c.name.getLabel()). // <1>
-        add(nameTf);
-
-TextField emailTf = new TextField();
-emailTf.setConstraint(TextField.EMAILADDR);
-uib.bind(c.email, emailTf);
-resp.add(c.email.getLabel()).
-        add(emailTf);
-
-TextField phoneTf = new TextField();
-phoneTf.setConstraint(TextField.PHONENUMBER);
-uib.bind(c.phone, phoneTf);
-resp.add(c.phone.getLabel()).
-        add(phoneTf);
-
-Picker dateOfBirth = new Picker();
-dateOfBirth.setType(Display.PICKER_TYPE_DATE); // <2>
-uib.bind(c.dateOfBirth, dateOfBirth);
-resp.add(c.dateOfBirth.getLabel()).
-        add(dateOfBirth);
-
-ButtonGroup genderGroup = new ButtonGroup();
-RadioButton male = RadioButton.createToggle("Male", genderGroup);
-RadioButton female = RadioButton.createToggle("Female", genderGroup);
-RadioButton undefined = RadioButton.createToggle("Undefined", genderGroup);
-uib.bindGroup(c.gender, new String[] {"M", "F", "U"}, male, female, undefined); // <3>
-resp.add(c.gender.getLabel()).
-        add(GridLayout.encloseIn(3, male, female, undefined));
-
-TextField rankTf = new TextField();
-rankTf.setConstraint(TextField.NUMERIC);
-uib.bind(c.rank, rankTf); // <4>
-resp.add(c.rank.getLabel()).
-        add(rankTf);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-101,indent=0]
 ----
 
 <1> Notice the use of the property's label, which allows better encapsulation
@@ -2651,11 +1577,7 @@ Up until now this was pretty cool but if you looked at the UI construction code 
 
 [source,java]
 ----
-InstantUI iui = new InstantUI();
-iui.excludeProperty(myContact.id); // <1>
-iui.setMultiChoiceLabels(myContact.gender, "Male", "Female", "Undefined"); // <2>
-iui.setMultiChoiceValues(myContact.gender, "M", "F", "U");
-Container cnt = iui.createEditUI(myContact, true); // <3>
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-102,indent=0]
 ----
 
 <1> The id property is useful for database storage but you want to exclude it from the UI
@@ -2666,14 +1588,14 @@ This still carries most of the flexibilities of the regular binding for example:
 
 [source,java]
 ----
-UiBinding.Binding b = iui.getBindings(cnt);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-103,indent=0]
 ----
 
 You might not have noticed this but in the previous verbose code you had lines like:
 
 [source,java]
 ----
-emailTf.setConstraint(TextField.EMAILADDR);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-104,indent=0]
 ----
 
 You might be surprised to know that this will still work seamlessly without doing anything, as would the picker component used to pick a date...
@@ -2686,7 +1608,7 @@ You've some special case defaults for some common property names, so if your pro
 
 [source,java]
 ----
-iui.setTextFieldConstraint(contact.email, TextArea.ANY);
+include::../demos/common/src/main/snippets/developer-guide/io.java[tag=io-java-105,indent=0]
 ----
 
 This will override the defaults you've in place. The goal of this tool is to have sensible "magical" defaults that "work."

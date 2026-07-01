@@ -1,0 +1,179 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::advanced-topics-under-the-hood-bytecode-001[]
+  Last modified 10-Jul-2017; size 1456 bytes
+  MD5 checksum 1cb00f6e63b918bb5a9f146ca8b0b78e
+  Compiled from "KotlinForm.kt"
+public final class com.codename1.hellokotlin2.KotlinForm extends com.codename1.ui.Form
+  SourceFile: "KotlinForm.kt"
+  InnerClasses:
+       static final #31; //class com/codename1/hellokotlin2/KotlinForm$1
+  RuntimeVisibleAnnotations:
+    0: #56(#57=[I#58,I#58,I#59],#60=[I#58,I#61,I#58],#62=I#58,#63=[s#64],#65=[s#55,s#66,s#6,s#67])
+  minor version: 0
+  major version: 50
+  flags: ACC_PUBLIC, ACC_FINAL, ACC_SUPER
+Constant pool:
+   #1 = Utf8               com/codename1/hellokotlin2/KotlinForm
+   #2 = Class              #1             //  com/codename1/hellokotlin2/KotlinForm
+   #3 = Utf8               com/codename1/ui/Form
+   #4 = Class              #3             //  com/codename1/ui/Form
+   #5 = Utf8               <init>
+   #6 = Utf8               ()V
+   #7 = Utf8               Hello Kotlin
+   #8 = String             #7             //  Hello Kotlin
+   #9 = Utf8               com/codename1/ui/layouts/BoxLayout
+  #10 = Class              #9             //  com/codename1/ui/layouts/BoxLayout
+  #11 = Utf8               y
+  #12 = Utf8               ()Lcom/codename1/ui/layouts/BoxLayout;
+  #13 = NameAndType        #11:#12        //  y:()Lcom/codename1/ui/layouts/BoxLayout;
+  #14 = Methodref          #10.#13        //  com/codename1/ui/layouts/BoxLayout.y:()Lcom/codename1/ui/layouts/BoxLayout;
+  #15 = Utf8               com/codename1/ui/layouts/Layout
+  #16 = Class              #15            //  com/codename1/ui/layouts/Layout
+  #17 = Utf8               (Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
+  #18 = NameAndType        #5:#17         //  "<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
+  #19 = Methodref          #4.#18         //  com/codename1/ui/Form."<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
+  #20 = Utf8               com/codename1/ui/Label
+  #21 = Class              #20            //  com/codename1/ui/Label
+  #22 = Utf8               (Ljava/lang/String;)V
+  #23 = NameAndType        #5:#22         //  "<init>":(Ljava/lang/String;)V
+  #24 = Methodref          #21.#23        //  com/codename1/ui/Label."<init>":(Ljava/lang/String;)V
+  #25 = Utf8               com/codename1/ui/Button
+  #26 = Class              #25            //  com/codename1/ui/Button
+  #27 = Utf8               Click Me
+  #28 = String             #27            //  Click Me
+  #29 = Methodref          #26.#23        //  com/codename1/ui/Button."<init>":(Ljava/lang/String;)V
+  #30 = Utf8               com/codename1/hellokotlin2/KotlinForm$1
+  #31 = Class              #30            //  com/codename1/hellokotlin2/KotlinForm$1
+  #32 = Utf8               (Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
+  #33 = NameAndType        #5:#32         //  "<init>":(Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
+  #34 = Methodref          #31.#33        //  com/codename1/hellokotlin2/KotlinForm$1."<init>":(Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
+  #35 = Utf8               com/codename1/ui/events/ActionListener
+  #36 = Class              #35            //  com/codename1/ui/events/ActionListener
+  #37 = Utf8               addActionListener
+  #38 = Utf8               (Lcom/codename1/ui/events/ActionListener;)V
+  #39 = NameAndType        #37:#38        //  addActionListener:(Lcom/codename1/ui/events/ActionListener;)V
+  #40 = Methodref          #26.#39        //  com/codename1/ui/Button.addActionListener:(Lcom/codename1/ui/events/ActionListener;)V
+  #41 = Utf8               com/codename1/ui/Component
+  #42 = Class              #41            //  com/codename1/ui/Component
+  #43 = Utf8               add
+  #44 = Utf8               (Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
+  #45 = NameAndType        #43:#44        //  add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
+  #46 = Methodref          #2.#45         //  com/codename1/hellokotlin2/KotlinForm.add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
+  #47 = Utf8               com/codename1/ui/Container
+  #48 = Class              #47            //  com/codename1/ui/Container
+  #49 = Methodref          #48.#45        //  com/codename1/ui/Container.add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
+  #50 = Utf8               clickMe
+  #51 = Utf8               Lcom/codename1/ui/Button;
+  #52 = Utf8               label
+  #53 = Utf8               Lcom/codename1/ui/Label;
+  #54 = Utf8               this
+  #55 = Utf8               Lcom/codename1/hellokotlin2/KotlinForm;
+  #56 = Utf8               Lkotlin/Metadata;
+  #57 = Utf8               mv
+  #58 = Integer            1
+  #59 = Integer            6
+  #60 = Utf8               bv
+  #61 = Integer            0
+  #62 = Utf8               k
+  #63 = Utf8               d1
+  #64 = Utf8
+                           \n\n\20¢¨
+  #65 = Utf8               d2
+  #66 = Utf8               Lcom/codename1/ui/Form;
+  #67 = Utf8               HelloKotlin2
+  #68 = Utf8               KotlinForm.kt
+  #69 = Utf8               Code
+  #70 = Utf8               LocalVariableTable
+  #71 = Utf8               LineNumberTable
+  #72 = Utf8               SourceFile
+  #73 = Utf8               InnerClasses
+  #74 = Utf8               RuntimeVisibleAnnotations
+{
+  public com.codename1.hellokotlin2.KotlinForm();
+    descriptor: ()V
+    flags: ACC_PUBLIC
+    Code:
+      stack=5, locals=3, args_size=1
+         0: aload_0
+         1: ldc           #8                  // String Hello Kotlin
+         3: invokestatic  #14                 // Method com/codename1/ui/layouts/BoxLayout.y:()Lcom/codename1/ui/layouts/BoxLayout;
+         6: checkcast     #16                 // class com/codename1/ui/layouts/Layout
+         9: invokespecial #19                 // Method com/codename1/ui/Form."<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
+        12: new           #21                 // class com/codename1/ui/Label
+        15: dup
+        16: ldc           #8                  // String Hello Kotlin
+        18: invokespecial #24                 // Method com/codename1/ui/Label."<init>":(Ljava/lang/String;)V
+        21: astore_1
+        22: new           #26                 // class com/codename1/ui/Button
+        25: dup
+        26: ldc           #28                 // String Click Me
+        28: invokespecial #29                 // Method com/codename1/ui/Button."<init>":(Ljava/lang/String;)V
+        31: astore_2
+        32: aload_2
+        33: new           #31                 // class com/codename1/hellokotlin2/KotlinForm$1
+        36: dup
+        37: aload_0
+        38: aload_1
+        39: invokespecial #34                 // Method com/codename1/hellokotlin2/KotlinForm$1."<init>":(Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
+        42: checkcast     #36                 // class com/codename1/ui/events/ActionListener
+        45: invokevirtual #40                 // Method com/codename1/ui/Button.addActionListener:(Lcom/codename1/ui/events/ActionListener;)V
+        48: aload_0
+        49: aload_1
+        50: checkcast     #42                 // class com/codename1/ui/Component
+        53: invokevirtual #46                 // Method add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
+        56: aload_2
+        57: checkcast     #42                 // class com/codename1/ui/Component
+        60: invokevirtual #49                 // Method com/codename1/ui/Container.add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
+        63: pop
+        64: return
+      LocalVariableTable:
+        Start  Length  Slot  Name   Signature
+           32      32     2 clickMe   Lcom/codename1/ui/Button;
+           22      42     1 label   Lcom/codename1/ui/Label;
+            0      65     0  this   Lcom/codename1/hellokotlin2/KotlinForm;
+      LineNumberTable:
+        line 13: 0
+        line 14: 12
+        line 15: 22
+        line 16: 32
+        line 21: 48
+}
+
+// end::advanced-topics-under-the-hood-bytecode-001[]
+
+// tag::advanced-topics-under-the-hood-bytecode-002[]
+InnerClasses:
+     static final #31; //class com/codename1/hellokotlin2/KotlinForm$1
+// end::advanced-topics-under-the-hood-bytecode-002[]
+
+// tag::advanced-topics-under-the-hood-bytecode-003[]
+Constant pool:
+   #1 = Utf8               com/codename1/hellokotlin2/KotlinForm
+   #2 = Class              #1             //  com/codename1/hellokotlin2/KotlinForm
+   #3 = Utf8               com/codename1/ui/Form
+   #4 = Class              #3             //  com/codename1/ui/Form
+   #5 = Utf8               <init>
+   #6 = Utf8               ()V
+   #7 = Utf8               Hello Kotlin
+   #8 = String             #7             //  Hello Kotlin
+   #9 = Utf8               com/codename1/ui/layouts/BoxLayout
+   ... etc.
+// end::advanced-topics-under-the-hood-bytecode-003[]
+
+// tag::advanced-topics-under-the-hood-bytecode-004[]
+public com.codename1.hellokotlin2.KotlinForm();
+  descriptor: ()V
+  flags: ACC_PUBLIC
+  Code:
+    stack=5, locals=3, args_size=1
+       0: aload_0
+       1: ldc           #8                  // String Hello Kotlin
+       3: invokestatic  #14                 // Method com/codename1/ui/layouts/BoxLayout.y:()Lcom/codename1/ui/layouts/BoxLayout;
+       6: checkcast     #16                 // class com/codename1/ui/layouts/Layout
+       9: invokespecial #19                 // Method com/codename1/ui/Form."<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
+      12: new           #21                 // class com/codename1/ui/Label
+      15: dup
+      16: ldc           #8                  // String Hello Kotlin
+      etc.
+// end::advanced-topics-under-the-hood-bytecode-004[]

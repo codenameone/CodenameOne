@@ -15,32 +15,7 @@ Register a single `CarApplication` from your app's `init()` -- before a head uni
 
 [source,java]
 ----
-import com.codename1.car.*;
-
-public class MyApp {
-    public void init(Object context) {
-        // ... normal app init ...
-        Car.setApplication(new MyCarApplication());
-    }
-}
-
-class MyCarApplication extends CarApplication {
-    public CarScreen onCreateRootScreen(CarContext context) {
-        return new LibraryScreen();
-    }
-}
-
-class LibraryScreen extends CarScreen {
-    protected CarTemplate onCreateTemplate() {
-        return new CarListTemplate().setTitle("Library")
-            .addRow(new CarRow("Now Playing").setText("Daft Punk — Discovery")
-                .setOnAction(ctx -> play()))
-            .addRow(new CarRow("Albums").setBrowsable(true)
-                .setOnAction(ctx -> ctx.pushScreen(new AlbumsScreen())))
-            .addRow(new CarRow("Playlists").setBrowsable(true)
-                .setOnAction(ctx -> ctx.pushScreen(new PlaylistsScreen())));
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java[tag=in-car-experiences-java-001,indent=0]
 ----
 
 That single description renders natively on both platforms:
@@ -72,7 +47,7 @@ Head units enforce a hard cap on the number of rows/items they display (driver-d
 
 [source,java]
 ----
-int max = context.getListRowLimit(); // 0 when unknown
+include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java[tag=in-car-experiences-java-002,indent=0]
 ----
 
 === Screen stack & lifecycle
@@ -81,20 +56,14 @@ int max = context.getListRowLimit(); // 0 when unknown
 
 [source,java]
 ----
-context.pushScreen(new DetailScreen());  // drill in
-context.popScreen();                     // back
-screen.invalidate();                     // rebuild this screen's template after a model change
-context.showToast("Added to queue");
+include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java[tag=in-car-experiences-java-003,indent=0]
 ----
 
 `CarScreen` exposes optional lifecycle hooks -- `onCreate()`, `onResume()`, `onPause()`, `onDestroy()` -- and `CarApplication` is notified of connection changes via `onCarConnected(CarContext)` / `onCarDisconnected()`. You can also observe connection globally:
 
 [source,java]
 ----
-Car.addConnectionListener(new CarConnectionListener() {
-    public void carConnected(CarContext ctx) { startLocationStream(); }
-    public void carDisconnected()           { stopLocationStream(); }
-});
+include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java[tag=in-car-experiences-java-004,indent=0]
 ----
 
 === Now-playing (audio apps)

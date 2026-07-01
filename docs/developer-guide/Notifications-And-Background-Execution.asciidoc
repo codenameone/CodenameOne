@@ -19,19 +19,7 @@ its notifications are shown. Request it through `Display`:
 
 [source,java]
 ----
-import com.codename1.notifications.NotificationPermissionRequest;
-import com.codename1.notifications.NotificationPermissionResult.AuthorizationLevel;
-
-NotificationPermissionRequest req = new NotificationPermissionRequest()
-        .provisional(true)      // iOS: deliver quietly without an explicit prompt
-        .timeSensitive(true);   // iOS: allow the time-sensitive interruption level
-
-Display.getInstance().requestNotificationPermission(req, result -> {
-    if (result.isGranted()) {
-        // schedule notifications
-    }
-    AuthorizationLevel level = result.getAuthorizationLevel();
-});
+include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java[tag=notifications-and-background-execution-java-001,indent=0]
 ----
 
 `NotificationPermissionResult.getAuthorizationLevel()` returns an `AuthorizationLevel`
@@ -61,18 +49,7 @@ before; the bean has been extended with fluent, backward-compatible setters:
 
 [source,java]
 ----
-LocalNotification n = new LocalNotification()
-        .setChannelId("messages")                 // Android channel (see below)
-        .setGroup("chat-42")                       // bundle related notifications
-        .setProgress(100, 40)                      // determinate progress bar (Android)
-        .setTimeSensitive(true);                   // break through Focus / elevated importance
-n.setId("msg-42");
-n.setAlertTitle("New message");
-n.setAlertBody("Tap to reply");
-n.addAction("open", "Open");
-n.addInputAction("reply", "Reply", "Type a message", "Send");  // inline quick reply
-Display.getInstance().scheduleLocalNotification(n, System.currentTimeMillis() + 1000,
-        LocalNotification.REPEAT_NONE);
+include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java[tag=notifications-and-background-execution-java-002,indent=0]
 ----
 
 When the user taps an action, the selected action id (and any quick-reply text) are
@@ -119,13 +96,7 @@ then reference it from a notification with `setChannelId(...)`:
 
 [source,java]
 ----
-new NotificationChannelBuilder("messages", "Messages")
-        .description("Incoming chat messages")
-        .importance(NotificationChannelBuilder.IMPORTANCE_HIGH)
-        .sound("/notification_sound_ping.mp3")
-        .enableVibration(true)
-        .lightColor(0xff0000)
-        .register();
+include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java[tag=notifications-and-background-execution-java-003,indent=0]
 ----
 
 Channels are an Android concept. On iOS and the simulator `register()` is a no-op (the
@@ -140,13 +111,7 @@ reconstructed after a cold launch -- pass state through the input data, not fiel
 
 [source,java]
 ----
-WorkRequest req = WorkRequest.builder("sync", SyncWorker.class)
-        .setRequiresNetwork(true)
-        .setRequiresCharging(true)
-        .setPeriodic(6 * 60 * 60 * 1000L)
-        .putInputData("account", "primary")
-        .build();
-BackgroundWork.schedule(req);
+include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java[tag=notifications-and-background-execution-java-004,indent=0]
 ----
 
 [options="header"]
@@ -171,14 +136,7 @@ and links `BackgroundTasks.framework` automatically.
 
 [source,java]
 ----
-ForegroundService svc = ForegroundService.start("downloads", "Downloading", "Please wait",
-        null, service -> {
-            for (int i = 0; i <= 100; i++) {
-                service.updateNotification("Downloading", i + "%");
-                // ... do a chunk of work ...
-            }
-        });
-// auto-stops when the task returns, or call svc.stop()
+include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java[tag=notifications-and-background-execution-java-005,indent=0]
 ----
 
 [options="header"]
@@ -198,15 +156,7 @@ text, URLs, files or images shared into your app from other apps:
 
 [source,java]
 ----
-public class MyApp extends Lifecycle {
-    public void onReceivedSharedContent(SharedContent content) {
-        for (SharedContent.Item item : content.getItems()) {
-            if (item.getType() == SharedContent.TYPE_IMAGE) {
-                importImage(item.getFilePath()); // a FileSystemStorage path
-            }
-        }
-    }
-}
+include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java[tag=notifications-and-background-execution-java-006,indent=0]
 ----
 
 [options="header"]

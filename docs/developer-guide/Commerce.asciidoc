@@ -10,9 +10,7 @@ The core idea is the *entitlement*: an abstract access right such as `pro` or `r
 
 [source,java]
 ----
-if (CommerceManager.getInstance().isEntitled("pro")) {
-    // unlock pro features
-}
+include::../demos/common/src/main/snippets/developer-guide/commerce.java[tag=commerce-java-001,indent=0]
 ----
 
 An entitlement is active when *any* of its granting products is active. This matters: a promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single authoritative rule -- the latest expiry over the active grants, evaluated against a server timestamp -- so a tampered device clock can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access on its own.
@@ -23,27 +21,21 @@ In your `Lifecycle.init` (or wherever you set up purchases):
 
 [source,java]
 ----
-CommerceManager cm = CommerceManager.getInstance();
-cm.setAppUserId(myAccountId);   // optional; a stable id for the signed-in user
+include::../demos/common/src/main/snippets/developer-guide/commerce.java[tag=commerce-java-002,indent=0]
 ----
 
 Drive purchases through the manager (these delegate to the `Purchase` API):
 
 [source,java]
 ----
-cm.subscribe("pro_monthly");
-// or cm.purchase("remove_ads");
+include::../demos/common/src/main/snippets/developer-guide/commerce.java[tag=commerce-java-003,indent=0]
 ----
 
 After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` makes a blocking network call, so run it off the EDT:
 
 [source,java]
 ----
-CN.callSerially(() -> {});                // (illustrative)
-new Thread(() -> {
-    cm.refresh();
-    if (cm.isEntitled("pro")) { /* ... */ }
-}).start();
+include::../demos/common/src/main/snippets/developer-guide/commerce.java[tag=commerce-java-004,indent=0]
 ----
 
 `isEntitled` returns the last cloud-validated answer when one is available, and otherwise falls back to the platform's own receipt (treating the entitlement id as a subscription SKU) so a paying user is never locked out while the network is down.

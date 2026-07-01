@@ -298,7 +298,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 
 
 .The slide transition moves both incoming and outgoing forms together
-image::img/transition-slide.jpg[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
+image::img/transition-slide.png[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
 
 .The slide transition can be applied vertically as well
 image::img/transition-slide-vertical.jpg[The slide transition can be applied vertically as well,scaledwidth=70%]
@@ -394,11 +394,7 @@ builder:
 
 [source,java]
 ----
-MorphTransition morph = MorphTransition.create(300)
-        .snapshotMode(true)
-        .morph("card");
-nextForm.setTransitionInAnimator(morph);
-nextForm.show();
+include::../demos/common/src/main/snippets/developer-guide/animations.java[tag=animations-java-001,indent=0]
 ----
 
 `snapshotMode(true)` captures each `(source, dest)` pair as a clipped
@@ -427,19 +423,7 @@ That one command will enable swiping back from `currentForm`. https://www.codena
 
 [source,java]
 ----
-/**
- * Useful when passing a value that might not exist to a function, e.g. When we
- * pass a form that we might need to construct dynamically later on.
- */
-public interface LazyValue<T> {
-    /**
-     * Returns the actual value.
-     *
-     * @param args optional arguments for the creation of the lazy value
-     * @return the value
-     */
-    T get(Object... args);
-}
+include::../demos/common/src/main/snippets/developer-guide/animations.java[tag=animations-java-002,indent=0]
 ----
 
 This effectively allows you to pass a form and create it as necessary (for example, for a GUI builder app you don't

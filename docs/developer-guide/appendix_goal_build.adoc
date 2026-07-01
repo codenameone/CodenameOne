@@ -10,7 +10,7 @@ This goal is bound to the `package` phase of the <<cn1app-archetype>>, so you do
 
 [source,bash]
 ----
-mvn cn1:build -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-build.sh[tag=appendix-goal-build-bash-001,indent=0]
 ----
 
 ==== Properties

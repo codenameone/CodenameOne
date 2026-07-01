@@ -19,20 +19,7 @@ The following snippet creates a button, that, when pressed, will fade itself and
 
 [source,java]
 ----
-import static com.codename1.ui.ComponentSelector.$;
-
-// ...
-
-Button slideUp = $(new Button("Slide Up")) // <1>
-    .setIcon(FontImage.MATERIAL_EXPAND_LESS) // <2>
-    .addActionListener(e->{ // <3>
-        $(e) // <4>
-            .getParent() // <5>
-            .find(">*") // <6>
-            .slideUpAndWait(1000) // <7>
-            .slideDownAndWait(1000); // <8>
-    })
-    .asComponent(Button.class); // <9>
+include::../demos/common/src/main/snippets/developer-guide/component-selector.java[tag=component-selector-java-001,indent=0]
 ----
 <1> - Creates a new Button and wraps it in a `ComponentSelector` so that you can use ComponentSelector's fluent API to change the button.
 <2> - Sets the icon on the button
@@ -93,27 +80,7 @@ Here is an example that uses tags to implement table striping so that even rows 
 
 [source,java]
 ----
-TableLayout tl = new TableLayout(numRows, numCols);
-Container table = new Container(tl);
-int rowNum = 0;
-int colNum = 0;
-for (String[] row : data) {
-    colNum = 0;
-    for (String cell : row) {
-        table.add(
-            tl.createConstraint(rowNum, colNum),
-            $(new Button(cell))
-                .setUIID("Label")
-                .addTags(rowNum % 2 == 0 ? "even":"odd")
-                .asComponent()
-        );
-        colNum++;
-    }
-    rowNum++;
-}
-$(".even", table)
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
+include::../demos/common/src/main/snippets/developer-guide/component-selector.java[tag=component-selector-java-002,indent=0]
 ----
 
 image::img/component-selector-table-striping.png[Table striping screenshot]
@@ -126,37 +93,28 @@ ComponentSelector includes wrappers for most of the methods of `com.codename1.ui
 
 [source,java]
 ----
-$(".even", table)
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
+include::../demos/common/src/main/snippets/developer-guide/component-selector.java[tag=component-selector-java-003,indent=0]
 ----
 
 Were you setting these values on the "selected" style, the "unselected" style, the "disabled" style, "ALL" styles? In fact you were setting these values on the "current" style. That is, the call to `setBgColor()` caused something like the following loop to happen on all the components in the set:
 
 [source,java]
 ----
-for (Component c : evenComponents) {
-    c.getStyle().setBgColor(0xcccccc);
-}
+include::../demos/common/src/main/snippets/developer-guide/component-selector.java[tag=component-selector-java-004,indent=0]
 ----
 
 If a component was in "selected" state, then this would changed the selected style. If it was in pressed state, then it would change the "pressed" style. Etc. What if you wanted to specifically change the styles in the "pressed" state. Then you would call `selectPressedStyle()` prior calling your style mutation methods. For example:
 
 [source,java]
 ----
-$(".even", table)
-    .selectPressedStyle()
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
+include::../demos/common/src/main/snippets/developer-guide/component-selector.java[tag=component-selector-java-005,indent=0]
 ----
 
 Or, ComponentSelector supports a "state" pseudo-selector that will initialize the selected style so that you don't have to call `selectXXXStyle()` before making changes. For example, The following snippet is equivalent to the previous:
 
 [source,java]
 ----
-$(".even:pressed", table)
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
+include::../demos/common/src/main/snippets/developer-guide/component-selector.java[tag=component-selector-java-006,indent=0]
 ----
 
 The following "state" pseudo-selectors are available:
@@ -186,29 +144,7 @@ For example, Consider this example, that shows a button that replaces itself and
 
 [source,java]
 ----
-Button replace = $(new Button("Replace Fade/Slide"))
-    .setIcon(FontImage.MATERIAL_REDEEM)
-    .addActionListener(e->{
-        $(e).getParent()
-            .find(">*")  // <1>
-            .replaceAndWait(c->{ // <2>
-                return $(new Label("Replacement")) // <3>
-                    .putClientProperty("origComponent", c) // <4>
-                    .asComponent();
-            }, CommonTransitions.createFade(1000)) // <5>
-            .replaceAndWait(c->{
-                Component orig = (Component)c.getClientProperty("origComponent");
-                if (orig != null) {
-                    c.putClientProperty("origComponent", null);
-                    return orig; // <6>
-                }
-                return c;
-
-            }, CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, false, 1000)); // <7>
-
-
-    })
-    .asComponent(Button.class);
+include::../demos/common/src/main/snippets/developer-guide/component-selector.java[tag=component-selector-java-007,indent=0]
 ----
 <1> Finds all siblings of the source button
 <2> Call `replaceAndWait()` with a mapping function to define the component that should replace each component. This will replace each component in the set with a replacement component in its respective container. This will also return a new ComponentSelector with the set of replacement components.
