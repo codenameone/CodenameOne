@@ -29,6 +29,13 @@ public final class TranscriptionSegment {
     private final long endTimeMs;
     private final String text;
 
+    /// Creates a timed transcript span.
+    ///
+    /// @param startTimeMs start offset from the beginning of the audio, in milliseconds
+    /// @param endTimeMs end offset from the beginning of the audio, in milliseconds
+    /// @param text text recognized in this span; `null` is treated as an empty string
+    /// @throws IllegalArgumentException if either timestamp is negative, or if `endTimeMs`
+    /// is before `startTimeMs`
     public TranscriptionSegment(long startTimeMs, long endTimeMs, String text) {
         if (startTimeMs < 0) {
             throw new IllegalArgumentException("startTimeMs must be >= 0");
@@ -41,14 +48,23 @@ public final class TranscriptionSegment {
         this.text = text == null ? "" : text;
     }
 
+    /// Gets the segment start offset from the beginning of the audio.
+    ///
+    /// @return start offset in milliseconds
     public long getStartTimeMs() {
         return startTimeMs;
     }
 
+    /// Gets the segment end offset from the beginning of the audio.
+    ///
+    /// @return end offset in milliseconds
     public long getEndTimeMs() {
         return endTimeMs;
     }
 
+    /// Gets the text recognized in this segment.
+    ///
+    /// @return recognized text, never `null`
     public String getText() {
         return text;
     }

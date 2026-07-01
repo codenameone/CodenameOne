@@ -26,8 +26,16 @@ package com.codename1.media;
 /// that expose segment timing can call these overloads; text-only
 /// recognizers continue to use [RecognitionCallback].
 public interface TimedRecognitionCallback extends RecognitionCallback {
+    /// Called with an interim timed recognition result.
+    ///
+    /// @param result partial timed recognition result
     void onPartialResult(TranscriptionResult result);
 
+    /// Called with the final timed recognition result.
+    ///
+    /// @param result final timed recognition result
+    /// @param confidence confidence score from `0.0` to `1.0`, when available
+    /// @param alternatives provider-specific alternative transcripts
     void onResult(TranscriptionResult result, float confidence, String[] alternatives);
 
     /// No-op adapter. The timed overloads forward to the string-only
@@ -35,10 +43,18 @@ public interface TimedRecognitionCallback extends RecognitionCallback {
     /// [RecognitionCallback] behaviour unless the timed methods are
     /// explicitly overridden.
     class Adapter extends RecognitionCallback.Adapter implements TimedRecognitionCallback {
+        /// Forwards partial timed results to the string-only partial callback.
+        ///
+        /// @param result partial timed recognition result
         public void onPartialResult(TranscriptionResult result) {
             onPartialResult(result == null ? "" : result.getText());
         }
 
+        /// Forwards final timed results to the string-only result callback.
+        ///
+        /// @param result final timed recognition result
+        /// @param confidence confidence score from `0.0` to `1.0`, when available
+        /// @param alternatives provider-specific alternative transcripts
         public void onResult(TranscriptionResult result, float confidence, String[] alternatives) {
             onResult(result == null ? "" : result.getText(), confidence, alternatives);
         }

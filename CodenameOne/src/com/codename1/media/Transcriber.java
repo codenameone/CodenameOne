@@ -28,7 +28,18 @@ import com.codename1.util.AsyncResource;
 /// cloud APIs, platform speech engines, or optional cn1libs such as
 /// `cn1-ai-whisper`; all return timed segments suitable for SRT/VTT.
 public abstract class Transcriber {
+    /// Creates a transcriber implementation.
+    protected Transcriber() {
+    }
+
+    /// Transcribes an audio file.
+    ///
+    /// @param request transcription request
+    /// @return asynchronous transcription result
     public abstract AsyncResource<TranscriptionResult> transcribe(TranscriptionRequest request);
 
+    /// Gets the provider identifier.
+    ///
+    /// @return provider name, such as `whisper`
     public abstract String getProvider();
 }

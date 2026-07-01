@@ -32,6 +32,14 @@ public final class TranscriptionResult {
     private final List<TranscriptionSegment> segments;
     private final String text;
 
+    /// Creates a transcription result from timed segments.
+    ///
+    /// The supplied list is copied, validated, and exposed through [#getSegments()]
+    /// as an immutable list. The plain text returned by [#getText()] is the
+    /// concatenation of each segment's text in order.
+    ///
+    /// @param segments ordered transcript segments
+    /// @throws IllegalArgumentException if `segments` is `null` or contains `null`
     public TranscriptionResult(List<TranscriptionSegment> segments) {
         if (segments == null) {
             throw new IllegalArgumentException("segments is required");
@@ -50,20 +58,35 @@ public final class TranscriptionResult {
         this.text = sb.toString();
     }
 
+    /// Creates a text-only result for providers that do not expose segment timing.
+    ///
+    /// The returned result contains one segment from `0` to `0` milliseconds.
+    ///
+    /// @param text recognized text
+    /// @return a transcription result containing one untimed segment
     public static TranscriptionResult textOnly(String text) {
         ArrayList<TranscriptionSegment> segments = new ArrayList<TranscriptionSegment>(1);
         segments.add(new TranscriptionSegment(0, 0, text));
         return new TranscriptionResult(segments);
     }
 
+    /// Gets the ordered timed transcript segments.
+    ///
+    /// @return immutable segment list
     public List<TranscriptionSegment> getSegments() {
         return segments;
     }
 
+    /// Gets the plain transcript text.
+    ///
+    /// @return transcript text, never `null`
     public String getText() {
         return text;
     }
 
+    /// Formats this transcription as SubRip captions.
+    ///
+    /// @return SRT text using millisecond timestamps
     public String toSrt() {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < segments.size(); i++) {
@@ -76,6 +99,9 @@ public final class TranscriptionResult {
         return out.toString();
     }
 
+    /// Formats this transcription as WebVTT captions.
+    ///
+    /// @return WebVTT text using millisecond timestamps
     public String toVtt() {
         StringBuilder out = new StringBuilder("WEBVTT\n\n");
         for (int i = 0; i < segments.size(); i++) {
