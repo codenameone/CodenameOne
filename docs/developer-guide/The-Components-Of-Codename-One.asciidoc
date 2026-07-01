@@ -2603,7 +2603,7 @@ try {
 }
 ----
 
-The mixed buffer is clipped to the normalized PCM range `[-1, 1]`, so it can be passed directly to `WAVWriter`.  The mixer does not resample or convert channel layouts; downsample or otherwise convert source buffers before adding them if they are not already on the target clock.
+The mixed buffer is clipped to the normalized PCM range `[-1, 1]`, so it can be passed directly to `WAVWriter`.  The mixer doesn't resample or convert channel layouts; downsample or otherwise convert source buffers before adding them if they're not already on the target clock.
 
 === ImageViewer
 
