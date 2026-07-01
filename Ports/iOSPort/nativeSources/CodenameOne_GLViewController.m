@@ -4577,7 +4577,7 @@ BOOL prefersStatusBarHidden = NO;
     CGRect rect = CGRectMake(x, y, width, height);
     painted = NO;
 	//[self performSelectorOnMainThread:@selector(setNeedsDisplay) withObject:0 waitUntilDone:NO];
-    void (^flushOnMain)(void) = ^{
+    dispatch_sync(dispatch_get_main_queue(), ^{
         @synchronized([CodenameOne_GLViewController instance]) {
             if([currentTarget count] > 0) {
                 [currentTarget addObjectsFromArray:upcomingTarget];
@@ -4591,12 +4591,7 @@ BOOL prefersStatusBarHidden = NO;
         }
         //[self setNeedsDisplayInRect:rect];
         [self drawFrame:rect];
-    };
-    if ([NSThread isMainThread]) {
-        flushOnMain();
-    } else {
-        dispatch_sync(dispatch_get_main_queue(), flushOnMain);
-    }
+    });
     /*int timeout = 5;
      while (!painted && timeout > 0) {
      sleep(5);
