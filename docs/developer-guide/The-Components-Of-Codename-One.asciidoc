@@ -869,18 +869,6 @@ The `fetchPropertyData` is a simplistic tool that fetches the next page of listi
 Now that you have a webservice lets proceed to create the UI. Check out the code annotations below:
 
 
-<1> Placeholder is essential for the https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage] class which this guide covers at a different place.
-
-<2> The `InfiniteScrollAdapter` accepts a runnable which is invoked every time you reach the edge of the scrolling. You used a closure instead of the typical run() method override.
-
-<3> This is a blocking call, after the method completes you will have all the data you need. Notice that this method doesn't block the EDT illegally.
-
-<4> If there is no more data you call the `addMoreComponents` method with a false argument. This indicates that there is no more data to fetch.
-
-<5> Here you add the actual components to the end of the form. Notice that you *must not* invoke the `add`/`remove` method of `Container`. Those might conflict with the work of the `InfiniteScrollAdapter`.
-
-<6> You pass true to show that the data isn't "prefilled" so the method should be invoked when the `Form` is first shown
-
 IMPORTANT: Don't violate the EDT in the callback. It's invoked on the event dispatch thread and it's crucial
 
 ==== The InfiniteContainer
@@ -1224,11 +1212,6 @@ To customize the table cell behavior you can derive the `Table` to create a "ren
 
 The example above can be extended to include far more capabilities:
 
-<1> The `createCell` method is invoked once per component but is similar conceptually to the `List` renderer. Notice that it doesn't return a "rubber stamp" though, it returns a full component.
-<2> You apply the picker to one cell for simplicities sake.
-<3> You need to set the value of the component manually, this is crucial since the `Table` doesn't "see" this.
-<4> You need to track the event and update the model in this case as the `Table` isn't aware of the data change.
-<5> You set the "pinstripe" effect by coloring even rows. Notice that unlike renderers you need to apply the coloring once as the `Components` are stateful.
 
 .Table with customize cells using the pinstripe effect
 image::img/components-table-pinstripe.png[Table with customize cells using the pinstripe effect,scaledwidth=20%]
@@ -1546,7 +1529,6 @@ You can use `ScaleImageLabel`/`ScaleImageButton` interchangeably. The major diff
 Here is a simple example that also shows the difference between the `scale to fill` and `scale to fit` modes:
 
 
-
 .ScaleImageLabel/Button, the top row includes scale to fit versions (the default) whereas the bottom row includes the scale to fill versions
 image::img/components-scaleimage.png[ScaleImageLabel/Button the top row includes scale to fit versions (the default) whereas the bottom row includes the scale to fill versions,scaledwidth=25%]
 
@@ -1574,8 +1556,6 @@ The basic functionality of the `Toolbar` includes the ability to add a command t
 
 
 The code below provides a brief overview of these options:
-
-
 
 
 .The Toolbar
@@ -1867,7 +1847,6 @@ You can also set its properties:
 And call its methods:
 
 
-
 ===== Legacy JSObject support
 
 This section describes the now deprecated `JSObject` approach. It's here for reference by developers working with older code. You suggest using the new API when starting a new project.
@@ -2138,7 +2117,6 @@ You can combine some demos above including the <<slider-stars-demo,Slider stars 
 image::img/components-swipablecontainer.png[SwipableContainer showing a common use case of ranking on swipe,scaledwidth=20%]
 
 
-
 === EmbeddedContainer
 
 https://www.codenameone.com/javadoc/com/codename1/ui/util/EmbeddedContainer.html[EmbeddedContainer] solves a problem that exists within the GUI builder and the class makes no sense outside of the context of the GUI builder.
@@ -2269,7 +2247,6 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/Calendar.html[Calendar]
 NOTE: You recommend developers use the <<picker-section,Picker UI>> rather than use the calendar to pick a date. It looks better on the devices.
 
 Simple usage of the `Calendar` class looks something like this:
-
 
 
 .The Calendar component

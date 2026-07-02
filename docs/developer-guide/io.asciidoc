@@ -375,7 +375,6 @@ TIP: `MultipartRequest` is a `ConnectionRequest` most stuff you expect from ther
 Since you assume most developers reading this will be familiar with Java here is the way to implement the multipart upload in the servlet API:
 
 
-
 ==== Parsing
 
 Codename One has many built in parsers for JSON, XML, CSV & Properties formats. You can use those parsers to read data from the Internet or data that's shipping with your product. For example: use the CSV data to setup default values for your application.
@@ -520,7 +519,6 @@ image::img/processing-package.png[Running the geocode sample above in the simula
 The XML processor handles global selections by using a double slash anywhere within the expression, for example:
 
 
-
 NOTE: Notice that Google’s JSON webservice uses plural form for each of the node names in that API (ie. results, address_components, and types) where they don’t in the XML services (that's result, address_component etc.)
 
 ====== Second example
@@ -543,12 +541,10 @@ If a document is ordered, you might want to select nodes by their position, for 
 It's also possible to select parent nodes, by using the `..` expression. For example:
 
 
-
 Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the ID attribute from the player node. Or, you could get the same result from the following simpler statement:
 
 
 It's also possible to nest expressions, for example:
-
 
 
 In the above example, if the player node had an address object, you’d be selecting all players from Canada. This is a simple example of a nested expression, but they can get much more complex, which will be required as the documents themselves get more complex. +
@@ -558,11 +554,9 @@ Moving on, to select a node based on the existence of an attribute:
 Above, you selected the IDs of all ranked players. Conversely, you can select the non-ranked players like this:
 
 
-
 NOTE: Logical not (!) operators aren't implemented)
 
 You can also select by the existence of a child node
-
 
 
 Above, you selected all players that have a middle name.<br/>
@@ -744,7 +738,6 @@ Notice the error message entry which is null meaning there was no error, if ther
 This should display an error message to the user if there was a problem sending the SMS:
 
 
-
 === Webservice wizard
 
 The Webservice Wizard can be invoked directly from the plugin. It generates stubs for the client side that allow performing simple method invocations on the server. It also generates a servlet that can be installed on any servlet container to intercept client side calls.
@@ -880,7 +873,6 @@ The https://www.codenameone.com/javadoc/com/codename1/io/services/CachedDataServ
 For example, it might be important to update the image if it changed but you still want caching.
 
 The `CachedDataService` will fetch data if it isn't cached locally and cache it. When you "refresh" it will send a special HTTP request that will send back the data if it has been updated since the last refresh:
-
 
 
 === Externalizable objects
@@ -1094,9 +1086,6 @@ You're pretty conflicted on this feature and are thinking about removing it.
 Without this feature the code would look like this:
 
 
-
-
-
 ===== Seamless serialization
 
 Suppose you have an object called `Contacts` which includes contact information for example:
@@ -1125,10 +1114,6 @@ If you continue the example from above to show persistence to the SQL database y
 
 In the above code you do the following:
 
-<1> Create or open an SQLite database using the standard syntax
-<2> Create a properties binding instance
-<3> Define the primary key for contact as `id` and set it to `auto increment` which will give it a unique value from the database
-<4> Call SQL's createTable if the table doesn't exist yet!
 
 TIP: Notice that now altering a created table isn't possible so if you add a new property you might need to detect that and do an `alter` call manually
 
@@ -1220,11 +1205,6 @@ Seems like the one above but it takes a String that's returned by the text field
 You can build a UI that would allow you to edit the `Contact` property in memory:
 
 
-<1> Notice the use of the property's label, which allows better encapsulation
-<2> You can bind picker seamlessly
-<3> You can bind many radio buttons to a single property to allow the user to select the gender, notice that labels and values can be different for example: "Male" selection will translate to "M" as the value
-<4> Numeric bindings "work"
-
 .Properties form for the contact
 image::img/properties-demo-binding.png[Properties form for the contact,scaledwidth=20%]
 
@@ -1247,10 +1227,6 @@ By using the `disconnect()` method in `Binding` you can separate the UI from the
 
 Up until now this was pretty cool but if you looked at the UI construction code above you would see that it's pretty full of boilerplate code. The thing about boilerplate is that it shows where automation can be applied, that's the exact idea behind the magical "InstantUI" class. This means that the UI above can be generated using this code:
 
-
-<1> The id property is useful for database storage but you want to exclude it from the UI
-<2> This implements the `gender` toggle button selection, you provide a hint to the UI so labels and values differ
-<3> You create the UI from the screenshot above with one line and it's seamlessly bound to the properties of myContact. The second argument indicates the "auto commit" status.
 
 This still carries most of the flexibilities of the regular binding for example: you can still get a binding object using:
 

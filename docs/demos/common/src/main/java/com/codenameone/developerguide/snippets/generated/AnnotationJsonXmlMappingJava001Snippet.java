@@ -72,7 +72,7 @@ class AnnotationJsonXmlMappingJava001Snippet {
         @JsonIgnore
         public String role;
 
-        public User() { }                                  //
+        public User() { }                                  // <1>
     }
     // end::annotation-json-xml-mapping-java-001[]
 }

@@ -64,10 +64,10 @@ class AnnotationComponentBindingJava001Snippet {
         @Bind(name = "userField", attr = BindAttr.TEXT)
         private String user;
         public String getUser()              { return user; }
-        public void   setUser(String u)      { this.user = u; }                  //
+        public void   setUser(String u)      { this.user = u; }                  // <1>
 
         @Bind(name = "rememberMe", attr = BindAttr.SELECTED)
-        public boolean remember;                                                   //
+        public boolean remember;                                                   // <2>
 
         @Bind(name = "banner", attr = BindAttr.UIID, twoWay = false)
         public String bannerStyle;
@@ -75,7 +75,7 @@ class AnnotationComponentBindingJava001Snippet {
         @Bind(name = "fullName",
               attr = BindAttr.TEXT,
               getter = "computeFullName",
-              setter = "applyFullName")                                           //
+              setter = "applyFullName")                                           // <3>
         private String fullName;
         public String computeFullName()      { return fullName.toUpperCase(); }
         public void   applyFullName(String f){ this.fullName = f.trim(); }

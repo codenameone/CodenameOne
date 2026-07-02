@@ -56,9 +56,9 @@ class IndexJava001Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     // tag::index-java-001[]
-    public class HelloWorld { //
-        private Form current; //
-        private Resources theme; //
+    public class HelloWorld { // <1>
+        private Form current; // <2>
+        private Resources theme; // <3>
 
         // null class methods null
     }

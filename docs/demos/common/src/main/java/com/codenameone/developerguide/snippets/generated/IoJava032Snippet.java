@@ -61,11 +61,11 @@ class IoJava032Snippet {
         JSONParser json = new JSONParser();
         try(Reader r = new InputStreamReader(Display.getInstance().getResourceAsStream(getClass(), "/anapioficeandfire.json"), "UTF-8");) {
             Map<String, Object> data = json.parseJSON(r);
-            java.util.List<Map<String, Object>> content = (java.util.List<Map<String, Object>>)data.get("root"); //
-            for(Map<String, Object> obj : content) { //
+            java.util.List<Map<String, Object>> content = (java.util.List<Map<String, Object>>)data.get("root"); // <1>
+            for(Map<String, Object> obj : content) { // <2>
                 String url = (String)obj.get("url");
                 String name = (String)obj.get("name");
-                java.util.List<String> titles =  (java.util.List<String>)obj.get("titles"); //
+                java.util.List<String> titles =  (java.util.List<String>)obj.get("titles"); // <3>
                 if(name == null || name.length() == 0) {
                     java.util.List<String> aliases = (java.util.List<String>)obj.get("aliases");
                     if(aliases != null && aliases.size() > 0) {

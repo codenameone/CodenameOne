@@ -58,11 +58,11 @@ class BasicsJava010Snippet {
     void snippet() throws Exception {
         // tag::basics-java-010[]
         Container cnt = new Container(BoxLayout.y());
-        cnt.add(new Label("Just Added")); //
-        cnt.addAll(new Label("Adding Multiple"), //
+        cnt.add(new Label("Just Added")); // <1>
+        cnt.addAll(new Label("Adding Multiple"), // <2>
             new Label("Second One"));
 
-        cnt.add(new Label("Chaining")). //
+        cnt.add(new Label("Chaining")). // <3>
             add(new Label("Value"));
         // end::basics-java-010[]
     }

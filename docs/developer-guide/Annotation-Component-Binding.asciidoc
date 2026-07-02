@@ -162,19 +162,6 @@ Multiple annotations on the same field are combined into a
 `GroupConstraint` (first failure wins), matching the behaviour of
 `Validator.addConstraint(Component, Constraint...)`.
 
-<1> `@Required @Email` is the canonical "mandatory address" pair. The
-    standard email regex accepts the empty string as "not yet an
-    address," so `@Required` is what enforces presence.
-<2> Inclusive bounds. Omit either side to remove that side of the
-    range (defaults are negative / positive infinity).
-<3> The field's static type is `String` because the user types the
-    digits into a `TextField` -- the binder runs `Integer.parseInt`
-    only when committing the value back through the JavaBeans setter
-    for an `int` target.
-<4> `PhoneConstraint` is a hand-written
-    `com.codename1.ui.validation.Constraint` with a public no-argument
-    constructor. The generated binder instantiates it once per
-    `bind()` call.
 
 After binding, drive validation through the returned handle:
 

@@ -46,7 +46,6 @@ Now in the `start()` method, add a button that lets the user buy the world:
 At this point, the app can track the sale of the world. To make it more useful, add `ToastBar` feedback for purchase completion:
 
 
-
 NOTE: You can test out this code in the simulator without doing any more setup and it will work. If you want the code to work on Android and iOS, you'll need to set up the app and in-app purchase settings in the Google Play and iTunes stores respectively as explained below
 
 When the app first opens you see your button:
@@ -231,9 +230,6 @@ You should now have all the background required to implement the Hello World Sub
 
 In the main form, you want two buttons to subscribe to the `World`, for one month and one year respectively. They look like:
 
-<1> In the event handler you check if the user is subscribed by calling `isSubscribed(PRODUCTS)`.  Notice that you check it against the array of both the one month and one year subscription SKUs.
-<2> You are able to tell the user when the current expiry date is so that they can gauge whether to proceed.
-<3> Since this is a non-renewable subscription, you use the `Purchase.purchase()` method. See following note about `subscribe()` vs `purchase()`
 
 ==== Subscribe() vs purchase()
 
@@ -454,9 +450,6 @@ The next section walks through the steps to get these values.
 ==== The `validateAndSaveReceipt()` method
 
 You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
-
-<1> You need to handle the case where the app is being used in the CN1 simulator. You'll treat this
-as a non-renewable receipt, and you'll calculate the expiry date using an "accelerated" clock to assist in testing.
 
 
 NOTE:  In many of the code snippets for the Server-side code, you'll see references to both a `Receipts` class and a `Receipt` class. This is slightly confusing. The `Receipts` class is a JPA entity the encapsulates a row from the "receipts" table of your SQL database. The `Receipt` class is `com.codename1.payment.Receipt`.  It's used to interface with the IAP validation library.

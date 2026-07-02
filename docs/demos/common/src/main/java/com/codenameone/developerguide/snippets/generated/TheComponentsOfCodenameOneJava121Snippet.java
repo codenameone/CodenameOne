@@ -69,7 +69,7 @@ class TheComponentsOfCodenameOneJava121Snippet {
         final int size = Display.getInstance().convertToPixels(7);
         final EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(size, size, 0xffcccccc), true);
 
-        final String[] actors = { "Peter Dinklage", "Nikolaj Coster-Waldau", "Lena Headey"}; //
+        final String[] actors = { "Peter Dinklage", "Nikolaj Coster-Waldau", "Lena Headey"}; // <1>
         final Image[] pictures = {
             URLImage.createToStorage(placeholder, "tyrion","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/tyrion-lannister-512x512.jpg"),
             URLImage.createToStorage(placeholder, "jaime","http://i.lv3.hbo.com/assets/images/series/game-of-thrones/character/s5/jamie-lannister-512x512.jpg"),
@@ -77,7 +77,7 @@ class TheComponentsOfCodenameOneJava121Snippet {
         };
 
         ac.setCompletionRenderer(new ListCellRenderer() {
-            private final Label focus = new Label(); //
+            private final Label focus = new Label(); // <2>
             private final Label line1 = new Label(characters[0]);
             private final Label line2 = new Label(actors[0]);
             private final Label icon = new Label(pictures[0]);
@@ -93,7 +93,7 @@ class TheComponentsOfCodenameOneJava121Snippet {
                             line2.setText(actors[iter]);
                             icon.setIcon(pictures[iter]);
                         } else {
-                            line2.setText(""); //
+                            line2.setText(""); // <3>
                             icon.setIcon(placeholder);
                         }
                         break;

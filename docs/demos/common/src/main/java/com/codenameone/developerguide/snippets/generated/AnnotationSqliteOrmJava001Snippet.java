@@ -70,7 +70,7 @@ class AnnotationSqliteOrmJava001Snippet {
         public java.util.Date createdAt;
 
         @DbTransient
-        public String cacheKey;                            //
+        public String cacheKey;                            // <1>
 
         public User() { }
     }

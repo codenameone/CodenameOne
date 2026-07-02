@@ -46,12 +46,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 === Use the dao
 
-<1> Idempotent -- `CREATE TABLE IF NOT EXISTS`.
-<2> The autoincrement `id` is filled in via
-    `SELECT last_insert_rowid()` after the insert.
-<3> `findById` returns `null` when no row matches.
-<4> Free-form `WHERE` clause; positional `?` parameters bind in order.
-<5> `update` and `delete` key off the entity's `@Id` value.
 
 `EntityManager` is a thin façade over `Database`. The underlying
 connection is reachable through `em.database()` for raw SQL when the

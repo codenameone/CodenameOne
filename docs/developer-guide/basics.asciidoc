@@ -168,10 +168,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 In the race to make code "`tighter`" you can make this even shorter. Most layout managers have their own custom terse syntax style for example:
 
 
-<1> Most layouts have a version of enclose to encapsulate components within (((Encapsulate)))
-
-<2> `FlowLayout` has variants that support aligning the components on various axis
-
 To sum this up, you can use layout managers and nesting to create elaborate UI's that implicitly adapt to different screen sizes and device orientation.
 
 ===== Flow Layout
@@ -401,13 +397,6 @@ The <<table-layout-constraint-sample,table layout constraint sample>> tries to s
 
 [[table-layout-constraint-sample]]
 
-<1> You need the `TableLayout` instance to create constraints. A constraint must be created for every component and must be used with the same layout as the parent container
-
-<2> To get the look in the <<table-layout-constraints,screenshot>> you need to turn scrolling off so the height constraint doesn't take up available height. Otherwise it will miscalculate available height due to scrolling. You can scroll a `TableLayout` but sizing will be different
-
-<3> You create the constraint and instantly apply width to it. This is a shorthand syntax for the <<full-code-tablelayout-constraint, code block below>>
-
-<4> You can chain constraint creation using a call like this so many constraints apply to a single cell. Notice that you don't span and set width on the same axis (horizontal span + width), doing something like that would create confusing behavior
 
 Here is the full code mentioned in item 3:
 
@@ -558,8 +547,6 @@ image::img/guibuilder-2-insets-3.png[Button's left inset linked to text field,sc
 
 The two active lines here are the last two:
 
-<1> Sets the left inset on `btn` to 0.
-<2> Links `btn`'s left inset to `tf` so that it's measured from the text field. The third parameter (`1.0`) is the reference position. This will either be `0` (meaning the reference point is the left edge of the text field), or `1` (meaning the reference point is the right edge of the text field). In this case you set a reference position of `1.0` because you want the button to be aligned to the text field's right edge.
 
 NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured. A reference position of 0 means that the inset is measured from the leading edge of the reference component. A value of 1.0 means that the inset is measured from the trailing edge of the reference component. A value of 0.5 means that the inset is measured from the center of the reference component. Etc. Any floating point value can be used, though the most common values are 0 and 1.
 

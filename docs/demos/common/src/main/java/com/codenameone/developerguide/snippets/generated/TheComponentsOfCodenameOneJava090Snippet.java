@@ -61,13 +61,13 @@ class TheComponentsOfCodenameOneJava090Snippet {
         Style s = UIManager.getInstance().getComponentStyle("Title");
 
         Form hi = new Form("Toolbar", new BoxLayout(BoxLayout.Y_AXIS));
-        TextField searchField = new TextField("", "Toolbar Search");
+        TextField searchField = new TextField("", "Toolbar Search"); // <1>
         searchField.getHintLabel().setUIID("Title");
         searchField.setUIID("Title");
         searchField.getAllStyles().setAlignment(Component.LEFT);
         hi.getToolbar().setTitleComponent(searchField);
         FontImage searchIcon = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, s);
-        searchField.addDataChangeListener((i1, i2) -> {
+        searchField.addDataChangeListener((i1, i2) -> { // <2>
             String t = searchField.getText();
             if(t.length() < 1) {
                 for(Component cmp : hi.getContentPane()) {
@@ -89,12 +89,12 @@ class TheComponentsOfCodenameOneJava090Snippet {
                     }
                     boolean show = val != null && val.toLowerCase().indexOf(t) > -1;
                     cmp.setHidden(!show);
-                    cmp.setVisible(show);
+                    cmp.setVisible(show); // <3>
                 }
             }
             hi.getContentPane().animateLayout(250);
         });
-        hi.getToolbar().addCommandToRightBar("", searchIcon, (e) -> {
+        hi.getToolbar().addCommandToRightBar("", searchIcon, (e) -> { // <4>
             searchField.startEditingAsync();
         });
 
