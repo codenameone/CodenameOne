@@ -60,6 +60,7 @@ public final class Cn1WidgetRenderer {
                 || "FloatingActionButton".equals(id) || "Tabs".equals(id) || "Toolbar".equals(id)
                 || "Dialog".equals(id) || "Spinner".equals(id)
                 || "TabsGeom".equals(id)                       // geometry-isolation: Tabs over a flat backdrop
+                || "TabsMorph".equals(id)                      // animation-frame validation: same bar, frozen morph
                 || "TabOne".equals(id)                         // minimal: one text-only tab, flat backdrop
                 || "GlassText".equals(id) || "GlassIcon".equals(id) // ladder rungs: glass + one element
                 || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
@@ -223,7 +224,7 @@ public final class Cn1WidgetRenderer {
             Tabs tabs = new Tabs(Component.TOP);
             tabs.addTab("Tab", new Container());
             c = tabs;
-        } else if ("Tabs".equals(id) || "TabsGeom".equals(id)) {
+        } else if ("Tabs".equals(id) || "TabsGeom".equals(id) || "TabsMorph".equals(id)) {
             // iOS UITabBar: an icon-over-label bar at the TOP, three items
             // (Featured / Search / More) mirroring the native reference's system
             // tab items; the first is selected (blue), the rest grey. NOT a

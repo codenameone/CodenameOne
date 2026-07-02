@@ -107,17 +107,27 @@ rf_log "CN1SS log tail:"; (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/  /' | 
 # CN1 suite here only renders the CN1 side and diffs it against the committed
 # goldens. The CN1 app may still deliver factory native renders; they are ignored.
 CN1_COUNT=0
+FRAME_COUNT=0
+FRAMES_WORK_DIR="$WORK_DIR/frames"; mkdir -p "$FRAMES_WORK_DIR"
 shopt -s nullglob
 declare -a COMPARE_ENTRIES=()
 for png in "$WS_RAW_DIR"/*_cn1.png; do
   base="$(basename "$png" .png)"; name="${base%_cn1}"
+  # Animation-frame captures ("<id>_tNNN_<appearance>") are validated by
+  # MorphFrameValidator against committed CN1 frame goldens + motion properties;
+  # they have no native golden, so they are kept OUT of the fidelity comparison.
+  if [[ "$name" =~ _t[0-9]{3}_ ]]; then
+    cp -f "$png" "$FRAMES_WORK_DIR/${name}_cn1.png"
+    FRAME_COUNT=$(( FRAME_COUNT + 1 ))
+    continue
+  fi
   dest="$WORK_DIR/${name}_cn1.png"; cp -f "$png" "$dest"
   COMPARE_ENTRIES+=("${name}=${dest}")
   CN1_COUNT=$(( CN1_COUNT + 1 ))
 done
 GOLDEN_COUNT=$(ls "$GOLDENS_DIR"/*.png 2>/dev/null | wc -l | tr -d ' ')
 shopt -u nullglob
-rf_log "Delivered: ${CN1_COUNT} cn1; committed native goldens: ${GOLDEN_COUNT}"
+rf_log "Delivered: ${CN1_COUNT} cn1 + ${FRAME_COUNT} animation frame(s); committed native goldens: ${GOLDEN_COUNT}"
 [ "$CN1_COUNT" -gt 0 ] || { rf_log "FATAL: no CN1 renders delivered"; exit 12; }
 [ "$GOLDEN_COUNT" -gt 0 ] || { rf_log "FATAL: no committed iOS goldens (run scripts/build-ios-native-ref.sh)"; exit 12; }
 
@@ -132,5 +142,32 @@ cn1ss_process_fidelity \
   "${COMPARE_ENTRIES[@]}"
 rc=$?
 cp -f "$WORK_DIR/fidelity-comment.md" "$ARTIFACTS_DIR/fidelity-comment.md" 2>/dev/null || true
+
+# ---- deterministic animation-frame validation ----
+# Frames are self-goldens (CN1 vs committed CN1): golden drift, stuck frames,
+# non-monotonic travel and broken overshoot all fail here. Missing goldens are
+# seeded from the run (and must be committed); the strips land in artifacts so
+# reviewers can see the whole motion at a glance.
+if [ "$FRAME_COUNT" -gt 0 ]; then
+  FRAME_GOLDENS_DIR="$APP_DIR/goldens/ios-metal-frames"
+  rf_log "STAGE:MORPH_FRAMES -> validating ${FRAME_COUNT} animation frame(s)"
+  frame_rc=0
+  cn1ss_java_run MorphFrameValidator \
+    --frames-dir "$FRAMES_WORK_DIR" \
+    --goldens-dir "$FRAME_GOLDENS_DIR" \
+    --seed-missing \
+    --out-json "$ARTIFACTS_DIR/morph-frames.json" \
+    --strip-dir "$ARTIFACTS_DIR" || frame_rc=$?
+  cp -f "$FRAMES_WORK_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
+  if [ "$frame_rc" -ne 0 ]; then
+    rf_log "Animation-frame validation FAILED (rc=$frame_rc)"
+    if [ "${CN1SS_FAIL_ON_MISMATCH:-0}" = "1" ]; then
+      [ "$rc" -eq 0 ] && rc=$frame_rc
+    else
+      rf_log "WARNING: not failing the run (CN1SS_FAIL_ON_MISMATCH unset)"
+    fi
+  fi
+fi
+
 rf_log "Done (rc=$rc). Artifacts in $ARTIFACTS_DIR"
 exit $rc

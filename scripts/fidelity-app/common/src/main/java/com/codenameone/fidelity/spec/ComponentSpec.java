@@ -42,6 +42,7 @@ public class ComponentSpec {
     private int tileHeightMm = -1;
     private List states = new ArrayList();
     private List platforms = new ArrayList();
+    private List frames = new ArrayList();
 
     public String getId() {
         return id;
@@ -171,16 +172,35 @@ public class ComponentSpec {
     }
 
     /**
+     * Animation-frame progress values (0..100, as strings) for deterministic
+     * animation validation. A component with a non-empty frames list is captured
+     * once per value with its animation frozen at exactly that progress
+     * ("&lt;id&gt;_t&lt;value&gt;_&lt;appearance&gt;_cn1.png") instead of the
+     * regular per-state render; there is no native golden for frames -- they are
+     * regression-compared against committed CN1 frame goldens and validated
+     * against the motion model on the host.
+     */
+    public List getFrames() {
+        return frames;
+    }
+
+    public void setFrames(List frames) {
+        this.frames = frames;
+    }
+
+    /**
      * True when this component should run on the given platform. A component with
      * no explicit platforms list runs everywhere; otherwise the platform name
      * must match one of the listed entries (matched by prefix so "and" covers
-     * "android"). Also returns false when the platform has no native widget key.
+     * "android"). Also returns false when the platform has no native widget key --
+     * except for animation-frame tests, which have no native reference at all
+     * (frames are validated against committed CN1 goldens + the motion model).
      */
     public boolean appliesToPlatform(String platformName) {
         if (platformName == null) {
             return false;
         }
-        if (getNativeKind(platformName) == null) {
+        if (getNativeKind(platformName) == null && (frames == null || frames.isEmpty())) {
             return false;
         }
         if (platforms == null || platforms.isEmpty()) {

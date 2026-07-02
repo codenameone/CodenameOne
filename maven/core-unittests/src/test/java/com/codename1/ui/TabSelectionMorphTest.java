@@ -115,6 +115,44 @@ class TabSelectionMorphTest {
         assertFalse(at(0.6f).barGrow, "bar-grow is gone by mid-travel");
     }
 
+    /**
+     * The full deterministic frame table at the review's fixed progress points
+     * (0, 10, 25, 50, 75, 90, 100): pill rect, lens rect, magnify, aberration,
+     * flight envelope and the bar-grow flag are pinned EXACTLY per frame. This is
+     * the numeric ground truth the fidelity animation-frame captures validate
+     * against -- any change to the motion path, overshoot (see t=0.90: the pill
+     * passes the 220px target to 230px before settling), lens size or tint
+     * timing shows up here as a frame-value diff, not as a vague "feels wrong".
+     */
+    @Test
+    void frameTableAtFixedProgressPoints() {
+        // {t, capX, capW, lensX, lensY, lensW, lensH, magnify, aberration, flight, barGrow}
+        Object[][] frames = {
+            {0.00f, 20, 80, 20, 46, 80, 48, 1.0800f, 0.0000f, 0.0000f, false},
+            {0.10f, 32, 105, 32, 38, 105, 56, 1.1726f, 0.0185f, 0.9259f, true},
+            {0.25f, 71, 105, 71, 37, 105, 56, 1.1800f, 0.0200f, 1.0000f, true},
+            {0.50f, 164, 105, 164, 37, 105, 56, 1.1800f, 0.0200f, 1.0000f, false},
+            {0.75f, 220, 90, 220, 38, 90, 61, 1.1300f, 0.0100f, 0.5000f, false},
+            {0.90f, 230, 98, 230, 45, 98, 50, 1.0800f, 0.0000f, 0.0000f, false},
+            {1.00f, 220, 80, 220, 46, 80, 48, 1.0800f, 0.0000f, 0.0000f, false},
+        };
+        for (Object[] f : frames) {
+            float t = (Float) f[0];
+            TabSelectionMorph m = at(t);
+            String at = "t=" + t + " ";
+            assertEquals(((Integer) f[1]).intValue(), m.capX, at + "capX");
+            assertEquals(((Integer) f[2]).intValue(), m.capW, at + "capW");
+            assertEquals(((Integer) f[3]).intValue(), m.lensX, at + "lensX");
+            assertEquals(((Integer) f[4]).intValue(), m.lensY, at + "lensY");
+            assertEquals(((Integer) f[5]).intValue(), m.lensW, at + "lensW");
+            assertEquals(((Integer) f[6]).intValue(), m.lensH, at + "lensH");
+            assertEquals(((Float) f[7]).floatValue(), m.magnify, 5e-5, at + "magnify");
+            assertEquals(((Float) f[8]).floatValue(), m.aberration, 5e-5, at + "aberration");
+            assertEquals(((Float) f[9]).floatValue(), m.flight, 5e-5, at + "flight");
+            assertEquals(((Boolean) f[10]).booleanValue(), m.barGrow, at + "barGrow");
+        }
+    }
+
     @Test
     void isDeterministic() {
         TabSelectionMorph a = at(0.37f);

@@ -40,6 +40,13 @@
 #                   per platform (Android tiles never composite the shared
 #                   backdrop, so glass/lens degrade to normal there).
 #   states          comma-separated: normal, pressed, disabled, selected.
+#   frames          comma-separated animation progress values (0..100). When set,
+#                   the component is captured once per value with its animation
+#                   FROZEN at exactly that progress (deterministic frames named
+#                   "<id>_t<value>_<appearance>_cn1.png") instead of per-state.
+#                   Frames have no native golden: they are regression-compared
+#                   against committed CN1 frame goldens (goldens/<platform>-frames)
+#                   and property-validated against the motion model on the host.
 #   platforms       comma-separated allow-list (ios, android). Omit = both.
 #   tile_width_mm   per-component width override (logical mm).
 #   tile_height_mm  per-component height override (logical mm).
@@ -219,6 +226,24 @@ components:
     native: ios_uitabbar
     backdrop: 808080
     platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 16
+    states: normal
+
+  # TabsMorph: deterministic animation-frame validation of the iOS-26 tab
+  # selection morph (review point: static start/end screenshots cannot catch a
+  # wrong motion path, overshoot, lens size or tint timing). The same tab bar as
+  # TabsGeom morphs from tab 0 (Featured) to tab 2 (More); each frame renders
+  # the morph FROZEN at the given progress via Tabs.setMorphTestState, so the
+  # captures are stable across runs. The flat grey backdrop keeps the travelling
+  # lens/tint measurable. Validated by MorphFrameValidator + frame goldens; the
+  # same fixed progress points are pinned numerically in TabSelectionMorphTest.
+  - id: TabsMorph
+    material: lens
+    cn1_uiid: Tabs
+    backdrop: 808080
+    platforms: ios
+    frames: 0,10,25,50,75,90,100
     tile_width_mm: 60
     tile_height_mm: 16
     states: normal

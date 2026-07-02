@@ -161,6 +161,8 @@ public class FidelitySpecParser {
             component.setStates(splitList(value));
         } else if ("platforms".equals(key)) {
             component.setPlatforms(splitList(value));
+        } else if ("frames".equals(key)) {
+            component.setFrames(splitList(value));
         }
     }
 
