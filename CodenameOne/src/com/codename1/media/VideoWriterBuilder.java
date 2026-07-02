@@ -90,8 +90,11 @@ public class VideoWriterBuilder {
         return this;
     }
 
-    /// Enables or disables the video track. Defaults to true. Set to false to produce an
-    /// audio only file.
+    /// Enables or disables the video track. Defaults to true.
+    ///
+    /// Audio-only output (`hasVideo(false)`) is not currently implemented by the
+    /// platform backends, so {@link #build()} rejects it rather than silently
+    /// producing a file with an empty or unexpected video track.
     ///
     /// #### Returns
     ///
@@ -225,8 +228,9 @@ public class VideoWriterBuilder {
     ///
     /// - `IOException`: if the writer could not be created
     ///
-    /// - `IllegalStateException`: if `#path(String)` was not set or video encoding is not
-    /// supported on this platform
+    /// - `IllegalStateException`: if `#path(String)` was not set, video encoding is not
+    /// supported on this platform, or audio-only output (`#hasVideo(boolean)` set to false)
+    /// was requested
     public VideoWriter build() throws IOException {
         if (path == null) {
             throw new IllegalStateException("Must set path for VideoWriterBuilder");
@@ -234,6 +238,14 @@ public class VideoWriterBuilder {
         VideoIO io = VideoIO.getVideoIO();
         if (io == null) {
             throw new IllegalStateException("VideoIO is not supported on this platform");
+        }
+        if (!hasVideo) {
+            // Audio-only output is not implemented by the platform backends
+            // (they always create a video encoder/pipeline); reject it here so
+            // the behaviour is consistent across platforms rather than producing
+            // a bogus video track.
+            throw new IllegalStateException(
+                    "audio-only output (hasVideo(false)) is not supported by VideoIO");
         }
         return io.createWriter(this);
     }

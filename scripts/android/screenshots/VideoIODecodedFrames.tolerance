@@ -1,5 +1,0 @@
-# Decoded H.264 frames: the solid colour blocks are stable run-to-run (software
-# MediaCodec is deterministic on the emulator) but the digit edges carry codec
-# ringing, so allow a wide channel delta over a modest fraction of the image.
-maxChannelDelta=72
-maxMismatchPercent=18.0
