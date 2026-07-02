@@ -1,4 +1,4 @@
-package com.codenameone.developerguide.advancedtopics;
+package com.example.wallet;
 
 import com.codename1.ui.Display;
 

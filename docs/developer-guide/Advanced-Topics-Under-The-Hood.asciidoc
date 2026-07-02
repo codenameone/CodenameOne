@@ -1164,7 +1164,7 @@ This generates the C stub below (returning `JAVA_NULL` until you implement it):
 
 [source,c]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.c[tag=advanced-topics-under-the-hood-c-001,indent=0]
+include::../demos/linux/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c[tag=advanced-topics-under-the-hood-c-001,indent=0]
 ----
 
 Type mapping: the primitives (`int`, `long`, `boolean`, `byte`, `short`, `char`,
@@ -2022,7 +2022,7 @@ Codename One exposes launch metadata through `AppArg` and `Display` properties. 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/WalletLaunchHandlerSnippet.java[tag=walletLaunchStart,indent=0]
+include::../demos/android/src/main/java/com/example/wallet/WalletLaunchHandlerSnippet.java[tag=walletLaunchStart,indent=0]
 ----
 
 ===== Returning results to the wallet API

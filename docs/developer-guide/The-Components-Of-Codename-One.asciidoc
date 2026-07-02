@@ -1561,7 +1561,7 @@ The host app reads the most recent payload from the same App Group at startup or
 
 [source,objective-c]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-components-of-codename-one.m[tag=the-components-of-codename-one-objective-c-001,indent=0]
+include::../demos/ios/src/main/objectivec/TheComponentsOfCodenameOneSnippets.m[tag=the-components-of-codename-one-objective-c-001,indent=0]
 ----
 
 The payload dictionary contains:
