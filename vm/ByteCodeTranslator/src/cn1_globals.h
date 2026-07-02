@@ -982,6 +982,15 @@ struct ThreadLocalData {
     JAVA_BOOLEAN threadKilled;      // we don't expect to see this in the GC
     JAVA_BOOLEAN interrupted;
 
+    // Dead-thread pending-migration queue (single-writer allObjectsInHeap):
+    // markDeadThread queues the dying thread's TLD (critical section held)
+    // instead of migrating pendingHeapAllocations itself; the GC thread drains
+    // the queue at mark start. gcReleaseRequested defers the TLD free (Thread
+    // finalizer) until after that drain. See cn1DeadPendingThreads in
+    // cn1_globals.m for the invariant and the race this closes.
+    struct ThreadLocalData* gcDeadNext;
+    JAVA_BOOLEAN gcQueuedForDrain;
+    JAVA_BOOLEAN gcReleaseRequested;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // PHASE 3b: state for conservatively scanning this thread's native C stack as a
     // GC root source (so object-bearing FRAMELESS methods, whose object roots live in

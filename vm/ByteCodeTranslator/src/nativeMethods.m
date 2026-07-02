@@ -703,6 +703,11 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         dot = newStringFromCString(threadStateData, ".");
         colon = newStringFromCString(threadStateData, ":");
         indent = newStringFromCString(threadStateData, "    at ");
+        // These slot writes are the ONLY non-GC-thread access to allObjectsInHeap;
+        // the critical section excludes them from the GC thread's table growth
+        // (mark migration / dead-thread drain both hold it) so the write can never
+        // land in a just-replaced (freed) table copy. One-shot, cost irrelevant.
+        lockCriticalSection();
         removeObjectFromHeapCollection(threadStateData, newline);
         removeObjectFromHeapCollection(threadStateData, dot);
         removeObjectFromHeapCollection(threadStateData, colon);
@@ -711,6 +716,7 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)dot)->java_lang_String_value);
         removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)colon)->java_lang_String_value);
         removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)indent)->java_lang_String_value);
+        unlockCriticalSection();
     }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
 
@@ -1380,6 +1386,10 @@ struct ThreadLocalData* getThreadLocalData() {
         // runs -- garbage-nonzero silently disables the fast path for the thread.
         i->bibopBytesLocal = 0;
         i->nativeAllocationMode = JAVA_FALSE;
+        // dead-thread pending-migration queue state (single-writer allObjectsInHeap)
+        i->gcDeadNext = 0;
+        i->gcQueuedForDrain = JAVA_FALSE;
+        i->gcReleaseRequested = JAVA_FALSE;
         
         i->blocks = malloc(500 * sizeof(struct TryBlock));
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -1700,12 +1710,7 @@ JAVA_VOID java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ob
 JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_INT p) {
 }
 
-JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadStruct) {
-    // if a thread object was created and never started, it will still become garbage
-    // and will still be finalized.  In that case, it never had resources allocated at all.
-    if(nativeThreadStruct!=0)
-    {
-    struct ThreadLocalData *head = (struct ThreadLocalData *)nativeThreadStruct;
+void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
     free(head->blocks);
     free(head->threadObjectStack);
     free(head->callStackClass);
@@ -1718,6 +1723,27 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     free(head->pendingHeapAllocations);
     free(head);
     nThreadsToKill--;
+}
+
+JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadStruct) {
+    // if a thread object was created and never started, it will still become garbage
+    // and will still be finalized.  In that case, it never had resources allocated at all.
+    if(nativeThreadStruct!=0)
+    {
+    struct ThreadLocalData *head = (struct ThreadLocalData *)nativeThreadStruct;
+    lockCriticalSection();
+    if(head->gcQueuedForDrain) {
+        // The TLD is still on the GC's dead-thread queue: its pendingHeapAllocations
+        // have not been migrated into allObjectsInHeap yet (this finalizer can run
+        // in the same cycle the thread died, when death lands mid-mark after the
+        // drain point). Freeing now would hand the drain a dangling TLD -- defer
+        // the free to cn1DrainDeadThreadPending, which runs it after migration.
+        head->gcReleaseRequested = JAVA_TRUE;
+        unlockCriticalSection();
+        return;
+    }
+    unlockCriticalSection();
+    cn1ReleaseThreadLocalData(head);
     }
 }
 

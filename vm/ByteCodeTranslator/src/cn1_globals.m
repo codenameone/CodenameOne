@@ -508,10 +508,27 @@ void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
 
 // memory map of all the heap objects which we can walk over to delete/deallocate
 // unused objects
-JAVA_OBJECT* allObjectsInHeap = 0; 
-JAVA_OBJECT* oldAllObjectsInHeap = 0;
+JAVA_OBJECT* allObjectsInHeap = 0;
 int sizeOfAllObjectsInHeap = 30000;
 int currentSizeOfAllObjectsInHeap = 0;
+
+// SINGLE-WRITER INVARIANT for allObjectsInHeap: the table is grown and walked
+// ONLY on the GC thread (mark migration, the dead-thread drain below, sweep,
+// root-snapshot build, overflow rescan -- all phases of the same thread, so
+// they are mutually sequential). The only non-GC-thread accesses are one-shot
+// slot writes under the critical section (getStack's immortal-string removal).
+// Dying threads therefore must NOT call placeObjectInHeapCollection (a growth's
+// realloc-and-free would race an in-flight GC-thread walk -- observed shape:
+// a sweep's slot-NULL lost in the memcpy'd copy resurrects a freed pointer, or
+// two growths during one hoisted-pointer walk free the array under the reader).
+// Instead markDeadThread queues the dying thread's TLD here (critical section
+// held) and the GC thread drains it at the start of the next mark -- strictly
+// before that cycle's sweep, so the migration always precedes any possible
+// finalization of the Thread object. Objects still in a queued TLD's pending
+// list are invisible to the sweep (only table entries are swept), so the
+// deferral can never free them early.
+static struct ThreadLocalData* cn1DeadPendingThreads = 0;  // guarded by criticalSection
+extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
 pthread_mutex_t* memoryAccessMutex = NULL;
 
 pthread_mutex_t* getMemoryAccessMutex() {
@@ -568,16 +585,15 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
             memset(tmpAllObjectsInHeap + sizeOfAllObjectsInHeap, 0, sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
             memcpy(tmpAllObjectsInHeap, allObjectsInHeap, sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
             sizeOfAllObjectsInHeap *= 2;
-            // Defer freeing the replaced array by one growth cycle: the sweep and the
-            // reference-counting removal path read allObjectsInHeap without taking the
-            // critical section, so an immediate free can pull the array out from under
-            // an in-flight read. Growths double the capacity so they are rare, and at
-            // most one stale array is retained.
-            if(oldAllObjectsInHeap != 0) {
-                free(oldAllObjectsInHeap);
-            }
-            oldAllObjectsInHeap = allObjectsInHeap;
+            // Immediate free is safe under the SINGLE-WRITER INVARIANT (see the
+            // cn1DeadPendingThreads comment): growth only ever runs on the GC
+            // thread, whose own walks are sequential with it, and every non-GC-
+            // thread access holds the critical section that the growth callers
+            // (mark migration / dead-thread drain) also hold. The old one-growth
+            // deferral could still double-free under two growths in one walk.
+            JAVA_OBJECT* replaced = allObjectsInHeap;
             allObjectsInHeap = tmpAllObjectsInHeap;
+            free(replaced);
             // record the real slot -- leaving pos at -1 here left the object's
             // __heapPosition unset, so a later reference-counted free could not null
             // its slot and the sweep would dereference the dangling pointer.
@@ -615,13 +631,43 @@ void collectThreadResources(struct ThreadLocalData *current)
         free(current->utf8Buffer);
         current->utf8Buffer = 0;
     }
-    for(int heapTrav = 0 ; heapTrav < current->heapAllocationSize ; heapTrav++) {
-        JAVA_OBJECT obj = (JAVA_OBJECT)current->pendingHeapAllocations[heapTrav];
-        if(obj) {
-            current->pendingHeapAllocations[heapTrav] = 0;
-            placeObjectInHeapCollection(obj);
+    // SINGLE-WRITER allObjectsInHeap: do NOT migrate pendingHeapAllocations here
+    // -- this runs on the DYING thread, and a table growth here races the GC
+    // thread's lock-free sweep/snapshot walks (see cn1DeadPendingThreads above).
+    // Queue the TLD instead; the GC drains it at the start of the next mark.
+    // Caller (markDeadThread) holds the critical section that guards the list.
+    current->gcQueuedForDrain = JAVA_TRUE;
+    current->gcDeadNext = cn1DeadPendingThreads;
+    cn1DeadPendingThreads = current;
+}
+
+// Drain the dead-thread queue on the GC thread at mark start: migrate each queued
+// TLD's pending allocations into allObjectsInHeap (the only place besides the
+// live-thread mark migration where the table may grow) and perform any TLD free
+// that the Thread finalizer requested while the TLD was still queued.
+static void cn1DrainDeadThreadPending() {
+    lockCriticalSection();
+    struct ThreadLocalData* head = cn1DeadPendingThreads;
+    cn1DeadPendingThreads = 0;
+    while(head != 0) {
+        struct ThreadLocalData* next = head->gcDeadNext;
+        for(int heapTrav = 0 ; heapTrav < head->heapAllocationSize ; heapTrav++) {
+            JAVA_OBJECT obj = (JAVA_OBJECT)head->pendingHeapAllocations[heapTrav];
+            if(obj) {
+                head->pendingHeapAllocations[heapTrav] = 0;
+                placeObjectInHeapCollection(obj);
+            }
         }
+        head->heapAllocationSize = 0;
+        head->gcDeadNext = 0;
+        head->gcQueuedForDrain = JAVA_FALSE;
+        if(head->gcReleaseRequested) {
+            // the Thread object was finalized while this TLD awaited the drain
+            cn1ReleaseThreadLocalData(head);
+        }
+        head = next;
     }
+    unlockCriticalSection();
 }
 static void gcMarkDrain(CODENAME_ONE_THREAD_STATE);
 // Parallel variant of gcMarkDrain: fans the transitive mark-drain out across a small
@@ -670,7 +716,13 @@ void codenameOneGCMark() {
     #if defined(__OBJC__)
     //NSLog(@"GC mark, %d dead processes pending",nThreadsToKill);
     #endif
-    
+
+    // Migrate dead threads' pending allocations into allObjectsInHeap NOW, on the
+    // GC thread, before any table walk of this cycle (root snapshots, sweep) --
+    // the single place besides the live-thread migration below where the table
+    // may grow. See the cn1DeadPendingThreads single-writer comment.
+    cn1DrainDeadThreadPending();
+
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -1978,7 +2030,21 @@ static int cn1ConsPgCmp(const void* a, const void* b) {
 // signal-stopped (it reallocs -> would deadlock against a thread frozen mid-malloc).
 // O(allObjectsInHeap + pending + bibop pages) -- bounded by the heap the sweep already
 // walks, so one rebuild per scanned thread is within the GC's existing complexity.
+// Build ONCE PER MARK CYCLE: the walk over allObjectsInHeap + every thread's
+// pending list plus the qsort is O(legacy objects * log) -- rebuilding it per
+// scanned thread (as the per-thread scan paths naively would) made the GC thread
+// spend more time in qsort than in marking on array-heavy workloads, stalling
+// mutators parked behind threadBlockedByGC. Rebuilding within one cycle can only
+// ever ADD objects allocated after the cycle started -- and those are mark==-1
+// fresh, kept alive by the sweep's grace rule whether or not they resolve -- so
+// the first build of the cycle is complete for correctness purposes. Nothing is
+// freed during mark (sweep runs after), so entries can never go stale mid-cycle.
+static int cn1ConsSnapEpoch = -1;
 void cn1GcBuildRootSnapshots(void) {
+    if(cn1ConsSnapEpoch == currentGcMarkValue) {
+        return; // already built this cycle
+    }
+    cn1ConsSnapEpoch = currentGcMarkValue;
     cn1ConsExtN = 0;
     int n = currentSizeOfAllObjectsInHeap;
     for(int i = 0 ; i < n ; i++) {
