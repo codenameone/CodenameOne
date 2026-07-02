@@ -657,6 +657,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-30T15:03:03+00:00"
       }
+    },
+    "game-builder-2d-platformer": {
+      "devto": {
+        "id": 4051588,
+        "url": "https://dev.to/codenameone/game-builder-tutorial-1-build-a-2d-platformer-dukes-coffee-run-45b0",
+        "syndicated_at": "2026-07-02T13:33:17+00:00"
+      }
     }
   }
 }
