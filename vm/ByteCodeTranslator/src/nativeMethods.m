@@ -2498,7 +2498,11 @@ JAVA_OBJECT java_lang_String_toString___R_java_lang_String(CODENAME_ONE_THREAD_S
 
 JAVA_CHAR java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT index) {
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
-    if(index < 0 || index >= ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->length) { THROW_ARRAY_INDEX_EXCEPTION(index); }
+    // bound by count (the JDK contract), NOT capacity: the lax capacity bound
+    // let buggy code read chars beyond length(), and it forced the stack-
+    // allocated builder path to zero its whole buffer just so such reads see
+    // the '\0' a fresh heap array would have held
+    if(index < 0 || index >= t->java_lang_StringBuilder_count) { THROW_ARRAY_INDEX_EXCEPTION(index); }
     JAVA_ARRAY_CHAR* dat = ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data;
     return dat[index];
 }
@@ -2598,6 +2602,11 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
 
 JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT start, JAVA_INT end, JAVA_OBJECT dst, JAVA_INT dstStart) {
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
+    // JDK contract: srcEnd bounded by length(), not capacity. Also keeps a
+    // lax caller from reading a stack-allocated builder's unzeroed tail.
+    if(start < 0 || start > end || end > t->java_lang_StringBuilder_count) {
+        THROW_ARRAY_INDEX_EXCEPTION(end);
+    }
     java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(threadStateData, t->java_lang_StringBuilder_value, start, dst, dstStart, end - start);
 }
 

@@ -360,6 +360,14 @@ public class Invoke extends Instruction {
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        } else {
+            // direct/devirtualized calls of the hottest String/StringBuilder
+            // natives get the call-site-inlined fast path (cn1_intrinsics.h)
+            String renamed = com.codename1.tools.translator.InlineIntrinsics.rename(bld.toString());
+            if (!renamed.contentEquals(bld)) {
+                bld.setLength(0);
+                bld.append(renamed);
+            }
         }
         boolean noPop = false;
         if(returnVal == null) {

@@ -587,6 +587,10 @@ public class ByteCodeClass {
             b.append(s);
             b.append(".h\"\n");
         }
+        // call-site-inlined fast paths for the hottest String/StringBuilder
+        // natives (self-disables via __has_include when those classes are
+        // eliminated from the build)
+        b.append("#include \"cn1_intrinsics.h\"\n");
         
         b.append("const struct clazz *base_interfaces_for_");
         b.append(clsName);

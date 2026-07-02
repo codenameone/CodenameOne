@@ -339,6 +339,14 @@ public class CustomInvoke extends Instruction {
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        } else {
+            // keep in sync with Invoke: direct/devirtualized calls of the mapped
+            // String/StringBuilder natives get the inlined fast path
+            String renamedIntr = com.codename1.tools.translator.InlineIntrinsics.rename(bld.toString());
+            if (!renamedIntr.contentEquals(bld)) {
+                bld.setLength(0);
+                bld.append(renamedIntr);
+            }
         }
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {
@@ -583,6 +591,14 @@ public class CustomInvoke extends Instruction {
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        } else {
+            // keep in sync with Invoke: direct/devirtualized calls of the mapped
+            // String/StringBuilder natives get the inlined fast path
+            String renamedIntr = com.codename1.tools.translator.InlineIntrinsics.rename(bld.toString());
+            if (!renamedIntr.contentEquals(bld)) {
+                bld.setLength(0);
+                bld.append(renamedIntr);
+            }
         }
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {

@@ -266,14 +266,13 @@ public class TypeInstruction extends Instruction {
                     b.append(stackAllocId);
                     b.append(".__heapPosition = -1; ");
                     if(stackFusedLen >= 0) {
-                        // stack-resident fused child: zero the blob (Java array
-                        // semantics), install a normal array header, point the
-                        // owner's field at it BEFORE the ctor (keep-if-null keeps it)
-                        b.append("memset(__cn1stkbuf_");
-                        b.append(stackAllocId);
-                        b.append(", 0, sizeof(__cn1stkbuf_");
-                        b.append(stackAllocId);
-                        b.append(")); __cn1stk_");
+                        // stack-resident fused child: install a normal array header,
+                        // point the owner's field at it BEFORE the ctor (keep-if-null
+                        // keeps it). The DATA region is deliberately NOT zeroed:
+                        // every reader of a builder buffer is bounded by count
+                        // (charAt/getChars/toString; setLength zero-fills expansion
+                        // explicitly), so the uninitialized tail is unreachable.
+                        b.append("__cn1stk_");
                         b.append(stackAllocId);
                         b.append(".");
                         b.append(stackFusedFieldCName);

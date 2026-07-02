@@ -1422,6 +1422,7 @@ static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
 // struct CN1BibopPage is defined in cn1_globals.h (shared with the inlined bump).
 
 static CN1BibopPage* _Atomic bibopAllPages = 0;   // registry head (atomic)
+static _Atomic long long bibopAllPagesCount = 0;  // grow-only registration count
 static CN1BibopPage* bibopFreePool = 0;           // bibopMutex
 static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
 static CN1BibopPage* _Atomic bibopSweepStack = 0; // Treiber-ish (push CAS / swap)
@@ -1540,6 +1541,9 @@ static CN1BibopPage* cn1BibopNewPage(int ci) {
         atomic_store_explicit(&p->nextAll, head, memory_order_relaxed);
     } while(!atomic_compare_exchange_weak_explicit(&bibopAllPages, &head, p,
                 memory_order_release, memory_order_relaxed));
+    // grow-only registration count: the snapshot builder keys its cached
+    // base-sorted page array off this (nodes never unlink or reorder)
+    atomic_fetch_add_explicit(&bibopAllPagesCount, 1, memory_order_release);
     return p;
 }
 
@@ -2069,6 +2073,17 @@ static int cn1ConsExtN = 0, cn1ConsExtCap = 0;
 typedef struct { char* base; int firstSlotOffset; int slotSize; int slotCount; int bumpIndex; } CN1ConsPage;
 static CN1ConsPage* cn1ConsPg = 0;
 static int cn1ConsPgN = 0, cn1ConsPgCap = 0;
+// Cached base-sorted page pointers (GC thread only). The registry is grow-only,
+// so this order is valid until the registration count changes.
+static CN1BibopPage** cn1ConsPgSorted = 0;
+static int cn1ConsPgSortedN = 0, cn1ConsPgSortedCap = 0;
+static long long cn1ConsPgSortedKey = -1;
+
+static int cn1ConsPgPtrCmp(const void* a, const void* b) {
+    char* la = (char*)(*(CN1BibopPage* const*)a);
+    char* lb = (char*)(*(CN1BibopPage* const*)b);
+    return (la > lb) - (la < lb);
+}
 #endif
 
 // Per-thread current ThreadLocalData, readable async-signal-safely from the stop
@@ -2109,14 +2124,6 @@ static int cn1ConsExtCmp(const void* a, const void* b) {
     char* lb = ((const CN1ConsExtent*)b)->lo;
     return (la > lb) - (la < lb);
 }
-
-#ifndef CN1_DISABLE_BIBOP
-static int cn1ConsPgCmp(const void* a, const void* b) {
-    char* la = ((const CN1ConsPage*)a)->base;
-    char* lb = ((const CN1ConsPage*)b)->base;
-    return (la > lb) - (la < lb);
-}
-#endif
 
 // Rebuild the resolver index. MUST be called while no thread we are about to scan is
 // signal-stopped (it reallocs -> would deadlock against a thread frozen mid-malloc).
@@ -2169,13 +2176,40 @@ void cn1GcBuildRootSnapshots(void) {
     unlockThreadHeapMutex();
     qsort(cn1ConsExt, cn1ConsExtN, sizeof(CN1ConsExtent), cn1ConsExtCmp);
 #ifndef CN1_DISABLE_BIBOP
-    cn1ConsPgN = 0;
-    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
-    while(p != 0) {
-        if(cn1ConsPgN == cn1ConsPgCap) {
-            cn1ConsPgCap = cn1ConsPgCap ? cn1ConsPgCap * 2 : 256;
-            cn1ConsPg = (CN1ConsPage*)realloc(cn1ConsPg, cn1ConsPgCap * sizeof(CN1ConsPage));
+    // The page registry is GROW-ONLY (nodes never unlink or reorder), so its
+    // base-sorted order only changes when a page is registered. Cache the
+    // sorted page-pointer array and rebuild+qsort ONLY when the registration
+    // count moved -- the per-cycle qsort of thousands of pages was one of the
+    // largest GC costs on allocation-churn workloads (profiled: ~1/3 of the
+    // snapshot build). A page registered mid-snapshot is missed by this cycle
+    // exactly as it was by the old head-once walk (its objects are covered by
+    // the mark==-1 grace); the count mismatch rebuilds on the NEXT cycle.
+    {
+        long long pageCount = atomic_load_explicit(&bibopAllPagesCount, memory_order_acquire);
+        if(pageCount != cn1ConsPgSortedKey) {
+            cn1ConsPgSortedN = 0;
+            CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+            while(p != 0) {
+                if(cn1ConsPgSortedN == cn1ConsPgSortedCap) {
+                    cn1ConsPgSortedCap = cn1ConsPgSortedCap ? cn1ConsPgSortedCap * 2 : 256;
+                    cn1ConsPgSorted = (CN1BibopPage**)realloc(cn1ConsPgSorted, cn1ConsPgSortedCap * sizeof(CN1BibopPage*));
+                }
+                cn1ConsPgSorted[cn1ConsPgSortedN++] = p;
+                p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+            }
+            qsort(cn1ConsPgSorted, cn1ConsPgSortedN, sizeof(CN1BibopPage*), cn1ConsPgPtrCmp);
+            // key on the number we actually WALKED: if registrations raced past
+            // the count we read, the next cycle's count differs and rebuilds
+            cn1ConsPgSortedKey = cn1ConsPgSortedN;
         }
+    }
+    if(cn1ConsPgSortedN > cn1ConsPgCap) {
+        cn1ConsPgCap = cn1ConsPgSortedN * 2;
+        cn1ConsPg = (CN1ConsPage*)realloc(cn1ConsPg, cn1ConsPgCap * sizeof(CN1ConsPage));
+    }
+    cn1ConsPgN = cn1ConsPgSortedN;
+    for(int pgI = 0 ; pgI < cn1ConsPgSortedN ; pgI++) {
+        CN1BibopPage* p = cn1ConsPgSorted[pgI];
         // Load bumpIndex FIRST (acquire), then the geometry. A page popped from
         // freePool is reformatted by the acquiring MUTATOR (cn1BibopFormatPage
         // rewrites slotSize/firstSlotOffset/slotCount) concurrently with this walk;
@@ -2185,15 +2219,12 @@ void cn1GcBuildRootSnapshots(void) {
         // (geometry may be torn but is never used); bump>0 -> the acquire makes the
         // matching geometry visible. Reading geometry BEFORE the acquire could pair
         // old geometry with the new bump -> misresolved interior words.
-        cn1ConsPg[cn1ConsPgN].bumpIndex = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
-        cn1ConsPg[cn1ConsPgN].base = (char*)p;
-        cn1ConsPg[cn1ConsPgN].firstSlotOffset = p->firstSlotOffset;
-        cn1ConsPg[cn1ConsPgN].slotSize = p->slotSize;
-        cn1ConsPg[cn1ConsPgN].slotCount = p->slotCount;
-        cn1ConsPgN++;
-        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+        cn1ConsPg[pgI].bumpIndex = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+        cn1ConsPg[pgI].base = (char*)p;
+        cn1ConsPg[pgI].firstSlotOffset = p->firstSlotOffset;
+        cn1ConsPg[pgI].slotSize = p->slotSize;
+        cn1ConsPg[pgI].slotCount = p->slotCount;
     }
-    qsort(cn1ConsPg, cn1ConsPgN, sizeof(CN1ConsPage), cn1ConsPgCmp);
 #endif
     if(getenv("CN1_SNAP_DEBUG")) {
         fprintf(stderr, "[SNAP] ext=%d pages=%d tableSize=%d\n",

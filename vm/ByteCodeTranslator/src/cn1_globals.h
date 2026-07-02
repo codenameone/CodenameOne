@@ -886,8 +886,18 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 #endif
 
 extern const char* volatile cn1LastNamSetter; // diagnosis: last bracket toucher
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// The bracket's purpose was to suppress GC interaction while native C code
+// holds heap references in UNROOTED C locals. Under conservative roots the
+// native stack IS scanned, so those locals are roots like any other -- the
+// flag stores (two of them per native call, one a global write) were pure
+// hot-path overhead on every String/StringBuilder/HashMap native.
+#define enteringNativeAllocations() do { } while(0)
+#define finishedNativeAllocations() do { } while(0)
+#else
 #define enteringNativeAllocations() do { threadStateData->nativeAllocationMode = JAVA_TRUE; cn1LastNamSetter = __FUNCTION__; } while(0)
 #define finishedNativeAllocations() do { threadStateData->nativeAllocationMode = JAVA_FALSE; cn1LastNamSetter = 0; } while(0)
+#endif
 
 // handles the stack used for print stack trace and GC
 struct ThreadLocalData {

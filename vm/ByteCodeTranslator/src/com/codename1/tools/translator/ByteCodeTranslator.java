@@ -232,6 +232,8 @@ public class ByteCodeTranslator {
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
+        File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
@@ -554,6 +556,8 @@ public class ByteCodeTranslator {
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
+        File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
