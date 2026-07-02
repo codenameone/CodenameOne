@@ -337,6 +337,7 @@
 				GCC_C_LANGUAGE_STANDARD = c99;
 				GCC_OPTIMIZATION_LEVEL = 3;
 				OTHER_CFLAGS = "-fwrapv -fno-strict-aliasing";
+				LLVM_LTO = YES_THIN;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -376,6 +377,7 @@
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				GCC_OPTIMIZATION_LEVEL = 3;
 				OTHER_CFLAGS = "-fwrapv -fno-strict-aliasing";
+				LLVM_LTO = YES_THIN;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "template-src/template-Prefix.pch";
 				INFOPLIST_FILE = "template-src/template-Info.plist";

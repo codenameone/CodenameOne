@@ -461,13 +461,7 @@ public class CustomInvoke extends Instruction {
         List<FusedConstructor.Child> kids = fusedPlan.getChildren();
         String[] lenExprs = new String[kids.size()];
         for (int i = 0; i < kids.size(); i++) {
-            FusedConstructor.Child c = kids.get(i);
-            String expr = c.ctorLengthExpr();
-            if (expr.startsWith("__cn1Arg")) {
-                int p = Integer.parseInt(expr.substring("__cn1Arg".length()));
-                expr = temps[p - 1];
-            }
-            lenExprs[i] = expr;
+            lenExprs[i] = kids.get(i).siteLengthExpr(temps);
         }
         String cType = owner.replace('/', '_').replace('$', '_');
         fusedPlan.appendFusedAlloc(b, cType, lenExprs, 1, 2);

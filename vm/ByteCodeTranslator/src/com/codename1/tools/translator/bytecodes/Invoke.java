@@ -205,16 +205,15 @@ public class Invoke extends Instruction {
     private void appendFusedAllocBlock(StringBuilder b) {
         List<ByteCodeMethodArg> args = getArgs();
         int n = args.size();
+        // substitution table: __cn1ArgP -> this site's on-stack read of arg P
+        String[] argExprByParam = new String[n];
+        for (int p = 1; p <= n; p++) {
+            argExprByParam[p - 1] = "SP[-" + (n - (p - 1)) + "].data.i";
+        }
         List<FusedConstructor.Child> kids = fusedPlan.getChildren();
         String[] lenExprs = new String[kids.size()];
         for (int i = 0; i < kids.size(); i++) {
-            FusedConstructor.Child c = kids.get(i);
-            String expr = c.ctorLengthExpr();
-            if (expr.startsWith("__cn1Arg")) {
-                int p = Integer.parseInt(expr.substring("__cn1Arg".length()));
-                expr = "SP[-" + (n - (p - 1)) + "].data.i";
-            }
-            lenExprs[i] = expr;
+            lenExprs[i] = kids.get(i).siteLengthExpr(argExprByParam);
         }
         String cType = owner.replace('/', '_').replace('$', '_');
         fusedPlan.appendFusedAlloc(b, cType, lenExprs, n + 1, n + 2);

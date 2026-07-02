@@ -75,24 +75,32 @@ public final class FusedConstructor {
     /** Hard cap on fused children per constructor. */
     private static final int MAX_CHILDREN = 4;
 
-    /** One fused child: {@code this.<fieldName> = new <type>[<len>]}. */
+    /** One fused child: {@code this.<fieldName> = new <type>[<lengthExpr>]}. */
     public static final class Child {
         /** declaring (owner) class in C form. */
         final String cOwner;
         final String fieldName;
         /** NEWARRAY type operand: 4=boolean 5=char 6=float 7=double 8=byte 9=short 10=int 11=long */
         final int arrayType;
-        /** 1-based constructor parameter holding the length, or -1. */
-        final int paramIndex;
-        /** length when paramIndex == -1. */
-        final int constLength;
+        /**
+         * C int expression for the length over {@code __cn1ArgN} parameter names
+         * and constants -- a parameter, a constant, or a recognized computed
+         * expression like {@code (__cn1Arg1 * __cn1Arg2)} for {@code new int[w*h]}.
+         * Valid verbatim inside the constructor; call sites substitute the
+         * {@code __cn1ArgN} names with their own argument expressions. Arithmetic
+         * wraps exactly like Java's (the generated C is compiled -fwrapv), so the
+         * site-side value always equals the ctor-side value.
+         */
+        final String lengthExpr;
+        /** 1-based ctor params the expression reads (for reassignment checks / substitution). */
+        final int[] usedParams;
 
-        Child(String cOwner, String fieldName, int arrayType, int paramIndex, int constLength) {
+        Child(String cOwner, String fieldName, int arrayType, String lengthExpr, int[] usedParams) {
             this.cOwner = cOwner;
             this.fieldName = fieldName;
             this.arrayType = arrayType;
-            this.paramIndex = paramIndex;
-            this.constLength = constLength;
+            this.lengthExpr = lengthExpr;
+            this.usedParams = usedParams;
         }
 
         String elemCType() {
@@ -121,9 +129,25 @@ public final class FusedConstructor {
             }
         }
 
-        /** C expression for the length INSIDE the constructor body (stable arg param). */
+        /** C expression for the length INSIDE the constructor body (stable arg params). */
         String ctorLengthExpr() {
-            return paramIndex > 0 ? ("__cn1Arg" + paramIndex) : Integer.toString(constLength);
+            return lengthExpr;
+        }
+
+        /**
+         * The length expression for an ALLOCATION SITE: every {@code __cn1ArgN}
+         * is replaced with the site's own C expression for that argument
+         * (operand-stack read or hoisted temp). Substitutes DESCENDING so
+         * {@code __cn1Arg12} is never clobbered by the {@code __cn1Arg1} pass.
+         */
+        String siteLengthExpr(String[] argExprByParam) {
+            String e = lengthExpr;
+            for (int p = argExprByParam.length; p >= 1; p--) {
+                if (argExprByParam[p - 1] != null) {
+                    e = e.replace("__cn1Arg" + p, argExprByParam[p - 1]);
+                }
+            }
+            return e;
         }
 
         public String getFieldName() {
@@ -225,41 +249,50 @@ public final class FusedConstructor {
                 continue;
             }
 
-            // ---- fused triple: ALOAD 0; <len>; NEWARRAY T; PUTFIELD f ----
+            // ---- fused store: ALOAD 0; <length expression>; NEWARRAY T; PUTFIELD f
+            // where the length expression is a small recognized computation over
+            // constructor parameters and constants (a bare param, a constant, or
+            // arithmetic like w*h). Evaluated symbolically into a C expression
+            // over __cn1ArgN (see evalLengthExpr).
             if (in instanceof VarOp && op == Opcodes.ALOAD && ((VarOp) in).getIndex() == 0) {
-                int i1 = nextReal(body, i + 1);
-                int i2 = i1 < 0 ? -1 : nextReal(body, i1 + 1);
-                int i3 = i2 < 0 ? -1 : nextReal(body, i2 + 1);
-                if (i3 > 0) {
-                    Instruction len = body.get(i1);
-                    Instruction na = body.get(i2);
-                    Instruction pf = body.get(i3);
-                    if (na instanceof VarOp && na.getOpcode() == Opcodes.NEWARRAY
-                            && pf instanceof Field && pf.getOpcode() == Opcodes.PUTFIELD) {
-                        int paramIndex = -1;
-                        int constLen = -1;
-                        if (len instanceof VarOp && len.getOpcode() == Opcodes.ILOAD) {
-                            int s = ((VarOp) len).getIndex();
-                            if (s > 0 && s < slotToParam.length && slotToParam[s] != 0 && !storedSlots[s]) {
-                                paramIndex = slotToParam[s];
+                java.util.ArrayList<String> stack = new java.util.ArrayList<String>();
+                java.util.ArrayList<Integer> used = new java.util.ArrayList<Integer>();
+                int j = nextReal(body, i + 1);
+                int exprInstrs = 0;
+                boolean exprOk = true;
+                while (j >= 0 && exprInstrs < 8) {
+                    Instruction cur = body.get(j);
+                    if (cur instanceof VarOp && cur.getOpcode() == Opcodes.NEWARRAY) {
+                        break;
+                    }
+                    if (!evalLengthExpr(cur, stack, used, slotToParam, storedSlots)) {
+                        exprOk = false;
+                        break;
+                    }
+                    exprInstrs++;
+                    j = nextReal(body, j + 1);
+                }
+                if (exprOk && j >= 0 && stack.size() == 1
+                        && body.get(j) instanceof VarOp && body.get(j).getOpcode() == Opcodes.NEWARRAY) {
+                    int pfIdx = nextReal(body, j + 1);
+                    if (pfIdx >= 0 && body.get(pfIdx) instanceof Field
+                            && body.get(pfIdx).getOpcode() == Opcodes.PUTFIELD) {
+                        Field f = (Field) body.get(pfIdx);
+                        // field must be declared by this class and its descriptor
+                        // must match the NEWARRAY element type
+                        if (f.getOwner().replace('/', '_').replace('$', '_').equals(ctor.getClsName())
+                                && descMatchesArrayType(f.getDesc(), ((VarOp) body.get(j)).getIndex())) {
+                            if (found.size() >= MAX_CHILDREN) {
+                                return null;
                             }
-                        } else {
-                            constLen = constIntValue(len);
-                        }
-                        if (paramIndex > 0 || constLen >= 0) {
-                            Field f = (Field) pf;
-                            // field must be declared by this class and its descriptor
-                            // must match the NEWARRAY element type
-                            if (f.getOwner().replace('/', '_').replace('$', '_').equals(ctor.getClsName())
-                                    && descMatchesArrayType(f.getDesc(), ((VarOp) na).getIndex())) {
-                                if (found.size() >= MAX_CHILDREN) {
-                                    return null;
-                                }
-                                found.add(new Child(ctor.getClsName(), f.getFieldName(),
-                                        ((VarOp) na).getIndex(), paramIndex, constLen));
-                                i = i3 + 1;
-                                continue;
+                            int[] up = new int[used.size()];
+                            for (int u = 0; u < up.length; u++) {
+                                up[u] = used.get(u);
                             }
+                            found.add(new Child(ctor.getClsName(), f.getFieldName(),
+                                    ((VarOp) body.get(j)).getIndex(), stack.get(0), up));
+                            i = pfIdx + 1;
+                            continue;
                         }
                     }
                 }
@@ -373,8 +406,65 @@ public final class FusedConstructor {
                 || op == Opcodes.LRETURN || op == Opcodes.FRETURN || op == Opcodes.DRETURN;
     }
 
+    /**
+     * Symbolic mini-evaluator for the length expression: consumes one bytecode
+     * instruction against a stack of C expression strings. Accepts int-param
+     * loads, int constants, and wrapping int arithmetic (the generated C is
+     * compiled -fwrapv, so C evaluation of the emitted expression matches Java
+     * bit-for-bit, including overflow -- an overflowed-negative length simply
+     * routes the site to the ordinary allocation path whose NEWARRAY sees the
+     * identical value). Returns false on anything unrecognized.
+     */
+    private static boolean evalLengthExpr(Instruction in, java.util.List<String> stack,
+                                          java.util.List<Integer> used,
+                                          int[] slotToParam, boolean[] storedSlots) {
+        int op = in.getOpcode();
+        if (in instanceof VarOp && op == Opcodes.ILOAD) {
+            int s = ((VarOp) in).getIndex();
+            if (s <= 0 || s >= slotToParam.length || slotToParam[s] == 0 || storedSlots[s]) {
+                return false; // not a (stable) parameter slot
+            }
+            used.add(slotToParam[s]);
+            stack.add("__cn1Arg" + slotToParam[s]);
+            return true;
+        }
+        int cv = constIntValue(in);
+        if (cv != Integer.MIN_VALUE) {
+            stack.add(Integer.toString(cv));
+            return true;
+        }
+        String binOp = null;
+        switch (op) {
+            case Opcodes.IADD: binOp = "+"; break;
+            case Opcodes.ISUB: binOp = "-"; break;
+            case Opcodes.IMUL: binOp = "*"; break;
+            default: break;
+        }
+        if (binOp != null) {
+            if (stack.size() < 2) {
+                return false;
+            }
+            String b = stack.remove(stack.size() - 1);
+            String a = stack.remove(stack.size() - 1);
+            stack.add("(" + a + " " + binOp + " " + b + ")");
+            return true;
+        }
+        if (op == Opcodes.ISHL) {
+            if (stack.size() < 2) {
+                return false;
+            }
+            String b = stack.remove(stack.size() - 1);
+            String a = stack.remove(stack.size() - 1);
+            stack.add("(" + a + " << (0x1f & " + b + "))");
+            return true;
+        }
+        return false;
+    }
+
+    /** the instruction's int constant, or Integer.MIN_VALUE if not a recognized constant. */
     private static int constIntValue(Instruction in) {
         switch (in.getOpcode()) {
+            case Opcodes.ICONST_M1: return -1;
             case Opcodes.ICONST_0: return 0;
             case Opcodes.ICONST_1: return 1;
             case Opcodes.ICONST_2: return 2;
@@ -384,16 +474,14 @@ public final class FusedConstructor {
             case Opcodes.BIPUSH:
             case Opcodes.SIPUSH:
                 if (in instanceof BasicInstruction) {
-                    int v = ((BasicInstruction) in).getValue();
-                    return v >= 0 ? v : -1;
+                    return ((BasicInstruction) in).getValue();
                 }
                 if (in instanceof VarOp) {
-                    int v = ((VarOp) in).getIndex();
-                    return v >= 0 ? v : -1;
+                    return ((VarOp) in).getIndex();
                 }
-                return -1;
+                return Integer.MIN_VALUE;
             default:
-                return -1;
+                return Integer.MIN_VALUE;
         }
     }
 
