@@ -215,20 +215,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * This is the definition of lexicographic ordering. If two strings are different, then either they have different characters at some index that is a valid index for both strings, or their lengths are different, or both. If they have different characters at one or more index positions, let k be the smallest such index; then the string whose character at position k has the smaller value, as determined by using the < operator, lexicographically precedes the other string. In this case, compareTo returns the difference of the two character values at position k in the two string -- that is, the value:
      * this.charAt(k)-anotherString.charAt(k) If there is no index position at which they differ, then the shorter string lexicographically precedes the longer string. In this case, compareTo returns the difference of the lengths of the strings -- that is, the value: this.length()-anotherString.length()
      */
-    public int compareTo(java.lang.String anotherString){
-        if(anotherString == this) {
-            return 0;
-        }
-        int minL = Math.min(anotherString.length(), length());
-        for(int iter = 0 ; iter < minL ; iter++) {
-            char a = value[offset + iter];
-            char b = anotherString.value[anotherString.offset + iter];
-            if(a != b) {
-                return a - b;
-            }
-        }
-        return length() - anotherString.length(); 
-    }
+    public native int compareTo(java.lang.String anotherString);
     
     public int compareToIgnoreCase(java.lang.String anotherString) {
         if (anotherString == this) {

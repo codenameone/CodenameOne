@@ -20,246 +20,54 @@ package java.util;
 /**
  * HashMap is an implementation of Map. All optional operations (adding and
  * removing) are supported. Keys and values can be any objects.
+ *
+ * <p>COMPACT LAYOUT (ParparVM): the map stores its content in three parallel
+ * arrays -- keys, values and an int metadata word per slot -- probed with open
+ * addressing (linear probing over a power-of-two capacity). There are NO entry
+ * objects at all: no per-mapping allocation, no pointer chasing on lookup, no
+ * entry-walk on {@link #clear()} (three array fills), and nothing extra for
+ * the garbage collector to trace beyond the arrays themselves. The metadata
+ * word is 0 for an empty slot, 1 for a tombstone (deleted), or the key's mixed
+ * hash with the sign bit forced on for an occupied slot -- so probing compares
+ * one negative int before ever touching the key. The hot operations
+ * (get/put/remove/containsKey/clear) are implemented natively over the raw
+ * array memory (see nativeMethods.m); the {@code *Impl} methods below are the
+ * semantically-identical pure-Java source of truth (also used by the
+ * JavaScript port).
  */
 public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
     private static final long serialVersionUID = 362498820763181265L;
 
-    /*
-     * Actual count of entries
-     */
-    transient int elementCount;
-
-    /*
-     * The internal data structure to hold Entries
-     */
-    transient Entry<K, V>[] elementData;
-
-    /*
-     * Entry object pool. clear()/removeEntry() push freed entries here (linked via
-     * next, key/value nulled to release refs) and createHashedEntry pops from it before
-     * allocating. Eliminates per-key allocation in churn patterns (fill/clear loops)
-     * where a generational nursery can't help (entries escape into the map). The pool is
-     * a GC-marked field, so pooled entries stay live.
-     */
-    transient Entry<K, V> cn1FreeList;
-
-    /*
-     * modification count, to keep track of structural modifications between the
-     * HashMap and the iterator
-     */
-    transient int modCount = 0;
-
-    /*
-     * default size that an HashMap created using the default constructor would
-     * have.
-     */
     private static final int DEFAULT_SIZE = 16;
 
-    /*
-     * maximum ratio of (stored elements)/(storage size) which does not lead to
-     * rehash
-     */
+    /** slot metadata: empty slot. */
+    static final int META_EMPTY = 0;
+    /** slot metadata: tombstone (previously occupied). */
+    static final int META_TOMB = 1;
+
+    /** parallel storage; length is always a power of two. */
+    transient Object[] cn1Keys;
+    transient Object[] cn1Vals;
+    transient int[] cn1Meta;
+
+    /** live mappings. */
+    transient int elementCount;
+
+    /** live + tombstones (drives resizing). */
+    transient int cn1Occupied;
+
+    /** structural modification count for iterator fail-fast. */
+    transient int modCount = 0;
+
     final float loadFactor;
 
-    /*
-     * maximum number of elements that can be put in this map before having to
-     * rehash
-     */
+    /** resize when cn1Occupied reaches this. */
     int threshold;
 
-    static class Entry<K, V> extends MapEntry<K, V> {
-        int origKeyHash;   // non-final so pooled (recycled) entries can be re-keyed
-
-        Entry<K, V> next;
-
-        Entry(K theKey, int hash) {
-            super(theKey, null);
-            this.origKeyHash = hash;
-        }
-
-        Entry(K theKey, V theValue) {
-            super(theKey, theValue);
-            origKeyHash = (theKey == null ? 0 : computeHashCode(theKey));
-        }
-    }
-
-    private static class AbstractMapIterator<K, V>  {
-        private int position = 0;
-        int expectedModCount;
-        Entry<K, V> futureEntry;
-        Entry<K, V> currentEntry;
-        Entry<K, V> prevEntry;
-
-        final HashMap<K, V> associatedMap;
-
-        AbstractMapIterator(HashMap<K, V> hm) {
-            associatedMap = hm;
-            expectedModCount = hm.modCount;
-            futureEntry = null;
-        }
-
-        public boolean hasNext() {
-            if (futureEntry != null) {
-                return true;
-            }
-            while (position < associatedMap.elementData.length) {
-                if (associatedMap.elementData[position] == null) {
-                    position++;
-                } else {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        final void checkConcurrentMod() throws ConcurrentModificationException {
-            if (expectedModCount != associatedMap.modCount) {
-                throw new ConcurrentModificationException();
-            }
-        }
-
-        final void makeNext() {
-            checkConcurrentMod();
-            if (!hasNext()) {
-                throw new NoSuchElementException();
-            }
-            if (futureEntry == null) {
-                currentEntry = associatedMap.elementData[position++];
-                futureEntry = currentEntry.next;
-                prevEntry = null;
-            } else {
-                if(currentEntry!=null){
-                    prevEntry = currentEntry;
-                }
-                currentEntry = futureEntry;
-                futureEntry = futureEntry.next;
-            }
-        }
-
-        public final void remove() {
-            checkConcurrentMod();
-            if (currentEntry==null) {
-                throw new IllegalStateException();
-            }
-            if(prevEntry==null){
-                int index = currentEntry.origKeyHash & (associatedMap.elementData.length - 1);
-                associatedMap.elementData[index] = associatedMap.elementData[index].next;
-            } else {
-                prevEntry.next = currentEntry.next;
-            }
-            currentEntry = null;
-            expectedModCount++;
-            associatedMap.modCount++;
-            associatedMap.elementCount--;
-
-        }
-    }
-
-
-    private static class EntryIterator <K, V> extends AbstractMapIterator<K, V> implements Iterator<Map.Entry<K, V>> {
-
-        EntryIterator (HashMap<K, V> map) {
-            super(map);
-        }
-
-        public Map.Entry<K, V> next() {
-            makeNext();
-            return currentEntry;
-        }
-    }
-
-    private static class KeyIterator <K, V> extends AbstractMapIterator<K, V> implements Iterator<K> {
-
-        KeyIterator (HashMap<K, V> map) {
-            super(map);
-        }
-
-        public K next() {
-            makeNext();
-            return currentEntry.key;
-        }
-    }
-
-    private static class ValueIterator <K, V> extends AbstractMapIterator<K, V> implements Iterator<V> {
-
-        ValueIterator (HashMap<K, V> map) {
-            super(map);
-        }
-
-        public V next() {
-            makeNext();
-            return currentEntry.value;
-        }
-    }
-
-    static class HashMapEntrySet<KT, VT> extends AbstractSet<Map.Entry<KT, VT>> {
-        private final HashMap<KT, VT> associatedMap;
-
-        public HashMapEntrySet(HashMap<KT, VT> hm) {
-            associatedMap = hm;
-        }
-
-        HashMap<KT, VT> hashMap() {
-            return associatedMap;
-        }
-
-        @Override
-        public int size() {
-            return associatedMap.elementCount;
-        }
-
-        @Override
-        public void clear() {
-            associatedMap.clear();
-        }
-
-        @Override
-        public boolean remove(Object object) {
-            if (object instanceof Map.Entry) {
-                Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
-                Entry<KT,VT> entry = associatedMap.getEntry(oEntry.getKey());
-                if(valuesEq(entry, oEntry)) {
-                    associatedMap.removeEntry(entry);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public boolean contains(Object object) {
-            if (object instanceof Map.Entry) {
-                Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
-                Entry<KT, VT> entry = associatedMap.getEntry(oEntry.getKey());
-                return valuesEq(entry, oEntry);
-            }
-            return false;
-        }
-
-        private static boolean valuesEq(Entry entry, Map.Entry<?, ?> oEntry) {
-            return (entry != null) &&
-                                   ((entry.value == null) ?
-                                    (oEntry.getValue() == null) :
-                                    (areEqualKeys(entry.value, oEntry.getValue())));
-        }
-
-        @Override
-        public Iterator<Map.Entry<KT, VT>> iterator() {
-            return new EntryIterator<KT,VT> (associatedMap);
-        }
-    }
-
-    /**
-     * Create a new element array
-     *
-     * @param s
-     * @return Reference to the element array
-     */
-    @SuppressWarnings("unchecked")
-    Entry<K, V>[] newElementArray(int s) {
-        return new Entry[s];
-    }
+    /** scratch results of cn1PutSlot for subclass (LinkedHashMap) hooks. */
+    transient int cn1LastPut;
+    transient boolean cn1LastInserted;
 
     /**
      * Constructs a new empty {@code HashMap} instance.
@@ -271,31 +79,25 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     /**
      * Constructs a new {@code HashMap} instance with the specified capacity.
      *
-     * @param capacity
-     *            the initial capacity of this hash map.
-     * @throws IllegalArgumentException
-     *                when the capacity is less than zero.
+     * @param capacity the initial capacity of this hash map.
+     * @throws IllegalArgumentException when the capacity is less than zero.
      */
     public HashMap(int capacity) {
         this(capacity, 0.75f);  // default load factor of 0.75
-        }
+    }
 
     /**
      * Calculates the capacity of storage required for storing given number of
      * elements
-     * 
-     * @param x
-     *            number of elements
-     * @return storage size
      */
     private static final int calculateCapacity(int x) {
-        if(x >= 1 << 30){
+        if (x >= 1 << 30) {
             return 1 << 30;
         }
-        if(x == 0){
+        if (x == 0) {
             return 16;
         }
-        x = x -1;
+        x = x - 1;
         x |= x >> 1;
         x |= x >> 2;
         x |= x >> 4;
@@ -308,21 +110,16 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * Constructs a new {@code HashMap} instance with the specified capacity and
      * load factor.
      *
-     * @param capacity
-     *            the initial capacity of this hash map.
-     * @param loadFactor
-     *            the initial load factor.
-     * @throws IllegalArgumentException
-     *                when the capacity is less than zero or the load factor is
-     *                less or equal to zero.
+     * @param capacity the initial capacity of this hash map.
+     * @param loadFactor the initial load factor.
+     * @throws IllegalArgumentException when the capacity is less than zero or
+     *         the load factor is less or equal to zero.
      */
     public HashMap(int capacity, float loadFactor) {
         if (capacity >= 0 && loadFactor > 0) {
             capacity = calculateCapacity(capacity);
-            elementCount = 0;
-            elementData = newElementArray(capacity);
             this.loadFactor = loadFactor;
-            computeThreshold();
+            cn1Alloc(capacity);
         } else {
             throw new IllegalArgumentException();
         }
@@ -332,91 +129,239 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * Constructs a new {@code HashMap} instance containing the mappings from
      * the specified map.
      *
-     * @param map
-     *            the mappings to add.
+     * @param map the mappings to add.
      */
     public HashMap(Map<? extends K, ? extends V> map) {
         this(calculateCapacity(map.size()));
         putAllImpl(map);
     }
 
+    final void cn1Alloc(int capacity) {
+        cn1Keys = new Object[capacity];
+        cn1Vals = new Object[capacity];
+        cn1Meta = new int[capacity];
+        elementCount = 0;
+        cn1Occupied = 0;
+        threshold = (int) (capacity * loadFactor);
+        if (threshold >= capacity) {
+            threshold = capacity - 1; // always keep one empty slot (probe termination)
+        }
+    }
+
     /**
-     * Removes all mappings from this hash map, leaving it empty.
+     * The occupied-slot marker for a key: its mixed hash with the sign bit
+     * forced on -- strictly negative, so it can never collide with META_EMPTY
+     * or META_TOMB, and slot occupancy tests are a single sign check.
+     */
+    static int cn1Marker(Object key) {
+        if (key == null) {
+            return 0x80000000;
+        }
+        int h = computeHashCode(key);
+        h ^= (h >>> 16);
+        return h | 0x80000000;
+    }
+
+    /**
+     * Probe for a key. Returns the slot index (>= 0) when found; otherwise
+     * {@code -(insertionPoint + 1)} where insertionPoint is the first
+     * tombstone met on the probe path (reuse), or the terminating empty slot.
+     */
+    final int cn1FindSlotImpl(Object key) {
+        int marker = cn1Marker(key);
+        int[] meta = cn1Meta;
+        int mask = meta.length - 1;
+        int i = marker & mask;
+        int firstTomb = -1;
+        while (true) {
+            int m = meta[i];
+            if (m == META_EMPTY) {
+                int ins = firstTomb >= 0 ? firstTomb : i;
+                return -(ins + 1);
+            }
+            if (m == marker) {
+                Object k = cn1Keys[i];
+                if (key == null ? k == null : (key == k || areEqualKeys(key, k))) {
+                    return i;
+                }
+            } else if (m == META_TOMB && firstTomb < 0) {
+                firstTomb = i;
+            }
+            i = (i + 1) & mask;
+        }
+    }
+
+    /**
+     * Shared put core (also used by LinkedHashMap). Sets {@link #cn1LastPut}
+     * to the final slot of the mapping and {@link #cn1LastInserted} to whether
+     * a NEW mapping was created (vs a value replacement).
+     */
+    final V cn1PutSlot(K key, V value) {
+        int idx = cn1FindSlotImpl(key);
+        if (idx >= 0) {
+            @SuppressWarnings("unchecked")
+            V old = (V) cn1Vals[idx];
+            cn1Vals[idx] = value;
+            cn1LastPut = idx;
+            cn1LastInserted = false;
+            return old;
+        }
+        int ins = -idx - 1;
+        boolean wasEmpty = cn1Meta[ins] == META_EMPTY;
+        cn1Meta[ins] = cn1Marker(key);
+        cn1Keys[ins] = key;
+        cn1Vals[ins] = value;
+        elementCount++;
+        if (wasEmpty) {
+            cn1Occupied++;
+        }
+        modCount++;
+        cn1LastPut = ins;
+        cn1LastInserted = true;
+        // NOTE: growth is the CALLER's responsibility (cn1MaybeGrow) so that
+        // LinkedHashMap can link the fresh slot into its ordering chain BEFORE
+        // the rebuild remaps every slot index.
+        return null;
+    }
+
+    /** grow when the caller finished its post-insert bookkeeping. */
+    final void cn1MaybeGrow() {
+        if (cn1Occupied >= threshold) {
+            cn1Grow();
+        }
+    }
+
+    /**
+     * Rebuild the table. Doubles the capacity when genuinely full; a
+     * tombstone-heavy table is rebuilt at the same size (purging tombstones).
+     * LinkedHashMap overrides this to preserve its ordering links.
+     */
+    void cn1Grow() {
+        int cap = cn1Meta.length;
+        int newCap = (elementCount * 2 >= cap) ? cap << 1 : cap;
+        Object[] oldK = cn1Keys;
+        Object[] oldV = cn1Vals;
+        int[] oldM = cn1Meta;
+        cn1Alloc(newCap);
+        int count = 0;
+        for (int i = 0; i < oldM.length; i++) {
+            if (oldM[i] < 0) {
+                cn1Insert(oldK[i], oldV[i], oldM[i]);
+                count++;
+            }
+        }
+        elementCount = count;
+        cn1Occupied = count;
+    }
+
+    /** raw insert into a table known not to contain the key (rebuild path). */
+    final int cn1Insert(Object key, Object value, int marker) {
+        int[] meta = cn1Meta;
+        int mask = meta.length - 1;
+        int i = marker & mask;
+        while (meta[i] != META_EMPTY) {
+            i = (i + 1) & mask;
+        }
+        meta[i] = marker;
+        cn1Keys[i] = key;
+        cn1Vals[i] = value;
+        return i;
+    }
+
+    /**
+     * Clears a found slot (tombstone it). Virtual so LinkedHashMap can unlink
+     * first; ALWAYS the single mutation point for removals (iterators too).
+     */
+    void cn1RemoveAtIndex(int idx) {
+        cn1Meta[idx] = META_TOMB;
+        cn1Keys[idx] = null;
+        cn1Vals[idx] = null;
+        elementCount--;
+        modCount++;
+    }
+
+    /** first occupied slot in iteration order; -1 when empty. */
+    int cn1FirstIndex() {
+        return cn1NextOccupied(0);
+    }
+
+    /** next occupied slot after {@code idx} in iteration order; -1 at the end. */
+    int cn1NextIndex(int idx) {
+        return cn1NextOccupied(idx + 1);
+    }
+
+    final int cn1NextOccupied(int from) {
+        int[] meta = cn1Meta;
+        for (int i = from; i < meta.length; i++) {
+            if (meta[i] < 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Removes all mappings from this hash map, leaving it empty. With the
+     * compact layout this is three array fills (no per-entry work at all);
+     * the native override is a pair of memsets.
      *
      * @see #isEmpty
      * @see #size
      */
     @Override
-    public void clear() {
-        if (elementCount > 0) {
-            // Pool the entries instead of dropping them to GC: null their key/value to
-            // release references, then push onto the free list for reuse.
-            for (int i = 0; i < elementData.length; i++) {
-                Entry<K, V> e = elementData[i];
-                while (e != null) {
-                    Entry<K, V> nx = e.next;
-                    e.key = null;
-                    e.value = null;
-                    e.next = cn1FreeList;
-                    cn1FreeList = e;
-                    e = nx;
-                }
-                elementData[i] = null;
+    public native void clear();
+
+    void clearImpl() {
+        if (elementCount > 0 || cn1Occupied > 0) {
+            Object[] k = cn1Keys;
+            Object[] v = cn1Vals;
+            int[] m = cn1Meta;
+            for (int i = 0; i < m.length; i++) {
+                m[i] = META_EMPTY;
+                k[i] = null;
+                v[i] = null;
             }
             elementCount = 0;
+            cn1Occupied = 0;
             modCount++;
         }
     }
 
     /**
-     * Computes the threshold for rehashing
-     */
-    private void computeThreshold() {
-        threshold = (int) (elementData.length * loadFactor);
-    }
-
-    /**
      * Returns whether this map contains the specified key.
      *
-     * @param key
-     *            the key to search for.
+     * @param key the key to search for.
      * @return {@code true} if this map contains the specified key,
      *         {@code false} otherwise.
      */
     @Override
-    public boolean containsKey(Object key) {
-        Entry<K, V> m = getEntry(key);
-        return m != null;
+    public native boolean containsKey(Object key);
+
+    boolean containsKeyImpl(Object key) {
+        return cn1FindSlotImpl(key) >= 0;
     }
 
     /**
      * Returns whether this map contains the specified value.
      *
-     * @param value
-     *            the value to search for.
+     * @param value the value to search for.
      * @return {@code true} if this map contains the specified value,
      *         {@code false} otherwise.
      */
     @Override
     public boolean containsValue(Object value) {
+        int[] meta = cn1Meta;
+        Object[] vals = cn1Vals;
         if (value != null) {
-            for (int i = 0; i < elementData.length; i++) {
-                Entry<K, V> entry = elementData[i];
-                while (entry != null) {
-                    if (areEqualKeys(value, entry.value)) {
-                        return true;
-                    }
-                    entry = entry.next;
+            for (int i = 0; i < meta.length; i++) {
+                if (meta[i] < 0 && (value == vals[i] || areEqualKeys(value, vals[i]))) {
+                    return true;
                 }
             }
         } else {
-            for (int i = 0; i < elementData.length; i++) {
-                Entry<K, V> entry = elementData[i];
-                while (entry != null) {
-                    if (entry.value == null) {
-                        return true;
-                    }
-                    entry = entry.next;
+            for (int i = 0; i < meta.length; i++) {
+                if (meta[i] < 0 && vals[i] == null) {
+                    return true;
                 }
             }
         }
@@ -432,50 +377,27 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      */
     @Override
     public Set<Map.Entry<K, V>> entrySet() {
-        return new HashMapEntrySet<K, V>(this);
+        return new CompactEntrySet<K, V>(this);
     }
 
     /**
      * Returns the value of the mapping with the specified key.
      *
-     * @param key
-     *            the key.
+     * @param key the key.
      * @return the value of the mapping with the specified key, or {@code null}
      *         if no mapping for the specified key is found.
      */
-    // Native: collapses get/getEntry/computeHashCode into one C call (closed-world hot
-    // path). The inner chain walk (findNonNullKeyEntry) was already native; this removes
-    // the translated-Java wrapper frames and inlines the key's hashCode (an untag for a
-    // tagged Integer). Semantically identical to the Java getEntry path it replaces.
     @Override
     public native V get(Object key);
 
-    final Entry<K, V> getEntry(Object key) {
-        Entry<K, V> m;
-        if (key == null) {
-            m = findNullKeyEntry();
-        } else {
-            int hash = computeHashCode(key);
-            int index = hash & (elementData.length - 1);
-            m = findNonNullKeyEntry(key, index, hash);
+    V getImpl(Object key) {
+        int idx = cn1FindSlotImpl(key);
+        if (idx < 0) {
+            return null;
         }
-        return m;
-    }
-
-    final native Entry<K,V> findNonNullKeyEntry(Object key, int index, int keyHash);/* {
-        Entry<K,V> m = elementData[index];
-        while (m != null
-                && (m.origKeyHash != keyHash || !areEqualKeys(key, m.key))) {
-            m = m.next;
-        }
-        return m;
-    }*/
-
-    final Entry<K,V> findNullKeyEntry() {
-        Entry<K,V> m = elementData[0];
-        while (m != null && m.key != null)
-            m = m.next;
-        return m;
+        @SuppressWarnings("unchecked")
+        V v = (V) cn1Vals[idx];
+        return v;
     }
 
     /**
@@ -518,13 +440,12 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
                 @Override
                 public boolean remove(Object key) {
-                    Entry<K, V> entry = HashMap.this.removeEntry(key);
-                    return entry != null;
+                    return HashMap.this.cn1RemoveKey(key);
                 }
 
                 @Override
                 public Iterator<K> iterator() {
-                    return new KeyIterator<K,V> (HashMap.this);
+                    return new KeyIterator<K, V>(HashMap.this);
                 }
             };
         }
@@ -534,68 +455,20 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     /**
      * Maps the specified key to the specified value.
      *
-     * @param key
-     *            the key.
-     * @param value
-     *            the value.
+     * @param key the key.
+     * @param value the value.
      * @return the value of any previous mapping with the specified key or
      *         {@code null} if there was no such mapping.
      */
     @Override
-    // Native: collapses put/putImpl/computeHashCode into one C call (closed-world hot
-    // path), reusing the native chain walk and the Java createHashedEntry/rehash slow
-    // path. Semantically identical to putImpl below.
     public native V put(K key, V value);
 
     V putImpl(K key, V value) {
-        Entry<K,V> entry;
-        if(key == null) {
-            entry = findNullKeyEntry();
-            if (entry == null) {
-                modCount++;
-                entry = createHashedEntry(null, 0, 0);
-                if (++elementCount > threshold) {
-                    rehash();
-                }
-            }
-        } else {
-            int hash = computeHashCode(key);
-            int index = hash & (elementData.length - 1);
-            entry = findNonNullKeyEntry(key, index, hash);
-            if (entry == null) {
-                modCount++;
-                entry = createHashedEntry(key, index, hash);
-                if (++elementCount > threshold) {
-                    rehash();
-                }
-            }
+        V old = cn1PutSlot(key, value);
+        if (cn1LastInserted) {
+            cn1MaybeGrow();
         }
-
-        V result = entry.value;
-        entry.value = value;
-        return result;
-    }
-
-    Entry<K, V> createEntry(K key, int index, V value) {
-        Entry<K, V> entry = new Entry<K, V>(key, value);
-        entry.next = elementData[index];
-        elementData[index] = entry;
-        return entry;
-    }
-
-    Entry<K,V> createHashedEntry(K key, int index, int hash) {
-        Entry<K,V> entry = cn1FreeList;
-        if (entry != null) {
-            cn1FreeList = entry.next;   // reuse a pooled entry
-            entry.key = key;
-            entry.origKeyHash = hash;
-            entry.value = null;
-        } else {
-            entry = new Entry<K,V>(key,hash);
-        }
-        entry.next = elementData[index];
-        elementData[index] = entry;
-        return entry;
+        return old;
     }
 
     /**
@@ -603,10 +476,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * will replace all mappings that this map had for any of the keys currently
      * in the given map.
      *
-     * @param map
-     *            the map to copy mappings from.
-     * @throws NullPointerException
-     *             if {@code map} is {@code null}.
+     * @param map the map to copy mappings from.
+     * @throws NullPointerException if {@code map} is {@code null}.
      */
     @Override
     public void putAll(Map<? extends K, ? extends V> map) {
@@ -616,112 +487,42 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     private void putAllImpl(Map<? extends K, ? extends V> map) {
-        int capacity = elementCount + map.size();
-        if (capacity > threshold) {
-            rehash(capacity);
-        }
         Iterator it = map.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry<? extends K, ? extends V> entry = (Map.Entry<? extends K, ? extends V>)it.next();
-            putImpl(entry.getKey(), entry.getValue());
+            Map.Entry<? extends K, ? extends V> entry = (Map.Entry<? extends K, ? extends V>) it.next();
+            put(entry.getKey(), entry.getValue());
         }
-    }
-
-    void rehash(int capacity) {
-        int length = calculateCapacity((capacity == 0 ? 1 : capacity << 1));
-
-        Entry<K, V>[] newData = newElementArray(length);
-        for (int i = 0; i < elementData.length; i++) {
-            Entry<K, V> entry = elementData[i];
-            elementData[i] = null;
-            while (entry != null) {
-                int index = entry.origKeyHash & (length - 1);
-                Entry<K, V> next = entry.next;
-                entry.next = newData[index];
-                newData[index] = entry;
-                entry = next;
-            }
-        }
-        elementData = newData;
-        computeThreshold();
-    }
-
-    void rehash() {
-        rehash(elementData.length);
     }
 
     /**
      * Removes the mapping with the specified key from this map.
      *
-     * @param key
-     *            the key of the mapping to remove.
+     * @param key the key of the mapping to remove.
      * @return the value of the removed mapping or {@code null} if no mapping
      *         for the specified key was found.
      */
     @Override
-    public V remove(Object key) {
-        Entry<K, V> entry = removeEntry(key);
-        if (entry != null) {
-            return entry.value;
-        }
-        return null;
-    }
+    public native V remove(Object key);
 
-    /*
-     * Remove the given entry from the hashmap.
-     * Assumes that the entry is in the map.
-     */
-    final void removeEntry(Entry<K, V> entry) {
-        int index = entry.origKeyHash & (elementData.length - 1);
-        Entry<K, V> m = elementData[index];
-        if (m == entry) {
-            elementData[index] = entry.next;
-        } else {
-            while (m.next != entry) {
-                m = m.next;
-            }
-            m.next = entry.next;
-
-        }
-        modCount++;
-        elementCount--;
-        // Pool the removed entry for reuse (release its references first).
-        entry.key = null;
-        entry.value = null;
-        entry.next = cn1FreeList;
-        cn1FreeList = entry;
-    }
-
-    final Entry<K, V> removeEntry(Object key) {
-        int index = 0;
-        Entry<K, V> entry;
-        Entry<K, V> last = null;
-        if (key != null) {
-            int hash = computeHashCode(key);
-            index = hash & (elementData.length - 1);
-            entry = elementData[index];
-            while (entry != null && !(entry.origKeyHash == hash && areEqualKeys(key, entry.key))) {
-                last = entry;
-                entry = entry.next;
-            }
-        } else {
-            entry = elementData[0];
-            while (entry != null && entry.key != null) {
-                last = entry;
-                entry = entry.next;
-            }
-        }
-        if (entry == null) {
+    V removeImpl(Object key) {
+        int idx = cn1FindSlotImpl(key);
+        if (idx < 0) {
             return null;
         }
-        if (last == null) {
-            elementData[index] = entry.next;
-        } else {
-            last.next = entry.next;
+        @SuppressWarnings("unchecked")
+        V old = (V) cn1Vals[idx];
+        cn1RemoveAtIndex(idx);
+        return old;
+    }
+
+    /** keySet().remove support: true when the key was present. */
+    boolean cn1RemoveKey(Object key) {
+        int idx = cn1FindSlotImpl(key);
+        if (idx < 0) {
+            return false;
         }
-        modCount++;
-        elementCount--;
-        return entry;
+        cn1RemoveAtIndex(idx);
+        return true;
     }
 
     /**
@@ -739,17 +540,6 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
      * is backed by this map so changes to one are reflected by the other. The
      * collection supports remove, removeAll, retainAll and clear operations,
      * and it does not support add or addAll operations.
-     * <p>
-     * This method returns a collection which is the subclass of
-     * AbstractCollection. The iterator method of this subclass returns a
-     * "wrapper object" over the iterator of map's entrySet(). The {@code size}
-     * method wraps the map's size method and the {@code contains} method wraps
-     * the map's containsValue method.
-     * <p>
-     * The collection is created when this method is called for the first time
-     * and returned in response to all subsequent calls. This method may return
-     * different collections when multiple concurrent calls occur, since no
-     * synchronization is performed.
      *
      * @return a collection of the values contained in this map.
      */
@@ -774,7 +564,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
 
                 @Override
                 public Iterator<V> iterator() {
-                    return new ValueIterator<K,V> (HashMap.this);
+                    return new ValueIterator<K, V>(HashMap.this);
                 }
             };
         }
@@ -782,13 +572,207 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     }
 
     /*
-     * Contract-related functionality 
+     * Contract-related functionality
      */
     static int computeHashCode(Object key) {
         return key.hashCode();
-}
+    }
 
     native static boolean areEqualKeys(Object key1, Object key2);
-        
-    
+
+    // ------------------------------------------------------------------
+    // Iteration over the compact layout. Order comes from cn1FirstIndex /
+    // cn1NextIndex, which LinkedHashMap overrides with its links.
+    // ------------------------------------------------------------------
+    static class AbstractMapIterator<K, V> {
+        int expectedModCount;
+        int futureIndex;
+        int currentIndex = -1;
+        final HashMap<K, V> associatedMap;
+
+        AbstractMapIterator(HashMap<K, V> hm) {
+            associatedMap = hm;
+            expectedModCount = hm.modCount;
+            futureIndex = hm.cn1FirstIndex();
+        }
+
+        public boolean hasNext() {
+            return futureIndex >= 0;
+        }
+
+        final void checkConcurrentMod() throws ConcurrentModificationException {
+            if (expectedModCount != associatedMap.modCount) {
+                throw new ConcurrentModificationException();
+            }
+        }
+
+        final void makeNext() {
+            checkConcurrentMod();
+            if (futureIndex < 0) {
+                throw new NoSuchElementException();
+            }
+            currentIndex = futureIndex;
+            futureIndex = associatedMap.cn1NextIndex(futureIndex);
+        }
+
+        public final void remove() {
+            checkConcurrentMod();
+            if (currentIndex < 0) {
+                throw new IllegalStateException();
+            }
+            associatedMap.cn1RemoveAtIndex(currentIndex);
+            currentIndex = -1;
+            expectedModCount++;
+        }
+    }
+
+    static class EntryIterator<K, V> extends AbstractMapIterator<K, V> implements Iterator<Map.Entry<K, V>> {
+        EntryIterator(HashMap<K, V> map) {
+            super(map);
+        }
+
+        public Map.Entry<K, V> next() {
+            makeNext();
+            return new CompactEntry<K, V>(associatedMap, currentIndex);
+        }
+    }
+
+    static class KeyIterator<K, V> extends AbstractMapIterator<K, V> implements Iterator<K> {
+        KeyIterator(HashMap<K, V> map) {
+            super(map);
+        }
+
+        @SuppressWarnings("unchecked")
+        public K next() {
+            makeNext();
+            return (K) associatedMap.cn1Keys[currentIndex];
+        }
+    }
+
+    static class ValueIterator<K, V> extends AbstractMapIterator<K, V> implements Iterator<V> {
+        ValueIterator(HashMap<K, V> map) {
+            super(map);
+        }
+
+        @SuppressWarnings("unchecked")
+        public V next() {
+            makeNext();
+            return (V) associatedMap.cn1Vals[currentIndex];
+        }
+    }
+
+    /**
+     * A live view of one mapping: reads go straight to the map's arrays and
+     * {@link #setValue} writes through (standard for map entry views). The view
+     * is only guaranteed while the mapping stays in place, exactly like the
+     * entry objects of other map implementations under structural change.
+     */
+    static final class CompactEntry<K, V> implements Map.Entry<K, V> {
+        final HashMap<K, V> map;
+        final int index;
+
+        CompactEntry(HashMap<K, V> map, int index) {
+            this.map = map;
+            this.index = index;
+        }
+
+        @SuppressWarnings("unchecked")
+        public K getKey() {
+            return (K) map.cn1Keys[index];
+        }
+
+        @SuppressWarnings("unchecked")
+        public V getValue() {
+            return (V) map.cn1Vals[index];
+        }
+
+        public V setValue(V object) {
+            V result = getValue();
+            map.cn1Vals[index] = object;
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (object instanceof Map.Entry) {
+                Map.Entry<?, ?> entry = (Map.Entry<?, ?>) object;
+                Object k = getKey();
+                Object v = getValue();
+                return (k == null ? entry.getKey() == null : k.equals(entry.getKey()))
+                        && (v == null ? entry.getValue() == null : v.equals(entry.getValue()));
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            Object k = getKey();
+            Object v = getValue();
+            return (k == null ? 0 : k.hashCode()) ^ (v == null ? 0 : v.hashCode());
+        }
+
+        @Override
+        public String toString() {
+            return getKey() + "=" + getValue();
+        }
+    }
+
+    static class CompactEntrySet<KT, VT> extends AbstractSet<Map.Entry<KT, VT>> {
+        private final HashMap<KT, VT> associatedMap;
+
+        CompactEntrySet(HashMap<KT, VT> hm) {
+            associatedMap = hm;
+        }
+
+        HashMap<KT, VT> hashMap() {
+            return associatedMap;
+        }
+
+        @Override
+        public int size() {
+            return associatedMap.elementCount;
+        }
+
+        @Override
+        public void clear() {
+            associatedMap.clear();
+        }
+
+        @Override
+        public boolean remove(Object object) {
+            if (object instanceof Map.Entry) {
+                Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
+                int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
+                if (idx >= 0 && valuesEq(associatedMap.cn1Vals[idx], oEntry)) {
+                    associatedMap.cn1RemoveAtIndex(idx);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean contains(Object object) {
+            if (object instanceof Map.Entry) {
+                Map.Entry<?, ?> oEntry = (Map.Entry<?, ?>) object;
+                int idx = associatedMap.cn1FindSlotImpl(oEntry.getKey());
+                return idx >= 0 && valuesEq(associatedMap.cn1Vals[idx], oEntry);
+            }
+            return false;
+        }
+
+        private static boolean valuesEq(Object value, Map.Entry<?, ?> oEntry) {
+            return (value == null)
+                    ? (oEntry.getValue() == null)
+                    : (value == oEntry.getValue() || areEqualKeys(value, oEntry.getValue()));
+        }
+
+        @Override
+        public Iterator<Map.Entry<KT, VT>> iterator() {
+            return new EntryIterator<KT, VT>(associatedMap);
+        }
+    }
 }

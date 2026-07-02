@@ -5269,6 +5269,15 @@ bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject,
 bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
 });
+bindNative(["cn1_java_lang_String_compareTo_java_lang_String_R_int"], function(__cn1ThisObject, other) {
+  const a = jvm.toNativeString(__cn1ThisObject), b = jvm.toNativeString(other);
+  const minL = Math.min(a.length, b.length);
+  for (let i = 0; i < minL; i++) {
+    const d = a.charCodeAt(i) - b.charCodeAt(i);
+    if (d !== 0) { return d | 0; }
+  }
+  return (a.length - b.length) | 0;
+});
 bindNative(["cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean"], function(__cn1ThisObject, other) {
   return (other != null && jvm.toNativeString(__cn1ThisObject).toLowerCase() === jvm.toNativeString(other).toLowerCase()) ? 1 : 0;
 });
@@ -5547,20 +5556,23 @@ bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Objec
   const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_s_equals_java_lang_Object_R_boolean");
   return (yield* adaptVirtualResult(equalsMethod(key1, key2))) ? 1 : 0;
 });
-bindNative(["cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {
-  const buckets = __cn1ThisObject[CN1_HASHMAP_ELEMENT_DATA];
-  let entry = buckets == null ? null : buckets[index | 0];
-  while (entry != null) {
-    if (((entry.cn1_java_util_HashMap_Entry_origKeyHash | 0) === (keyHash | 0))
-            && (yield* adaptVirtualResult(cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean(key, entry[CN1_HASHMAP_ENTRY_KEY])))) {
-      return entry;
-    }
-    entry = entry[CN1_HASHMAP_ENTRY_NEXT];
-  }
-  return null;
+// COMPACT HashMap natives: the C implementations are hand-tuned probe loops;
+// on the JS backend every one of them simply delegates to the pure-Java *Impl
+// twin (the semantic source of truth) that the translator compiled to JS.
+bindNative(["cn1_java_util_HashMap_get_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_getImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
 });
-bindNative(["cn1_java_util_LinkedHashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry(__cn1ThisObject, key, index, keyHash));
+bindNative(["cn1_java_util_HashMap_put_java_lang_Object_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key, value) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_putImpl_java_lang_Object_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key, value));
+});
+bindNative(["cn1_java_util_HashMap_remove_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_removeImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
+});
+bindNative(["cn1_java_util_HashMap_containsKey_java_lang_Object_R_boolean"], function*(__cn1ThisObject, key) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_containsKeyImpl_java_lang_Object_R_boolean(__cn1ThisObject, key));
+});
+bindNative(["cn1_java_util_HashMap_clear"], function*(__cn1ThisObject) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_clearImpl(__cn1ThisObject));
 });
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
   const chars = yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8")));

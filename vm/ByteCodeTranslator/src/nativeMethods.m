@@ -30,7 +30,6 @@
 #include "java_lang_Throwable.h"
 #include "java_lang_StringBuilder.h"
 #include "java_util_HashMap.h"
-#include "java_util_HashMap_Entry.h"
 #include "java_lang_NullPointerException.h"
 #include "java_lang_Class.h"
 #include "java_lang_System.h"
@@ -357,18 +356,50 @@ JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_T
     if(t->java_lang_String_count != o->java_lang_String_count) {
         return JAVA_FALSE;
     }
-    
-    JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data;
-    JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
-    JAVA_INT oo = o->java_lang_String_offset;
-    JAVA_INT to = t->java_lang_String_offset;
-    
-    for(int iter = 0 ; iter < t->java_lang_String_count ; iter++) {
-        if(oa[iter+oo] != ta[iter+to]) {
-            return JAVA_FALSE;
+    // cached-hash precheck: two computed-and-cached unequal hashes prove
+    // inequality without touching the character data (big win for string keys
+    // in maps, where equals runs right after both hashes were computed).
+    JAVA_INT th = t->java_lang_String_hashCode;
+    JAVA_INT oh = o->java_lang_String_hashCode;
+    if(th != 0 && oh != 0 && th != oh) {
+        return JAVA_FALSE;
+    }
+
+    JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
+    JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
+    // byte-equality of UTF-16 code units == string equality; libc memcmp is the
+    // SIMD-optimized comparison on every target.
+    return memcmp(ta, oa, (size_t)t->java_lang_String_count * sizeof(JAVA_ARRAY_CHAR)) == 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1) {
+    if(__cn1ThisObject == __cn1Arg1) {
+        return 0;
+    }
+    struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
+    struct obj__java_lang_String* o = (struct obj__java_lang_String*)__cn1Arg1;
+    JAVA_INT tc = t->java_lang_String_count;
+    JAVA_INT oc = o->java_lang_String_count;
+    JAVA_INT minL = tc < oc ? tc : oc;
+    const JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
+    const JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
+    // find the first differing 4-char block with 64-bit compares, then resolve
+    // the exact code unit inside it (UTF-16 code-unit order, like Java).
+    JAVA_INT i = 0;
+    for(; i + 4 <= minL; i += 4) {
+        uint64_t a, b;
+        memcpy(&a, ta + i, 8);
+        memcpy(&b, oa + i, 8);
+        if(a != b) {
+            break;
         }
     }
-    return JAVA_TRUE;
+    for(; i < minL; i++) {
+        if(ta[i] != oa[i]) {
+            return (JAVA_INT)ta[i] - (JAVA_INT)oa[i];
+        }
+    }
+    return tc - oc;
 }
 
 JAVA_INT java_lang_Character_toLowerCase___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
@@ -2004,59 +2035,14 @@ JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
 // computeHashCode(virtual hashCode) -> findNonNullKeyEntry. The chain walk and the
 // tagged-int hashCode (an inline untag in virtual_..._hashCode) are already cheap; this
 // removes the translated-Java wrapper frames. Bit-identical to the Java getEntry path.
-extern JAVA_OBJECT java_util_HashMap_findNullKeyEntry___R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
-extern JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_INT);
-JAVA_OBJECT java_util_HashMap_get___java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
-    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
-    struct obj__java_util_HashMap_Entry* m;
-    if(key == JAVA_NULL) {
-        m = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNullKeyEntry___R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject);
-    } else {
-        JAVA_INT hash = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
-        JAVA_INT index = hash & (((JAVA_ARRAY)t->java_util_HashMap_elementData)->length - 1);
-        m = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, key, index, hash);
-    }
-    if(m != 0) {
-        return m->java_util_MapEntry_value;
-    }
-    return JAVA_NULL;
-}
-
-// Closed-world native HashMap.put: collapses put/putImpl/computeHashCode into one C
-// call. Find (native chain walk) + value update done in C; the slow path (new key)
-// reuses the Java createHashedEntry/rehash (which barrier their own stores). The only
-// store we own here is entry.value = value, hence the explicit write barrier.
-extern JAVA_OBJECT java_util_HashMap_createHashedEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_INT);
-extern JAVA_VOID java_util_HashMap_rehash__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
-JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key, JAVA_OBJECT value) {
-    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
-    struct obj__java_util_HashMap_Entry* entry;
-    if(key == JAVA_NULL) {
-        entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNullKeyEntry___R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject);
-        if(entry == 0) {
-            t->java_util_HashMap_modCount++;
-            entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_createHashedEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, JAVA_NULL, 0, 0);
-            if(++t->java_util_HashMap_elementCount > t->java_util_HashMap_threshold) {
-                java_util_HashMap_rehash__(threadStateData, __cn1ThisObject);
-            }
-        }
-    } else {
-        JAVA_INT hash = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
-        JAVA_INT index = hash & (((JAVA_ARRAY)t->java_util_HashMap_elementData)->length - 1);
-        entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, key, index, hash);
-        if(entry == 0) {
-            t->java_util_HashMap_modCount++;
-            entry = (struct obj__java_util_HashMap_Entry*)java_util_HashMap_createHashedEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(threadStateData, __cn1ThisObject, key, index, hash);
-            if(++t->java_util_HashMap_elementCount > t->java_util_HashMap_threshold) {
-                java_util_HashMap_rehash__(threadStateData, __cn1ThisObject);
-            }
-        }
-    }
-    JAVA_OBJECT result = entry->java_util_MapEntry_value;
-    CN1_WRITE_BARRIER((JAVA_OBJECT)entry, value);
-    entry->java_util_MapEntry_value = value;
-    return result;
-}
+// ============================================================================
+// COMPACT HashMap natives (open addressing over parallel arrays -- see the
+// layout notes in java/util/HashMap.java). These are the C twins of the
+// pure-Java *Impl methods; any semantic change must be applied to BOTH (the
+// JavaScript port runs the Impls). ParparVM natives read the Java arrays as
+// raw C memory, so a probe is a linear scan of an int array -- no JNI cost,
+// no entry objects, no pointer chasing.
+// ============================================================================
 
 JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
     if(__cn1Arg1 == __cn1Arg2) {
@@ -2065,15 +2051,127 @@ JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_
     return virtual_java_lang_Object_equals___java_lang_Object_R_boolean(threadStateData, __cn1Arg1, __cn1Arg2);
 }
 
-JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT key, JAVA_INT index, JAVA_INT keyHash) {
-    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
-    JAVA_ARRAY_OBJECT* obj = ((JAVA_ARRAY)t->java_util_HashMap_elementData)->data;
-    struct obj__java_util_HashMap_Entry* m = (struct obj__java_util_HashMap_Entry*)obj[index];
-    while (m != 0
-           && (m->java_util_HashMap_Entry_origKeyHash != keyHash || !java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, m->java_util_MapEntry_key))) {
-        m = (struct obj__java_util_HashMap_Entry*)m->java_util_HashMap_Entry_next;
+// the occupied-slot marker: mixed hash with the sign bit forced on (must match
+// HashMap.cn1Marker exactly)
+static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
+    if(key == JAVA_NULL) {
+        return (JAVA_INT)0x80000000;
     }
-    return (JAVA_OBJECT)m;
+    JAVA_INT h = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
+    h ^= (JAVA_INT)(((uint32_t)h) >> 16);
+    return h | (JAVA_INT)0x80000000;
+}
+
+// probe; >=0 found slot, else -(insertionPoint+1) (first tombstone on the path
+// if any, else the terminating empty slot). Must match cn1FindSlotImpl.
+static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker) {
+    JAVA_ARRAY metaArr = (JAVA_ARRAY)t->java_util_HashMap_cn1Meta;
+    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)metaArr->data;
+    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
+    int mask = metaArr->length - 1;
+    int i = marker & mask;
+    int firstTomb = -1;
+    while(1) {
+        JAVA_INT m = meta[i];
+        if(m == 0) { // META_EMPTY
+            return -((firstTomb >= 0 ? firstTomb : i) + 1);
+        }
+        if(m == marker) {
+            JAVA_OBJECT k = keys[i];
+            if(key == JAVA_NULL ? k == JAVA_NULL
+                    : (k == key || java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, k))) {
+                return i;
+            }
+        } else if(m == 1 && firstTomb < 0) { // META_TOMB
+            firstTomb = i;
+        }
+        i = (i + 1) & mask;
+    }
+}
+
+JAVA_OBJECT java_util_HashMap_get___java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, cn1HmMarker(threadStateData, key));
+    if(idx < 0) {
+        return JAVA_NULL;
+    }
+    return ((JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data)[idx];
+}
+
+JAVA_BOOLEAN java_util_HashMap_containsKey___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    return cn1HmFindSlot(threadStateData, t, key, cn1HmMarker(threadStateData, key)) >= 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+extern JAVA_VOID java_util_HashMap_cn1Grow__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+
+JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key, JAVA_OBJECT value) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    JAVA_INT marker = cn1HmMarker(threadStateData, key);
+    JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, marker);
+    JAVA_OBJECT valsObj = t->java_util_HashMap_cn1Vals;
+    JAVA_ARRAY_OBJECT* vals = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)valsObj)->data;
+    if(idx >= 0) {
+        JAVA_OBJECT old = vals[idx];
+        CN1_WRITE_BARRIER(valsObj, value);
+        vals[idx] = value;
+        return old;
+    }
+    JAVA_INT ins = -idx - 1;
+    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Meta)->data;
+    JAVA_OBJECT keysObj = t->java_util_HashMap_cn1Keys;
+    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keysObj)->data;
+    JAVA_BOOLEAN wasEmpty = meta[ins] == 0 ? JAVA_TRUE : JAVA_FALSE;
+    meta[ins] = marker;
+    CN1_WRITE_BARRIER(keysObj, key);
+    keys[ins] = key;
+    CN1_WRITE_BARRIER(valsObj, value);
+    vals[ins] = value;
+    t->java_util_HashMap_elementCount++;
+    if(wasEmpty) {
+        t->java_util_HashMap_cn1Occupied++;
+    }
+    t->java_util_HashMap_modCount++;
+    // NOTE: base-class receivers only -- LinkedHashMap overrides put() in Java
+    // (virtual dispatch never routes an LHM here), and cn1Grow is package-
+    // private so application subclasses cannot override it: the direct call to
+    // the base implementation below is exact.
+    if(t->java_util_HashMap_cn1Occupied >= t->java_util_HashMap_threshold) {
+        java_util_HashMap_cn1Grow__(threadStateData, __cn1ThisObject);
+    }
+    return JAVA_NULL;
+}
+
+JAVA_OBJECT java_util_HashMap_remove___java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, cn1HmMarker(threadStateData, key));
+    if(idx < 0) {
+        return JAVA_NULL;
+    }
+    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Meta)->data;
+    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
+    JAVA_ARRAY_OBJECT* vals = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data;
+    JAVA_OBJECT old = vals[idx];
+    meta[idx] = 1; // META_TOMB
+    keys[idx] = JAVA_NULL;
+    vals[idx] = JAVA_NULL;
+    t->java_util_HashMap_elementCount--;
+    t->java_util_HashMap_modCount++;
+    return old;
+}
+
+JAVA_VOID java_util_HashMap_clear__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    if(t->java_util_HashMap_elementCount > 0 || t->java_util_HashMap_cn1Occupied > 0) {
+        JAVA_ARRAY metaArr = (JAVA_ARRAY)t->java_util_HashMap_cn1Meta;
+        int len = metaArr->length;
+        memset(metaArr->data, 0, (size_t)len * sizeof(JAVA_ARRAY_INT));
+        memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));
+        memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));
+        t->java_util_HashMap_elementCount = 0;
+        t->java_util_HashMap_cn1Occupied = 0;
+        t->java_util_HashMap_modCount++;
+    }
 }
 
 JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
