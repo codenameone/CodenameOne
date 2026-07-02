@@ -22,30 +22,26 @@
  */
 package com.codename1.ui;
 
-/**
- * Pure, testable model of the iOS-26 "Liquid Glass" tab selection morph.
- *
- * <p>Given the animation time {@code t} (0..1), the source and target cell bounds, the
- * resolved bar geometry and the theme tokens, {@link #compute} returns a plain data
- * object describing the frame: the grey selection-pill rect, the glass lens (drop) rect
- * plus its lens parameters (magnify / aberration / tint), the travel envelope, and the
- * optional whole-bar grow rect.</p>
- *
- * <p>It has no dependency on {@link Graphics}, the component tree or the theme, so it can
- * be unit-tested at fixed progress values and reused by the fidelity animation-frame
- * probes. {@code Tabs.paintSelectionCapsule} is the single production caller; it resolves
- * the tokens + geometry from the theme/component and then paints from the returned model.
- */
+/// Pure, testable model of the iOS-26 "Liquid Glass" tab selection morph.
+///
+/// Given the animation time `t` (0..1), the source and target cell bounds, the
+/// resolved bar geometry and the theme tokens, {@link #compute} returns a plain data
+/// object describing the frame: the grey selection-pill rect, the glass lens (drop) rect
+/// plus its lens parameters (magnify / aberration / tint), the travel envelope, and the
+/// optional whole-bar grow rect.
+///
+/// It has no dependency on {@link Graphics}, the component tree or the theme, so it can
+/// be unit-tested at fixed progress values and reused by the fidelity animation-frame
+/// probes. `Tabs.paintSelectionCapsule` is the single production caller; it resolves
+/// the tokens + geometry from the theme/component and then paints from the returned model.
 final class TabSelectionMorph {
 
-    /**
-     * The morph's tuning tokens. Themes do not set these individually: a NAMED
-     * PRESET ({@link #preset}) supplies the full envelope set, and the theme
-     * exposes only high-level controls -- the preset name (tabsMorphPreset),
-     * the lens intensity (tabsMorphLensIntensityPct, {@link #scaleLensIntensity})
-     * and the springiness (tabsMorphSpringPct, {@link #spring}) -- so the
-     * motion stays coherent instead of being tuned one constant at a time.
-     */
+    /// The morph's tuning tokens. Themes do not set these individually: a NAMED
+    /// PRESET ({@link #preset}) supplies the full envelope set, and the theme
+    /// exposes only high-level controls -- the preset name (tabsMorphPreset),
+    /// the lens intensity (tabsMorphLensIntensityPct, {@link #scaleLensIntensity})
+    /// and the springiness (tabsMorphSpringPct, {@link #spring}) -- so the
+    /// motion stays coherent instead of being tuned one constant at a time.
     static final class Tokens {
         float stretch;        // horizontal elongation while moving (fraction)
         float squashW;        // width compression at the stop (fraction)
@@ -64,11 +60,9 @@ final class TabSelectionMorph {
         int barGrowPct;       // whole-bar grow pulse percent (0 = off)
         float spring = 1f;    // settle-overshoot scale (1 = preset amount, 0 = none)
 
-        /**
-         * The named motion presets. "ios26" (the default, and any unknown name)
-         * is the measured iOS 26 Liquid Glass morph; "subtle" halves the
-         * deformation and optics for a calmer selection change.
-         */
+        /// The named motion presets. "ios26" (the default, and any unknown name)
+        /// is the measured iOS 26 Liquid Glass morph; "subtle" halves the
+        /// deformation and optics for a calmer selection change.
         static Tokens preset(String name) {
             Tokens tk = new Tokens();
             if ("subtle".equals(name)) {
@@ -104,11 +98,9 @@ final class TabSelectionMorph {
             return tk;
         }
 
-        /**
-         * Scales the lens OPTICS (magnification delta, aberration, tint)
-         * around the preset values: 1 = as authored, 0 = an optically flat
-         * drop, 2 = twice the optical strength. Geometry is unaffected.
-         */
+        /// Scales the lens OPTICS (magnification delta, aberration, tint)
+        /// around the preset values: 1 = as authored, 0 = an optically flat
+        /// drop, 2 = twice the optical strength. Geometry is unaffected.
         void scaleLensIntensity(float intensity) {
             float i = intensity < 0 ? 0 : intensity;
             restMag = 1f + (restMag - 1f) * i;
@@ -131,19 +123,17 @@ final class TabSelectionMorph {
     private TabSelectionMorph() {
     }
 
-    /** smoothstep(a,b,x): 0 below a, 1 above b, smooth between; a may be &gt; b. */
+    /// smoothstep(a,b,x): 0 below a, 1 above b, smooth between; a may be > b.
     static float smooth(float a, float b, float x) {
         float t = (x - a) / (b - a);
         t = t < 0 ? 0 : (t > 1 ? 1 : t);
         return t * t * (3 - 2 * t);
     }
 
-    /**
-     * Position easing: an even ease-in-out travel reaching the target ~t=0.78, then a
-     * small damped overshoot that settles by t=1 (the "stop" bounce). The
-     * springiness scales the overshoot amplitude: 1 = the preset 0.09, 0 = no
-     * overshoot (a plain ease-in-out stop), 2 = double the bounce.
-     */
+    /// Position easing: an even ease-in-out travel reaching the target ~t=0.78, then a
+    /// small damped overshoot that settles by t=1 (the "stop" bounce). The
+    /// springiness scales the overshoot amplitude: 1 = the preset 0.09, 0 = no
+    /// overshoot (a plain ease-in-out stop), 2 = double the bounce.
     static float springEase(float t, float springiness) {
         if (t <= 0f) {
             return 0f;
@@ -160,21 +150,19 @@ final class TabSelectionMorph {
         return 1f + 0.09f * springiness * (float) (Math.sin(u * Math.PI) * (1f - u));
     }
 
-    /**
-     * Computes one morph frame.
-     *
-     * @param t         linear animation time 0..1 (1 == settled; pass 1 with from==to for the resting frame)
-     * @param fromX     source cell x (in the bar's inner-x space)
-     * @param fromW     source cell width
-     * @param toX       target cell x
-     * @param toW       target cell width
-     * @param innerX    the tab bar's inner-left x (added to cell x to get the paint x)
-     * @param capYBase  the settled pill top (bar-height span top)
-     * @param capHBase  the settled pill height
-     * @param barLeftX  whole-bar left edge (paint space) for the grow pass
-     * @param barRightX whole-bar right edge (paint space) for the grow pass
-     * @param tk        resolved theme tokens
-     */
+    /// Computes one morph frame.
+    ///
+    /// @param t         linear animation time 0..1 (1 == settled; pass 1 with from==to for the resting frame)
+    /// @param fromX     source cell x (in the bar's inner-x space)
+    /// @param fromW     source cell width
+    /// @param toX       target cell x
+    /// @param toW       target cell width
+    /// @param innerX    the tab bar's inner-left x (added to cell x to get the paint x)
+    /// @param capYBase  the settled pill top (bar-height span top)
+    /// @param capHBase  the settled pill height
+    /// @param barLeftX  whole-bar left edge (paint space) for the grow pass
+    /// @param barRightX whole-bar right edge (paint space) for the grow pass
+    /// @param tk        resolved theme tokens
     static TabSelectionMorph compute(float t, int fromX, int fromW, int toX, int toW,
             int innerX, int capYBase, int capHBase, int barLeftX, int barRightX, Tokens tk) {
         TabSelectionMorph m = new TabSelectionMorph();

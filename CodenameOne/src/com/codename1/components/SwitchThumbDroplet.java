@@ -22,25 +22,23 @@
  */
 package com.codename1.components;
 
-/**
- * Pure, testable model of the iOS-26 "Liquid Glass" switch-thumb droplet.
- *
- * <p>While the thumb slides between the off and on positions it behaves like a
- * liquid droplet: it stretches along the travel axis and squashes vertically,
- * peaking mid-slide and settling back to a circle at either end. Given the
- * slide progress (0 at either resting end .. 1 at the opposite end) and the
- * resting thumb size, {@link #compute} returns the frame's draw size and the
- * centre-preserving offsets. The envelope is {@code sin(progress * PI)} so the
- * deformation is zero at both ends and maximal exactly mid-travel.</p>
- *
- * <p>No {@link com.codename1.ui.Graphics}/theme/tree dependency, so the motion
- * can be unit-tested at fixed progress values and validated by the fidelity
- * animation-frame probes, mirroring {@code TabSelectionMorph} for the tab
- * lens. {@code Switch.paint} is the single production caller.</p>
- */
+/// Pure, testable model of the iOS-26 "Liquid Glass" switch-thumb droplet.
+///
+/// While the thumb slides between the off and on positions it behaves like a
+/// liquid droplet: it stretches along the travel axis and squashes vertically,
+/// peaking mid-slide and settling back to a circle at either end. Given the
+/// slide progress (0 at either resting end .. 1 at the opposite end) and the
+/// resting thumb size, {@link #compute} returns the frame's draw size and the
+/// centre-preserving offsets. The envelope is `sin(progress * PI)` so the
+/// deformation is zero at both ends and maximal exactly mid-travel.
+///
+/// No {@link com.codename1.ui.Graphics}/theme/tree dependency, so the motion
+/// can be unit-tested at fixed progress values and validated by the fidelity
+/// animation-frame probes, mirroring `TabSelectionMorph` for the tab
+/// lens. `Switch.paint` is the single production caller.
 final class SwitchThumbDroplet {
 
-    /** Theme-resolved tuning tokens (percentages already divided to fractions). */
+    /// Theme-resolved tuning tokens (percentages already divided to fractions).
     static final class Tokens {
         float stretch;   // switchLiquidStretchPct/100 -- elongation along the travel axis
         float squash;    // switchLiquidSquashPct/100  -- vertical squash per unit of stretch
@@ -55,14 +53,12 @@ final class SwitchThumbDroplet {
     private SwitchThumbDroplet() {
     }
 
-    /**
-     * Computes one droplet frame.
-     *
-     * @param progress slide progress 0..1 (0 and 1 are the resting ends)
-     * @param thumbW   resting thumb width in px
-     * @param thumbH   resting thumb height in px
-     * @param tk       resolved theme tokens
-     */
+    /// Computes one droplet frame.
+    ///
+    /// @param progress slide progress 0..1 (0 and 1 are the resting ends)
+    /// @param thumbW   resting thumb width in px
+    /// @param thumbH   resting thumb height in px
+    /// @param tk       resolved theme tokens
     static SwitchThumbDroplet compute(float progress, int thumbW, int thumbH, Tokens tk) {
         SwitchThumbDroplet d = new SwitchThumbDroplet();
         float p = progress < 0 ? 0 : (progress > 1 ? 1 : progress);
