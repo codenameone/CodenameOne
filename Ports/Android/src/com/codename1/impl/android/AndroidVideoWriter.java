@@ -190,11 +190,11 @@ class AndroidVideoWriter extends VideoWriter {
         closed = true;
         try {
             if (hasVideo) {
-                signalEndOfStream(videoCodec);
+                signalEndOfStream(videoCodec, videoSamples);
                 videoFormat = drainToEnd(videoCodec, videoSamples);
             }
             if (hasAudio) {
-                signalEndOfStream(audioCodec);
+                signalEndOfStream(audioCodec, audioSamples);
                 audioFormat = drainToEnd(audioCodec, audioSamples);
             }
             mux();
@@ -279,12 +279,22 @@ class AndroidVideoWriter extends VideoWriter {
         return drain(codec, out, true);
     }
 
-    private void signalEndOfStream(MediaCodec codec) {
+    private void signalEndOfStream(MediaCodec codec, List<Sample> out) {
         while (true) {
             int index = codec.dequeueInputBuffer(TIMEOUT_US);
             if (index >= 0) {
                 codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 return;
+            }
+            // No free input buffer means the encoder is blocked on pending
+            // output. Drain whatever output is available so an input buffer can
+            // free up; otherwise this loop would spin forever and close() would
+            // hang. Keep the reported output format so mux() still gets it.
+            MediaFormat f = drain(codec, out, false);
+            if (codec == videoCodec) {
+                videoFormat = f;
+            } else {
+                audioFormat = f;
             }
         }
     }
