@@ -153,6 +153,71 @@ class TabSelectionMorphTest {
         }
     }
 
+    /**
+     * The theme controls the morph through a named preset plus two high-level
+     * scalars (lens intensity, springiness) -- the "ios26" preset IS the
+     * shipped iOS Modern tuning, pinned here so a preset edit is a visible,
+     * reviewed change rather than a drive-by constant tweak.
+     */
+    @Test
+    void presetIos26MatchesShippedTuning() {
+        TabSelectionMorph.Tokens tk = TabSelectionMorph.Tokens.preset("ios26");
+        assertEquals(0.32f, tk.stretch, 1e-6);
+        assertEquals(0.16f, tk.squashW, 1e-6);
+        assertEquals(0.14f, tk.grow, 1e-6);
+        assertEquals(0.18f, tk.squashH, 1e-6);
+        assertEquals(0.5f, tk.liftMm, 1e-6);
+        assertEquals(96, tk.bubbleWidthPct);
+        assertEquals(18, tk.overflowPct);
+        assertEquals(0.3f, tk.downBiasMm, 1e-6);
+        assertEquals(1.08f, tk.restMag, 1e-6);
+        assertEquals(1.18f, tk.peakMag, 1e-6);
+        assertEquals(0.02f, tk.peakAb, 1e-6);
+        assertEquals(1f, tk.tintStrength, 1e-6);
+        assertEquals(0, tk.barGrowPct);
+        assertEquals(1f, tk.spring, 1e-6, "preset springiness is the reference bounce");
+        // unknown names fall back to ios26, "subtle" is a calmer variant
+        assertEquals(tk.stretch, TabSelectionMorph.Tokens.preset("nonsense").stretch, 1e-6);
+        assertTrue(TabSelectionMorph.Tokens.preset("subtle").stretch < tk.stretch);
+    }
+
+    @Test
+    void lensIntensityScalesOpticsNotGeometry() {
+        TabSelectionMorph.Tokens tk = TabSelectionMorph.Tokens.preset("ios26");
+        tk.scaleLensIntensity(0f);
+        assertEquals(1f, tk.restMag, 1e-6, "intensity 0 = optically flat drop");
+        assertEquals(1f, tk.peakMag, 1e-6);
+        assertEquals(0f, tk.peakAb, 1e-6);
+        assertEquals(0f, tk.tintStrength, 1e-6);
+        assertEquals(0.32f, tk.stretch, 1e-6, "geometry untouched by lens intensity");
+
+        TabSelectionMorph.Tokens twice = TabSelectionMorph.Tokens.preset("ios26");
+        twice.scaleLensIntensity(2f);
+        assertEquals(1.36f, twice.peakMag, 1e-5, "intensity 2 doubles the magnify delta");
+        assertEquals(1f, twice.tintStrength, 1e-6, "tint strength clamps at 1");
+    }
+
+    @Test
+    void springinessControlsOvershoot() {
+        // Sample mid-settle (t=0.9, inside the overshoot window) at three
+        // springiness values: no spring stops dead on an ease-out, more spring
+        // overshoots further.
+        TabSelectionMorph.Tokens none = tokens();
+        none.spring = 0f;
+        TabSelectionMorph.Tokens strong = tokens();
+        strong.spring = 2f;
+        int xNone = TabSelectionMorph.compute(0.9f, FROM_X, FROM_W, TO_X, TO_W,
+                INNER_X, CAP_Y, CAP_H, BAR_LEFT, BAR_RIGHT, none).capX;
+        int xRef = at(0.9f).capX;
+        int xStrong = TabSelectionMorph.compute(0.9f, FROM_X, FROM_W, TO_X, TO_W,
+                INNER_X, CAP_Y, CAP_H, BAR_LEFT, BAR_RIGHT, strong).capX;
+        assertTrue(xNone < xRef, "reference bounce overshoots past the springless stop");
+        assertTrue(xRef < xStrong, "stronger springiness overshoots further");
+        assertEquals(at(1f).capX, TabSelectionMorph.compute(1f, FROM_X, FROM_W, TO_X, TO_W,
+                INNER_X, CAP_Y, CAP_H, BAR_LEFT, BAR_RIGHT, strong).capX,
+                "every springiness settles on the same target");
+    }
+
     @Test
     void isDeterministic() {
         TabSelectionMorph a = at(0.37f);

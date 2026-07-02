@@ -42,6 +42,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.GlassRecipe;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
@@ -3027,29 +3028,42 @@ public class Component implements Animation, StyleListener, Editable {
         // translucent (opaque would be false and skip paintComponentBackground). The
         // port blurs the destination region in place; an unsupported port returns
         // false and the component simply paints without the blur.
-        // NOTE: this blurs on every paint -- fine for the static themed bars that use
-        // it today; a future optimisation could cache the blurred backdrop.
+        // COST/CACHING POLICY (per paint path):
+        //  * A glass surface only pays when it repaints; static chrome over static
+        //    content costs nothing between repaints.
+        //  * iOS live screen, selection lens: a pure GPU fragment shader on the
+        //    frame's own command buffer -- no sync, no readback, no cache needed.
+        //  * iOS live screen, glass material: the backdrop readback is required
+        //    (the material is a function of the pixels behind the glass), but the
+        //    composed patch is CACHED per rect+params+backdrop-hash in the port
+        //    (METALView glass patch cache), so a repaint over an unchanged
+        //    backdrop skips the colour transform + blur + optics; scrolling
+        //    content under the glass recomposes that frame from the real bytes.
+        //  * Offscreen mutable images (capture tooling) and the desktop simulator
+        //    blur per paint -- capture renders once, and the simulator is not a
+        //    shipping surface.
         float backdropBlur = getStyle().getBackdropFilterBlurRadius();
         if (backdropBlur > 0) {
+            // The glass surface's material INTENT comes from a typed, named
+            // recipe (GlassRecipe -- plain blur, chrome bar, floating pill,
+            // glass panel), resolved per UIID via <UIID>GlassRecipe /
+            // glassRecipeDefault. The recipe carries the bounded, measured
+            // material parameters; this paint path only forwards them to the
+            // port, so similar glass surfaces share one definition instead of
+            // reconstructing the material from loose per-parameter constants.
+            // glassMaterialBool remains the theme-wide opt-in to the Liquid
+            // Glass materials; without it backdrop-filter stays a plain blur.
+            GlassRecipe recipe = null;
             if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
                 int fg = getStyle().getFgColor();
                 int fgLuma = (int)(0.2126f*((fg>>16)&0xff) + 0.7152f*((fg>>8)&0xff) + 0.0722f*(fg&0xff));
                 boolean darkMat = fgLuma > 128; // dark theme uses a light fg
-                // Material params (reverse-engineered UIVisualEffectView / UIGlassEffect
-                // defaults). Different native glass surfaces use different materials
-                // (a navbar's chrome background is far more transparent than a bare
-                // UIGlassEffect panel), so the params are overridable per-UIID via theme
-                // constants -- e.g. ToolbarGlassScaleDark -- falling back to a global
-                // glassScaleDark and finally the measured panel default.
-                String uiid = getUIID();
-                float sat = glassMaterialParam(uiid, "GlassSat", darkMat, darkMat ? 2.5f : 1.95f);
-                float scale = glassMaterialParam(uiid, "GlassScale", darkMat, darkMat ? 0.238f : 0.303f);
-                float offset = glassMaterialParam(uiid, "GlassOffset", darkMat, darkMat ? 28.4f : 174.3f);
-                // Liquid Glass optics: edge refraction (lensing -- bends the backdrop
-                // toward the edges so the glass reads as a layer ON TOP, not a flat
-                // see-through hole) and the specular edge rim (the bright glint).
-                float refract = glassMaterialParam(uiid, "Refract", darkMat, 0.4f);
-                float specular = glassMaterialParam(uiid, "Specular", darkMat, 0.5f);
+                recipe = GlassRecipe.resolve(getUIManager(), getUIID(), darkMat);
+                if (recipe.getKind() == GlassRecipe.Kind.PLAIN_BLUR) {
+                    recipe = null;
+                }
+            }
+            if (recipe != null) {
                 // Match the glass material to the component's rounded/pill shape so it
                 // does not spill into a square. RoundBorder is a capsule (-1 sentinel);
                 // RoundRectBorder carries an explicit corner radius (mm -> px); any
@@ -3061,7 +3075,9 @@ public class Component implements Animation, StyleListener, Editable {
                 } else if (bd instanceof RoundRectBorder) {
                     cornerRadius = Display.getInstance().convertToPixels(((RoundRectBorder) bd).getCornerRadius());
                 }
-                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius, sat, scale, offset, refract, specular);
+                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius,
+                        recipe.getSaturation(), recipe.getScale(), recipe.getOffset(),
+                        recipe.getRefraction(), recipe.getSpecular());
             } else {
                 g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
             }
@@ -3092,27 +3108,6 @@ public class Component implements Animation, StyleListener, Editable {
         if (paintIntersects && parent != null) {
             paintIntersectingComponentsAbove(g);
         }
-    }
-
-    /// Resolves a glass-material parameter (saturation/scale/offset) for the
-    /// backdrop-filter "Liquid Glass" effect. Lets a theme override the measured
-    /// panel defaults per-UIID (e.g. ToolbarGlassScaleDark for the chrome material
-    /// of a translucent nav bar) with a global fallback (glassScaleDark) and finally
-    /// the supplied default. The "Dark"/"Light" suffix selects the appearance.
-    private float glassMaterialParam(String uiid, String key, boolean dark, float def) {
-        UIManager m = getUIManager();
-        String suffix = dark ? "Dark" : "Light";
-        String v = m.getThemeConstant(uiid + key + suffix, null);
-        if (v == null) {
-            v = m.getThemeConstant("glass" + key + suffix, null);
-        }
-        if (v != null) {
-            try {
-                return Float.parseFloat(v.trim());
-            } catch (NumberFormatException ignore) {
-            }
-        }
-        return def;
     }
 
     /// Paints intersecting components that appear above this component.

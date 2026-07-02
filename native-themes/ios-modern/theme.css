@@ -43,111 +43,39 @@
     --accent-color-dark: #0a84ff;
     /* Opt the backdrop-filter glass layers into the reverse-engineered iOS Liquid Glass material (affine luma/sat/scale/offset transform). */
     glassMaterialBool: true;
-    /* Liquid Glass OPTICS (global defaults; per-UIID override as <UIID>RefractLight
-       etc). Refract = edge lensing strength (bends the backdrop toward the edges so
-       the glass reads as a layer on top, not a flat hole); Specular = brightness of
-       the edge glint. Quoted floats. */
-    glassRefractLight: "0.4";
-    glassRefractDark: "0.4";
-    glassSpecularLight: "0.5";
-    glassSpecularDark: "0.5";
-    /* The nav bar is an edge-to-edge chrome bar, not a floating glass pill -- it has
-       no visible floating edges, so the specular rim and edge lensing don't apply. */
-    ToolbarRefractLight: "0";
-    ToolbarRefractDark: "0";
-    ToolbarSpecularLight: "0";
-    ToolbarSpecularDark: "0";
-    TitleAreaRefractLight: "0";
-    TitleAreaRefractDark: "0";
-    TitleAreaSpecularLight: "0";
-    TitleAreaSpecularDark: "0";
-    /* A UINavigationBar's default "chrome" background is a far more transparent
-       glass than a bare UIGlassEffect panel -- it lets the backdrop through almost
-       unchanged rather than flooring to a frosted off-white/charcoal. Override the
-       material per-UIID for the Toolbar/TitleArea so the bar tracks the backdrop
-       (near pass-through: high scale, low offset floor, mild saturation). Quoted
-       so the CSS compiler keeps them as string constants the runtime parses to
-       float. Dark/Light selected at paint time by appearance. */
-    ToolbarGlassScaleDark: "1.0";
-    ToolbarGlassOffsetDark: "12";
-    ToolbarGlassSatDark: "1.6";
-    ToolbarGlassScaleLight: "0.85";
-    ToolbarGlassOffsetLight: "20";
-    ToolbarGlassSatLight: "1.1";
-    TitleAreaGlassScaleDark: "1.0";
-    TitleAreaGlassOffsetDark: "12";
-    TitleAreaGlassSatDark: "1.6";
-    TitleAreaGlassScaleLight: "0.85";
-    TitleAreaGlassOffsetLight: "20";
-    TitleAreaGlassSatLight: "1.1";
-    /* The tab bar glass is a TRANSLUCENT chrome (like the nav bar), NOT the opaque
-       UIGlassEffect panel: the backdrop must show through the OUTER bar so the
-       brighter white selected sub-capsule (Tab.selected) stands out (glass-on-glass).
-       Measured native light outer bar ~171 vs selected ~237; dark outer ~150. The
-       earlier opaque floor (offset 200) washed the whole bar white and hid the
-       selected capsule. */
-    /* The BAR is the bright FROSTED surface (iOS 26): strongly toward white in light,
-       fairly uniform (low scale). Measured native light bar ~236 over grey; the
-       selected lens (Tabs.paintSelectionCapsule, TabSel* constants) then reads a touch
-       DARKER than this. Dark bar keeps the panel default (~58, matches native ~51). */
-    /* Bar = bright FROST that still passes the backdrop COLOURS through (native shows
-       the yellow/blue bleed): higher scale for backdrop variance, offset for the bright
-       floor (grey -> ~236 light / ~51 dark). NO refraction on the bar -- it is the flat
-       frosted surface; only the selected lens refracts. Double-refraction (bar + lens)
-       produced the "hole + offset layer" on the selected capsule. */
-    TabsContainerGlassScaleLight: "1.0";
-    TabsContainerGlassOffsetLight: "108";
-    TabsContainerGlassSatLight: "1.8";
-    TabsContainerGlassScaleDark: "0.3";
-    TabsContainerGlassOffsetDark: "13";
-    TabsContainerGlassSatDark: "2.5";
-    TabsContainerRefractLight: "0";
-    TabsContainerRefractDark: "0";
-    TabsContainerSpecularLight: "0.2";
-    TabsContainerSpecularDark: "0.2";
+    /* Liquid Glass MATERIALS are typed, named recipes (com.codename1.ui.plaf.
+       GlassRecipe): each bundles the measured saturation/scale/offset colour
+       transform + edge optics of one native material, so similar glass surfaces
+       share one bounded definition instead of loose per-parameter constants.
+       Per-UIID assignment below; everything else defaults to the "panel" recipe
+       (bare UIGlassEffect: heavy wash + edge refraction + specular rim), which
+       is what the glass buttons, dialogs and panels use.
+         chrome -- rectangular edge-anchored bars (nav/title): near pass-through,
+                   no rim/lensing (the bar has no floating edges).
+         pill   -- the floating tab-bar chrome: bright frost that still passes
+                   the backdrop colours, faint rim, no refraction (only the
+                   travelling selection lens refracts; double-refraction read as
+                   a "hole + offset layer").
+         panel  -- the default for free-standing glass surfaces.
+       The selection DROP itself is the lens op (tabSel* below), not a backdrop
+       material. */
+    ToolbarGlassRecipe: "chrome";
+    TitleAreaGlassRecipe: "chrome";
+    TabsContainerGlassRecipe: "pill";
     /* Inset the capsule from the cell/pill edge so the bright bar-frost rim (236) shows
        AROUND it like native, instead of the lens covering it to the pill edge. */
     tabSelInsetMm: "0.6";
-    /* Selected-capsule LENS material (Tabs.paintSelectionCapsule): near pass-through so
-       it reads slightly darker than the bright bar in light (~216 vs 236) and a touch
-       lighter than the dark bar (~83 vs 51), like the iOS 26 lens. Scale tuned so the
-       capsule lands on native's flat 216 (236*0.915); specular 0 keeps it flat (native's
-       selection capsule has no visible rim -- a rim left a darker edge band / "ring"). */
-    TabSelScaleLight: "0.915";
-    TabSelOffsetLight: "0";
-    TabSelSatLight: "1.3";
-    TabSelRefractLight: "0";
-    TabSelSpecularLight: "0";
-    /* Dark selection capsule is a LIGHTER lens over the dark bar (native bar ~51 ->
-       capsule ~83, i.e. +32). scale 1.0 + offset 32 lifts it above the bar instead of
-       sinking below it (0.5/6 sank it to ~31, an inverted darker lens). */
-    TabSelScaleDark: "1.0";
-    TabSelOffsetDark: "32";
-    TabSelSatDark: "1.6";
-    TabSelRefractDark: "0";
-    TabSelSpecularDark: "0";
-    /* iOS 26 selection-DROP lens (Tabs.paintSelectionCapsule -> Graphics.lensRegion).
-       The distortion is keyed to the travel envelope: a faint bulge (RestMag) when
-       settled, growing to a strong magnify + chromatic aberration mid-flight so the
-       glyphs smear with a blue fringe only while the drop moves, like native. Tint
-       recolours the dark glyph to the accent ONLY inside the drop. */
-    tabSelLensMagnifyPct: "118";
-    tabSelLensRestMagPct: "108";
-    tabSelLensAberrationPct: "2";
-    tabSelLensTintPct: "100";
-    tabSelLensOverflowPct: "18";
-    tabSelBubbleWidthPct: "96";
-    tabSelStretchPct: "32";
-    tabSelGrowPct: "14";
-    tabSelSquashHPct: "18";
-    tabSelSquashWPct: "16";
-    tabSelLiftMm: "0.5";
-    /* The drop is anchored at the bar bottom and bulges UP; a tiny overhang past the bar
-       bottom (downBias) reads like native without a hollow white bulge below the bar. */
-    tabSelDownBiasMm: "0.3";
-    /* Whole-bar swell at the very start: OFF for now -- a uniform magnify pass leaves a
-       faint distortion ring in the bar's surroundings. Needs a real content scale. */
-    tabSelBarGrowPct: "0";
+    /* iOS 26 selection-DROP lens morph (Tabs.paintSelectionCapsule ->
+       Graphics.lensRegion): the detailed envelopes (stretch/squash/lift/lens
+       magnify/aberration/tint timing) live in NAMED PRESETS inside the motion
+       model (TabSelectionMorph.Tokens.preset), pinned by unit test and the
+       fidelity animation-frame captures. The theme only picks the high-level
+       controls:
+         tabsMorphPreset            "ios26" (default) | "subtle"
+         tabsMorphLensIntensityPct  scales the lens optics around 100
+         tabsMorphSpringPct         scales the settle overshoot around 100
+         tabsAnimatedIndicatorDurationInt   the morph duration (ms), below */
+    tabsMorphPreset: "ios26";
     --accent-pressed-color: #0064d1;
     --accent-pressed-color-dark: #64b1ff;
     --accent-disabled-color: #b3d4ff;

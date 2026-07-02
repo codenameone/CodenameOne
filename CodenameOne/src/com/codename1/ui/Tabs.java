@@ -1539,19 +1539,6 @@ public class Tabs extends Container {
     // Position easing (springEaseTabs) + smoothstep (lensSmooth) now live in the pure
     // TabSelectionMorph model (springEase / smooth) so the morph math is unit-testable.
 
-    /// Reads a float-valued theme constant (stored as a quoted string), falling back
-    /// to the default when absent or malformed.
-    private float floatConst(String key, float def) {
-        String v = getUIManager().getThemeConstant(key, null);
-        if (v != null) {
-            try {
-                return Float.parseFloat(v.trim());
-            } catch (NumberFormatException ignore) {
-            }
-        }
-        return def;
-    }
-
     /// The thin frost rim left around the selection capsule (tabSelInsetMm, default a hair).
     private int selectionCapsuleInsetPx() {
         float insetMm = 0.1f;
@@ -1762,23 +1749,22 @@ public class Tabs extends Container {
         g.setAlpha(oldA);
     }
 
-    /// Resolves the selection-morph theme constants into a TabSelectionMorph.Tokens.
-    /// Kept separate from the pure model so the model has no theme/Display dependency.
+    /// Resolves the selection-morph tokens from the theme's HIGH-LEVEL controls
+    /// only (review: fewer, coherent morph knobs): tabsMorphPreset picks a named
+    /// envelope set inside the motion model ("ios26" default / "subtle"),
+    /// tabsMorphLensIntensityPct scales the lens optics around the preset (100 =
+    /// as authored) and tabsMorphSpringPct scales the settle overshoot (100 =
+    /// preset bounce, 0 = plain stop). Duration remains
+    /// tabsAnimatedIndicatorDurationInt. The mm lengths carried by the preset
+    /// are converted to px here so the model stays Display-free.
     private TabSelectionMorph.Tokens morphTokens() {
-        TabSelectionMorph.Tokens tk = new TabSelectionMorph.Tokens();
-        tk.stretch = floatConst("tabSelStretchPct", 32f) / 100f;
-        tk.squashW = floatConst("tabSelSquashWPct", 18f) / 100f;
-        tk.grow = floatConst("tabSelGrowPct", 18f) / 100f;
-        tk.squashH = floatConst("tabSelSquashHPct", 24f) / 100f;
-        tk.liftPx = Display.getInstance().convertToPixels(floatConst("tabSelLiftMm", 0.5f));
-        tk.bubbleWidthPct = getUIManager().getThemeConstant("tabSelBubbleWidthPct", 72);
-        tk.overflowPct = getUIManager().getThemeConstant("tabSelLensOverflowPct", 22);
-        tk.downBiasPx = Display.getInstance().convertToPixels(floatConst("tabSelDownBiasMm", 0f));
-        tk.restMag = getUIManager().getThemeConstant("tabSelLensRestMagPct", 114) / 100f;
-        tk.peakMag = getUIManager().getThemeConstant("tabSelLensMagnifyPct", 166) / 100f;
-        tk.peakAb = getUIManager().getThemeConstant("tabSelLensAberrationPct", 4) / 100f;
-        tk.tintStrength = getUIManager().getThemeConstant("tabSelLensTintPct", 100) / 100f;
-        tk.barGrowPct = getUIManager().getThemeConstant("tabSelBarGrowPct", 0);
+        UIManager uim = getUIManager();
+        TabSelectionMorph.Tokens tk = TabSelectionMorph.Tokens.preset(
+                uim.getThemeConstant("tabsMorphPreset", "ios26"));
+        tk.scaleLensIntensity(uim.getThemeConstant("tabsMorphLensIntensityPct", 100) / 100f);
+        tk.spring = uim.getThemeConstant("tabsMorphSpringPct", 100) / 100f;
+        tk.liftPx = Display.getInstance().convertToPixels(tk.liftMm);
+        tk.downBiasPx = Display.getInstance().convertToPixels(tk.downBiasMm);
         return tk;
     }
 

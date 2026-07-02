@@ -38,21 +38,85 @@ package com.codename1.ui;
  */
 final class TabSelectionMorph {
 
-    /** Theme-resolved tuning tokens (percentages already divided to fractions, lengths in px). */
+    /**
+     * The morph's tuning tokens. Themes do not set these individually: a NAMED
+     * PRESET ({@link #preset}) supplies the full envelope set, and the theme
+     * exposes only high-level controls -- the preset name (tabsMorphPreset),
+     * the lens intensity (tabsMorphLensIntensityPct, {@link #scaleLensIntensity})
+     * and the springiness (tabsMorphSpringPct, {@link #spring}) -- so the
+     * motion stays coherent instead of being tuned one constant at a time.
+     */
     static final class Tokens {
-        float stretch;        // tabSelStretchPct/100 -- horizontal elongation while moving
-        float squashW;        // tabSelSquashWPct/100 -- width compression at the stop
-        float grow;           // tabSelGrowPct/100    -- vertical grow mid-flight
-        float squashH;        // tabSelSquashHPct/100 -- extra height at the stop
-        int liftPx;           // tabSelLiftMm in px   -- upward content lift
-        int bubbleWidthPct;   // tabSelBubbleWidthPct -- drop width vs. cell
-        int overflowPct;      // tabSelLensOverflowPct-- vertical bulge past the bar
-        int downBiasPx;       // tabSelDownBiasMm in px
-        float restMag;        // tabSelLensRestMagPct/100
-        float peakMag;        // tabSelLensMagnifyPct/100
-        float peakAb;         // tabSelLensAberrationPct/100
-        float tintStrength;   // tabSelLensTintPct/100
-        int barGrowPct;       // tabSelBarGrowPct (0 = off)
+        float stretch;        // horizontal elongation while moving (fraction)
+        float squashW;        // width compression at the stop (fraction)
+        float grow;           // vertical grow mid-flight (fraction)
+        float squashH;        // extra height at the stop (fraction)
+        float liftMm;         // upward content lift in mm (the caller converts to px)
+        int liftPx;           // upward content lift in px
+        int bubbleWidthPct;   // drop width vs. cell (percent)
+        int overflowPct;      // vertical bulge past the bar (percent)
+        float downBiasMm;     // downward bias in mm (the caller converts to px)
+        int downBiasPx;       // downward bias in px
+        float restMag;        // settled lens magnification (1.0 = none)
+        float peakMag;        // mid-flight lens magnification
+        float peakAb;         // mid-flight chromatic aberration (fraction)
+        float tintStrength;   // lens accent-tint strength 0..1
+        int barGrowPct;       // whole-bar grow pulse percent (0 = off)
+        float spring = 1f;    // settle-overshoot scale (1 = preset amount, 0 = none)
+
+        /**
+         * The named motion presets. "ios26" (the default, and any unknown name)
+         * is the measured iOS 26 Liquid Glass morph; "subtle" halves the
+         * deformation and optics for a calmer selection change.
+         */
+        static Tokens preset(String name) {
+            Tokens tk = new Tokens();
+            if ("subtle".equals(name)) {
+                tk.stretch = 0.16f;
+                tk.squashW = 0.08f;
+                tk.grow = 0.07f;
+                tk.squashH = 0.09f;
+                tk.liftMm = 0.25f;
+                tk.bubbleWidthPct = 96;
+                tk.overflowPct = 12;
+                tk.downBiasMm = 0.15f;
+                tk.restMag = 1.04f;
+                tk.peakMag = 1.09f;
+                tk.peakAb = 0.01f;
+                tk.tintStrength = 1f;
+                tk.barGrowPct = 0;
+                return tk;
+            }
+            // "ios26" -- the shipped iOS Modern tuning.
+            tk.stretch = 0.32f;
+            tk.squashW = 0.16f;
+            tk.grow = 0.14f;
+            tk.squashH = 0.18f;
+            tk.liftMm = 0.5f;
+            tk.bubbleWidthPct = 96;
+            tk.overflowPct = 18;
+            tk.downBiasMm = 0.3f;
+            tk.restMag = 1.08f;
+            tk.peakMag = 1.18f;
+            tk.peakAb = 0.02f;
+            tk.tintStrength = 1f;
+            tk.barGrowPct = 0;
+            return tk;
+        }
+
+        /**
+         * Scales the lens OPTICS (magnification delta, aberration, tint)
+         * around the preset values: 1 = as authored, 0 = an optically flat
+         * drop, 2 = twice the optical strength. Geometry is unaffected.
+         */
+        void scaleLensIntensity(float intensity) {
+            float i = intensity < 0 ? 0 : intensity;
+            restMag = 1f + (restMag - 1f) * i;
+            peakMag = 1f + (peakMag - 1f) * i;
+            peakAb = peakAb * i;
+            float t = tintStrength * i;
+            tintStrength = t > 1f ? 1f : t;
+        }
     }
 
     // ---- outputs (all in the same coordinate space as the input geometry) ----
@@ -76,9 +140,11 @@ final class TabSelectionMorph {
 
     /**
      * Position easing: an even ease-in-out travel reaching the target ~t=0.78, then a
-     * small damped overshoot that settles by t=1 (the "stop" bounce).
+     * small damped overshoot that settles by t=1 (the "stop" bounce). The
+     * springiness scales the overshoot amplitude: 1 = the preset 0.09, 0 = no
+     * overshoot (a plain ease-in-out stop), 2 = double the bounce.
      */
-    static float springEase(float t) {
+    static float springEase(float t, float springiness) {
         if (t <= 0f) {
             return 0f;
         }
@@ -91,7 +157,7 @@ final class TabSelectionMorph {
             return u * u * (3 - 2 * u);
         }
         float u = (t - travelEnd) / (1f - travelEnd);
-        return 1f + 0.09f * (float) (Math.sin(u * Math.PI) * (1f - u));
+        return 1f + 0.09f * springiness * (float) (Math.sin(u * Math.PI) * (1f - u));
     }
 
     /**
@@ -114,7 +180,7 @@ final class TabSelectionMorph {
         TabSelectionMorph m = new TabSelectionMorph();
         float tp = t < 0 ? 0 : (t > 1 ? 1 : t);
 
-        float pos = springEase(tp);
+        float pos = springEase(tp, tk.spring);
         int x = fromX + (int) ((toX - fromX) * pos);
         int w = fromW + (int) ((toW - fromW) * pos);
 
