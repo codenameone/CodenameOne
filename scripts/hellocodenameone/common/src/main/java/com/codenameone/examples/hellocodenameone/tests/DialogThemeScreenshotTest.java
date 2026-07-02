@@ -65,7 +65,25 @@ public class DialogThemeScreenshotTest extends DualAppearanceBaseTest {
         // a full-width strip. Mirrors the ~72% width a packed Dialog.show() now caps
         // to (dialogMaxWidthPercentInt); narrow phone/JS screens were already
         // card-width, so this only tightens the wide-screen render.
-        dialog.setPreferredW(com.codename1.ui.Display.getInstance().getDisplayWidth() * 72 / 100);
+        int cap = com.codename1.ui.Display.getInstance().getDisplayWidth() * 72 / 100;
+        dialog.setPreferredW(cap);
+        // A TextArea wraps its rows to its CURRENT width and derives its preferred
+        // HEIGHT from those rows -- capping only the card's width leaves the body
+        // with its unwrapped (shorter) preferred height, clipping the message once
+        // the cap actually binds (seen on the 375px JavaScript-port screen). Hand
+        // the span text its wrap width up front, slightly undershooting: the slack
+        // can only make the card taller, never clip.
+        com.codename1.ui.TextArea txt = message.getTextComponent();
+        int slack = com.codename1.ui.Display.getInstance().convertToPixels(4);
+        int innerW = cap
+                - dialog.getStyle().getHorizontalPadding()
+                - body.getStyle().getHorizontalPadding()
+                - txt.getStyle().getHorizontalPadding()
+                - slack;
+        if (innerW > slack) {
+            txt.setWidth(innerW);
+            txt.setShouldCalcPreferredSize(true);
+        }
         Container center = new Container(new FlowLayout(Component.CENTER));
         center.add(dialog);
         form.add(center);

@@ -112,12 +112,25 @@ final class TabSelectionMorph {
     }
 
     // ---- outputs (all in the same coordinate space as the input geometry) ----
-    int capX, capY, capW, capH;        // grey selection pill (bar height)
-    int lensX, lensY, lensW, lensH;    // glass drop lens
-    float magnify, aberration, tintStrength;
-    float flight;                      // 0 settled .. ~1 travelling (drives the pill alpha fade)
-    boolean barGrow;                   // whether the whole-bar grow pass is active this frame
-    int barGrowX, barGrowY, barGrowW, barGrowH;
+    // grey selection pill (bar height)
+    int capX;
+    int capY;
+    int capW;
+    int capH;
+    // glass drop lens rect + optics
+    int lensX;
+    int lensY;
+    int lensW;
+    int lensH;
+    float magnify;
+    float aberration;
+    float tintStrength;
+    float flight;         // 0 settled .. ~1 travelling (drives the pill alpha fade)
+    boolean barGrow;      // whether the whole-bar grow pass is active this frame
+    int barGrowX;
+    int barGrowY;
+    int barGrowW;
+    int barGrowH;
     float barGrowMag;
 
     private TabSelectionMorph() {
