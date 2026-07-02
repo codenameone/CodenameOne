@@ -28,9 +28,9 @@ if [ ! -f "$CORE_JAR" ] && [ -f "$ROOT_DIR/maven/core/target/codenameone-core-8.
   CORE_JAR="$ROOT_DIR/maven/core/target/codenameone-core-8.0-SNAPSHOT.jar"
 fi
 
-ANDROID_CN1_JAR="$ROOT_DIR/maven/android/target/codenameone-android-8.0-SNAPSHOT-with-android-dependencies.jar"
+ANDROID_CN1_JAR="$ROOT_DIR/maven/android/target/codenameone-android-8.0-SNAPSHOT.jar"
 if [ ! -f "$ANDROID_CN1_JAR" ]; then
-  ANDROID_CN1_JAR="$HOME/.m2/repository/com/codenameone/codenameone-android/8.0-SNAPSHOT/codenameone-android-8.0-SNAPSHOT-with-android-dependencies.jar"
+  ANDROID_CN1_JAR="$HOME/.m2/repository/com/codenameone/codenameone-android/8.0-SNAPSHOT/codenameone-android-8.0-SNAPSHOT.jar"
 fi
 COMMON_CLASSES="$ROOT_DIR/docs/demos/common/target/classes"
 
@@ -56,8 +56,16 @@ rm -rf "$WORK_DIR"
 mkdir -p "$CLASSES_DIR"
 find "$ROOT_DIR/docs/demos/android/src/main/java" -name '*.java' -print | sort > "$SOURCES_FILE"
 
+COMPILE_CLASSPATH="$ANDROID_JAR:$COMMON_CLASSES:$CORE_JAR:$ANDROID_CN1_JAR"
+ANDROID_BINARIES_DIR="$ROOT_DIR/maven/target/cn1-binaries/android"
+if [ -d "$ANDROID_BINARIES_DIR" ]; then
+  while IFS= read -r jar; do
+    COMPILE_CLASSPATH="$COMPILE_CLASSPATH:$jar"
+  done < <(find "$ANDROID_BINARIES_DIR" -maxdepth 1 -name '*.jar' -print | sort)
+fi
+
 javac \
   --release 17 \
-  -cp "$ANDROID_JAR:$COMMON_CLASSES:$CORE_JAR:$ANDROID_CN1_JAR" \
+  -cp "$COMPILE_CLASSPATH" \
   -d "$CLASSES_DIR" \
   @"$SOURCES_FILE"
