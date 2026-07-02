@@ -154,6 +154,23 @@ public final class FusedConstructor {
             return fieldName;
         }
 
+        /** public accessors for cross-package consumers (implicit stack alloc) */
+        public String getLengthExpr() {
+            return lengthExpr;
+        }
+
+        public int getUsedParamCount() {
+            return usedParams.length;
+        }
+
+        public String getElemCTypePublic() {
+            return elemCType();
+        }
+
+        public String getArrayClassRefPublic() {
+            return arrayClassRef();
+        }
+
         public String getCOwner() {
             return cOwner;
         }

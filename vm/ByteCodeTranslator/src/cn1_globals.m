@@ -1299,12 +1299,16 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 }
 
 extern JAVA_BOOLEAN gcCurrentlyRunning;
-int allocationsSinceLastGC = 0;
+// BYTES since the last cycle -- MUST be 64-bit: an allocation-churn workload
+// moves multiple GB between cycles, and the old int accumulator wrapped
+// NEGATIVE, so isHighFrequencyGC returned false and the GC thread slept its
+// full 30s idle wait while dead pages ballooned into the GB range.
+long long allocationsSinceLastGC = 0;
 long long totalAllocations = 0;
 long long cn1_instr_allocCount = 0;
 
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
-    int alloc = allocationsSinceLastGC;
+    long long alloc = allocationsSinceLastGC;
     allocationsSinceLastGC = 0;
     return alloc > CN1_HIGH_FREQUENCY_ALLOCATION_THRESHOLD && totalAllocations > CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD;
 }
@@ -1562,9 +1566,21 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // LEVER A: flush this thread's plain-add byte accumulator into the global atomic
     // (once per page-acquire). No-op unless -DCN1_DEATOMIC_BYTES.
     CN1_BIBOP_FLUSH_BYTES(threadStateData);
-    if(constantPoolObjects == 0 || threadStateData->nativeAllocationMode) {
+    if(constantPoolObjects == 0) {
         return;
     }
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+    // Without conservative roots, a thread inside a native-allocation bracket
+    // must be neither parked nor made to trigger a cycle (its half-built
+    // objects aren't rooted). Under conservative roots the native C locals ARE
+    // scanned, so both are safe -- and skipping here was starving the 24MB
+    // trigger entirely on workloads whose every allocation happens inside a
+    // native (e.g. StringBuilder.toString): the GC thread then slept its idle
+    // wait while dead pages accumulated into the GB range.
+    if(threadStateData->nativeAllocationMode) {
+        return;
+    }
+#endif
     // GC SAFEPOINT (once per page-acquire): a thread allocating ONLY small BiBOP
     // objects never reaches the legacy alloc path's pending-buffer park, so without
     // this check the collector's while(threadActive) wait is satisfied only by
@@ -1581,9 +1597,12 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     }
     if(!gcCurrentlyRunning &&
        atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_TRIGGER_BYTES) {
+        // save/restore: we may already be INSIDE a caller's native-allocation
+        // bracket (reachable here under CN1_CONSERVATIVE_GC_ROOTS)
+        JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
         threadStateData->nativeAllocationMode = JAVA_TRUE;
         java_lang_System_gc__(threadStateData);
-        threadStateData->nativeAllocationMode = JAVA_FALSE;
+        threadStateData->nativeAllocationMode = wasNam;
     }
 #ifndef CN1_BIBOP_NO_PACING
     // Backpressure: bound RSS when the collector falls behind. This wait MUST be a

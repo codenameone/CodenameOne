@@ -1763,6 +1763,16 @@ public class BytecodeMethod implements SignatureSet {
                 String saType = saTi.getStackAllocType();
                 if(saType != null) {
                     b.append("    struct obj__").append(saType).append(" __cn1stk_").append(saIter).append(";\n");
+                    if(saTi.getStackFusedLen() >= 0) {
+                        // constant-capacity fused child buffer lives on the stack
+                        // too (8-aligned via the long long element type); the NEW
+                        // codegen installs an ordinary array header into it and
+                        // points the owner's field at it (keep-if-null ctor keeps it)
+                        b.append("    long long __cn1stkbuf_").append(saIter)
+                                .append("[(CN1_FUSED_ARR_BYTES(").append(saTi.getStackFusedLen())
+                                .append(", sizeof(").append(saTi.getStackFusedElemCType())
+                                .append(")) + 7) / 8];\n");
+                    }
                     saTi.setStackAllocId(saIter);
                 }
             }
@@ -2865,6 +2875,474 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     // ------------------------------------------------------------------
+    // IMPLICIT STACK ALLOCATION of non-escaping java.lang.StringBuilder.
+    //
+    // javac lowers every string concatenation to
+    //   NEW StringBuilder ; DUP ; [args] ; INVOKESPECIAL <init> ;
+    //   (INVOKEVIRTUAL append)* ; INVOKEVIRTUAL toString
+    // optionally parking the builder in a local between appends. HotSpot's
+    // escape analysis scalar-replaces the whole chain; this is the AOT
+    // equivalent: prove the builder reference is only ever the RECEIVER of
+    // java.lang.StringBuilder virtual calls (append returns `this`, so the
+    // returned alias is tracked too -- it may be popped, chained into the
+    // next receiver, or re-stored into the SAME local) and lower the NEW to
+    // the method-scoped stack struct the @StackAllocate machinery already
+    // provides. The builder object then never touches the heap; its char[]
+    // buffer stays a heap array (the @Fused ctor's keep-if-null init
+    // allocates it on seeing value==NULL) and is kept alive by the
+    // conservative scan, which walks the whole native stack region the
+    // struct lives in.
+    //
+    // Bails (keeps the heap path) on: methods with try/catch or
+    // synchronization, a tracked ref crossing a label/branch/switch while
+    // live on the operand stack, stack shuffles at/near the ref, the ref
+    // used as a call ARGUMENT, stored to a field/array/other local,
+    // returned, thrown, or any instruction whose stack effect isn't in the
+    // conservative table below. StringBuilder is final, so receiver calls
+    // can't dispatch to an escaping override.
+    // ------------------------------------------------------------------
+    private static final boolean DISABLE_SB_STACK_ALLOC =
+            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_SB_STACK_ALLOC", "false"));
+    private static final String SB_OWNER = "java/lang/StringBuilder";
+
+    /** Slots consumed by the argument list of a method descriptor (no receiver). */
+    private static int sbDescArgSlots(String desc) {
+        int slots = 0;
+        int i = 1; // skip '('
+        while (desc.charAt(i) != ')') {
+            char c = desc.charAt(i);
+            if (c == 'J' || c == 'D') {
+                slots += 2; i++;
+            } else if (c == 'L') {
+                slots += 1; i = desc.indexOf(';', i) + 1;
+            } else if (c == '[') {
+                i++;
+                continue; // element char (or more brackets) still to come; array = 1 slot
+            } else {
+                slots += 1; i++;
+            }
+            // arrays: the '[' prefix loop above falls through to the element char,
+            // which added the single slot for the whole array reference
+        }
+        return slots;
+    }
+
+    /** Slots pushed by a method descriptor's return type. */
+    private static int sbDescRetSlots(String desc) {
+        char c = desc.charAt(desc.indexOf(')') + 1);
+        if (c == 'V') return 0;
+        if (c == 'J' || c == 'D') return 2;
+        return 1;
+    }
+
+    /** Slot width of a field descriptor. */
+    private static int sbFieldSlots(String desc) {
+        char c = desc.charAt(0);
+        return (c == 'J' || c == 'D') ? 2 : 1;
+    }
+
+    /**
+     * Conservative stack effect {pops, pushes} in SLOTS for instructions that can
+     * appear while a tracked StringBuilder ref is live on the operand stack.
+     * Returns null for anything unmodeled (caller bails). Invokes and the
+     * allowed consumers of the ref itself are handled by the walker, not here.
+     */
+    private static int[] sbPopPush(Instruction in) {
+        int op = in.getOpcode();
+        if (in instanceof com.codename1.tools.translator.bytecodes.Ldc) {
+            Object v = ((com.codename1.tools.translator.bytecodes.Ldc) in).getValue();
+            if (v instanceof Long || v instanceof Double) return new int[]{0, 2};
+            if (v instanceof Integer || v instanceof Float || v instanceof String) return new int[]{0, 1};
+            return null; // class constants can throw on resolution; unusual -- bail
+        }
+        if (in instanceof Field) {
+            int w = sbFieldSlots(((Field) in).getDesc());
+            switch (op) {
+                case Opcodes.GETSTATIC: return new int[]{0, w};
+                case Opcodes.PUTSTATIC: return new int[]{w, 0};
+                case Opcodes.GETFIELD:  return new int[]{1, w};
+                case Opcodes.PUTFIELD:  return new int[]{1 + w, 0};
+            }
+            return null;
+        }
+        if (in instanceof IInc) {
+            return new int[]{0, 0};
+        }
+        switch (op) {
+            case Opcodes.ACONST_NULL:
+            case Opcodes.ICONST_M1: case Opcodes.ICONST_0: case Opcodes.ICONST_1:
+            case Opcodes.ICONST_2: case Opcodes.ICONST_3: case Opcodes.ICONST_4: case Opcodes.ICONST_5:
+            case Opcodes.FCONST_0: case Opcodes.FCONST_1: case Opcodes.FCONST_2:
+            case Opcodes.BIPUSH: case Opcodes.SIPUSH:
+            case Opcodes.ILOAD: case Opcodes.FLOAD: case Opcodes.ALOAD:
+                return new int[]{0, 1};
+            case Opcodes.LCONST_0: case Opcodes.LCONST_1:
+            case Opcodes.DCONST_0: case Opcodes.DCONST_1:
+            case Opcodes.LLOAD: case Opcodes.DLOAD:
+                return new int[]{0, 2};
+            case Opcodes.ISTORE: case Opcodes.FSTORE:
+                return new int[]{1, 0};
+            case Opcodes.LSTORE: case Opcodes.DSTORE:
+                return new int[]{2, 0};
+            case Opcodes.IALOAD: case Opcodes.FALOAD: case Opcodes.AALOAD:
+            case Opcodes.BALOAD: case Opcodes.CALOAD: case Opcodes.SALOAD:
+                return new int[]{2, 1};
+            case Opcodes.LALOAD: case Opcodes.DALOAD:
+                return new int[]{2, 2};
+            case Opcodes.IASTORE: case Opcodes.FASTORE: case Opcodes.BASTORE:
+            case Opcodes.CASTORE: case Opcodes.SASTORE:
+                return new int[]{3, 0};
+            case Opcodes.AASTORE:
+                // an AASTORE deep in the args can't store OUR ref (that would need
+                // the ref above it, and consuming past the ref bails elsewhere)
+                return new int[]{3, 0};
+            case Opcodes.LASTORE: case Opcodes.DASTORE:
+                return new int[]{4, 0};
+            case Opcodes.IADD: case Opcodes.ISUB: case Opcodes.IMUL: case Opcodes.IDIV:
+            case Opcodes.IREM: case Opcodes.ISHL: case Opcodes.ISHR: case Opcodes.IUSHR:
+            case Opcodes.IAND: case Opcodes.IOR: case Opcodes.IXOR:
+            case Opcodes.FADD: case Opcodes.FSUB: case Opcodes.FMUL: case Opcodes.FDIV: case Opcodes.FREM:
+                return new int[]{2, 1};
+            case Opcodes.LADD: case Opcodes.LSUB: case Opcodes.LMUL: case Opcodes.LDIV:
+            case Opcodes.LREM: case Opcodes.LAND: case Opcodes.LOR: case Opcodes.LXOR:
+                return new int[]{4, 2};
+            case Opcodes.LSHL: case Opcodes.LSHR: case Opcodes.LUSHR:
+                return new int[]{3, 2};
+            case Opcodes.DADD: case Opcodes.DSUB: case Opcodes.DMUL: case Opcodes.DDIV: case Opcodes.DREM:
+                return new int[]{4, 2};
+            case Opcodes.INEG: case Opcodes.FNEG:
+                return new int[]{1, 1};
+            case Opcodes.LNEG: case Opcodes.DNEG:
+                return new int[]{2, 2};
+            case Opcodes.I2F: case Opcodes.F2I: case Opcodes.I2B: case Opcodes.I2C: case Opcodes.I2S:
+                return new int[]{1, 1};
+            case Opcodes.I2L: case Opcodes.I2D: case Opcodes.F2L: case Opcodes.F2D:
+                return new int[]{1, 2};
+            case Opcodes.L2I: case Opcodes.L2F: case Opcodes.D2I: case Opcodes.D2F:
+                return new int[]{2, 1};
+            case Opcodes.L2D: case Opcodes.D2L:
+                return new int[]{2, 2};
+            case Opcodes.LCMP: case Opcodes.DCMPL: case Opcodes.DCMPG:
+                return new int[]{4, 1};
+            case Opcodes.FCMPL: case Opcodes.FCMPG:
+                return new int[]{2, 1};
+            case Opcodes.ARRAYLENGTH: case Opcodes.INSTANCEOF:
+                return new int[]{1, 1};
+            case Opcodes.ANEWARRAY: case Opcodes.NEWARRAY:
+                return new int[]{1, 1};
+            case Opcodes.NEW:
+                return new int[]{0, 1};
+            case Opcodes.NOP:
+                return new int[]{0, 0};
+            default:
+                return null; // DUP*/SWAP/POP*/ASTORE/CHECKCAST/branches/returns/
+                             // ATHROW/MONITOR*/MULTIANEWARRAY/JSR/RET/invokes:
+                             // walker-handled or bail
+        }
+    }
+
+    /**
+     * CFG walk from {@code startIdx} with a tracked StringBuilder ref on the
+     * operand stack ({@code above} slots above it) until every path consumes the
+     * ref in a provably non-escaping way. Forward branches (the ternary-in-
+     * argument shape javac emits inside append chains) are followed with a
+     * per-index depth state; a join whose incoming depths disagree, a backward
+     * edge, or anything unmodeled bails. {@code trackedLocal} is the single
+     * local slot allowed to (re)receive the ref alias, or -1 when none is
+     * established yet.
+     *
+     * @param aliasStoresOut indices of ASTORE instructions that received the
+     *        alias (accumulated across paths)
+     * @return the local that received the alias (or the incoming trackedLocal /
+     *         -1), or {@code SB_WALK_BAIL} to reject the site
+     */
+    private static final int SB_WALK_BAIL = Integer.MIN_VALUE;
+
+    private int sbWalkUse(int startIdx, int above, int trackedLocal,
+            java.util.Map<org.objectweb.asm.Label, Integer> labelIndex,
+            java.util.Set<Integer> aliasStoresOut) {
+        java.util.Map<Integer, Integer> stateAt = new java.util.HashMap<Integer, Integer>();
+        java.util.ArrayDeque<int[]> work = new java.util.ArrayDeque<int[]>();
+        work.add(new int[]{startIdx, above});
+        int storedLocal = trackedLocal;
+        while (!work.isEmpty()) {
+            int[] st = work.poll();
+            int i = st[0];
+            int cur = st[1];
+            for (; i < instructions.size(); i++) {
+                Instruction c = instructions.get(i);
+                if (c instanceof LineNumber || c instanceof LocalVariable) {
+                    continue;
+                }
+                if (c instanceof LabelInstruction) {
+                    Integer seen = stateAt.get(i);
+                    if (seen != null) {
+                        if (seen.intValue() != cur) {
+                            return SB_WALK_BAIL; // join with disagreeing depth
+                        }
+                        break; // already walked from here with this state
+                    }
+                    stateAt.put(i, cur);
+                    continue;
+                }
+                int op = c.getOpcode();
+                if (c instanceof TryCatch || c instanceof SwitchInstruction
+                        || op == Opcodes.ATHROW
+                        || op == Opcodes.MONITORENTER || op == Opcodes.MONITOREXIT
+                        || op == Opcodes.IRETURN || op == Opcodes.LRETURN || op == Opcodes.FRETURN
+                        || op == Opcodes.DRETURN || op == Opcodes.ARETURN || op == Opcodes.RETURN) {
+                    return SB_WALK_BAIL;
+                }
+                if (c instanceof Jump) {
+                    Integer target = labelIndex.get(((Jump) c).getLabel());
+                    if (target == null || target.intValue() <= i) {
+                        return SB_WALK_BAIL; // unknown or backward edge while live
+                    }
+                    int pops;
+                    switch (op) {
+                        case Opcodes.GOTO: pops = 0; break;
+                        case Opcodes.IFEQ: case Opcodes.IFNE: case Opcodes.IFLT:
+                        case Opcodes.IFGE: case Opcodes.IFGT: case Opcodes.IFLE:
+                        case Opcodes.IFNULL: case Opcodes.IFNONNULL:
+                            pops = 1; break;
+                        case Opcodes.IF_ICMPEQ: case Opcodes.IF_ICMPNE: case Opcodes.IF_ICMPLT:
+                        case Opcodes.IF_ICMPGE: case Opcodes.IF_ICMPGT: case Opcodes.IF_ICMPLE:
+                        case Opcodes.IF_ACMPEQ: case Opcodes.IF_ACMPNE:
+                            pops = 2; break;
+                        default:
+                            return SB_WALK_BAIL;
+                    }
+                    if (pops > cur) {
+                        return SB_WALK_BAIL; // branches ON the ref
+                    }
+                    cur -= pops;
+                    work.add(new int[]{target.intValue(), cur});
+                    if (op == Opcodes.GOTO) {
+                        break; // no fallthrough
+                    }
+                    continue; // fallthrough path continues in this loop
+                }
+                if (c instanceof Invoke) {
+                    Invoke inv = (Invoke) c;
+                    if (op == Opcodes.INVOKEDYNAMIC) {
+                        return SB_WALK_BAIL;
+                    }
+                    int argSlots = sbDescArgSlots(inv.getDesc());
+                    int retSlots = sbDescRetSlots(inv.getDesc());
+                    boolean hasReceiver = op != Opcodes.INVOKESTATIC;
+                    int consumed = argSlots + (hasReceiver ? 1 : 0);
+                    if (consumed <= cur) {
+                        cur += retSlots - consumed; // whole call above the ref
+                        continue;
+                    }
+                    // the call reaches the ref: legal ONLY as the receiver of a
+                    // StringBuilder virtual call with exactly the args above it
+                    if (hasReceiver && op == Opcodes.INVOKEVIRTUAL
+                            && SB_OWNER.equals(inv.getOwner()) && cur == argSlots) {
+                        if (inv.getDesc().endsWith(")Ljava/lang/StringBuilder;")) {
+                            cur = 0; // the returned alias replaces the ref
+                            continue;
+                        }
+                        break; // consumed for good on this path
+                    }
+                    return SB_WALK_BAIL;
+                }
+                if (op == Opcodes.POP && cur == 0) {
+                    break; // alias discarded on this path
+                }
+                if (op == Opcodes.ASTORE && cur == 0 && c instanceof VarOp) {
+                    int n = ((VarOp) c).getIndex();
+                    if (storedLocal == -1) {
+                        storedLocal = n;
+                    } else if (storedLocal != n) {
+                        return SB_WALK_BAIL;
+                    }
+                    aliasStoresOut.add(i);
+                    break; // parked in the tracked local on this path
+                }
+                if (op == Opcodes.DUP && cur >= 1) {
+                    cur += 1; continue;
+                }
+                if (op == Opcodes.DUP2 && cur >= 2) {
+                    cur += 2; continue;
+                }
+                if (op == Opcodes.POP && cur >= 1) {
+                    cur -= 1; continue;
+                }
+                if (op == Opcodes.POP2 && cur >= 2) {
+                    cur -= 2; continue;
+                }
+                int[] pp = sbPopPush(c);
+                if (pp == null || pp[0] > cur) {
+                    return SB_WALK_BAIL;
+                }
+                cur += pp[1] - pp[0];
+            }
+            if (i >= instructions.size()) {
+                return SB_WALK_BAIL; // ran off the method with the ref live
+            }
+        }
+        return storedLocal;
+    }
+
+    private void stackAllocStringBuilders() {
+        if (DISABLE_SB_STACK_ALLOC) {
+            return;
+        }
+        if (synchronizedMethod) {
+            return;
+        }
+        java.util.Map<org.objectweb.asm.Label, Integer> labelIndex =
+                new java.util.HashMap<org.objectweb.asm.Label, Integer>();
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof TryCatch) {
+                return; // exception edges aren't modeled by the walks
+            }
+            if (in instanceof LabelInstruction) {
+                labelIndex.put(((LabelInstruction) in).getLabel(), i);
+            }
+        }
+        for (int idx = 0; idx < instructions.size(); idx++) {
+            Instruction ins = instructions.get(idx);
+            if (!(ins instanceof TypeInstruction) || ins.getOpcode() != Opcodes.NEW) {
+                continue;
+            }
+            TypeInstruction ti = (TypeInstruction) ins;
+            if (!SB_OWNER.equals(ti.getTypeName()) || ti.getStackAllocType() != null
+                    || ti.isScalarReplaced() || ti.isInitBeforePublish() || ti.isFusedNew()) {
+                continue;
+            }
+            // NEW ; DUP ; [simple straight-line args] ; INVOKESPECIAL SB.<init>
+            int dupIdx = srNextReal(idx + 1);
+            if (dupIdx < 0 || instructions.get(dupIdx).getOpcode() != Opcodes.DUP) {
+                continue;
+            }
+            int invIdx = -1;
+            boolean bail = false;
+            int above = 0; // slots above the DUP'd ref (the ctor args build here)
+            for (int j = srNextReal(dupIdx + 1); j >= 0; j = srNextReal(j + 1)) {
+                Instruction c = instructions.get(j);
+                int op = c.getOpcode();
+                if (c instanceof LabelInstruction) { bail = true; break; }
+                if (c instanceof Invoke && op == Opcodes.INVOKESPECIAL
+                        && "<init>".equals(((Invoke) c).getName())) {
+                    Invoke iv = (Invoke) c;
+                    if (SB_OWNER.equals(iv.getOwner()) && above == sbDescArgSlots(iv.getDesc())) {
+                        invIdx = j;
+                    } else {
+                        bail = true;
+                    }
+                    break;
+                }
+                if (c instanceof Jump || c instanceof CustomJump || c instanceof SwitchInstruction) {
+                    bail = true; break;
+                }
+                if (c instanceof Invoke) {
+                    Invoke iv = (Invoke) c;
+                    if (op == Opcodes.INVOKEDYNAMIC) { bail = true; break; }
+                    int consumed = sbDescArgSlots(iv.getDesc()) + (op == Opcodes.INVOKESTATIC ? 0 : 1);
+                    if (consumed > above) { bail = true; break; }
+                    above += sbDescRetSlots(iv.getDesc()) - consumed;
+                    continue;
+                }
+                int[] pp = sbPopPush(c);
+                if (pp == null || pp[0] > above) { bail = true; break; }
+                above += pp[1] - pp[0];
+            }
+            if (bail || invIdx < 0) {
+                continue;
+            }
+
+            // After <init> the DUP'd ref is on TOS. Walk the construction use.
+            java.util.Set<Integer> aliasStores = new java.util.HashSet<Integer>();
+            int trackedLocal = sbWalkUse(srNextReal(invIdx + 1), 0, -1, labelIndex, aliasStores);
+            if (trackedLocal == SB_WALK_BAIL) {
+                continue;
+            }
+
+            boolean ok = true;
+            if (trackedLocal >= 0) {
+                // The construction walk parked the ref in a local. Validate the
+                // slot's whole lifetime: no reads that could belong to a previous
+                // scope's value, every ALOAD walks to a legal consumption, every
+                // ASTORE to the slot is one of the recorded alias stores (a store
+                // of anything ELSE into the slot -- javac slot reuse -- bails:
+                // soundness over coverage).
+                int definingStore = Integer.MAX_VALUE;
+                for (int k : aliasStores) {
+                    definingStore = Math.min(definingStore, k);
+                }
+                for (int k = 0; k < instructions.size() && ok; k++) {
+                    Instruction u = instructions.get(k);
+                    if (!(u instanceof VarOp)) {
+                        if (u.getOpcode() == Opcodes.RET) { ok = false; }
+                        continue;
+                    }
+                    int op = u.getOpcode();
+                    int n = ((VarOp) u).getIndex();
+                    if (n != trackedLocal) {
+                        continue;
+                    }
+                    if (op == Opcodes.ALOAD) {
+                        if (k < definingStore) { ok = false; break; }
+                        int w = sbWalkUse(k + 1, 0, trackedLocal, labelIndex, aliasStores);
+                        if (w == SB_WALK_BAIL) { ok = false; break; }
+                    } else if (op == Opcodes.ASTORE || op == Opcodes.ISTORE
+                            || op == Opcodes.LSTORE || op == Opcodes.FSTORE || op == Opcodes.DSTORE) {
+                        // non-ASTOREs to the same slot index (javac slot sharing
+                        // across types) also retarget it -- treated below
+                        if (op != Opcodes.ASTORE) { ok = false; break; }
+                    } else if (op == Opcodes.RET) {
+                        ok = false; break;
+                    }
+                }
+                if (ok) {
+                    for (int k = 0; k < instructions.size() && ok; k++) {
+                        Instruction u = instructions.get(k);
+                        if (u instanceof VarOp && u.getOpcode() == Opcodes.ASTORE
+                                && ((VarOp) u).getIndex() == trackedLocal
+                                && !aliasStores.contains(k)) {
+                            ok = false; // an unrelated value retargets the slot
+                        }
+                    }
+                }
+            }
+            if (!ok) {
+                continue;
+            }
+            ti.markImplicitStackAlloc();
+
+            // When the ctor's @Fused plan has exactly one CONSTANT-length
+            // primitive-array child (the no-arg StringBuilder: value = new
+            // char[INITIAL_CAPACITY]), park the buffer on the stack too and
+            // pre-install it -- the keep-if-null ctor init then keeps it and
+            // the builder allocates NOTHING on the heap. Non-constant
+            // capacities keep the heap buffer (still correct via keep-if-null).
+            Invoke ctorInv = (Invoke) instructions.get(invIdx);
+            com.codename1.tools.translator.bytecodes.FusedConstructor fp =
+                    com.codename1.tools.translator.bytecodes.FusedConstructor.analyze(
+                            ctorInv.getOwner(), ctorInv.getDesc());
+            if (fp != null && fp.getChildren().size() == 1) {
+                com.codename1.tools.translator.bytecodes.FusedConstructor.Child ch =
+                        fp.getChildren().get(0);
+                if (ch.getUsedParamCount() == 0) {
+                    int len = -1;
+                    try {
+                        len = Integer.parseInt(ch.getLengthExpr().trim());
+                    } catch (NumberFormatException ignore) {
+                    }
+                    if (len >= 0 && len <= 4096) {
+                        ti.setStackFusedChild(len, ch.getElemCTypePublic(),
+                                ch.getArrayClassRefPublic(),
+                                ch.getCOwner() + "_" + ch.getFieldName());
+                    }
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // FUSED OBJECTS, constructor side (see FusedConstructor). For a ctor of a
     // @Fused class with a plan, replace each planned quadruple
     //   ALOAD 0 ; <len> ; NEWARRAY T ; PUTFIELD f
@@ -3324,6 +3802,14 @@ public class BytecodeMethod implements SignatureSet {
         scalarReplaceStackAllocations();
         // the pass above may have removed instructions (ALOADs folded into reads)
         instructionCount = instructions.size();
+
+        // Implicitly stack-allocate provably non-escaping StringBuilders (javac
+        // string concatenation). Runs on the raw instruction list, BEFORE the
+        // fused/init-before-publish NEW pairing -- both skip NEW sites whose
+        // getStackAllocType() is non-null, so a marked site keeps its plain
+        // out-of-line <init> call (whose keep-if-null field init then heap-
+        // allocates the buffer into the stack struct's value field).
+        stackAllocStringBuilders();
 
         // Per-object memset elimination (init-before-publish). Runs on the raw
         // (pre-fusion) instruction list -- like scalar replacement -- so the

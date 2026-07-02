@@ -57,6 +57,7 @@ public class TypeInstruction extends Instruction {
     }
 
     private boolean fusedNew = false;
+    private boolean implicitStackAlloc = false;
 
     /**
      * Marks this {@code NEW} of a {@code @Fused} class as DEFERRED: like
@@ -110,11 +111,52 @@ public class TypeInstruction extends Instruction {
             return null;
         }
         String mangled = type.replace('.', '_').replace('/', '_').replace('$', '_');
+        if(implicitStackAlloc) {
+            // per-SITE stack allocation proven by escape analysis
+            // (BytecodeMethod.stackAllocStringBuilders) -- no class annotation
+            return mangled;
+        }
         ByteCodeClass bc = Parser.getClassObject(mangled);
         if(bc != null && bc.isStackAllocatable()) {
             return mangled;
         }
         return null;
+    }
+
+    /**
+     * Marks this NEW site for stack allocation WITHOUT the class-level
+     * {@code @StackAllocate} annotation: the caller (an escape-analysis pass)
+     * has proven this particular allocation never outlives the frame.
+     */
+    public void markImplicitStackAlloc() {
+        this.implicitStackAlloc = true;
+    }
+
+    private int stackFusedLen = -1;
+    private String stackFusedElemCType;
+    private String stackFusedClassRef;
+    private String stackFusedFieldCName;
+
+    /**
+     * For an implicit stack-alloc site whose ctor's @Fused plan has ONE
+     * constant-length primitive-array child: the child buffer is placed in a
+     * method-scoped stack blob (__cn1stkbuf_<id>) and installed before the ctor
+     * runs, so the keep-if-null ctor field-init KEEPS it -- the builder then
+     * allocates nothing on the heap at all.
+     */
+    public void setStackFusedChild(int len, String elemCType, String classRef, String fieldCName) {
+        this.stackFusedLen = len;
+        this.stackFusedElemCType = elemCType;
+        this.stackFusedClassRef = classRef;
+        this.stackFusedFieldCName = fieldCName;
+    }
+
+    public int getStackFusedLen() {
+        return stackFusedLen;
+    }
+
+    public String getStackFusedElemCType() {
+        return stackFusedElemCType;
     }
 
     public void setStackAllocId(int id) {
@@ -206,7 +248,9 @@ public class TypeInstruction extends Instruction {
                     // reaches it as a root (its pointer rides the operand stack) and
                     // scans its fields, so any heap objects it references stay live.
                     // It is never freed; it simply dies when the frame unwinds.
-                    b.append("__STATIC_INITIALIZER_");
+                    b.append("if(__builtin_expect(!class__");
+                    b.append(type);
+                    b.append(".initialized, 0)) __STATIC_INITIALIZER_");
                     b.append(type);
                     b.append("(threadStateData); memset(&__cn1stk_");
                     b.append(stackAllocId);
@@ -220,7 +264,30 @@ public class TypeInstruction extends Instruction {
                     b.append(stackAllocId);
                     b.append(".__codenameOneGcMark = -1; __cn1stk_");
                     b.append(stackAllocId);
-                    b.append(".__heapPosition = -1; PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
+                    b.append(".__heapPosition = -1; ");
+                    if(stackFusedLen >= 0) {
+                        // stack-resident fused child: zero the blob (Java array
+                        // semantics), install a normal array header, point the
+                        // owner's field at it BEFORE the ctor (keep-if-null keeps it)
+                        b.append("memset(__cn1stkbuf_");
+                        b.append(stackAllocId);
+                        b.append(", 0, sizeof(__cn1stkbuf_");
+                        b.append(stackAllocId);
+                        b.append(")); __cn1stk_");
+                        b.append(stackAllocId);
+                        b.append(".");
+                        b.append(stackFusedFieldCName);
+                        b.append(" = cn1FusedInstallPrimArray((JAVA_OBJECT)__cn1stkbuf_");
+                        b.append(stackAllocId);
+                        b.append(", 0, ");
+                        b.append(stackFusedClassRef);
+                        b.append(", sizeof(");
+                        b.append(stackFusedElemCType);
+                        b.append("), ");
+                        b.append(stackFusedLen);
+                        b.append("); ");
+                    }
+                    b.append("PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
                     b.append(stackAllocId);
                     b.append("); /* NEW stack-allocated */\n");
                     break;

@@ -1189,7 +1189,7 @@ extern void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj);
 extern void* cn1MonitorDataGet(JAVA_OBJECT o);
 extern void cn1MonitorDataSet(JAVA_OBJECT o, void* data);
 extern void* cn1MonitorDataRemove(JAVA_OBJECT o);
-extern int allocationsSinceLastGC;
+extern long long allocationsSinceLastGC;
 extern long long totalAllocations;
 
 // LEVER A (perf-tier1, -DCN1_DEATOMIC_BYTES): per-object BiBOP byte accounting.
@@ -1211,13 +1211,13 @@ extern long long totalAllocations;
     JAVA_LONG __bl = (ts)->bibopBytesLocal; \
     if(__bl) { \
         atomic_fetch_add_explicit(&bibopBytesSinceGc, __bl, memory_order_relaxed); \
-        allocationsSinceLastGC += (int)__bl; \
+        allocationsSinceLastGC += __bl; \
         totalAllocations += __bl; \
         (ts)->bibopBytesLocal = 0; } } while(0)
 #else
 #define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { \
     atomic_fetch_add_explicit(&bibopBytesSinceGc, (n), memory_order_relaxed); \
-    allocationsSinceLastGC += (int)(n); totalAllocations += (n); } while(0)
+    allocationsSinceLastGC += (n); totalAllocations += (n); } while(0)
 #define CN1_BIBOP_FLUSH_BYTES(ts) do {} while(0)
 #endif
 
