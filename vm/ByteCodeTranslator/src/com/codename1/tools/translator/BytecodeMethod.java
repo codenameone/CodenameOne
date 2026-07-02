@@ -3714,12 +3714,29 @@ public class BytecodeMethod implements SignatureSet {
                             instructions.remove(iter-3);
                             instructions.remove(iter-3);
                             instructions.remove(iter-3);
-                            String code = "    {\n" +
-                                    "        JAVA_OBJECT __cn1ArrayTmp = " + arrayLiteral + ";\n" +
-                                    "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
-                                    "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
-                                    "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n" +
-                                    "    }\n";
+                            String code;
+                            if (frameless && !"OBJECT".equals(elementType)) {
+                                // Diverging-check store (frameless only): the failure
+                                // path throws and RETURNS, keeping the cold call out of
+                                // the loop body so clang can hoist array header loads.
+                                // OBJECT stores keep the macro (covariance check).
+                                String check = (current.isBoundsSafe() || isDisableNullAndArrayBoundsChecks()) ? "" :
+                                        "        CN1_ARRAY_CHECK_DIVERGE(__cn1ArrayTmp, __cn1IndexTmp, " + (returnType.isVoid() ? "" : "0") + ");\n";
+                                code = "    {\n" +
+                                        "        JAVA_OBJECT __cn1ArrayTmp = " + arrayLiteral + ";\n" +
+                                        "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
+                                        "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
+                                        check +
+                                        "        ((JAVA_ARRAY_" + elementType + "*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp] = __cn1ValueTmp;\n" +
+                                        "    }\n";
+                            } else {
+                                code = "    {\n" +
+                                        "        JAVA_OBJECT __cn1ArrayTmp = " + arrayLiteral + ";\n" +
+                                        "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
+                                        "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
+                                        "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n" +
+                                        "    }\n";
+                            }
                             instructions.add(iter-3, new CustomIntruction(code, code, dependentClasses));
                             iter = iter-3;
                             instructionCount = instructions.size();
@@ -3794,6 +3811,34 @@ public class BytecodeMethod implements SignatureSet {
                             }
                         }
                         
+                        // DIVERGING-check prelude for array-load operands (frameless
+                        // methods only): read the element via CN1_ARRAY_CHECK_DIVERGE
+                        // -- whose throw path RETURNS -- instead of the merging
+                        // cn1_array_element_* accessor whose cold call inside the loop
+                        // body blocks clang from hoisting the array header loads.
+                        String arrayCmpPrelude = null;
+                        if (frameless && rightLiteral != null && leftLiteral != null) {
+                            StringBuilder pre = new StringBuilder();
+                            String rv = returnType.isVoid() ? "" : "0";
+                            if (leftArg instanceof ArrayLoadExpression) {
+                                StringBuilder t = new StringBuilder();
+                                if (((ArrayLoadExpression) leftArg).emitDiverging("__cn1AjL", rv, t)) {
+                                    pre.append(t);
+                                    leftLiteral = "__cn1AjL";
+                                }
+                            }
+                            if (rightArg instanceof ArrayLoadExpression) {
+                                StringBuilder t = new StringBuilder();
+                                if (((ArrayLoadExpression) rightArg).emitDiverging("__cn1AjR", rv, t)) {
+                                    pre.append(t);
+                                    rightLiteral = "__cn1AjR";
+                                }
+                            }
+                            if (pre.length() > 0) {
+                                arrayCmpPrelude = pre.toString();
+                            }
+                        }
+
                         if (rightLiteral != null && leftLiteral != null) {
                             Jump jmp = (Jump)current;
                             instructions.remove(iter-2);
@@ -3825,15 +3870,21 @@ public class BytecodeMethod implements SignatureSet {
                                 default :
                                     throw new RuntimeException("Invalid operator during optimization of integer comparison");
                             }
-                                    
-                            
+
+
+                            if (arrayCmpPrelude != null) {
+                                sb.append("{\n    ").append(arrayCmpPrelude);
+                            }
                             sb.append("if (").append(leftLiteral).append(operator).append(rightLiteral).append(") /* ").append(opName).append(" CustomJump */ ");
                             CustomJump newJump = CustomJump.create(jmp, sb.toString());
                             //jmp.setCustomCompareCode(sb.toString());
+                            if (arrayCmpPrelude != null) {
+                                newJump.setCustomSuffix("    }\n");
+                            }
                             newJump.setOptimized(true);
                             instructions.add(iter, newJump);
                             instructionCount = instructions.size();
-                            
+
                         }
                         
                     }
@@ -3910,13 +3961,30 @@ public class BytecodeMethod implements SignatureSet {
                             // keep CN1_CMP_EXPR for NaN-correct ordering.
                             String directLongCmp = (leftArg instanceof ArithmeticExpression)
                                     ? ((ArithmeticExpression) leftArg).getLongCompareDirect(operator) : null;
+                            // Diverging-check prelude for a fused array-load operand
+                            // (frameless only) -- see the IF_ICMP arm above.
+                            String arrayCmpPrelude1 = null;
+                            if (directLongCmp == null && frameless && leftArg instanceof ArrayLoadExpression) {
+                                StringBuilder t = new StringBuilder();
+                                if (((ArrayLoadExpression) leftArg).emitDiverging("__cn1AjL",
+                                        returnType.isVoid() ? "" : "0", t)) {
+                                    arrayCmpPrelude1 = t.toString();
+                                    leftLiteral = "__cn1AjL";
+                                }
+                            }
                             if (directLongCmp != null) {
                                 sb.append("if (").append(directLongCmp).append(") /* ").append(opName).append(" CustomJump LCMP */ ");
                             } else {
+                                if (arrayCmpPrelude1 != null) {
+                                    sb.append("{\n    ").append(arrayCmpPrelude1);
+                                }
                                 sb.append("if (").append(leftLiteral).append(operator).append(rightArg).append(") /* ").append(opName).append(" CustomJump */ ");
                             }
                             CustomJump newJump = CustomJump.create(jmp, sb.toString());
                             //jmp.setCustomCompareCode(sb.toString());
+                            if (arrayCmpPrelude1 != null) {
+                                newJump.setCustomSuffix("    }\n");
+                            }
                             newJump.setOptimized(true);
                             instructions.add(iter, newJump);
                             instructionCount = instructions.size();

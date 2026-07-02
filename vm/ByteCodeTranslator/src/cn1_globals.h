@@ -1442,18 +1442,29 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
         #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) ((array == JAVA_NULL) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (bounds < 0 || bounds >= ((JAVA_ARRAY)array)->length) ? throwArrayIndexOutOfBoundsException_R_boolean(threadStateData, bounds) : JAVA_TRUE)
         #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) if(array == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); } \
             if(bounds < 0 || bounds >= ((JAVA_ARRAY)array)->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
-           
-    #else 
+        // DIVERGING check for FRAMELESS methods only: the failure path throws and
+        // RETURNS from the (frame-free) method instead of falling through. That
+        // keeps the throwException CALL out of every loop cycle, so clang can
+        // hoist the array header loads (data/length) that the merging accessors
+        // (cn1_array_element_*) force it to reload each iteration. Mirrors the
+        // CN1_FRAMELESS_SOE_GUARD throw-and-return pattern.
+        #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
+            if(__builtin_expect(array == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; } \
+            if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)array)->length), 0)) { THROW_ARRAY_INDEX_EXCEPTION(bounds); return retval; }
+    #else
         #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[-array_pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
         #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) ((array == JAVA_NULL) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : JAVA_TRUE)
         #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) if(array == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
+        #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
+            if(__builtin_expect(array == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; }
     #endif
 #else
     #define CHECK_NPE_TOP_OF_STACK()
     #define CHECK_NPE_AT_STACK(pos)
-    #define CHECK_ARRAY_ACCESS(array_pos, bounds) 
+    #define CHECK_ARRAY_ACCESS(array_pos, bounds)
     #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) JAVA_TRUE
-    #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) 
+    #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds)
+    #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval)
 #endif
 
 #ifdef CN1_INCLUDE_ARRAY_BOUND_CHECKS
