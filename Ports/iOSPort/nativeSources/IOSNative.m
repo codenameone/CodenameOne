@@ -885,6 +885,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
 // Material icon font. widthHeight[0/1] receive the image size in PIXELS.
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_String_int_float_int_int_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_INT color, JAVA_FLOAT size, JAVA_INT weight, JAVA_OBJECT n2)
 {
+#if TARGET_OS_WATCH
+    // watchOS marks UIScreen and UIGraphicsImageRenderer unavailable; returning
+    // 0 makes FontImage fall back to the Material icon font, same as pre-iOS-13.
+    return 0;
+#else
     if (@available(iOS 13.0, *)) {
         POOL_BEGIN();
         NSString* nameStr = toNSString(CN1_THREAD_STATE_PASS_ARG name);
@@ -962,6 +967,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
     } else {
         return 0;
     }
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)
