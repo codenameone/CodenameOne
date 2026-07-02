@@ -23,12 +23,15 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
+import com.codename1.tools.translator.ByteCodeField;
 import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
 import com.codename1.tools.translator.Util;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.objectweb.asm.Opcodes;
 
 /**
@@ -120,6 +123,104 @@ public final class InlinableConstructor {
             }
             b.append(lhs).append(" = ").append(value).append(";\n");
         }
+    }
+
+    /** The set of instance-field names this ctor writes (for the unwritten-set diff). */
+    private Set<String> writtenFieldNames() {
+        Set<String> w = new HashSet<String>();
+        for (Store s : stores) {
+            w.add(s.fieldName);
+        }
+        return w;
+    }
+
+    /**
+     * Emit per-argument C temps ({@code __ibpaN_}) in ARGUMENT ORDER and return the
+     * temp names to substitute for {@code argExprs}. Folded literal args are not
+     * always pure: one can be a call expression (a folded {@code CustomInvoke} with
+     * a non-object return) or a throwing load (GETFIELD null check, array bounds).
+     * Evaluating those at each USE site -- i.e. in ctor-body store order -- would
+     * break Java's left-to-right argument evaluation, double-evaluate an arg the
+     * ctor stores into two fields, and (on the no-memset path) run code that can
+     * reach a GC safepoint while the half-built object is visible to the
+     * conservative native-stack scan. Hoisting every arg into a temp BEFORE the
+     * allocation restores Java call semantics and keeps the alloc->publish window
+     * free of calls and throws. clang -O3 copy-propagates the temps, so pure args
+     * cost nothing.
+     */
+    public static String[] appendArgTemps(StringBuilder b, String[] argExprs, char[] argCats) {
+        String[] temps = new String[argExprs.length];
+        for (int i = 0; i < argExprs.length; i++) {
+            String t;
+            switch (argCats[i]) {
+                case 'o': t = "JAVA_OBJECT"; break;
+                case 'l': t = "JAVA_LONG"; break;
+                case 'f': t = "JAVA_FLOAT"; break;
+                case 'd': t = "JAVA_DOUBLE"; break;
+                default:  t = "JAVA_INT"; break;
+            }
+            temps[i] = "__ibpa" + i + "_";
+            b.append("    ").append(t).append(" ").append(temps[i]).append(" = ")
+             .append(argExprs[i]).append(";\n");
+        }
+        return temps;
+    }
+
+    /**
+     * INIT-BEFORE-PUBLISH codegen (memset elimination). Evaluates the ctor args
+     * into C temps (arg order -- see {@link #appendArgTemps}) when {@code argCats}
+     * is non-null, allocates {@code cType} WITHOUT the body memset, runs the
+     * inlined ctor field stores, explicitly zeroes every instance field the ctor
+     * does NOT write (reference fields -> JAVA_NULL for GC safety; primitive
+     * fields -> 0 for Java default-value semantics), THEN publishes the fully-
+     * built object into the surviving operand-stack slot and pops the
+     * receiver+args. Between the alloc and the publish the emitted C is
+     * straight-line loads/stores only -- no calls, no throws, no safepoint -- so
+     * the concurrent/conservative collector can never observe (or trace) the
+     * half-built object.
+     *
+     * @param cType        mangled class name (e.g. {@code com_bench_Bench_Node})
+     * @param argExprs     C expressions for the ctor parameters
+     * @param argCats      per-arg type category ('o','i','l','f','d') for temp
+     *                     hoisting; null when every argExpr is a pure, non-throwing
+     *                     operand-stack read ({@code SP[-k].data.x})
+     * @param survivorSlot the surviving object slot, as a POSITIVE SP offset k
+     *                     (published via {@code SP[-k].data.o})
+     * @param pop          number of stack slots to pop (receiver + on-stack args)
+     */
+    public void appendInitBeforePublish(StringBuilder b, String cType, String[] argExprs,
+                                        char[] argCats, int survivorSlot, int pop) {
+        b.append("    {\n");
+        if (argCats != null) {
+            argExprs = appendArgTemps(b, argExprs, argCats);
+        }
+        b.append("    JAVA_OBJECT __ibp = CN1_FAST_NEW_NOZERO(").append(cType).append(");\n");
+        // ctor-written fields (params / constants)
+        appendStores(b, "__ibp", argExprs);
+        // explicit zeros for the fields the ctor does NOT write (empty when the
+        // ctor writes every field). clang -O3 coalesces adjacent zero
+        // stores; padding is neither written nor GC-scanned so it is left alone.
+        Set<String> written = writtenFieldNames();
+        ByteCodeClass cls = Parser.getClassObject(cType);
+        if (cls != null) {
+            for (ByteCodeField f : cls.getAllInstanceFieldsInLayoutOrder()) {
+                if (written.contains(f.getFieldName())) {
+                    continue;
+                }
+                b.append("    ((struct obj__").append(f.getClsName()).append("*)(__ibp))->")
+                 .append(f.getClsName()).append("_").append(f.getFieldName())
+                 .append(" = ").append(f.isObjectType() ? "JAVA_NULL" : "0").append(";\n");
+            }
+        }
+        // parentCls was left 0 by cn1BibopFastAllocNoZero so that a signal-stopped
+        // thread's conservative scan skips the mid-construction object (gcMarkObject
+        // guards on parentCls==0). Set it only now, with every field written: from
+        // this store on the object is safely traceable. (The __NEW_X slow-path
+        // fallback already set it -- rewriting the same value is harmless.)
+        b.append("    __ibp->__codenameOneParentClsReference = &class__").append(cType).append(";\n");
+        // publish: the object becomes a GC root only now, fully constructed.
+        b.append("    SP[-").append(survivorSlot).append("].data.o = __ibp;\n");
+        b.append("    SP -= ").append(pop).append("; }\n");
     }
 
     /**

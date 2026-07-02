@@ -76,7 +76,14 @@ public class CustomInvoke extends Instruction {
     }
     
     public static CustomInvoke create(Invoke invoke) {
-        return new CustomInvoke(invoke.getOpcode(), invoke.getOwner(), invoke.getName(), invoke.getDesc(), invoke.isItf());
+        CustomInvoke ci = new CustomInvoke(invoke.getOpcode(), invoke.getOwner(), invoke.getName(), invoke.getDesc(), invoke.isItf());
+        // Preserve the init-before-publish marking across the literal-arg folding
+        // (memset elimination). The matching NEW is already deferred; if we lost
+        // the mark here the placeholder null would never be replaced.
+        if (invoke.isInitBeforePublish()) {
+            ci.initBeforePublish = true;
+        }
+        return ci;
     }
 
     public boolean isMethodUsed(String desc, String name) {
@@ -359,6 +366,13 @@ public class CustomInvoke extends Instruction {
     private boolean emittingInlineCtorElse = false;
     private InlinableConstructor inlineCtorPlan;
     private boolean inlineCtorAnalyzed = false;
+    // Copied from the source Invoke by create() -- this <init> allocates + builds
+    // + publishes its object (the matching NEW only pushed a placeholder).
+    private boolean initBeforePublish = false;
+
+    public boolean isInitBeforePublish() {
+        return initBeforePublish;
+    }
 
     /**
      * If this is a void INVOKESPECIAL {@code <init>} whose target ctor is inlinable
@@ -387,12 +401,31 @@ public class CustomInvoke extends Instruction {
         }
         String objExpr = targetObjectLiteral != null ? targetObjectLiteral : "SP[-1].data.o";
         String[] argExprs = literalArgs != null ? literalArgs : new String[0];
+        // FOLDED literal args are not always pure -- one can be a call expression
+        // or a throwing load. Hoist them into C temps in ARGUMENT ORDER (Java
+        // left-to-right semantics, single evaluation) before any store/alloc.
+        // See InlinableConstructor.appendArgTemps.
+        char[] argCats = new char[args.size()];
+        for (int j = 0; j < argCats.length; j++) {
+            argCats[j] = args.get(j).getQualifier();
+        }
         int pop = targetObjectLiteral != null ? 0 : 1; // only the receiver may be on-stack
+        if (initBeforePublish && targetObjectLiteral == null) {
+            // Memset elimination: allocate into a temp, build fully, THEN publish.
+            // Literal-arg ctor with the receiver on-stack (from NEW;DUP): the
+            // survivor sits one slot below the receiver (SP[-2]); pop the receiver.
+            String cType = owner.replace('/', '_').replace('$', '_');
+            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1);
+            return true;
+        }
         b.append("#ifndef CN1_DISABLE_INLINE_CTOR\n");
-        inlineCtorPlan.appendStores(b, objExpr, argExprs);
+        b.append("    {\n");
+        String[] argTemps = InlinableConstructor.appendArgTemps(b, argExprs, argCats);
+        inlineCtorPlan.appendStores(b, objExpr, argTemps);
         if (pop > 0) {
             b.append("    SP -= ").append(pop).append(";\n");
         }
+        b.append("    }\n");
         b.append("#else\n");
         emittingInlineCtorElse = true;
         appendInstruction(b);
@@ -579,20 +612,23 @@ public class CustomInvoke extends Instruction {
                 }
             }
             if (targetObjectLiteral == null) {
+                // TYPE-BEFORE-DATA discipline -- see the identical block in
+                // Invoke.appendInstruction: a signal-stopped thread must never
+                // expose (type=OBJECT, data=<primitive>) to the stack scan.
                 if(returnVal.equals("JAVA_OBJECT")) {
-                    b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
+                    b.append("    SP[-1].type = CN1_TYPE_INVALID; SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
                 } else {
                     if(returnVal.equals("JAVA_INT")) {
-                        b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
+                        b.append("    SP[-1].type = CN1_TYPE_INT; SP[-1].data.i = tmpResult; }\n");
                     } else {
                         if(returnVal.equals("JAVA_LONG")) {
-                            b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
+                            b.append("    SP[-1].type = CN1_TYPE_LONG; SP[-1].data.l = tmpResult; }\n");
                         } else {
                             if(returnVal.equals("JAVA_DOUBLE")) {
-                                b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
+                                b.append("    SP[-1].type = CN1_TYPE_DOUBLE; SP[-1].data.d = tmpResult; }\n");
                             } else {
                                 if(returnVal.equals("JAVA_FLOAT")) {
-                                    b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
+                                    b.append("    SP[-1].type = CN1_TYPE_FLOAT; SP[-1].data.f = tmpResult; }\n");
                                 } else {
                                     throw new UnsupportedOperationException("Unknown type: " + returnVal);
                                 }

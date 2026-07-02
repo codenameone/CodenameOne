@@ -38,6 +38,23 @@ public class TypeInstruction extends Instruction {
     private int stackAllocId = -1;
     private boolean scalarReplaced = false;
     private int scalarStructId = -1;
+    private boolean initBeforePublish = false;
+
+    /**
+     * Marks this {@code NEW} as INIT-BEFORE-PUBLISH (memset elimination): the
+     * allocation is DEFERRED to the matching inlined {@code <init>} site, so the
+     * NEW itself only pushes a null placeholder (keeping the operand-stack depth
+     * unchanged). The matching {@code <init>} allocates into a C temp, initializes
+     * every field, and only then publishes the object into the surviving stack
+     * slot. Set by {@code BytecodeMethod.markInitBeforePublish}.
+     */
+    public void markInitBeforePublish() {
+        this.initBeforePublish = true;
+    }
+
+    public boolean isInitBeforePublish() {
+        return initBeforePublish;
+    }
     public TypeInstruction(int opcode, String type) {
         super(opcode);
         this.type = type;
@@ -189,6 +206,15 @@ public class TypeInstruction extends Instruction {
                     b.append(".__heapPosition = -1; PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
                     b.append(stackAllocId);
                     b.append("); /* NEW stack-allocated */\n");
+                    break;
+                }
+                if(initBeforePublish) {
+                    // INIT-BEFORE-PUBLISH: allocation is deferred to the matching
+                    // inlined <init> (which builds the object in a C temp and only
+                    // then publishes it). Push a null placeholder so the operand
+                    // stack depth / DUP shape is exactly as before; the <init> writes
+                    // the real object into the surviving slot.
+                    b.append("PUSH_POINTER(JAVA_NULL); /* NEW deferred (init-before-publish) */\n");
                     break;
                 }
                 // CN1_FAST_NEW inlines the BiBOP bump fast-path at the allocation

@@ -171,6 +171,17 @@ public class Invoke extends Instruction {
     private boolean emittingInlineCtorElse = false;
     private InlinableConstructor inlineCtorPlan;
     private boolean inlineCtorAnalyzed = false;
+    // Set by BytecodeMethod.markInitBeforePublish -- this <init> allocates + builds
+    // + publishes its object (the matching NEW only pushed a placeholder).
+    private boolean initBeforePublish = false;
+
+    public void markInitBeforePublish() {
+        this.initBeforePublish = true;
+    }
+
+    public boolean isInitBeforePublish() {
+        return initBeforePublish;
+    }
 
     /**
      * Lever B for the non-folded path: a void INVOKESPECIAL {@code <init>} whose args
@@ -195,6 +206,16 @@ public class Invoke extends Instruction {
         String[] argExprs = new String[n];
         for (int j = 0; j < n; j++) {
             argExprs[j] = "SP[-" + (n - j) + "].data." + args.get(j).getQualifier();
+        }
+        if (initBeforePublish) {
+            // Memset elimination: allocate into a temp, build fully, THEN publish
+            // into the surviving object slot (SP[-(n+2)]) and pop receiver+args.
+            // argCats == null: every argExpr here is a pure SP[-k].data.x read
+            // (the args were evaluated onto the operand stack BEFORE this <init>),
+            // so no temp hoisting is needed.
+            String cType = owner.replace('/', '_').replace('$', '_');
+            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, null, n + 2, n + 1);
+            return true;
         }
         b.append("#ifndef CN1_DISABLE_INLINE_CTOR\n");
         inlineCtorPlan.appendStores(b, objExpr, argExprs);
@@ -359,20 +380,29 @@ public class Invoke extends Instruction {
                     b.append(";\n");
                 }
             }
+            // TYPE-BEFORE-DATA discipline (same as the PUSH_* macros): the slot being
+            // overwritten here is typically the stale receiver slot (type OBJECT). A
+            // thread can be signal-stopped BETWEEN these two stores (conservative-GC
+            // thread freeze lands at arbitrary instructions); if data were written
+            // first the precise stack scan would see (type=OBJECT, data=<int>) and
+            // gcMarkObject would dereference a non-pointer. Primitives set the final
+            // type first (a (INT, stale-data) window is never dereferenced); the
+            // object case goes through INVALID exactly like PUSH_POINTER (tmpResult
+            // stays alive in the C temp, covered by the conservative scan).
             if(returnVal.equals("JAVA_OBJECT")) {
-                b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
+                b.append("    SP[-1].type = CN1_TYPE_INVALID; SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
             } else {
                 if(returnVal.equals("JAVA_INT")) {
-                    b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
+                    b.append("    SP[-1].type = CN1_TYPE_INT; SP[-1].data.i = tmpResult; }\n");
                 } else {
                     if(returnVal.equals("JAVA_LONG")) {
-                        b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
+                        b.append("    SP[-1].type = CN1_TYPE_LONG; SP[-1].data.l = tmpResult; }\n");
                     } else {
                         if(returnVal.equals("JAVA_DOUBLE")) {
-                            b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
+                            b.append("    SP[-1].type = CN1_TYPE_DOUBLE; SP[-1].data.d = tmpResult; }\n");
                         } else {
                             if(returnVal.equals("JAVA_FLOAT")) {
-                                b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
+                                b.append("    SP[-1].type = CN1_TYPE_FLOAT; SP[-1].data.f = tmpResult; }\n");
                             } else {
                                 throw new UnsupportedOperationException("Unknown type: " + returnVal);
                             }

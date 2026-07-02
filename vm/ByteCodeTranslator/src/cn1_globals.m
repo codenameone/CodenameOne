@@ -638,6 +638,8 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE);
 static void cn1GcSignalStopThreads(struct ThreadLocalData* self);
 static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
+void cn1GcBuildRootSnapshots(void);
+JAVA_OBJECT cn1ConservativeResolve(void* w);
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
 // Transient ⊇ self-check (NOT in the shipping path): asserts every precise object
 // root on a paused thread's object stack is also resolved by the conservative scan.
@@ -679,17 +681,21 @@ void codenameOneGCMark() {
             }
             if(t != d) {
                 struct elementStruct* objects = t->threadObjectStack;
-                
+
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                // PHASE 3b: demand a FRESH native-stack capture this round. Only a
+                // thread that actually parks at a safepoint (CN1_GC_PARK_CAPTURE)
+                // re-raises this; a stale capture from a previous cycle is never
+                // reused (the scanner falls back to a signal-stop instead).
+                // This must run for EVERY thread -- a NATIVE (non-lightweight)
+                // thread can also park once (lowMemoryMode / max-heap backpressure)
+                // and would otherwise satisfy useCoop with that stale SP forever,
+                // silently skipping the live region below it (missed roots -> UAF).
+                t->gcParkCaptured = JAVA_FALSE;
+#endif
                 // wait for the thread to pause so we can traverse its stack but not for native threads where
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
-#ifdef CN1_CONSERVATIVE_GC_ROOTS
-                    // PHASE 3b: demand a FRESH native-stack capture this round. Only a
-                    // thread that actually parks at a safepoint (CN1_GC_PARK_CAPTURE)
-                    // re-raises this; a stale capture from a previous cycle is never
-                    // reused (the scanner falls back to a signal-stop instead).
-                    t->gcParkCaptured = JAVA_FALSE;
-#endif
                     t->threadBlockedByGC = JAVA_TRUE;
                     int totalwait = 0;
                     long now = time(0);
@@ -759,8 +765,14 @@ void codenameOneGCMark() {
                 }
                 
                 t->heapAllocationSize = 0;
-                
+
                 int stackSize = t->threadObjectStackOffset;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                // Refresh the page/extent snapshot for the VALIDATED precise scan
+                // below (also rebuilt in cn1GcScanThreadNativeStack before any
+                // signal-stop; building here first only makes it fresher).
+                cn1GcBuildRootSnapshots();
+#endif
                 for(int stackIter = 0 ; stackIter < stackSize ; stackIter++) {
                     struct elementStruct* current = &t->threadObjectStack[stackIter];
                     if (current->type < CN1_TYPE_INVALID || current->type > CN1_TYPE_PRIMITIVE) {
@@ -780,7 +792,27 @@ void codenameOneGCMark() {
 #endif
                     }
                     if(current != 0 && current->type == CN1_TYPE_OBJECT && current->data.o != JAVA_NULL) {
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                        // VALIDATED precise scan: a SIGNAL-STOPPED thread can be frozen
+                        // between the type and data stores of a push -- and since the
+                        // elementStruct fields are plain (non-volatile) stores, clang may
+                        // also reorder them -- so a type==OBJECT slot can transiently hold
+                        // a stale primitive (observed: gcMarkObject(0x4e20) from a frozen
+                        // PUSH_INT window). Resolve the word against the page/extent
+                        // snapshot exactly like a conservative root: garbage never reaches
+                        // gcMarkObject; every live PUBLISHED object resolves to itself
+                        // (objects in pages/extents newer than the snapshot are mark==-1
+                        // fresh and survive via the sweep's grace rule; immortal class
+                        // objects are skipped by gcMarkObject anyway). Liveness of a value
+                        // hidden by a torn window is covered by the conservative native
+                        // stack + register scan -- the value is still in a C temp.
+                        JAVA_OBJECT resolved = cn1ConservativeResolve((void*)current->data.o);
+                        if(resolved != JAVA_NULL) {
+                            gcMarkObject(t, resolved, JAVA_FALSE);
+                        }
+#else
                         gcMarkObject(t, current->data.o, JAVA_FALSE);
+#endif
                         //marked++;
                     }
                 }
@@ -1418,6 +1450,20 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     if(constantPoolObjects == 0 || threadStateData->nativeAllocationMode) {
         return;
     }
+    // GC SAFEPOINT (once per page-acquire): a thread allocating ONLY small BiBOP
+    // objects never reaches the legacy alloc path's pending-buffer park, so without
+    // this check the collector's while(threadActive) wait is satisfied only by
+    // monitor/sleep/native yields -- a tight allocation loop could stall the GC's
+    // root scan for a long time. Same idiom as the legacy park: capture the native
+    // stack for the cooperative conservative scan, mark inactive, wait out the GC.
+    if(threadStateData->threadBlockedByGC) {
+        CN1_GC_PARK_CAPTURE(threadStateData);
+        threadStateData->threadActive = JAVA_FALSE;
+        while(threadStateData->threadBlockedByGC) {
+            usleep((JAVA_INT)(500));
+        }
+        threadStateData->threadActive = JAVA_TRUE;
+    }
     if(!gcCurrentlyRunning &&
        atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_TRIGGER_BYTES) {
         threadStateData->nativeAllocationMode = JAVA_TRUE;
@@ -1434,12 +1480,22 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // degrades to RSS growth, never a permanent hang.
     if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_HARD_CAP &&
        get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
+        CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
         threadStateData->threadActive = JAVA_FALSE;
         int spins = 0;
         while(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_HARD_CAP &&
               get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
               spins++ < 200000) {
             usleep(50);
+        }
+        // The spin can exit via the safety cap while a mark is STILL RUNNING and the
+        // collector believes this thread is paused (it already scanned our roots).
+        // Waking mid-drain violates snapshot-at-the-beginning: we could load a grey
+        // object's field into a local and null the field -- the referent would never
+        // be marked and gets swept while reachable. Honor the GC pause before
+        // resuming, exactly like every other park in the codebase.
+        while(threadStateData->threadBlockedByGC) {
+            usleep((JAVA_INT)(500));
         }
         threadStateData->threadActive = JAVA_TRUE;
     }
@@ -1714,7 +1770,11 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             // so the dead monitored slot(s) reach cn1BibopReclaimSlot.
         }
 #endif
-        int n = atomic_load_explicit(&page->bumpIndex, memory_order_relaxed);
+        // ACQUIRE pairs with the allocator's RELEASE store of bumpIndex: for every
+        // slot i < n the header stores (parentCls / heapPosition / mark) that
+        // preceded that release are visible to this walk. Relaxed could observe a
+        // freshly-bumped slot with a garbage header.
+        int n = atomic_load_explicit(&page->bumpIndex, memory_order_acquire);
         void* fl = 0;
         int freeCount = 0;
         int liveCount = 0;
@@ -1731,7 +1791,14 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 o->__codenameOneGcMark = V;
                 liveCount++;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-                if(o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
+                // parentCls==0 => a MID-CONSTRUCTION memset-elided object (the
+                // translator publishes the class pointer only once every field is
+                // written -- see cn1BibopFastAllocNoZero). Such classes are barred
+                // from the elision if they declare a finalizer, so skipping the
+                // finalizer probe here is exact, and dereferencing would be a NULL
+                // crash (this sweep runs concurrently with the constructing thread).
+                if(o->__codenameOneParentClsReference != 0 &&
+                   o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
             } else if(m < V - 1) {
                 cn1BibopReclaimSlot(threadStateData, o);
@@ -1951,11 +2018,20 @@ void cn1GcBuildRootSnapshots(void) {
             cn1ConsPgCap = cn1ConsPgCap ? cn1ConsPgCap * 2 : 256;
             cn1ConsPg = (CN1ConsPage*)realloc(cn1ConsPg, cn1ConsPgCap * sizeof(CN1ConsPage));
         }
+        // Load bumpIndex FIRST (acquire), then the geometry. A page popped from
+        // freePool is reformatted by the acquiring MUTATOR (cn1BibopFormatPage
+        // rewrites slotSize/firstSlotOffset/slotCount) concurrently with this walk;
+        // its bumpIndex is 0 from the O(1) reclaim until the first allocation's
+        // RELEASE store raises it -- which also publishes the new geometry (same
+        // thread). So: bump==0 -> the resolver rejects every word into this page
+        // (geometry may be torn but is never used); bump>0 -> the acquire makes the
+        // matching geometry visible. Reading geometry BEFORE the acquire could pair
+        // old geometry with the new bump -> misresolved interior words.
+        cn1ConsPg[cn1ConsPgN].bumpIndex = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
         cn1ConsPg[cn1ConsPgN].base = (char*)p;
         cn1ConsPg[cn1ConsPgN].firstSlotOffset = p->firstSlotOffset;
         cn1ConsPg[cn1ConsPgN].slotSize = p->slotSize;
         cn1ConsPg[cn1ConsPgN].slotCount = p->slotCount;
-        cn1ConsPg[cn1ConsPgN].bumpIndex = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
         cn1ConsPgN++;
         p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
     }
@@ -1984,7 +2060,13 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 int idx = (int)((off - pg->firstSlotOffset) / pg->slotSize);
                 if(idx < 0 || idx >= pg->bumpIndex || idx >= pg->slotCount) return JAVA_NULL;
                 JAVA_OBJECT o = (JAVA_OBJECT)(cand + pg->firstSlotOffset + (long)idx * pg->slotSize);
-                int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_RELAXED);
+                // ACQUIRE: the slot may be getting reused RIGHT NOW by a mutator
+                // (freelist pop -> header stores -> mark=-1 RELEASE). Pairing with
+                // that release orders our subsequent __heapPosition and (in
+                // gcMarkObject) parentCls/body reads after the mark read, so a
+                // stale stack word can never resolve a half-reinitialized slot
+                // whose first 8 bytes still hold the free-list next pointer.
+                int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
                 if(m == CN1_BIBOP_FREE_MARK) return JAVA_NULL;   // on the page free-list
                 if(o->__heapPosition != CN1_BIBOP_HEAP_POS) return JAVA_NULL;
                 return o;                                        // interior -> slot base
@@ -2049,7 +2131,18 @@ static char* cn1GcStackBase(pthread_t pt, size_t* outSize) {
 // holds the GPRs on macOS/Linux), then spins until the GC publishes gcSigRelease.
 static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
     struct ThreadLocalData* t = cn1TlsSelf;
-    if(t == 0 || !t->gcSigStopRequest) return;
+    if(t == 0) return;
+    // GENERATION HANDSHAKE (strand-proof): the stop request carries a generation
+    // number > 0. We park by publishing gcSigStopped = gen and spin until the GC
+    // publishes gcSigRelease >= gen (monotonic). This survives every abandonment
+    // interleaving the old boolean protocol did not:
+    //   * StopOne times out after the handler passed the request gate -> StopOne
+    //     PRE-RELEASES the generation, so the late park exits immediately.
+    //   * The GC's bounded release wait expires while we are descheduled, and a
+    //     LATER cycle stops us again -> its release value is LARGER, so >= still
+    //     frees us; a monotonic release is never reset to 0.
+    int gen = (int)t->gcSigStopRequest;
+    if(gen == 0) return;
     volatile int marker = 0;
     void* sp = (void*)&marker;
 #if !defined(_WIN32)
@@ -2072,9 +2165,11 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
 #endif
     t->gcSigStackPointer = sp;
     __atomic_thread_fence(__ATOMIC_RELEASE);
-    t->gcSigStopped = 1;
-    while(!t->gcSigRelease) { /* async-signal-safe spin */ }
-    t->gcSigStopped = 0;
+    t->gcSigStopped = (sig_atomic_t)gen;
+    while((int)t->gcSigRelease < gen) { /* async-signal-safe spin */ }
+    // Only clear our own park marker -- a late-exiting older handler must not
+    // wipe a newer generation's park the GC is currently waiting on.
+    if((int)t->gcSigStopped == gen) t->gcSigStopped = 0;
 }
 
 void cn1GcInstallSignalHandler(void) {
@@ -2099,20 +2194,30 @@ void cn1GcInstallSignalHandler(void) {
 static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
 #if !defined(_WIN32)
     if(!t->gcPthreadValid) return 0;
-    t->gcSigRelease = 0;
-    t->gcSigStopped = 0;
+    // Next generation for this thread (only the GC thread writes it). gcSigRelease
+    // is MONOTONIC and never reset -- see the handler's generation handshake.
+    int gen = (int)t->gcSigStopGen + 1;
+    t->gcSigStopGen = (sig_atomic_t)gen;
     t->gcSigRegsLen = 0;
     t->gcSigStackPointer = 0;
     __atomic_thread_fence(__ATOMIC_RELEASE);
-    t->gcSigStopRequest = 1;
+    t->gcSigStopRequest = (sig_atomic_t)gen;
     if(pthread_kill(t->gcPthread, CN1_GC_STOP_SIGNAL) != 0) { t->gcSigStopRequest = 0; return 0; }
-    // bounded wait for the handler to park
+    // bounded wait for the handler to park THIS generation
     int spins = 0;
-    while(!t->gcSigStopped) {
+    while((int)t->gcSigStopped != gen) {
         if(++spins > 2000000) { /* ~timeout: could not stop */ break; }
         if((spins & 1023) == 0) usleep(50);
     }
-    if(!t->gcSigStopped) { t->gcSigStopRequest = 0; return 0; }
+    if((int)t->gcSigStopped != gen) {
+        // Abandon: the signal may still be pending, and the handler may ALREADY be
+        // past its request gate about to park. PRE-RELEASE the generation so that
+        // park (whenever it happens) exits immediately instead of spinning forever
+        // on a release nobody will send -- the strand bug of the boolean protocol.
+        t->gcSigRelease = (sig_atomic_t)gen;
+        t->gcSigStopRequest = 0;
+        return 0;
+    }
     return (char*)t->gcSigStackPointer;
 #else
     return 0;
@@ -2121,10 +2226,12 @@ static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
 
 static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
 #if !defined(_WIN32)
-    t->gcSigRelease = 1;
+    t->gcSigRelease = t->gcSigStopGen;   // monotonic: frees this AND any older park
     __atomic_thread_fence(__ATOMIC_RELEASE);
     int spins = 0;
     while(t->gcSigStopped) { if(++spins > 2000000) break; }
+    // Clear the request so a stale still-queued SIGUSR2 delivered after this point
+    // sees gen==0 at the handler gate and returns without parking.
     t->gcSigStopRequest = 0;
 #endif
 }

@@ -511,7 +511,7 @@ public class ByteCodeClass {
         return false;
     }
 
-    private boolean hasFinalizer() {
+    public boolean hasFinalizer() {
         for(BytecodeMethod bm : methods) {
             if(bm.isFinalizer()) {
                 return true;

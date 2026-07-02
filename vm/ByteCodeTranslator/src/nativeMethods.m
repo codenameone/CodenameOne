@@ -1372,6 +1372,14 @@ struct ThreadLocalData* getThreadLocalData() {
         memset(i->pendingHeapAllocations, 0, PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         i->heapAllocationSize = 0;
         i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
+        // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
+        // trigger/pacing accounting (CN1_BIBOP_FLUSH_BYTES adds it into the global
+        // counters); garbage here means a spurious immediate GC + hard-cap park, or
+        // a dead allocation trigger, on every new thread. nativeAllocationMode is
+        // read by the inlined alloc fast path (cn1BibopFastAlloc) before any setter
+        // runs -- garbage-nonzero silently disables the fast path for the thread.
+        i->bibopBytesLocal = 0;
+        i->nativeAllocationMode = JAVA_FALSE;
         
         i->blocks = malloc(500 * sizeof(struct TryBlock));
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -1384,6 +1392,7 @@ struct ThreadLocalData* getThreadLocalData() {
         i->gcSigStopRequest = 0;
         i->gcSigStopped = 0;
         i->gcSigRelease = 0;
+        i->gcSigStopGen = 0;
         i->gcSigStackPointer = 0;
         i->gcSigRegsLen = 0;
         cn1TlsSelf = i;

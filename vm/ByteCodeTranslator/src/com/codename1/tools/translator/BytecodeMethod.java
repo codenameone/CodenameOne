@@ -2837,6 +2837,110 @@ public class BytecodeMethod implements SignatureSet {
         }
     }
 
+    // ------------------------------------------------------------------
+    // PER-OBJECT MEMSET ELIMINATION (init-before-publish).
+    //
+    // Recognizes:   NEW X ; DUP ; <args> ; INVOKESPECIAL X.<init>
+    // where X.<init> is inlinable (InlinableConstructor -- super()==Object,
+    // body is param/const field stores only). The arg region must be free of
+    // nested NEW / other <init> / stack-shuffle / stack-store/pop / control-flow
+    // (same shape the scalar-replace matcher requires) so the receiver reliably
+    // sits at the bottom of the group and the placeholder can never leak into a
+    // local. On a match the NEW is deferred (pushes only a null placeholder) and
+    // the <init> is marked to allocate-build-publish; the body memset is elided
+    // (the object is never a GC root while half-built -- fields the ctor does
+    // not write are zeroed explicitly by the emitter).
+    // Conservative: any deviation from the shape leaves today's memset path.
+    // ------------------------------------------------------------------
+    private void markInitBeforePublish() {
+        for (int idx = 0; idx < instructions.size(); idx++) {
+            Instruction ins = instructions.get(idx);
+            if (!(ins instanceof TypeInstruction)) {
+                continue;
+            }
+            TypeInstruction ti = (TypeInstruction) ins;
+            if (ti.getOpcode() != Opcodes.NEW) {
+                continue;
+            }
+            // leave @StackAllocate / scalar-replaced NEWs to their own path
+            if (ti.isScalarReplaced() || ti.getStackAllocType() != null) {
+                continue;
+            }
+
+            // DUP must immediately follow the NEW.
+            int dupIdx = srNextReal(idx + 1);
+            if (dupIdx < 0 || instructions.get(dupIdx).getOpcode() != Opcodes.DUP) {
+                continue;
+            }
+
+            // Find the matching INVOKESPECIAL X.<init>; bail if the arg region
+            // holds a nested NEW / other <init> / stack-shuffle / control-flow.
+            int invIdx = -1;
+            boolean bail = false;
+            for (int j = srNextReal(dupIdx + 1); j >= 0; j = srNextReal(j + 1)) {
+                Instruction c = instructions.get(j);
+                int op = c.getOpcode();
+                if (c instanceof Invoke && op == Opcodes.INVOKESPECIAL
+                        && "<init>".equals(((Invoke) c).getName())) {
+                    invIdx = j;
+                    break;
+                }
+                if (c instanceof TypeInstruction && op == Opcodes.NEW) { bail = true; break; }
+                if (c instanceof Jump || c instanceof CustomJump || c instanceof SwitchInstruction
+                        || c instanceof TryCatch) { bail = true; break; }
+                switch (op) {
+                    case Opcodes.DUP: case Opcodes.DUP_X1: case Opcodes.DUP_X2:
+                    case Opcodes.DUP2: case Opcodes.DUP2_X1: case Opcodes.DUP2_X2:
+                    case Opcodes.SWAP: case Opcodes.GOTO:
+                    // ASTORE could park the (deferred, null) placeholder in a local;
+                    // POP/POP2 could drop it. Verifier-legal, javac never emits it
+                    // in the NEW;DUP idiom -- bail so the placeholder can only flow
+                    // to the DUP pair consumed by the marked <init>.
+                    case Opcodes.ASTORE: case Opcodes.POP: case Opcodes.POP2:
+                    case Opcodes.MONITORENTER: case Opcodes.MONITOREXIT:
+                    case Opcodes.ATHROW:
+                        bail = true;
+                        break;
+                    default:
+                        break;
+                }
+                if (bail) { break; }
+            }
+            if (bail || invIdx < 0) {
+                continue;
+            }
+            Invoke initInv = (Invoke) instructions.get(invIdx);
+            // the <init> owner must match the NEW'd type (else the receiver is not
+            // the freshly-NEW'd object at the bottom of the group).
+            String newType = srMangle(ti.getTypeName());
+            String initOwner = srMangle(initInv.getOwner());
+            if (!newType.equals(initOwner)) {
+                continue;
+            }
+
+            com.codename1.tools.translator.bytecodes.InlinableConstructor plan =
+                    com.codename1.tools.translator.bytecodes.InlinableConstructor.analyze(
+                            initInv.getOwner(), initInv.getDesc());
+            if (plan == null) {
+                continue; // opaque ctor -> keep the memset
+            }
+            // A finalizer-bearing class must keep the memset path: the concurrent
+            // sweep's grace branch reads parentCls->finalizerFunction on mark==-1
+            // slots to raise the page's needsReclaim flag, and a mid-construction
+            // elided object has parentCls==0 there -- its finalizer would go
+            // unrecorded (the sweep's NULL guard skips it). Trivial-ctor classes
+            // with finalize() are vanishingly rare, so nothing of value is lost.
+            ByteCodeClass newCls = Parser.getClassObject(newType);
+            if (newCls == null || newCls.hasFinalizer()) {
+                continue;
+            }
+
+            // accept: defer the NEW, mark the <init> to allocate-build-publish.
+            ti.markInitBeforePublish();
+            initInv.markInitBeforePublish();
+        }
+    }
+
     /** X extends java.lang.Object directly and every instance field is primitive (no static initializer). */
     private boolean srPrimitiveOnlyDirectObject(ByteCodeClass x) {
         ByteCodeClass base = x.getBaseClassObject();
@@ -3124,6 +3228,13 @@ public class BytecodeMethod implements SignatureSet {
         scalarReplaceStackAllocations();
         // the pass above may have removed instructions (ALOADs folded into reads)
         instructionCount = instructions.size();
+
+        // Per-object memset elimination (init-before-publish). Runs on the raw
+        // (pre-fusion) instruction list -- like scalar replacement -- so the
+        // NEW/DUP/<init> idiom is still made of explicit opcodes. Marks matched
+        // sites; the literal-arg folding below is suppressed for them so the
+        // <init> stays a plain on-stack Invoke or a receiver-on-stack CustomInvoke.
+        markInitBeforePublish();
 
         // Mark source lines whose every instruction is non-throwing/non-calling as
         // elidable (their per-line line-info store becomes a no-op in release --
