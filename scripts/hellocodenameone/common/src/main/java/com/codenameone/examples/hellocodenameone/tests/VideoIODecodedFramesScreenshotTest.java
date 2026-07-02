@@ -9,6 +9,8 @@ import com.codename1.media.VideoWriter;
 import com.codename1.media.VideoWriterBuilder;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 
 import java.io.InputStream;
@@ -18,33 +20,45 @@ import java.util.List;
 /**
  * Animation screenshot test for the {@link com.codename1.media.VideoIO} API.
  *
- * <p>It encodes a six-frame "counting" clip whose frames show the digits 1..6,
- * each on a distinct colour, then decodes the clip back into frames with the
- * video decoder and lays the SIX DECODED frames out as a 2x3 grid. A decode
- * regression is then visible: the digits stop appearing, decode in the wrong
- * order, come back the wrong colour, or blank.</p>
+ * <p>It draws six "counting" frames showing the digits 1..6 with a real font
+ * (the video-subtitle / on-frame-text use case), each on a distinct colour;
+ * encodes them into a clip; decodes the clip back with the video decoder; and
+ * lays the SIX DECODED frames out as a 2x3 grid. A decode regression is then
+ * visible: the rendered digits stop surviving the round-trip, decode in the
+ * wrong order, come back the wrong colour, or blank.</p>
  *
- * <p>The grid is composed directly in an ARGB {@code int[]} from the decoded
- * frames' pixels (via {@link VideoFrame#getARGB()}) and turned into a single
- * immutable image. That deliberately avoids drawing the decoded images onto a
- * mutable off-screen image, which does not render on the iOS Metal backend (the
- * capture came back black) and dropped the first frame under iOS GL.</p>
+ * <p>Threading matters here. iOS renders images through GL/Metal contexts that
+ * are bound to the EDT: drawing into an image and reading its pixels back must
+ * happen on the EDT. So the frames are rendered with a real font AND read to
+ * ARGB ({@link Image#getRGB()}) on the EDT; only the blocking native
+ * encode/decode runs on a worker thread, operating on the raw pixel arrays via
+ * {@link VideoWriter#writeFrame(int[], int, int, long)}. (An earlier version
+ * rendered/read the frames on the worker thread, which the GL backend tolerated
+ * flakily -- one dropped frame -- and the Metal backend did not, coming back
+ * blank.) The final grid is composed in an ARGB int[] and emitted as one
+ * immutable image, so the emit path never reads back a drawn-onto mutable image.</p>
  *
- * <p>The pixel-exact decode differs between platform codecs, so each baseline
- * ships a generous {@code .tolerance} file. Where the platform cannot encode
+ * <p>Pixel-exact decode differs between platform codecs, so each baseline ships
+ * a generous {@code .tolerance} file. Where the platform cannot encode
  * (unsupported targets, a browser without WebCodecs, a native suite whose codec
  * plugins are absent) the test reports SKIPPED and emits no screenshot. This is
- * the visual companion to {@link VideoIORoundTripTest}, which does the strict
- * programmatic verification (frame order, brightness ramp, PCM).</p>
+ * the visual companion to {@link VideoIORoundTripTest} (frame order, brightness
+ * ramp, PCM verification).</p>
  */
 public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreenshotTest {
     private static final int FRAMES = 6;
-    // Encode resolution: large enough that the digit survives lossy H.264.
+    // Encode resolution: large enough that the rendered digit survives H.264.
     private static final int VW = 192;
     private static final int VH = 144;
     private static final float FPS = 6f;
     private static final int GRID_COLS = 2;
     private static final int GRID_ROWS = 3;
+
+    /// One distinct, saturated colour per frame (red, orange, yellow, green,
+    /// blue, violet); the solid blocks survive 4:2:0 chroma subsampling cleanly.
+    private static final int[] FRAME_COLORS = {
+        0xE53935, 0xFB8C00, 0xFDD835, 0x43A047, 0x1E88E5, 0x8E24AA
+    };
 
     private VideoFrame[] decoded;
 
@@ -60,17 +74,28 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
 
     @Override
     public boolean runTest() {
-        // The encode + decode is native, blocking work; run it off the EDT.
-        // Only once the decoded frames are in hand do we show the host form and
-        // let the base class trigger buildScreenshot(). If the platform can't
-        // encode/decode we skip without emitting a screenshot.
+        // runTest() is invoked on the EDT by Cn1ssDeviceRunner. Render the source
+        // frames with a real font AND read their pixels here, on the EDT -- iOS
+        // image drawing/readback is EDT-bound (doing it on the worker made the
+        // decoded frames blank on Metal / flaky on GL). Only the blocking native
+        // encode+decode goes to the worker, operating on the raw ARGB arrays.
+        final int[][] sources = new int[FRAMES][];
+        try {
+            for (int i = 0; i < FRAMES; i++) {
+                sources[i] = makeDigitFrame(i).getRGB();
+            }
+        } catch (Throwable t) {
+            fail("source frame render failed: " + t);
+            return true;
+        }
+
         Thread worker = new Thread(new Runnable() {
             @Override
             public void run() {
                 VideoFrame[] result;
                 String skipReason;
                 try {
-                    result = encodeThenDecode();
+                    result = encodeThenDecode(sources);
                     skipReason = result == null ? "videoio-unavailable" : null;
                 } catch (Throwable t) {
                     result = null;
@@ -102,10 +127,9 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
         return true;
     }
 
-    /// Compose the six decoded frames into a 2x3 grid purely in an ARGB int[]
-    /// (nearest-neighbour scaled) and return it as a single immutable image.
-    /// No mutable-image drawing is involved, so it renders identically on every
-    /// backend (including iOS Metal).
+    /// Compose the six decoded frames into a 2x3 grid in an ARGB int[] (nearest-
+    /// neighbour scaled) and return it as one immutable image, so the emit path
+    /// never reads back a drawn-onto mutable image.
     @Override
     protected Image buildScreenshot(int width, int height) {
         int cellW = Math.max(1, width / GRID_COLS);
@@ -130,24 +154,17 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
                 int cx = (i % GRID_COLS) * cellW;
                 int cy = (i / GRID_COLS) * cellH;
                 for (int y = 0; y < cellH; y++) {
-                    int sy = y * fh / cellH;
-                    if (sy >= fh) {
-                        sy = fh - 1;
-                    }
+                    int sy = Math.min(fh - 1, y * fh / cellH);
                     int dstRow = (cy + y) * gw + cx;
                     int srcRow = sy * fw;
                     for (int x = 0; x < cellW; x++) {
-                        int sx = x * fw / cellW;
-                        if (sx >= fw) {
-                            sx = fw - 1;
-                        }
+                        int sx = Math.min(fw - 1, x * fw / cellW);
                         out[dstRow + x] = 0xff000000 | (src[srcRow + sx] & 0x00ffffff);
                     }
                 }
             }
         }
 
-        // Thin separators between cells.
         int sep = 0xff303030;
         for (int c = 1; c < GRID_COLS; c++) {
             int x = Math.min(c * cellW, gw - 1);
@@ -164,10 +181,11 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
         return Image.createImage(out, gw, gh);
     }
 
-    /// Encode the 1..6 counting clip, decode it back, and return exactly
-    /// {@link #FRAMES} decoded frames, or null when the platform cannot
-    /// encode/decode (a clean SKIP, not a failure).
-    private VideoFrame[] encodeThenDecode() throws Exception {
+    /// Encode the six pre-rendered source frames, decode them back, and return
+    /// exactly {@link #FRAMES} decoded frames, or null when the platform cannot
+    /// encode/decode (a clean SKIP, not a failure). Runs on the worker thread;
+    /// takes raw ARGB arrays so no image drawing/readback happens off the EDT.
+    private VideoFrame[] encodeThenDecode(int[][] sources) throws Exception {
         VideoIO io = VideoIO.getVideoIO();
         if (io == null || !VideoIO.isSupported()) {
             return null;
@@ -200,7 +218,7 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
                     .width(VW).height(VH).frameRate(FPS)
                     .videoCodec(videoCodec));
             for (int i = 0; i < FRAMES; i++) {
-                writer.writeFrame(makeDigitFrame(i), Math.round(i * 1000f / FPS));
+                writer.writeFrame(sources[i], VW, VH, Math.round(i * 1000f / FPS));
             }
             writer.close();
         } catch (Throwable t) {
@@ -235,7 +253,6 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
         if (frames.isEmpty()) {
             return null;
         }
-        // Resample to exactly FRAMES evenly spaced decoded frames.
         VideoFrame[] result = new VideoFrame[FRAMES];
         for (int i = 0; i < FRAMES; i++) {
             int idx = (int) Math.round((double) i * (frames.size() - 1) / (double) (FRAMES - 1));
@@ -244,66 +261,40 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
         return result;
     }
 
-    /// One distinct, saturated colour per frame so the six decoded frames are
-    /// told apart by hue (red, orange, yellow, green, blue, violet) -- the solid
-    /// colour blocks survive 4:2:0 chroma subsampling cleanly.
-    private static final int[] FRAME_COLORS = {
-        0xE53935, // 1 red
-        0xFB8C00, // 2 orange
-        0xFDD835, // 3 yellow
-        0x43A047, // 4 green
-        0x1E88E5, // 5 blue
-        0x8E24AA, // 6 violet
-    };
-
-    /// 5x7 bitmap font for the digits 1..6 (each row is 5 bits, the high bit is
-    /// the left column). Rendered straight into the frame's ARGB int[] so no
-    /// mutable-image drawing/readback is involved -- Graphics text/image drawing
-    /// onto a mutable image is unreliable on the iOS Metal backend (the digits
-    /// vanished there when drawn that way).
-    private static final int[][] DIGIT_5x7 = {
-        {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E}, // 1
-        {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F}, // 2
-        {0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E}, // 3
-        {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02}, // 4
-        {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E}, // 5
-        {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E}, // 6
-    };
-
-    /// A source frame: the digit (index+1) rendered as a large bitmap over that
-    /// frame's distinct colour, composed entirely in an ARGB int[].
+    /// A source frame: the digit (index+1) drawn with a real font over that
+    /// frame's distinct colour. Must be called on the EDT (image drawing is
+    /// EDT-bound on iOS). The glyph is rendered at the platform font size then
+    /// scaled up so it fills most of the frame and survives lossy compression.
     private static Image makeDigitFrame(int index) {
         int rgb = FRAME_COLORS[index % FRAME_COLORS.length];
         int bg = 0xff000000 | rgb;
-        int r = (rgb >> 16) & 0xff, g = (rgb >> 8) & 0xff, b = rgb & 0xff;
-        int luma = (r * 30 + g * 59 + b * 11) / 100;
-        int ink = luma < 140 ? 0xffffffff : 0xff000000;
+        Image img = Image.createImage(VW, VH, bg);
+        Graphics g = img.getGraphics();
 
-        int[] px = new int[VW * VH];
-        java.util.Arrays.fill(px, bg);
-
-        int[] glyph = DIGIT_5x7[index % DIGIT_5x7.length];
-        // Scale the 5x7 glyph up to ~3/4 of the frame, keeping its aspect ratio.
-        int gh = VH * 3 / 4;
-        int gwid = gh * 5 / 7;
-        if (gwid > VW * 3 / 4) {
-            gwid = VW * 3 / 4;
-            gh = gwid * 7 / 5;
+        int r = (rgb >> 16) & 0xff, gg2 = (rgb >> 8) & 0xff, b = rgb & 0xff;
+        int luma = (r * 30 + gg2 * 59 + b * 11) / 100;
+        int ink = luma < 140 ? 0xffffff : 0x000000;
+        String s = String.valueOf(index + 1);
+        Font font = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
+        int tw = Math.max(1, font.stringWidth(s));
+        int th = Math.max(1, font.getHeight());
+        Image glyph = Image.createImage(tw, th, bg);
+        Graphics gg = glyph.getGraphics();
+        gg.setColor(ink);
+        gg.setFont(font);
+        gg.drawString(s, 0, 0);
+        int targetH = VH * 3 / 4;
+        int targetW = Math.max(1, tw * targetH / th);
+        if (targetW > VW * 3 / 4) {
+            targetW = VW * 3 / 4;
         }
-        int ox = (VW - gwid) / 2;
-        int oy = (VH - gh) / 2;
-        for (int y = 0; y < gh; y++) {
-            int gy = Math.min(6, y * 7 / gh);
-            int bits = glyph[gy];
-            int base = (oy + y) * VW + ox;
-            for (int x = 0; x < gwid; x++) {
-                int gx = Math.min(4, x * 5 / gwid);
-                if ((bits & (1 << (4 - gx))) != 0) {
-                    px[base + x] = ink;
-                }
-            }
+        Image big = glyph.scaled(targetW, targetH);
+        g.drawImage(big, (VW - targetW) / 2, (VH - targetH) / 2);
+        if (big != glyph) {
+            big.dispose();
         }
-        return Image.createImage(px, VW, VH);
+        glyph.dispose();
+        return img;
     }
 
     private static void cleanup(String path) {
