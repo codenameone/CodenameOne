@@ -141,6 +141,37 @@ if [ "$CN1_COUNT" -eq 0 ]; then
   rf_log "FATAL: no CN1 renders delivered over WebSocket"
   exit 12
 fi
+# Tile-size parity guard: a CN1 tile whose canvas differs from its committed
+# golden means the render environment broke the golden contract (wrong screen
+# size/density clamps the 60mm tile silently and skews EVERY score -- the CI
+# emulator's 320px default screen did exactly that). Fail loudly instead.
+SIZE_MISMATCHES="$(python3 - "$WORK_DIR" "$GOLDENS_DIR" <<'PYEOF'
+import struct, sys, os
+def png_size(path):
+    with open(path, 'rb') as f:
+        head = f.read(24)
+    return struct.unpack('>II', head[16:24])
+work, goldens = sys.argv[1], sys.argv[2]
+bad = []
+for f in sorted(os.listdir(work)):
+    if not f.endswith('_cn1.png'):
+        continue
+    g = os.path.join(goldens, f[:-len('_cn1.png')] + '.png')
+    if not os.path.isfile(g):
+        continue
+    cs, gs = png_size(os.path.join(work, f)), png_size(g)
+    if cs != gs:
+        bad.append('%s: cn1 %dx%d vs golden %dx%d' % (f, cs[0], cs[1], gs[0], gs[1]))
+print('\n'.join(bad))
+PYEOF
+)"
+if [ -n "$SIZE_MISMATCHES" ]; then
+  rf_log "FATAL: CN1 tile canvas differs from the committed golden -- the render"
+  rf_log "environment violates the golden contract (480x800 @ 160dpi; see the"
+  rf_log "wm size/density override in scripts-fidelity.yml):"
+  printf '%s\n' "$SIZE_MISMATCHES" | while IFS= read -r line; do rf_log "  $line"; done
+  exit 13
+fi
 # NATIVE_COUNT is normally 0: native references are committed golden sets
 # captured locally (build-android-native-ref.sh); any same-run native renders
 # are archived for diagnostics only.

@@ -567,7 +567,9 @@ Dialog {
     color: #1d1b20;
     padding: 2mm;
     margin: 0;
-    border-radius: 6mm;
+    /* Material 3 dialog corner = 28dp (4.4mm at 160dpi); 6mm read visibly
+       rounder than the native alert. */
+    border-radius: 4.4mm;
     /* Native Material dialogs sit on an elevation shadow; box-shadow is CEF-only,
        so approximate the soft edge with a thin outline-variant stroke. 0.2mm
        rounded to <1px on Android and vanished -- 0.4mm guarantees it renders. */
@@ -775,15 +777,17 @@ PopupContent {
     MultiLine4 { color: #938f99; }
 
     /* border-radius must be restated: this dark override REPLACES the light
-       Dialog style wholesale, so omitting it dropped the 6mm card radius and
-       the dark dialog rendered as a square outlined box. */
-    Dialog { background-color: #211f26; color: #e6e0e9; border: 0.4mm solid #635f6b; border-radius: 6mm; }
-    DialogBody { background-color: #211f26; color: #e6e0e9; }
-    DialogTitle { color: #e6e0e9; background-color: #211f26; }
-    DialogBody { color: #cac4d0; }
+       Dialog style wholesale, so omitting it dropped the card radius and the
+       dark dialog rendered as a square outlined box. Native dark M3 dialogs
+       use surfaceContainerHigh (#2b2930) with NO outline (tonal elevation,
+       not a stroke -- the golden-tile diff showed the old #211f26 + 0.4mm
+       grey border as the two biggest dark-dialog gaps). */
+    Dialog { background-color: #2b2930; color: #e6e0e9; border: none; border-radius: 4.4mm; }
+    DialogBody { background-color: transparent; color: #cac4d0; }
+    DialogTitle { color: #e6e0e9; background-color: transparent; }
     DialogButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
-    DialogContentPane { background-color: #211f26; }
-    DialogCommandArea { background-color: #211f26; }
+    DialogContentPane { background-color: transparent; }
+    DialogCommandArea { background-color: transparent; }
     PopupContent { background-color: #211f26; color: #e6e0e9; }
 
     FloatingActionButton { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); }

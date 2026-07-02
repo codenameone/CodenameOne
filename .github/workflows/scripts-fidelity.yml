@@ -138,8 +138,12 @@ jobs:
         with:
           # The emulator profile is part of the android-m3 golden-set contract:
           # the committed native references (scripts/build-android-native-ref.sh)
-          # are captured LOCALLY on this same API level, so CI never generates
-          # references -- it only renders the CN1 side and diffs.
+          # are captured LOCALLY on the same API level AND the same 480x800 @
+          # 160dpi screen, so CI never generates references -- it only renders
+          # the CN1 side and diffs. The wm size/density override below is
+          # load-bearing: the runner's default AVD screen (320x640) is narrower
+          # than the 60mm tile (377px at 160dpi), which silently clamped every
+          # CN1 tile to the 320px screen width and skewed all comparator scores.
           api-level: 36
           arch: x86_64
           target: google_apis
@@ -147,7 +151,7 @@ jobs:
           # TRANSITIONAL: the first run under committed-goldens scoring re-anchors
           # the baseline (upload below); once that baseline is committed, drop
           # FIDELITY_UPDATE_BASELINE so the ratchet gates for real.
-          script: FIDELITY_UPDATE_BASELINE=1 ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
+          script: adb shell wm size 480x800 && adb shell wm density 160 && FIDELITY_UPDATE_BASELINE=1 ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
       - name: Upload fidelity artifacts
         if: always()
         uses: actions/upload-artifact@v7
