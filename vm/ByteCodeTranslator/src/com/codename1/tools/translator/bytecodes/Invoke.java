@@ -260,14 +260,14 @@ public class Invoke extends Instruction {
             inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, null, n + 2, n + 1);
             return true;
         }
-        b.append("#ifndef CN1_DISABLE_INLINE_CTOR\n");
+        b.append("\n#ifndef CN1_DISABLE_INLINE_CTOR\n"); // leading \n: the previous emission may not end a line, and a directive must start one
         inlineCtorPlan.appendStores(b, objExpr, argExprs);
         b.append("    SP -= ").append(n + 1).append(";\n");
-        b.append("#else\n");
+        b.append("\n#else\n");
         emittingInlineCtorElse = true;
         appendInstruction(b);
         emittingInlineCtorElse = false;
-        b.append("#endif\n");
+        b.append("\n#endif\n");
         return true;
     }
 

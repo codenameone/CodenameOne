@@ -441,7 +441,7 @@ public class CustomInvoke extends Instruction {
             inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1);
             return true;
         }
-        b.append("#ifndef CN1_DISABLE_INLINE_CTOR\n");
+        b.append("\n#ifndef CN1_DISABLE_INLINE_CTOR\n"); // leading \n: the previous emission may not end a line, and a directive must start one
         b.append("    {\n");
         String[] argTemps = InlinableConstructor.appendArgTemps(b, argExprs, argCats);
         inlineCtorPlan.appendStores(b, objExpr, argTemps);
@@ -449,11 +449,11 @@ public class CustomInvoke extends Instruction {
             b.append("    SP -= ").append(pop).append(";\n");
         }
         b.append("    }\n");
-        b.append("#else\n");
+        b.append("\n#else\n");
         emittingInlineCtorElse = true;
         appendInstruction(b);
         emittingInlineCtorElse = false;
-        b.append("#endif\n");
+        b.append("\n#endif\n");
         return true;
     }
 
