@@ -1536,27 +1536,8 @@ public class Tabs extends Container {
         g.setAlpha(oldAlpha);
     }
 
-    /// Position easing for the selection bubble: an EVEN ease-in-out travel that reaches
-    /// the target around t=0.78, then a small damped OVERSHOOT that settles by t=1 (the
-    /// "stop" bounce). Not front-loaded like a plain ease-out-back. t in 0..1.
-    private static float springEaseTabs(float t) {
-        if (t <= 0f) return 0f;
-        if (t >= 1f) return 1f;
-        float travelEnd = 0.78f;
-        if (t <= travelEnd) {
-            float u = t / travelEnd;
-            return u * u * (3 - 2 * u);                 // smoothstep travel to 1.0
-        }
-        float u = (t - travelEnd) / (1f - travelEnd);   // 0..1 over the settle tail
-        return 1f + 0.09f * (float) (Math.sin(u * Math.PI) * (1f - u));   // overshoot then settle
-    }
-
-    /// smoothstep(a,b,x): 0 below a, 1 above b, smooth between. `a` may be &gt; `b`.
-    private static float lensSmooth(float a, float b, float x) {
-        float t = (x - a) / (b - a);
-        t = t < 0 ? 0 : (t > 1 ? 1 : t);
-        return t * t * (3 - 2 * t);
-    }
+    // Position easing (springEaseTabs) + smoothstep (lensSmooth) now live in the pure
+    // TabSelectionMorph model (springEase / smooth) so the morph math is unit-testable.
 
     /// Reads a float-valued theme constant (stored as a quoted string), falling back
     /// to the default when absent or malformed.
@@ -1691,129 +1672,81 @@ public class Tabs extends Container {
         // a large inset leaves a bright bar-frost band above/below it (reads as a
         // separate inset pill / "ring"). Tunable via tabSelInsetMm (default a hair).
         int inset = selectionCapsuleInsetPx();
-        int x;
-        int w;
-        // Liquid-morph envelopes: `bump` (0 at ends, 1 mid-travel) drives the drop
-        // bulging past the cell -- elongating toward the travel direction and growing
-        // TALLER (a rounded blob) mid-flight, so it "overflows" then settles. `vScale`
-        // carries the grow + a small settle OVERSHOOT into the lens height (the X
-        // position bezier already overshoots), giving the dual-axis settling bounce.
-        float flight = 0f;          // 0 settled, ~1 while the bubble is travelling
-        float vScale = 1f;
-        int liftPx = 0;
-        float grow = 0f;            // brief whole-bar swell pulse at the very start
-        // morphTestValue (>=0) renders a fixed LINEAR-TIME progress (0..100) for the probe.
-        boolean animating = morphTestValue >= 0 || indicatorAnimMotion != null;
-        if (animating) {
-            int v = morphTestValue >= 0 ? morphTestValue : indicatorAnimMotion.getValue();
-            float tp = (v < 0 ? 0 : (v > 100 ? 100 : v)) / 100f;        // linear TIME 0..1
-            float pos = springEaseTabs(tp);                            // ease-out-back position
-            x = indicatorFromX + (int) ((indicatorToX - indicatorFromX) * pos);
-            w = indicatorFromW + (int) ((indicatorToW - indicatorFromW) * pos);
-            // The bubble is TALL the whole time it travels, then at the STOP it compresses
-            // (the deceleration squeezes its width and pushes it even taller) and settles.
-            flight = lensSmooth(0f, 0.12f, tp) * (1f - lensSmooth(0.64f, 0.86f, tp));
-            float moving = lensSmooth(0f, 0.08f, tp) * (1f - lensSmooth(0.88f, 1f, tp));
-            // Smooth settle bump peaking ~tp .80. A (1-d^2)^2 polynomial, NOT a Gaussian:
-            // ParparVM does not emit a declaration for java.lang.Math.exp here (it is not
-            // otherwise reachable in a minimal app) and Xcode 26 makes the resulting
-            // implicit-declaration a hard error. This shape matches the old exp bump.
-            float sd = (tp - 0.80f) / 0.14f;
-            float squash = (sd > -1f && sd < 1f) ? (1f - sd * sd) * (1f - sd * sd) : 0f;
-            // ELONGATE horizontally while moving (a long droplet), then COMPRESS the width
-            // at the stop -- but it stays elongated. Vertically it grows tall + the squash.
-            w = (int) (w * (1f + moving * (floatConst("tabSelStretchPct", 32f) / 100f)));
-            w = (int) (w * (1f - squash * (floatConst("tabSelSquashWPct", 18f) / 100f)));
-            vScale = 1f + flight * (floatConst("tabSelGrowPct", 18f) / 100f)
-                    + squash * (floatConst("tabSelSquashHPct", 24f) / 100f);
-            liftPx = (int) (flight * Display.getInstance().convertToPixels(floatConst("tabSelLiftMm", 0.5f)));
-            // Brief whole-bar SWELL at the very start (native frames 3-5): the whole tab
-            // bar + its icons inflate as the interaction begins, then settle. Peaks early
-            // (~tp .12) and is gone by ~tp .42, before the drop reaches its target.
-            grow = lensSmooth(0f, 0.10f, tp) * (1f - lensSmooth(0.20f, 0.42f, tp));
-        } else {
-            int[] cb = new int[2];
-            capsuleCellBounds(activeComponent, inset, cb);
-            x = cb[0];
-            w = cb[1];
-        }
-        // Span the OUTER pill height (not the padded inner box) so the capsule reaches
-        // the pill edge like native -- using getInnerY()/Height() leaves the bar's
-        // padding as a bright frost band above/below the capsule (the visible "ring").
+        // Bar vertical geometry: span the OUTER pill height (not the padded inner box) so
+        // the capsule reaches the pill edge like native -- using getInnerY()/Height()
+        // leaves the bar's padding as a bright frost band above/below (the visible "ring").
         int padTopPx = tabsContainer.getInnerY() - tabsContainer.getY();
         int padBotPx = (tabsContainer.getY() + tabsContainer.getHeight())
                 - (tabsContainer.getInnerY() + tabsContainer.getInnerHeight());
-        int capX = tabsContainer.getInnerX() + x;
-        int capY = tabsContainer.getInnerY() - padTopPx + inset;
-        int capH = tabsContainer.getInnerHeight() + padTopPx + padBotPx - 2 * inset;
-        // The native bubble is COMPACT -- narrower than the full cell -- so the glass
-        // droplet reads clearly. Shrink the width around the cell centre (tunable).
-        int bubblePct = getUIManager().getThemeConstant("tabSelBubbleWidthPct", 72);
-        int bubbleW = w * bubblePct / 100;
-        capX += (w - bubbleW) / 2;
-        w = bubbleW;
-        if (w <= 0 || capH <= 0) {
+        int innerX = tabsContainer.getInnerX();
+        int capYBase = tabsContainer.getInnerY() - padTopPx + inset;
+        int capHBase = tabsContainer.getInnerHeight() + padTopPx + padBotPx - 2 * inset;
+        if (capHBase <= 0) {
             return;
         }
+
+        // Source/target cell bounds (inner-x space). morphTestValue (>=0) renders a fixed
+        // LINEAR-TIME progress for the probe; otherwise the live motion drives t. When not
+        // animating we settle by asking the model for t=1 with from==to==the active cell.
+        int fromX;
+        int fromW;
+        int toX;
+        int toW;
+        float t;
+        if (morphTestValue >= 0 || indicatorAnimMotion != null) {
+            int v = morphTestValue >= 0 ? morphTestValue : indicatorAnimMotion.getValue();
+            t = (v < 0 ? 0 : (v > 100 ? 100 : v)) / 100f;
+            fromX = indicatorFromX;
+            fromW = indicatorFromW;
+            toX = indicatorToX;
+            toW = indicatorToW;
+        } else {
+            int[] cb = new int[2];
+            capsuleCellBounds(activeComponent, inset, cb);
+            fromX = cb[0];
+            fromW = cb[1];
+            toX = cb[0];
+            toW = cb[1];
+            t = 1f;
+        }
+
+        // Whole-bar extent (paint space) for the grow pass.
+        int nTabs = tabsContainer.getComponentCount();
+        int[] cb0 = new int[2];
+        int[] cbN = new int[2];
+        capsuleCellBounds(0, inset, cb0);
+        capsuleCellBounds(nTabs - 1, inset, cbN);
+        int barLeftX = innerX + cb0[0];
+        int barRightX = innerX + cbN[0] + cbN[1];
+
+        // The whole frame -- pill rect, lens rect + params, bar-grow rect -- is produced by
+        // the pure, unit-tested TabSelectionMorph model so the motion can be validated
+        // deterministically (see TabSelectionMorphTest / the fidelity animation-frame probe).
+        TabSelectionMorph m = TabSelectionMorph.compute(t, fromX, fromW, toX, toW,
+                innerX, capYBase, capHBase, barLeftX, barRightX, morphTokens());
+        if (m.capW <= 0 || m.capH <= 0) {
+            return;
+        }
+
         // Dark/light by the bar's fg luma -- the TabsContainer fg is distinguishable
         // (text-secondary), unlike the accent-blue selected-tab fg.
         int fg = tabsContainer.getStyle().getFgColor();
         int fgLuma = (int) (0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff));
         boolean dark = fgLuma > 128;
         if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
-            // iOS 26 selection DROP. Two layers: (1) a subtle grey selection PILL at
-            // bar height (the "selected cell" background) and (2) a glass LENS painted
-            // OVER the bar + (dark) glyphs that magnifies + chromatically aberrates +
+            // iOS 26 selection DROP: a subtle grey selection PILL at bar height plus a glass
+            // LENS painted OVER the (dark) glyphs that magnifies + chromatically aberrates +
             // dark->accent tints the content beneath, so the blue exists ONLY inside the
-            // drop. The lens uses a UNIFORM magnify with a rim falloff (a glass slab, not
-            // a fisheye) and a SHARP luminance key (grey pill stays grey) -- both in the
-            // per-port lens op. Distortion scales with the travel bump; the drop grows
-            // into a rounded blob mid-flight, overflowing the bar, then settles.
-            //
-            // WHOLE-BAR GROW: a brief swell of the entire bar at the very start, done as
-            // a uniform magnify pass over the whole bar region via the SAME lens op with
-            // tintStrength 0 + aberration 0 (so it is a clean zoom with no blue tint /
-            // glass cues -- magnify ~1.05 keeps glassAmt at 0). The region is expanded by
-            // a margin so the bar sits in the lens dome's flat centre and grows OUTWARD
-            // into the margin rather than only swelling internally. Screen-space, so it
-            // ports to Metal identically (no graphics transform, which the native lens op
-            // would ignore anyway). Runs only during the early grow pulse.
-            float barGrowPct = floatConst("tabSelBarGrowPct", 0f);
-            if (grow > 0.01f && barGrowPct > 0f) {
-                int nTabs = tabsContainer.getComponentCount();
-                int[] cb0 = new int[2];
-                int[] cbN = new int[2];
-                capsuleCellBounds(0, inset, cb0);
-                capsuleCellBounds(nTabs - 1, inset, cbN);
-                int barLeft = tabsContainer.getInnerX() + cb0[0];
-                int barRight = tabsContainer.getInnerX() + cbN[0] + cbN[1];
-                int barW0 = barRight - barLeft;
-                float growMag = 1f + grow * (barGrowPct / 100f);
-                int mgx = (int) (barW0 * 0.18f);
-                int mgy = (int) (capH * 0.18f);
-                g.lensRegion(barLeft - mgx, capY - mgy, barW0 + 2 * mgx, capH + 2 * mgy,
-                        -1f, growMag, 0f, 0x000000, 0f);
+            // drop. A brief WHOLE-BAR GROW (uniform magnify, no tint) swells the bar at the
+            // very start. All rects/params come from the morph model above.
+            if (m.barGrow) {
+                g.lensRegion(m.barGrowX, m.barGrowY, m.barGrowW, m.barGrowH,
+                        -1f, m.barGrowMag, 0f, 0x000000, 0f);
             }
-            drawSelectionPill(g, capX, capY, w, capH, flight);
-            float peakMag = getUIManager().getThemeConstant("tabSelLensMagnifyPct", 166) / 100f;
-            float restMag = getUIManager().getThemeConstant("tabSelLensRestMagPct", 114) / 100f;
-            float peakAb = getUIManager().getThemeConstant("tabSelLensAberrationPct", 4) / 100f;
-            float magnify = restMag + (peakMag - restMag) * flight;
-            float aberration = peakAb * flight;
-            float tintStrength = getUIManager().getThemeConstant("tabSelLensTintPct", 100) / 100f;
-            int overflowPct = getUIManager().getThemeConstant("tabSelLensOverflowPct", 22);
-            // Accent supplied by the lens (the glyphs paint dark); read from a theme
-            // constant so it is independent of the now-dark tab fg. Default iOS blue.
+            drawSelectionPill(g, m.capX, m.capY, m.capW, m.capH, m.flight);
+            // Accent supplied by the lens (the glyphs paint dark); default iOS blue.
             int tint = getUIManager().getThemeConstant("tabSelLensTintColorInt", 0x0a84ff);
-            int baseLensH = capH + capH * overflowPct / 100;
-            int lensH = (int) (baseLensH * vScale);            // grow/overshoot mid-morph
-            // CENTRE the drop on the bar with only a MODEST overflow so it bulges slightly
-            // both ways like native (a rounded capsule a hair taller than the bar), not a
-            // tall empty bubble. Keep the overflow small enough that the slight below-bar
-            // overhang does not become a hollow white bulge. downBias nudges it down a hair.
-            int downBias = Display.getInstance().convertToPixels(floatConst("tabSelDownBiasMm", 0f));
-            int lensY = capY + capH / 2 - lensH / 2 - liftPx + downBias;
-            g.lensRegion(capX, lensY, w, lensH, -1f, magnify, aberration, tint, tintStrength);
+            g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify, m.aberration, tint, m.tintStrength);
             return;
         }
         // Non-glass platforms: a translucent rounded capsule.
@@ -1823,10 +1756,30 @@ public class Tabs extends Container {
         g.setAntiAliased(true);
         g.setColor(dark ? 0x8e8e93 : 0xffffff);
         g.setAlpha(dark ? 120 : 205);
-        g.fillRoundRect(capX, capY, w, capH, capH, capH);
+        g.fillRoundRect(m.capX, m.capY, m.capW, m.capH, m.capH, m.capH);
         g.setAntiAliased(aa);
         g.setColor(oldC);
         g.setAlpha(oldA);
+    }
+
+    /// Resolves the selection-morph theme constants into a TabSelectionMorph.Tokens.
+    /// Kept separate from the pure model so the model has no theme/Display dependency.
+    private TabSelectionMorph.Tokens morphTokens() {
+        TabSelectionMorph.Tokens tk = new TabSelectionMorph.Tokens();
+        tk.stretch = floatConst("tabSelStretchPct", 32f) / 100f;
+        tk.squashW = floatConst("tabSelSquashWPct", 18f) / 100f;
+        tk.grow = floatConst("tabSelGrowPct", 18f) / 100f;
+        tk.squashH = floatConst("tabSelSquashHPct", 24f) / 100f;
+        tk.liftPx = Display.getInstance().convertToPixels(floatConst("tabSelLiftMm", 0.5f));
+        tk.bubbleWidthPct = getUIManager().getThemeConstant("tabSelBubbleWidthPct", 72);
+        tk.overflowPct = getUIManager().getThemeConstant("tabSelLensOverflowPct", 22);
+        tk.downBiasPx = Display.getInstance().convertToPixels(floatConst("tabSelDownBiasMm", 0f));
+        tk.restMag = getUIManager().getThemeConstant("tabSelLensRestMagPct", 114) / 100f;
+        tk.peakMag = getUIManager().getThemeConstant("tabSelLensMagnifyPct", 166) / 100f;
+        tk.peakAb = getUIManager().getThemeConstant("tabSelLensAberrationPct", 4) / 100f;
+        tk.tintStrength = getUIManager().getThemeConstant("tabSelLensTintPct", 100) / 100f;
+        tk.barGrowPct = getUIManager().getThemeConstant("tabSelBarGrowPct", 0);
+        return tk;
     }
 
     /// Draws the animated indicator inside `tabsContainer`'s paint flow. Called
