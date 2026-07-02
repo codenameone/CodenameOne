@@ -1,7 +1,7 @@
 [[media-and-audio-section]]
 = Media and Audio
 
-[[mediamanager-section]]
+[[media-audio-mediamanager-section]]
 == MediaManager and MediaPlayer
 
 // HTML_ONLY_START
