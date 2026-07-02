@@ -231,12 +231,28 @@ public final class Cn1WidgetRenderer {
             // tab items; the first is selected (blue), the rest grey. NOT a
             // Material pill strip.
             Tabs tabs = new Tabs(Component.TOP);
-            // The material icons don't auto-tint to the tab's fg, so build them with
-            // explicit colours: the selected item (Featured) is blue, the rest grey,
-            // matching the native UITabBar tint.
-            // The glass pill mutes the selected tint, so start from a more vivid blue.
-            int selColor = dark ? 0x409cff : 0x0a84ff;
-            int unselColor = dark ? 0xebebf5 : 0x3c3c43;
+            // The material icons don't auto-tint to the tab's fg, so build them
+            // with explicit colours -- but the colours are PER PLATFORM, not a
+            // shared constant. On iOS the vivid blues are part of the lens
+            // pipeline (the theme's SelectedTab fg is deliberately dark; the GPU
+            // lens drop colours it blue, and the glass pill mutes the tint so
+            // the icon starts more vivid than the final look). On Android the
+            // tabs must render the THEME's own Material colours (purple
+            // selected / onSurfaceVariant unselected) exactly as the theme
+            // defines them -- hardcoding the iOS blues here made the Android
+            // tile a fake that could never match the honest M3 reference.
+            boolean iosTabs = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
+            int selColor;
+            int unselColor;
+            if (iosTabs) {
+                selColor = dark ? 0x409cff : 0x0a84ff;
+                unselColor = dark ? 0xebebf5 : 0x3c3c43;
+            } else {
+                selColor = com.codename1.ui.plaf.UIManager.getInstance()
+                        .getComponentStyle("SelectedTab").getFgColor();
+                unselColor = com.codename1.ui.plaf.UIManager.getInstance()
+                        .getComponentStyle("UnselectedTab").getFgColor();
+            }
             com.codename1.ui.plaf.Style selS = new com.codename1.ui.plaf.Style();
             selS.setFgColor(selColor);
             selS.setBgTransparency(0);

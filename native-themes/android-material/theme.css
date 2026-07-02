@@ -612,7 +612,11 @@ FloatingActionButton {
     /* Material 3 FAB is a rounded SQUARE (squircle, ~28% radius), not a circle. */
     border-radius: 2.4mm;
 }
-FloatingActionButton.pressed { background-color: var(--accent-container-color, #eaddff); }
+/* Pressed = the M3 state layer: onPrimaryContainer at 12% composited over the
+   container fill (#eaddff + #21005d@12% = #d2c2ec). Restating the container
+   colour here made pressed a byte-identical no-op the fidelity suite flagged
+   (CN1 pressed tile == normal tile while the native reference darkens). */
+FloatingActionButton.pressed { background-color: #d2c2ec; }
 
 /* ChatView (com.codename1.components.ChatView) -- mirrors the iOS modern
    layout but uses Material 3 surfaces. USER bubble = primary container,
@@ -783,7 +787,8 @@ PopupContent {
     PopupContent { background-color: #211f26; color: #e6e0e9; }
 
     FloatingActionButton { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); }
-    FloatingActionButton.pressed { background-color: var(--accent-container-color-dark, #4f378b); }
+    /* #4f378b + #eaddff@12% -- the dark pressed state layer lightens. */
+    FloatingActionButton.pressed { background-color: #624b99; }
 
     ChatView { background-color: #141218; }
     ChatViewMessages { background-color: #141218; }

@@ -135,8 +135,12 @@ public class MainActivity extends Activity {
         }
         final Job job = jobs.get(jobIndex++);
         float dpi = getResources().getDisplayMetrics().densityDpi;
-        final int w = Math.max(1, Math.round(job.spec.wMM * dpi / 25.4f));
-        final int h = Math.max(1, Math.round(job.spec.hMM * dpi / 25.4f));
+        // TRUNCATE, exactly like CN1's AndroidImplementation.convertToPixels
+        // ((int) (mm / 25.4f * ppi)) -- Math.round made every tile 1px larger
+        // than the CN1 side (378x101 vs 377x100) and the size mismatch alone
+        // dragged the comparator scores down across the board.
+        final int w = Math.max(1, (int) (job.spec.wMM * dpi / 25.4f));
+        final int h = Math.max(1, (int) (job.spec.hMM * dpi / 25.4f));
         View tile = RefWidgets.buildTile(this, job.spec.kind, job.state, job.appearance,
                 job.spec.text, w, h);
         if (tile == null) {

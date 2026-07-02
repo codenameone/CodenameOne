@@ -103,16 +103,12 @@ final class RefWidgets {
             p.setProgress(50);
             view = p;
         } else if ("material_tablayout".equals(kind)) {
-            boolean dark = "dark".equals(appearance);
-            int selColor = dark ? 0xff409cff : 0xff0a84ff;
-            int unselColor = dark ? 0xffebebf5 : 0xff3c3c43;
+            // An HONEST Material 3 reference: default Theme_Material3 styling
+            // (primary-coloured indicator + selected tab, onSurfaceVariant
+            // unselected). Never re-tint this to another platform's palette --
+            // a doctored reference can't catch the CN1 theme drifting.
             TabLayout tabs = new TabLayout(ctx);
             tabs.setTabMode(TabLayout.MODE_FIXED);
-            tabs.setSelectedTabIndicatorColor(selColor);
-            tabs.setTabTextColors(unselColor, selColor);
-            int[][] tintStates = new int[][]{ new int[]{android.R.attr.state_selected}, new int[0] };
-            tabs.setTabIconTint(new android.content.res.ColorStateList(
-                    tintStates, new int[]{selColor, unselColor}));
             tabs.addTab(tabs.newTab().setText("Featured").setIcon(materialGlyph(ctx, '\uE838', 4.6f)));
             tabs.addTab(tabs.newTab().setText("Search").setIcon(materialGlyph(ctx, '\uE8B6', 4.6f)));
             tabs.addTab(tabs.newTab().setText("More").setIcon(materialGlyph(ctx, '\uE5D3', 4.6f)));
