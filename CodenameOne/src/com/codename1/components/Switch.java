@@ -805,6 +805,13 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /// to clear and resume normal behaviour.
     public void setMorphTestProgress(float progress) {
         morphTestProgress = progress > 1 ? 1 : progress;
+        if (morphTestProgress < 0) {
+            // Clearing must also undo the drag state the probe forced during
+            // paint, or the thumb keeps rendering the last frozen frame until a
+            // real pointer interaction resets it.
+            dragged = false;
+            deltaX = 0;
+        }
         repaint();
     }
 

@@ -62,6 +62,7 @@ public class MorphFrameValidator {
         Path goldensDir = null;
         Path outJson = null;
         Path stripDir = null;
+        Path specPath = null;
         boolean seedMissing = false;
         int maxChannelDelta = 8;
         double maxMismatchPercent = 0.5d;
@@ -72,6 +73,7 @@ public class MorphFrameValidator {
                 case "--goldens-dir" -> goldensDir = Path.of(args[++i]);
                 case "--out-json" -> outJson = Path.of(args[++i]);
                 case "--strip-dir" -> stripDir = Path.of(args[++i]);
+                case "--spec" -> specPath = Path.of(args[++i]);
                 case "--seed-missing" -> seedMissing = true;
                 case "--max-channel-delta" -> maxChannelDelta = Integer.parseInt(args[++i]);
                 case "--max-mismatch-percent" -> maxMismatchPercent = Double.parseDouble(args[++i]);
@@ -87,6 +89,10 @@ public class MorphFrameValidator {
             System.exit(EXIT_USAGE);
             return;
         }
+        // The DECLARED frame set per component id (fidelity-tests.yaml `frames:`),
+        // so a capture that died mid-sequence cannot validate green on just the
+        // frames it happened to deliver.
+        Map<String, List<Integer>> declaredFrames = loadDeclaredFrames(specPath);
 
         // Group delivered frames by (id, appearance), ordered by progress value.
         Map<String, TreeMap<Integer, Path>> groups = new TreeMap<>();
@@ -121,34 +127,25 @@ public class MorphFrameValidator {
                 images.put(f.getKey(), ImageIO.read(f.getValue().toFile()));
             }
 
-            // ---- 1. golden regression ----
-            List<String> seeded = new ArrayList<>();
-            if (goldensDir != null) {
-                Files.createDirectories(goldensDir);
-                for (Map.Entry<Integer, Path> f : frames.entrySet()) {
-                    String goldenName = f.getValue().getFileName().toString().replace("_cn1.png", ".png");
-                    Path golden = goldensDir.resolve(goldenName);
-                    if (!Files.isRegularFile(golden)) {
-                        if (seedMissing) {
-                            Files.copy(f.getValue(), golden);
-                            seeded.add(goldenName);
-                            System.out.println("[morph]   SEEDED golden " + goldenName + " (commit it!)");
-                        } else {
-                            goldenFailures.add(name + " t" + f.getKey() + ": golden missing (" + golden + ")");
-                        }
-                        continue;
-                    }
-                    BufferedImage g = ImageIO.read(golden.toFile());
-                    double mismatch = mismatchPercent(g, images.get(f.getKey()), maxChannelDelta);
-                    if (mismatch > maxMismatchPercent) {
-                        goldenFailures.add(String.format(
-                                "%s t%d: %.3f%% of pixels drifted beyond delta %d (allowed %.3f%%)",
-                                name, f.getKey(), mismatch, maxChannelDelta, maxMismatchPercent));
+            // ---- 1. motion properties (validated BEFORE goldens, so a broken
+            //         sequence can never seed goldens) ----
+            List<String> groupPropertyFailures = new ArrayList<>();
+            // Every DECLARED frame must have been delivered: the device runner
+            // isolates per-frame failures, so a capture that died mid-sequence
+            // would otherwise validate green on the survivors.
+            String componentId = name.substring(0, name.lastIndexOf('_'));
+            List<Integer> declared = declaredFrames.get(componentId);
+            if (declared != null) {
+                for (Integer expected : declared) {
+                    if (!images.containsKey(expected)) {
+                        groupPropertyFailures.add(name + ": declared frame t" + expected
+                                + " was not delivered (capture died or the probe failed)");
                     }
                 }
+            } else if (specPath != null) {
+                groupPropertyFailures.add(name + ": component '" + componentId
+                        + "' has no frames declaration in the spec");
             }
-
-            // ---- 2. motion properties ----
             List<Integer> ts = new ArrayList<>(images.keySet());
             Map<Integer, Double> changedFraction = new LinkedHashMap<>();
             Map<Integer, Integer> rightmost = new LinkedHashMap<>();
@@ -171,21 +168,22 @@ public class MorphFrameValidator {
                 rightmost.put(t, rx);
             }
             if (ts.size() < 3) {
-                propertyFailures.add(name + ": only " + ts.size() + " frame(s) delivered; need at least 3");
+                groupPropertyFailures.add(name + ": only " + ts.size() + " frame(s) delivered; need at least 3");
             } else {
                 int tFirst = ts.get(0);
                 int tLast = ts.get(ts.size() - 1);
                 if (changedFraction.get(tLast) < DISTINCT_MIN_FRACTION) {
-                    propertyFailures.add(name + ": selection did not move (t" + tFirst + " and t" + tLast
+                    groupPropertyFailures.add(name + ": selection did not move (t" + tFirst + " and t" + tLast
                             + " are visually identical)");
                 }
-                // Travel frames pairwise distinct: a frozen/stuck morph renders the
-                // same pixels for different progress values.
-                for (int i = 1; i < ts.size() - 1; i++) {
+                // EVERY adjacent frame pair must be distinct: a frozen/stuck morph
+                // renders the same pixels for different progress values (including
+                // one that never starts, so the first pair is checked too).
+                for (int i = 0; i < ts.size() - 1; i++) {
                     int a = ts.get(i);
                     int b = ts.get(i + 1);
                     if (mismatchPercent(images.get(a), images.get(b), CHANGE_TAU) < DISTINCT_MIN_FRACTION * 100) {
-                        propertyFailures.add(name + ": frames t" + a + " and t" + b
+                        groupPropertyFailures.add(name + ": frames t" + a + " and t" + b
                                 + " are identical -- the morph is stuck between these progress values");
                     }
                 }
@@ -195,23 +193,67 @@ public class MorphFrameValidator {
                 // the allowance scales with the tile (10% of its width) with
                 // --overshoot-px as a floor. A genuinely broken settle (snapping back
                 // toward the source tab) is a large fraction of the tile and still fails.
+                // The settle window opens at t=86: the spring's overshoot peaks near
+                // t~0.87 (travelEnd 0.78 + peak of sin(u*pi)*(1-u)), so pull-back is
+                // legitimate physics from there on.
                 int settleAllowancePx = Math.max(overshootPx, base.getWidth() / 10);
                 int maxSeen = -1;
                 for (int i = 1; i < ts.size(); i++) {
                     int t = ts.get(i);
                     int rx = rightmost.get(t);
-                    boolean settleWindow = t >= 90;
+                    boolean settleWindow = t >= 86;
                     if (rx + 2 < maxSeen && !settleWindow) {
-                        propertyFailures.add(String.format(
+                        groupPropertyFailures.add(String.format(
                                 "%s: rightmost change moved BACKWARDS at t%d (%dpx after reaching %dpx)",
                                 name, t, rx, maxSeen));
                     }
                     if (settleWindow && rx < maxSeen - settleAllowancePx) {
-                        propertyFailures.add(String.format(
+                        groupPropertyFailures.add(String.format(
                                 "%s: settle at t%d pulled back %dpx (> settle allowance %dpx)",
                                 name, t, maxSeen - rx, settleAllowancePx));
                     }
                     maxSeen = Math.max(maxSeen, rx);
+                }
+            }
+            propertyFailures.addAll(groupPropertyFailures);
+
+            // ---- 2. golden regression (seeding gated on the properties above) ----
+            List<String> seeded = new ArrayList<>();
+            if (goldensDir != null) {
+                Files.createDirectories(goldensDir);
+                for (Map.Entry<Integer, Path> f : frames.entrySet()) {
+                    String goldenName = f.getValue().getFileName().toString().replace("_cn1.png", ".png");
+                    Path golden = goldensDir.resolve(goldenName);
+                    if (!Files.isRegularFile(golden)) {
+                        if (seedMissing && groupPropertyFailures.isEmpty()) {
+                            Files.copy(f.getValue(), golden);
+                            seeded.add(goldenName);
+                            System.out.println("[morph]   SEEDED golden " + goldenName + " (commit it!)");
+                        } else if (seedMissing) {
+                            goldenFailures.add(name + " t" + f.getKey()
+                                    + ": golden missing and seeding WITHHELD (this sequence failed its motion properties)");
+                        } else {
+                            goldenFailures.add(name + " t" + f.getKey() + ": golden missing (" + golden + ")");
+                        }
+                        continue;
+                    }
+                    BufferedImage g = ImageIO.read(golden.toFile());
+                    BufferedImage actual = images.get(f.getKey());
+                    // Size is part of the self-golden contract: comparing only the
+                    // overlap would hide a tile-size regression entirely.
+                    if (g.getWidth() != actual.getWidth() || g.getHeight() != actual.getHeight()) {
+                        goldenFailures.add(String.format(
+                                "%s t%d: frame size %dx%d differs from golden %dx%d",
+                                name, f.getKey(), actual.getWidth(), actual.getHeight(),
+                                g.getWidth(), g.getHeight()));
+                        continue;
+                    }
+                    double mismatch = mismatchPercent(g, actual, maxChannelDelta);
+                    if (mismatch > maxMismatchPercent) {
+                        goldenFailures.add(String.format(
+                                "%s t%d: %.3f%% of pixels drifted beyond delta %d (allowed %.3f%%)",
+                                name, f.getKey(), mismatch, maxChannelDelta, maxMismatchPercent));
+                    }
                 }
             }
 
@@ -255,6 +297,93 @@ public class MorphFrameValidator {
             System.exit(EXIT_GOLDEN);
         }
         System.out.println("[morph] OK: " + groups.size() + " group(s) validated");
+    }
+
+    /// Loads the per-component `frames:` declarations from fidelity-tests.yaml
+    /// (the same flat subset ProcessScreenshots reads). Returns an empty map when
+    /// no spec is given/readable -- delivered-set completeness is then not checked.
+    private static Map<String, List<Integer>> loadDeclaredFrames(Path specPath) {
+        Map<String, List<Integer>> out = new TreeMap<>();
+        if (specPath == null || !Files.isRegularFile(specPath)) {
+            if (specPath != null) {
+                System.err.println("[morph] WARNING: --spec " + specPath + " not readable; declared-frame check skipped");
+            }
+            return out;
+        }
+        try {
+            String id = null;
+            List<String> lines = new ArrayList<>(Files.readAllLines(specPath));
+            lines.add("- id: __end__");
+            boolean inComponents = false;
+            for (String raw : lines) {
+                String line = stripComment(raw).trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                if (line.equals("components:")) {
+                    inComponents = true;
+                    continue;
+                }
+                if (!inComponents) {
+                    continue;
+                }
+                if (line.startsWith("- ")) {
+                    id = null;
+                    line = line.substring(2).trim();
+                }
+                int idx = line.indexOf(':');
+                if (idx < 0) {
+                    continue;
+                }
+                String key = line.substring(0, idx).trim();
+                String value = unquote(line.substring(idx + 1).trim());
+                if ("id".equals(key)) {
+                    id = value;
+                } else if ("frames".equals(key) && id != null) {
+                    List<Integer> vals = new ArrayList<>();
+                    for (String part : value.split(",")) {
+                        try {
+                            vals.add(Integer.parseInt(part.trim()));
+                        } catch (NumberFormatException ignored) {
+                            // malformed entries are simply not required
+                        }
+                    }
+                    out.put(id, vals);
+                }
+            }
+        } catch (IOException ex) {
+            System.err.println("[morph] WARNING: failed to read spec " + specPath + ": " + ex.getMessage());
+        }
+        return out;
+    }
+
+    /// Strips a trailing "#" comment, but only when the "#" is outside quotes and
+    /// at the line start or preceded by whitespace (so quoted values keep theirs).
+    private static String stripComment(String line) {
+        boolean inQuote = false;
+        char quote = 0;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (inQuote) {
+                if (c == quote) {
+                    inQuote = false;
+                }
+            } else if (c == '"' || c == '\'') {
+                inQuote = true;
+                quote = c;
+            } else if (c == '#' && (i == 0 || Character.isWhitespace(line.charAt(i - 1)))) {
+                return line.substring(0, i);
+            }
+        }
+        return line;
+    }
+
+    private static String unquote(String value) {
+        if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"")
+                || value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 
     /// Percentage (0..100) of overlapping pixels whose max channel delta exceeds tau.

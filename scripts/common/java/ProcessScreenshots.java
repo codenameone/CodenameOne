@@ -191,7 +191,10 @@ public class ProcessScreenshots {
         // fidelity-tests.yaml (test INTENT), not from image-content heuristics.
         // A missing spec (or a test the spec does not know) falls back to the
         // legacy corner heuristic so old artifact sets can still be re-scored.
-        Map<String, String> materialByComponent = loadMaterialMap(specPath, referenceDir, specPlatform);
+        // The spec's per-test `backdrop:` also drives the GEOMETRY masks: tiles
+        // over a declared solid/gradient/photo backdrop are masked against that
+        // backdrop, so their widget bbox is real instead of the full tile.
+        Map<String, String[]> specByComponent = loadSpecInfo(specPath, referenceDir, specPlatform);
         java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
@@ -262,7 +265,8 @@ public class ProcessScreenshots {
                         int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
                         double[] sf;
                         boolean glass = false;
-                        String material = resolveMaterial(materialByComponent, testName);
+                        String[] specInfo = resolveSpecInfo(specByComponent, testName);
+                        String material = specInfo != null ? specInfo[SPEC_MATERIAL] : null;
                         String materialSource = material != null ? "spec" : "heuristic";
                         int[] refArr = backdropImg != null
                                 ? stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch)
@@ -303,7 +307,14 @@ public class ProcessScreenshots {
                         // plus derived offset / size-ratio / center-offset numbers the
                         // gate can ratchet on. Corner radius is estimated for the
                         // masked glass/lens pills where roundness is a design feature.
-                        details.put("geometry", geometryMetrics(natc, cn1c, bg, glass ? refArr : null));
+                        // Tiles over a DECLARED backdrop (solid/gradient/photo) mask
+                        // against that backdrop -- a bg-colour mask would classify the
+                        // whole backdrop as widget and report a degenerate full-tile
+                        // bbox on exactly the geometry-isolation tiles.
+                        int[] geoRef = glass ? refArr : geometryReference(
+                                specInfo != null ? specInfo[SPEC_BACKDROP] : null,
+                                backdropImg, cn1.width(), cn1.height(), cw, ch);
+                        details.put("geometry", geometryMetrics(natc, cn1c, bg, geoRef));
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
                         record.put("status", "compared");
@@ -553,16 +564,26 @@ public class ProcessScreenshots {
                 + Math.abs((p & 0xff) - (q & 0xff))) / 3;
     }
 
-    /// Loads the per-component `material:` declarations from fidelity-tests.yaml.
-    /// An explicit --spec path wins; otherwise the canonical spec is located
-    /// relative to the goldens dir (mirroring loadBackdrop). Only the flat subset
-    /// the spec is written in is understood: a `components:` list whose entries
-    /// start with `- id:` followed by 4-space-indented `key: value` lines.
+    /// Per-component declarations parsed from fidelity-tests.yaml:
+    /// [0] = normalized material (normal|glass|lens; null = legacy heuristic),
+    /// [1] = the tile backdrop the DEVICE renders behind the widget (a 6-hex
+    ///       colour, "gradient", "photo", or null for a plain tile) -- explicit,
+    ///       or the material-derived "photo" default, matching
+    ///       ComponentSpec.getBackdrop(). Backdrops are an iOS-only concept.
+    private static final int SPEC_MATERIAL = 0;
+    private static final int SPEC_BACKDROP = 1;
+
+    /// Loads the per-component `material:`/`backdrop:` declarations from
+    /// fidelity-tests.yaml. An explicit --spec path wins; otherwise the canonical
+    /// spec is located relative to the goldens dir (mirroring loadBackdrop). Only
+    /// the flat subset the spec is written in is understood: a `components:` list
+    /// whose entries start with `- id:` followed by indented `key: value` lines.
     /// Entries whose `platforms:` allow-list excludes the platform are skipped.
-    /// On Android the glass/lens intents degrade to "normal": Android tiles never
-    /// composite the shared photo backdrop, so there is nothing to mask.
-    /// Returns null when no spec can be read (callers fall back to the heuristic).
-    static Map<String, String> loadMaterialMap(Path specPath, Path referenceDir, String platform) {
+    /// On Android the glass/lens intents degrade to "normal" and backdrops to
+    /// none: Android tiles never composite a backdrop, so there is nothing to
+    /// mask. Returns null when no spec can be read (callers fall back to the
+    /// legacy heuristic).
+    static Map<String, String[]> loadSpecInfo(Path specPath, Path referenceDir, String platform) {
         Path candidate = specPath != null ? specPath
                 : (referenceDir != null
                         ? referenceDir.resolve("../../common/src/main/resources/fidelity-tests.yaml").normalize()
@@ -574,21 +595,17 @@ public class ProcessScreenshots {
             return null;
         }
         boolean android = platform != null && platform.startsWith("and");
-        Map<String, String> out = new LinkedHashMap<>();
+        Map<String, String[]> out = new LinkedHashMap<>();
         try {
             boolean inComponents = false;
             String id = null;
             String material = null;
+            String backdrop = null;
             boolean platformOk = true;
             List<String> lines = Files.readAllLines(candidate);
             lines.add("- id: __end__");   // flush the final entry
             for (String raw : lines) {
-                String line = raw;
-                int hash = line.indexOf('#');
-                if (hash >= 0) {
-                    line = line.substring(0, hash);
-                }
-                String trimmed = line.trim();
+                String trimmed = stripYamlComment(raw).trim();
                 if (trimmed.isEmpty()) {
                     continue;
                 }
@@ -601,10 +618,13 @@ public class ProcessScreenshots {
                 }
                 if (trimmed.startsWith("- ")) {
                     if (id != null && platformOk) {
-                        out.put(id, normalizeMaterial(material, android));
+                        String mat = normalizeMaterial(material, android);
+                        String bd = android ? null : effectiveBackdrop(backdrop, mat);
+                        out.put(id, new String[]{mat, bd});
                     }
                     id = null;
                     material = null;
+                    backdrop = null;
                     platformOk = true;
                     trimmed = trimmed.substring(2).trim();
                 }
@@ -621,6 +641,7 @@ public class ProcessScreenshots {
                 switch (key) {
                     case "id" -> id = value;
                     case "material" -> material = value;
+                    case "backdrop" -> backdrop = value;
                     case "platforms" -> {
                         platformOk = false;
                         for (String p : value.split(",")) {
@@ -642,6 +663,28 @@ public class ProcessScreenshots {
         return out.isEmpty() ? null : out;
     }
 
+    /// Strips a trailing "#" comment, but only when the "#" is outside quotes
+    /// and at the line start or preceded by whitespace, so a quoted value that
+    /// contains "#" (e.g. a colour) survives.
+    private static String stripYamlComment(String line) {
+        boolean inQuote = false;
+        char quote = 0;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (inQuote) {
+                if (c == quote) {
+                    inQuote = false;
+                }
+            } else if (c == '"' || c == '\'') {
+                inQuote = true;
+                quote = c;
+            } else if (c == '#' && (i == 0 || Character.isWhitespace(line.charAt(i - 1)))) {
+                return line.substring(0, i);
+            }
+        }
+        return line;
+    }
+
     /// A spec entry without a material declaration maps to null so that test
     /// keeps the legacy heuristic; glass/lens degrade to normal on Android.
     private static String normalizeMaterial(String material, boolean android) {
@@ -658,16 +701,28 @@ public class ProcessScreenshots {
         return material;
     }
 
+    /// Mirrors ComponentSpec.getBackdrop(): explicit value wins, material
+    /// glass/lens default to the shared photo, everything else has none.
+    private static String effectiveBackdrop(String backdrop, String material) {
+        if (backdrop != null && !backdrop.isEmpty()) {
+            return backdrop;
+        }
+        if ("glass".equals(material) || "lens".equals(material)) {
+            return "photo";
+        }
+        return null;
+    }
+
     /// Maps a delivered test name ("Toolbar_normal_dark") to its component's
-    /// declared material via longest-id-prefix match at an underscore boundary,
+    /// spec declaration via longest-id-prefix match at an underscore boundary,
     /// so a future id containing underscores still resolves. Null = unknown.
-    static String resolveMaterial(Map<String, String> materialByComponent, String testName) {
-        if (materialByComponent == null || testName == null) {
+    static String[] resolveSpecInfo(Map<String, String[]> specByComponent, String testName) {
+        if (specByComponent == null || testName == null) {
             return null;
         }
-        String best = null;
+        String[] best = null;
         int bestLen = -1;
-        for (Map.Entry<String, String> e : materialByComponent.entrySet()) {
+        for (Map.Entry<String, String[]> e : specByComponent.entrySet()) {
             String id = e.getKey();
             if ((testName.equals(id) || testName.startsWith(id + "_")) && id.length() > bestLen) {
                 best = e.getValue();
@@ -782,9 +837,11 @@ public class ProcessScreenshots {
     ///   offset_x / offset_y   -- CN1 bbox origin minus native bbox origin (px).
     ///   width_ratio / height_ratio -- CN1 bbox extent over native bbox extent.
     ///   center_offset         -- Euclidean distance between the bbox centers (px).
-    ///   corner_radius_native / _cn1 / _delta -- rounded-corner radius estimate,
-    ///     glass/lens tiles only, from the non-content area of the bbox corner
-    ///     squares (a = r^2 * (1 - pi/4) per corner, averaged over the 4 corners).
+    ///   corner_radius_native / _cn1 / _delta -- rounded-corner radius estimate
+    ///     for backdrop-masked tiles (glass/lens and the declared-backdrop
+    ///     isolation tiles, where the widget silhouette is well-defined), from
+    ///     the non-content area of the bbox corner squares
+    ///     (a = r^2 * (1 - pi/4) per corner, averaged over the 4 corners).
     /// A tile with no content on either side reports empty=true and no numbers.
     ///
     /// The outermost EDGE_TRIM pixels of the tile are excluded from the geometry
@@ -844,6 +901,50 @@ public class ProcessScreenshots {
             geo.put("corner_radius_delta", round2(rc - rn));
         }
         return geo;
+    }
+
+    /// Builds the geometry-mask reference for a tile's DECLARED backdrop: the
+    /// pixel the backdrop would put at each position of the cropped region, so
+    /// widget pixels are the ones that differ from it. Mirrors the device
+    /// renderer's applyBackdrop: a 6-hex value is a solid fill, "gradient" is a
+    /// vertical #1e64ff -> #28c850 ramp over the full tile, "photo" is the
+    /// shared backdrop PNG (scaleToFill). Returns null when the tile has no
+    /// backdrop (callers fall back to the plain bg-colour mask) or the photo
+    /// asset is unavailable.
+    private static int[] geometryReference(String backdrop, BufferedImage backdropImg,
+            int fullW, int fullH, int cw, int ch) {
+        if (backdrop == null) {
+            return null;
+        }
+        if ("photo".equals(backdrop)) {
+            return backdropImg != null ? stretchCropTopLeft(backdropImg, fullW, fullH, cw, ch) : null;
+        }
+        int[] out = new int[cw * ch];
+        if ("gradient".equals(backdrop)) {
+            int sr = 0x1e, sg = 0x64, sb = 0xff;
+            int er = 0x28, eg = 0xc8, eb = 0x50;
+            for (int y = 0; y < ch; y++) {
+                float f = fullH <= 1 ? 0f : (float) y / (fullH - 1);
+                int r = sr + (int) ((er - sr) * f);
+                int g = sg + (int) ((eg - sg) * f);
+                int b = sb + (int) ((eb - sb) * f);
+                int rgb = (r << 16) | (g << 8) | b;
+                for (int x = 0; x < cw; x++) {
+                    out[y * cw + x] = rgb;
+                }
+            }
+            return out;
+        }
+        if (backdrop.length() == 6) {
+            try {
+                int rgb = Integer.parseInt(backdrop, 16) & 0xffffff;
+                java.util.Arrays.fill(out, rgb);
+                return out;
+            } catch (NumberFormatException ignore) {
+                // not a colour -> no backdrop reference
+            }
+        }
+        return null;
     }
 
     /// Content mask against a known solid background colour (the tile bg).

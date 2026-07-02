@@ -135,12 +135,15 @@ export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_IOS_COMMENT -->"
 export CN1SS_PREVIEW_SUBDIR="ios-fidelity"
 export CN1SS_FIDELITY_SPEC="${CN1SS_FIDELITY_SPEC:-$APP_DIR/common/src/main/resources/fidelity-tests.yaml}"
 export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-ios}"
+# NOTE: the || capture keeps `set -e` from aborting here -- the frames stage
+# below must run (and its artifacts must land) even when the fidelity gate
+# reports a regression; the exit codes are combined at the end.
+rc=0
 cn1ss_process_fidelity \
   "Native fidelity (iOS Modern, Metal)" \
   "$WORK_DIR/fidelity-compare.json" "$WORK_DIR/fidelity-summary.txt" "$WORK_DIR/fidelity-comment.md" \
   "$GOLDENS_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" "$BASELINE_FILE" \
-  "${COMPARE_ENTRIES[@]}"
-rc=$?
+  "${COMPARE_ENTRIES[@]}" || rc=$?
 cp -f "$WORK_DIR/fidelity-comment.md" "$ARTIFACTS_DIR/fidelity-comment.md" 2>/dev/null || true
 
 # ---- deterministic animation-frame validation ----
@@ -155,6 +158,7 @@ if [ "$FRAME_COUNT" -gt 0 ]; then
   cn1ss_java_run MorphFrameValidator \
     --frames-dir "$FRAMES_WORK_DIR" \
     --goldens-dir "$FRAME_GOLDENS_DIR" \
+    --spec "$CN1SS_FIDELITY_SPEC" \
     --seed-missing \
     --out-json "$ARTIFACTS_DIR/morph-frames.json" \
     --strip-dir "$ARTIFACTS_DIR" || frame_rc=$?

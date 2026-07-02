@@ -3045,11 +3045,14 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_BOOLEAN n7) {
     POOL_BEGIN();
-    int horizontal = 2;
-    if(n7) {
-        horizontal = 3;
-    }
-    DrawGradient* d = [[DrawGradient alloc] initWithArgs:horizontal startColorA:n1 endColorA:n2 xA:n3 yA:n4 widthA:n5 heightA:n6 relativeXA:0 relativeYA:0 relativeSizeA:0];
+    // DrawGradient's protocol (DrawGradient.h): 2 = GRADIENT_TYPE_HORIZONTAL,
+    // 3 = GRADIENT_TYPE_VERTICAL. This mapping had been INVERTED here since the
+    // original 2012 port (horizontal=true sent 3), so every ON-SCREEN linear
+    // gradient painted with its axis swapped; the mutable-image variant
+    // (fillLinearGradientMutable) always had it right. Caught by the fidelity
+    // suite's geometry masks on the gradient-backdrop isolation tile.
+    int gradientType = n7 ? 2 : 3;
+    DrawGradient* d = [[DrawGradient alloc] initWithArgs:gradientType startColorA:n1 endColorA:n2 xA:n3 yA:n4 widthA:n5 heightA:n6 relativeXA:0 relativeYA:0 relativeSizeA:0];
     [CodenameOne_GLViewController upcoming:d];
 #ifndef CN1_USE_ARC
     [d release];

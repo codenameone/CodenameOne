@@ -131,6 +131,22 @@ fi
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_ANDROID_COMMENT -->"
 export CN1SS_FIDELITY_SPEC="${CN1SS_FIDELITY_SPEC:-$APP_DIR/common/src/main/resources/fidelity-tests.yaml}"
 export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-android}"
+
+# Animation-frame captures ("<id>_tNNN_<appearance>") have no native golden and
+# are validated by MorphFrameValidator on iOS; keep any future Android frames
+# delivery out of the native-fidelity comparison so it cannot break the gate
+# with a phantom "missing golden".
+if [ ${#COMPARE_ENTRIES[@]} -gt 0 ]; then
+  declare -a FILTERED_ENTRIES=()
+  for entry in "${COMPARE_ENTRIES[@]}"; do
+    if [[ "${entry%%=*}" =~ _t[0-9]{3}_ ]]; then
+      rf_log "Skipping animation frame in fidelity compare: ${entry%%=*}"
+      continue
+    fi
+    FILTERED_ENTRIES+=("$entry")
+  done
+  COMPARE_ENTRIES=("${FILTERED_ENTRIES[@]}")
+fi
 export CN1SS_PREVIEW_SUBDIR="android-fidelity"
 COMPARE_JSON="$WORK_DIR/fidelity-compare.json"
 SUMMARY_FILE="$WORK_DIR/fidelity-summary.txt"
