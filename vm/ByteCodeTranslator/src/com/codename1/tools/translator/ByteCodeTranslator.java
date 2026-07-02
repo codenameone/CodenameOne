@@ -943,11 +943,17 @@ public class ByteCodeTranslator {
             // -fno-strict-aliasing: the generated code accesses one allocation
             //   through JavaObjectPrototype, JavaArrayPrototype and obj__<class>
             //   simultaneously; TBAA is unsound for it.
+            // -fno-builtin-fmod(f): on Darwin/-fno-math-errno clang treats fmod as
+            //   pure and IF-CONVERTS rarely-taken clamp guards into branchless
+            //   selects that SPECULATE a full libm fmod call every iteration
+            //   (measured 1.7x slowdown on a transcendental loop). Dropping just
+            //   fmod's builtin status keeps the guard a branch; sqrt/sin/cos keep
+            //   their intrinsics.
             // clang-cl (the Windows toolchain) takes the GNU spellings via /clang:.
             writer.append("if(MSVC)\n");
-            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /clang:-fwrapv /clang:-fno-strict-aliasing)\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /clang:-fwrapv /clang:-fno-strict-aliasing /clang:-fno-builtin-fmod /clang:-fno-builtin-fmodf)\n");
             writer.append("else()\n");
-            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing)\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf)\n");
             writer.append("endif()\n");
             if (executable && !windows) {
                 // ThinLTO for the Release Linux executable: the translator emits one

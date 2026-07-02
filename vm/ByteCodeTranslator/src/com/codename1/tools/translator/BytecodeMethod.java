@@ -657,6 +657,22 @@ public class BytecodeMethod implements SignatureSet {
                     case Opcodes.LSTORE:
                     case Opcodes.FSTORE:
                     case Opcodes.DSTORE:
+                    // BIPUSH/SIPUSH parse as VarOp (visitIntInsn), NOT BasicInstruction:
+                    // without these two cases ANY method containing an int constant in
+                    // 6..32767 was silently disqualified from frameless codegen -- an
+                    // enormous accidental exclusion (a `& 1023` mask or a char literal
+                    // was enough). They just push an int constant; trivially safe.
+                    case Opcodes.BIPUSH:
+                    case Opcodes.SIPUSH:
+                        hasRealInstruction = true;
+                        continue;
+                    case Opcodes.NEWARRAY:
+                        // primitive array allocation (also a VarOp via visitIntInsn):
+                        // pushes a fresh object ref onto the local operand array --
+                        // safe under object mode exactly like NEW/ANEWARRAY.
+                        if (!obj) {
+                            return false;
+                        }
                         hasRealInstruction = true;
                         continue;
                     case Opcodes.ALOAD:
@@ -1508,19 +1524,20 @@ public class BytecodeMethod implements SignatureSet {
             // TryCatch instruction, so we cannot prove its frame is never re-entered
             // by the unwind machinery -- keep its locals volatile.
             //
-            // A call in the body also forces volatile, as a PERFORMANCE heuristic
-            // (non-volatile is still correct without it): non-volatile locals in a
-            // loop that makes calls (e.g. libm sqrt/sin/cos) make clang juggle
-            // callee-saved registers across each call and run slower, whereas
-            // call-free compute loops (array reductions, integer kernels) vectorize
-            // and register-allocate dramatically better without volatile. Inlined
-            // accessors no longer count as calls, so this composes with inlining.
-            // -DCN1_FORCE_VOLATILE_LOCALS=true restores the always-volatile behavior
-            // (off-switch for the non-volatile-locals optimization).
+            // The old heuristic ALSO forced volatile whenever the body contained any
+            // call, to keep clang from juggling callee-saved registers around
+            // call-heavy loops (libm kernels). That was far too blunt: it put the
+            // loop counters of every method that merely CALLS something -- e.g. a
+            // recursive quicksort whose partition loops are call-free -- into memory
+            // on every iteration. Measured on the current codegen (frameless +
+            // inlined accessors + ThinLTO), dropping the call trigger is a large win
+            // for call-bearing methods with hot call-free loops and neutral for the
+            // libm-style loops the heuristic originally protected.
+            // -DCN1_FORCE_VOLATILE_LOCALS=true restores the always-volatile behavior.
             boolean volatileLocals = FORCE_VOLATILE_LOCALS || onDeviceDebug || synchronizedMethod;
             if (!volatileLocals) {
                 for (Instruction tcScan : instructions) {
-                    if (tcScan instanceof TryCatch || tcScan instanceof Invoke || tcScan instanceof CustomInvoke) {
+                    if (tcScan instanceof TryCatch) {
                         volatileLocals = true;
                         break;
                     }

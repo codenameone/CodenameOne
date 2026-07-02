@@ -508,6 +508,7 @@ void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
 
 // memory map of all the heap objects which we can walk over to delete/deallocate
 // unused objects
+const char* volatile cn1LastNamSetter = 0;
 JAVA_OBJECT* allObjectsInHeap = 0;
 int sizeOfAllObjectsInHeap = 30000;
 int currentSizeOfAllObjectsInHeap = 0;
@@ -538,15 +539,16 @@ extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
 // arrays too) removal is a no-op and the object WOULD be swept while the C
 // global still points at it. Register them here instead; the mark phase treats
 // the array as a root set every cycle. Tiny and append-only.
-#define CN1_MAX_IMMORTAL_ROOTS 32
-static JAVA_OBJECT cn1ImmortalRoots[CN1_MAX_IMMORTAL_ROOTS];
-static int cn1ImmortalRootsN = 0;
+static JAVA_OBJECT* cn1ImmortalRoots = 0;
+static int cn1ImmortalRootsN = 0, cn1ImmortalRootsCap = 0;
 void cn1AddImmortalRoot(JAVA_OBJECT o) {
     if(o == JAVA_NULL) return;
     lockCriticalSection();
-    if(cn1ImmortalRootsN < CN1_MAX_IMMORTAL_ROOTS) {
-        cn1ImmortalRoots[cn1ImmortalRootsN++] = o;
+    if(cn1ImmortalRootsN == cn1ImmortalRootsCap) {
+        cn1ImmortalRootsCap = cn1ImmortalRootsCap ? cn1ImmortalRootsCap * 2 : 64;
+        cn1ImmortalRoots = (JAVA_OBJECT*)realloc(cn1ImmortalRoots, cn1ImmortalRootsCap * sizeof(JAVA_OBJECT));
     }
+    cn1ImmortalRoots[cn1ImmortalRootsN++] = o;
     unlockCriticalSection();
 }
 pthread_mutex_t* memoryAccessMutex = NULL;
@@ -1240,6 +1242,18 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     if(allObjectsInHeap == 0) {
         allObjectsInHeap = malloc(sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
         memset(allObjectsInHeap, 0, sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
+    }
+
+    // BiBOP-resident object: there is no table entry to remove -- the page sweep
+    // frees it regardless, so the caller's intent ("make this immortal", used by
+    // the generated static-final removal and VM-internal caches) would silently
+    // do NOTHING and the object would be swept while a static/C global still
+    // points at it (observed: java.lang.System.LOCK freed under the GC thread's
+    // own wait()). Deliver the intended semantics: register it as a permanent
+    // GC root instead.
+    if(o != JAVA_NULL && !CN1_IS_TAGGED(o) && o->__heapPosition == CN1_BIBOP_HEAP_POS) {
+        cn1AddImmortalRoot(o);
+        return JAVA_TRUE;
     }
 
     int pos = findPointerPosInHeap(o);
@@ -2132,6 +2146,16 @@ void cn1GcBuildRootSnapshots(void) {
     }
     qsort(cn1ConsPg, cn1ConsPgN, sizeof(CN1ConsPage), cn1ConsPgCmp);
 #endif
+    if(getenv("CN1_SNAP_DEBUG")) {
+        fprintf(stderr, "[SNAP] ext=%d pages=%d tableSize=%d\n",
+            cn1ConsExtN,
+#ifndef CN1_DISABLE_BIBOP
+            cn1ConsPgN,
+#else
+            0,
+#endif
+            currentSizeOfAllObjectsInHeap);
+    }
 }
 
 // (a) Resolve an arbitrary machine word to the base of the live heap object it points
@@ -2468,14 +2492,35 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // no table registration, no extent-snapshot entry, no per-object free.
     // Objects larger than the biggest size class fall through to the legacy
     // calloc + table-registration path below. 0 => pages unavailable, fall back.
-    if(parent != 0 && size <= CN1_BIBOP_MAX_OBJECT &&
-       constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
+    // nativeAllocationMode no longer forces the legacy path: its purpose was to
+    // keep native-held objects visible to the collector via the pending table,
+    // and under CN1_CONSERVATIVE_GC_ROOTS (always on) a native's C locals are
+    // scanned as roots directly. Keeping natives on the legacy path made every
+    // native-bracketed allocation (e.g. StringBuilder.append's buffer growth) a
+    // table+extent entry -- measured: 1.5M-entry extent snapshots qsorted per GC
+    // cycle during string churn, stalling mutators. The mode still suppresses GC
+    // triggers/parks inside the bracket (cn1BibopMaybeGc honors it).
+    if(parent != 0 && size <= CN1_BIBOP_MAX_OBJECT && constantPoolObjects != 0
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+       && !threadStateData->nativeAllocationMode
+#endif
+       ) {
         JAVA_OBJECT bibopObj = cn1BibopAlloc(threadStateData, size, parent);
         if(bibopObj != JAVA_NULL) {
             return bibopObj;
         }
     }
 #endif
+    if(getenv("CN1_LEGACY_DEBUG")) {
+        static _Atomic long cn1LegacyDbgCount = 0;
+        long c = atomic_fetch_add_explicit(&cn1LegacyDbgCount, 1, memory_order_relaxed);
+        if((c % 100000) == 0) {
+            fprintf(stderr, "[LEGACY] #%ld cls=%s size=%d nativeMode=%d lastSetter=%s\n",
+                c, parent ? parent->clsName : "?", size,
+                (int)threadStateData->nativeAllocationMode,
+                cn1LastNamSetter ? cn1LastNamSetter : "(cleared)");
+        }
+    }
     if(lowMemoryMode && !threadStateData->nativeAllocationMode) {
         CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
         threadStateData->threadActive = JAVA_FALSE;
@@ -3528,8 +3573,11 @@ static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
 // it, passing it as a transient call argument, or returning copies is fine.
 JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz* cls) {
 #if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
-    if(totalSize <= CN1_BIBOP_MAX_OBJECT && constantPoolObjects != 0 &&
-       !threadStateData->nativeAllocationMode) {
+    if(totalSize <= CN1_BIBOP_MAX_OBJECT && constantPoolObjects != 0
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+       && !threadStateData->nativeAllocationMode
+#endif
+       ) {
         return cn1BibopAlloc(threadStateData, totalSize, cls);
     }
 #endif

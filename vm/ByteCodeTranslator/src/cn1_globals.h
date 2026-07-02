@@ -885,8 +885,9 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 #define CN1_WRITE_BARRIER(target, value)
 #endif
 
-#define enteringNativeAllocations() threadStateData->nativeAllocationMode = JAVA_TRUE
-#define finishedNativeAllocations() threadStateData->nativeAllocationMode = JAVA_FALSE
+extern const char* volatile cn1LastNamSetter; // diagnosis: last bracket toucher
+#define enteringNativeAllocations() do { threadStateData->nativeAllocationMode = JAVA_TRUE; cn1LastNamSetter = __FUNCTION__; } while(0)
+#define finishedNativeAllocations() do { threadStateData->nativeAllocationMode = JAVA_FALSE; cn1LastNamSetter = 0; } while(0)
 
 // handles the stack used for print stack trace and GC
 struct ThreadLocalData {
@@ -1216,8 +1217,11 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
     CN1BibopPage* p = bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
-                        constantPoolObjects != (JAVA_OBJECT*)0 &&
-                        !threadStateData->nativeAllocationMode, 1)) {
+                        constantPoolObjects != (JAVA_OBJECT*)0
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+                        && !threadStateData->nativeAllocationMode
+#endif
+                        , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
         if(__builtin_expect(bi < p->slotCount, 1)) {
             JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
@@ -1277,8 +1281,11 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
     CN1BibopPage* p = bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
-                        constantPoolObjects != (JAVA_OBJECT*)0 &&
-                        !threadStateData->nativeAllocationMode, 1)) {
+                        constantPoolObjects != (JAVA_OBJECT*)0
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+                        && !threadStateData->nativeAllocationMode
+#endif
+                        , 1)) {
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
         if(__builtin_expect(bi < p->slotCount, 1)) {
             JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
