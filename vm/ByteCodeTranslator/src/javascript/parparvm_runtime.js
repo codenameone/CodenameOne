@@ -5200,6 +5200,15 @@ bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Objec
 bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function() { return null; });
 bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function() { return null; });
 bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function() { return 0; });
+// Tagged-immediate Integer natives (C-side poor-man's-Valhalla). The JS port
+// has no tagged pointers: cn1Value reads the heap field, valueOf delegates to
+// the pure-Java cache twin (valueOfHeap).
+bindNative(["cn1_java_lang_Integer_cn1Value_R_int"], function(__cn1ThisObject) {
+  return __cn1ThisObject.cn1_java_lang_Integer_value | 0;
+});
+bindNative(["cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer"], function*(i) {
+  return yield* adaptVirtualResult(cn1_java_lang_Integer_valueOfHeap_int_R_java_lang_Integer(i));
+});
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
 bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
 bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function() { return _LfromNumber(33554432); });

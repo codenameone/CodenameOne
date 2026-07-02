@@ -98,6 +98,8 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_System_gcLight",
             "cn1_java_lang_System_gcMarkSweep",
             "cn1_java_lang_System_identityHashCode_java_lang_Object_R_int",
+            "cn1_java_lang_Integer_cn1Value_R_int",
+            "cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer",
             "cn1_java_lang_System_isHighFrequencyGC_R_boolean",
             "cn1_java_lang_Thread_currentThread_R_java_lang_Thread",
             "cn1_java_lang_Thread_getNativeThreadId_R_long",
@@ -148,6 +150,25 @@ final class JavascriptNativeRegistry {
     ));
 
     private JavascriptNativeRegistry() {
+    }
+
+    // Pure-Java twins the JS RUNTIME bindings delegate to (bindNative ->
+    // cn1_..._getImpl_... etc). Nothing in BYTECODE calls them, so the
+    // unused-method cull would eliminate them and the delegation would throw
+    // ReferenceError at runtime -- they must be retention roots. Keyed as
+    // "<mangled-class>.<method-name>" (all overloads of the name are kept).
+    private static final Set<String> RUNTIME_DELEGATE_TARGETS = new HashSet<String>(Arrays.asList(
+            "java_util_HashMap.getImpl",
+            "java_util_HashMap.putImpl",
+            "java_util_HashMap.removeImpl",
+            "java_util_HashMap.containsKeyImpl",
+            "java_util_HashMap.clearImpl",
+            "java_lang_StringBuilder.toStringImpl",
+            "java_lang_Integer.valueOfHeap"
+    ));
+
+    static boolean isRuntimeDelegateTarget(String mangledClassName, String methodName) {
+        return RUNTIME_DELEGATE_TARGETS.contains(mangledClassName + "." + methodName);
     }
 
     static boolean hasRuntimeImplementation(String symbol) {

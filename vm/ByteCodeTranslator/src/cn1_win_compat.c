@@ -195,6 +195,15 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start_
     return 0;
 }
 
+int pthread_detach(pthread_t thread) {
+    /* joins are unsupported in this shim anyway; detaching = releasing the
+       handle so the kernel object dies with the thread (GC mark workers) */
+    if (thread.handle != NULL && thread.handle != GetCurrentThread()) {
+        CloseHandle((HANDLE)thread.handle);
+    }
+    return 0;
+}
+
 pthread_t pthread_self(void) {
     pthread_t t;
     t.handle = GetCurrentThread(); /* pseudo-handle, valid for priority calls */

@@ -854,6 +854,14 @@ public class Parser extends ClassVisitor {
                 continue;
             }
             for(BytecodeMethod mtd : bc.getMethods()) {
+                // Pure-Java twins that the JS runtime's bindNative delegates call
+                // (getImpl/putImpl/toStringImpl/valueOfHeap...): no bytecode call
+                // site exists, so without this keep they would be culled and the
+                // JS delegation would throw ReferenceError. Kept on all targets --
+                // the C natives use some of them as fallbacks too.
+                if(JavascriptNativeRegistry.isRuntimeDelegateTarget(bc.getClsName(), mtd.getMethodName())) {
+                    continue;
+                }
                 if(mtd.isEliminated() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.getMethodName().equals("finalize") || mtd.isNative()) {
                     if (!mtd.isEliminated() && mtd.getMethodName().contains("yield")) {
                         if(ByteCodeTranslator.verbose) {

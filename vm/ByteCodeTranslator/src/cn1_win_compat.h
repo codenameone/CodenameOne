@@ -39,8 +39,10 @@ typedef struct { void* Ptr; } cn1_condvar_t;
 typedef struct { cn1_srwlock_t lock; } pthread_mutex_t;
 typedef struct { cn1_condvar_t cond; } pthread_cond_t;
 
-/* A zero-initialised SRWLOCK is a valid, unlocked lock (SRWLOCK_INIT == {0}). */
+/* A zero-initialised SRWLOCK is a valid, unlocked lock (SRWLOCK_INIT == {0});
+ * same for CONDITION_VARIABLE (CONDITION_VARIABLE_INIT == {0}). */
 #define PTHREAD_MUTEX_INITIALIZER { { 0 } }
+#define PTHREAD_COND_INITIALIZER  { { 0 } }
 
 typedef unsigned long pthread_key_t;
 typedef struct { void* handle; unsigned long id; } pthread_t;
@@ -105,6 +107,7 @@ int pthread_attr_init(pthread_attr_t* attr);
 int pthread_attr_destroy(pthread_attr_t* attr);
 int pthread_attr_setdetachstate(pthread_attr_t* attr, int detachstate);
 int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start_routine)(void*), void* arg);
+int pthread_detach(pthread_t thread);
 pthread_t pthread_self(void);
 int pthread_getschedparam(pthread_t thread, int* policy, struct sched_param* param);
 int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param* param);
