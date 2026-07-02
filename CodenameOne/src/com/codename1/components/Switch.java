@@ -160,6 +160,10 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private Image trackOffImage;
     private Image trackDisabledImage;
     private boolean dragged;
+    // TEST-ONLY: when >=0, paint() renders the thumb slide frozen at this 0..1
+    // progress (OFF -> ON) instead of the live drag state, so the fidelity
+    // animation-frame probe can capture deterministic droplet frames.
+    private float morphTestProgress = -1f;
     private long dragStartTime;
     private int pressX;
     private int pressY;
@@ -328,6 +332,16 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         int alpha = g.concatenateAlpha(255);
         g.setColor(color);
         g.fillRoundRect(shadowSpread + thumbInset, shadowSpread + thumbInset, baseW, baseH, arc, arc);
+        // Liquid-glass sheen: a soft specular highlight across the top of the knob so it
+        // reads as glass rather than a flat disc. Subtle -- the primary glass cue is the
+        // droplet stretch/squash during travel (see paint()).
+        if (UIManager.getInstance().isThemeConstant("switchLiquidGlassBool", false)) {
+            int tx = shadowSpread + thumbInset, ty = shadowSpread + thumbInset;
+            g.setColor(0xffffff);
+            g.concatenateAlpha(110);
+            g.fillRoundRect(tx + baseW / 8, ty + baseH / 10, baseW * 3 / 4, baseH * 2 / 5, arc, arc);
+            g.setAlpha(255);
+        }
         g.setAlpha(alpha);
         return img;
     }
@@ -783,6 +797,17 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         changeDispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
     }
 
+    /// TEST-ONLY hook: render the thumb slide frozen at a fixed `progress`
+    /// (0 = resting OFF .. 1 = the ON end) instead of the live drag state, so a
+    /// fidelity probe can capture exact deterministic frames of the liquid-glass
+    /// droplet animation without racing the real-time motion. Assumes the switch
+    /// is in the OFF state (the frame travels OFF -> ON). Pass a negative value
+    /// to clear and resume normal behaviour.
+    public void setMorphTestProgress(float progress) {
+        morphTestProgress = progress > 1 ? 1 : progress;
+        repaint();
+    }
+
     /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
@@ -794,12 +819,28 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         int strackLength = Math.max(cTrackImage.getWidth(), cTrackImage.getWidth());
         int sheight = Math.max(cthumbImage.getHeight(), Math.max(cTrackImage.getHeight(), cTrackImage.getHeight()));
 
+        if (morphTestProgress >= 0) {
+            // Frozen-frame probe: fake a drag from OFF toward ON at exactly this
+            // progress so the thumb position AND the droplet envelope below are a
+            // pure function of the probe value (see setMorphTestProgress).
+            int trackM = cTrackImage.getWidth() - cthumbImage.getWidth();
+            int v = (int) (morphTestProgress * trackM);
+            dragged = v > 0;
+            deltaX = isRTL() ? v : -v;
+        }
+
         int vdeltaX = -deltaX; //virtual increase in slider "value" where OFF state = 0 and ON state = itrackLength
         if (isRTL()) {
             vdeltaX = deltaX;
         }
 
         Style s = getStyle();
+        // Liquid-glass thumb (iOS 26): while the thumb slides it stretches along the
+        // travel axis and squashes vertically like a droplet, settling round at each end.
+        // Opt in with switchLiquidGlassBool; the envelope peaks mid-slide (nextImageProgress).
+        boolean liquidGlass = getUIManager().isThemeConstant("switchLiquidGlassBool", false);
+        float liquidStretch = getUIManager().getThemeConstant("switchLiquidStretchPct", 38) / 100f;
+        float liquidSquash = getUIManager().getThemeConstant("switchLiquidSquashPct", 50) / 100f;
         int padLeft = s.getPaddingLeft(isRTL()); //s.getPaddingLeftNoRTL();
         int padRight = s.getPaddingRight(isRTL());
         int padTop = s.getPaddingTop();
@@ -890,19 +931,36 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
         }
 
-        //draw the thumb image
+        //draw the thumb image (liquid-glass: stretch along travel + squash mid-slide)
+        int thumbAbsX = getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign);
+        int thumbAbsY = getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign);
+        int tw = cthumbImage.getWidth();
+        int th = cthumbImage.getHeight();
+        int tx = thumbAbsX;
+        int ty = thumbAbsY;
+        int tdw = tw;
+        int tdh = th;
+        if (liquidGlass && dragged && nextImageProgress > 0) {
+            // The whole frame comes from the pure, unit-tested droplet model so the
+            // motion can be validated deterministically (see SwitchThumbDropletTest
+            // / the fidelity animation-frame probe).
+            SwitchThumbDroplet.Tokens tk = new SwitchThumbDroplet.Tokens();
+            tk.stretch = liquidStretch;
+            tk.squash = liquidSquash;
+            SwitchThumbDroplet drop = SwitchThumbDroplet.compute((float) nextImageProgress, tw, th, tk);
+            tdw = drop.drawW;
+            tdh = drop.drawH;
+            tx = thumbAbsX + drop.offsetX;                    // keep centred on the thumb centre
+            ty = thumbAbsY + drop.offsetY;
+        }
         int alph = g.getAlpha();
         if (nextImageProgress > 0 && nextThumbImage != null) {
             g.setAlpha((int) Math.round((1 - nextImageProgress) * 255));
         }
-        g.drawImage(cthumbImage,
-                getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),
-                getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));
+        g.drawImage(cthumbImage, tx, ty, tdw, tdh);
         if (nextImageProgress > 0 && nextThumbImage != null) {
             g.setAlpha((int) Math.round(nextImageProgress * 255));
-            g.drawImage(nextThumbImage,
-                    getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),
-                    getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));
+            g.drawImage(nextThumbImage, tx, ty, tdw, tdh);
             g.setAlpha(alph);
         }
 

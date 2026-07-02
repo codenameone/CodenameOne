@@ -333,12 +333,14 @@ public class FidelityDeviceRunner {
             public void run() {
                 for (int i = 0; i < tabsComponents.size(); i++) {
                     Component comp = (Component) tabsComponents.get(i);
+                    String frame = ((String) frames.get(i)).trim();
+                    int value = parseFrameValue(frame);
                     if (comp instanceof com.codename1.ui.Tabs) {
                         com.codename1.ui.Tabs tabs = (com.codename1.ui.Tabs) comp;
                         int last = Math.max(0, tabs.getTabCount() - 1);
-                        String frame = ((String) frames.get(i)).trim();
-                        int value = parseFrameValue(frame);
                         tabs.setMorphTestState(0, last, value);
+                    } else if (comp instanceof com.codename1.components.Switch) {
+                        ((com.codename1.components.Switch) comp).setMorphTestProgress(value / 100f);
                     }
                 }
             }

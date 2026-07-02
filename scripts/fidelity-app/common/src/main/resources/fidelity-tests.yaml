@@ -113,6 +113,18 @@ components:
     native_android: material_switch
     states: normal,selected,disabled
 
+  # SwitchMorph: deterministic animation-frame validation of the liquid-glass
+  # switch-thumb droplet (stretch along travel + vertical squash, peaking
+  # mid-slide). Each frame renders the slide FROZEN at the given progress via
+  # Switch.setMorphTestProgress; validated by MorphFrameValidator + frame
+  # goldens, and pinned numerically in SwitchThumbDropletTest.
+  - id: SwitchMorph
+    material: normal
+    cn1_uiid: Switch
+    platforms: ios
+    frames: 0,25,50,75,100
+    states: normal
+
   - id: Slider
     material: normal
     cn1_uiid: Slider

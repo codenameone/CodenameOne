@@ -254,6 +254,12 @@
     /* The native UISwitch thumb is a CIRCLE (not elongated); widthScale 1.0 keeps
        it round so it matches the golden. */
     switchThumbWidthScale: "1.35";
+    /* iOS 26 Liquid Glass thumb: while it slides the knob stretches along the travel
+       axis and squashes vertically like a droplet (peaks mid-slide, round at the ends)
+       and carries a soft glass sheen. stretch/squash are percentages. */
+    switchLiquidGlassBool: true;
+    switchLiquidStretchPct: 38;
+    switchLiquidSquashPct: 50;
     /* iOS uses a circular mark for checkboxes (Reminders-style) and
        keeps the circular radio button. These integer constants are
        Material icon codepoints that DefaultLookAndFeel reads to

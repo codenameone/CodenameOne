@@ -61,6 +61,7 @@ public final class Cn1WidgetRenderer {
                 || "Dialog".equals(id) || "Spinner".equals(id)
                 || "TabsGeom".equals(id)                       // geometry-isolation: Tabs over a flat backdrop
                 || "TabsMorph".equals(id)                      // animation-frame validation: same bar, frozen morph
+                || "SwitchMorph".equals(id)                    // animation-frame validation: frozen droplet slide
                 || "TabOne".equals(id)                         // minimal: one text-only tab, flat backdrop
                 || "GlassText".equals(id) || "GlassIcon".equals(id) // ladder rungs: glass + one element
                 || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
@@ -128,7 +129,7 @@ public final class Cn1WidgetRenderer {
                 rb.setEnabled(false);
             }
             c = rb;
-        } else if ("Switch".equals(id)) {
+        } else if ("Switch".equals(id) || "SwitchMorph".equals(id)) {
             Switch sw = new Switch();
             sw.setUIID(uiid);
             if ("selected".equals(state)) {
