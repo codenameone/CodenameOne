@@ -1547,6 +1547,7 @@ public class Tabs extends Container {
             try {
                 insetMm = Float.parseFloat(iv.trim());
             } catch (NumberFormatException ignore) {
+                insetMm = 0.1f;   // malformed constant -> keep the hairline default
             }
         }
         return Display.getInstance().convertToPixels(insetMm);

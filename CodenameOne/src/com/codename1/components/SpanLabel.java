@@ -168,6 +168,32 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         // implementation will prevent calcPreferredSize() from ever being called,
         // and we still want to calculate the preferred height based on this preferred width.
         this.preferredW = preferredW;
+        setShouldCalcPreferredSize(true);
+    }
+
+    /// {@inheritDoc }
+    @Override
+    protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+        // Honor the setPreferredW contract: the preferred HEIGHT must account
+        // for the text wrapping at the capped width. A TextArea wraps its rows
+        // to its CURRENT width and derives its preferred height from those rows,
+        // so prime that width from the cap before measuring -- otherwise a
+        // width-capped span label reports its unwrapped (shorter) height and
+        // the extra rows clip (e.g. a dialog card whose width cap binds on a
+        // narrow screen).
+        if (preferredW > -1) {
+            int innerW = preferredW
+                    - getStyle().getHorizontalPadding()
+                    - text.getStyle().getHorizontalPadding();
+            if (icon.getIcon() != null) {
+                innerW -= iconWrapper.getPreferredW();
+            }
+            if (innerW > 0 && text.getWidth() != innerW) {
+                text.setWidth(innerW);
+                text.setShouldCalcPreferredSize(true);
+            }
+        }
+        return super.calcPreferredSize();
     }
 
     /// Gets the component used for styling font icons on this SpanLabel.

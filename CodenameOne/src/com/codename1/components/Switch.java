@@ -336,7 +336,8 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         // reads as glass rather than a flat disc. Subtle -- the primary glass cue is the
         // droplet stretch/squash during travel (see paint()).
         if (UIManager.getInstance().isThemeConstant("switchLiquidGlassBool", false)) {
-            int tx = shadowSpread + thumbInset, ty = shadowSpread + thumbInset;
+            int tx = shadowSpread + thumbInset;
+            int ty = shadowSpread + thumbInset;
             g.setColor(0xffffff);
             g.concatenateAlpha(110);
             g.fillRoundRect(tx + baseW / 8, ty + baseH / 10, baseW * 3 / 4, baseH * 2 / 5, arc, arc);

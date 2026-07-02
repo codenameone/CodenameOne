@@ -1829,8 +1829,15 @@ public class Dialog extends Form implements AbstractDialog {
         }
         if (prefWidth < origPrefWidth) {
             // Re-measure at the capped width so the wrapped body reports its true
-            // (taller) height for correct vertical centring.
+            // (taller) height. Merely invalidating preferred sizes is NOT enough:
+            // a TextArea derives its preferred height from rows wrapped at its
+            // CURRENT width, and the children still hold their stale (uncapped)
+            // widths -- reporting the unwrapped, shorter height and clipping the
+            // body behind the commands wherever the cap binds. Lay the content
+            // out at the capped width first so nested text actually wraps.
             contentPane.setWidth(prefWidth);
+            contentPane.setHeight(height);
+            ((Container) contentPane).layoutContainer();
             contentPane.setShouldCalcPreferredSize(true);
         }
         int prefHeight = contentPane.getPreferredH();
