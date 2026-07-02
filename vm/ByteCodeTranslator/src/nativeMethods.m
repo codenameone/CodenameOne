@@ -2507,6 +2507,25 @@ JAVA_CHAR java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE,
     return dat[index];
 }
 
+// Small-copy helper: a libc memcpy call costs more than the copy itself for the
+// short segments string building deals in (a handful of UTF-16 chars). Inline
+// 8-byte word moves up to 32 chars; beyond that libc's SIMD wins. src/dst never
+// overlap here (fresh destination or append region beyond the source).
+static inline void cn1CharCopy(JAVA_ARRAY_CHAR* dst, const JAVA_ARRAY_CHAR* src, int count) {
+    if(count <= 32) {
+        int b = count * (int)sizeof(JAVA_ARRAY_CHAR);
+        int i = 0;
+        for(; i + 8 <= b; i += 8) {
+            uint64_t w; memcpy(&w, (const char*)src + i, 8); memcpy((char*)dst + i, &w, 8);
+        }
+        for(; i + 2 <= b; i += 2) {
+            uint16_t w; memcpy(&w, (const char*)src + i, 2); memcpy((char*)dst + i, &w, 2);
+        }
+    } else {
+        memcpy(dst, src, (size_t)count * sizeof(JAVA_ARRAY_CHAR));
+    }
+}
+
 JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT str) {
     enteringNativeAllocations();
     if (str == JAVA_NULL) {
@@ -2514,17 +2533,71 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
         finishedNativeAllocations();
         return __cn1ThisObject;
     }
-    int length = java_lang_String_length___R_int(threadStateData, str);
+    struct obj__java_lang_String* s = (struct obj__java_lang_String*)str;
+    int length = s->java_lang_String_count;
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
     int newCount = t->java_lang_StringBuilder_count + length;
     if (newCount > ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->length) {
         java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, newCount);
     }
-    java_lang_String_getChars___int_int_char_1ARRAY_int(threadStateData, str, 0, length, t->java_lang_StringBuilder_value, t->java_lang_StringBuilder_count);
+    JAVA_ARRAY_CHAR* src = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)s->java_lang_String_value)->data) + s->java_lang_String_offset;
+    JAVA_ARRAY_CHAR* dst = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data) + t->java_lang_StringBuilder_count;
+    cn1CharCopy(dst, src, length);
     t->java_lang_StringBuilder_count = newCount;
     finishedNativeAllocations();
     return __cn1ThisObject;
-    
+
+}
+
+// Native toString: the result String is ONE fused block (object + char[] child)
+// filled with a single memcpy -- no Java ctor chain, no System.arraycopy, no
+// separate array allocation. Falls back to the pure-Java twin when the fused
+// allocator declines (oversize for BiBOP).
+JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    if(__builtin_expect(!class__java_lang_String.initialized, 0)) __STATIC_INITIALIZER_java_lang_String(threadStateData);
+    struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
+    int count = t->java_lang_StringBuilder_count;
+    enteringNativeAllocations();
+    int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
+    int total = off + CN1_FUSED_ARR_BYTES(count, sizeof(JAVA_ARRAY_CHAR));
+    // Inline no-zero bump path (init-before-publish, same discipline as the
+    // translator's CN1_FAST_NEW_NOZERO sites): every field of the String AND
+    // of the fused child header is stored, the data region is fully memcpy'd,
+    // and ONLY THEN is the class pointer published -- until that store the
+    // parentCls==0 guard keeps a signal-stopped scan from tracing the body.
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+    JAVA_OBJECT so = cn1BibopFastAllocNoZero(threadStateData, total, &class__java_lang_String, CN1_BIBOP_CIDX(total));
+#else
+    JAVA_OBJECT so = JAVA_NULL;
+#endif
+    JAVA_BOOLEAN published = JAVA_FALSE;
+    if(so == JAVA_NULL) {
+        so = cn1AllocFused(threadStateData, total, &class__java_lang_String); // zeroed, parentCls set
+        if(so == JAVA_NULL) {
+            JAVA_OBJECT r = java_lang_StringBuilder_toStringImpl___R_java_lang_String(threadStateData, __cn1ThisObject);
+            finishedNativeAllocations();
+            return r;
+        }
+        published = JAVA_TRUE;
+    }
+    JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), count);
+    struct obj__java_lang_String* rs = (struct obj__java_lang_String*)so;
+    rs->java_lang_String_value = arr;
+    rs->java_lang_String_offset = 0;
+    rs->java_lang_String_count = count;
+    rs->java_lang_String_hashCode = 0;
+    rs->java_lang_String_nsString = 0;
+    if(count > 0) {
+        // re-read the buffer AFTER the allocation (it can run a GC handshake;
+        // non-moving heap, but the value field itself is re-loadable for free)
+        JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data;
+        cn1CharCopy((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data, src, count);
+    }
+    if(!published) {
+        so->__codenameOneParentClsReference = &class__java_lang_String; // PUBLISH
+    }
+    finishedNativeAllocations();
+    return so;
 }
 
 JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT start, JAVA_INT end, JAVA_OBJECT dst, JAVA_INT dstStart) {
@@ -2609,11 +2682,9 @@ JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREA
     JAVA_ARRAY srcArr = (JAVA_ARRAY)get_field_java_lang_String_value(__cn1ThisObject);
     JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)srcArr->data;
     JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)__cn1Arg3)->data;
-    int start = offset + __cn1Arg1;
-    int end = offset + __cn1Arg2;
-    for (JAVA_INT i=start; i<end; i++) {
-        dst[__cn1Arg4++] = src[i];
-    }
+    // memmove: String and destination can only overlap through VM-internal
+    // aliasing tricks, but the safe spelling costs nothing here
+    memmove(dst + __cn1Arg4, src + offset + __cn1Arg1, (size_t)(__cn1Arg2 - __cn1Arg1) * sizeof(JAVA_ARRAY_CHAR));
 }
 
 // Shared non-ObjC case-conversion body: per-char simple mapping via towupper/
