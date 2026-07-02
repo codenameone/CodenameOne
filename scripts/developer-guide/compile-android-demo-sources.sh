@@ -52,6 +52,7 @@ fi
 WORK_DIR="${TMPDIR:-/tmp}/cn1-docs-android-compile"
 CLASSES_DIR="$WORK_DIR/classes"
 SOURCES_FILE="$WORK_DIR/android-sources.txt"
+STUB_SOURCES_DIR="$WORK_DIR/stubs"
 
 rm -rf "$WORK_DIR"
 mkdir -p "$CLASSES_DIR"
@@ -66,6 +67,58 @@ if [ -d "$ANDROID_BINARIES_DIR" ]; then
   while IFS= read -r jar; do
     COMPILE_CLASSPATH="$COMPILE_CLASSPATH:$jar"
   done < <(find "$ANDROID_BINARIES_DIR" -maxdepth 1 -name '*.jar' -print | sort)
+fi
+
+if [ "${CN1_FORCE_ANDROID_COMPILE_STUBS:-0}" = "1" ] \
+    || ! javap -classpath "$COMPILE_CLASSPATH" com.codename1.impl.android.AndroidNativeUtil >/dev/null 2>&1 \
+    || ! javap -classpath "$COMPILE_CLASSPATH" com.codename1.impl.android.AndroidImplementation >/dev/null 2>&1 \
+    || ! javap -classpath "$COMPILE_CLASSPATH" com.codename1.impl.android.PermissionPromptCallback >/dev/null 2>&1; then
+  mkdir -p "$STUB_SOURCES_DIR/com/codename1/impl/android"
+  cat > "$STUB_SOURCES_DIR/com/codename1/impl/android/AndroidNativeUtil.java" <<'STUB'
+package com.codename1.impl.android;
+
+import android.app.Activity;
+
+public final class AndroidNativeUtil {
+    private AndroidNativeUtil() {
+    }
+
+    public static boolean checkForPermission(String permission, String rationale) {
+        return true;
+    }
+
+    public static Activity getActivity() {
+        return null;
+    }
+
+    public static void setPermissionPromptCallback(PermissionPromptCallback callback) {
+    }
+}
+STUB
+  cat > "$STUB_SOURCES_DIR/com/codename1/impl/android/AndroidImplementation.java" <<'STUB'
+package com.codename1.impl.android;
+
+public final class AndroidImplementation {
+    private AndroidImplementation() {
+    }
+
+    public static void runOnUiThreadAndBlock(Runnable runnable) {
+        if (runnable != null) {
+            runnable.run();
+        }
+    }
+}
+STUB
+  cat > "$STUB_SOURCES_DIR/com/codename1/impl/android/PermissionPromptCallback.java" <<'STUB'
+package com.codename1.impl.android;
+
+public interface PermissionPromptCallback {
+    boolean showPermissionPrompt(String permission, String title, String body, String positiveButtonText, String negativeButtonText);
+
+    void showPermissionMessage(String permission, String title, String body, String okButtonText);
+}
+STUB
+  find "$STUB_SOURCES_DIR" -name '*.java' -print | sort >> "$SOURCES_FILE"
 fi
 
 javac \
