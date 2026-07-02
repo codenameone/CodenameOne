@@ -1157,7 +1157,7 @@ in the bodies. Each function takes the thread state as its first argument and
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.java[tag=advanced-topics-under-the-hood-java-001,indent=0]
+include::../demos/common/src/main/java/com/mycompany/myapp/MyNative.java[tag=myNativeInterface,indent=0]
 ----
 
 This generates the C stub below (returning `JAVA_NULL` until you implement it):
@@ -1854,7 +1854,7 @@ The code below allows you to rearrange the items based on a sensible order. Noti
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.java[tag=advanced-topics-under-the-hood-java-004,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/RearrangeableItemsDemo.java[tag=rearrangeableItems,indent=0]
 ----
 
 .Drag demo
@@ -2000,12 +2000,12 @@ Optional native Android example for certificate fingerprint verification (called
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.java[tag=advanced-topics-under-the-hood-java-005,indent=0]
+include::../demos/android/src/main/java/com/example/wallet/WalletBridgeSecurity.java[tag=walletTrustedCallerSignature,indent=0]
 ----
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.java[tag=advanced-topics-under-the-hood-java-006,indent=0]
+include::../demos/android/src/main/java/com/example/wallet/WalletBridgeActivity.java[tag=walletBridgeActivity,indent=0]
 ----
 
 ===== Reading contract data in `start()`
@@ -2022,7 +2022,7 @@ Codename One exposes launch metadata through `AppArg` and `Display` properties. 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.java[tag=advanced-topics-under-the-hood-java-007,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/WalletLaunchHandlerSnippet.java[tag=walletLaunchStart,indent=0]
 ----
 
 ===== Returning results to the wallet API

@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           xvfb-run -a mvn -B -ntp -f maven/pom.xml \
-            -pl core,javase,css-compiler,codenameone-maven-plugin \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin \
             -am install \
             -Plocal-dev-javase \
             -DskipTests \
@@ -72,6 +72,12 @@ jobs:
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
           xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml test
+
+      - name: Compile Android demo sources
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          scripts/developer-guide/compile-android-demo-sources.sh
 
       - name: Validate developer guide snippets
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
