@@ -77,6 +77,23 @@ int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mutex, const s
 int pthread_cond_signal(pthread_cond_t* cond);
 int pthread_cond_broadcast(pthread_cond_t* cond);
 
+/* --- one-time initialization (BiBOP / nursery lazy init) --- */
+typedef struct { long state; } pthread_once_t; /* 0=idle 1=running 2=done */
+#define PTHREAD_ONCE_INIT { 0 }
+int pthread_once(pthread_once_t* once_control, void (*init_routine)(void));
+
+/* --- aligned allocation (BiBOP page arena) ---
+   Maps onto _aligned_malloc. The arena NEVER frees page memory (the page
+   registry is grow-only), so the _aligned_free pairing rule is moot. */
+static __inline int posix_memalign(void** memptr, size_t alignment, size_t size) {
+    void* p = _aligned_malloc(size, alignment);
+    if (p == 0) {
+        return 12; /* ENOMEM */
+    }
+    *memptr = p;
+    return 0;
+}
+
 /* --- thread local storage --- */
 int pthread_key_create(pthread_key_t* key, void (*destructor)(void*));
 int pthread_key_delete(pthread_key_t key);

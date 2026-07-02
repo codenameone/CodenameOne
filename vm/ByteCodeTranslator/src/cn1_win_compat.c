@@ -21,6 +21,19 @@
 _Static_assert(sizeof(cn1_srwlock_t) == sizeof(SRWLOCK), "SRWLOCK layout mismatch");
 _Static_assert(sizeof(cn1_condvar_t) == sizeof(CONDITION_VARIABLE), "CONDITION_VARIABLE layout mismatch");
 
+/* one-time init: double-checked CAS on the state word (0=idle 1=running 2=done) */
+int pthread_once(pthread_once_t* once_control, void (*init_routine)(void)) {
+    if (InterlockedCompareExchange((volatile LONG*)&once_control->state, 1, 0) == 0) {
+        init_routine();
+        InterlockedExchange((volatile LONG*)&once_control->state, 2);
+    } else {
+        while (InterlockedCompareExchange((volatile LONG*)&once_control->state, 2, 2) != 2) {
+            Sleep(0);
+        }
+    }
+    return 0;
+}
+
 /* --- mutex (non-recursive, like a default pthread mutex) --- */
 int pthread_mutex_init(pthread_mutex_t* mutex, const void* attr) {
     (void)attr;

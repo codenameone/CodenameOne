@@ -1,3 +1,8 @@
+// glibc/musl hide pthread_getattr_np and the ucontext REG_* gregs indices
+// behind _GNU_SOURCE; must be defined before the first libc include.
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
 #include "cn1_globals.h"
 #include <assert.h>
 #include "java_lang_Class.h"
@@ -2328,6 +2333,7 @@ static char* cn1GcStackBase(pthread_t pt, size_t* outSize) {
 // else a handler local that is strictly deeper than the interrupted frame -- safe, it
 // only widens the scanned range) and a raw copy of the ucontext (its inline mcontext
 // holds the GPRs on macOS/Linux), then spins until the GC publishes gcSigRelease.
+#if !defined(_WIN32)
 static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
     struct ThreadLocalData* t = cn1TlsSelf;
     if(t == 0) return;
@@ -2370,6 +2376,7 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
     // wipe a newer generation's park the GC is currently waiting on.
     if((int)t->gcSigStopped == gen) t->gcSigStopped = 0;
 }
+#endif // !_WIN32 (signal-stop unavailable; Windows uses the cooperative path)
 
 void cn1GcInstallSignalHandler(void) {
     if(cn1GcSignalHandlerInstalled) return;
@@ -3470,6 +3477,11 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
 static int gcMarkResolveThreadCount() {
 #ifdef CN1_GC_MARK_THREADS
     int n = CN1_GC_MARK_THREADS;
+#elif defined(_WIN32)
+    // no sysconf in the Win32 shim; NUMBER_OF_PROCESSORS is always set on Windows
+    const char* np = getenv("NUMBER_OF_PROCESSORS");
+    long ncpu = np != 0 ? atol(np) : 2;
+    int n = (int)(ncpu - 1);
 #else
     long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
     int n = (int)(ncpu - 1);

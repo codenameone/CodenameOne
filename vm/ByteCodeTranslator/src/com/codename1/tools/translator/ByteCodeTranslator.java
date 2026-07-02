@@ -969,7 +969,9 @@ public class ByteCodeTranslator {
                 // consumers whose final link is not LTO-aware, and clang-cl/lld-link
                 // on Windows is a separate follow-up. The iOS Xcode template enables
                 // the same via LLVM_LTO=YES_THIN on its optimized configurations.
-                writer.append("if(NOT MSVC)\n");
+                // -flto=thin is CLANG syntax; gcc (Alpine/musl default) rejects it.
+                // Plain gcc -flto is deliberately NOT substituted -- untested here.
+                writer.append("if(CMAKE_C_COMPILER_ID MATCHES \"Clang\")\n");
                 writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-flto=thin>)\n");
                 writer.append("    target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-flto=thin>)\n");
                 writer.append("endif()\n");
