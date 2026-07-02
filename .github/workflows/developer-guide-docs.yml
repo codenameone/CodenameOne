@@ -110,6 +110,14 @@ jobs:
           path: build/developer-guide/guide-screenshots
           if-no-files-found: warn
 
+      - name: Upload generated guide screenshots
+        if: always() && (github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true')
+        uses: actions/upload-artifact@v7
+        with:
+          name: developer-guide-generated-screenshots
+          path: build/developer-guide/guide-screenshots/generated
+          if-no-files-found: warn
+
       - name: Fail when guide screenshots differ
         if: steps.compare_guide_screenshots.outcome == 'failure'
         run: |

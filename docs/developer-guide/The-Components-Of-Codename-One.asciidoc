@@ -1413,7 +1413,7 @@ To enable in a custom theme:
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-components-of-codename-one.css[tag=the-components-of-codename-one-css-001,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=the-components-of-codename-one-css-001,indent=0]
 ----
 
 To toggle programmatically (for example, add it to a Tabs instance whose theme

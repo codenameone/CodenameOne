@@ -7,6 +7,7 @@ BASELINE_DIR="${BASELINE_DIR:-${PROJECT_ROOT}/docs/developer-guide/img}"
 STORAGE_DIR="${CN1_STORAGE_DIR:-${HOME}/.cn1}"
 MANIFEST_FILE="${GUIDE_SCREENSHOT_MANIFEST:-${PROJECT_ROOT}/scripts/developer-guide/guide-screenshots.txt}"
 ARTIFACT_DIR="${1:-${PROJECT_ROOT}/docs/demos/guide-screenshot-artifacts}"
+GENERATED_DIR="${ARTIFACT_DIR}/generated"
 
 if ! command -v compare >/dev/null 2>&1; then
   echo "ImageMagick 'compare' command is required." >&2
@@ -15,6 +16,7 @@ fi
 
 mkdir -p "${ARTIFACT_DIR}"
 find "${ARTIFACT_DIR}" -mindepth 1 -delete
+mkdir -p "${GENERATED_DIR}"
 
 if [[ ! -d "${STORAGE_DIR}" ]]; then
   echo "Storage directory ${STORAGE_DIR} does not exist; no guide screenshots were captured." >&2
@@ -47,6 +49,8 @@ for filename in "${EXPECTED_SCREENSHOTS[@]}"; do
     mismatch_count=$((mismatch_count + 1))
     continue
   fi
+
+  cp "${screenshot}" "${GENERATED_DIR}/${filename}"
 
   baseline=""
   baseline_ext=""

@@ -1,0 +1,275 @@
+/**
+ * Compiled developer-guide CSS snippets.
+ * Complete examples that do not require external assets or generated image borders live here.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+}
+
+/* tag::native-themes-css-001[] */
+#Constants {
+    includeNativeBool: true;
+    darkModeBool: true;
+}
+
+/* Touch the four UIIDs that paint with primary / primary-container.
+   The role-as-rule pattern keeps brand changes localised. */
+Button { background-color: #00796b; }
+Button.pressed { background-color: #4db6ac; color: #00251a; }
+RaisedButton { background-color: #b2dfdb; color: #00251a; }
+RaisedButton.pressed { background-color: #80cbc4; }
+SelectedTab { color: #00796b; }
+BackCommand { color: #00796b; }
+TitleCommand { color: #00796b; }
+/* end::native-themes-css-001[] */
+
+/* tag::native-themes-css-002[] */
+#Constants {
+    includeNativeBool: true;
+    darkModeBool: true;
+
+    /* Override the native theme's accent palette. The compiler picks
+       up these declarations from #Constants and exports them as
+       @accent-color / @accent-color-dark theme constants so every
+       UIID bound to var(--accent-color) in the parent native theme
+       picks them up at app launch - no per-UIID rule edit needed. */
+    --accent-color: #ff2d95;
+    --accent-color-dark: #ff2d95;
+    --accent-pressed-color: #c71a75;
+    --accent-pressed-color-dark: #c71a75;
+    --accent-on-color: #ffffff;
+
+    /* Material 3 RaisedButton uses a separate "container" tonal
+       pair; iOS ignores these (no bindings reference them) so it's
+       safe to set them unconditionally. */
+    --accent-container-color: #ff2d95;
+    --accent-container-color-dark: #ff2d95;
+    --accent-on-container-color: #ffffff;
+    --accent-on-container-color-dark: #ffffff;
+}
+/* end::native-themes-css-002[] */
+
+/* tag::native-themes-css-003[] */
+#Constants {
+    includeNativeBool: true;
+    darkModeBool: true;
+}
+
+/* Tweak only what's different. Everything you do not redeclare
+   keeps coming from the native theme. */
+RaisedButton { background-color: #d81b60; }
+RaisedButton.pressed { background-color: #b71c5c; }
+RaisedButton.disabled { background-color: #ffd6e2; color: #ffffff; }
+
+@media (prefers-color-scheme: dark) {
+    RaisedButton { background-color: #ff80ab; color: #4a0026; }
+    RaisedButton.pressed { background-color: #f06292; }
+}
+/* end::native-themes-css-003[] */
+
+/* tag::native-themes-css-004[] */
+DangerButton {
+    cn1-derive: RaisedButton;
+    background-color: #d32f2f;
+}
+DangerButton.pressed {
+    cn1-derive: RaisedButton;
+    background-color: #b71c1c;
+}
+/* end::native-themes-css-004[] */
+
+/* tag::the-components-of-codename-one-css-001[] */
+#Constants {
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;    /* tween duration in ms */
+    tabsAnimatedIndicatorThicknessMm: 1;      /* underline thickness  */
+}
+
+TabIndicator {
+    /* The indicator picks up its color from this UIID's fg. If the
+       UIID isn't defined or has fgColor == 0, the indicator falls
+       back to the currently-selected tab's fgColor. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+/* end::the-components-of-codename-one-css-001[] */
+
+/* tag::tvplatforms-css-001[] */
+Label {
+    color: black;
+}
+
+@media device-tv {
+    Label {
+        /* Larger type for the 10-foot UI */
+        font-size: 3mm;
+        color: white;
+    }
+}
+/* end::tvplatforms-css-001[] */
+
+/* tag::miscellaneous-features-css-001[] */
+#Constants {
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;       /* 8mm circle           */
+    pullToRefreshIndicatorStrokeMm: "0.6";     /* 0.6mm stroke thickness */
+}
+
+TabIndicator {
+    /* The pull-to-refresh arc shares its color with the animated tab
+       indicator -- both follow the brand's accent. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+/* end::miscellaneous-features-css-001[] */
+
+/* tag::css-css-001[] */
+Button {
+    text-align: center;
+    border: 1pt solid gray;
+    background-color: transparent;
+}
+
+Button.pressed {
+    background-color: gray;
+}
+/* end::css-css-001[] */
+
+/* tag::css-css-002[] */
+MyButton {
+   cn1-derive: Button;
+   background-color: blue;
+}
+/* end::css-css-002[] */
+
+/* tag::css-css-003[] */
+#Device {
+    min-resolution: 120dpi;
+    max-resolution: 480dpi;
+    resolution: 480dpi;
+}
+/* end::css-css-003[] */
+
+/* tag::css-css-007[] */
+#Constants {
+    --main-bg-color: red;
+}
+
+MyContainer {
+    background-color: var(--main-bg-color);
+}
+/* end::css-css-007[] */
+
+/* tag::css-css-008[] */
+#Constants {
+    --main-bg-color: red;
+}
+
+MyContainer {
+    background-color: var(--main-bg-color, blue);
+}
+/* end::css-css-008[] */
+
+/* tag::css-css-020[] */
+#Constants {
+  defaultSourceDPIInt: 0;
+}
+/* end::css-css-020[] */
+
+/* tag::css-css-027[] */
+SideCommand {
+    font-family:  "native:MainThin";
+}
+/* end::css-css-027[] */
+
+/* tag::css-css-032[] */
+#Constants {
+ defaultFontSizeInt: 18;
+}
+/* end::css-css-032[] */
+
+/* tag::css-css-033[] */
+#Constants {
+ defaultFontSizeInt: 18;
+ defaultDesktopFontSizeInt: 14;
+}
+/* end::css-css-033[] */
+
+/* tag::css-css-035[] */
+Button {
+    color: #222222;
+}
+
+@media (prefers-color-scheme: dark) {
+    Button {
+        color: #f0f0f0;
+        background-color: #000000;
+    }
+
+    Button.selected {
+        color: #ff0000;
+    }
+}
+/* end::css-css-035[] */
+
+/* tag::css-css-036[] */
+Label {
+    color: black;
+}
+
+@media platform-and {
+    Label {
+        color: green;
+    }
+}
+
+@media platform-ios {
+    Label {
+        color: red;
+    }
+}
+/* end::css-css-036[] */
+
+/* tag::css-css-040[] */
+Label {
+ font-size: 3mm;
+}
+/* end::css-css-040[] */
+
+/* tag::css-css-041[] */
+#Constants {
+ device-desktop-font-scale: "1.5";
+}
+
+Label {
+ font-size: 3mm;
+}
+/* end::css-css-041[] */
+
+/* tag::css-css-042[] */
+Label {
+ font-size: 3mm;
+}
+
+@media device-desktop {
+ Label {
+ font-size: 4.5mm;
+ }
+}
+/* end::css-css-042[] */
+
+/* tag::css-css-043[] */
+#Constants {
+ device-phone-font-scale: "1.5";
+ device-tablet-font-scale: "1.2";
+ device-desktop-font-scale: "1.4";
+ platform-ios-font-scale: "0.9";
+ density-low-font-scale: "1.2";
+ platform-ios-density-low-font-scale: "1.3";
+}
+/* end::css-css-043[] */

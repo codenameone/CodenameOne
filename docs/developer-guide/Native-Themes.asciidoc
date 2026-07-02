@@ -160,7 +160,7 @@ accent-bearing UIID at once:
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-001,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-themes-css-001,indent=0]
 ----
 
 === iOS modern color palette
@@ -325,7 +325,7 @@ runtime overrides:
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-002,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-themes-css-002,indent=0]
 ----
 
 Bindings that reference a constant you didn't override stay at
@@ -494,7 +494,7 @@ Your app's `theme.css` inherits from the installed native theme:
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-003,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-themes-css-003,indent=0]
 ----
 
 The user's CSS is layered on top of the native theme at app launch,
@@ -516,7 +516,7 @@ theme's UIIDs and refine it:
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/native-themes.css[tag=native-themes-css-004,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-themes-css-004,indent=0]
 ----
 
 `cn1-derive` works best when the relationship is *child refines

@@ -51,7 +51,7 @@ src/main/css/
 +
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.css[tag=svg-transcoder-css-001,indent=0]
+include::../demos/common/src/main/css/developer-guide/svg-transcoder.css[tag=svg-transcoder-css-001,indent=0]
 ----
 
 . Build the project:
@@ -91,7 +91,7 @@ reach for first.
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.css[tag=svg-transcoder-css-002,indent=0]
+include::../demos/common/src/main/css/developer-guide/svg-transcoder.css[tag=svg-transcoder-css-002,indent=0]
 ----
 
 Use `cn1-source-dpi: <bucket>` (accepted keywords: `low`, `medium`,
@@ -204,7 +204,7 @@ src/main/css/
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.css[tag=svg-transcoder-css-003,indent=0]
+include::../demos/common/src/main/css/developer-guide/svg-transcoder.css[tag=svg-transcoder-css-003,indent=0]
 ----
 
 [source,java]

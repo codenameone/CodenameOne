@@ -72,6 +72,11 @@ and path; parameters are annotated `@Path` / `@Query` / `@Header` /
 `@Body` so the processor knows how to assemble the `Rest` call.  The
 emitted method shape:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/example/petstore/PetApi.java[tag=appendix-goal-generate-openapi-java-001,indent=0]
+----
+
 
 Model types are emitted as fully qualified names (the API interface
 lives in `<basePackage>` and models under `<basePackage>.model`) so

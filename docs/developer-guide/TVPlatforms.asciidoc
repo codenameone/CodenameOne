@@ -47,7 +47,7 @@ selected at runtime when `Display.isTV()` (respectively `isWatch()`) returns
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/tvplatforms.css[tag=tvplatforms-css-001,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=tvplatforms-css-001,indent=0]
 ----
 
 === Building for Android TV / Google TV

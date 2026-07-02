@@ -167,6 +167,14 @@ def validate_includes(includes):
                 f"{item['sourceFile']}:{item['line']}: Java/Kotlin guide snippets in the common demo "
                 f"must live under a compiled source root, not src/main/snippets: {item['target']}"
             )
+        if item["language"].strip().lower() == "css" and (
+            "/demos/common/src/main/snippets/" in item["target"]
+            or item["target"].startswith("../demos/common/src/main/snippets/")
+        ):
+            errors.append(
+                f"{item['sourceFile']}:{item['line']}: CSS guide snippets in the common demo "
+                f"must live under src/main/css so the CSS compiler sees them: {item['target']}"
+            )
         if item["language"].strip().lower() in ("javascript", "html") and (
             "/demos/common/" in item["target"] or item["target"].startswith("../demos/common/")
         ):

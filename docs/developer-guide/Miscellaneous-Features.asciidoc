@@ -604,7 +604,7 @@ To enable in a custom theme:
 
 [source,css]
 ----
-include::../demos/common/src/main/snippets/developer-guide/miscellaneous-features.css[tag=miscellaneous-features-css-001,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=miscellaneous-features-css-001,indent=0]
 ----
 
 Behavior:
