@@ -251,18 +251,19 @@ public abstract class VideoIO {
             this.spoolPath = spoolPath;
         }
 
-        public int getWidth() { return delegate.getWidth(); }
-        public int getHeight() { return delegate.getHeight(); }
-        public long getDurationMillis() { return delegate.getDurationMillis(); }
-        public float getFrameRate() { return delegate.getFrameRate(); }
-        public boolean hasVideo() { return delegate.hasVideo(); }
-        public boolean hasAudio() { return delegate.hasAudio(); }
-        public int getAudioSampleRate() { return delegate.getAudioSampleRate(); }
-        public int getAudioChannels() { return delegate.getAudioChannels(); }
-        public VideoFrame frameAt(long millis) throws IOException { return delegate.frameAt(millis); }
-        public void readFrames(float fps, FrameCallback callback) throws IOException { delegate.readFrames(fps, callback); }
-        public AudioBuffer readAudio() throws IOException { return delegate.readAudio(); }
+        @Override public int getWidth() { return delegate.getWidth(); }
+        @Override public int getHeight() { return delegate.getHeight(); }
+        @Override public long getDurationMillis() { return delegate.getDurationMillis(); }
+        @Override public float getFrameRate() { return delegate.getFrameRate(); }
+        @Override public boolean hasVideo() { return delegate.hasVideo(); }
+        @Override public boolean hasAudio() { return delegate.hasAudio(); }
+        @Override public int getAudioSampleRate() { return delegate.getAudioSampleRate(); }
+        @Override public int getAudioChannels() { return delegate.getAudioChannels(); }
+        @Override public VideoFrame frameAt(long millis) throws IOException { return delegate.frameAt(millis); }
+        @Override public void readFrames(float fps, FrameCallback callback) throws IOException { delegate.readFrames(fps, callback); }
+        @Override public AudioBuffer readAudio() throws IOException { return delegate.readAudio(); }
 
+        @Override
         public void close() throws IOException {
             try {
                 delegate.close();

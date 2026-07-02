@@ -9,8 +9,6 @@ import com.codename1.media.VideoWriter;
 import com.codename1.media.VideoWriterBuilder;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
-import com.codename1.ui.Font;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 
 import java.io.InputStream;
@@ -258,41 +256,54 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
         0x8E24AA, // 6 violet
     };
 
-    /// A source frame: the digit (index+1) drawn large over that frame's
-    /// distinct colour.
+    /// 5x7 bitmap font for the digits 1..6 (each row is 5 bits, the high bit is
+    /// the left column). Rendered straight into the frame's ARGB int[] so no
+    /// mutable-image drawing/readback is involved -- Graphics text/image drawing
+    /// onto a mutable image is unreliable on the iOS Metal backend (the digits
+    /// vanished there when drawn that way).
+    private static final int[][] DIGIT_5x7 = {
+        {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E}, // 1
+        {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F}, // 2
+        {0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E}, // 3
+        {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02}, // 4
+        {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E}, // 5
+        {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E}, // 6
+    };
+
+    /// A source frame: the digit (index+1) rendered as a large bitmap over that
+    /// frame's distinct colour, composed entirely in an ARGB int[].
     private static Image makeDigitFrame(int index) {
         int rgb = FRAME_COLORS[index % FRAME_COLORS.length];
         int bg = 0xff000000 | rgb;
-        Image img = Image.createImage(VW, VH, bg);
-        Graphics g = img.getGraphics();
+        int r = (rgb >> 16) & 0xff, g = (rgb >> 8) & 0xff, b = rgb & 0xff;
+        int luma = (r * 30 + g * 59 + b * 11) / 100;
+        int ink = luma < 140 ? 0xffffffff : 0xff000000;
 
-        int r = (rgb >> 16) & 0xff, gg2 = (rgb >> 8) & 0xff, b = rgb & 0xff;
-        int luma = (r * 30 + gg2 * 59 + b * 11) / 100;
-        int ink = luma < 140 ? 0xffffff : 0x000000;
-        String s = String.valueOf(index + 1);
-        Font font = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
-        int tw = Math.max(1, font.stringWidth(s));
-        int th = Math.max(1, font.getHeight());
-        // Render the glyph small, then scale it up so the digit fills most of the
-        // frame regardless of the platform's native large-font size. The glyph
-        // buffer is filled with the frame's background so the scaled box blends in.
-        Image glyph = Image.createImage(tw, th, bg);
-        Graphics gg = glyph.getGraphics();
-        gg.setColor(ink);
-        gg.setFont(font);
-        gg.drawString(s, 0, 0);
-        int targetH = VH * 3 / 4;
-        int targetW = Math.max(1, tw * targetH / th);
-        if (targetW > VW * 3 / 4) {
-            targetW = VW * 3 / 4;
+        int[] px = new int[VW * VH];
+        java.util.Arrays.fill(px, bg);
+
+        int[] glyph = DIGIT_5x7[index % DIGIT_5x7.length];
+        // Scale the 5x7 glyph up to ~3/4 of the frame, keeping its aspect ratio.
+        int gh = VH * 3 / 4;
+        int gwid = gh * 5 / 7;
+        if (gwid > VW * 3 / 4) {
+            gwid = VW * 3 / 4;
+            gh = gwid * 7 / 5;
         }
-        Image big = glyph.scaled(targetW, targetH);
-        g.drawImage(big, (VW - targetW) / 2, (VH - targetH) / 2);
-        if (big != glyph) {
-            big.dispose();
+        int ox = (VW - gwid) / 2;
+        int oy = (VH - gh) / 2;
+        for (int y = 0; y < gh; y++) {
+            int gy = Math.min(6, y * 7 / gh);
+            int bits = glyph[gy];
+            int base = (oy + y) * VW + ox;
+            for (int x = 0; x < gwid; x++) {
+                int gx = Math.min(4, x * 5 / gwid);
+                if ((bits & (1 << (4 - gx))) != 0) {
+                    px[base + x] = ink;
+                }
+            }
         }
-        glyph.dispose();
-        return img;
+        return Image.createImage(px, VW, VH);
     }
 
     private static void cleanup(String path) {
