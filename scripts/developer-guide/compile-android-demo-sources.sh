@@ -24,7 +24,14 @@ if [ -z "$ANDROID_JAR" ]; then
 fi
 
 CORE_JAR="$HOME/.m2/repository/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar"
-ANDROID_CN1_JAR="$HOME/.m2/repository/com/codenameone/codenameone-android/8.0-SNAPSHOT/codenameone-android-8.0-SNAPSHOT-with-android-dependencies.jar"
+if [ ! -f "$CORE_JAR" ] && [ -f "$ROOT_DIR/maven/core/target/codenameone-core-8.0-SNAPSHOT.jar" ]; then
+  CORE_JAR="$ROOT_DIR/maven/core/target/codenameone-core-8.0-SNAPSHOT.jar"
+fi
+
+ANDROID_CN1_JAR="$ROOT_DIR/maven/android/target/codenameone-android-8.0-SNAPSHOT-with-android-dependencies.jar"
+if [ ! -f "$ANDROID_CN1_JAR" ]; then
+  ANDROID_CN1_JAR="$HOME/.m2/repository/com/codenameone/codenameone-android/8.0-SNAPSHOT/codenameone-android-8.0-SNAPSHOT-with-android-dependencies.jar"
+fi
 COMMON_CLASSES="$ROOT_DIR/docs/demos/common/target/classes"
 
 for required in "$CORE_JAR" "$ANDROID_CN1_JAR"; do
