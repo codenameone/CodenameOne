@@ -60,4 +60,17 @@ class RecognitionOptionsTest {
         assertEquals(1, new RecognitionOptions().setMaxResults(0).getMaxResults());
         assertEquals(1, new RecognitionOptions().setMaxResults(-3).getMaxResults());
     }
+
+    @Test
+    void timestampCallbacksForwardToStringCallbacksByDefault() {
+        final String[] transcript = new String[1];
+        TimedRecognitionCallback callback = new TimedRecognitionCallback.Adapter() {
+            @Override
+            public void onResult(String t, float c, String[] a) {
+                transcript[0] = t;
+            }
+        };
+        callback.onResult(TranscriptionResult.textOnly("caption text"), -1, new String[0]);
+        assertEquals("caption text", transcript[0]);
+    }
 }
