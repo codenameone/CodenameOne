@@ -956,6 +956,51 @@ extern BOOL isRetinaBug();
 // 3) Gaussian-blur, 4) apply optics (rounded-rect SDF mask + edge refraction +
 // specular rim), 5) draw the pill-shaped translucent glass patch back over the
 // backdrop so the component's fill + foreground (queued next) paint on top. Runs
+// ---- live-glass patch cache ------------------------------------------------
+// Caching/invalidation policy for the live-screen glass materials (review):
+//   * A glass surface only pays at all when it REPAINTS; a static chrome bar
+//     over static content costs nothing between repaints.
+//   * When it does repaint, the backdrop readback (commit + waitUntilCompleted
+//     + blit + getBytes) is unavoidable for correctness -- the material is a
+//     function of the pixels behind the glass. What CAN be skipped is the
+//     expensive composition: the per-pixel colour transform, the Gaussian
+//     blur and the edge optics.
+//   * So the composed patch is cached per glass rect: while the rect, the
+//     material parameters AND a hash of the backdrop bytes are unchanged
+//     (i.e. "backdrop and bounds are stable"), the cached patch is redrawn
+//     directly. When the backdrop changes -- scrolling content under the bar,
+//     an animation behind the glass -- the hash misses and the patch is
+//     recomposed that frame; there is no stale-glass failure mode because the
+//     decision is taken from the actual backdrop bytes, not from heuristics.
+//   * The travelling selection LENS never takes this path: it is a pure GPU
+//     fragment shader on the frame's own command buffer (lensScreenRegionX),
+//     with no sync and no readback, so it needs no cache.
+// Define CN1_GLASS_PROFILE to NSLog per-paint timing + cache hit/miss so the
+// frame-cost evidence is reproducible on any device/simulator build.
+#define CN1_GLASS_PATCH_CACHE_SLOTS 8
+typedef struct {
+    int valid;
+    int fx, fy, fw, fh;
+    float rad, cornerRadius, sat, scale, offset, refract, specular;
+    uint64_t backdropHash;
+    uint32_t *patch;       // composed premultiplied glass patch (fw*fh), malloc'd
+} CN1GlassPatchCacheEntry;
+static CN1GlassPatchCacheEntry cn1GlassPatchCache[CN1_GLASS_PATCH_CACHE_SLOTS];
+static int cn1GlassPatchCacheNext = 0;
+
+// FNV-1a over the backdrop words -- a fraction of the cost of the blur pass it
+// can save, and any real backdrop change flips it.
+static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
+    const uint32_t *words = (const uint32_t *)bytes;
+    size_t n = len / 4;
+    uint64_t hsh = 1469598103934665603ULL;
+    for (size_t i = 0; i < n; i++) {
+        hsh ^= words[i];
+        hsh *= 1099511628211ULL;
+    }
+    return hsh;
+}
+
 // during the drain like blurScreenRegionX; one GPU sync per glass paint.
 - (void)glassScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius
               cornerRadius:(float)cornerRadius sat:(float)sat scale:(float)scale
@@ -1019,6 +1064,37 @@ extern BOOL isRetinaBug();
     if (avail == NULL) { [self setFramebuffer]; return; }
     [scratch getBytes:avail bytesPerRow:availRow fromRegion:MTLRegionMake2D(0, 0, aw, ah) mipmapLevel:0];
 
+#ifdef CN1_GLASS_PROFILE
+    CFTimeInterval cn1gpT0 = CACurrentMediaTime();
+#endif
+    // 2b) Patch cache: when this glass rect, its material params AND the
+    //     backdrop bytes are unchanged since the last composition, redraw the
+    //     cached patch and skip the transform + blur + optics entirely (see
+    //     the policy comment above the cache).
+    uint64_t backdropHash = cn1GlassBackdropHash(avail, availRow * (NSUInteger)ah);
+    int cacheSlot = -1;
+    for (int ci = 0; ci < CN1_GLASS_PATCH_CACHE_SLOTS; ci++) {
+        CN1GlassPatchCacheEntry *e = &cn1GlassPatchCache[ci];
+        if (e->valid && e->fx == fx && e->fy == fy && e->fw == fw && e->fh == fh
+                && e->rad == rad && e->cornerRadius == cornerRadius && e->sat == sat
+                && e->scale == scale && e->offset == offset && e->refract == refract
+                && e->specular == specular) {
+            cacheSlot = ci;
+            if (e->backdropHash == backdropHash && e->patch != NULL) {
+                free(avail);
+                [self setFramebuffer];
+                [self drawGlassPatch:e->patch fw:fw fh:fh x:x y:y w:w h:h];
+#ifdef CN1_GLASS_PROFILE
+                NSLog(@"CN1GLASSPROF hit rect=%d,%d %dx%d hash=%016llx %.2fms",
+                      fx, fy, fw, fh, (unsigned long long)backdropHash,
+                      (CACurrentMediaTime() - cn1gpT0) * 1000.0);
+#endif
+                return;
+            }
+            break;
+        }
+    }
+
     // 3) Edge-replicate into a padded buffer and apply the colour material.
     uint32_t *prgb = (uint32_t *)malloc((size_t)bw * (size_t)bh * 4);
     if (prgb == NULL) { free(avail); [self setFramebuffer]; return; }
@@ -1047,10 +1123,38 @@ extern BOOL isRetinaBug();
     glassApplyOptics(prgb, bw, bh, pad, out, fw, fh, cornerRadius, refract, specular, (float)s);
     free(prgb);
 
+    // 4b) Store the composed patch in the cache (the cache owns the buffer).
+    if (cacheSlot < 0) {
+        cacheSlot = cn1GlassPatchCacheNext;
+        cn1GlassPatchCacheNext = (cn1GlassPatchCacheNext + 1) % CN1_GLASS_PATCH_CACHE_SLOTS;
+    }
+    CN1GlassPatchCacheEntry *entry = &cn1GlassPatchCache[cacheSlot];
+    if (entry->patch != NULL) {
+        free(entry->patch);
+    }
+    entry->valid = 1;
+    entry->fx = fx; entry->fy = fy; entry->fw = fw; entry->fh = fh;
+    entry->rad = rad; entry->cornerRadius = cornerRadius; entry->sat = sat;
+    entry->scale = scale; entry->offset = offset; entry->refract = refract;
+    entry->specular = specular;
+    entry->backdropHash = backdropHash;
+    entry->patch = out;
+
     // 5) Restart the screen encoder, then draw the glass patch back (display coords).
     [self setFramebuffer];
+    [self drawGlassPatch:out fw:fw fh:fh x:x y:y w:w h:h];
+#ifdef CN1_GLASS_PROFILE
+    NSLog(@"CN1GLASSPROF miss rect=%d,%d %dx%d hash=%016llx %.2fms",
+          fx, fy, fw, fh, (unsigned long long)backdropHash,
+          (CACurrentMediaTime() - cn1gpT0) * 1000.0);
+#endif
+}
+
+// Uploads a composed premultiplied-BGRA glass patch and draws it at the given
+// CN1-logical rect. The patch buffer is NOT consumed (the cache owns it).
+- (void)drawGlassPatch:(uint32_t *)patch fw:(int)fw fh:(int)fh x:(int)x y:(int)y w:(int)w h:(int)h {
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-    CGContextRef bmp = CGBitmapContextCreate(out, fw, fh, 8, (size_t)fw * 4, cs,
+    CGContextRef bmp = CGBitmapContextCreate(patch, fw, fh, 8, (size_t)fw * 4, cs,
         kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
     CGImageRef outCg = bmp ? CGBitmapContextCreateImage(bmp) : NULL;
     if (outCg != NULL) {
@@ -1061,7 +1165,6 @@ extern BOOL isRetinaBug();
     }
     if (bmp != NULL) { CGContextRelease(bmp); }
     CGColorSpaceRelease(cs);
-    free(out);
 }
 
 // Live-screen iOS 26 selection "drop" LENS. Unlike glassScreenRegionX (a frosted
