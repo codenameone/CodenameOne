@@ -59,6 +59,10 @@ final class RefWidgets {
             int[][] sts = {{-android.R.attr.state_enabled}, {}};
             b.setBackgroundTintList(new android.content.res.ColorStateList(sts, new int[]{disBg, container}));
             b.setTextColor(new android.content.res.ColorStateList(sts, new int[]{disText, onContainer}));
+            // The real tonal style also swaps the ripple to onSecondaryContainer;
+            // the filled default (onPrimary) is invisible over the container fill.
+            b.setRippleColor(android.content.res.ColorStateList.valueOf(
+                    (onContainer & 0xffffff) | (0x1f << 24)));
             view = b;
         } else if ("material_button_outlined".equals(kind) || "material_button_text".equals(kind)) {
             MaterialButton b = new MaterialButton(ctx, null,
@@ -195,11 +199,13 @@ final class RefWidgets {
     }
 
     /**
-     * Applies the PRESSED visual state on a live, laid-out view: the real
-     * state_pressed drawable state plus a centred ripple hotspot, with
-     * drawables snapped so the capture is deterministic (no mid-ripple frame).
-     * This is what the retired off-screen factory could not do honestly --
-     * a real window runs the state-layer rendering exactly as a touch would.
+     * Applies the PRESSED visual state on a live, laid-out view by dispatching
+     * a REAL held touch-down at the widget centre: the ripple/state-layer runs
+     * its normal enter animation on the RenderThread and settles into the held
+     * steady state, exactly as under a user's finger. (The synthetic
+     * setPressed + jumpDrawablesToCurrentState path leaves some styles -- the
+     * outlined button, notably -- with no visible layer at all.) The caller
+     * must wait for the ripple to settle before capturing.
      */
     static void applyPressedIfNeeded(View tile, String state) {
         if (!"pressed".equals(state) || !(tile instanceof ViewGroup)
@@ -207,14 +213,18 @@ final class RefWidgets {
             return;
         }
         View v = ((ViewGroup) tile).getChildAt(0);
+        float cx = Math.max(1, v.getWidth() / 2f);
+        float cy = Math.max(1, v.getHeight() / 2f);
+        long t = android.os.SystemClock.uptimeMillis();
+        android.view.MotionEvent ev = android.view.MotionEvent.obtain(
+                t, t, android.view.MotionEvent.ACTION_DOWN, cx, cy, 0);
+        v.dispatchTouchEvent(ev);
+        ev.recycle();
         v.setPressed(true);
-        v.refreshDrawableState();
         android.graphics.drawable.Drawable bg = v.getBackground();
         if (bg != null) {
-            bg.setState(new int[]{android.R.attr.state_enabled, android.R.attr.state_pressed});
-            bg.setHotspot(Math.max(1, v.getWidth() / 2f), Math.max(1, v.getHeight() / 2f));
+            bg.setHotspot(cx, cy);
         }
-        jumpDrawables(tile);
     }
 
     /** Recursively snap every drawable in the tree to its final state. */

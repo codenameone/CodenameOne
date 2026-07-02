@@ -147,17 +147,35 @@ public class MainActivity extends Activity {
         root.removeAllViews();
         root.addView(tile, new FrameLayout.LayoutParams(w, h));
         final View tileRef = tile;
-        // Two frames: one to lay out + apply the pressed state on the LIVE view,
-        // one so the state-layer actually renders before the copy.
+        // Lay out first, then apply the state. Static states snap their
+        // drawables and capture after a short settle; pressed states hold a
+        // REAL touch-down and wait for the ripple's enter animation to reach
+        // its held steady state before the copy (well past the ~300ms Material
+        // ripple, still under the long-press timeout side effects mattering
+        // for these widgets).
+        final boolean pressed = "pressed".equals(job.state);
         tile.post(new Runnable() {
             public void run() {
                 RefWidgets.applyPressedIfNeeded(tileRef, job.state);
-                RefWidgets.jumpDrawables(tileRef);
+                if (!pressed) {
+                    RefWidgets.jumpDrawables(tileRef);
+                    tileRef.postDelayed(new Runnable() {
+                        public void run() {
+                            capture(job, tileRef, w, h);
+                        }
+                    }, 120);
+                    return;
+                }
+                // Held press: let the ripple's enter animation play out and
+                // settle into the held steady state (~300ms), then capture.
+                // Do NOT jumpDrawablesToCurrentState here -- on a held
+                // RippleDrawable that clears the settled state layer instead
+                // of finishing it.
                 tileRef.postDelayed(new Runnable() {
                     public void run() {
                         capture(job, tileRef, w, h);
                     }
-                }, 120);
+                }, 700);
             }
         });
     }

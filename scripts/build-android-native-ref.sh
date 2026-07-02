@@ -38,10 +38,12 @@ if [ "$DPI" != "160" ]; then
   log "WARNING: capturing at ${DPI}dpi will not match the CI emulator profile (160dpi)."
 fi
 
-if command -v gradle >/dev/null 2>&1; then
+if [ -x "$PROJ/gradlew" ]; then
+  GRADLE="$PROJ/gradlew"
+elif command -v gradle >/dev/null 2>&1; then
   GRADLE=gradle
 else
-  log "gradle not found on PATH (install via Android Studio / sdkman)"; exit 3
+  log "gradle not found (no wrapper at $PROJ/gradlew and none on PATH)"; exit 3
 fi
 
 log "Building the native-ref APK"
@@ -52,9 +54,12 @@ APK="$PROJ/app/build/outputs/apk/debug/app-debug.apk"
 log "Installing + launching"
 "${ADB[@]}" install -r "$APK" >/dev/null
 "${ADB[@]}" shell am force-stop "$PKG" >/dev/null 2>&1 || true
-"${ADB[@]}" shell am start -n "$PKG/.MainActivity" >/dev/null
 
 REFS="/sdcard/Android/data/$PKG/files/refs"
+# Clear any previous run's output BEFORE launching, or the DONE poll below can
+# race the app's own cleanup and pull the stale set.
+"${ADB[@]}" shell "rm -rf $REFS" >/dev/null 2>&1 || true
+"${ADB[@]}" shell am start -n "$PKG/.MainActivity" >/dev/null
 log "Waiting for capture to finish"
 for i in $(seq 1 60); do
   if "${ADB[@]}" shell "ls $REFS/DONE" >/dev/null 2>&1; then
