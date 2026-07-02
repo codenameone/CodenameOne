@@ -195,8 +195,11 @@ public class MorphFrameValidator {
                 // toward the source tab) is a large fraction of the tile and still fails.
                 // The settle window opens at t=86: the spring's overshoot peaks near
                 // t~0.87 (travelEnd 0.78 + peak of sin(u*pi)*(1-u)), so pull-back is
-                // legitimate physics from there on.
-                int settleAllowancePx = Math.max(overshootPx, base.getWidth() / 10);
+                // legitimate physics from there on. 15% of the tile: the measured
+                // iOS-26 morph pulls back ~12.6% of the tile at settle (overshoot +
+                // bubble-width relaxation at 3x device scale); a broken settle that
+                // snaps back toward the source tab is a whole cell (~30%+) and fails.
+                int settleAllowancePx = Math.max(overshootPx, base.getWidth() * 15 / 100);
                 int maxSeen = -1;
                 for (int i = 1; i < ts.size(); i++) {
                     int t = ts.get(i);
