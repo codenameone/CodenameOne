@@ -88,10 +88,12 @@ public class FidelityDeviceRunner {
 
     private void runSuiteImpl() {
         platform = resolvePlatform();
-        // Default ON: every run also renders the native reference so the host
-        // can (re)generate goldens and report fidelity without separate device
-        // property plumbing. Set cn1ss.fidelity.captureNative=false to skip.
-        captureNative = !"false".equals(Display.getInstance().getProperty("cn1ss.fidelity.captureNative", "true"));
+        // Default OFF: native references are captured LOCALLY by the standalone
+        // native-ref apps (scripts/build-{ios,android}-native-ref.sh) and
+        // committed as versioned golden sets -- the suite only renders the CN1
+        // side. Set cn1ss.fidelity.captureNative=true to also exercise the
+        // legacy in-app factory (its renders are archived for debugging only).
+        captureNative = "true".equals(Display.getInstance().getProperty("cn1ss.fidelity.captureNative", "false"));
         println("CN1SS:INFO:fidelity platform=" + platform + " captureNative=" + captureNative);
         spec = loadSpec();
         if (spec == null) {

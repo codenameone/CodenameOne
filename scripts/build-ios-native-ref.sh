@@ -66,9 +66,18 @@ log "Booting simulator $UDID"
 xcrun simctl boot "$UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1 || true
 
-log "Installing + launching native-ref app"
+log "Installing native-ref app"
 xcrun simctl uninstall "$UDID" "$BUNDLE_ID" 2>/dev/null || true
 xcrun simctl install "$UDID" "$BUILD"
+
+# Build+install only (record-ios-native-anim.sh launches the app itself in
+# its animate mode instead of the default still-capture run).
+if [ "${NATIVEREF_BUILD_ONLY:-0}" = "1" ]; then
+  log "NATIVEREF_BUILD_ONLY=1 -- app installed, skipping still capture"
+  exit 0
+fi
+
+log "Launching native-ref app"
 # --console streams stdout until the app exits (it calls exit(0) after writing).
 xcrun simctl launch --console-pty "$UDID" "$BUNDLE_ID" 2>&1 | sed 's/^/[native-ref][app] /' || true
 

@@ -74,9 +74,11 @@ func colorFromHex(_ hex: String) -> UIColor? {
 }
 
 let SPECS: [Spec] = [
-    Spec(component: "Button",      kind: "ios_uibutton_system", states: ["normal","disabled"], wMM: 60, hMM: 14),
-    Spec(component: "RaisedButton",kind: "ios_uibutton_filled", states: ["normal","disabled"], wMM: 60, hMM: 14),
-    Spec(component: "FlatButton",  kind: "ios_uibutton_plain",  states: ["normal"],            wMM: 60, hMM: 14),
+    // "pressed" is a REAL highlighted state on the live control (isHighlighted
+    // in a real window) -- something an off-screen rasterizer cannot produce.
+    Spec(component: "Button",      kind: "ios_uibutton_system", states: ["normal","pressed","disabled"], wMM: 60, hMM: 14),
+    Spec(component: "RaisedButton",kind: "ios_uibutton_filled", states: ["normal","pressed","disabled"], wMM: 60, hMM: 14),
+    Spec(component: "FlatButton",  kind: "ios_uibutton_plain",  states: ["normal","pressed"],            wMM: 60, hMM: 14),
     Spec(component: "TextField",   kind: "ios_uitextfield",     states: ["normal","disabled"],           wMM: 60, hMM: 14),
     Spec(component: "CheckBox",    kind: "ios_check_glyph",     states: ["normal","selected","disabled"],wMM: 60, hMM: 14),
     Spec(component: "RadioButton", kind: "ios_radio_glyph",     states: ["normal","selected","disabled"],wMM: 60, hMM: 14),
@@ -93,17 +95,8 @@ let SPECS: [Spec] = [
     Spec(component: "GlassPanelRed",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "ff3b30"),
     Spec(component: "GlassPanelGrad",  kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "gradient"),
     Spec(component: "GlassPanelPhoto", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "photo"),
-    // Reverse-engineering patches: solid grays + RGB primaries through the real
-    // UIVisualEffectView, so the host can fit the glass colour transform (the glass
-    // output over a solid == the transform of that colour, blur being a no-op).
-    Spec(component: "GlassCharK00", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "000000"),
-    Spec(component: "GlassCharK40", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "404040"),
-    Spec(component: "GlassCharK80", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "808080"),
-    Spec(component: "GlassCharKC0", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "c0c0c0"),
-    Spec(component: "GlassCharKFF", kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "ffffff"),
-    Spec(component: "GlassCharR",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "ff0000"),
-    Spec(component: "GlassCharG",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "00ff00"),
-    Spec(component: "GlassCharB",   kind: "ios_glass_panel", states: ["normal"], wMM: 60, hMM: 14, backdrop: "0000ff"),
+    // (The GlassChar* reverse-engineering patches were retired once the glass
+    // colour transform was fitted; their goldens are gone from the committed set.)
     Spec(component: "TabsGeom",        kind: "ios_uitabbar",    states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
     Spec(component: "TabOne",          kind: "ios_uitabbar_one", states: ["normal"], wMM: 60, hMM: 16, backdrop: "808080"),
     // Ladder rungs: a glass capsule (radius h/2) filling the tile minus 1mm, with
@@ -377,10 +370,66 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         w.rootViewController = UIViewController()
         w.makeKeyAndVisible()
         self.window = w
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.renderAll(host: w.rootViewController!.view)
+        let env = ProcessInfo.processInfo.environment
+        if env["NATIVEREF_MODE"] == "animate" {
+            // Animation-reference mode (record-ios-native-anim.sh): loop a REAL
+            // native animation -- the iOS 26 tab-selection lens morph or the
+            // UISwitch toggle -- while the host records the simulator screen.
+            // The resulting video is the native motion reference the CN1
+            // deterministic morph frames are compared against.
+            let anim = env["NATIVEREF_ANIM"] ?? "tabs"
+            let appearance = env["NATIVEREF_APPEARANCE"] ?? "light"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.runAnimation(host: w.rootViewController!.view, anim: anim, appearance: appearance)
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.renderAll(host: w.rootViewController!.view)
+            }
         }
         return true
+    }
+
+    func runAnimation(host: UIView, anim: String, appearance: String) {
+        host.overrideUserInterfaceStyle = appearance == "dark" ? .dark : .light
+        host.backgroundColor = UIColor(white: 0.5, alpha: 1)   // the morph frames' flat grey
+        if anim == "switch" {
+            let sw = UISwitch()
+            sw.isOn = false
+            sw.translatesAutoresizingMaskIntoConstraints = false
+            host.addSubview(sw)
+            NSLayoutConstraint.activate([
+                sw.centerXAnchor.constraint(equalTo: host.centerXAnchor),
+                sw.centerYAnchor.constraint(equalTo: host.centerYAnchor),
+            ])
+            print("NATIVEREF:ANIMATING switch \(appearance)")
+            Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { _ in
+                sw.setOn(!sw.isOn, animated: true)
+            }
+            return
+        }
+        // Default: the tab bar selection morph, first tab -> last tab and back,
+        // mirroring the deterministic CN1 TabsMorph frames (travel 0 -> last).
+        let wPt = 60.0 * PT_PER_MM
+        let hPt = 16.0 * PT_PER_MM
+        let bar = UITabBar(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
+        let a = UITabBarItem(title: "Featured", image: UIImage(systemName: "star.fill"), tag: 0)
+        let b = UITabBarItem(title: "Search", image: UIImage(systemName: "magnifyingglass"), tag: 1)
+        let c = UITabBarItem(title: "More", image: UIImage(systemName: "ellipsis"), tag: 2)
+        bar.items = [a, b, c]
+        bar.selectedItem = a
+        let ap = UITabBarAppearance()
+        ap.configureWithDefaultBackground()
+        bar.standardAppearance = ap
+        if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap }
+        bar.center = CGPoint(x: host.bounds.midX, y: host.bounds.midY)
+        host.addSubview(bar)
+        print("NATIVEREF:ANIMATING tabs \(appearance)")
+        var toLast = true
+        Timer.scheduledTimer(withTimeInterval: 1.4, repeats: true) { _ in
+            bar.selectedItem = toLast ? c : a
+            toLast = !toLast
+        }
     }
 
     func renderAll(host: UIView) {

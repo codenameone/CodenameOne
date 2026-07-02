@@ -58,13 +58,17 @@ defaults:
   appearances: light,dark
 
 components:
+  # "pressed" references are captured as a REAL highlighted/pressed state on a
+  # live control in the native-ref apps (isHighlighted / setPressed + ripple
+  # hotspot in a real window) -- honest pressed visuals an off-screen
+  # rasterizer cannot produce.
   - id: Button
     material: glass
     cn1_uiid: Button
     native: ios_uibutton_system
     native_android: material_button_filled
     text: Default
-    states: normal,disabled
+    states: normal,pressed,disabled
 
   - id: RaisedButton
     material: glass
@@ -72,7 +76,7 @@ components:
     native: ios_uibutton_filled
     native_android: material_button_tonal
     text: Raised
-    states: normal,disabled
+    states: normal,pressed,disabled
 
   - id: FlatButton
     material: glass
@@ -80,7 +84,7 @@ components:
     native: ios_uibutton_plain
     native_android: material_button_outlined
     text: Flat
-    states: normal
+    states: normal,pressed
 
   - id: TextField
     material: normal
