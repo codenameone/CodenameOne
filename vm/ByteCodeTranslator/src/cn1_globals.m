@@ -529,6 +529,26 @@ int currentSizeOfAllObjectsInHeap = 0;
 // deferral can never free them early.
 static struct ThreadLocalData* cn1DeadPendingThreads = 0;  // guarded by criticalSection
 extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
+
+// ---- Immortal roots ------------------------------------------------------
+// VM-internal objects referenced ONLY from C globals (e.g. getStack's cached
+// separator strings) are invisible to every root source; the old trick of
+// removeObjectFromHeapCollection'ing them only worked while such objects lived
+// in the legacy table -- for BiBOP-resident objects (all small objects now,
+// arrays too) removal is a no-op and the object WOULD be swept while the C
+// global still points at it. Register them here instead; the mark phase treats
+// the array as a root set every cycle. Tiny and append-only.
+#define CN1_MAX_IMMORTAL_ROOTS 32
+static JAVA_OBJECT cn1ImmortalRoots[CN1_MAX_IMMORTAL_ROOTS];
+static int cn1ImmortalRootsN = 0;
+void cn1AddImmortalRoot(JAVA_OBJECT o) {
+    if(o == JAVA_NULL) return;
+    lockCriticalSection();
+    if(cn1ImmortalRootsN < CN1_MAX_IMMORTAL_ROOTS) {
+        cn1ImmortalRoots[cn1ImmortalRootsN++] = o;
+    }
+    unlockCriticalSection();
+}
 pthread_mutex_t* memoryAccessMutex = NULL;
 
 pthread_mutex_t* getMemoryAccessMutex() {
@@ -722,6 +742,15 @@ void codenameOneGCMark() {
     // the single place besides the live-thread migration below where the table
     // may grow. See the cn1DeadPendingThreads single-writer comment.
     cn1DrainDeadThreadPending();
+
+    // Immortal roots: VM-internal objects held only by C globals (see
+    // cn1AddImmortalRoot). Marked as roots every cycle; the per-thread drains
+    // below trace them transitively.
+    lockCriticalSection();
+    for(int ir = 0 ; ir < cn1ImmortalRootsN ; ir++) {
+        gcMarkObject(d, cn1ImmortalRoots[ir], JAVA_FALSE);
+    }
+    unlockCriticalSection();
 
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
@@ -2429,11 +2458,17 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
 #endif
 #if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
-    // Small NON-ARRAY objects: serve from the per-thread BiBOP page heap, which
-    // skips placeObjectInHeapCollection / allObjectsInHeap entirely. Arrays and
-    // objects larger than the biggest size class fall through to the legacy
+    // Small objects AND small arrays: serve from the per-thread BiBOP page heap,
+    // which skips placeObjectInHeapCollection / allObjectsInHeap entirely. Arrays
+    // are single-block (header + contiguous data, see allocArray) so a slot holds
+    // the whole thing; the page sweep walks slot boundaries only and the
+    // conservative resolver maps interior element pointers to the slot base, so
+    // no array-specific GC handling is needed. Moving arrays here removes the
+    // dominant legacy-table traffic (char[] buffers, boxed-free int[] work sets):
+    // no table registration, no extent-snapshot entry, no per-object free.
+    // Objects larger than the biggest size class fall through to the legacy
     // calloc + table-registration path below. 0 => pages unavailable, fall back.
-    if(parent != 0 && !parent->isArray && size <= CN1_BIBOP_MAX_OBJECT &&
+    if(parent != 0 && size <= CN1_BIBOP_MAX_OBJECT &&
        constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
         JAVA_OBJECT bibopObj = cn1BibopAlloc(threadStateData, size, parent);
         if(bibopObj != JAVA_NULL) {
@@ -3467,6 +3502,38 @@ static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
     if(gcMarkWorklistOverflow) {
         gcMarkDrain(threadStateData);
     }
+}
+
+// ---- FUSED OBJECTS -------------------------------------------------------
+// A fused object is an owner whose ENCAPSULATED child (e.g. java.lang.String's
+// char[] value -- never exposed outside the class) is laid out INSIDE the
+// owner's own allocation block instead of being a separate heap object. The
+// child keeps a full, ordinary object header so every reader treats it as a
+// normal object, but it has NO independent GC identity:
+//   * it is never registered anywhere (no table entry, no page slot of its own),
+//     so the sweep -- which walks BiBOP slot boundaries / table entries only --
+//     can never free it separately: it dies with its owner's slot;
+//   * the conservative resolver maps any pointer into the block (including the
+//     child header and its interior data) to the SLOT BASE, i.e. the OWNER, so
+//     a stack/register reference to the child keeps the whole block alive;
+//   * the owner's generated mark function still gcMarkObject()s the child --
+//     harmless stores into our own block (nothing ever sweeps by that mark).
+// The block must live in a BiBOP page for the resolver-covers-interior property,
+// so this returns NULL for oversized requests (or when BiBOP is unavailable)
+// and the caller falls back to ordinary two-object allocation. The returned
+// block is fully zeroed (cn1BibopAlloc mid-build safety) with the owner's
+// parentCls set; the caller lays out the child header + data.
+// OWNERSHIP CONTRACT (verified per class, not enforced at runtime): the child
+// reference must never be stored anywhere that can outlive the owner. Reading
+// it, passing it as a transient call argument, or returning copies is fine.
+JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz* cls) {
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+    if(totalSize <= CN1_BIBOP_MAX_OBJECT && constantPoolObjects != 0 &&
+       !threadStateData->nativeAllocationMode) {
+        return cn1BibopAlloc(threadStateData, totalSize, cls);
+    }
+#endif
+    return JAVA_NULL;
 }
 
 JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {

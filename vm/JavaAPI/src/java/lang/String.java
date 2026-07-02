@@ -36,6 +36,7 @@ import java.util.Comparator;
  * The Java language provides special support for the string concatenation operator (+), and for conversion of other objects to strings. String concatenation is implemented through the StringBuffer class and its append method. String conversions are implemented through the method toString, defined by Object and inherited by all classes in Java. For additional information on string concatenation and conversion, see Gosling, Joy, and Steele, The Java Language Specification.
  * Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(char[]), StringBuffer.append(char[], int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
  */
+@com.codename1.annotations.Fused
 public final class String implements java.lang.CharSequence, Comparable<String> {
     
     public static final Comparator<String> CASE_INSENSITIVE_ORDER = new Comparator<String>() {
@@ -140,6 +141,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         System.arraycopy(data, offset, value, 0, count);
     }
 
+    /**
+     * ALIASING constructor -- the new String takes ownership of {@code data}
+     * WITHOUT copying. Callers must pass a freshly created array that no other
+     * code retains (StringBuilder's copy-on-write share, concat's scratch
+     * buffer). NEVER pass another String's value array: a fused String's value
+     * lives inside the donor's own allocation block and dies with it.
+     */
     String(int offset, int charCount, char[] data) {
         if ((offset | charCount) < 0 || charCount > data.length - offset) {
             throw failedBoundsCheck(data.length, offset, charCount);
@@ -154,9 +162,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * value - a String.
      */
     public String(java.lang.String value){
-        this.offset = value.offset;
-        this.value = value.value;
+        // COPY, do not share: the source may be a FUSED string whose value array
+        // lives inside the source's own allocation block -- sharing it would let
+        // this string outlive the block it points into.
+        this.offset = 0;
         this.count = value.count;
+        this.value = value.toCharArray();
     }
 
     /**
@@ -241,7 +252,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         char[] n = new char[length() + str.length()];
         System.arraycopy(value, offset, n, 0, count);
         System.arraycopy(str.value, str.offset, n, count, str.count);
-        return new String(n); 
+        return new String(0, n.length, n); // n is fresh + private: alias, no copy
     }
 
     /**

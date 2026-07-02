@@ -1628,6 +1628,43 @@ extern void gcReleaseObj(JAVA_OBJECT o);
 
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 extern JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment);
+// Fused-object block allocator (owner + encapsulated child in ONE BiBOP slot;
+// see the FUSED OBJECTS comment in cn1_globals.m). NULL => caller must fall
+// back to ordinary separate allocations (oversize / BiBOP unavailable).
+extern JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz* cls);
+
+// Bytes a fused primitive-array child occupies inside the owner block: array
+// header + the data-pointer skip allocArray uses + elements, 8-aligned so a
+// following child's header is aligned.
+#define CN1_FUSED_ARR_BYTES(len, esz) \
+    ((int)((sizeof(struct JavaArrayPrototype) + sizeof(void*) + (size_t)(len) * (esz) + 7) & ~(size_t)7))
+
+// Lay out a fused child array INSIDE an owner block freshly returned by
+// cn1AllocFused (zeroed, owner parentCls set). The child gets a full ordinary
+// array header -- every reader sees a normal array -- but no independent GC
+// identity: the page sweep walks slot boundaries only, and the conservative
+// resolver maps any pointer into the block to the OWNER (slot base), so the
+// child lives and dies with it. heapPosition -1 = never registered; the
+// remove/free paths no-op on it. Element placement mirrors allocArray.
+static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, struct clazz* acls, int esz, int len) {
+    struct JavaArrayPrototype* a = (struct JavaArrayPrototype*)((char*)owner + off);
+    a->__codenameOneParentClsReference = acls;
+    a->__codenameOneGcMark = -1;
+    a->__heapPosition = -1;
+    a->length = len;
+    a->dimensions = 1;
+    a->primitiveSize = esz;
+    if(len > 0) {
+        void* p = (void*)&(a->data);
+        p = (char*)p + sizeof(void*);
+        a->data = p;
+    } else {
+        a->data = 0;
+    }
+    return (JAVA_OBJECT)a;
+}
+// Register an object referenced only from C globals as a permanent GC root.
+extern void cn1AddImmortalRoot(JAVA_OBJECT o);
 extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primitiveSize, int dim);
 #define CN1_SIMD_ALIGNMENT 16
 /* Maximum payload size we are willing to alloca() on the per-thread stack

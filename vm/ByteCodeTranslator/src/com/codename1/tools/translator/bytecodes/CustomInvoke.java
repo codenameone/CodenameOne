@@ -83,6 +83,8 @@ public class CustomInvoke extends Instruction {
         if (invoke.isInitBeforePublish()) {
             ci.initBeforePublish = true;
         }
+        // Same for a FUSED construction (the deferred NEW's owner+children block).
+        ci.fusedPlan = invoke.getFusedPlan();
         return ci;
     }
 
@@ -434,8 +436,56 @@ public class CustomInvoke extends Instruction {
         return true;
     }
 
+    // FUSED OBJECTS: see Invoke.fusedPlan; copied by create().
+    private FusedConstructor fusedPlan;
+
+    /**
+     * Fused allocation for the FOLDED path. Stack: [survivor(ph), receiver(ph)]
+     * (all args are literals). Literal args are hoisted into C temps first --
+     * one may be a call/throwing expression, and the length expressions plus the
+     * ctor call itself must observe each argument exactly once, in order -- then
+     * the temps replace literalArgs for the ordinary call emission that follows.
+     */
+    private void appendFusedAllocBlock(StringBuilder b) {
+        List<ByteCodeMethodArg> args = getArgs();
+        char[] argCats = new char[args.size()];
+        for (int j = 0; j < argCats.length; j++) {
+            argCats[j] = args.get(j).getQualifier();
+        }
+        b.append("    {\n");
+        String[] temps = InlinableConstructor.appendArgTemps(b,
+                literalArgs != null ? literalArgs : new String[0], argCats);
+        for (int j = 0; j < temps.length; j++) {
+            literalArgs[j] = temps[j];
+        }
+        List<FusedConstructor.Child> kids = fusedPlan.getChildren();
+        String[] lenExprs = new String[kids.size()];
+        for (int i = 0; i < kids.size(); i++) {
+            FusedConstructor.Child c = kids.get(i);
+            String expr = c.ctorLengthExpr();
+            if (expr.startsWith("__cn1Arg")) {
+                int p = Integer.parseInt(expr.substring("__cn1Arg".length()));
+                expr = temps[p - 1];
+            }
+            lenExprs[i] = expr;
+        }
+        String cType = owner.replace('/', '_').replace('$', '_');
+        fusedPlan.appendFusedAlloc(b, cType, lenExprs, 1, 2);
+        // NOTE: the enclosing brace is closed AFTER the ordinary call emission by
+        // appendInstruction (the temps must stay in scope for the call).
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (fusedPlan != null && targetObjectLiteral == null) {
+            appendFusedAllocBlock(b);
+            FusedConstructor plan = fusedPlan;
+            fusedPlan = null;              // recurse once into the ordinary emission
+            appendInstruction(b);
+            fusedPlan = plan;
+            b.append("    }\n");           // closes appendFusedAllocBlock's temp scope
+            return;
+        }
         if (!emittingInlineCtorElse && tryAppendInlinedConstructor(b)) {
             return;
         }

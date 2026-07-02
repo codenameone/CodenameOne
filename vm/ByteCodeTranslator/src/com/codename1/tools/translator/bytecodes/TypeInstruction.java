@@ -55,6 +55,23 @@ public class TypeInstruction extends Instruction {
     public boolean isInitBeforePublish() {
         return initBeforePublish;
     }
+
+    private boolean fusedNew = false;
+
+    /**
+     * Marks this {@code NEW} of a {@code @Fused} class as DEFERRED: like
+     * init-before-publish, the NEW pushes only a null placeholder; the matching
+     * {@code <init>} site allocates owner + fused children as one block (or
+     * falls back to an ordinary allocation), writes it into both placeholder
+     * slots, and calls the constructor. See FusedConstructor.
+     */
+    public void markFusedNew() {
+        this.fusedNew = true;
+    }
+
+    public boolean isFusedNew() {
+        return fusedNew;
+    }
     public TypeInstruction(int opcode, String type) {
         super(opcode);
         this.type = type;
@@ -206,6 +223,12 @@ public class TypeInstruction extends Instruction {
                     b.append(".__heapPosition = -1; PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
                     b.append(stackAllocId);
                     b.append("); /* NEW stack-allocated */\n");
+                    break;
+                }
+                if(fusedNew) {
+                    // FUSED construction: allocation deferred to the matching <init>
+                    // site (owner+children single block); push a placeholder only.
+                    b.append("PUSH_POINTER(JAVA_NULL); /* NEW deferred (fused) */\n");
                     break;
                 }
                 if(initBeforePublish) {

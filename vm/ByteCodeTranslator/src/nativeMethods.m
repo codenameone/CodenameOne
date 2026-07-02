@@ -703,20 +703,15 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         dot = newStringFromCString(threadStateData, ".");
         colon = newStringFromCString(threadStateData, ":");
         indent = newStringFromCString(threadStateData, "    at ");
-        // These slot writes are the ONLY non-GC-thread access to allObjectsInHeap;
-        // the critical section excludes them from the GC thread's table growth
-        // (mark migration / dead-thread drain both hold it) so the write can never
-        // land in a just-replaced (freed) table copy. One-shot, cost irrelevant.
-        lockCriticalSection();
-        removeObjectFromHeapCollection(threadStateData, newline);
-        removeObjectFromHeapCollection(threadStateData, dot);
-        removeObjectFromHeapCollection(threadStateData, colon);
-        removeObjectFromHeapCollection(threadStateData, indent);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)newline)->java_lang_String_value);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)dot)->java_lang_String_value);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)colon)->java_lang_String_value);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)indent)->java_lang_String_value);
-        unlockCriticalSection();
+        // These strings are referenced ONLY by the C globals above -- invisible
+        // to every GC root source. The old removeObjectFromHeapCollection trick
+        // only immortalized objects living in the legacy table; BiBOP-resident
+        // objects (all small objects, arrays included) are swept by the page
+        // walk regardless, so they must be registered as real roots instead.
+        cn1AddImmortalRoot(newline);
+        cn1AddImmortalRoot(dot);
+        cn1AddImmortalRoot(colon);
+        cn1AddImmortalRoot(indent);
     }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
 
@@ -2511,6 +2506,43 @@ JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREA
     }
 }
 
+// Shared non-ObjC case-conversion body: per-char simple mapping via towupper/
+// towlower (identical to Character.toUpperCase/toLowerCase for ASCII and the
+// BMP simple mappings). Returns `this` unchanged when no character maps (same
+// contract as the JDK). The old #else branch was a stub that ALWAYS returned
+// `this` -- silently wrong on every non-ObjC target (Linux, clean builds).
+#if !(defined(__APPLE__) && defined(__OBJC__))
+#include <wctype.h>
+static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, int toUpper) {
+    struct obj__java_lang_String* s = (struct obj__java_lang_String*)me;
+    int count = s->java_lang_String_count;
+    if(count == 0) return me;
+    enteringNativeAllocations();
+    JAVA_OBJECT arr = allocArray(threadStateData, count, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
+    // read the source AFTER the allocation (non-moving GC, `me` rooted by the caller)
+    JAVA_ARRAY_CHAR* src = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)s->java_lang_String_value)->data) + s->java_lang_String_offset;
+    JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data;
+    JAVA_BOOLEAN changed = JAVA_FALSE;
+    for(int i = 0 ; i < count ; i++) {
+        JAVA_ARRAY_CHAR c = src[i];
+        JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)(toUpper ? towupper(c) : towlower(c));
+        if(m != c) changed = JAVA_TRUE;
+        dst[i] = m;
+    }
+    if(!changed) {
+        finishedNativeAllocations();
+        return me; // arr becomes garbage; the GC reclaims it
+    }
+    JAVA_OBJECT str = __NEW_INSTANCE_java_lang_String(threadStateData);
+    struct obj__java_lang_String* o = (struct obj__java_lang_String*)str;
+    o->java_lang_String_value = arr;   // fresh private array: alias, no copy
+    o->java_lang_String_offset = 0;
+    o->java_lang_String_count = count;
+    finishedNativeAllocations();
+    return str;
+}
+#endif
+
 JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
 #if defined(__APPLE__) && defined(__OBJC__)
     enteringNativeAllocations();
@@ -2521,8 +2553,7 @@ JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREA
     finishedNativeAllocations();
     return jString;
 #else
-    // TODO: Implement stub
-    return __cn1ThisObject; // Stub
+    return cn1StringConvertCase(threadStateData, __cn1ThisObject, 1);
 #endif
 }
 
@@ -2536,8 +2567,7 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     finishedNativeAllocations();
     return jString;
 #else
-    // TODO: Implement stub
-    return __cn1ThisObject; // Stub
+    return cn1StringConvertCase(threadStateData, __cn1ThisObject, 0);
 #endif
 }
 

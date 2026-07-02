@@ -1266,11 +1266,21 @@ public class BytecodeMethod implements SignatureSet {
         inlinableCtorComputed = true;
         if (constructor) {
             inlinableCtorPlan = com.codename1.tools.translator.bytecodes.InlinableConstructor.analyzeRaw(this, desc);
+            // FUSED OBJECTS: snapshot the fused-construction plan from the same RAW
+            // list (the class-level @Fused gate is applied by the users of the plan;
+            // the shape analysis is cheap and most ctors bail on the first check).
+            fusedCtorPlan = com.codename1.tools.translator.bytecodes.FusedConstructor.analyzeRaw(this, desc);
         }
     }
 
     public com.codename1.tools.translator.bytecodes.InlinableConstructor getInlinableConstructorPlan() {
         return inlinableCtorPlan;
+    }
+
+    private com.codename1.tools.translator.bytecodes.FusedConstructor fusedCtorPlan;
+
+    public com.codename1.tools.translator.bytecodes.FusedConstructor getFusedConstructorPlan() {
+        return fusedCtorPlan;
     }
 
     public String getMethodIdentifier() {
@@ -2838,6 +2848,56 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     // ------------------------------------------------------------------
+    // FUSED OBJECTS, constructor side (see FusedConstructor). For a ctor of a
+    // @Fused class with a plan, replace each planned quadruple
+    //   ALOAD 0 ; <len> ; NEWARRAY T ; PUTFIELD f
+    // with the KEEP-IF-NULL FusedFieldInit statement. The re-match uses the
+    // same shape as the parse-time analysis; instructions are still raw here
+    // (this runs first in optimize()).
+    // ------------------------------------------------------------------
+    private void replaceFusedCtorTriples() {
+        if (!constructor || fusedCtorPlan == null) {
+            return;
+        }
+        ByteCodeClass cls = Parser.getClassObject(clsName);
+        if (cls == null || !cls.isFused()) {
+            return;
+        }
+        java.util.List<com.codename1.tools.translator.bytecodes.FusedConstructor.Child> kids =
+                fusedCtorPlan.getChildren();
+        int nextChild = 0;
+        for (int i = 0; i < instructions.size() - 3 && nextChild < kids.size(); i++) {
+            Instruction a0 = instructions.get(i);
+            if (!(a0 instanceof VarOp) || a0.getOpcode() != Opcodes.ALOAD
+                    || ((VarOp) a0).getIndex() != 0) {
+                continue;
+            }
+            int i1 = srNextReal(i + 1);
+            int i2 = i1 < 0 ? -1 : srNextReal(i1 + 1);
+            int i3 = i2 < 0 ? -1 : srNextReal(i2 + 1);
+            if (i3 < 0) {
+                break;
+            }
+            Instruction na = instructions.get(i2);
+            Instruction pf = instructions.get(i3);
+            if (!(na instanceof VarOp) || na.getOpcode() != Opcodes.NEWARRAY
+                    || !(pf instanceof Field) || pf.getOpcode() != Opcodes.PUTFIELD) {
+                continue;
+            }
+            com.codename1.tools.translator.bytecodes.FusedConstructor.Child child = kids.get(nextChild);
+            if (!((Field) pf).getFieldName().equals(child.getFieldName())) {
+                continue; // a different (unplanned) array store; leave it alone
+            }
+            // replace the four real instructions with the single statement
+            instructions.remove(i3);
+            instructions.remove(i2);
+            instructions.remove(i1);
+            instructions.set(i, new com.codename1.tools.translator.bytecodes.FusedFieldInit(child));
+            nextChild++;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // PER-OBJECT MEMSET ELIMINATION (init-before-publish).
     //
     // Recognizes:   NEW X ; DUP ; <args> ; INVOKESPECIAL X.<init>
@@ -2915,6 +2975,19 @@ public class BytecodeMethod implements SignatureSet {
             String newType = srMangle(ti.getTypeName());
             String initOwner = srMangle(initInv.getOwner());
             if (!newType.equals(initOwner)) {
+                continue;
+            }
+
+            // FUSED OBJECTS take precedence over memset elimination: a @Fused
+            // class's matched ctor gets the single-block owner+children
+            // allocation (zeroed; the ordinary out-of-line ctor then runs with
+            // the children pre-installed -- see FusedConstructor).
+            com.codename1.tools.translator.bytecodes.FusedConstructor fusedPlan =
+                    com.codename1.tools.translator.bytecodes.FusedConstructor.analyze(
+                            initInv.getOwner(), initInv.getDesc());
+            if (fusedPlan != null) {
+                ti.markFusedNew();
+                initInv.setFusedPlan(fusedPlan);
                 continue;
             }
 
@@ -3190,8 +3263,14 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     boolean optimize() {
+        // FUSED OBJECTS, constructor side: rewrite each planned
+        // `ALOAD 0; <len>; NEWARRAY T; PUTFIELD f` quadruple into the
+        // self-contained KEEP-IF-NULL FusedFieldInit BEFORE any other pass can
+        // fold/reorder those instructions. Runs on the raw list (first thing).
+        replaceFusedCtorTriples();
+
         int instructionCount = instructions.size();
-        
+
         // optimize away a method that only contains the void return instruction e.g. blank constructors etc.
         if(instructionCount < 6) {
             int realCount = instructionCount;

@@ -183,6 +183,43 @@ public class Invoke extends Instruction {
         return initBeforePublish;
     }
 
+    // FUSED OBJECTS: non-null when this <init> belongs to a deferred NEW of a
+    // @Fused class -- the emission allocates owner+children as one block,
+    // fills BOTH placeholder slots, then proceeds with the ordinary call.
+    private FusedConstructor fusedPlan;
+
+    public void setFusedPlan(FusedConstructor plan) {
+        this.fusedPlan = plan;
+    }
+
+    public FusedConstructor getFusedPlan() {
+        return fusedPlan;
+    }
+
+    /**
+     * Emit the fused allocation block for this {@code <init>}. Stack layout on
+     * entry: [survivor(placeholder), receiver(placeholder), args...]; child
+     * length expressions are pure reads of the on-stack int args. Falls through
+     * to the caller's ordinary emission afterwards.
+     */
+    private void appendFusedAllocBlock(StringBuilder b) {
+        List<ByteCodeMethodArg> args = getArgs();
+        int n = args.size();
+        List<FusedConstructor.Child> kids = fusedPlan.getChildren();
+        String[] lenExprs = new String[kids.size()];
+        for (int i = 0; i < kids.size(); i++) {
+            FusedConstructor.Child c = kids.get(i);
+            String expr = c.ctorLengthExpr();
+            if (expr.startsWith("__cn1Arg")) {
+                int p = Integer.parseInt(expr.substring("__cn1Arg".length()));
+                expr = "SP[-" + (n - (p - 1)) + "].data.i";
+            }
+            lenExprs[i] = expr;
+        }
+        String cType = owner.replace('/', '_').replace('$', '_');
+        fusedPlan.appendFusedAlloc(b, cType, lenExprs, n + 1, n + 2);
+    }
+
     /**
      * Lever B for the non-folded path: a void INVOKESPECIAL {@code <init>} whose args
      * are all still on the operand stack. Emits the {@code #ifdef CN1_INLINE_CTOR}
@@ -230,6 +267,11 @@ public class Invoke extends Instruction {
 
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (fusedPlan != null) {
+            // FUSED construction: single-block owner+children allocation into the
+            // placeholder slots, then fall through to the ordinary ctor call below.
+            appendFusedAllocBlock(b);
+        }
         if (!emittingInlineCtorElse && tryAppendInlinedConstructor(b)) {
             return;
         }

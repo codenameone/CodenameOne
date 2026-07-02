@@ -934,6 +934,22 @@ public class ByteCodeTranslator {
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
             }
 
+            // JAVA SEMANTICS FLAGS -- required for correctness, every target:
+            // -fwrapv: Java int/long arithmetic is DEFINED to wrap on overflow;
+            //   in C signed overflow is UB and clang -O3 provably exploits it
+            //   (observed: `long += int + int` fused into a 64-bit add, skipping
+            //   the Java-mandated 32-bit wrap -- checksum diverged by 2^32 per
+            //   overflow). The Xcode template sets the same via OTHER_CFLAGS.
+            // -fno-strict-aliasing: the generated code accesses one allocation
+            //   through JavaObjectPrototype, JavaArrayPrototype and obj__<class>
+            //   simultaneously; TBAA is unsound for it.
+            // clang-cl (the Windows toolchain) takes the GNU spellings via /clang:.
+            writer.append("if(MSVC)\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /clang:-fwrapv /clang:-fno-strict-aliasing)\n");
+            writer.append("else()\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing)\n");
+            writer.append("endif()\n");
+
             // Opt-in Link-Time Optimization. The translator emits a separate C
             // function per reachable Java method; LTO lets the C compiler inline
             // the tiny per-call frame helpers and the array-access inline helpers

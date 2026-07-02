@@ -2261,6 +2261,24 @@ public class ByteCodeClass {
         this.stackAllocatable = stackAllocatable;
     }
 
+    private boolean fused;
+
+    /**
+     * True when the class carries {@code @com.codename1.annotations.Fused}: its
+     * constructor-created primitive-array fields are encapsulated, so instances
+     * are allocated together with those arrays as ONE heap block (single
+     * allocation, single GC object; the arrays have no independent GC identity
+     * and die with the owner). See {@link
+     * com.codename1.tools.translator.bytecodes.FusedConstructor}.
+     */
+    public boolean isFused() {
+        return fused;
+    }
+
+    public void setFused(boolean fused) {
+        this.fused = fused;
+    }
+
     public boolean isFinalClass() {
         return finalClass;
     }
