@@ -392,10 +392,6 @@ the source during the animation doesn't carry the original parent's clip.
 To opt into the image-snapshot path call `snapshotMode(true)` on the
 builder:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnimationsSnippets.java[tag=animations-java-001,indent=0]
-----
 
 `snapshotMode(true)` captures each `(source, dest)` pair as a clipped
 `Image` at `initTransition()`, then the tween draws those images at the
@@ -421,10 +417,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 // vale-skip: Microsoft.Adverbs: "lazily" describes the lazy-evaluation semantics of LazyValue, a precise CS term, not a softener.
 That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows you to pass a value lazily:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnimationsSnippets.java[tag=animations-java-002,indent=0]
-----
 
 This effectively allows you to pass a form and create it as necessary (for example, for a GUI builder app you don't
 have the actual previous form instance), notice that the arguments aren't used for this case but will be used in

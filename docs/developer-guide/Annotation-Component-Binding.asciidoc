@@ -14,7 +14,7 @@ It's a thin alternative to the imperative `UiBinding` API
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationComponentBindingJava001Snippet.java[tag=annotation-component-binding-java-001,indent=0]
 ----
 <1> JavaBeans `getUser` / `setUser` are detected automatically when the
     field is private. The processor instruments `setUser` to fire a
@@ -50,10 +50,6 @@ The default lookup matches GUI-builder names exactly.
 
 === Bind at runtime
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-002,indent=0]
-----
 
 `Binding` is the handle the binder returns:
 
@@ -113,10 +109,6 @@ For every two-way `@Bind` field whose write accessor is a method
 `cn1:process-annotations` Mojo reads the original `.class` file with
 ASM and inserts the equivalent of:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-003,indent=0]
-----
 
 The injection lands before every `return` point of the setter. The
 instrumented setter is written back to `target/classes`, replacing the
@@ -170,10 +162,6 @@ Multiple annotations on the same field are combined into a
 `GroupConstraint` (first failure wins), matching the behaviour of
 `Validator.addConstraint(Component, Constraint...)`.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-004,indent=0]
-----
 <1> `@Required @Email` is the canonical "mandatory address" pair. The
     standard email regex accepts the empty string as "not yet an
     address," so `@Required` is what enforces presence.
@@ -190,10 +178,6 @@ include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBi
 
 After binding, drive validation through the returned handle:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-005,indent=0]
-----
 
 `Binding#getValidator()` never returns `null` -- when the model has no
 validation annotations the validator is empty and `isValid()` returns

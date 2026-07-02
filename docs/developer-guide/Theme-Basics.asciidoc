@@ -21,16 +21,12 @@ Codename One themes are effectively a set of UIIDs mapped to a https://www.coden
 
 You can also add many resource files to a project and work with them. In code, initialize a theme like this in your main class:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThemeBasicsSnippets.java[tag=theme-basics-java-001,indent=0]
-----
 
 The `initFirstTheme` method is a helper method that hides some `try`/`catch` logic and some verbosity. It could be expressed as:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/ThemeBasicsSnippets.java[tag=theme-basics-java-002,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThemeBasicsJava002Snippet.java[tag=theme-basics-java-002,indent=0]
 ----
 
 === Customizing your theme
@@ -377,10 +373,6 @@ Derive allows you to inherit the behavior of a UIID and extend it with some cust
 
 For example: Lets say you created a component that's supposed to look like a title, you could do something like:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThemeBasicsSnippets.java[tag=theme-basics-java-003,indent=0]
-----
 
 However, title might sometimes be aligned to the left (based on theme) and you always want your component to be center aligned. For example, you don't want that to affect the actual titles in the app...
 
@@ -431,10 +423,6 @@ NOTE: You should notice that font sizing is inconsistent between platforms recom
 
 You can load a truetype font from code using:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThemeBasicsSnippets.java[tag=theme-basics-java-004,indent=0]
-----
 
 Notice that, in code, pixel sizes are supported, so it’s up to you to decide how to convert that. Recommend using millimeters with the `convertToPixels` method. You also need to derive the font with the proper size, unless you want a 0 sized font which isn't useful.
 
@@ -444,10 +432,6 @@ IMPORTANT: Due to licensing restrictions Codename One doesn't bundle Apple's iOS
 
 The code below demonstrates all the major fonts available in Codename One with the handlee ttf file posing as a standin for arbitrary TTF:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThemeBasicsSnippets.java[tag=theme-basics-java-005,indent=0]
-----
 
 .The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC
 image::img/theme-font-catalog.png[The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC,scaledwidth=60%]

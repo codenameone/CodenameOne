@@ -73,7 +73,7 @@ first `Form` is shown:
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/DesktopIntegrationSnippets.java[tag=desktop-integration-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava001Snippet.java[tag=desktop-integration-java-001,indent=0]
 -----
 
 NOTE: The native title bar and native menu bar on macOS require iOS 13 / macOS 10.15 (Catalyst)
@@ -93,7 +93,7 @@ and the `Command.DESKTOP_MENU_*` constants:
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/DesktopIntegrationSnippets.java[tag=desktop-integration-java-002,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava002Snippet.java[tag=desktop-integration-java-002,indent=0]
 -----
 
 The recognised values are (case-insensitive):
@@ -122,7 +122,7 @@ next to the menu item and triggers the command from the keyboard:
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/DesktopIntegrationSnippets.java[tag=desktop-integration-java-003,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava003Snippet.java[tag=desktop-integration-java-003,indent=0]
 -----
 
 The single-argument form uses the platform's *primary* modifier - Command on macOS, Control on
@@ -182,10 +182,6 @@ macOS / Mac Catalyst build it goes through the same `UNUserNotificationCenter` p
 the notification delivers it to your app's `LocalNotificationCallback`, exactly as on mobile, so the
 same scheduling and handling code is shared across phone and desktop:
 
-[source,java]
------
-include::../demos/common/src/main/snippets/developer-guide/DesktopIntegrationSnippets.java[tag=desktop-integration-java-004,indent=0]
------
 
 NOTE: On the Java SE build desktop notifications require an OS with system-tray support
 (`java.awt.SystemTray`); where it's unavailable the notification is logged and skipped.

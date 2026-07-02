@@ -224,10 +224,6 @@ Materials are resolved through `MaterialRegistry`, a process-wide registry that 
 built-ins (`MaterialRegistry.GRASS`, `ROAD`, `STONE`, `SAND`, `WATER`, `DIRT`). `WATER`
 is registered as solid. Applications add their own without changing the level format:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/GameAssetsSnippets.java[tag=game-assets-java-001,indent=0]
-----
 
 Unknown ids resolve to a neutral gray placeholder, so a level that references a
 not-yet-registered material still loads. Materials cover terrain cells and

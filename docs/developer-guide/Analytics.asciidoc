@@ -10,17 +10,9 @@ NOTE: The older `AnalyticsService` class still works but is deprecated. It now d
 
 Register providers once, early in your app's lifecycle. Providers are plain objects -- there is no reflection or service lookup, which keeps the mechanism safe under the obfuscation applied to release builds.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-001,indent=0]
-----
 
 Once at least one provider is registered, report usage from anywhere in your app:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-002,indent=0]
-----
 
 `Analytics.crash` emits a lightweight exception event (for example GA4's `app_exception`) to whichever analytics backends you have registered, so exception counts appear next to your usage metrics. It's separate from Codename One Crash Protection (`com.codename1.crash.CrashProtection`), which is a dedicated pipeline that records full, symbolicated stack traces to the build cloud crash console for debugging. The two are independent: use Crash Protection to diagnose crashes, use `Analytics.crash` when you also want exception events in your analytics, and enable either or both.
 
@@ -29,19 +21,11 @@ include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.jav
 
 The API is designed to help you comply with privacy regulations such as GDPR and CCPA. A `ConsentMode` controls what happens before the user makes an explicit choice. The default is `OPT_IN`: nothing is collected or transmitted until the application records consent.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-003,indent=0]
-----
 
 `AnalyticsConsent.all()` grants every category and `AnalyticsConsent.none()` denies every category. The older `granted()` and `denied()` methods remain as aliases.
 
 Consent is broken down by category, so you can honor granular choices -- for example allowing crash reporting while declining behavioral analytics:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-004,indent=0]
-----
 
 The consent choice is persisted, so it survives restarts. Screen views and events require the `analytics` category, crash reports require `crashReporting`, and `setUserId` requires `personalization`. Calls made without the matching consent are dropped.
 
@@ -49,24 +33,12 @@ The consent choice is persisted, so it survives restarts. Screen views and event
 
 If your application has already obtained consent through its own mechanism -- a custom prompt, a third-party consent-management platform, an enterprise device-management policy, or a jurisdiction where you have determined consent isn't required -- record it once at startup so reporting flows without a second prompt:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-005,indent=0]
-----
 
 You can also seed every category and then revoke just one with the builder, for example to allow analytics but not ad storage:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-006,indent=0]
-----
 
 If you would rather not gate at all, switch the default so collection is active unless the user withdraws it. This places the compliance responsibility on you as the integrator:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-007,indent=0]
-----
 
 Note that the service records pseudonymous data rather than anonymous data. The client id described below is a persistent identifier stored on the device; it isn't tied to a real-world identity and the server discards full IP addresses, but storing and reading such an identifier for usage tracking is often treated as consent-requiring under GDPR and similar regimes. That's why opt-in is the safe default. Relax it only when you are confident the change fits your use.
 
@@ -74,10 +46,6 @@ Note that the service records pseudonymous data rather than anonymous data. The 
 
 Each device is identified by a pseudonymous client id. It's generated on first use and stored locally -- it isn't derived from any hardware identifier. To honor an erasure request ("right to be forgotten"), reset it:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-008,indent=0]
-----
 
 For the first-party service this can be paired with a server-side deletion of the previous id's data.
 
@@ -113,10 +81,6 @@ You can add your own events at any time with `Analytics.event(...)`; these built
 
 `CodenameOneAnalyticsProvider` batches events and posts them to the Codename One cloud, which aggregates them into the reports shown in the developer console. App identity is read from the build-injected properties, so no API key is embedded in your app.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-009,indent=0]
-----
 
 The capabilities you actually get -- screen views, custom events, user properties, retention window, raw export -- are gated server-side by your subscription tier. Higher tiers retain data longer and unlock richer reporting.
 
@@ -124,10 +88,6 @@ The capabilities you actually get -- screen views, custom events, user propertie
 
 `GoogleAnalyticsProvider` uses the GA4 Measurement Protocol. Create it with a measurement id (`G-XXXXXXXX`) and a Measurement Protocol API secret from the GA4 admin console:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-010,indent=0]
-----
 
 Screen views are sent as the GA4 `screen_view` event and crashes as `app_exception`.
 
@@ -135,19 +95,11 @@ Screen views are sent as the GA4 `screen_view` event and crashes as `app_excepti
 
 `MatomoAnalyticsProvider` targets Matomo (formerly Piwik) through its HTTP tracking API. Matomo can be self-hosted and supports IP anonymization, which makes it a good fit for privacy-sensitive deployments:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-011,indent=0]
-----
 
 ==== Firebase
 
 `FirebaseAnalyticsProvider` forwards to the native Firebase Analytics SDK on Android and iOS. Register it like any other provider:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-012,indent=0]
-----
 
 Firebase reports only from a native Android or iOS build, and only when two things are in place. Without both, `FirebaseAnalyticsProvider` does nothing -- which is why it's always safe to register, including in the Codename One simulator and the desktop build, where it's a no-op.
 
@@ -174,19 +126,11 @@ WARNING: You need both the configuration file and the matching build hint. If ei
 
 `LoggingAnalyticsProvider` logs every call instead of sending it anywhere. It's the recommended default in the simulator and is used as the backing provider in tests.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-013,indent=0]
-----
 
 === Writing your own provider
 
 Implement `AnalyticsProvider`, or extend `AbstractAnalyticsProvider` and override only the calls you support. The `Analytics` class handles consent gating and fan-out for you, so a provider just forwards the data to its backend.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnalyticsSnippets.java[tag=analytics-java-014,indent=0]
-----
 
 The `init(AnalyticsContext)` callback hands you the app name, version, platform, locale and the pseudonymous client id. `onConsentChanged(AnalyticsConsent)` lets a provider reconfigure when the user updates consent. `supports(AnalyticsCapability)` lets tooling introspect which features a provider offers.
 

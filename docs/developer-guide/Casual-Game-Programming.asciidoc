@@ -78,10 +78,3 @@ Codename One is a single threaded API, it supports working on other threads but 
 Now that you got that out of the way, the rest of the code is clearer. Now you understand that `animateLayoutAndWait` will wait for the animation to complete and the next lines can do the next animation. Indeed after that you invoke the `dealCard` method that hands the cards to the players. This method is also blocking (using and `wait` methods internally) it also marks the cards as draggable and adds that drag logic which you will later use to swap cards.
 
 In the animation department, you use a method called replace to fade in a component using a transition.
-
-To handle the dealing an action listener is added to the deck button, this action listener is invoked when the cards are dealt and that completes the game:
-
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/CasualGameProgrammingSnippets.java[tag=casual-game-programming-java-001,indent=0]
-----

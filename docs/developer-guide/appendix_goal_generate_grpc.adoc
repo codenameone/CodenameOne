@@ -74,17 +74,9 @@ optional `name` attribute so introspection tooling can recover it.
 
 The `@GrpcClient` interface looks like:
 
-[source, java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AppendixGoalGenerateGrpcSnippets.java[tag=appendix-goal-generate-grpc-java-001,indent=0]
-----
 
 Call sites use the static factory:
 
-[source, java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AppendixGoalGenerateGrpcSnippets.java[tag=appendix-goal-generate-grpc-java-002,indent=0]
-----
 
 The `<Service>GrpcImpl` class that actually performs the gRPC-Web
 POST lives in `target/generated-sources` -- the project source

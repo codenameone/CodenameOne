@@ -18,7 +18,7 @@ by side.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSnippets.java[tag=annotation-sqlite-orm-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationSqliteOrmJava001Snippet.java[tag=annotation-sqlite-orm-java-001,indent=0]
 ----
 <1> Excluded from the generated table.
 
@@ -46,10 +46,6 @@ include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSn
 
 === Use the dao
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSnippets.java[tag=annotation-sqlite-orm-java-002,indent=0]
-----
 <1> Idempotent -- `CREATE TABLE IF NOT EXISTS`.
 <2> The autoincrement `id` is filled in via
     `SELECT last_insert_rowid()` after the insert.
@@ -61,10 +57,6 @@ include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSn
 connection is reachable through `em.database()` for raw SQL when the
 dao surface isn't enough. Transactions:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSnippets.java[tag=annotation-sqlite-orm-java-003,indent=0]
-----
 
 === Relationships
 

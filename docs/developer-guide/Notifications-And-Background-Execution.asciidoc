@@ -19,7 +19,7 @@ its notifications are shown. Request it through `Display`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava001Snippet.java[tag=notifications-and-background-execution-java-001,indent=0]
 ----
 
 `NotificationPermissionResult.getAuthorizationLevel()` returns an `AuthorizationLevel`
@@ -47,10 +47,6 @@ provisioning profile doesn't carry breaks code signing).
 `LocalNotification` is scheduled through `Display.scheduleLocalNotification(...)` as
 before; the bean has been extended with fluent, backward-compatible setters:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-002,indent=0]
-----
 
 When the user taps an action, the selected action id (and any quick-reply text) are
 delivered through `com.codename1.push.PushContent` -- `getActionId()`, `getActionTitle()`
@@ -94,10 +90,6 @@ Channels let the user control importance, sound, vibration, lights, lock screen
 visibility and badge display for a group of notifications. Build and register one at startup,
 then reference it from a notification with `setChannelId(...)`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-003,indent=0]
-----
 
 Channels are an Android concept. On iOS and the simulator `register()` is a no-op (the
 simulator stores the channel so its name can be shown in the notification panel); the
@@ -109,10 +101,6 @@ channel id you assign is still carried so the notification behaves consistently.
 Implement `BackgroundWorker` in a class with a public no-argument constructor (it's
 reconstructed after a cold launch -- pass state through the input data, not fields):
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-004,indent=0]
-----
 
 [options="header"]
 |===
@@ -134,10 +122,6 @@ and links `BackgroundTasks.framework` automatically.
 
 `ForegroundService` runs a long task while a persistent notification is shown:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-005,indent=0]
-----
 
 [options="header"]
 |===
@@ -154,10 +138,6 @@ Override the type with the `android.foregroundServiceType` build hint (default `
 Override `onReceivedSharedContent(SharedContent)` on your `Lifecycle` subclass to receive
 text, URLs, files or images shared into your app from other apps:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-006,indent=0]
-----
 
 [options="header"]
 |===

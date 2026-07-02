@@ -8,17 +8,9 @@ Gesture detection lives in the core rather than in each platform port. Any platf
 
 `MotionSensorManager.getInstance()` always returns a manager. On a device without motion hardware every sensor reports as unsupported, so application code can call the API without a null check on the manager itself. `getSensor(int)` returns `null` when the requested sensor isn't available on the current device:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MotionSensorsSnippets.java[tag=motion-sensors-java-001,indent=0]
-----
 
 Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MotionSensorsSnippets.java[tag=motion-sensors-java-002,indent=0]
-----
 
 === Sensor types
 
@@ -53,10 +45,6 @@ Readings use a single convention across every port: the x-axis points to the rig
 
 Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The accelerometer powers on for the duration that a gesture listener stays registered:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MotionSensorsSnippets.java[tag=motion-sensors-java-003,indent=0]
-----
 
 The recognized gestures are:
 
@@ -68,10 +56,6 @@ The recognized gestures are:
 
 The detection thresholds suit most apps as shipped, and you can tune them when a gesture needs to be more or less sensitive:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MotionSensorsSnippets.java[tag=motion-sensors-java-004,indent=0]
-----
 
 A smaller sampling interval makes gestures more responsive at a higher battery cost. The value is clamped to the range 10ms through 1000ms.
 

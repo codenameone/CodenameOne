@@ -24,20 +24,12 @@ snapshot. There are two ways to read it.
 
 Any pointer listener receives an `ActionEvent`; call `getPointerEvent()` on it:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-001,indent=0]
-----
 
 ==== By polling
 
 When you're inside a pointer callback you can also poll the current values directly from `CN`
 (or `Display`), mirroring the existing `CN.isShiftKeyDown()` family:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-002,indent=0]
-----
 
 TIP: Values have safe defaults. On a plain touch screen the button is `BUTTON_PRIMARY`, the pressure
 is `1.0` and the type is `TYPE_TOUCH` (or `TYPE_UNKNOWN` on ports that don't classify the device).
@@ -56,10 +48,6 @@ For the common case of a context menu, use the unified `addContextMenuListener`.
 secondary (right) mouse click, a stylus barrel button click and a long press, so the same code
 handles desktop and touch:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-003,indent=0]
-----
 
 === Mouse wheel and trackpad scrolling
 
@@ -69,10 +57,6 @@ the wheel yourself - for example control plus wheel to zoom, or horizontal scrol
 https://www.codenameone.com/javadoc/com/codename1/ui/events/WheelEvent.html[`WheelEvent`];
 consuming it prevents the default scroll.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-004,indent=0]
-----
 
 A positive `getDeltaY()` reveals content above (the user scrolled down); a positive `getDeltaX()`
 reveals content to the left. `isPrecise()` is true for high resolution devices such as trackpads.
@@ -102,10 +86,6 @@ NOTE: A Windows precision touchpad usually reports a pinch as control plus wheel
 gesture, so it also arrives through the universal wheel API. Handle that case with a
 `addMouseWheelListener` that checks `isControlDown()` (shown above) if you target those devices.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-005,indent=0]
-----
 
 === Stylus and pen support
 
@@ -119,10 +99,6 @@ When a stylus is used (Apple Pencil, S-Pen, Surface Pen) the pointer type is `TY
 For drawing surfaces a dedicated `addStylusListener` fires on press, drag and release only when the
 pointer is a stylus or eraser:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-006,indent=0]
-----
 
 Pen hover (the pen moving above the screen without touching, available on devices such as the S-Pen
 and the M2 iPad with Apple Pencil) flows through the existing `pointerHover` callbacks; the snapshot
@@ -139,10 +115,6 @@ Foldable and dual screen devices (Galaxy Fold, Galaxy Flip, Pixel Fold, Surface 
 at runtime. Query the live posture through
 https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-007,indent=0]
-----
 
 * `getPosture()` - `POSTURE_FLAT`, `POSTURE_HALF_OPENED`, `POSTURE_CLOSED` or `POSTURE_UNKNOWN`.
 * `getHingeAngle()` - hinge angle in degrees (`-1` when unknown).
@@ -153,10 +125,6 @@ include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFac
 
 React to fold changes with a posture listener:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeviceInputAndFormFactorsSnippets.java[tag=device-input-and-form-factors-java-008,indent=0]
-----
 
 To exercise this in the desktop simulator, use the *Simulate -> Foldable* menu: enable foldable
 mode, then pick a posture (flat, half-opened or closed), the fold orientation (vertical or

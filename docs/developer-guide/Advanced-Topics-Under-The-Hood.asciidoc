@@ -2729,12 +2729,7 @@ NOTE: Codename One also supports https://www.codenameone.com/blog/mirah-for-code
 
 The first thing to do is take a look at the byte-code that's produced by the compiler. Use `javap` to print out a nice version.
 
-Consider this sample Kotlin class:
-
-[source,kotlin]
-----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.kt[tag=advanced-topics-under-the-hood-kotlin-001,indent=0]
-----
+Consider a sample Kotlin class that extends `Form`, creates a `Label` and `Button`, and updates the label from the button's listener.
 
 Take a look at the bytecode that Kotlin produced for this class:
 
@@ -2820,12 +2815,7 @@ IMPORTANT: Building cn1libs manually in this way is a ** bad habit, as it bypass
 
 For your "Hello World" test you will need to create a separate project in your JVM language and produce class files that you will *manually* copy into an appropriate location of your project. You will want to use the *normal* tools for the language and not worry about how it integrates with Codename One. For Kotlin, the steps follow the getting started tutorial on the Kotlin site to create a new Kotlin project in IntelliJ. When Steve ported Mirah, he used a text editor and the mirahc command-line compiler to create your Hello World class. The tools and process will depend on the language.
 
-Here is the "hello world" you created in Kotlin:
-
-[source,kotlin]
-----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.kt[tag=advanced-topics-under-the-hood-kotlin-002,indent=0]
-----
+Create a minimal "hello world" class in the external language runtime you are evaluating.
 
 After building this, the build produces a directory that contains `com/mycompany/myapp/HelloKotlin.class`.
 

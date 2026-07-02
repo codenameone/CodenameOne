@@ -10,7 +10,7 @@ Codename One supports sending SMS messages but not receiving them as this functi
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava001Snippet.java[tag=miscellaneous-features-java-001,indent=0]
 ----
 
 Android supports sending SMS messages in the background without any UI. iOS doesn't provide that ability, so the best it can offer is to launch the native SMS app with your message composed for the user to send. Android supports that interactive flow as well (launching the OS native SMS app).
@@ -33,10 +33,6 @@ sending which is the current behavior on Android.
 
 A typical use of this API would be something like this:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-002,indent=0]
-----
 
 ==== Dialing
 
@@ -46,7 +42,7 @@ You can dial the phone by using:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-003,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava003Snippet.java[tag=miscellaneous-features-java-003,indent=0]
 ----
 
 ==== Call detection
@@ -63,7 +59,7 @@ On Android, call detection is unsupported because robust detection would require
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-004,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava004Snippet.java[tag=miscellaneous-features-java-004,indent=0]
 ----
 
 ==== E-Mail
@@ -72,7 +68,7 @@ You can send an email through the platforms native email client with code such a
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-005,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava005Snippet.java[tag=miscellaneous-features-java-005,indent=0]
 ----
 
 You can add one attachment by using `setAttachment` and `setAttachmentMimeType`.
@@ -81,10 +77,6 @@ NOTE: You need to use files from `FileSystemStorage` and *NOT* `Storage` files!
 
 You can add more than one attachment by putting them directly into the attachment map for example:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-006,indent=0]
-----
 
 NOTE: Some features such as attachments etc. Don't work in the simulator but should work on iOS/Android
 
@@ -96,17 +88,13 @@ If you want the theme system to automatically scale its fonts when larger text i
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-007,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava007Snippet.java[tag=miscellaneous-features-java-007,indent=0]
 ----
 
 You can also enable this behavior in the theme by setting the `useLargerTextScaleBool` theme constant to `true`.
 
 If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-008,indent=0]
-----
 
 ==== How the scale is computed per platform
 
@@ -130,10 +118,6 @@ Notice that on some platforms this will prompt the user for permissions and the 
 
 Once you have a https://www.codenameone.com/javadoc/com/codename1/contacts/Contact.html[Contact] you can use the `getContactById` method, but the default method is a bit slow if you want to pull a large batch of contacts. The solution for this is to extract the data that you need through
 
-[source,text]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-009,indent=0]
-----
 
 Here you can specify true for the attributes that actually matter to you.
 
@@ -145,10 +129,6 @@ IMPORTANT: When retrieving all the contacts, notice that you should probably not
 
 You can then extract all the contacts using code that looks a bit like this, notice that you use a thread so the UI won't be blocked!
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-010,indent=0]
-----
 
 .List of contacts
 image::img/contacts-list.png[List of contacts,scaledwidth=20%]
@@ -157,10 +137,6 @@ Notice that you didn't fetch the image of the contact as the performance of load
 
 TIP: The `scheduleBackgroundTask` method is like `new Thread()` in some regards. It places elements in a queue instead of opening too many threads so it can be good for non-urgent tasks
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-011,indent=0]
-----
 
 .Contacts with the default photos on the simulator, on device these will use actual user photos when available
 image::img/contacts-with-photos.png[Contacts with the default photos on the simulator, on device these will use actual user photos when available,scaledwidth=20%]
@@ -184,31 +160,23 @@ When you're iterating on translations you can also use the simulator to capture 
 Open the Simulator menu and enable *Auto Update Default Bundle* so that running your app in the Codename One simulator will create any missing resource bundles on the fly as you interact with the UI, which makes it simple to populate keys without manually editing files during development.
 You can install the bundle using code like this:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-012,indent=0]
-----
 
 The device language (as an ISO 639 two-letter code) could be retrieved with this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-013,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava013Snippet.java[tag=miscellaneous-features-java-013,indent=0]
 ----
 
 Once installed a resource bundle takes over the UI and every string set to a label (and label like components) will be automatically localized based on the bundle. You can also use the localize method of https://www.codenameone.com/javadoc/com/codename1/ui/plaf/UIManager.html[UIManager] to perform localization on your own:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-014,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava014Snippet.java[tag=miscellaneous-features-java-014,indent=0]
 ----
 
 The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-015,indent=0]
-----
 
 An exception for localization is the `TextField`/`TextArea` components both of which contain user data, in those cases the text won't be localized to avoid accidental localization of user input.
 
@@ -218,7 +186,7 @@ The resource bundle is a map between keys and values for example: the code below
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-016,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava016Snippet.java[tag=miscellaneous-features-java-016,indent=0]
 ----
 
 .Localized label
@@ -230,10 +198,6 @@ The https://www.codenameone.com/javadoc/com/codename1/l10n/L10NManager.html[L10N
 
 It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-017,indent=0]
-----
 
 .Localization formatting/parsing and information
 image::img/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
@@ -398,7 +362,7 @@ The most basic usage for the API allows you to fetch a device Location, notice t
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-018,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava018Snippet.java[tag=miscellaneous-features-java-018,indent=0]
 ----
 
 IMPORTANT: In order for location to work on iOS you *MUST* define the build hint `ios.locationUsageDescription` and describe why your application needs access to location. Otherwise you won't get location updates!
@@ -410,7 +374,7 @@ TIP: Notice that there is a method called `getCurrentLocation()` which will retu
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-019,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava019Snippet.java[tag=miscellaneous-features-java-019,indent=0]
 ----
 
 IMPORTANT: On Android location maps to low-level APIs if you disable the usage of Google Play Services. By default location should perform well if you leave the Google Play Services on
@@ -437,10 +401,6 @@ Class names are problematic since device builds are obfuscated, you should use l
 The following code demonstrates usage of the GeoFence API:
 
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-020,indent=0]
-----
 
 ===== Android background location permissions (API 30+)
 
@@ -448,10 +408,6 @@ On Android 11 (API level 30) and higher, requesting background location permissi
 
 For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-021,indent=0]
-----
 
 === Background music playback
 
@@ -472,7 +428,7 @@ The API itself couldn’t be simpler:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-022,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava022Snippet.java[tag=miscellaneous-features-java-022,indent=0]
 ----
 
 Just captures and returns a path to a photo you can either open it using the https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] class or save it somewhere.
@@ -481,10 +437,6 @@ IMPORTANT: The returned file is a temporary file, you shouldn't store a referenc
 
 For example: you can copy the `Image` to `Storage` using:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-023,indent=0]
-----
 
 TIP: When running on the simulator the `Capture` API opens a file chooser API instead of physically capturing the data. This makes debugging device or situation specific issues simpler
 
@@ -492,7 +444,7 @@ You can capture an image from the camera using an API like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-024,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava024Snippet.java[tag=miscellaneous-features-java-024,indent=0]
 ----
 
 .Captured photos previewed in the ImageViewer
@@ -510,7 +462,7 @@ The sample below captures audio recordings (using the 'Capture' API) and copies 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-025,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava025Snippet.java[tag=miscellaneous-features-java-025,indent=0]
 ----
 
 .Captured recordings in the demo
@@ -518,10 +470,6 @@ image::img/capture-audio.png[Captured recordings in the demo,scaledwidth=20%]
 
 Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-026,indent=0]
-----
 
 image::img/media-audio-recording-example.png[Example of recording and playback audio using Media API]
 
@@ -529,10 +477,6 @@ image::img/media-audio-recording-example.png[Example of recording and playback a
 
 The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-027,indent=0]
-----
 
 === Gallery
 
@@ -544,7 +488,7 @@ You can adapt the `Capture` sample above to use the gallery as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-028,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava028Snippet.java[tag=miscellaneous-features-java-028,indent=0]
 ----
 
 TIP: No need for a screenshot as it will look identical to the capture image screenshot above
@@ -590,7 +534,7 @@ This creates some potential issues for instance in `MultiButton`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-029,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava029Snippet.java[tag=miscellaneous-features-java-029,indent=0]
 ----
 
 The leader also determines the style state, so all the elements being lead are in the same state. For example: if the button is pressed all elements will display their pressed states, notice that they will do so with their own styles but
@@ -603,7 +547,7 @@ For example: the `SpanButton` class is like this code:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-030,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava030Snippet.java[tag=miscellaneous-features-java-030,indent=0]
 ----
 
 ==== Blocking lead behavior
@@ -618,7 +562,7 @@ The sample below is based on the `Accordion` component which uses a lead compone
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-031,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava031Snippet.java[tag=miscellaneous-features-java-031,indent=0]
 ----
 
 This allows you to add/edit entries but it also allows the delete button above to actually work. Without a call to `setBlockLead(true)` the delete button would cat as the rest of the accordion title.
@@ -636,7 +580,7 @@ TIP: Pull to refresh is implicitly implements in the `InifiniteContainer`
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-032,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava032Snippet.java[tag=miscellaneous-features-java-032,indent=0]
 ----
 
 `setPullToRefresh(Runnable)` is provided as a more discoverable alias for the
@@ -697,7 +641,7 @@ The sample below launches a "godfather" search on IMDB when this is sure to work
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-033,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava033Snippet.java[tag=miscellaneous-features-java-033,indent=0]
 ----
 
 === Automatic build hint configuration
@@ -708,10 +652,6 @@ A good example for a common problem developers face is location code that doesn'
 
 To solve this sort of used case you have two APIs in `Display`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-034,indent=0]
-----
 
 Both of these allow you to detect if a build hint is set and if not (or if it's set incorrectly) set its value...
 
@@ -732,33 +672,17 @@ That's why `EasyThread` exists: it takes some concepts of Codename One's threadi
 
 Easy thread can be created like this:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-035,indent=0]
-----
 
 You can send a task to the thread using:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-036,indent=0]
-----
 
 However, it gets better, say you want to return a value:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-037,indent=0]
-----
 
 Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. This code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
 
 These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-038,indent=0]
-----
 
 There are a few other variants like `runAndWait` and there is a `kill()` method which stops a thread and releases its resources.
 
@@ -768,7 +692,7 @@ Codename one can change the mouse cursor when hovering over specific areas to sh
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MiscellaneousFeaturesSnippets.java[tag=miscellaneous-features-java-039,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava039Snippet.java[tag=miscellaneous-features-java-039,indent=0]
 ----
 
 Once this is enabled you can set the cursor over a specific region using `cmp.setCursor()` which accepts one of the cursor constants defined in `Component`.

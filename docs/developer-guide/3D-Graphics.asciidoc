@@ -61,10 +61,6 @@ The renderer below draws a Phong lit cube. `Primitives.cube` builds the geometry
 a `Material` describes the surface, and a `Camera` supplies the view. Notice there
 is no shader code anywhere.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThreeDGraphicsSnippets.java[tag=3d-graphics-java-001,indent=0]
-----
 
 `setContinuous(true)` runs an animation loop. For a static scene leave it off and
 call `view.requestRender()` whenever something changes; this conserves battery.
@@ -92,10 +88,6 @@ optional `Texture` (`setTexture`), and a `RenderState` controlling depth testing
 alpha blending and face culling. Textures come from a Codename One `Image` or raw
 ARGB pixels:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThreeDGraphicsSnippets.java[tag=3d-graphics-java-002,indent=0]
-----
 
 .An UNLIT cube with a checkerboard texture (NEAREST filtering)
 image::img/gpu-textured-cube.png[A checkerboard textured cube,scaledwidth=40%]
@@ -107,10 +99,6 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/VertexBuffer.html[VertexBu
 with a `VertexFormat`, fill the interleaved float data, and (optionally) an
 https://www.codenameone.com/javadoc/com/codename1/gpu/IndexBuffer.html[IndexBuffer]:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThreeDGraphicsSnippets.java[tag=3d-graphics-java-003,indent=0]
-----
 
 Vertex buffers are allocated through the platform SIMD allocator, which on iOS
 (ParparVM) places the data at a fixed, aligned native address so it can be handed
@@ -124,10 +112,6 @@ binary `.glb` container and the JSON `.gltf` form with embedded buffers.
 `loadModel` returns the mesh together with the base-color texture from the model's
 own material, so a textured model renders with no extra setup:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThreeDGraphicsSnippets.java[tag=3d-graphics-java-004,indent=0]
-----
 
 The model below is the Khronos "BoomBox" glTF sample (a CC0 model carrying its own
 base-color texture), loaded this way and drawn Phong lit:
@@ -170,10 +154,6 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/Matrix4.html[Matrix4]
 
 Querying capabilities at runtime:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/ThreeDGraphicsSnippets.java[tag=3d-graphics-java-005,indent=0]
-----
 
 === Threading
 

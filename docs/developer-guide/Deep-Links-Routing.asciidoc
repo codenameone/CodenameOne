@@ -18,15 +18,11 @@ Annotate the target `Form` class:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/DeepLinksRoutingSnippets.java[tag=deep-links-routing-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeepLinksRoutingJava001Snippet.java[tag=deep-links-routing-java-001,indent=0]
 ----
 
 Or annotate a static factory method:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeepLinksRoutingSnippets.java[tag=deep-links-routing-java-002,indent=0]
-----
 
 Both forms are supported and a project can mix them. Path variables in
 the pattern (`:id`, `*`, `**`) are matched by name against parameters
@@ -56,10 +52,6 @@ resolves the URL through the same generated route table that handles
 incoming deep links, builds the matching `Form`, pushes it onto the
 navigation stack, and shows it.
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeepLinksRoutingSnippets.java[tag=deep-links-routing-java-003,indent=0]
-----
 
 The five-method surface (`navigate`, `back`, `getCurrent`, `getStack`,
 `popTo`) is everything the application sees -- the rest of the URL-to-
@@ -89,10 +81,6 @@ Host an `apple-app-site-association` JSON file at
 `https://your.domain/.well-known/apple-app-site-association` over HTTPS
 without redirects. The plugin's `AasaBuilder` produces the payload:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeepLinksRoutingSnippets.java[tag=deep-links-routing-java-004,indent=0]
-----
 
 Tell iOS which domains your app claims by setting the
 `ios.associatedDomains` build hint -- a comma-separated list of
@@ -111,10 +99,6 @@ Host an `assetlinks.json` file at
 `https://your.domain/.well-known/assetlinks.json`. The plugin's
 `AssetLinksBuilder` produces the payload:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeepLinksRoutingSnippets.java[tag=deep-links-routing-java-005,indent=0]
-----
 
 Tell Android which URLs to intercept by setting the
 `android.xintent_filter` build hint with a verified intent filter for
@@ -150,10 +134,6 @@ the simulator's URL-injection helper.
 Independent of deep linking, individual forms can intercept back / pop
 attempts so they can confirm before discarding unsaved work:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/DeepLinksRoutingSnippets.java[tag=deep-links-routing-java-006,indent=0]
-----
 
 The guard fires for the toolbar back button, the Android hardware back
 key, the iOS edge-swipe gesture, and any programmatic back navigation.

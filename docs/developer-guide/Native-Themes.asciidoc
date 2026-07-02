@@ -338,10 +338,6 @@ For dynamic theming - in-app accent toggles, branded flavours,
 A/B tests - push the same constants through
 `UIManager.addThemeProps` after the theme has been installed:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/NativeThemesSnippets.java[tag=native-themes-java-001,indent=0]
-----
 
 Values can be passed with or without the leading `#` and in any
 case; the runtime accepts `"ff2d95"`, `"#FF2D95"`, and the 3-digit

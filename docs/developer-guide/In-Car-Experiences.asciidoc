@@ -13,10 +13,6 @@ This API is *zero cost when unused*: simply referencing `com.codename1.car` is w
 
 Register a single `CarApplication` from your app's `init()` -- before a head unit connects -- and return a root `CarScreen` that builds a template:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-001,indent=0]
-----
 
 That single description renders natively on both platforms:
 
@@ -45,26 +41,14 @@ image::img/car-androidauto-grid.png[Android Auto grid template,640]
 
 Head units enforce a hard cap on the number of rows/items they display (driver-distraction rules). Query it and trim accordingly:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-002,indent=0]
-----
 
 === Screen stack & lifecycle
 
 `CarContext` manages a back stack, mirroring `androidx.car.app`'s `ScreenManager` and CarPlay's `CPInterfaceController`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-003,indent=0]
-----
 
 `CarScreen` exposes optional lifecycle hooks -- `onCreate()`, `onResume()`, `onPause()`, `onDestroy()` -- and `CarApplication` is notified of connection changes via `onCarConnected(CarContext)` / `onCarDisconnected()`. You can also observe connection globally:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-004,indent=0]
-----
 
 === Now-playing (audio apps)
 

@@ -75,10 +75,6 @@ This is useful for platform abstraction classes where one implementation is guar
 
 For example, Codename One annotates:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-001,indent=0]
-----
 
 NOTE: This hint is intended for ParparVM native translation and doesn't apply to the JavaScript back end.
 
@@ -169,10 +165,6 @@ speedup.
 
 `Simd` is accessed as a singleton:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-002,indent=0]
-----
 
 The returned object is safe to cache in a field as long as the cache is
 refreshed across simulator restarts (the simulator may swap the backing
@@ -192,10 +184,6 @@ arbitrary `new`-allocated arrays to `Simd` primitives.
 Every buffer used with a `Simd` primitive must so come from one of
 the allocation helpers on `Simd`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-003,indent=0]
-----
 
 // vale-skip: write-good.TooWordy — 'minimum size' is a precise lower bound; 'least size' would be wrong.
 All three methods enforce a minimum size of 16 elements and throw
@@ -212,10 +200,6 @@ simulator or undefined results on device.
 
 ==== A minimal End-to-End example
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-004,indent=0]
-----
 
 All `Simd` ops take explicit `offset` / `length` pairs so callers can
 chunk a large buffer through a small scratch array without reallocating.
@@ -236,10 +220,6 @@ solution is to let the compiler place these buffers on the call stack
 where they cost nothing to create and are reclaimed automatically when the
 method returns. This is what the `alloca*` family exposes:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-005,indent=0]
-----
 
 On the simulator (and on Android) these behave like heap allocations with
 registration. On ParparVM the translator intercepts each `alloca*` call
@@ -458,7 +438,7 @@ This can be accomplished with a single line of code:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-006,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava006Snippet.java[tag=performance-java-006,indent=0]
 ----
 
 You place this in the `init(Object)` method so all future on-device errors are emailed to you. Internally this method uses the `Display.getInstance().addEdtErrorHandler()` API to bind error listeners to the EDT. When an exception is thrown there it's swallowed (using `ActionEvent.consume()`). The `Log` data is then sent using `Log.sendLog()`.
@@ -488,25 +468,17 @@ This led to the discovery that you're loading the same resource file over and ov
 
 In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-007,indent=0]
-----
 
 This seems reasonable until you realize that the constructors for `SMSShare`, `EmailShare` & `FacebookShare` load the icons for each of those...
 
 These icons are in a shared resource file that you load and don't cache. The initial workaround was to cache this resource but a better solution was to convert this code:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-008,indent=0]
-----
 
 Into this code:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-009,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava009Snippet.java[tag=performance-java-009,indent=0]
 ----
 
 This way the resource uses lazy loading as needed.
@@ -533,15 +505,11 @@ Here you defined:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-010,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava010Snippet.java[tag=performance-java-010,indent=0]
 ----
 
 Then you did this within the background loading thread:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-011,indent=0]
-----
 
 This effectively sleeps when the user interacts with the UI and loads the images if the user hasn't touched the UI in a while.
 
@@ -549,16 +517,8 @@ Notice that you also check if the scroll changes, this allows you to notice case
 
 All you need to do now is update the `lastScroll` variable whenever user interaction is in place. This works for user touches:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-012,indent=0]
-----
 
 This works for general scrolling:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PerformanceSnippets.java[tag=performance-java-013,indent=0]
-----
 
 NOTE: Due to technical constraints you can't use a lambda in this specific case...

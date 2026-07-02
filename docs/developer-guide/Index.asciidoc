@@ -294,7 +294,7 @@ After clicking finish in the new project wizard you have a `HelloWorld` project 
 
 [source,java,title='HelloWorld Class']
 ----
-include::../demos/common/src/main/snippets/developer-guide/IndexSnippets.java[tag=index-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IndexJava001Snippet.java[tag=index-java-001,indent=0]
 ----
 
 <1> This is the main class, it's the entry point to the app, notice it doesn't have a `main` method but rather callback which this guide covers soon
@@ -305,10 +305,6 @@ include::../demos/common/src/main/snippets/developer-guide/IndexSnippets.java[ta
 
 Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
 
-[source,java,title='HelloWorld init(Object)']
-----
-include::../demos/common/src/main/snippets/developer-guide/IndexSnippets.java[tag=index-java-002,indent=0]
-----
 
 <1> `init` is the first of the four lifecycle methods. It's responsible for initialization of variables and values
 
@@ -334,10 +330,6 @@ include::../demos/common/src/main/snippets/developer-guide/IndexSnippets.java[ta
 
 In a cold start `init(Object)` is invoked followed by the `start()` method. For example, `start()` can be invoked more than once if an app is minimized and restored, see the sidebar <<ApplicationLifecycle,Application Lifecycle>>:
 
-[source,java,title='HelloWorld start()']
-----
-include::../demos/common/src/main/snippets/developer-guide/IndexSnippets.java[tag=index-java-003,indent=0]
-----
 
 <1> If the app was minimized you don't want to do much, show the last `Form` of the application
 
@@ -386,10 +378,6 @@ IMPORTANT: `destroy()` is optional there is no guarantee that it will be invoked
 
 Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
 
-[source,java,title='HelloWorld stop() and destroy()']
-----
-include::../demos/common/src/main/snippets/developer-guide/IndexSnippets.java[tag=index-java-004,indent=0]
-----
 
 <1> `stop()` is invoked when the app is minimized or a different app is opened
 
@@ -548,38 +536,15 @@ Due to the way Kotlin works you can create a regular Java project and convert so
 
 The hello world Java source file looks like this (removed some comments and whitespace):
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/IndexSnippets.java[tag=index-java-005,indent=0]
-----
 
-When you select that file and select the menu option #Code# -> #Convert Java file to Kotlin File# you should get this:
+When you select that file and select the menu option #Code# -> #Convert Java file to Kotlin File# you should get a familiar structure. The problem is that there are two bugs in the automatic conversion... That's the code for Kotlin behaves differently from standard Java.
 
-[source,kotlin]
-----
-include::../demos/common/src/main/snippets/developer-guide/index.kt[tag=index-kotlin-001,indent=0]
-----
-
-That's pretty familiar. The problem is that there are two bugs in the automatic conversion... That's the code for Kotlin behaves differently from standard Java.
-
-The first problem is that Kotlin classes are final unless declared otherwise so you need to add the open keyword before the class declaration as such:
-
-[source,kotlin]
-----
-include::../demos/common/src/main/snippets/developer-guide/index.kt[tag=index-kotlin-002,indent=0]
-----
+The first problem is that Kotlin classes are final unless declared otherwise so you need to add the open keyword before the class declaration.
 
 This is essential as the build server will fail with weird errors related to instanceof.
 
 NOTE: This applies to the main class of the project, other classes in Codename One can remain `final`
 
 The second problem is that arguments are non-null by default. The `init` method might have a null argument. This fails with an exception. The solution is to add a question mark to the end of the call: `fun init(context: Any?)`.
-
-The full working sample is:
-
-[source,kotlin]
-----
-include::../demos/common/src/main/snippets/developer-guide/index.kt[tag=index-kotlin-003,indent=0]
-----
 
 Once all that's in place Kotlin should work. This should be possible for more JVM languages in the future.

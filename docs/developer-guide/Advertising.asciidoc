@@ -77,10 +77,6 @@ include::../demos/common/src/main/snippets/developer-guide/advertising.xml[tag=a
 Enable a provider once at startup. Each library exposes a static `install()`
 method that registers its provider with `AdManager`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-001,indent=0]
-----
 
 That single call binds the provider; the rest of your code uses only the
 framework API in `com.codename1.ads`. If no provider is registered the API
@@ -96,10 +92,6 @@ wrap Google's User Messaging Platform or an equivalent), and on iOS the App
 Tracking Transparency prompt must be presented to access the advertising
 identifier. The recommended order is to initialize, gather consent, then load:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-002,indent=0]
-----
 
 `AdConfig` also carries the global compliance flags every network requires:
 test mode, test device ids, child directed treatment, under-age-of-consent
@@ -114,10 +106,6 @@ unit ids while developing.
 `BannerAd` is a regular Codename One component. Add it to a form (typically
 anchored at the top or bottom) and call `load()`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-003,indent=0]
-----
 
 The default `SIZE_ADAPTIVE` requests an anchored adaptive banner sized to the
 available width, which is the recommended modern banner type.
@@ -127,28 +115,16 @@ available width, which is the recommended modern banner type.
 Interstitials are event driven - load, then show when loaded, and preload the
 next one when the current ad is dismissed:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-004,indent=0]
-----
 
 You can also let Codename One show an interstitial automatically on screen
 transitions, no more often than a given interval:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-005,indent=0]
-----
 
 === Rewarded and rewarded interstitial ads
 
 Register a reward listener and grant the reward when it fires. For valuable
 rewards, verify server side rather than trusting the client:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-006,indent=0]
-----
 
 `RewardedInterstitialAd` has the same API but is shown on a transition rather
 than opt-in.
@@ -158,10 +134,6 @@ than opt-in.
 App open ads are shown while the app is brought to the foreground. Let the
 manager and provider handle the foreground hook and freshness window for you:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-007,indent=0]
-----
 
 === Native ads
 
@@ -172,10 +144,6 @@ chat or a search results screen - where a banner feels bolted on but a row
 styled like the others fits in. The ad must still be clearly labelled
 (for example "Sponsored"):
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-008,indent=0]
-----
 
 `NativeAd` exposes the headline, body, call-to-action, advertiser and rating
 that you bind to your own components. Native ad support is an optional provider
@@ -206,9 +174,4 @@ method. No framework or build-tool changes are required.
 
 For tests and screenshots the framework ships a deterministic, network-free
 provider, `MockAdProvider` (in `cn1-ads-mock`), that renders fixed, labelled ads
-with stable sizes and colours. Enable it the same way:
-
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-009,indent=0]
-----
+with stable sizes and colours.

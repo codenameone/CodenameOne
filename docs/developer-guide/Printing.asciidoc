@@ -6,10 +6,6 @@ The document is a file in `FileSystemStorage` identified by its path and mime ty
 
 === Quick start: Print a PDF
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PrintingSnippets.java[tag=printing-java-001,indent=0]
-----
 
 `Printer.printPDF(path, listener)` is shorthand for `Printer.print(path, "application/pdf", listener)`. Use the general `print` variant for other document types, for example `Printer.print(photoPath, "image/jpeg", listener)`.
 
@@ -19,10 +15,6 @@ Gate the call on `isPrintingSupported()`. When it returns `false` the listener r
 
 `Printer.printImage(image, listener)` prints a `com.codename1.ui.Image` directly. The image is encoded to a temporary PNG file behind the scenes and the file is deleted once the print flow finishes:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/PrintingSnippets.java[tag=printing-java-002,indent=0]
-----
 
 This pairs well with drawing on a mutable image, so you can compose a printable page (a receipt, a ticket, a chart) with the standard `Graphics` API and send it to paper without generating a PDF.
 

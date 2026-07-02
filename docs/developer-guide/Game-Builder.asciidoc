@@ -60,10 +60,6 @@ sets up the perspective camera, lights and a `Model` per element. Put game logic
 
 Loading and playing a level at runtime is three lines:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/GameBuilderSnippets.java[tag=game-builder-java-001,indent=0]
-----
 
 === Getting started
 
@@ -183,10 +179,6 @@ companion's `onUpdate(double dt)`. `GameSceneView` realizes every element into a
 whose `getUserData()` is the source `GameElement`, so you read the properties you set in
 the editor:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/GameBuilderSnippets.java[tag=game-builder-java-002,indent=0]
-----
 
 Win/lose conditions, scoring, enemy AI and level transitions (using a door's `target`)
 are all decided here. For rigid-body games use
@@ -244,10 +236,6 @@ companion in your app, where the scene is rendered by the GPU-accelerated
 companion `<Scene>.java`. To show the scene in your app, instantiate the companion and
 `start()` it:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/GameBuilderSnippets.java[tag=game-builder-java-003,indent=0]
-----
 
 The level is plain data, so you can ship many `.game` files and load whichever level the
 player selects.

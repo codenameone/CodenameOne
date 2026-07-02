@@ -22,7 +22,7 @@ or any mix:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationJsonXmlMappingJava001Snippet.java[tag=annotation-json-xml-mapping-java-001,indent=0]
 ----
 <1> Every `@Mapped` class must declare a public no-arg constructor --
     the generated mapper calls it from `fromJson` / `fromXml`.
@@ -32,10 +32,6 @@ For `PropertyBusinessObject`-style classes the same annotations work on
 `Property#set` so subscribers (`addChangeListener`) still see the
 mutation:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-002,indent=0]
-----
 
 ==== Field-level annotations
 
@@ -69,10 +65,6 @@ include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMapp
 
 === Round-trip
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-003,indent=0]
-----
 
 `Mappers.fromJson` and `Mappers.fromXml` both accept either a `String`
 or a `java.io.Reader`, so streamed responses (network, file, resource)
@@ -123,10 +115,6 @@ persisted across builds.
 Sometimes a class lives in a third-party JAR the build can't annotate.
 Hand-write a `Mapper<T>` and register it at startup:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-004,indent=0]
-----
 
 Hand-written mappers take precedence over generated ones for the same
 class.

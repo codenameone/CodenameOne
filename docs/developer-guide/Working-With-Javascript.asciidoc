@@ -20,15 +20,11 @@ Class1.java
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava001Snippet.java[tag=working-with-javascript-java-001,indent=0]
 ----
 
 Class2.java
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-002,indent=0]
-----
 
 This fails because `Class2` calls Class1.getValue() in its static initializer, and `getValue()` calls `Log.p()`, which, underneath the covers, writes to Storage - which involves some synchronous network access in the JavaScript port (that is, it uses `wait()` and `notify()` under the hood.
 
@@ -36,7 +32,7 @@ If you remove the call to `Log.p()` from `getValue()`, as follows:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-003,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava003Snippet.java[tag=working-with-javascript-java-003,indent=0]
 ----
 
 Then everything would be fine.
@@ -214,7 +210,7 @@ By default, the CORS proxy is used for HTTP requests to URLS at a different doma
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-004,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava004Snippet.java[tag=working-with-javascript-java-004,indent=0]
 ----
 
 *Why would you want to do this?*
@@ -521,7 +517,7 @@ Then in your app's `init()` method, add the following:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-005,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava005Snippet.java[tag=working-with-javascript-java-005,indent=0]
 ----
 
 === Disabling the 'OnBeforeUnload' handler
@@ -539,7 +535,7 @@ NOTE: Some browsers don't allow you to specify the message that's displayed in t
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-006,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava006Snippet.java[tag=working-with-javascript-java-006,indent=0]
 ----
 
 [id="pwa_deployment", reftext="Deploying as a Progressive Web App"]
@@ -620,7 +616,7 @@ For example:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-007,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava007Snippet.java[tag=working-with-javascript-java-007,indent=0]
 ----
 
 WARNING: Don't abuse this feature. You should enable this polling when necessary. For example, If your app enables the user to listen for voice commands, enable polling for the period of time that it's listening. When the user wants to stop listening, you should also stop the polling by setting the interval to "0."
@@ -649,7 +645,7 @@ To preserve the iframe and its JavaScript state across deinitialization cycles, 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithJavascriptSnippets.java[tag=working-with-javascript-java-008,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava008Snippet.java[tag=working-with-javascript-java-008,indent=0]
 ----
 
 This keeps the iframe in the DOM even when the component is deinitialized, preserving all JavaScript state.

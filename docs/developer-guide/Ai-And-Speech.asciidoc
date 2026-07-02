@@ -38,7 +38,7 @@ not change when you swap providers:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechJava001Snippet.java[tag=ai-and-speech-java-001,indent=0]
 ----
 
 All five factories return the same `LlmClient` API. OpenAI, Ollama,
@@ -56,10 +56,6 @@ target per provider (`gpt-4o-mini`, `claude-sonnet-4-5`,
 `ChatRequest` is a builder. The bare minimum is a model identifier and
 one user message:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-002,indent=0]
-----
 
 `ChatResponse.getText()` concatenates every text part of the assistant
 message. `getFinishReason()` returns one of `"stop"`, `"length"`,
@@ -74,10 +70,6 @@ a `StreamingListener` on the EDT. The returned `AsyncResource` resolves
 to the final aggregated `ChatResponse` when the stream completes;
 calling `cancel()` on the resource closes the underlying socket:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-003,indent=0]
-----
 
 The decoder reassembles fragmented SSE deltas before invoking the
 listener, so `onContentDelta` always receives a complete token chunk.
@@ -92,10 +84,6 @@ on the first fragment and `id` is present on the first call.
 and the handler returns the JSON result that gets fed back into the
 conversation:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-004,indent=0]
-----
 
 `ToolChoice` covers the four standard modes:
 
@@ -110,20 +98,12 @@ Constrain a response to JSON with `ResponseFormat.JSON_OBJECT`. The
 client adds the provider-specific flag, and `ChatResponse.getText()`
 returns a string the runtime can hand to `JSONParser`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-005,indent=0]
-----
 
 ==== Multi-modal messages
 
 Attach an image to a user message by adding an `ImagePart`. The part
 accepts either inline bytes plus a MIME type or a remote HTTPS URL:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-006,indent=0]
-----
 
 ==== Embeddings
 
@@ -131,10 +111,6 @@ include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.j
 the vectors for semantic search, deduplication, or downstream
 clustering:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-007,indent=0]
-----
 
 ==== Image generation
 
@@ -142,10 +118,6 @@ include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.j
 DALL-E 3 today; the on-device factory routes through the optional
 `cn1-ai-stablediffusion` cn1lib (when present in the consumer project):
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-008,indent=0]
-----
 
 DALL-E 3 supports `count = 1` only. Larger batches require a different
 underlying model; pass it via `setModel(...)`.
@@ -155,10 +127,6 @@ underlying model; pass it via `setModel(...)`.
 `ConversationStore` wraps `Storage` to serialize a list of
 `ChatMessage` values to JSON under a named key:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-009,indent=0]
-----
 
 `Tokenizer.estimateMessages(history)` returns a rough token count so you
 can trim the oldest turns before the conversation outgrows the model's
@@ -170,10 +138,6 @@ context window.
 placeholders pass through unchanged so partially-filled templates are
 safe to log:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-010,indent=0]
-----
 
 ==== Retry policy
 
@@ -218,10 +182,6 @@ can extract. Fetch the key from a server endpoint that the user
 authenticates against, then cache it locally with the non-prompting
 `SecureStorage` overloads:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-011,indent=0]
-----
 
 === The `ChatView` component
 
@@ -237,10 +197,6 @@ The component exposes thread-safe `addMessage`, `appendToLastMessage`,
 and `setTypingIndicatorVisible` methods, so background callbacks from
 `chatStream(...)` can mutate the view directly:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-012,indent=0]
-----
 
 `ChatBubble` and `ChatInput` are public, so subclass them for custom
 rendering. Override `ChatView.createBubble(message)` to swap in a
@@ -279,10 +235,6 @@ history, dispatches the response into the view, and updates the typing
 indicator. Use it for prototypes, or as a reference implementation when
 you need a custom send pipeline:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-013,indent=0]
-----
 
 === Speech recognition and TextToSpeech
 
@@ -293,10 +245,6 @@ on every platform. The default implementation returns `false` from
 
 ==== `SpeechRecognizer`
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-014,indent=0]
-----
 
 iOS uses `SFSpeechRecognizer`, Android uses `android.speech.SpeechRecognizer`,
 and the JavaSE simulator stays unsupported unless the optional
@@ -307,7 +255,7 @@ active session early; partial results stop firing immediately.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-015,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechJava015Snippet.java[tag=ai-and-speech-java-015,indent=0]
 ----
 
 iOS uses `AVSpeechSynthesizer`, Android uses
@@ -354,17 +302,9 @@ include::../demos/common/src/main/snippets/developer-guide/ai-and-speech.xml[tag
 
 ==== Example: Scanning a barcode
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-016,indent=0]
-----
 
 ==== Example: Face detection
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-017,indent=0]
-----
 
 NOTE: ML Kit barcode and face detection ship as small Pods or Gradle
 dependencies that add a few megabytes to the binary. The document
@@ -377,10 +317,6 @@ The pieces compose well. The following loop captures a photo,
 extracts text with the multi-modal `gpt-4o` model, speaks the result,
 and streams the same text into a `ChatView`:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/AiAndSpeechSnippets.java[tag=ai-and-speech-java-018,indent=0]
-----
 
 The same code runs unchanged in the simulator when Ollama is detected,
 on Android with the multi-modal native client, and on iOS through the

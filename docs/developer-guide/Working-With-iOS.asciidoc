@@ -90,10 +90,6 @@ Notifications can either be set up as one-time or as repeating.
 
 ===== Example sending notification
 
-[source,java]
------
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithIosSnippets.java[tag=working-with-ios-java-001,indent=0]
------
 
 NOTE: On iOS, scheduling a local notification with an `id` that already exists now replaces the earlier scheduled notification with that same `id` instead of keeping duplicates.
 
@@ -109,17 +105,13 @@ The API for receiving/handling local notifications is also like push. Your appli
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithIosSnippets.java[tag=working-with-ios-java-002,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithIosJava002Snippet.java[tag=working-with-ios-java-002,indent=0]
 -----
 
 The `notificationId` parameter will match the `id` value of the notification as set using `LocalNotification.setId()`.
 
 ===== Example receiving notification
 
-[source,java]
------
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithIosSnippets.java[tag=working-with-ios-java-003,indent=0]
------
 
 NOTE: `localNotificationReceived()` is called when the user responds to the notification by tapping on the alert. If the user doesn't click on the notification, then this event handler will never be fired.
 
@@ -127,10 +119,6 @@ NOTE: `localNotificationReceived()` is called when the user responds to the noti
 
 Repeating notifications will continue until they're canceled by the app. You can cancel a single notification by calling:
 
-[source,java]
------
-include::../demos/common/src/main/snippets/developer-guide/WorkingWithIosSnippets.java[tag=working-with-ios-java-004,indent=0]
------
 
 Where `notificationId` is the string id that was set for the notification using `LocalNotification.setId()`.
 

@@ -30,33 +30,21 @@ Start with a simple example of an app that sells `Worlds`. First, pick the SKU f
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava001Snippet.java[tag=monetization-java-001,indent=0]
 ----
 
 TIP: Although this example uses the package-name convention for a SKU, you can use any name you want, for example `UA8879`.
 
 Next, the app's main class needs to implement the `PurchaseCallback` interface
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-002,indent=0]
-----
 
 Using these callbacks, the app receives notifications whenever a purchase changes. For this simple app, only `itemPurchased()` and `itemPurchaseError()` matter. The legacy `itemRefunded()`, `subscriptionStarted()`, and `subscriptionCanceled()` hooks are deprecated in the core API and are no longer dispatched by the stores. Instead of relying on callbacks for long-term entitlement state, query the current receipts at runtime with helpers such as `Purchase.wasPurchased(...)`, `Purchase.isSubscribed(...)`, or `Purchase.getReceipts()`. That keeps the UI aligned with the latest data from the underlying store.
 
 Now in the `start()` method, add a button that lets the user buy the world:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-003,indent=0]
-----
 
 At this point, the app can track the sale of the world. To make it more useful, add `ToastBar` feedback for purchase completion:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-004,indent=0]
-----
 
 
 NOTE: You can test out this code in the simulator without doing any more setup and it will work. If you want the code to work on Android and iOS, you'll need to set up the app and in-app purchase settings in the Google Play and iTunes stores respectively as explained below
@@ -84,22 +72,14 @@ You'll use storage to keep track of the number of worlds that the user purchased
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-005,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava005Snippet.java[tag=monetization-java-005,indent=0]
 ----
 
 Now you'll change your buy code as follows:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-006,indent=0]
-----
 
 And your `itemPurchased()` callback will need to add a world:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-007,indent=0]
-----
 
 NOTE: When you set up the products in the iTunes store you will need to mark the product as a consumable product or iTunes will prevent you from purchasing it more than once
 
@@ -125,10 +105,6 @@ Apple allows you to present discounted introductory pricing to existing subscrib
 
 To build the signed discount payload required by Apple you can use the `ApplePromotionalOffer` helper:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-008,indent=0]
-----
 
 Apple generates the signature and timestamp from your App Store Connect server notifications endpoint; Codename One passes them to the native StoreKit APIs. For one-time products you can call `purchase(sku, offer)` instead of `subscribe(...)`.
 
@@ -176,10 +152,6 @@ You'll expand on the theme of "Buying" the world for this app, except, this time
 . A 1-month subscription
 . A 1-year subscription
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-009,indent=0]
-----
 
 Notice that you create two separate SKUs for the 1 month and 1-year subscription.  **Each subscription period must have its own SKU**.  The example uses an array (`PRODUCTS`) that contains both of the SKUs. This is handy, as you'll see in the examples ahead, because the APIs for checking status and expiry date of a subscription take the SKUs in a "subscription group" as input.
 
@@ -203,19 +175,11 @@ A basic receipt store needs to implement just two methods:
 
 You'll register it in your app's init() method so that it's always available:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-010,indent=0]
-----
 
 These methods are designed to be asynchronous since real-world apps will always be connecting to some sort of network service. Instead of returning a value, both of these methods are passed instances of the `SuccessCallback` class. It's important to make sure to call `callback.onSuccess()` *ALWAYS* when the methods have completed, even if there is an error, or the Buy class will just assume that you're taking a long time to complete the task, and will continue to wait for you to finish.
 
 Once implemented, your `fetchReceipts()` method will look like:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-011,indent=0]
-----
 
 This is straight forward. You're checking to see if you already have a list of receipts stored. If so you return that list to the callback. If not you return an empty array of receipts.
 
@@ -223,10 +187,6 @@ NOTE: `Receipt` implements `Externalizable` so you are able to write instances d
 
 The `submitReceipt()` method is a little more complex, as it needs to calculate the new expiry date for your subscription:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-012,indent=0]
-----
 
 The main logic of this method involves iterating through all the existing receipts to find the *latest* current expiry date, so that when the user purchases a subscription, it's added onto the end of the current subscription (if one exists) rather than going from today's date. This enables users to renew their subscription before the subscription has expired.
 
@@ -248,17 +208,9 @@ In your hello world app you synchronize the subscriptions in a few places.
 
 At the end of the `start()` method:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-013,indent=0]
-----
 
 And you also provide a button to allow the user to manually synchronize the receipts:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-014,indent=0]
-----
 
 ===== Expiry dates and subscription status
 
@@ -272,10 +224,6 @@ If you need to know more information about subscriptions, you can always just ca
 
 In the hello world app you'll use this information in a few different places. On your main form you'll include a label to show the current expiry date, and you allow the user to press a button to synchronize receipts manually if they think the value is out of date:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-015,indent=0]
-----
 
 ===== Allowing the user to purchase the subscription
 
@@ -283,10 +231,6 @@ You should now have all the background required to implement the Hello World Sub
 
 In the main form, you want two buttons to subscribe to the `World`, for one month and one year respectively. They look like:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-016,indent=0]
-----
 <1> In the event handler you check if the user is subscribed by calling `isSubscribed(PRODUCTS)`.  Notice that you check it against the array of both the one month and one year subscription SKUs.
 <2> You are able to tell the user when the current expiry date is so that they can gauge whether to proceed.
 <3> Since this is a non-renewable subscription, you use the `Purchase.purchase()` method. See following note about `subscribe()` vs `purchase()`
@@ -305,10 +249,6 @@ Which one you use depends on the type of product that's being purchased. If your
 
 The buy callbacks are like the ones implemented in the regular in-app purchase examples:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-017,indent=0]
-----
 
 Notice that, in `itemPurchased()` you don't need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. You do make a call to `synchronizeReceiptsSync(0)` but this is just to ensure that your toast message has the new expiry date loaded already.
 
@@ -373,7 +313,7 @@ To aid in this process, Codename One provides a fully functional in-app purchase
 +
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-018,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava018Snippet.java[tag=monetization-java-018,indent=0]
 ----
 5. Add the `ios.plistInject` build hint to your project with the value `<key>NSAppTransportSecurity</key> <dict>     <key>NSAllowsArbitraryLoads</key>     <true/> </dict>`.  This is so that you can use http urls in iOS.  Since you don't intend to fully publish this app, you can cut corners like this. If you were creating a real app, you would use proper secure URLs.
 
@@ -474,39 +414,22 @@ The example uses the https://github.com/shannah/cn1-generic-webservice-client[Ge
 
 The source for your ReceiptStore is as follows:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-019,indent=0]
-----
 
 Notice that you aren't doing any calculation of expiry dates in your client app, as you did in the previous post (on non-renewable receipts). Since you are using a server now, it makes sense to move all that logic over to the server.
 
 The `createRESTClient()` method shown there creates a `RESTfulWebServiceClient` and configuring it to use basic authentication with a username and password. The idea is that your user would have logged into your app at some point, and you would have a username and password on hand to pass back to the web service with the receipt data so that you can connect the subscription to a user account. The source of that method is listed here:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-020,indent=0]
-----
 
 ===== Server-Side
 
 On the server-side, your REST controller is a standard JAX-RS REST interface. The Netbeans web service wizard generated it and then it was modified to suit the purposes here. The methods of the `ReceiptsFacadeREST` class for the REST API are shown here:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-021,indent=0]
-----
 
 The magic happens inside that `validateAndSaveReceipt()` method, which You'll cover in detail soon.
 
 ====== Notifications
 
-It's important to note that you won't be notified by apple or google when changes are made to subscriptions. It's up to you to periodically "poll" their web service to find if any changes have been made. Changes you would be interested in are primarily renewals and cancellations. To deal with this, set up a method to run periodically (once-per day might be enough). For testing, the example below sets it up to run once per minute:
-
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-022,indent=0]
-----
+It's important to note that you won't be notified by apple or google when changes are made to subscriptions. It's up to you to periodically "poll" their web service to find if any changes have been made. Changes you would be interested in are primarily renewals and cancellations. Set up a method to run periodically (once per day might be enough), using the scheduling mechanism on your server stack.
 
 That method finds all the receipts in the database that haven't been validated in some period of time, and validates it. Again, the magic happens inside the `validateAndSaveReceipt()` method which you cover later.
 
@@ -519,10 +442,6 @@ For this tutorial, the example uses a purpose-built library to handle receipt va
 
 The general usage is as follows:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-023,indent=0]
-----
 
 As you can see from this snippet, the complexity of receipt validation has been reduced to entering three configuration strings:
 
@@ -536,10 +455,6 @@ The next section walks through the steps to get these values.
 
 You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-024,indent=0]
-----
 <1> You need to handle the case where the app is being used in the CN1 simulator. You'll treat this
 as a non-renewable receipt, and you'll calculate the expiry date using an "accelerated" clock to assist in testing.
 
@@ -663,10 +578,6 @@ WARNING: Use the "client_email" value as your client ID, not the "client_id" val
 
 You'll set these in your constants:
 
-[source,java]
-----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-025,indent=0]
-----
 
 **NOT DONE YET**
 
@@ -697,7 +608,7 @@ The `ReceiptsFacadeREST` class includes a flag to enable/disable play store vali
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-026,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava026Snippet.java[tag=monetization-java-026,indent=0]
 ----
 
 Change this to `false`.
@@ -745,14 +656,14 @@ Once you have a shared secret, update the ReceiptsFacadeREST class with the valu
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-027,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava027Snippet.java[tag=monetization-java-027,indent=0]
 ----
 
 And enable iTunes store validation:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/MonetizationSnippets.java[tag=monetization-java-028,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava028Snippet.java[tag=monetization-java-028,indent=0]
 ----
 
 Change this to `false`.
