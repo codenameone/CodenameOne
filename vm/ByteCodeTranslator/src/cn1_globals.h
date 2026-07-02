@@ -1156,6 +1156,16 @@ typedef struct CN1BibopPage {
                                           //  GC via the sweep-stack release-push)
     JAVA_BOOLEAN gcNeedsReclaim;          // a survivor carries a finalizer or monitor ->
                                           //  dead slots must reach cn1BibopReclaimSlot
+    JAVA_BOOLEAN gcHasMonitors;           // STICKY: a monitor was ever attached to an
+                                          //  object in this page (set by
+                                          //  cn1BibopNoteMonitorAttached, cleared only by
+                                          //  cn1BibopFormatPage). Suppresses the O(1)
+                                          //  all-dead reclaim for THIS page only, so a
+                                          //  dead monitored slot always reaches
+                                          //  cn1BibopReclaimSlot -- replacing the global
+                                          //  monitor count that disabled the shortcut for
+                                          //  EVERY page whenever any monitor existed
+                                          //  (e.g. java.lang.System.LOCK, permanently).
                                           //  (recomputed at every full walk)
     _Atomic int gcLastMarkedEpoch;        // currentGcMarkValue stamped by gcMarkObject when
                                           //  a slot on this page is marked live (relaxed;

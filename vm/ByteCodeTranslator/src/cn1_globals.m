@@ -1405,17 +1405,15 @@ static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
 _Atomic long bibopBytesSinceGc = 0;
 
-#ifndef CN1_BIBOP_NO_FASTSWEEP
-// Number of live monitors (lazily-malloc'd CN1ThreadData) currently attached to BiBOP
-// slots. Incremented (seq_cst, globally visible) by cn1BibopNoteMonitorAttached when
-// monitorEnter first attaches a monitor to a BiBOP object; decremented by
-// cn1BibopReclaimSlot when it free()s one. While > 0 the sweep's O(1) all-dead shortcut
-// is suppressed, so every dead monitored slot is guaranteed to reach cn1BibopReclaimSlot
-// (the only place a BiBOP monitor is freed). This sidesteps the cross-thread visibility
-// problem of a per-page flag: a monitor can be attached by ANY thread to a survivor on a
-// page it does not own, with no happens-before to that page's later retire-push.
-static _Atomic int cn1BibopLiveMonitors = 0;
-#endif
+// (The old global BiBOP-monitor count that suppressed the O(1) all-dead reclaim
+// for EVERY page while ANY monitor existed is gone: java.lang.System.LOCK is a
+// permanently-monitored BiBOP object, so the gate degraded every sweep to the
+// full per-slot walk -- measured 3-4x on allocation churn. Replaced by the
+// STICKY per-page gcHasMonitors flag: the visibility concern the global count
+// sidestepped (attach by a foreign thread with no happens-before to the page's
+// retire-push) is covered by the mark handshake -- a page can only be PROVEN all-dead
+// after a full mark in which the attaching thread was stopped and scanned,
+// which orders its attach store before the sweep's read.)
 
 // Per-thread current page per size class. Only ever touched by the owning
 // thread (allocation) and by that same thread on death (collectThreadResources
@@ -1453,6 +1451,7 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     p->gcAllocedSinceSweep = JAVA_FALSE;
     p->gcNeedsReclaim = JAVA_FALSE;
+    p->gcHasMonitors = JAVA_FALSE;
     atomic_store_explicit(&p->gcLastMarkedEpoch, 0, memory_order_relaxed);
     p->gcGraceEpoch = 0;
 #endif
@@ -1778,19 +1777,18 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     void* md = cn1MonitorDataRemove(o);
     if(md) {
         free(md);
-#ifndef CN1_BIBOP_NO_FASTSWEEP
-        // Balance the increment in cn1BibopNoteMonitorAttached. codenameOneGcFree (the
-        // large/heap path) early-returns for BiBOP slots, so this is the ONLY site that
-        // frees a BiBOP monitor -> the count is exactly balanced.
-        atomic_fetch_sub_explicit(&cn1BibopLiveMonitors, 1, memory_order_seq_cst);
-#endif
     }
 }
 
 #ifndef CN1_BIBOP_NO_FASTSWEEP
 void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
     if(obj != JAVA_NULL && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
-        atomic_fetch_add_explicit(&cn1BibopLiveMonitors, 1, memory_order_seq_cst);
+        // STICKY per-page flag (plain store): visible to any sweep that could
+        // legitimately take the all-dead shortcut for this page, because that
+        // requires a full mark completed AFTER this (live) object died, and the
+        // mark's thread-stop handshake orders this store before the GC's reads.
+        CN1BibopPage* p = (CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
+        p->gcHasMonitors = JAVA_TRUE;
     }
 }
 #endif
@@ -1808,7 +1806,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     // unreachable (not marked this cycle, aged >=2 cycles), so no mutator can hold a
     // reference to monitorEnter one during this sweep; any concurrent attach is to a live
     // object on some OTHER page and is observed by the next sweep.
-    int monitorsLive = atomic_load_explicit(&cn1BibopLiveMonitors, memory_order_seq_cst) > 0;
 #endif
     while(list != 0) {
         CN1BibopPage* page = list;
@@ -1823,7 +1820,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         //       no live (reachable) object -- a reachable object is always marked, so an
         //       unmarked-this-cycle occupant is unreachable garbage in grace-aging; and
         //   * !gcNeedsReclaim       -> no survivor carries a finalizer (monitors handled
-        //       by the global monitorsLive gate); and
+        //       by the page's sticky gcHasMonitors flag); and
         //   * freeList == 0         -> the page is full (defensive: a homogeneous page
         //       can only reach here full -- a partial page, once adopted, is always
         //       allocated into before re-retire, which sets gcAllocedSinceSweep).
@@ -1844,7 +1841,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 bibopPartialPool[page->classIndex] = page;
                 pthread_mutex_unlock(&bibopMutex);
                 continue;
-            } else if(!monitorsLive) {
+            } else if(!page->gcHasMonitors) {
                 // AGED PAST GRACE (even the youngest survivor at gcGraceEpoch < V-1 is
                 // dead) and no BiBOP monitor exists to free -> the full walk would
                 // reclaim every slot (no finalizers) and route the page to freePool,
@@ -1914,7 +1911,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // has survivors while ANY BiBOP monitor is live globally: this can never miss a
         // monitored survivor (over-approximation only suppresses a future O(1) shortcut,
         // never a needed reclaim) and keeps the dead-monitor freeing exactly as before.
-        if(monitorsLive && liveCount > 0) needsReclaim = JAVA_TRUE;
+        if(page->gcHasMonitors && liveCount > 0) needsReclaim = JAVA_TRUE;
         // Refresh the per-page facts for the next sweep. gcGraceEpoch = V is a safe upper
         // bound on every survivor's epoch (survivors are at V from grace/mark-this-cycle,
         // or at V-1 from aging) so the all-dead test (gcGraceEpoch < V-1) can never fire
