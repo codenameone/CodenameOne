@@ -32,6 +32,7 @@ ANDROID_CN1_JAR="$ROOT_DIR/maven/android/target/codenameone-android-8.0-SNAPSHOT
 if [ ! -f "$ANDROID_CN1_JAR" ]; then
   ANDROID_CN1_JAR="$HOME/.m2/repository/com/codenameone/codenameone-android/8.0-SNAPSHOT/codenameone-android-8.0-SNAPSHOT.jar"
 fi
+ANDROID_CN1_CLASSES="$ROOT_DIR/maven/android/target/classes"
 COMMON_CLASSES="$ROOT_DIR/docs/demos/common/target/classes"
 
 for required in "$CORE_JAR" "$ANDROID_CN1_JAR"; do
@@ -57,6 +58,9 @@ mkdir -p "$CLASSES_DIR"
 find "$ROOT_DIR/docs/demos/android/src/main/java" -name '*.java' -print | sort > "$SOURCES_FILE"
 
 COMPILE_CLASSPATH="$ANDROID_JAR:$COMMON_CLASSES:$CORE_JAR:$ANDROID_CN1_JAR"
+if [ -d "$ANDROID_CN1_CLASSES" ]; then
+  COMPILE_CLASSPATH="$COMPILE_CLASSPATH:$ANDROID_CN1_CLASSES"
+fi
 ANDROID_BINARIES_DIR="$ROOT_DIR/maven/target/cn1-binaries/android"
 if [ -d "$ANDROID_BINARIES_DIR" ]; then
   while IFS= read -r jar; do
