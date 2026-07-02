@@ -84,20 +84,21 @@ the human-readable "where do the themes stand" guide, and they make degenerate r
 tiles legible -- e.g. a Material progress bar is a thin line on a near-black dark
 tile, so its raw PNG reads as solid black, but the card frames and scores it.
 
-### Why the comparison is same-run (environment robustness)
+### Environment pinning (why the golden contract matters)
 
-The CN1 tile and the native tile are produced **in the same environment** every
-run. Native widgets render slightly differently across environments (emulator
-GPU, OS version, font hinting), so a native golden captured on one machine would
-not match a CN1 render on another. Comparing same-environment renders makes the
-*score* portable. The committed `goldens/` are re-seedable drift artifacts for
-human review (`FIDELITY_UPDATE_GOLDENS=1`); the committed `baseline/` holds the
-expected scores the ratchet gates against (`FIDELITY_UPDATE_BASELINE=1` to
-re-record, a deliberate, reviewed action).
-
-Native renders are snapped to their final state before rasterizing
-(`jumpDrawablesToCurrentState` on Android) so the off-screen capture is
-deterministic run-to-run.
+Native widgets render slightly differently across environments (emulator GPU,
+OS version, font hinting, density), so the committed golden sets are pinned to
+an exact capture profile (iOS 26 simulator runtime; Android API level +
+160dpi) and CI runs the CN1 side on a MATCHING environment -- the iOS job
+asserts the runtime, the Android capture script warns on a density mismatch.
+Tile pixel sizes derive from mm with the same truncation on both sides (a 1px
+rounding mismatch measurably drags every comparator score). The committed
+`baseline/<set>-fidelity-baseline.json` holds the expected scores the ratchet
+gates against (`FIDELITY_UPDATE_BASELINE=1` to re-record -- a deliberate,
+reviewed action). Reference honesty rule: capture native widgets with their
+platform's DEFAULT styling; never re-tint a reference toward another
+platform's palette to make scores comparable, because a doctored reference
+cannot catch the CN1 theme drifting.
 
 ## Layout
 
@@ -135,52 +136,17 @@ PR that touches the native themes, the app, or the renderers.
 
 ## Current standing
 
-See `tools/fidelity-stats.py` for the live summary
-(`python3 scripts/fidelity-app/tools/fidelity-stats.py`).
+Live numbers come from the CI comments on the PR (`Native fidelity (...)`) and
+`python3 scripts/fidelity-app/tools/fidelity-stats.py` against the committed
+baselines -- do not trust prose snapshots here to stay current. As of the
+versioned-golden-set restructure: Android Material 3 sits in the mid-90s
+median against locally captured API-36/160dpi references (with honest pressed
+states), iOS Modern in the low-90s median on the iOS 26 simulator, with the
+per-pair laggards tracked in `native-themes/COVERAGE.md`.
 
-### Android (Material 3) -- complete, verified
-
-44 component/state/appearance pairs, run on an API-34 emulator, with the
-top-left-anchored harness and the structure-aware metric:
-
-- **Overall mean ~48%** -- an honest figure. (An earlier color-delta metric
-  reported a meaningless 82.6%: it was mostly measuring "both tiles share a
-  background colour", and scored a small outlined native field vs a full-width
-  CN1 field at 94.6%. The structure-aware metric scores that pair at ~40%.)
-- **Per component (mean):** Switch ~81%, RaisedButton ~70%, Button ~67%,
-  RadioButton ~61%, CheckBox ~60%, FlatButton ~57%, TextField ~39%, Slider ~13%,
-  ProgressBar ~0%.
-- **Real findings it surfaces:** CN1's radio/checkbox render ~1.5x larger than
-  Material; CN1 TextField defaults to a full-width filled field vs Material's
-  narrow outlined one; CN1 Slider/ProgressBar differ markedly from Material; the
-  native Material progress indicator barely renders at this tile size (a
-  per-component capture issue to tune). Switch is the closest match.
-- The off-screen native raster is deterministic run-to-run after
-  `jumpDrawablesToCurrentState` (a real bug the gate caught and we fixed).
-
-### iOS (Modern theme, Metal) -- CN1 side working; native reference blocked
-
-- The **CN1 render pipeline works end-to-end on the Metal simulator**: all 44
-  CN1 tiles render under `iOSModernTheme` and ship over the WebSocket; the suite
-  completes cleanly (`CN1SS:SUITE:FINISHED`). iOS CN1 tiles are captured at
-  Retina resolution (e.g. 1087x254 px for a 60x14mm tile).
-- The **native UIKit reference capture is blocked** by a ParparVM bridge issue:
-  the native `renderWidgetPng` (returning `byte[]`) executes its Objective-C
-  body (confirmed via NSLog) but the call surfaces a `NullPointerException` for a
-  deterministic subset of widget kinds (`ios_uiswitch`, `ios_uislider`,
-  `ios_uiprogress`, the SF-symbol check/radio) while `ios_uibutton_*` /
-  `ios_uitextfield` return empty. `bool`-returning methods (`isSupported`) work;
-  only the array-returning path fails. UIKit must run on the iOS main thread,
-  but CN1's EDT is a separate thread, and neither calling from the EDT nor a
-  `dispatch_sync(main)` hop from it has produced delivered bytes. ParparVM does
-  not populate `getStackTrace()`, so the exact failing line is not yet pinned.
-- **Recommended next approach for iOS:** instead of a `byte[]`-returning native
-  interface, wrap the native `UIView` in a CN1 `PeerComponent` and capture it via
-  `Display.screenshot()` cropped to the peer bounds. On iOS,
-  `cn1_captureView` (`Ports/iOSPort/nativeSources/IOSNative.m`) already composites
-  peer `UIView`s into the screenshot via `drawViewHierarchyInRect:`, so this runs
-  entirely on CN1's own main-thread capture path and sidesteps the array-return
-  bridge. (Android stays on the off-screen `renderViewOnBitmap` path, which is
-  reliable there.)
-
-These numbers are the baseline the theme work drives upward.
+Historical note: early iterations reported inflated colour-delta scores, then
+an honest structure-aware rewrite scored the unturned themes in the 40s; the
+theme work since then closed real gaps (sizing, glyphs, glass materials,
+geometry) against un-doctored native references. The native reference capture
+moved from same-run CI rendering to committed, OS-generation-versioned golden
+sets captured by the standalone apps in this directory.
