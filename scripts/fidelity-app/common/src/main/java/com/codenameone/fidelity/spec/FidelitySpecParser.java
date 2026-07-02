@@ -151,6 +151,8 @@ public class FidelitySpecParser {
             component.setText(value);
         } else if ("backdrop".equals(key)) {
             component.setBackdrop(value);
+        } else if ("material".equals(key)) {
+            component.setMaterial(value);
         } else if ("tile_width_mm".equals(key)) {
             component.setTileWidthMm(parseInt(value, -1));
         } else if ("tile_height_mm".equals(key)) {

@@ -37,6 +37,7 @@ public class ComponentSpec {
     private String nativeAndroidKind;
     private String text;
     private String backdrop;
+    private String material;
     private int tileWidthMm = -1;
     private int tileHeightMm = -1;
     private List states = new ArrayList();
@@ -95,16 +96,16 @@ public class ComponentSpec {
      *   a 6-hex colour ("808080") => a solid fill of that colour;
      *   "gradient" => a vertical blue (#1e64ff top) to green (#28c850 bottom) ramp;
      *   "photo"    => the shared glass-backdrop.png asset.
-     * When omitted, glass kinds (Tabs, Toolbar, Button, RaisedButton, FlatButton)
-     * default to "photo" so the Liquid Glass blend has content behind it; every
-     * other component defaults to none (a plain tile, returned as null here).
+     * When omitted, material glass/lens tests default to "photo" so the Liquid
+     * Glass blend has content behind it; every other component defaults to none
+     * (a plain tile, returned as null here).
      */
     public String getBackdrop() {
         if (backdrop != null) {
             return backdrop;
         }
-        if ("Tabs".equals(id) || "Toolbar".equals(id) || "Button".equals(id)
-                || "RaisedButton".equals(id) || "FlatButton".equals(id)) {
+        String m = getMaterial();
+        if ("glass".equals(m) || "lens".equals(m)) {
             return "photo";
         }
         return null;
@@ -112,6 +113,29 @@ public class ComponentSpec {
 
     public void setBackdrop(String backdrop) {
         this.backdrop = backdrop;
+    }
+
+    /**
+     * The comparison intent declared in fidelity-tests.yaml: "normal", "glass" or
+     * "lens" (see the spec header). The host comparator picks its scoring mode
+     * from this field rather than inferring glass from corner/backdrop
+     * heuristics. When omitted, the legacy glass kinds (Tabs, Toolbar, Button,
+     * RaisedButton, FlatButton) default to "glass" for compatibility with specs
+     * that predate the field; everything else defaults to "normal".
+     */
+    public String getMaterial() {
+        if (material != null && material.length() > 0) {
+            return material;
+        }
+        if ("Tabs".equals(id) || "Toolbar".equals(id) || "Button".equals(id)
+                || "RaisedButton".equals(id) || "FlatButton".equals(id)) {
+            return "glass";
+        }
+        return "normal";
+    }
+
+    public void setMaterial(String material) {
+        this.material = material;
     }
 
     public int getTileWidthMm() {

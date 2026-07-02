@@ -48,7 +48,9 @@ public class ProcessScreenshots {
                     arguments.actualEntries,
                     arguments.emitBase64,
                     arguments.previewDir,
-                    arguments.backdrop
+                    arguments.backdrop,
+                    arguments.spec,
+                    arguments.specPlatform
             );
         } else {
             payload = buildResults(
@@ -174,7 +176,9 @@ public class ProcessScreenshots {
             List<Map.Entry<String, Path>> actualEntries,
             boolean emitBase64,
             Path previewDir,
-            Path backdropPath
+            Path backdropPath,
+            Path specPath,
+            String specPlatform
     ) throws IOException {
         List<Map<String, Object>> results = new ArrayList<>();
         // Glass tiles (Toolbar/Tabs/Buttons over iOS Liquid Glass) are composited
@@ -183,6 +187,11 @@ public class ProcessScreenshots {
         // of how wrong the widget is. Load the backdrop so we can mask it out and
         // score ONLY the widget (see structuralFidelityGlass).
         BufferedImage backdropImg = loadBackdrop(backdropPath, referenceDir);
+        // Comparison mode comes from the per-test `material:` declared in
+        // fidelity-tests.yaml (test INTENT), not from image-content heuristics.
+        // A missing spec (or a test the spec does not know) falls back to the
+        // legacy corner heuristic so old artifact sets can still be re-scored.
+        Map<String, String> materialByComponent = loadMaterialMap(specPath, referenceDir, specPlatform);
         java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
@@ -253,10 +262,26 @@ public class ProcessScreenshots {
                         int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
                         double[] sf;
                         boolean glass = false;
-                        if (backdropImg != null) {
-                            // Reproduce CN1's/native's BACKGROUND scaleToFill (stretch,
-                            // ignore aspect) of the backdrop over the full tile, sampled
-                            // at the cropped top-left region.
+                        String material = resolveMaterial(materialByComponent, testName);
+                        String materialSource = material != null ? "spec" : "heuristic";
+                        if (material != null) {
+                            // Mode from declared test intent (review: material tag).
+                            boolean wantsMask = "glass".equals(material) || "lens".equals(material);
+                            if (wantsMask && backdropImg != null) {
+                                int[] refArr = stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch);
+                                glass = true;
+                                sf = structuralFidelityGlass(natc, cn1c, refArr);
+                            } else {
+                                if (wantsMask) {
+                                    details.put("material_note",
+                                            "material=" + material + " but no backdrop reference was found; scored whole-tile");
+                                }
+                                sf = structuralFidelity(natc, cn1c, bg);
+                            }
+                        } else if (backdropImg != null) {
+                            // Legacy fallback: infer glass from the golden's corners
+                            // matching the stretched shared backdrop (scaleToFill,
+                            // ignore aspect), sampled at the cropped top-left region.
                             int[] refArr = stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch);
                             if (isGlassTile(natc, refArr, cw, ch)) {
                                 glass = true;
@@ -272,6 +297,8 @@ public class ProcessScreenshots {
                         details.put("shape_sim", round4(sf[1]));
                         details.put("size_agreement", round4(sf[2]));
                         details.put("glass", glass);
+                        details.put("material", material != null ? material : (glass ? "glass" : "normal"));
+                        details.put("material_source", materialSource);
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
                         record.put("status", "compared");
@@ -519,6 +546,130 @@ public class ProcessScreenshots {
         return (Math.abs(((p >> 16) & 0xff) - ((q >> 16) & 0xff))
                 + Math.abs(((p >> 8) & 0xff) - ((q >> 8) & 0xff))
                 + Math.abs((p & 0xff) - (q & 0xff))) / 3;
+    }
+
+    /// Loads the per-component `material:` declarations from fidelity-tests.yaml.
+    /// An explicit --spec path wins; otherwise the canonical spec is located
+    /// relative to the goldens dir (mirroring loadBackdrop). Only the flat subset
+    /// the spec is written in is understood: a `components:` list whose entries
+    /// start with `- id:` followed by 4-space-indented `key: value` lines.
+    /// Entries whose `platforms:` allow-list excludes the platform are skipped.
+    /// On Android the glass/lens intents degrade to "normal": Android tiles never
+    /// composite the shared photo backdrop, so there is nothing to mask.
+    /// Returns null when no spec can be read (callers fall back to the heuristic).
+    static Map<String, String> loadMaterialMap(Path specPath, Path referenceDir, String platform) {
+        Path candidate = specPath != null ? specPath
+                : (referenceDir != null
+                        ? referenceDir.resolve("../../common/src/main/resources/fidelity-tests.yaml").normalize()
+                        : null);
+        if (candidate == null || !Files.isRegularFile(candidate)) {
+            if (specPath != null) {
+                System.err.println("WARNING: --spec " + specPath + " not readable; falling back to glass heuristic");
+            }
+            return null;
+        }
+        boolean android = platform != null && platform.startsWith("and");
+        Map<String, String> out = new LinkedHashMap<>();
+        try {
+            boolean inComponents = false;
+            String id = null;
+            String material = null;
+            boolean platformOk = true;
+            List<String> lines = Files.readAllLines(candidate);
+            lines.add("- id: __end__");   // flush the final entry
+            for (String raw : lines) {
+                String line = raw;
+                int hash = line.indexOf('#');
+                if (hash >= 0) {
+                    line = line.substring(0, hash);
+                }
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                if (trimmed.equals("components:")) {
+                    inComponents = true;
+                    continue;
+                }
+                if (!inComponents) {
+                    continue;
+                }
+                if (trimmed.startsWith("- ")) {
+                    if (id != null && platformOk) {
+                        out.put(id, normalizeMaterial(material, android));
+                    }
+                    id = null;
+                    material = null;
+                    platformOk = true;
+                    trimmed = trimmed.substring(2).trim();
+                }
+                int idx = trimmed.indexOf(':');
+                if (idx < 0) {
+                    continue;
+                }
+                String key = trimmed.substring(0, idx).trim();
+                String value = trimmed.substring(idx + 1).trim();
+                if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"")
+                        || value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                switch (key) {
+                    case "id" -> id = value;
+                    case "material" -> material = value;
+                    case "platforms" -> {
+                        platformOk = false;
+                        for (String p : value.split(",")) {
+                            p = p.trim();
+                            if (!p.isEmpty() && platform != null
+                                    && (platform.startsWith(p) || p.startsWith(platform))) {
+                                platformOk = true;
+                                break;
+                            }
+                        }
+                    }
+                    default -> { }
+                }
+            }
+        } catch (IOException ex) {
+            System.err.println("WARNING: failed to read spec " + candidate + ": " + ex.getMessage());
+            return null;
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    /// A spec entry without a material declaration maps to null so that test
+    /// keeps the legacy heuristic; glass/lens degrade to normal on Android.
+    private static String normalizeMaterial(String material, boolean android) {
+        if (material == null || material.isEmpty()) {
+            return null;
+        }
+        if (!material.equals("normal") && !material.equals("glass") && !material.equals("lens")) {
+            System.err.println("WARNING: unknown material '" + material + "' in spec; treating as normal");
+            return "normal";
+        }
+        if (android && !material.equals("normal")) {
+            return "normal";
+        }
+        return material;
+    }
+
+    /// Maps a delivered test name ("Toolbar_normal_dark") to its component's
+    /// declared material via longest-id-prefix match at an underscore boundary,
+    /// so a future id containing underscores still resolves. Null = unknown.
+    static String resolveMaterial(Map<String, String> materialByComponent, String testName) {
+        if (materialByComponent == null || testName == null) {
+            return null;
+        }
+        String best = null;
+        int bestLen = -1;
+        for (Map.Entry<String, String> e : materialByComponent.entrySet()) {
+            String id = e.getKey();
+            if ((testName.equals(id) || testName.startsWith(id + "_")) && id.length() > bestLen) {
+                best = e.getValue();
+                bestLen = id.length();
+            }
+        }
+        return best;
     }
 
     /// A tile is "glass" when its corners show the backdrop (the widget is inset, so
@@ -1637,9 +1788,12 @@ public class ProcessScreenshots {
         final double maxMismatchPercent;
         final String mode;
         final Path backdrop;
+        final Path spec;
+        final String specPlatform;
 
         private Arguments(Path referenceDir, List<Map.Entry<String, Path>> actualEntries, boolean emitBase64, Path previewDir,
-                          int maxChannelDelta, double maxMismatchPercent, String mode, Path backdrop) {
+                          int maxChannelDelta, double maxMismatchPercent, String mode, Path backdrop,
+                          Path spec, String specPlatform) {
             this.referenceDir = referenceDir;
             this.actualEntries = actualEntries;
             this.emitBase64 = emitBase64;
@@ -1648,6 +1802,8 @@ public class ProcessScreenshots {
             this.maxMismatchPercent = maxMismatchPercent;
             this.mode = mode;
             this.backdrop = backdrop;
+            this.spec = spec;
+            this.specPlatform = specPlatform;
         }
 
         static Arguments parse(String[] args) {
@@ -1658,6 +1814,8 @@ public class ProcessScreenshots {
             double maxMismatchPercent = 0.30d;
             String mode = "golden";
             Path backdrop = null;
+            Path spec = null;
+            String specPlatform = "ios";
             List<Map.Entry<String, Path>> actuals = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
@@ -1686,6 +1844,20 @@ public class ProcessScreenshots {
                             return null;
                         }
                         backdrop = Path.of(args[i]);
+                    }
+                    case "--spec" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --spec");
+                            return null;
+                        }
+                        spec = Path.of(args[i]);
+                    }
+                    case "--spec-platform" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --spec-platform");
+                            return null;
+                        }
+                        specPlatform = args[i];
                     }
                     case "--emit-base64" -> emitBase64 = true;
                     case "--preview-dir" -> {
@@ -1740,7 +1912,7 @@ public class ProcessScreenshots {
                 System.err.println("--reference-dir is required");
                 return null;
             }
-            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent, mode, backdrop);
+            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent, mode, backdrop, spec, specPlatform);
         }
 
         private static int parseIntArg(String flag, String value) {

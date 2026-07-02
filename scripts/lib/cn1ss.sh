@@ -591,6 +591,16 @@ cn1ss_process_fidelity() {
   if [ -n "${CN1SS_FIDELITY_BACKDROP:-}" ] && [ -f "${CN1SS_FIDELITY_BACKDROP}" ]; then
     compare_args+=("--backdrop" "${CN1SS_FIDELITY_BACKDROP}")
   fi
+  # The comparison mode (normal / glass-masked / lens) is declared per test in
+  # fidelity-tests.yaml; pass the spec + platform so the comparator scores from
+  # test intent instead of the legacy corner heuristic. When unset the comparator
+  # looks for the canonical spec relative to the goldens dir.
+  if [ -n "${CN1SS_FIDELITY_SPEC:-}" ] && [ -f "${CN1SS_FIDELITY_SPEC}" ]; then
+    compare_args+=("--spec" "${CN1SS_FIDELITY_SPEC}")
+  fi
+  if [ -n "${CN1SS_FIDELITY_PLATFORM:-}" ]; then
+    compare_args+=("--spec-platform" "${CN1SS_FIDELITY_PLATFORM}")
+  fi
   local entry
   for entry in "${actual_entries[@]}"; do
     compare_args+=("--actual" "$entry")

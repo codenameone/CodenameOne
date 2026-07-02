@@ -67,13 +67,20 @@ public class RenderFidelityReport {
             Double meanDelta = toDouble(details.get("mean_channel_delta"));
             Double base = baseline.get(test);
             Double delta = (fidelity != null && base != null) ? (fidelity - base) : null;
+            // Comparison mode as declared in fidelity-tests.yaml; a trailing "*"
+            // marks a mode that came from the legacy content heuristic instead.
+            String material = stringValue(details.get("material"), "");
+            if ("heuristic".equals(stringValue(details.get("material_source"), ""))
+                    && !material.isEmpty()) {
+                material = material + "*";
+            }
 
             PairRow row = new PairRow(test, status, fidelity, ssim, meanDelta, base, delta,
                     stringValue(result.get("native_path"), ""),
                     stringValue(result.get("cn1_path"), ""),
                     JsonUtil.asObject(result.get("preview")),
                     JsonUtil.asObject(result.get("native_preview")),
-                    stringValue(result.get("message"), ""));
+                    stringValue(result.get("message"), ""), material);
             rows.add(row);
 
             String message;
@@ -168,12 +175,13 @@ public class RenderFidelityReport {
         // Per-pair fidelity table (worst first): the percentage data for every
         // mismatch, at a glance, without scrolling through the image cards.
         if (compared > 0) {
-            commentLines.add("| Component | State | Appearance | Fidelity | SSIM | mean delta | vs base |");
-            commentLines.add("|---|---|---|--:|--:|--:|--:|");
+            commentLines.add("| Component | State | Appearance | Material | Fidelity | SSIM | mean delta | vs base |");
+            commentLines.add("|---|---|---|---|--:|--:|--:|--:|");
             for (PairRow row : comparedRows) {
                 String[] p = splitTest(row.test);
-                commentLines.add(String.format("| %s | %s | %s | %.1f%% | %.3f | %.2f | %s |",
-                        p[0], p[1], p[2], row.fidelity, nz(row.ssim), nz(row.meanDelta), deltaCell(row.delta)));
+                commentLines.add(String.format("| %s | %s | %s | %s | %.1f%% | %.3f | %.2f | %s |",
+                        p[0], p[1], p[2], row.material.isEmpty() ? "-" : row.material,
+                        row.fidelity, nz(row.ssim), nz(row.meanDelta), deltaCell(row.delta)));
             }
             commentLines.add("");
         }
@@ -397,10 +405,11 @@ public class RenderFidelityReport {
         final Map<String, Object> cn1Preview;
         final Map<String, Object> nativePreview;
         final String message;
+        final String material;
 
         PairRow(String test, String status, Double fidelity, Double ssim, Double meanDelta, Double baseline,
                 Double delta, String nativePath, String cn1Path, Map<String, Object> cn1Preview,
-                Map<String, Object> nativePreview, String message) {
+                Map<String, Object> nativePreview, String message, String material) {
             this.test = test;
             this.status = status;
             this.fidelity = fidelity;
@@ -413,6 +422,7 @@ public class RenderFidelityReport {
             this.cn1Preview = cn1Preview;
             this.nativePreview = nativePreview;
             this.message = message;
+            this.material = material;
         }
     }
 

@@ -20,8 +20,25 @@
 #   backdrop        tile background behind the widget (iOS only): a 6-hex colour
 #                   (e.g. 808080) = solid fill; "gradient" = vertical blue->green
 #                   ramp; "photo" = the shared glass-backdrop.png. Omit to use the
-#                   default: glass kinds (Tabs/Toolbar/Button/RaisedButton/
-#                   FlatButton) default to "photo", everything else to none.
+#                   default: material glass/lens tests default to "photo" (the
+#                   Liquid Glass blend needs content behind it), everything else
+#                   to none.
+#   material        comparison intent: how the host comparator scores this test.
+#                   "normal" (default) = whole-tile compare. Also used for the
+#                   isolation tiles over a SOLID/gradient backdrop: both sides
+#                   render the identical backdrop, so it self-cancels in a
+#                   whole-tile compare and masking is unnecessary.
+#                   "glass"  = the widget composites over the shared photo
+#                   backdrop; the comparator masks the backdrop out and scores
+#                   ONLY the widget, so the unchanged backdrop cannot inflate
+#                   the score.
+#                   "lens"   = selection-lens optics (the iOS-26 tab lens).
+#                   Scored like "glass"; animation-frame captures are
+#                   additionally validated against the motion model.
+#                   The comparison mode is chosen from THIS field (test intent),
+#                   not from corner/backdrop heuristics; material is resolved
+#                   per platform (Android tiles never composite the shared
+#                   backdrop, so glass/lens degrade to normal there).
 #   states          comma-separated: normal, pressed, disabled, selected.
 #   platforms       comma-separated allow-list (ios, android). Omit = both.
 #   tile_width_mm   per-component width override (logical mm).
@@ -35,6 +52,7 @@ defaults:
 
 components:
   - id: Button
+    material: glass
     cn1_uiid: Button
     native: ios_uibutton_system
     native_android: material_button_filled
@@ -42,6 +60,7 @@ components:
     states: normal,disabled
 
   - id: RaisedButton
+    material: glass
     cn1_uiid: RaisedButton
     native: ios_uibutton_filled
     native_android: material_button_tonal
@@ -49,6 +68,7 @@ components:
     states: normal,disabled
 
   - id: FlatButton
+    material: glass
     cn1_uiid: FlatButton
     native: ios_uibutton_plain
     native_android: material_button_outlined
@@ -56,6 +76,7 @@ components:
     states: normal
 
   - id: TextField
+    material: normal
     cn1_uiid: TextField
     native: ios_uitextfield
     native_android: material_textinput
@@ -63,6 +84,7 @@ components:
     states: normal,disabled
 
   - id: CheckBox
+    material: normal
     cn1_uiid: CheckBox
     native: ios_check_glyph
     native_android: material_checkbox
@@ -70,6 +92,7 @@ components:
     states: normal,selected,disabled
 
   - id: RadioButton
+    material: normal
     cn1_uiid: RadioButton
     native: ios_radio_glyph
     native_android: material_radio
@@ -77,24 +100,28 @@ components:
     states: normal,selected,disabled
 
   - id: Switch
+    material: normal
     cn1_uiid: Switch
     native: ios_uiswitch
     native_android: material_switch
     states: normal,selected,disabled
 
   - id: Slider
+    material: normal
     cn1_uiid: Slider
     native: ios_uislider
     native_android: material_slider
     states: normal,disabled
 
   - id: ProgressBar
+    material: normal
     cn1_uiid: ProgressBar
     native: ios_uiprogress
     native_android: material_progress_linear
     states: normal
 
   - id: Tabs
+    material: glass
     cn1_uiid: Tabs
     native: ios_uitabbar
     native_android: material_tablayout
@@ -102,6 +129,7 @@ components:
     states: normal
 
   - id: Toolbar
+    material: glass
     cn1_uiid: Toolbar
     native: ios_uinavbar
     native_android: material_toolbar
@@ -110,6 +138,7 @@ components:
     states: normal
 
   - id: Dialog
+    material: normal
     cn1_uiid: Dialog
     native: ios_alert_view
     native_android: material_alert_view
@@ -119,6 +148,7 @@ components:
     states: normal
 
   - id: FloatingActionButton
+    material: normal
     cn1_uiid: FloatingActionButton
     native_android: material_fab
     platforms: android
@@ -127,6 +157,7 @@ components:
     states: normal,pressed
 
   - id: Spinner
+    material: normal
     cn1_uiid: Spinner
     native: ios_uipickerview
     platforms: ios
@@ -140,6 +171,7 @@ components:
   # widget content. CN1 paints a GlassPanel-UIID container; native paints a
   # UIVisualEffectView (iOS 26 Liquid Glass when available).
   - id: GlassPanelGrey
+    material: normal
     cn1_uiid: GlassPanel
     native: ios_glass_panel
     backdrop: 808080
@@ -149,6 +181,7 @@ components:
     states: normal
 
   - id: GlassPanelRed
+    material: normal
     cn1_uiid: GlassPanel
     native: ios_glass_panel
     backdrop: ff3b30
@@ -158,6 +191,7 @@ components:
     states: normal
 
   - id: GlassPanelGrad
+    material: normal
     cn1_uiid: GlassPanel
     native: ios_glass_panel
     backdrop: gradient
@@ -167,6 +201,7 @@ components:
     states: normal
 
   - id: GlassPanelPhoto
+    material: glass
     cn1_uiid: GlassPanel
     native: ios_glass_panel
     backdrop: photo
@@ -179,6 +214,7 @@ components:
   # blurs a flat colour into a uniform tint, so only the tab GEOMETRY differs --
   # isolating layout fidelity from the glass blend.
   - id: TabsGeom
+    material: normal
     cn1_uiid: Tabs
     native: ios_uitabbar
     backdrop: 808080
@@ -192,6 +228,7 @@ components:
   # pill geometry, a single centred text label and the uniform glass tint remain,
   # so this is the smallest case we can drive to ~100% to expose what breaks.
   - id: TabOne
+    material: normal
     cn1_uiid: Tabs
     native: ios_uitabbar_one
     backdrop: 808080
@@ -204,6 +241,7 @@ components:
   # both sides over flat grey. GlassText isolates the centred text label; GlassIcon
   # isolates the icon glyph -- each on top of the matched glass capsule.
   - id: GlassText
+    material: normal
     cn1_uiid: GlassText
     native: ios_glass_text
     backdrop: 808080
@@ -213,6 +251,7 @@ components:
     states: normal
 
   - id: GlassIcon
+    material: normal
     cn1_uiid: GlassText
     native: ios_glass_icon
     backdrop: 808080

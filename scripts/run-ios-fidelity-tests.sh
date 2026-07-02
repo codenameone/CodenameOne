@@ -123,6 +123,8 @@ rf_log "Delivered: ${CN1_COUNT} cn1; committed native goldens: ${GOLDEN_COUNT}"
 
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_IOS_COMMENT -->"
 export CN1SS_PREVIEW_SUBDIR="ios-fidelity"
+export CN1SS_FIDELITY_SPEC="${CN1SS_FIDELITY_SPEC:-$APP_DIR/common/src/main/resources/fidelity-tests.yaml}"
+export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-ios}"
 cn1ss_process_fidelity \
   "Native fidelity (iOS Modern, Metal)" \
   "$WORK_DIR/fidelity-compare.json" "$WORK_DIR/fidelity-summary.txt" "$WORK_DIR/fidelity-comment.md" \
