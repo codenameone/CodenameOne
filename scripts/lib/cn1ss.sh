@@ -684,6 +684,12 @@ cn1ss_process_fidelity() {
   if [ -n "${CN1SS_FIDELITY_EPSILON:-}" ]; then
     gate_args+=(--epsilon "$CN1SS_FIDELITY_EPSILON")
   fi
+  if [ -n "${CN1SS_FIDELITY_GEOMETRY_EPSILON_PX:-}" ]; then
+    gate_args+=(--geometry-epsilon-px "$CN1SS_FIDELITY_GEOMETRY_EPSILON_PX")
+  fi
+  if [ -n "${CN1SS_FIDELITY_GEOMETRY_EPSILON_RATIO:-}" ]; then
+    gate_args+=(--geometry-epsilon-ratio "$CN1SS_FIDELITY_GEOMETRY_EPSILON_RATIO")
+  fi
   if [ "${FIDELITY_UPDATE_BASELINE:-0}" = "1" ]; then
     cn1ss_log "WARNING: FIDELITY_UPDATE_BASELINE=1 -- recording current fidelity as the new baseline (gate BYPASSED)."
     if ! cn1ss_java_run "$CN1SS_FIDELITY_GATE_CLASS" "${gate_args[@]}" --update-baseline "$baseline_file"; then

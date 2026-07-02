@@ -264,11 +264,13 @@ public class ProcessScreenshots {
                         boolean glass = false;
                         String material = resolveMaterial(materialByComponent, testName);
                         String materialSource = material != null ? "spec" : "heuristic";
+                        int[] refArr = backdropImg != null
+                                ? stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch)
+                                : null;
                         if (material != null) {
                             // Mode from declared test intent (review: material tag).
                             boolean wantsMask = "glass".equals(material) || "lens".equals(material);
-                            if (wantsMask && backdropImg != null) {
-                                int[] refArr = stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch);
+                            if (wantsMask && refArr != null) {
                                 glass = true;
                                 sf = structuralFidelityGlass(natc, cn1c, refArr);
                             } else {
@@ -278,17 +280,12 @@ public class ProcessScreenshots {
                                 }
                                 sf = structuralFidelity(natc, cn1c, bg);
                             }
-                        } else if (backdropImg != null) {
+                        } else if (refArr != null && isGlassTile(natc, refArr, cw, ch)) {
                             // Legacy fallback: infer glass from the golden's corners
                             // matching the stretched shared backdrop (scaleToFill,
                             // ignore aspect), sampled at the cropped top-left region.
-                            int[] refArr = stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch);
-                            if (isGlassTile(natc, refArr, cw, ch)) {
-                                glass = true;
-                                sf = structuralFidelityGlass(natc, cn1c, refArr);
-                            } else {
-                                sf = structuralFidelity(natc, cn1c, bg);
-                            }
+                            glass = true;
+                            sf = structuralFidelityGlass(natc, cn1c, refArr);
                         } else {
                             sf = structuralFidelity(natc, cn1c, bg);
                         }
@@ -299,6 +296,14 @@ public class ProcessScreenshots {
                         details.put("glass", glass);
                         details.put("material", material != null ? material : (glass ? "glass" : "normal"));
                         details.put("material_source", materialSource);
+                        // Explicit geometry metrics (review: separate geometry fidelity
+                        // from visual similarity). The visual score overlays cropped
+                        // tiles, which can hide size / position / anchoring drift, so
+                        // the widget content bboxes of BOTH renders are reported raw,
+                        // plus derived offset / size-ratio / center-offset numbers the
+                        // gate can ratchet on. Corner radius is estimated for the
+                        // masked glass/lens pills where roundness is a design feature.
+                        details.put("geometry", geometryMetrics(natc, cn1c, bg, glass ? refArr : null));
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
                         record.put("status", "compared");
@@ -768,6 +773,171 @@ public class ProcessScreenshots {
         }
         double headline = Math.sqrt(fillSim * ssim);
         return new double[]{100.0d * headline, fillSim, fillSim};
+    }
+
+    /// Geometry fidelity block (independent of the visual similarity score):
+    ///   native_bbox / cn1_bbox -- [x, y, w, h] of the widget content in each
+    ///     render (bg-delta mask for normal tiles, backdrop-delta mask when
+    ///     refArr is provided, i.e. the glass/lens tiles).
+    ///   offset_x / offset_y   -- CN1 bbox origin minus native bbox origin (px).
+    ///   width_ratio / height_ratio -- CN1 bbox extent over native bbox extent.
+    ///   center_offset         -- Euclidean distance between the bbox centers (px).
+    ///   corner_radius_native / _cn1 / _delta -- rounded-corner radius estimate,
+    ///     glass/lens tiles only, from the non-content area of the bbox corner
+    ///     squares (a = r^2 * (1 - pi/4) per corner, averaged over the 4 corners).
+    /// A tile with no content on either side reports empty=true and no numbers.
+    ///
+    /// The outermost EDGE_TRIM pixels of the tile are excluded from the geometry
+    /// masks: off-screen native captures leave single-pixel junk lines at the
+    /// tile borders (a grey bottom row, a dark right column), and while a few
+    /// hundred stray pixels are noise to the visual score, they stretch a
+    /// min/max bounding box to the full tile. Both renders are trimmed
+    /// identically, so a widget genuinely flush with the tile edge keeps
+    /// identical (clipped) numbers on both sides.
+    private static final int GEOMETRY_EDGE_TRIM = 2;
+
+    private static Map<String, Object> geometryMetrics(PNGImage nativeImg, PNGImage cn1, int bgRgb, int[] refArr) {
+        Map<String, Object> geo = new LinkedHashMap<>();
+        BufferedImage bn = toRgbImage(nativeImg);
+        BufferedImage bc = toRgbImage(cn1);
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        boolean[] maskN;
+        boolean[] maskC;
+        if (refArr != null) {
+            maskN = contentMaskRef(nArr, refArr, GLASS_TAU);
+            maskC = contentMaskRef(cArr, refArr, GLASS_TAU);
+        } else {
+            maskN = contentMaskBg(nArr, bgRgb, CONTENT_TAU);
+            maskC = contentMaskBg(cArr, bgRgb, CONTENT_TAU);
+        }
+        trimEdges(maskN, w, h, GEOMETRY_EDGE_TRIM);
+        trimEdges(maskC, w, h, GEOMETRY_EDGE_TRIM);
+        int[] boxN = maskBBox(maskN, w, h);
+        int[] boxC = maskBBox(maskC, w, h);
+        if (boxN[2] <= 0 || boxC[2] <= 0) {
+            geo.put("empty", true);
+            return geo;
+        }
+        geo.put("native_bbox", bboxList(boxN));
+        geo.put("cn1_bbox", bboxList(boxC));
+        geo.put("offset_x", boxC[0] - boxN[0]);
+        geo.put("offset_y", boxC[1] - boxN[1]);
+        geo.put("width_ratio", round4((double) boxC[2] / boxN[2]));
+        geo.put("height_ratio", round4((double) boxC[3] / boxN[3]));
+        double dcx = (boxC[0] + boxC[2] / 2.0d) - (boxN[0] + boxN[2] / 2.0d);
+        double dcy = (boxC[1] + boxC[3] / 2.0d) - (boxN[1] + boxN[3] / 2.0d);
+        geo.put("center_offset", round2(Math.sqrt(dcx * dcx + dcy * dcy)));
+        if (refArr != null) {
+            double rn = estimateCornerRadius(maskN, w, boxN);
+            double rc = estimateCornerRadius(maskC, w, boxC);
+            geo.put("corner_radius_native", round2(rn));
+            geo.put("corner_radius_cn1", round2(rc));
+            geo.put("corner_radius_delta", round2(rc - rn));
+        }
+        return geo;
+    }
+
+    /// Content mask against a known solid background colour (the tile bg).
+    private static boolean[] contentMaskBg(int[] arr, int bgRgb, int tau) {
+        int bgR = (bgRgb >> 16) & 0xff;
+        int bgG = (bgRgb >> 8) & 0xff;
+        int bgB = bgRgb & 0xff;
+        boolean[] m = new boolean[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            int p = arr[i];
+            int r = (p >> 16) & 0xff;
+            int g = (p >> 8) & 0xff;
+            int b = p & 0xff;
+            m[i] = Math.abs(r - bgR) > tau || Math.abs(g - bgG) > tau || Math.abs(b - bgB) > tau;
+        }
+        return m;
+    }
+
+    /// Clears the outermost `trim` pixels of the mask on every side.
+    private static void trimEdges(boolean[] mask, int w, int h, int trim) {
+        for (int y = 0; y < h; y++) {
+            boolean edgeRow = y < trim || y >= h - trim;
+            for (int x = 0; x < w; x++) {
+                if (edgeRow || x < trim || x >= w - trim) {
+                    mask[y * w + x] = false;
+                }
+            }
+        }
+    }
+
+    private static List<Object> bboxList(int[] box) {
+        List<Object> out = new ArrayList<>();
+        out.add(box[0]);
+        out.add(box[1]);
+        out.add(box[2]);
+        out.add(box[3]);
+        return out;
+    }
+
+    /// Bounding box {x, y, w, h} of the true pixels of a content mask; w=0 when
+    /// the mask has fewer than MIN_CONTENT_PIXELS set.
+    private static int[] maskBBox(boolean[] mask, int w, int h) {
+        int x0 = w, y0 = h, x1 = -1, y1 = -1;
+        long count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (mask[y * w + x]) {
+                    if (x < x0) x0 = x;
+                    if (x > x1) x1 = x;
+                    if (y < y0) y0 = y;
+                    if (y > y1) y1 = y;
+                    count++;
+                }
+            }
+        }
+        if (x1 < 0 || count < MIN_CONTENT_PIXELS) {
+            return new int[]{0, 0, 0, 0};
+        }
+        return new int[]{x0, y0, x1 - x0 + 1, y1 - y0 + 1};
+    }
+
+    /// Rounded-corner radius estimate for a pill/rounded-rect content mask: in
+    /// each k x k bbox-corner square the rounding leaves a = r^2 * (1 - pi/4)
+    /// pixels uncovered, so r = sqrt(a / (1 - pi/4)); the four corners are
+    /// averaged. Interior glyphs never reach the bbox corners, so they do not
+    /// disturb the estimate; a square corner reports ~0.
+    private static double estimateCornerRadius(boolean[] mask, int stride, int[] box) {
+        int k = Math.min(48, Math.min(box[2], box[3]) / 2);
+        if (k < 3) {
+            return 0;
+        }
+        long[] miss = new long[4];
+        for (int j = 0; j < k; j++) {
+            for (int i = 0; i < k; i++) {
+                if (!mask[(box[1] + j) * stride + (box[0] + i)]) {
+                    miss[0]++;                                                     // top-left
+                }
+                if (!mask[(box[1] + j) * stride + (box[0] + box[2] - 1 - i)]) {
+                    miss[1]++;                                                     // top-right
+                }
+                if (!mask[(box[1] + box[3] - 1 - j) * stride + (box[0] + i)]) {
+                    miss[2]++;                                                     // bottom-left
+                }
+                if (!mask[(box[1] + box[3] - 1 - j) * stride + (box[0] + box[2] - 1 - i)]) {
+                    miss[3]++;                                                     // bottom-right
+                }
+            }
+        }
+        final double factor = 1.0d - Math.PI / 4.0d;
+        double sum = 0;
+        for (long m : miss) {
+            sum += Math.sqrt(m / factor);
+        }
+        return sum / 4.0d;
     }
 
     private static double[] grayCrop(int[] arr, int stride, int x0, int y0, int w, int h) {

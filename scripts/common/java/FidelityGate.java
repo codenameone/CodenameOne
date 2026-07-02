@@ -15,11 +15,23 @@ import java.util.TreeMap;
 /// mismatch, error). Being below 100% never fails on its own -- the suite is a
 /// one-way ratchet that can only improve.
 ///
+/// GEOMETRY is ratcheted separately from visual similarity (the overlay score
+/// can hide size/position/anchoring drift): per pair the gate tracks the bbox
+/// center offset (px) and the bbox width/height ratios, and fails when the
+/// center offset grows by more than --geometry-epsilon-px (default 2.0) over
+/// the baseline, or when a size ratio drifts further from 1.0 by more than
+/// --geometry-epsilon-ratio (default 0.02). Corner-radius agreement is reported
+/// (see RenderFidelityReport) but not gated: the estimator is stable to ~1px,
+/// which is exactly the range honest AA differences occupy.
+///
 /// With --update-baseline it instead WRITES a fresh baseline from the current
 /// measurements (merged over any existing one) and exits 0 without gating. This
 /// is the deliberate, loud act invoked via FIDELITY_UPDATE_BASELINE=1.
 ///
-/// Baseline format: { "pairs": { "<test>": <fidelity_percent>, ... } }
+/// Baseline format: { "pairs":    { "<test>": <fidelity_percent>, ... },
+///                    "geometry": { "<test>": { "center_offset": px,
+///                                              "width_ratio": r, "height_ratio": r }, ... } }
+/// The geometry section is optional (older baselines gate fidelity only).
 public class FidelityGate {
     private static final int EXIT_USAGE = 2;
     private static final int EXIT_IO = 1;
@@ -41,15 +53,28 @@ public class FidelityGate {
             return;
         }
         Map<String, Double> current = new LinkedHashMap<>();
+        Map<String, Map<String, Double>> currentGeometry = new LinkedHashMap<>();
         List<String> broken = new ArrayList<>();
         for (Object item : JsonUtil.asArray(data.get("results"))) {
             Map<String, Object> result = JsonUtil.asObject(item);
             String test = stringValue(result.get("test"), "unknown");
             String status = stringValue(result.get("status"), "unknown");
             if ("compared".equals(status)) {
-                Double fidelity = toDouble(JsonUtil.asObject(result.get("details")).get("fidelity_percent"));
+                Map<String, Object> details = JsonUtil.asObject(result.get("details"));
+                Double fidelity = toDouble(details.get("fidelity_percent"));
                 if (fidelity != null) {
                     current.put(test, fidelity);
+                }
+                Map<String, Object> geo = JsonUtil.asObject(details.get("geometry"));
+                Double centerOffset = toDouble(geo.get("center_offset"));
+                Double widthRatio = toDouble(geo.get("width_ratio"));
+                Double heightRatio = toDouble(geo.get("height_ratio"));
+                if (centerOffset != null && widthRatio != null && heightRatio != null) {
+                    Map<String, Double> g = new LinkedHashMap<>();
+                    g.put("center_offset", centerOffset);
+                    g.put("width_ratio", widthRatio);
+                    g.put("height_ratio", heightRatio);
+                    currentGeometry.put(test, g);
                 }
             } else {
                 broken.add(test + " (" + status + ")");
@@ -57,11 +82,12 @@ public class FidelityGate {
         }
 
         if (arguments.updateBaseline != null) {
-            updateBaseline(arguments, current);
+            updateBaseline(arguments, current, currentGeometry);
             return;
         }
 
         Map<String, Double> baseline = loadBaseline(arguments.baselineJson);
+        Map<String, Map<String, Double>> baselineGeometry = loadBaselineGeometry(arguments.baselineJson);
         List<String> regressions = new ArrayList<>();
         for (Map.Entry<String, Double> entry : current.entrySet()) {
             Double base = baseline.get(entry.getKey());
@@ -77,10 +103,44 @@ public class FidelityGate {
             }
         }
 
-        boolean failed = !regressions.isEmpty() || !broken.isEmpty();
+        // Geometry ratchet: position and size may only drift TOWARD the native
+        // render. The visual overlay score absorbs small geometry errors, so
+        // these are gated on their own numbers.
+        List<String> geometryRegressions = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Double>> entry : currentGeometry.entrySet()) {
+            Map<String, Double> base = baselineGeometry.get(entry.getKey());
+            if (base == null) {
+                continue;   // fidelity loop already reported brand-new pairs
+            }
+            Map<String, Double> cur = entry.getValue();
+            double offGrowth = cur.get("center_offset") - base.get("center_offset");
+            if (offGrowth > arguments.geometryEpsilonPx) {
+                geometryRegressions.add(String.format(
+                        "%s: center offset %.2fpx -> %.2fpx (grew %.2f, epsilon %.2f)",
+                        entry.getKey(), base.get("center_offset"), cur.get("center_offset"),
+                        offGrowth, arguments.geometryEpsilonPx));
+            }
+            for (String axis : new String[]{"width_ratio", "height_ratio"}) {
+                double drift = Math.abs(cur.get(axis) - 1.0d) - Math.abs(base.get(axis) - 1.0d);
+                if (drift > arguments.geometryEpsilonRatio) {
+                    geometryRegressions.add(String.format(
+                            "%s: %s %.4f -> %.4f (moved %.4f further from 1.0, epsilon %.4f)",
+                            entry.getKey(), axis, base.get(axis), cur.get(axis),
+                            drift, arguments.geometryEpsilonRatio));
+                }
+            }
+        }
+
+        boolean failed = !regressions.isEmpty() || !geometryRegressions.isEmpty() || !broken.isEmpty();
         if (!regressions.isEmpty()) {
             System.err.println("[gate] FAIL: " + regressions.size() + " fidelity regression(s) below baseline:");
             for (String r : regressions) {
+                System.err.println("  - " + r);
+            }
+        }
+        if (!geometryRegressions.isEmpty()) {
+            System.err.println("[gate] FAIL: " + geometryRegressions.size() + " geometry regression(s) beyond baseline:");
+            for (String r : geometryRegressions) {
                 System.err.println("  - " + r);
             }
         }
@@ -100,7 +160,8 @@ public class FidelityGate {
                 + String.format("%.2f", arguments.epsilon) + ").");
     }
 
-    private static void updateBaseline(Arguments arguments, Map<String, Double> current) {
+    private static void updateBaseline(Arguments arguments, Map<String, Double> current,
+            Map<String, Map<String, Double>> currentGeometry) {
         // Merge current measurements over any existing baseline so a partial run
         // does not drop entries it did not exercise. Loud by design.
         Map<String, Double> merged = new TreeMap<>(loadBaseline(arguments.baselineJson));
@@ -109,8 +170,19 @@ public class FidelityGate {
         for (Map.Entry<String, Double> entry : merged.entrySet()) {
             pairs.put(entry.getKey(), round2(entry.getValue()));
         }
+        Map<String, Map<String, Double>> mergedGeometry = new TreeMap<>(loadBaselineGeometry(arguments.baselineJson));
+        mergedGeometry.putAll(currentGeometry);
+        Map<String, Object> geometry = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, Double>> entry : mergedGeometry.entrySet()) {
+            Map<String, Object> g = new LinkedHashMap<>();
+            for (Map.Entry<String, Double> metric : entry.getValue().entrySet()) {
+                g.put(metric.getKey(), metric.getValue());
+            }
+            geometry.put(entry.getKey(), g);
+        }
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("pairs", pairs);
+        root.put("geometry", geometry);
         try {
             Path out = arguments.updateBaseline;
             if (out.getParent() != null) {
@@ -143,6 +215,35 @@ public class FidelityGate {
             System.err.println("Warning: could not read baseline " + baselinePath + ": " + ex.getMessage());
         }
         return baseline;
+    }
+
+    /// The optional "geometry" baseline section; empty for pre-geometry baselines
+    /// (those pairs simply are not geometry-gated until the baseline is refreshed).
+    private static Map<String, Map<String, Double>> loadBaselineGeometry(Path baselinePath) {
+        Map<String, Map<String, Double>> out = new LinkedHashMap<>();
+        if (baselinePath == null || !Files.isRegularFile(baselinePath)) {
+            return out;
+        }
+        try {
+            String text = Files.readString(baselinePath, StandardCharsets.UTF_8);
+            Map<String, Object> geometry = JsonUtil.asObject(JsonUtil.asObject(JsonUtil.parse(text)).get("geometry"));
+            for (Map.Entry<String, Object> entry : geometry.entrySet()) {
+                Map<String, Object> raw = JsonUtil.asObject(entry.getValue());
+                Double centerOffset = toDouble(raw.get("center_offset"));
+                Double widthRatio = toDouble(raw.get("width_ratio"));
+                Double heightRatio = toDouble(raw.get("height_ratio"));
+                if (centerOffset != null && widthRatio != null && heightRatio != null) {
+                    Map<String, Double> g = new LinkedHashMap<>();
+                    g.put("center_offset", centerOffset);
+                    g.put("width_ratio", widthRatio);
+                    g.put("height_ratio", heightRatio);
+                    out.put(entry.getKey(), g);
+                }
+            }
+        } catch (IOException ex) {
+            System.err.println("Warning: could not read baseline geometry " + baselinePath + ": " + ex.getMessage());
+        }
+        return out;
     }
 
     private static double round2(double value) {
@@ -178,12 +279,17 @@ public class FidelityGate {
         final Path baselineJson;
         final Path updateBaseline;
         final double epsilon;
+        final double geometryEpsilonPx;
+        final double geometryEpsilonRatio;
 
-        private Arguments(Path compareJson, Path baselineJson, Path updateBaseline, double epsilon) {
+        private Arguments(Path compareJson, Path baselineJson, Path updateBaseline, double epsilon,
+                double geometryEpsilonPx, double geometryEpsilonRatio) {
             this.compareJson = compareJson;
             this.baselineJson = baselineJson;
             this.updateBaseline = updateBaseline;
             this.epsilon = epsilon;
+            this.geometryEpsilonPx = geometryEpsilonPx;
+            this.geometryEpsilonRatio = geometryEpsilonRatio;
         }
 
         static Arguments parse(String[] args) {
@@ -191,6 +297,8 @@ public class FidelityGate {
             Path baseline = null;
             Path update = null;
             double epsilon = 0.5d;
+            double geometryEpsilonPx = 2.0d;
+            double geometryEpsilonRatio = 0.02d;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
@@ -227,6 +335,30 @@ public class FidelityGate {
                             return null;
                         }
                     }
+                    case "--geometry-epsilon-px" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --geometry-epsilon-px");
+                            return null;
+                        }
+                        try {
+                            geometryEpsilonPx = Double.parseDouble(args[i]);
+                        } catch (NumberFormatException ex) {
+                            System.err.println("Invalid value for --geometry-epsilon-px: " + args[i]);
+                            return null;
+                        }
+                    }
+                    case "--geometry-epsilon-ratio" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --geometry-epsilon-ratio");
+                            return null;
+                        }
+                        try {
+                            geometryEpsilonRatio = Double.parseDouble(args[i]);
+                        } catch (NumberFormatException ex) {
+                            System.err.println("Invalid value for --geometry-epsilon-ratio: " + args[i]);
+                            return null;
+                        }
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -237,7 +369,7 @@ public class FidelityGate {
                 System.err.println("--compare-json is required");
                 return null;
             }
-            return new Arguments(compare, baseline, update, epsilon);
+            return new Arguments(compare, baseline, update, epsilon, geometryEpsilonPx, geometryEpsilonRatio);
         }
     }
 }

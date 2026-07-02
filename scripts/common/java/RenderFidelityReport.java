@@ -74,13 +74,14 @@ public class RenderFidelityReport {
                     && !material.isEmpty()) {
                 material = material + "*";
             }
+            Map<String, Object> geometry = JsonUtil.asObject(details.get("geometry"));
 
             PairRow row = new PairRow(test, status, fidelity, ssim, meanDelta, base, delta,
                     stringValue(result.get("native_path"), ""),
                     stringValue(result.get("cn1_path"), ""),
                     JsonUtil.asObject(result.get("preview")),
                     JsonUtil.asObject(result.get("native_preview")),
-                    stringValue(result.get("message"), ""), material);
+                    stringValue(result.get("message"), ""), material, geometry);
             rows.add(row);
 
             String message;
@@ -184,6 +185,41 @@ public class RenderFidelityReport {
                         row.fidelity, nz(row.ssim), nz(row.meanDelta), deltaCell(row.delta)));
             }
             commentLines.add("");
+
+            // Geometry metrics, separated from the visual similarity score: the
+            // overlay comparison can hide size/position/anchoring drift, so the
+            // raw widget-bbox numbers get their own (collapsed) table. Sorted
+            // worst-geometry first (largest center offset).
+            List<PairRow> geometryRows = new ArrayList<>();
+            for (PairRow row : comparedRows) {
+                if (row.geometry != null && toDouble(row.geometry.get("center_offset")) != null) {
+                    geometryRows.add(row);
+                }
+            }
+            if (!geometryRows.isEmpty()) {
+                geometryRows.sort(Comparator.comparingDouble(
+                        (PairRow r) -> nz(toDouble(r.geometry.get("center_offset")))).reversed());
+                commentLines.add("<details><summary>Geometry vs native (bbox offset / size ratio / center offset / corner radius) -- gated separately from the visual score</summary>");
+                commentLines.add("");
+                commentLines.add("| Component | State | Appearance | bbox dx,dy (px) | w ratio | h ratio | center off (px) | radius native->cn1 (px) |");
+                commentLines.add("|---|---|---|--:|--:|--:|--:|--:|");
+                for (PairRow row : geometryRows) {
+                    String[] p = splitTest(row.test);
+                    Map<String, Object> g = row.geometry;
+                    Double rn = toDouble(g.get("corner_radius_native"));
+                    Double rc = toDouble(g.get("corner_radius_cn1"));
+                    String radius = (rn != null && rc != null)
+                            ? String.format("%.1f -> %.1f", rn, rc) : "-";
+                    commentLines.add(String.format("| %s | %s | %s | %+.0f,%+.0f | %.3f | %.3f | %.1f | %s |",
+                            p[0], p[1], p[2],
+                            nz(toDouble(g.get("offset_x"))), nz(toDouble(g.get("offset_y"))),
+                            nz(toDouble(g.get("width_ratio"))), nz(toDouble(g.get("height_ratio"))),
+                            nz(toDouble(g.get("center_offset"))), radius));
+                }
+                commentLines.add("");
+                commentLines.add("</details>");
+                commentLines.add("");
+            }
         }
 
         // Non-compared pairs (errors / not delivered / missing golden) listed
@@ -406,10 +442,12 @@ public class RenderFidelityReport {
         final Map<String, Object> nativePreview;
         final String message;
         final String material;
+        final Map<String, Object> geometry;
 
         PairRow(String test, String status, Double fidelity, Double ssim, Double meanDelta, Double baseline,
                 Double delta, String nativePath, String cn1Path, Map<String, Object> cn1Preview,
-                Map<String, Object> nativePreview, String message, String material) {
+                Map<String, Object> nativePreview, String message, String material,
+                Map<String, Object> geometry) {
             this.test = test;
             this.status = status;
             this.fidelity = fidelity;
@@ -423,6 +461,7 @@ public class RenderFidelityReport {
             this.nativePreview = nativePreview;
             this.message = message;
             this.material = material;
+            this.geometry = geometry;
         }
     }
 
