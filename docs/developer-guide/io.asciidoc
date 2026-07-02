@@ -499,7 +499,7 @@ The sample below uses results from https://anapioficeandfire.com/[an API of ice 
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/io.js[tag=io-javascript-001,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/io.js[tag=io-javascript-001,indent=0]
 ----
 
 You will place that into a file named "anapioficeandfire.json" in the src directory to make the next sample simpler:
@@ -618,7 +618,7 @@ The returned JSON looks something like this (notice it's snipped because the dat
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/io.js[tag=io-javascript-002,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/io.js[tag=io-javascript-002,indent=0]
 ----
 
 .Running the geocode sample above in the simulator
@@ -916,7 +916,7 @@ The result is in JSON form you ignore it since it isn't that important but it mi
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/io.js[tag=io-javascript-003,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/io.js[tag=io-javascript-003,indent=0]
 ----
 
 Notice the error message entry which is null meaning there was no error, if there was an error you'd have a message there or an error code that isn't in the 200-210 range.

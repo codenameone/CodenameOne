@@ -627,14 +627,14 @@ If there is an error that isn't fatal such as quota exceeded etc. You will get a
 
 [source,JavaScript]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-001,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-001,indent=0]
 -----
 
 A normal response, will be an array with results:
 
 [source,JavaScript]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-002,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/push-notifications.js[tag=push-notifications-javascript-002,indent=0]
 -----
 
 

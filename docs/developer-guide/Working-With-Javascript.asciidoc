@@ -254,7 +254,7 @@ You can customize this splash screen by modifying the HTML source inside the *cn
 
 [source,html]
 ----
-include::../demos/common/src/main/snippets/developer-guide/working-with-javascript.html[tag=working-with-javascript-html-001,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.html[tag=working-with-javascript-html-001,indent=0]
 ----
 
 [id="debugging", reftext="Debugging in Chrome"]
@@ -431,14 +431,14 @@ The solution for this is to add a *variable* into the URL as follows:
 
 [source,javascript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/working-with-javascript.js[tag=working-with-javascript-javascript-001,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.js[tag=working-with-javascript-javascript-001,indent=0]
 ----
 
 The `{{javascript.googlemaps.key}}` variable will be replaced with the value of the `javascript.googlemaps.key` build hint by the build server, so the resulting include you see in the index.html page will be something like:
 
 [source,html]
 ----
-include::../demos/common/src/main/snippets/developer-guide/working-with-javascript.html[tag=working-with-javascript-html-002,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.html[tag=working-with-javascript-html-002,indent=0]
 ----
 
 [id="environment_variables", reftext="Browser Environment Variables"]

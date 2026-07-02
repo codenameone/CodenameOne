@@ -1186,14 +1186,14 @@ The default generated stubs for the JavaScript build look like this `com_mycompa
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-001,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-001,indent=0]
 ----
 
 A simple implementation looks like this:
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-002,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-002,indent=0]
 ----
 
 Notice that you use the `complete()` method of the provided callback to pass the return value rather than using the `return` statement. This is to work around the fact that JavaScript doesn't natively support threads. The *Java* thread that's calling your native interface will block until your method calls `callback.complete()`. This allows you to use asynchronous APIs inside your native method while still allowing Codename One to work use your native interface through a synchronous API.
@@ -1224,7 +1224,7 @@ becomes
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-003,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-003,indent=0]
 ----
 
 Java API:
@@ -1238,7 +1238,7 @@ becomes
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-004,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-004,indent=0]
 ----
 
 [source,java]
@@ -1250,7 +1250,7 @@ becomes
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-005,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-005,indent=0]
 ----
 
 ==== Native GUI components
@@ -1283,7 +1283,7 @@ JavaScript would expect a DOM Element (for example: a `<div>` tag to be returned
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-006,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-006,indent=0]
 ----
 
 
@@ -1356,7 +1356,7 @@ NOTE: You had to break lines for the print version, the JavaScript version is a 
 .JavaScript Version
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-007,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-007,indent=0]
 ----
 
 .Java SE Version
@@ -1631,7 +1631,7 @@ This method is called from JavaScript inside a native interface using the follow
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-008,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-008,indent=0]
 ----
 
 In this example you first get a reference to the `fireMapChangeEvent` method, and then call it later. For example, you could have called it directly also.
@@ -1659,14 +1659,14 @@ One of the problematic aspects of calling back into Java from JavaScript is that
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-009,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-009,indent=0]
 ----
 
 to
 
 [source,JavaScript]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-010,indent=0]
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-010,indent=0]
 ----
 
 This will cause the call to be wrapped in the appropriate bootstrap code to work with threads - and it's necessary in cases where the method *may* use threads of any kind. The side-effect of calling a method with the `$async` suffix is that you can't use return values from the method.

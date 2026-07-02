@@ -159,6 +159,13 @@ def validate_includes(includes):
                     f"{item['sourceFile']}:{item['line']}: Java snippet fixture must use a valid Java filename: "
                     f"{item['target']}"
                 )
+        if item["language"].strip().lower() in ("javascript", "html") and (
+            "/demos/common/" in item["target"] or item["target"].startswith("../demos/common/")
+        ):
+            errors.append(
+                f"{item['sourceFile']}:{item['line']}: JavaScript/HTML snippets must live under "
+                f"the JavaScript demo module, not common: {item['target']}"
+            )
 
         tag_match = TAG_RE.search(item["attrs"])
         if not tag_match:
