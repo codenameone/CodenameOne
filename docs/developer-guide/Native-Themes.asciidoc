@@ -563,6 +563,12 @@ lens. The effect is opt-in: the iOS modern theme sets
 `tabsSelectionCapsuleBool: true` and `glassMaterialBool: true`. Without the
 glass flag the capsule degrades to a plain translucent pill.
 
+The morph is developed against the real OS control: the frame-by-frame
+comparison below shows the native iOS 26 tab bar (left) and the Codename
+One render (right) at matching moments of the selection travel.
+
+image::img/ios-modern-tab-morph-fidelity.png[Native iOS 26 tab bar vs the Codename One morph, frame by frame,scaledwidth=70%]
+
 The animation is controlled by a *named motion preset* plus a handful of
 high-level knobs. The detailed envelopes (stretch, squash, lift, lens
 magnification, aberration, tint timing) live inside the preset in the
