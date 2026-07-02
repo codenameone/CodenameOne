@@ -23,6 +23,10 @@
 name: Linux native build + run (GTK3, x64 + arm64)
 
 on:
+  # Manual dispatch: this PR's changed-file count exceeds GitHub's paths-filter
+  # diff limit, so pull_request triggers stopped firing -- dispatch with
+  #   gh workflow run <file> --ref <branch>
+  workflow_dispatch:
   pull_request:
     paths:
       - '.github/workflows/linux-build-run.yml'
