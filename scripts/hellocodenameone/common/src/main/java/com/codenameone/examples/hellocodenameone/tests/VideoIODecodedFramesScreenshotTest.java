@@ -39,11 +39,15 @@ import java.util.List;
  * immutable image, so the emit path never reads back a drawn-onto mutable image.</p>
  *
  * <p>Pixel-exact decode differs between platform codecs, so each baseline ships
- * a generous {@code .tolerance} file. Where the platform cannot encode
- * (unsupported targets, a browser without WebCodecs, a native suite whose codec
- * plugins are absent) the test reports SKIPPED and emits no screenshot. This is
- * the visual companion to {@link VideoIORoundTripTest} (frame order, brightness
- * ramp, PCM verification).</p>
+ * a generous {@code .tolerance} file. The test reports SKIPPED and emits no
+ * screenshot when it cannot produce a valid comparison: where the platform
+ * cannot encode (unsupported targets, a browser without WebCodecs, a native
+ * suite whose codec plugins are absent), OR where the backend cannot read the
+ * rendered source frame back (iOS' Metal renderer has a getRGB-after-draw bug
+ * that ghosts drawn text away while keeping the solid fill -- see
+ * {@link #framesContainRenderedInk}; iOS GL, macOS/Catalyst-Metal, Android and
+ * the simulator all read it back correctly). This is the visual companion to
+ * {@link VideoIORoundTripTest} (frame order, brightness ramp, PCM verification).</p>
  */
 public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreenshotTest {
     private static final int FRAMES = 6;
@@ -86,6 +90,25 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
             }
         } catch (Throwable t) {
             fail("source frame render failed: " + t);
+            return true;
+        }
+
+        // Precondition: the rendered digit must actually survive Image.getRGB()
+        // on this backend, otherwise we'd feed the encoder flat colour and diff
+        // against a baseline that can never match. iOS' Metal renderer has a
+        // getRGB-after-draw synchronisation bug: the solid createImage(bg) fill
+        // reads back fine, but drawString/drawImage content into a mutable image
+        // is not committed to the texture before readback, so the digit comes
+        // back ghosted away (colours are correct, the number vanishes). This is
+        // a platform rendering limitation unrelated to VideoIO decode -- iOS GL,
+        // macOS/Catalyst (also Metal), Android and the simulator all read the
+        // ink back correctly. When the ink didn't survive, SKIP rather than
+        // encode blank frames.
+        if (!framesContainRenderedInk(sources)) {
+            System.out.println("CN1SS:INFO:test=" + getImageName()
+                    + " status=SKIPPED reason=frame-render-readback-unavailable-on-"
+                    + Display.getInstance().getPlatformName());
+            done();
             return true;
         }
 
@@ -295,6 +318,43 @@ public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreens
         }
         glyph.dispose();
         return img;
+    }
+
+    /// True when every source frame still contains the rendered digit's ink
+    /// after Image.getRGB() readback. A correctly rendered digit covers well
+    /// over 1% of the frame in strong (near-white or near-black) ink; a backend
+    /// that drops drawn content on readback (iOS Metal getRGB-after-draw) leaves
+    /// only faint near-background pixels, so the strong-ink count collapses.
+    private static boolean framesContainRenderedInk(int[][] sources) {
+        for (int i = 0; i < sources.length; i++) {
+            int bg = 0xff000000 | FRAME_COLORS[i % FRAME_COLORS.length];
+            int[] px = sources[i];
+            int strong = 0;
+            for (int p = 0; p < px.length; p++) {
+                if (isStrongInkPixel(px[p], bg)) {
+                    strong++;
+                }
+            }
+            if (strong < Math.max(1, px.length / 100)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A pixel is "strong ink" when it is far from the frame background AND close
+    /// to pure white or pure black (the two ink colours). Ghosted readback pixels
+    /// sit near the background colour and fail the distance test.
+    private static boolean isStrongInkPixel(int argb, int bg) {
+        int r = (argb >> 16) & 0xff, g = (argb >> 8) & 0xff, b = argb & 0xff;
+        int br = (bg >> 16) & 0xff, bgn = (bg >> 8) & 0xff, bb = bg & 0xff;
+        int dist = Math.abs(r - br) + Math.abs(g - bgn) + Math.abs(b - bb);
+        if (dist < 200) {
+            return false;
+        }
+        boolean nearWhite = r > 200 && g > 200 && b > 200;
+        boolean nearBlack = r < 60 && g < 60 && b < 60;
+        return nearWhite || nearBlack;
     }
 
     private static void cleanup(String path) {
