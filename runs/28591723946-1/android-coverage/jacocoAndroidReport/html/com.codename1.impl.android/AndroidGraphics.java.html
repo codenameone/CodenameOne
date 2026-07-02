@@ -1,0 +1,1839 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidGraphics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidGraphics.java</span></div><h1>AndroidGraphics.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2009 Pader-Sync Ltd. &amp;amp; Co. KG.  All Rights Reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Visit http://www.pader-sync.com/ for contact information.
+ *
+ *
+ * Linking this library statically or dynamically with other modules is making a
+ * combined work based on this library. Thus, the terms and conditions of the GNU
+ * General Public License cover the whole combination.
+ *
+ *    As a special exception, the copyright holders of this library give you
+ *    permission to link this library with independent modules to produce an
+ *    executable, regardless of the license terms of these independent modules, and
+ *    to copy and distribute the resulting executable under terms of your choice,
+ *    provided that you also meet, for each linked independent module, the terms
+ *    and conditions of the license of that module. An independent module is a
+ *    module which is not derived from or based on this library. If you modify this
+ *    library, you may extend this exception to your version of the library, but you
+ *    are not obligated to do so. If you do not wish to do so, delete this exception
+ *    statement from your version.
+ *
+ * March 2009
+ * Thorsten Schemm
+ * http://www.pader-sync.com/
+ *
+ */
+package com.codename1.impl.android;
+
+
+import android.graphics.*;
+import android.view.View;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.ui.CN;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.Stroke;
+
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.Shape;
+import com.codename1.ui.plaf.Style;
+
+/**
+ * #######################################################################
+ * #######################################################################
+ *
+ * Bundle one canvas and two paints to get one graphics object.
+ */
+class AndroidGraphics {
+
+    protected Canvas canvas;
+    protected Paint paint;
+    // The Bitmap behind a mutable-image canvas (null for the screen canvas). Lets
+    // CSS backdrop-filter:blur read/write the destination region directly (absolute
+    // bitmap coordinates, bypassing the canvas transform). See blurRegion.
+    Bitmap underlyingBitmap;
+    private boolean isMutableImageGraphics;
+    private CodenameOneTextPaint font;
+    private Transform transform;
+    private Matrix convertedTransform, convertedInverseTransform;
+<span class="fc" id="L79">    private boolean transformDirty = true;</span>
+<span class="fc" id="L80">    private boolean inverseTransformDirty = true;</span>
+
+    private boolean clipFresh;
+<span class="fc" id="L83">    private final RectF tmprectF = new RectF();</span>
+<span class="fc" id="L84">    private final Rect tmprect = new Rect();</span>
+<span class="fc" id="L85">    private final Path tmppath = new Path();</span>
+<span class="fc" id="L86">    protected final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);</span>
+    AndroidImplementation impl;
+<span class="fc" id="L88">    private int alpha = 255;</span>
+
+
+<span class="fc" id="L91">    AndroidGraphics(AndroidImplementation impl, Canvas canvas, boolean isMutableImageGraphics) {</span>
+<span class="fc" id="L92">        this.isMutableImageGraphics = isMutableImageGraphics;</span>
+<span class="fc" id="L93">        this.canvas = canvas;</span>
+<span class="fc" id="L94">        this.paint = new Paint();</span>
+<span class="fc" id="L95">        paint.setAntiAlias(true);</span>
+<span class="fc" id="L96">        this.font = (CodenameOneTextPaint) ((AndroidImplementation.NativeFont)impl.getDefaultFont()).font;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if(canvas != null) {</span>
+<span class="fc" id="L98">            canvas.save();</span>
+        }
+<span class="fc" id="L100">        transform = Transform.makeIdentity();</span>
+<span class="fc" id="L101">        this.impl = impl;</span>
+<span class="fc" id="L102">    }</span>
+
+
+    void setCanvas(Canvas canvas) {
+<span class="fc" id="L106">        this.canvas = canvas;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if(canvas != null) {</span>
+<span class="fc" id="L108">            canvas.save();</span>
+        }
+<span class="fc" id="L110">        clipSet = false;</span>
+<span class="fc" id="L111">    }</span>
+
+    void setCanvasNoSave(Canvas canvas) {
+<span class="fc" id="L114">        this.canvas = canvas;</span>
+<span class="fc" id="L115">        clipSet = false;</span>
+<span class="fc" id="L116">    }</span>
+
+    Paint getFont() {
+<span class="fc" id="L119">        return font;</span>
+    }
+
+    void setFont(CodenameOneTextPaint font) {
+<span class="fc" id="L123">        this.font = font;</span>
+<span class="fc" id="L124">        this.font.setColor(this.paint.getColor());</span>
+<span class="fc" id="L125">    }</span>
+
+    void setColor(int color){
+<span class="fc" id="L128">        int c = (alpha &lt;&lt; 24) | (color &amp; 0xffffff);</span>
+<span class="fc" id="L129">        this.paint.setColor(c);</span>
+<span class="fc" id="L130">        this.font.setColor(c);</span>
+<span class="fc" id="L131">    }</span>
+
+    Paint getPaint() {
+<span class="fc" id="L134">        return paint;</span>
+    }
+
+    void setPaint(Paint p) {
+<span class="fc" id="L138">        paint = p;</span>
+<span class="fc" id="L139">    }</span>
+
+    public void drawImage(Object img, int x, int y) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (img == null) return;</span>
+<span class="fc" id="L143">        canvas.save();</span>
+<span class="fc" id="L144">        applyTransform();</span>
+<span class="fc" id="L145">        canvas.drawBitmap((Bitmap) img, x, y, paint);</span>
+<span class="fc" id="L146">        unapplyTransform();</span>
+<span class="fc" id="L147">        canvas.restore();</span>
+<span class="fc" id="L148">    }</span>
+
+    public void drawShadow(Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        if (image == null || canvas == null) {</span>
+<span class="nc" id="L152">            return;</span>
+        }
+<span class="nc" id="L154">        Bitmap bmp = (Bitmap)image;</span>
+<span class="nc" id="L155">        float bmpW = bmp.getWidth();</span>
+<span class="nc" id="L156">        float bmpH = bmp.getHeight();</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        if (bmpW == 0 || bmpH == 0) {</span>
+<span class="nc" id="L158">            return;</span>
+        }
+
+<span class="nc" id="L161">        Bitmap scaledBmp = Bitmap.createScaledBitmap(bmp, bmp.getWidth() + 2 * spreadRadius, bmp.getHeight() + 2 * spreadRadius, false);</span>
+<span class="nc" id="L162">        Paint alphaPaint = new Paint();</span>
+<span class="nc" id="L163">        alphaPaint.setMaskFilter(new BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL));</span>
+<span class="nc" id="L164">        int[] offsetXY = new int[2];</span>
+<span class="nc" id="L165">        Bitmap bmAlpha = scaledBmp.extractAlpha(alphaPaint, offsetXY);</span>
+<span class="nc" id="L166">        scaledBmp.recycle();</span>
+<span class="nc" id="L167">        canvas.save();</span>
+<span class="nc" id="L168">        applyTransform();</span>
+<span class="nc" id="L169">        Paint shadowPaint = new Paint();</span>
+<span class="nc" id="L170">        int alpha = (int)Math.floor(opacity * 255);</span>
+<span class="nc" id="L171">        shadowPaint.setColor(0xff000000 | color);</span>
+<span class="nc" id="L172">        shadowPaint.setAlpha(alpha);</span>
+<span class="nc" id="L173">        canvas.drawBitmap(bmAlpha, x + offsetXY[0] - spreadRadius + offsetX, y + offsetXY[1] - spreadRadius + offsetY, shadowPaint);</span>
+<span class="nc" id="L174">        bmAlpha.recycle();</span>
+
+<span class="nc" id="L176">        unapplyTransform();</span>
+<span class="nc" id="L177">        canvas.restore();</span>
+<span class="nc" id="L178">    }</span>
+
+    void drawImageImpl(Object img, int x, int y, int w, int h) {
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (img == null) return;</span>
+<span class="fc" id="L182">        Bitmap b = (Bitmap) img;</span>
+<span class="fc" id="L183">        Rect src = new Rect();</span>
+<span class="fc" id="L184">        src.top = 0;</span>
+<span class="fc" id="L185">        src.bottom = b.getHeight();</span>
+<span class="fc" id="L186">        src.left = 0;</span>
+<span class="fc" id="L187">        src.right = b.getWidth();</span>
+<span class="fc" id="L188">        Rect dest = new Rect();</span>
+<span class="fc" id="L189">        dest.top = y;</span>
+<span class="fc" id="L190">        dest.bottom = y + h;</span>
+<span class="fc" id="L191">        dest.left = x;</span>
+<span class="fc" id="L192">        dest.right = x + w;</span>
+<span class="fc" id="L193">        canvas.drawBitmap(b, src, dest, paint);</span>
+<span class="fc" id="L194">    }</span>
+
+    public void drawImage(Object img, int x, int y, int w, int h) {
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (img == null) return;</span>
+<span class="fc" id="L198">        canvas.save();</span>
+<span class="fc" id="L199">        applyTransform();</span>
+<span class="fc" id="L200">        drawImageImpl(img, x, y, w, h);</span>
+<span class="fc" id="L201">        unapplyTransform();</span>
+<span class="fc" id="L202">        canvas.restore();</span>
+<span class="fc" id="L203">    }</span>
+
+    public void tileImage(Object img, int x, int y, int w, int h) {
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (img == null) return;</span>
+<span class="fc" id="L207">        Bitmap b = (Bitmap) img;</span>
+<span class="fc" id="L208">        Rect dest = new Rect();</span>
+<span class="fc" id="L209">        dest.top = 0;</span>
+<span class="fc" id="L210">        dest.bottom = h;</span>
+<span class="fc" id="L211">        dest.left = 0;</span>
+<span class="fc" id="L212">        dest.right = w;</span>
+<span class="fc" id="L213">        BitmapShader shader = new BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);</span>
+<span class="fc" id="L214">        Paint tilePainter = new Paint(paint);</span>
+<span class="fc" id="L215">        tilePainter.setShader(shader);</span>
+<span class="fc" id="L216">        tilePainter.setAntiAlias(false);</span>
+<span class="fc" id="L217">        canvas.save();</span>
+<span class="fc" id="L218">        canvas.translate(x, y);</span>
+<span class="fc" id="L219">        applyTransform();</span>
+<span class="fc" id="L220">        canvas.drawRect(dest, tilePainter);</span>
+<span class="fc" id="L221">        unapplyTransform();</span>
+<span class="fc" id="L222">        canvas.restore();</span>
+<span class="fc" id="L223">    }</span>
+    
+    private void tileImageImpl(Object img, int x, int y, int w, int h) {
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (img == null) return;</span>
+<span class="nc" id="L227">        Bitmap b = (Bitmap) img;</span>
+<span class="nc" id="L228">        Rect dest = new Rect();</span>
+<span class="nc" id="L229">        dest.top = 0;</span>
+<span class="nc" id="L230">        dest.bottom = h;</span>
+<span class="nc" id="L231">        dest.left = 0;</span>
+<span class="nc" id="L232">        dest.right = w;</span>
+<span class="nc" id="L233">        BitmapShader shader = new BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);</span>
+<span class="nc" id="L234">        Paint tilePainter = new Paint();</span>
+<span class="nc" id="L235">        tilePainter.setShader(shader);</span>
+<span class="nc" id="L236">        tilePainter.setAntiAlias(false);</span>
+<span class="nc" id="L237">        canvas.translate(x, y);</span>
+        //canvas.concat(getTransformMatrix());
+<span class="nc" id="L239">        canvas.drawRect(dest, tilePainter);</span>
+<span class="nc" id="L240">    }</span>
+    
+
+    private Matrix getInverseTransform() {
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (inverseTransformDirty) {</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (convertedInverseTransform == null) {</span>
+<span class="nc" id="L246">                convertedInverseTransform = new Matrix();</span>
+            }
+<span class="nc" id="L248">            getTransformMatrix().invert(convertedInverseTransform);</span>
+<span class="nc" id="L249">            inverseTransformDirty = false;</span>
+        }
+<span class="nc" id="L251">        return convertedInverseTransform;</span>
+    }
+
+    private Matrix getTransformMatrix(){
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if ( transformDirty ){</span>
+        	// Conversion from 4x4 to 3x3
+        	// See http://www.w3.org/TR/2009/WD-SVG-Transforms-20090320/#_4x4-to-3x3-conversion
+        	// for formula
+<span class="fc" id="L259">            CN1Matrix4f m = (CN1Matrix4f)transform.getNativeTransform();</span>
+<span class="fc" id="L260">            float[] mMatrix3x3 = new float[9];</span>
+<span class="fc" id="L261">            float[] mMatrix4x4 = m.getData();</span>
+
+
+<span class="fc" id="L264">            mMatrix3x3[0] = mMatrix4x4[0];</span>
+<span class="fc" id="L265">            mMatrix3x3[1] = mMatrix4x4[4];</span>
+<span class="fc" id="L266">            mMatrix3x3[2] = mMatrix4x4[12];</span>
+<span class="fc" id="L267">            mMatrix3x3[3] = mMatrix4x4[1];</span>
+<span class="fc" id="L268">            mMatrix3x3[4] = mMatrix4x4[5];</span>
+<span class="fc" id="L269">            mMatrix3x3[5] = mMatrix4x4[13];</span>
+<span class="fc" id="L270">            mMatrix3x3[6] = mMatrix4x4[3];</span>
+<span class="fc" id="L271">            mMatrix3x3[7] = mMatrix4x4[7];</span>
+<span class="fc" id="L272">            mMatrix3x3[8] = mMatrix4x4[15];</span>
+
+
+<span class="fc" id="L275">            convertedTransform = new Matrix();</span>
+
+<span class="fc" id="L277">            convertedTransform.setValues(mMatrix3x3);</span>
+
+<span class="fc" id="L279">            transformDirty = false;</span>
+
+
+
+
+
+        }
+<span class="fc" id="L286">        return convertedTransform;</span>
+
+    }
+
+    public void drawLine(int x1, int y1, int x2, int y2) {
+<span class="fc" id="L291">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L292">        canvas.save();</span>
+<span class="fc" id="L293">        applyTransform();</span>
+<span class="fc" id="L294">        canvas.drawLine(x1, y1, x2, y2, paint);</span>
+<span class="fc" id="L295">        unapplyTransform();</span>
+<span class="fc" id="L296">        canvas.restore();</span>
+<span class="fc" id="L297">    }</span>
+
+
+    public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (nPoints &lt;= 1) {</span>
+<span class="nc" id="L302">            return;</span>
+        }
+<span class="fc" id="L304">        this.tmppath.rewind();</span>
+<span class="fc" id="L305">        this.tmppath.moveTo(xPoints[0], yPoints[0]);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        for (int i = 1; i &lt; nPoints; i++) {</span>
+<span class="fc" id="L307">            this.tmppath.lineTo(xPoints[i], yPoints[i]);</span>
+        }
+<span class="fc" id="L309">        paint.setStyle(Paint.Style.STROKE);</span>
+<span class="fc" id="L310">        float strokeW = 1;</span>
+<span class="fc" id="L311">        paint.setStrokeWidth(strokeW);</span>
+<span class="fc" id="L312">        canvas.save();</span>
+<span class="fc" id="L313">        applyTransform();</span>
+<span class="fc" id="L314">        canvas.drawPath(this.tmppath, paint);</span>
+<span class="fc" id="L315">        unapplyTransform();</span>
+<span class="fc" id="L316">        canvas.restore();</span>
+<span class="fc" id="L317">    }</span>
+
+    public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (nPoints &lt;= 1) {</span>
+<span class="nc" id="L321">            return;</span>
+        }
+<span class="fc" id="L323">        this.tmppath.rewind();</span>
+<span class="fc" id="L324">        this.tmppath.moveTo(xPoints[0], yPoints[0]);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        for (int i = 1; i &lt; nPoints; i++) {</span>
+<span class="fc" id="L326">            this.tmppath.lineTo(xPoints[i], yPoints[i]);</span>
+        }
+<span class="fc" id="L328">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L329">        canvas.save();</span>
+<span class="fc" id="L330">        applyTransform();</span>
+<span class="fc" id="L331">        canvas.drawPath(this.tmppath, paint);</span>
+<span class="fc" id="L332">        unapplyTransform();</span>
+<span class="fc" id="L333">        canvas.restore();</span>
+<span class="fc" id="L334">    }</span>
+
+    public void drawRGB(int[] rgbData, int offset, int x,
+            int y, int w, int h, boolean processAlpha) {
+<span class="fc" id="L338">        canvas.save();</span>
+<span class="fc" id="L339">        applyTransform();</span>
+<span class="fc" id="L340">        canvas.drawBitmap(rgbData, offset, w, x, y, w, h,</span>
+                processAlpha, null);
+<span class="fc" id="L342">        unapplyTransform();</span>
+<span class="fc" id="L343">        canvas.restore();</span>
+<span class="fc" id="L344">    }</span>
+
+    public void drawRect(int x, int y, int width, int height) {
+
+<span class="fc" id="L348">        boolean antialias = paint.isAntiAlias();</span>
+<span class="fc" id="L349">        paint.setStyle(Paint.Style.STROKE);</span>
+<span class="fc" id="L350">        paint.setAntiAlias(false);</span>
+<span class="fc" id="L351">        float strokeW = 1;</span>
+
+<span class="fc" id="L353">        paint.setStrokeWidth(strokeW);</span>
+<span class="fc" id="L354">        canvas.save();</span>
+<span class="fc" id="L355">        applyTransform();</span>
+<span class="fc" id="L356">        canvas.drawRect(x +strokeW/2, y+strokeW/2, x + width - strokeW/2, y + height - strokeW/2, paint);</span>
+<span class="fc" id="L357">        paint.setAntiAlias(antialias);</span>
+<span class="fc" id="L358">        unapplyTransform();</span>
+<span class="fc" id="L359">        canvas.restore();</span>
+<span class="fc" id="L360">    }</span>
+
+    public void drawRoundRect(int x, int y, int width,
+            int height, int arcWidth, int arcHeight) {
+
+<span class="fc" id="L365">        paint.setStyle(Paint.Style.STROKE);</span>
+<span class="fc" id="L366">        float strokeW = 1;</span>
+<span class="fc" id="L367">        paint.setStrokeWidth(strokeW);</span>
+<span class="fc" id="L368">        this.tmprectF.set(x+strokeW/2, y+strokeW/2, x + width-strokeW/2, y + height-strokeW/2);</span>
+<span class="fc" id="L369">        canvas.save();</span>
+<span class="fc" id="L370">        applyTransform();</span>
+<span class="fc" id="L371">        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);</span>
+<span class="fc" id="L372">        unapplyTransform();</span>
+<span class="fc" id="L373">        canvas.restore();</span>
+<span class="fc" id="L374">    }</span>
+
+    public void drawString(String str, int x, int y) {
+<span class="fc" id="L377">        canvas.save();</span>
+<span class="fc" id="L378">        applyTransform();</span>
+<span class="fc" id="L379">        canvas.drawText(str, x, y - font.top(), font);</span>
+<span class="fc" id="L380">        unapplyTransform();</span>
+<span class="fc" id="L381">        canvas.restore();</span>
+<span class="fc" id="L382">    }</span>
+
+    public void drawArc(int x, int y, int width, int height,
+            int startAngle, int arcAngle) {
+<span class="fc" id="L386">        paint.setStyle(Paint.Style.STROKE);</span>
+<span class="fc" id="L387">        float strokeW = 1;</span>
+<span class="fc" id="L388">        paint.setStrokeWidth(strokeW);</span>
+<span class="fc" id="L389">        this.tmprectF.set(x+strokeW/2, y+strokeW/2, x + width - strokeW/2, y + height - strokeW/2);</span>
+<span class="fc" id="L390">        canvas.save();</span>
+<span class="fc" id="L391">        applyTransform();</span>
+<span class="fc" id="L392">        canvas.drawArc(this.tmprectF, 360 - startAngle,</span>
+                -arcAngle, false, paint);
+<span class="fc" id="L394">        unapplyTransform();</span>
+<span class="fc" id="L395">        canvas.restore();</span>
+<span class="fc" id="L396">    }</span>
+
+    public void fillArc(int x, int y, int width, int height,
+            int startAngle, int arcAngle) {
+<span class="fc" id="L400">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L401">        this.tmprectF.set(x, y, x + width, y + height);</span>
+<span class="fc" id="L402">        canvas.save();</span>
+<span class="fc" id="L403">        applyTransform();</span>
+<span class="fc" id="L404">        canvas.drawArc(this.tmprectF, 360 - startAngle,</span>
+                -arcAngle, true, paint);
+<span class="fc" id="L406">        unapplyTransform();</span>
+<span class="fc" id="L407">        canvas.restore();</span>
+<span class="fc" id="L408">    }</span>
+
+    public void fillRect(int x, int y, int width, int height) {
+        //System.out.println(&quot;Filling rect &quot;+x+&quot;, &quot;+y+&quot;, &quot;+width+&quot;, &quot;+height);
+        //System.out.println(&quot;Clip bounds is &quot;+canvas.getClipBounds());
+<span class="fc" id="L413">        boolean antialias = paint.isAntiAlias();</span>
+<span class="fc" id="L414">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L415">        paint.setAntiAlias(false);</span>
+<span class="fc" id="L416">        canvas.save();</span>
+<span class="fc" id="L417">        applyTransform();</span>
+<span class="fc" id="L418">        canvas.drawRect(x, y, x + width, y + height, paint);</span>
+<span class="fc" id="L419">        paint.setAntiAlias(antialias);</span>
+<span class="fc" id="L420">        unapplyTransform();</span>
+<span class="fc" id="L421">        canvas.restore();</span>
+
+<span class="fc" id="L423">    }</span>
+
+   public void fillRect(int x, int y, int w, int h, byte alpha) {
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if(alpha != 0) {</span>
+<span class="nc" id="L427">            int oldAlpha = getAlpha();</span>
+<span class="nc" id="L428">            setAlpha(alpha &amp; 0xff);</span>
+<span class="nc" id="L429">            fillRect(x, y, w, h);</span>
+<span class="nc" id="L430">            setAlpha(oldAlpha);</span>
+        }
+<span class="nc" id="L432">    }</span>
+
+   public void fillRectImpl(int x, int y, int w, int h, byte alpha) {
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        if(alpha != 0) {</span>
+<span class="fc" id="L436">            int oldAlpha = getAlpha();</span>
+<span class="fc" id="L437">            setAlpha(alpha &amp; 0xff);</span>
+
+<span class="fc" id="L439">            boolean antialias = paint.isAntiAlias();</span>
+<span class="fc" id="L440">            paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L441">            paint.setAntiAlias(false);</span>
+<span class="fc" id="L442">            canvas.drawRect(x, y, x + w, y + h, paint);</span>
+<span class="fc" id="L443">            paint.setAntiAlias(antialias);</span>
+
+<span class="fc" id="L445">            setAlpha(oldAlpha);</span>
+        }
+<span class="fc" id="L447">    }</span>
+
+    public void paintComponentBackground(byte bgType, Image bgImageOrig, int bgColor, byte bgTransparency,
+                                         int startColor, int endColor, float relativeX,
+                                         float relativeY, float relativeSize,
+                                         int x, int y, int width, int height) {
+<span class="pc bpc" id="L453" title="2 of 4 branches missed.">        if (width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L454">            return;</span>
+        }
+<span class="fc" id="L456">        canvas.save();</span>
+<span class="fc" id="L457">        applyTransform();</span>
+        try {
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">            if (bgImageOrig == null) {</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">                if(bgType &gt;= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {</span>
+<span class="nc" id="L461">                    drawGradientBackground(bgType, bgColor, bgTransparency, startColor, endColor,</span>
+                            relativeX, relativeY, relativeSize, x, y, width, height);
+                    //canvas.restore();
+<span class="nc" id="L464">                    return;</span>
+                }
+<span class="fc" id="L466">                setColor(bgColor);</span>
+<span class="fc" id="L467">                fillRectImpl(x, y, width, height, bgTransparency);</span>
+                //canvas.restore();
+<span class="fc" id="L469">                return;</span>
+            } else {
+<span class="nc" id="L471">                int iW = bgImageOrig.getWidth();</span>
+<span class="nc" id="L472">                int iH = bgImageOrig.getHeight();</span>
+<span class="nc" id="L473">                Object bgImage = bgImageOrig.getImage();</span>
+<span class="nc bnc" id="L474" title="All 22 branches missed.">                switch (bgType) {</span>
+                    case Style.BACKGROUND_NONE:
+<span class="nc bnc" id="L476" title="All 2 branches missed.">                        if (bgTransparency != 0) {</span>
+<span class="nc" id="L477">                            setColor(bgColor);</span>
+<span class="nc" id="L478">                            fillRectImpl(x, y, width, height, bgTransparency);</span>
+                        }
+                        //canvas.restore();
+<span class="nc" id="L481">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_SCALED:
+<span class="nc" id="L483">                        drawImageImpl(bgImage, x, y, width, height);</span>
+                        //canvas.restore();
+<span class="nc" id="L485">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_SCALED_FILL:
+<span class="nc" id="L487">                        float r = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+<span class="nc" id="L488">                        int bwidth = (int) (((float) iW) * r);</span>
+<span class="nc" id="L489">                        int bheight = (int) (((float) iH) * r);</span>
+<span class="nc" id="L490">                        drawImageImpl(bgImage, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);</span>
+                        //canvas.restore();
+<span class="nc" id="L492">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_SCALED_FIT:
+<span class="nc bnc" id="L494" title="All 2 branches missed.">                        if (bgTransparency != 0) {</span>
+<span class="nc" id="L495">                            setColor(bgColor);</span>
+<span class="nc" id="L496">                            fillRectImpl(x, y, width, height, bgTransparency);</span>
+                        }
+<span class="nc" id="L498">                        float r2 = Math.min(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+<span class="nc" id="L499">                        int awidth = (int) (((float) iW) * r2);</span>
+<span class="nc" id="L500">                        int aheight = (int) (((float) iH) * r2);</span>
+<span class="nc" id="L501">                        drawImageImpl(bgImage, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);</span>
+                        //canvas.restore();
+<span class="nc" id="L503">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_BOTH:
+<span class="nc" id="L505">                        tileImageImpl(bgImage, x, y, width, height);</span>
+                        //canvas.restore();
+<span class="nc" id="L507">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+<span class="nc" id="L509">                        setColor(bgColor);</span>
+<span class="nc" id="L510">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L511">                        tileImageImpl(bgImage, x, y, width, iH);</span>
+                        //canvas.restore();
+<span class="nc" id="L513">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
+<span class="nc" id="L515">                        setColor(bgColor);</span>
+<span class="nc" id="L516">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L517">                        tileImageImpl(bgImage, x, y + (height / 2 - iH / 2), width, iH);</span>
+                        //canvas.restore();
+<span class="nc" id="L519">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
+<span class="nc" id="L521">                        setColor(bgColor);</span>
+<span class="nc" id="L522">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L523">                        tileImageImpl(bgImage, x, y + (height - iH), width, iH);</span>
+                        //canvas.restore();
+<span class="nc" id="L525">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
+<span class="nc" id="L527">                        setColor(bgColor);</span>
+<span class="nc" id="L528">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">                        for (int yPos = 0; yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L530">                            canvas.drawBitmap((Bitmap) bgImage, x, y + yPos, paint);</span>
+                        }
+                        //canvas.restore();
+<span class="nc" id="L533">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
+<span class="nc" id="L535">                        setColor(bgColor);</span>
+<span class="nc" id="L536">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc bnc" id="L537" title="All 2 branches missed.">                        for (int yPos = 0; yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L538">                            canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y + yPos, paint);</span>
+                        }
+                        //canvas.restore();
+<span class="nc" id="L541">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
+<span class="nc" id="L543">                        setColor(bgColor);</span>
+<span class="nc" id="L544">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc bnc" id="L545" title="All 2 branches missed.">                        for (int yPos = 0; yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L546">                            canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y + yPos, paint);</span>
+                        }
+                        //canvas.restore();
+<span class="nc" id="L549">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+<span class="nc" id="L551">                        setColor(bgColor);</span>
+<span class="nc" id="L552">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L553">                        canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y, paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L555">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+<span class="nc" id="L557">                        setColor(bgColor);</span>
+<span class="nc" id="L558">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L559">                        canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y + (height - iH), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L561">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+<span class="nc" id="L563">                        setColor(bgColor);</span>
+<span class="nc" id="L564">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L565">                        canvas.drawBitmap((Bitmap) bgImage, x, y + (height / 2 - iH / 2), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L567">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+<span class="nc" id="L569">                        setColor(bgColor);</span>
+<span class="nc" id="L570">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L571">                        canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y + (height / 2 - iH / 2), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L573">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+<span class="nc" id="L575">                        setColor(bgColor);</span>
+<span class="nc" id="L576">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L577">                        canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y + (height / 2 - iH / 2), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L579">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+<span class="nc" id="L581">                        setColor(bgColor);</span>
+<span class="nc" id="L582">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L583">                        canvas.drawBitmap((Bitmap) bgImage, x, y, paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L585">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+<span class="nc" id="L587">                        setColor(bgColor);</span>
+<span class="nc" id="L588">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L589">                        canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y, paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L591">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+<span class="nc" id="L593">                        setColor(bgColor);</span>
+<span class="nc" id="L594">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L595">                        canvas.drawBitmap((Bitmap) bgImage, x, y + (height - iH), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L597">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+<span class="nc" id="L599">                        setColor(bgColor);</span>
+<span class="nc" id="L600">                        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L601">                        canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y + (height - iH), paint);</span>
+                        ///canvas.restore();
+<span class="nc" id="L603">                        return;</span>
+                    case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                    case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                    case Style.BACKGROUND_GRADIENT_RADIAL:
+<span class="nc" id="L607">                        drawGradientBackground(bgType, bgColor, bgTransparency, startColor, endColor,</span>
+                                relativeX, relativeY, relativeSize, x, y, width, height);
+                        //canvas.restore();
+<span class="nc" id="L610">                        return;</span>
+                }
+            }
+        } finally {
+<span class="pc" id="L614">            unapplyTransform();</span>
+<span class="pc" id="L615">            canvas.restore();</span>
+<span class="nc" id="L616">        }</span>
+
+<span class="nc" id="L618">    }</span>
+
+    private void drawGradientBackground(byte bgType, int bgColor, byte bgTransparency, int startColor, int endColor, float relativeX,
+                        float relativeY, float relativeSize,
+                        int x, int y, int width, int height) {
+<span class="nc bnc" id="L623" title="All 4 branches missed.">        switch (bgType) {</span>
+            case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+<span class="nc" id="L625">                fillLinearGradient(startColor, endColor,</span>
+                        x, y, width, height, true);
+<span class="nc" id="L627">                return;</span>
+            case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+<span class="nc" id="L629">                fillLinearGradient(startColor, endColor,</span>
+                        x, y, width, height, false);
+<span class="nc" id="L631">                return;</span>
+            case Style.BACKGROUND_GRADIENT_RADIAL:
+<span class="nc" id="L633">                fillRectRadialGradient(startColor, endColor,</span>
+                        x, y, width, height, relativeX, relativeY,
+                        relativeSize);
+<span class="nc" id="L636">                return;</span>
+        }
+<span class="nc" id="L638">        setColor(bgColor);</span>
+<span class="nc" id="L639">        fillRectImpl(x, y, width, height, bgTransparency);</span>
+<span class="nc" id="L640">    }   </span>
+   
+    public void paintComponentBackground(int x, int y, int width, int height, Style s) {
+<span class="pc bpc" id="L643" title="2 of 4 branches missed.">        if (width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L644">            return;</span>
+        }
+<span class="fc" id="L646">        canvas.save();</span>
+<span class="fc" id="L647">        applyTransform();</span>
+<span class="fc" id="L648">        Image bgImageOrig = s.getBgImage();</span>
+        try {
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">            if (bgImageOrig == null) {</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">                if (s.getBackgroundType() &gt;= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {</span>
+<span class="nc" id="L652">                    drawGradientBackground(s, x, y, width, height);</span>
+                    //canvas.restore();
+<span class="nc" id="L654">                    return;</span>
+                }
+<span class="fc" id="L656">                setColor(s.getBgColor());</span>
+<span class="fc" id="L657">                fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+                //canvas.restore();
+<span class="fc" id="L659">                return;</span>
+            } else {
+<span class="nc" id="L661">                int iW = bgImageOrig.getWidth();</span>
+<span class="nc" id="L662">                int iH = bgImageOrig.getHeight();</span>
+<span class="nc" id="L663">                Object bgImage = bgImageOrig.getImage();</span>
+<span class="nc bnc" id="L664" title="All 22 branches missed.">                switch (s.getBackgroundType()) {</span>
+                    case Style.BACKGROUND_NONE:
+<span class="nc bnc" id="L666" title="All 2 branches missed.">                        if (s.getBgTransparency() != 0) {</span>
+<span class="nc" id="L667">                            setColor(s.getBgColor());</span>
+<span class="nc" id="L668">                            fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+                        }
+                        //canvas.restore();
+<span class="nc" id="L671">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_SCALED:
+<span class="nc" id="L673">                        drawImageImpl(bgImage, x, y, width, height);</span>
+                        //canvas.restore();
+<span class="nc" id="L675">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_SCALED_FILL:
+<span class="nc" id="L677">                        float r = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+<span class="nc" id="L678">                        int bwidth = (int) (((float) iW) * r);</span>
+<span class="nc" id="L679">                        int bheight = (int) (((float) iH) * r);</span>
+<span class="nc" id="L680">                        drawImageImpl(bgImage, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);</span>
+                        //canvas.restore();
+<span class="nc" id="L682">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_SCALED_FIT:
+<span class="nc bnc" id="L684" title="All 2 branches missed.">                        if (s.getBgTransparency() != 0) {</span>
+<span class="nc" id="L685">                            setColor(s.getBgColor());</span>
+<span class="nc" id="L686">                            fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+                        }
+<span class="nc" id="L688">                        float r2 = Math.min(((float) width) / ((float) iW), ((float) height) / ((float) iH));</span>
+<span class="nc" id="L689">                        int awidth = (int) (((float) iW) * r2);</span>
+<span class="nc" id="L690">                        int aheight = (int) (((float) iH) * r2);</span>
+<span class="nc" id="L691">                        drawImageImpl(bgImage, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);</span>
+                        //canvas.restore();
+<span class="nc" id="L693">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_BOTH:
+<span class="nc" id="L695">                        tileImageImpl(bgImage, x, y, width, height);</span>
+                        //canvas.restore();
+<span class="nc" id="L697">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+<span class="nc" id="L699">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L700">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L701">                        tileImageImpl(bgImage, x, y, width, iH);</span>
+                        //canvas.restore();
+<span class="nc" id="L703">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
+<span class="nc" id="L705">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L706">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L707">                        tileImageImpl(bgImage, x, y + (height / 2 - iH / 2), width, iH);</span>
+                        //canvas.restore();
+<span class="nc" id="L709">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
+<span class="nc" id="L711">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L712">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L713">                        tileImageImpl(bgImage, x, y + (height - iH), width, iH);</span>
+                        //canvas.restore();
+<span class="nc" id="L715">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
+<span class="nc" id="L717">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L718">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc bnc" id="L719" title="All 2 branches missed.">                        for (int yPos = 0; yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L720">                            canvas.drawBitmap((Bitmap) bgImage, x, y + yPos, paint);</span>
+                        }
+<span class="nc" id="L722">                        canvas.restore();</span>
+<span class="nc" id="L723">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
+<span class="nc" id="L725">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L726">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc bnc" id="L727" title="All 2 branches missed.">                        for (int yPos = 0; yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L728">                            canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y + yPos, paint);</span>
+                        }
+                        //canvas.restore();
+<span class="nc" id="L731">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
+<span class="nc" id="L733">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L734">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc bnc" id="L735" title="All 2 branches missed.">                        for (int yPos = 0; yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L736">                            canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y + yPos, paint);</span>
+                        }
+                        //canvas.restore();
+<span class="nc" id="L739">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+<span class="nc" id="L741">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L742">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L743">                        canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y, paint);</span>
+<span class="nc" id="L744">                        canvas.restore();</span>
+<span class="nc" id="L745">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+<span class="nc" id="L747">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L748">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L749">                        canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y + (height - iH), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L751">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+<span class="nc" id="L753">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L754">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L755">                        canvas.drawBitmap((Bitmap) bgImage, x, y + (height / 2 - iH / 2), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L757">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+<span class="nc" id="L759">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L760">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L761">                        canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y + (height / 2 - iH / 2), paint);</span>
+<span class="nc" id="L762">                        canvas.restore();</span>
+<span class="nc" id="L763">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+<span class="nc" id="L765">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L766">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L767">                        canvas.drawBitmap((Bitmap) bgImage, x + (width / 2 - iW / 2), y + (height / 2 - iH / 2), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L769">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+<span class="nc" id="L771">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L772">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L773">                        canvas.drawBitmap((Bitmap) bgImage, x, y, paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L775">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+<span class="nc" id="L777">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L778">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L779">                        canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y, paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L781">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+<span class="nc" id="L783">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L784">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L785">                        canvas.drawBitmap((Bitmap) bgImage, x, y + (height - iH), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L787">                        return;</span>
+                    case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+<span class="nc" id="L789">                        setColor(s.getBgColor());</span>
+<span class="nc" id="L790">                        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L791">                        canvas.drawBitmap((Bitmap) bgImage, x + width - iW, y + (height - iH), paint);</span>
+                        //canvas.restore();
+<span class="nc" id="L793">                        return;</span>
+                    case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                    case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                    case Style.BACKGROUND_GRADIENT_RADIAL:
+                    case Style.BACKGROUND_GRADIENT_LINEAR:
+                    case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+                    case Style.BACKGROUND_GRADIENT_CONIC:
+                    case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+                    case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL:
+<span class="nc" id="L802">                        drawGradientBackground(s, x, y, width, height);</span>
+                        //canvas.restore();
+<span class="nc" id="L804">                        return;</span>
+                }
+            }
+        } finally {
+<span class="pc" id="L808">            unapplyTransform();</span>
+<span class="pc" id="L809">            canvas.restore();</span>
+<span class="nc" id="L810">        }</span>
+
+<span class="nc" id="L812">    }</span>
+
+    private void drawGradientBackground(Style s, int x, int y, int width, int height) {
+<span class="nc bnc" id="L815" title="All 5 branches missed.">        switch (s.getBackgroundType()) {</span>
+            case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+<span class="nc" id="L817">                fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),</span>
+                        x, y, width, height, true);
+<span class="nc" id="L819">                return;</span>
+            case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+<span class="nc" id="L821">                fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),</span>
+                        x, y, width, height, false);
+<span class="nc" id="L823">                return;</span>
+            case Style.BACKGROUND_GRADIENT_RADIAL:
+<span class="nc" id="L825">                fillRectRadialGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),</span>
+<span class="nc" id="L826">                        x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),</span>
+<span class="nc" id="L827">                        s.getBackgroundGradientRelativeSize());</span>
+<span class="nc" id="L828">                return;</span>
+            case Style.BACKGROUND_GRADIENT_LINEAR:
+            case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+            case Style.BACKGROUND_GRADIENT_CONIC:
+            case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+            case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL: {
+<span class="nc" id="L834">                com.codename1.ui.Gradient g = s.getGradient();</span>
+<span class="nc bnc" id="L835" title="All 2 branches missed.">                if (g != null) {</span>
+<span class="nc" id="L836">                    fillGradient(g, x, y, width, height);</span>
+<span class="nc" id="L837">                    return;</span>
+                }
+                break;
+            }
+        }
+<span class="nc" id="L842">        setColor(s.getBgColor());</span>
+<span class="nc" id="L843">        fillRectImpl(x, y, width, height, s.getBgTransparency());</span>
+<span class="nc" id="L844">    }</span>
+
+    public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+<span class="fc" id="L847">        boolean antialias = paint.isAntiAlias();</span>
+<span class="fc" id="L848">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L849">        paint.setAntiAlias(false);</span>
+<span class="fc" id="L850">        paint.setAlpha(255);</span>
+<span class="fc" id="L851">        int c1 = startColor;</span>
+<span class="fc" id="L852">        int alphaStart = ColorUtil.alpha(startColor);</span>
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">        if (alphaStart == 0) {</span>
+<span class="nc" id="L854">            alphaStart = 0xff;</span>
+        }
+<span class="fc" id="L856">        int alphaEnd = ColorUtil.alpha(endColor);</span>
+<span class="pc bpc" id="L857" title="1 of 2 branches missed.">        if (alphaEnd == 0) {</span>
+<span class="nc" id="L858">            alphaEnd = 0xff;</span>
+        }
+<span class="fc" id="L860">        c1 = ColorUtil.argb(alphaStart, ColorUtil.red(c1), ColorUtil.green(c1), ColorUtil.blue(c1));</span>
+<span class="fc" id="L861">        int c2 = endColor;</span>
+<span class="fc" id="L862">        c2 = ColorUtil.argb(alphaEnd, ColorUtil.red(c2), ColorUtil.green(c2), ColorUtil.blue(c2));</span>
+        
+<span class="fc bfc" id="L864" title="All 2 branches covered.">        if(!horizontal) {</span>
+<span class="fc" id="L865">            paint.setShader(new LinearGradient(x, y, x, y+height, c1, c2, Shader.TileMode.MIRROR));</span>
+        } else {
+<span class="fc" id="L867">            paint.setShader(new LinearGradient(x, y, x+width, y, c1, c2, Shader.TileMode.MIRROR));</span>
+        }
+<span class="fc" id="L869">        canvas.save();</span>
+<span class="fc" id="L870">        applyTransform();</span>
+<span class="fc" id="L871">        canvas.drawRect(x, y, x + width, y + height, paint);</span>
+<span class="fc" id="L872">        paint.setAntiAlias(antialias);</span>
+<span class="fc" id="L873">        paint.setShader(null);</span>
+<span class="fc" id="L874">        unapplyTransform();</span>
+<span class="fc" id="L875">        canvas.restore();</span>
+<span class="fc" id="L876">    }</span>
+
+    public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+<span class="fc" id="L879">        boolean antialias = paint.isAntiAlias();</span>
+<span class="fc" id="L880">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L881">        paint.setAntiAlias(false);</span>
+<span class="fc" id="L882">        paint.setAlpha(255);</span>
+<span class="fc" id="L883">        float radius = Math.min((float)width, (float)height) * relativeSize;</span>
+<span class="fc" id="L884">        int centerX = (int) (width * (1 - relativeX));</span>
+<span class="fc" id="L885">        int centerY = (int) (height * (1 - relativeY));</span>
+
+<span class="fc" id="L887">        paint.setShader(new RadialGradient(x + centerX, y + centerY, radius, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));</span>
+<span class="fc" id="L888">        canvas.save();</span>
+<span class="fc" id="L889">        applyTransform();</span>
+<span class="fc" id="L890">        canvas.drawRect(x, y, x + width, y + height, paint);</span>
+<span class="fc" id="L891">        paint.setAntiAlias(antialias);</span>
+<span class="fc" id="L892">        paint.setShader(null);</span>
+<span class="fc" id="L893">        unapplyTransform();</span>
+<span class="fc" id="L894">        canvas.restore();</span>
+<span class="fc" id="L895">    }</span>
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+<span class="fc" id="L897">        fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);</span>
+<span class="fc" id="L898">    }</span>
+    
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+<span class="fc" id="L901">        boolean antialias = paint.isAntiAlias();</span>
+<span class="fc" id="L902">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L903">        paint.setAntiAlias(false);</span>
+<span class="fc" id="L904">        paint.setAlpha(255);</span>
+<span class="fc" id="L905">        paint.setShader(new RadialGradient(x+width/2, y+width/2, Math.max(width, height)/2, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));</span>
+<span class="fc" id="L906">        canvas.save();</span>
+<span class="fc" id="L907">        applyTransform();</span>
+<span class="fc" id="L908">        this.tmprectF.set(x, y, x + width, y + height);</span>
+<span class="fc" id="L909">        canvas.drawArc(this.tmprectF, 360 - startAngle,</span>
+                -arcAngle, true, paint);
+        //canvas.drawRect(x, y, x + width, y + height, paint);
+<span class="fc" id="L912">        paint.setAntiAlias(antialias);</span>
+<span class="fc" id="L913">        paint.setShader(null);</span>
+<span class="fc" id="L914">        unapplyTransform();</span>
+<span class="fc" id="L915">        canvas.restore();</span>
+        
+<span class="fc" id="L917">    }</span>
+
+    private static Shader.TileMode tile(byte cycleMethod) {
+<span class="fc bfc" id="L920" title="All 3 branches covered.">        switch (cycleMethod) {</span>
+            case com.codename1.ui.Gradient.CYCLE_REPEAT:
+<span class="fc" id="L922">                return Shader.TileMode.REPEAT;</span>
+            case com.codename1.ui.Gradient.CYCLE_REFLECT:
+<span class="fc" id="L924">                return Shader.TileMode.MIRROR;</span>
+            default:
+<span class="fc" id="L926">                return Shader.TileMode.CLAMP;</span>
+        }
+    }
+
+    /// Fills the rectangle with the given Gradient using the appropriate
+    /// native Android Shader. Invoked from `Graphics.fillGradient` and from
+    /// the background-painting path when the Style carries an extended
+    /// gradient.
+    public void fillGradient(com.codename1.ui.Gradient g, int x, int y, int width, int height) {
+<span class="pc bpc" id="L935" title="3 of 6 branches missed.">        if (g == null || width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L936">            return;</span>
+        }
+<span class="fc" id="L938">        boolean antialias = paint.isAntiAlias();</span>
+<span class="fc" id="L939">        boolean dither = paint.isDither();</span>
+<span class="fc" id="L940">        paint.setStyle(Paint.Style.FILL);</span>
+        // AA so the elliptical-radial transform doesn't stair-step the
+        // shader output along the gradient bands; dither so slow stop-to-stop
+        // transitions don't band visibly in 8-bit RGB.
+<span class="fc" id="L944">        paint.setAntiAlias(true);</span>
+<span class="fc" id="L945">        paint.setDither(true);</span>
+<span class="fc" id="L946">        paint.setAlpha(255);</span>
+<span class="fc" id="L947">        canvas.save();</span>
+<span class="fc" id="L948">        applyTransform();</span>
+        try {
+<span class="fc bfc" id="L950" title="All 2 branches covered.">            if (g instanceof com.codename1.ui.LinearGradient) {</span>
+<span class="fc" id="L951">                com.codename1.ui.LinearGradient lg = (com.codename1.ui.LinearGradient) g;</span>
+<span class="fc" id="L952">                float[] ep = new float[4];</span>
+<span class="fc" id="L953">                lg.computeShaderEndpoints(width, height, ep);</span>
+<span class="fc" id="L954">                paint.setShader(new LinearGradient(</span>
+                        x + ep[0], y + ep[1], x + ep[2], y + ep[3],
+<span class="fc" id="L956">                        lg.getColors(), lg.getNormalizedPositions(), tile(lg.getCycleMethod())));</span>
+<span class="fc" id="L957">                canvas.drawRect(x, y, x + width, y + height, paint);</span>
+<span class="fc bfc" id="L958" title="All 2 branches covered.">            } else if (g instanceof com.codename1.ui.RadialGradient) {</span>
+<span class="fc" id="L959">                com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) g;</span>
+<span class="fc" id="L960">                float[] geom = new float[4];</span>
+<span class="fc" id="L961">                rg.computeShaderRadii(width, height, geom);</span>
+<span class="fc" id="L962">                float cx = geom[0], cy = geom[1], rx = geom[2], ry = geom[3];</span>
+<span class="fc" id="L963">                float r = Math.max(rx, ry);</span>
+<span class="pc bpc" id="L964" title="2 of 6 branches missed.">                if (Math.abs(rx - ry) &gt; 0.01f &amp;&amp; rx &gt; 0 &amp;&amp; ry &gt; 0) {</span>
+<span class="fc" id="L965">                    android.graphics.Matrix m = new android.graphics.Matrix();</span>
+<span class="fc" id="L966">                    m.postTranslate(-(x + cx), -(y + cy));</span>
+<span class="fc" id="L967">                    m.postScale(rx / r, ry / r);</span>
+<span class="fc" id="L968">                    m.postTranslate(x + cx, y + cy);</span>
+<span class="fc" id="L969">                    canvas.concat(m);</span>
+                }
+<span class="fc" id="L971">                paint.setShader(new RadialGradient(</span>
+<span class="pc bpc" id="L972" title="1 of 2 branches missed.">                        x + cx, y + cy, r &lt;= 0 ? 1f : r,</span>
+<span class="fc" id="L973">                        rg.getColors(), rg.getNormalizedPositions(), tile(rg.getCycleMethod())));</span>
+<span class="fc" id="L974">                canvas.drawRect(x, y, x + width, y + height, paint);</span>
+<span class="pc bpc" id="L975" title="1 of 2 branches missed.">            } else if (g instanceof com.codename1.ui.ConicGradient) {</span>
+<span class="fc" id="L976">                com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) g;</span>
+<span class="fc" id="L977">                float cx = cg.getRelativeCenterX() * width;</span>
+<span class="fc" id="L978">                float cy = cg.getRelativeCenterY() * height;</span>
+                // Android's SweepGradient starts at the positive X axis and
+                // sweeps counter-clockwise. CSS conic-gradient starts at top
+                // (-Y) and sweeps clockwise. Compose a rotation on the shader.
+<span class="fc" id="L982">                android.graphics.Matrix sm = new android.graphics.Matrix();</span>
+<span class="fc" id="L983">                sm.preRotate(cg.getFromAngleDegrees() - 90f, x + cx, y + cy);</span>
+<span class="fc" id="L984">                SweepGradient sg = new SweepGradient(</span>
+<span class="fc" id="L985">                        x + cx, y + cy, cg.getColors(), cg.getPositions());</span>
+<span class="fc" id="L986">                sg.setLocalMatrix(sm);</span>
+<span class="fc" id="L987">                paint.setShader(sg);</span>
+<span class="fc" id="L988">                canvas.drawRect(x, y, x + width, y + height, paint);</span>
+            }
+        } finally {
+<span class="fc" id="L991">            paint.setAntiAlias(antialias);</span>
+<span class="fc" id="L992">            paint.setDither(dither);</span>
+<span class="fc" id="L993">            paint.setShader(null);</span>
+<span class="fc" id="L994">            unapplyTransform();</span>
+<span class="fc" id="L995">            canvas.restore();</span>
+        }
+<span class="fc" id="L997">    }</span>
+
+    public int concatenateAlpha(int alpha) {
+<span class="nc" id="L1000">        int oldAlpha = getAlpha();</span>
+<span class="nc bnc" id="L1001" title="All 2 branches missed.">        if (alpha == 255) return oldAlpha;</span>
+<span class="nc" id="L1002">        setAlpha((int)(oldAlpha * (alpha/255f)));</span>
+<span class="nc" id="L1003">        return oldAlpha;</span>
+    }
+
+    public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text,
+            Bitmap icon, Bitmap stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide,
+            int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
+<span class="nc" id="L1009">        int clipX = getClipX();</span>
+<span class="nc" id="L1010">        int clipY = getClipY();</span>
+<span class="nc" id="L1011">        int clipW = getClipWidth();</span>
+<span class="nc" id="L1012">        int clipH = getClipHeight();</span>
+
+<span class="nc" id="L1014">        Font cn1Font = style.getFont();</span>
+<span class="nc" id="L1015">        Object nativeFont = cn1Font.getNativeFont();</span>
+<span class="nc" id="L1016">        impl.setNativeFont(this, nativeFont);</span>
+<span class="nc" id="L1017">        setColor(style.getFgColor());</span>
+<span class="nc" id="L1018">        canvas.save();</span>
+<span class="nc" id="L1019">        concatenateAlpha(style.getFgAlpha());</span>
+<span class="nc" id="L1020">        applyTransform();</span>
+
+<span class="nc" id="L1022">        int iconWidth = 0;</span>
+<span class="nc" id="L1023">        int iconHeight = 0;</span>
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">        if(icon != null) {</span>
+<span class="nc" id="L1025">            iconWidth = icon.getWidth();</span>
+<span class="nc" id="L1026">            iconHeight = icon.getHeight();</span>
+        }
+
+<span class="nc" id="L1029">        int textDecoration = style.getTextDecoration();</span>
+<span class="nc" id="L1030">        int stateIconSize = 0;</span>
+<span class="nc" id="L1031">        int stateIconYPosition = 0;</span>
+
+<span class="nc" id="L1033">        int leftPadding = style.getPaddingLeft(rtl);</span>
+<span class="nc" id="L1034">        int rightPadding = style.getPaddingRight(rtl);</span>
+<span class="nc" id="L1035">        int topPadding = style.getPaddingTop();</span>
+<span class="nc" id="L1036">        int bottomPadding = style.getPaddingBottom();</span>
+
+<span class="nc" id="L1038">        int fontHeight = 0;</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L1040">            text = &quot;&quot;;</span>
+        }
+<span class="nc bnc" id="L1042" title="All 2 branches missed.">        if (text.length() &gt; 0) {</span>
+<span class="nc" id="L1043">            fontHeight = cn1Font.getHeight();</span>
+        }
+
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">        if (stateIcon != null) {</span>
+<span class="nc" id="L1047">            stateIconSize = stateIcon.getWidth();</span>
+<span class="nc" id="L1048">            stateIconYPosition = cmpY + topPadding</span>
+                    + (cmpHeight - topPadding
+                    - bottomPadding) / 2 - stateIconSize / 2;
+<span class="nc" id="L1051">            int tX = cmpX;</span>
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">            if (isOppositeSide) {</span>
+<span class="nc bnc" id="L1053" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L1054">                    tX += leftPadding;</span>
+                } else {
+<span class="nc" id="L1056">                    tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                }
+<span class="nc" id="L1058">                cmpWidth -= leftPadding - stateIconSize;</span>
+            } else {
+<span class="nc" id="L1060">                preserveSpaceForState = stateIconSize + gap;</span>
+<span class="nc bnc" id="L1061" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L1062">                    tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                } else {
+<span class="nc" id="L1064">                    tX += leftPadding;</span>
+                }
+            }
+
+<span class="nc" id="L1068">            drawImage(stateIcon, tX, stateIconYPosition);</span>
+        }
+
+        //default for bottom left alignment
+<span class="nc" id="L1072">        int x = cmpX + leftPadding + preserveSpaceForState;</span>
+<span class="nc" id="L1073">        int y = cmpY + topPadding;</span>
+
+<span class="nc" id="L1075">        int align = reverseAlignForBidi(rtl, style.getAlignment());</span>
+
+<span class="nc" id="L1077">        int textPos = reverseAlignForBidi(rtl, textPosition);</span>
+
+        //set initial x,y position according to the alignment and textPosition
+<span class="nc bnc" id="L1080" title="All 4 branches missed.">        switch (align) {</span>
+            case Component.LEFT:
+<span class="nc bnc" id="L1082" title="All 3 branches missed.">                switch (textPos) {</span>
+                    case Label.LEFT:
+                    case Label.RIGHT:
+<span class="nc bnc" id="L1085" title="All 2 branches missed.">                        y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? iconHeight : 0), fontHeight))) / 2;</span>
+<span class="nc" id="L1086">                        break;</span>
+                    case Label.BOTTOM:
+                    case Label.TOP:
+<span class="nc bnc" id="L1089" title="All 2 branches missed.">                        y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;</span>
+                        break;
+                }
+<span class="nc" id="L1092">                break;</span>
+            case Component.CENTER:
+<span class="nc bnc" id="L1094" title="All 3 branches missed.">                switch (textPos) {</span>
+                    case Label.LEFT:
+                    case Label.RIGHT:
+<span class="nc" id="L1097">                        x = x + (cmpWidth - (preserveSpaceForState</span>
+                                + leftPadding
+                                + rightPadding
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">                                + ((icon != null) ? iconWidth + gap : 0)</span>
+                                + stringWidth)) / 2;
+<span class="nc" id="L1102">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+<span class="nc" id="L1103">                        y = y + (cmpHeight - (topPadding</span>
+                                + bottomPadding
+<span class="nc bnc" id="L1105" title="All 2 branches missed.">                                + Math.max(((icon != null) ? iconHeight : 0),</span>
+                                        fontHeight))) / 2;
+<span class="nc" id="L1107">                        break;</span>
+                    case Label.BOTTOM:
+                    case Label.TOP:
+<span class="nc" id="L1110">                        x = x + (cmpWidth - (preserveSpaceForState + leftPadding</span>
+                                + rightPadding
+<span class="nc bnc" id="L1112" title="All 2 branches missed.">                                + Math.max(((icon != null) ? iconWidth + gap : 0),</span>
+                                        stringWidth))) / 2;
+<span class="nc" id="L1114">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+<span class="nc" id="L1115">                        y = y + (cmpHeight - (topPadding</span>
+                                + bottomPadding
+<span class="nc bnc" id="L1117" title="All 2 branches missed.">                                + ((icon != null) ? iconHeight + gap : 0)</span>
+                                + fontHeight)) / 2;
+                        break;
+                }
+<span class="nc" id="L1121">                break;</span>
+            case Component.RIGHT:
+<span class="nc bnc" id="L1123" title="All 3 branches missed.">                switch (textPos) {</span>
+                    case Label.LEFT:
+                    case Label.RIGHT:
+<span class="nc" id="L1126">                        x = cmpX + cmpWidth - rightPadding</span>
+<span class="nc bnc" id="L1127" title="All 2 branches missed.">                                - (((icon != null) ? (iconWidth + gap) : 0)</span>
+                                + stringWidth);
+<span class="nc bnc" id="L1129" title="All 2 branches missed.">                        if (rtl) {</span>
+<span class="nc" id="L1130">                            x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);</span>
+                        } else {
+<span class="nc" id="L1132">                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                        }
+<span class="nc" id="L1134">                        y = y + (cmpHeight - (topPadding</span>
+                                + bottomPadding
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">                                + Math.max(((icon != null) ? iconHeight : 0),</span>
+                                        fontHeight))) / 2;
+<span class="nc" id="L1138">                        break;</span>
+                    case Label.BOTTOM:
+                    case Label.TOP:
+<span class="nc" id="L1141">                        x = cmpX + cmpWidth - rightPadding</span>
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">                                - (Math.max(((icon != null) ? (iconWidth) : 0),</span>
+                                        stringWidth));
+<span class="nc" id="L1144">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+<span class="nc" id="L1145">                        y = y + (cmpHeight - (topPadding</span>
+                                + bottomPadding
+<span class="nc bnc" id="L1147" title="All 2 branches missed.">                                + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;</span>
+                        break;
+                }
+<span class="nc" id="L1150">                break;</span>
+            default:
+                break;
+        }
+
+<span class="nc" id="L1155">        int textSpaceW = cmpWidth - rightPadding - leftPadding;</span>
+
+<span class="nc bnc" id="L1157" title="All 6 branches missed.">        if (icon != null &amp;&amp; (textPos == Label.RIGHT || textPos == Label.LEFT)) {</span>
+<span class="nc" id="L1158">            textSpaceW = textSpaceW - iconWidth;</span>
+        }
+
+<span class="nc bnc" id="L1161" title="All 2 branches missed.">        if (stateIcon != null) {</span>
+<span class="nc" id="L1162">            textSpaceW = textSpaceW - stateIconSize;</span>
+        } else {
+<span class="nc" id="L1164">            textSpaceW = textSpaceW - preserveSpaceForState;</span>
+        }
+
+<span class="nc bnc" id="L1167" title="All 2 branches missed.">        if (icon == null) {</span>
+            // no icon only string
+<span class="nc" id="L1169">            drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,</span>
+                    textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
+        } else {
+<span class="nc" id="L1172">            int strWidth = stringWidth;</span>
+            int iconStringWGap;
+            int iconStringHGap;
+
+<span class="nc bnc" id="L1176" title="All 5 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">                    if (iconHeight &gt; fontHeight) {</span>
+<span class="nc" id="L1179">                        iconStringHGap = (iconHeight - fontHeight) / 2;</span>
+<span class="nc" id="L1180">                        strWidth = drawLabelStringValign(nativeFont, text, x, y, textSpaceW, isTickerRunning,</span>
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, iconHeight,
+                                fontHeight, valign);
+
+<span class="nc" id="L1184">                        drawImage(icon, x + strWidth + gap, y);</span>
+                    } else {
+<span class="nc" id="L1186">                        iconStringHGap = (fontHeight - iconHeight) / 2;</span>
+<span class="nc" id="L1187">                        strWidth = drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning,</span>
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
+
+<span class="nc" id="L1190">                        drawImage(icon, x + strWidth + gap, y + iconStringHGap);</span>
+                    }
+<span class="nc" id="L1192">                    break;</span>
+                case Label.RIGHT:
+<span class="nc bnc" id="L1194" title="All 2 branches missed.">                    if (iconHeight &gt; fontHeight) {</span>
+<span class="nc" id="L1195">                        iconStringHGap = (iconHeight - fontHeight) / 2;</span>
+<span class="nc" id="L1196">                        drawImage(icon, x, y);</span>
+<span class="nc" id="L1197">                        drawLabelStringValign(nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,</span>
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight, fontHeight, valign);
+                    } else {
+<span class="nc" id="L1200">                        iconStringHGap = (fontHeight - iconHeight) / 2;</span>
+<span class="nc" id="L1201">                        drawImage(icon, x, y + iconStringHGap);</span>
+<span class="nc" id="L1202">                        drawLabelString(nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,</span>
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    }
+<span class="nc" id="L1205">                    break;</span>
+                case Label.BOTTOM:
+                    //center align the smaller
+<span class="nc bnc" id="L1208" title="All 2 branches missed.">                    if (iconWidth &gt; strWidth) {</span>
+<span class="nc" id="L1209">                        iconStringWGap = (iconWidth - strWidth) / 2;</span>
+<span class="nc" id="L1210">                        drawImage(icon, x, y);</span>
+<span class="nc" id="L1211">                        drawLabelString(nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,</span>
+                                isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    } else {
+<span class="nc" id="L1214">                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;</span>
+<span class="nc" id="L1215">                        drawImage(icon, x + iconStringWGap, y);</span>
+
+<span class="nc" id="L1217">                        drawLabelString(nativeFont, text, x, y + iconHeight + gap, textSpaceW, isTickerRunning,</span>
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    }
+<span class="nc" id="L1220">                    break;</span>
+                case Label.TOP:
+                    //center align the smaller
+<span class="nc bnc" id="L1223" title="All 2 branches missed.">                    if (iconWidth &gt; strWidth) {</span>
+<span class="nc" id="L1224">                        iconStringWGap = (iconWidth - strWidth) / 2;</span>
+<span class="nc" id="L1225">                        drawLabelString(nativeFont, text, x + iconStringWGap, y, textSpaceW, isTickerRunning,</span>
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+<span class="nc" id="L1227">                        drawImage(icon, x, y + fontHeight + gap);</span>
+                    } else {
+<span class="nc" id="L1229">                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;</span>
+<span class="nc" id="L1230">                        drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,</span>
+                                textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+<span class="nc" id="L1232">                        drawImage(icon, x + iconStringWGap, y + fontHeight + gap);</span>
+                    }
+                    break;
+            }
+        }
+<span class="nc" id="L1237">        unapplyTransform();</span>
+<span class="nc" id="L1238">        canvas.restore();</span>
+<span class="nc" id="L1239">        setClip(clipX, clipY, clipW, clipH);</span>
+<span class="nc" id="L1240">    }</span>
+
+    /**
+     * Implements the drawString for the text component and adjust the valign
+     * assuming the icon is in one of the sides
+     */
+    private int drawLabelStringValign(
+            Object nativeFont, String str, int x, int y, int textSpaceW,
+            boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl,
+            boolean endsWith3Points, int textWidth,
+            int iconStringHGap, int iconHeight, int fontHeight, int valign) {
+<span class="nc bnc" id="L1251" title="All 3 branches missed.">        switch (valign) {</span>
+            case Component.TOP:
+<span class="nc" id="L1253">                return drawLabelString(nativeFont, str, x, y, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);</span>
+            case Component.CENTER:
+<span class="nc" id="L1255">                return drawLabelString(nativeFont, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);</span>
+            default:
+<span class="nc" id="L1257">                return drawLabelString(nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);</span>
+        }
+    }
+
+    /**
+     * Implements the drawString for the text component and adjust the valign
+     * assuming the icon is in one of the sides
+     */
+    private int drawLabelString(Object nativeFont, String text, int x, int y, int textSpaceW,
+            boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl, boolean endsWith3Points, int textWidth,
+            int fontHeight) {
+<span class="nc" id="L1268">        int cx = getClipX();</span>
+<span class="nc" id="L1269">        int cy = getClipY();</span>
+<span class="nc" id="L1270">        int cw = getClipWidth();</span>
+<span class="nc" id="L1271">        int ch = getClipHeight();</span>
+<span class="nc" id="L1272">        clipRect(x, cy, textSpaceW, ch);</span>
+
+<span class="nc" id="L1274">        int drawnW = drawLabelText(textDecoration, rtl, isTickerRunning, endsWith3Points, nativeFont,</span>
+                textWidth, textSpaceW, tickerShiftText, text, x, y, fontHeight);
+
+<span class="nc" id="L1277">        setClip(cx, cy, cw, ch);</span>
+
+<span class="nc" id="L1279">        return drawnW;</span>
+    }
+
+    private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Object f) {
+<span class="nc bnc" id="L1283" title="All 2 branches missed.">        if (length * charWidth &lt; width) {</span>
+<span class="nc" id="L1284">            return true;</span>
+        }
+<span class="nc" id="L1286">        length = Math.min(s.length(), length);</span>
+<span class="nc bnc" id="L1287" title="All 2 branches missed.">        return impl.stringWidth(f, s.substring(0, length)) &lt; width;</span>
+    }
+
+    /**
+     * Draws the text of a label
+     *
+     * @param textDecoration decoration information for the text
+     * @param text the text for the label
+     * @param x position for the label
+     * @param y position for the label
+     * @param txtW stringWidth(text) equivalent which is faster than just
+     * invoking string width all the time
+     * @param textSpaceW the width available for the component
+     * @return the space used by the drawing
+     */
+    protected int drawLabelText(int textDecoration, boolean rtl, boolean isTickerRunning,
+            boolean endsWith3Points, Object nativeFont, int txtW, int textSpaceW, int shiftText, String text, int x, int y, int fontHeight) {
+<span class="nc bnc" id="L1304" title="All 4 branches missed.">        if ((!isTickerRunning) || rtl) {</span>
+            //if there is no space to draw the text add ... at the end
+<span class="nc bnc" id="L1306" title="All 4 branches missed.">            if (txtW &gt; textSpaceW &amp;&amp; textSpaceW &gt; 0) {</span>
+                // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+                // the allowed space is handled differently in RTL, this is due to the reverse algorithm
+                // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+                // trimming characters from the end of the text (as done with LTR) won't do.
+                // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+                // the downside is that a part of a letter may be shown here as well.
+
+<span class="nc bnc" id="L1314" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc bnc" id="L1315" title="All 4 branches missed.">                    if ((!isTickerRunning) &amp;&amp; endsWith3Points) {</span>
+<span class="nc" id="L1316">                        String points = &quot;...&quot;;</span>
+<span class="nc" id="L1317">                        int pointsW = impl.stringWidth(nativeFont, points);</span>
+<span class="nc" id="L1318">                        drawString(nativeFont, points, shiftText + x, y, textDecoration, fontHeight);</span>
+<span class="nc" id="L1319">                        clipRect(pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);</span>
+                    }
+<span class="nc" id="L1321">                    x = x - txtW + textSpaceW;</span>
+<span class="nc bnc" id="L1322" title="All 2 branches missed.">                } else if (endsWith3Points) {</span>
+<span class="nc" id="L1323">                    String points = &quot;...&quot;;</span>
+<span class="nc" id="L1324">                    int index = 1;</span>
+<span class="nc" id="L1325">                    int widest = impl.charWidth(nativeFont, 'W');</span>
+<span class="nc" id="L1326">                    int pointsW = impl.stringWidth(nativeFont, points);</span>
+<span class="nc bnc" id="L1327" title="All 4 branches missed.">                    while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, nativeFont) &amp;&amp; index &lt; text.length()) {</span>
+<span class="nc" id="L1328">                        index++;</span>
+                    }
+<span class="nc" id="L1330">                    text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;</span>
+<span class="nc" id="L1331">                    txtW = impl.stringWidth(nativeFont, text);</span>
+                }
+            }
+        }
+
+<span class="nc" id="L1336">        drawString(nativeFont, text, shiftText + x, y, textDecoration, fontHeight);</span>
+<span class="nc" id="L1337">        return Math.min(txtW, textSpaceW);</span>
+    }
+
+    /**
+     * Draw a string using the current font and color in the x,y coordinates.
+     * The font is drawn from the top position and not the baseline.
+     *
+     * @param nativeFont the font used
+     * @param str the string to be drawn.
+     * @param x the x coordinate.
+     * @param y the y coordinate.
+     * @param textDecoration Text decoration bitmask (See Style's
+     * TEXT_DECORATION_* constants)
+     */
+    private void drawString(Object nativeFont, String str, int x, int y, int textDecoration, int fontHeight) {
+<span class="nc bnc" id="L1352" title="All 2 branches missed.">        if (str.length() == 0) {</span>
+<span class="nc" id="L1353">            return;</span>
+        }
+
+        // this if has only the minor effect of providing a slighly faster execution path
+<span class="nc bnc" id="L1357" title="All 2 branches missed.">        if (textDecoration != 0) {</span>
+<span class="nc bnc" id="L1358" title="All 2 branches missed.">            boolean raised = (textDecoration &amp; Style.TEXT_DECORATION_3D) != 0;</span>
+<span class="nc bnc" id="L1359" title="All 2 branches missed.">            boolean lowerd = (textDecoration &amp; Style.TEXT_DECORATION_3D_LOWERED) != 0;</span>
+<span class="nc bnc" id="L1360" title="All 2 branches missed.">            boolean north = (textDecoration &amp; Style.TEXT_DECORATION_3D_SHADOW_NORTH) != 0;</span>
+<span class="nc bnc" id="L1361" title="All 6 branches missed.">            if (raised || lowerd || north) {</span>
+<span class="nc" id="L1362">                textDecoration = textDecoration &amp; (~Style.TEXT_DECORATION_3D) &amp; (~Style.TEXT_DECORATION_3D_LOWERED) &amp; (~Style.TEXT_DECORATION_3D_SHADOW_NORTH);</span>
+<span class="nc" id="L1363">                int c = getColor();</span>
+<span class="nc" id="L1364">                int a = getAlpha();</span>
+<span class="nc" id="L1365">                int newColor = 0;</span>
+<span class="nc" id="L1366">                int offset = -2;</span>
+<span class="nc bnc" id="L1367" title="All 2 branches missed.">                if (lowerd) {</span>
+<span class="nc" id="L1368">                    offset = 2;</span>
+<span class="nc" id="L1369">                    newColor = 0xffffff;</span>
+<span class="nc bnc" id="L1370" title="All 2 branches missed.">                } else if (north) {</span>
+<span class="nc" id="L1371">                    offset = 2;</span>
+                }
+<span class="nc" id="L1373">                setColor(newColor);</span>
+<span class="nc bnc" id="L1374" title="All 2 branches missed.">                if (a == 0xff) {</span>
+<span class="nc" id="L1375">                    setAlpha(140);</span>
+                }
+<span class="nc" id="L1377">                drawString(nativeFont, str, x, y + offset, textDecoration, fontHeight);</span>
+<span class="nc" id="L1378">                setAlpha(a);</span>
+<span class="nc" id="L1379">                setColor(c);</span>
+<span class="nc" id="L1380">                drawString(nativeFont, str, x, y, textDecoration, fontHeight);</span>
+<span class="nc" id="L1381">                return;</span>
+            }
+<span class="nc" id="L1383">            canvas.drawText(str, x, y - font.top(), font);</span>
+<span class="nc bnc" id="L1384" title="All 2 branches missed.">            if ((textDecoration &amp; Style.TEXT_DECORATION_UNDERLINE) != 0) {</span>
+<span class="nc" id="L1385">                paint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1386">                canvas.drawLine(x, y + fontHeight - 1, x + impl.stringWidth(nativeFont, str), y + fontHeight - 1, paint);</span>
+            }
+<span class="nc bnc" id="L1388" title="All 2 branches missed.">            if ((textDecoration &amp; Style.TEXT_DECORATION_STRIKETHRU) != 0) {</span>
+<span class="nc" id="L1389">                paint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1390">                canvas.drawLine(x, y + fontHeight / 2, x + impl.stringWidth(nativeFont, str), y + fontHeight / 2, paint);</span>
+            }
+<span class="nc bnc" id="L1392" title="All 2 branches missed.">            if ((textDecoration &amp; Style.TEXT_DECORATION_OVERLINE) != 0) {</span>
+<span class="nc" id="L1393">                paint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1394">                canvas.drawLine(x, y, x + impl.stringWidth(nativeFont, str), y, paint);</span>
+            }
+<span class="nc" id="L1396">        } else {</span>
+<span class="nc" id="L1397">            canvas.drawText(str, x, y - font.top(), font);</span>
+        }
+<span class="nc" id="L1399">    }</span>
+
+    /**
+     * Reverses alignment in the case of bidi
+     */
+    protected final int reverseAlignForBidi(boolean rtl, int align) {
+<span class="nc bnc" id="L1405" title="All 2 branches missed.">        if (rtl) {</span>
+<span class="nc bnc" id="L1406" title="All 3 branches missed.">            switch (align) {</span>
+                case Component.RIGHT:
+<span class="nc" id="L1408">                    return Component.LEFT;</span>
+                case Component.LEFT:
+<span class="nc" id="L1410">                    return Component.RIGHT;</span>
+            }
+        }
+<span class="nc" id="L1413">        return align;</span>
+    }
+
+    public void fillRoundRect(int x, int y, int width,
+            int height, int arcWidth, int arcHeight) {
+<span class="fc" id="L1418">        paint.setStyle(Paint.Style.FILL);</span>
+<span class="fc" id="L1419">        this.tmprectF.set(x, y, x + width, y + height);</span>
+<span class="fc" id="L1420">        canvas.save();</span>
+<span class="fc" id="L1421">        applyTransform();</span>
+<span class="fc" id="L1422">        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);</span>
+<span class="fc" id="L1423">        unapplyTransform();</span>
+<span class="fc" id="L1424">        canvas.restore();</span>
+<span class="fc" id="L1425">    }</span>
+
+    public int getAlpha() {
+<span class="fc" id="L1428">        return alpha;</span>
+    }
+
+    public void setAlpha(int alpha) {
+<span class="fc bfc" id="L1432" title="All 2 branches covered.">        if(alpha != this.alpha) {</span>
+<span class="fc" id="L1433">            this.alpha = alpha;</span>
+<span class="fc" id="L1434">            paint.setAlpha(alpha);</span>
+<span class="fc" id="L1435">            paint.setXfermode(PORTER);</span>
+        }
+<span class="fc" id="L1437">    }</span>
+
+    private void freshClip() {
+<span class="fc bfc" id="L1440" title="All 2 branches covered.">        if(!clipFresh) {</span>
+<span class="fc" id="L1441">            clipFresh = true;</span>
+<span class="fc" id="L1442">            canvas.save();</span>
+<span class="fc" id="L1443">            applyTransform();</span>
+<span class="fc" id="L1444">            canvas.getClipBounds(this.tmprect);</span>
+<span class="fc" id="L1445">            unapplyTransform();</span>
+<span class="fc" id="L1446">            canvas.restore();</span>
+        }
+<span class="fc" id="L1448">    }</span>
+
+    public int getClipHeight() {
+<span class="fc" id="L1451">        freshClip();</span>
+<span class="fc" id="L1452">        return this.tmprect.height();</span>
+    }
+
+    public int getClipWidth() {
+<span class="fc" id="L1456">        freshClip();</span>
+<span class="fc" id="L1457">        return this.tmprect.width();</span>
+    }
+
+    public int getClipX() {
+<span class="fc" id="L1461">        freshClip();</span>
+<span class="fc" id="L1462">        return this.tmprect.left;</span>
+    }
+
+    public int getClipY() {
+<span class="fc" id="L1466">        freshClip();</span>
+<span class="fc" id="L1467">        return this.tmprect.top;</span>
+    }
+
+<span class="fc" id="L1470">    private boolean clipSet = false;</span>
+
+    // Stack of clipSet values captured by pushClip. Each pushClip adds an
+    // unpaired canvas.save() so the clip can be widened (restored) on
+    // popClip. clipSet is reset to false after the push so that a setClip
+    // inside the push/pop block doesn't restore our pushed save.
+<span class="fc" id="L1476">    private final java.util.ArrayDeque&lt;Boolean&gt; pushedClipSetStack = new java.util.ArrayDeque&lt;Boolean&gt;();</span>
+
+    public void pushClip() {
+<span class="fc" id="L1479">        canvas.save();</span>
+<span class="fc" id="L1480">        pushedClipSetStack.push(Boolean.valueOf(clipSet));</span>
+<span class="fc" id="L1481">        clipSet = false;</span>
+<span class="fc" id="L1482">    }</span>
+
+    public void popClip() {
+<span class="pc bpc" id="L1485" title="1 of 2 branches missed.">        if (pushedClipSetStack.isEmpty()) {</span>
+<span class="nc" id="L1486">            return;</span>
+        }
+<span class="fc bfc" id="L1488" title="All 2 branches covered.">        if (clipSet) {</span>
+<span class="fc" id="L1489">            canvas.restore();</span>
+<span class="fc" id="L1490">            clipSet = false;</span>
+        }
+<span class="fc" id="L1492">        canvas.restore();</span>
+<span class="fc" id="L1493">        clipSet = pushedClipSetStack.pop().booleanValue();</span>
+<span class="fc" id="L1494">        clipFresh = false;</span>
+<span class="fc" id="L1495">    }</span>
+
+    public void setClip(int x, int y, int width, int height) {
+        //System.out.println(&quot;Setting clip  &quot;+x+&quot;,&quot;+y+&quot;,&quot;+width+&quot;, &quot;+height);
+<span class="fc bfc" id="L1499" title="All 2 branches covered.">        if (clipSet) {</span>
+<span class="fc" id="L1500">            canvas.restore();</span>
+        }
+<span class="fc" id="L1502">        canvas.save();</span>
+<span class="fc" id="L1503">        clipSet = true;</span>
+<span class="fc" id="L1504">        clipFresh = false;</span>
+<span class="pc bpc" id="L1505" title="3 of 4 branches missed.">        if (getTransform().isIdentity() || transformSemaphore &gt; 0) {</span>
+<span class="fc" id="L1506">            canvas.clipRect(x, y, x + width, y + height, Region.Op.INTERSECT);</span>
+        } else {
+<span class="nc" id="L1508">            this.tmppath.rewind();</span>
+<span class="nc" id="L1509">            this.tmppath.addRect((float) x, (float) y, (float) width + x, (float) height + y, Path.Direction.CW);</span>
+<span class="nc" id="L1510">            this.tmppath.transform(getTransformMatrix());</span>
+<span class="nc" id="L1511">            canvas.clipPath(this.tmppath, Region.Op.INTERSECT);</span>
+        }
+<span class="fc" id="L1513">    }</span>
+
+    public void setClipRaw(int x, int y, int width, int height) {
+        //System.out.println(&quot;Setting clip raw &quot;+x+&quot;,&quot;+y+&quot;,&quot;+width+&quot;, &quot;+height);
+<span class="fc bfc" id="L1517" title="All 2 branches covered.">        if (clipSet) {</span>
+<span class="fc" id="L1518">            canvas.restore();</span>
+        }
+<span class="fc" id="L1520">        canvas.save();</span>
+<span class="fc" id="L1521">        clipSet = true;</span>
+<span class="fc" id="L1522">        clipFresh = false;</span>
+<span class="pc bpc" id="L1523" title="1 of 4 branches missed.">        if (!getTransform().isIdentity() &amp;&amp; transformSemaphore &gt; 0) {</span>
+            // If the transform is currently applied, then we need to
+            // apply the inverse transform to the clip path here because
+            // the &quot;raw&quot; variant always passes clips in global &quot;screen&quot; coordinates.
+<span class="nc" id="L1527">            this.tmppath.rewind();</span>
+<span class="nc" id="L1528">            this.tmppath.addRect((float) x, (float) y, (float) width + x, (float) height + y, Path.Direction.CW);</span>
+<span class="nc" id="L1529">            this.tmppath.transform(getInverseTransform());</span>
+<span class="nc" id="L1530">            canvas.clipPath(this.tmppath, Region.Op.INTERSECT);</span>
+        } else {
+<span class="fc" id="L1532">            canvas.clipRect(x, y, x + width, y + height, Region.Op.INTERSECT);</span>
+        }
+<span class="fc" id="L1534">    }</span>
+
+    public void setClip(Shape clipShape) {
+        //System.out.println(&quot;Setting clip to shape &quot;+clipShape);
+<span class="pc bpc" id="L1538" title="1 of 2 branches missed.">        if (clipSet) {</span>
+<span class="nc" id="L1539">            canvas.restore();</span>
+        }
+<span class="fc" id="L1541">        canvas.save();</span>
+<span class="fc" id="L1542">        clipSet = true;</span>
+<span class="fc" id="L1543">        clipFresh = false;</span>
+<span class="fc" id="L1544">        this.tmppath.rewind();</span>
+<span class="fc" id="L1545">        AndroidImplementation.cn1ShapeToAndroidPath(clipShape, this.tmppath);</span>
+<span class="pc bpc" id="L1546" title="3 of 4 branches missed.">        if (!getTransform().isIdentity() &amp;&amp; transformSemaphore == 0) {</span>
+<span class="nc" id="L1547">            this.tmppath.transform(getTransformMatrix());</span>
+        }
+<span class="fc" id="L1549">        canvas.clipPath(this.tmppath, Region.Op.INTERSECT);</span>
+<span class="fc" id="L1550">    }</span>
+
+    /**
+     * Sets the clip to the provided raw path.  This path won't be transformed
+     * using the current transform matrix.  It will be applied directly.
+     * @param path
+     */
+    public void setClipRaw(Path path) {
+        //System.out.println(&quot;setting clip to raw &quot;+path);
+<span class="pc bpc" id="L1559" title="1 of 2 branches missed.">        if (clipSet) {</span>
+<span class="fc" id="L1560">            canvas.restore();</span>
+        }
+<span class="fc" id="L1562">        canvas.save();</span>
+<span class="fc" id="L1563">        clipSet = true;</span>
+<span class="fc" id="L1564">        clipFresh = false;</span>
+<span class="pc bpc" id="L1565" title="1 of 4 branches missed.">        if (!getTransform().isIdentity() &amp;&amp; transformSemaphore &gt; 0) {</span>
+            // If the transform is currently applied, then we need to
+            // apply the inverse transform to the clip path here because
+            // the &quot;raw&quot; variant always passes clips in global &quot;screen&quot; coordinates.
+<span class="nc" id="L1569">            this.tmppath.set(path);</span>
+<span class="nc" id="L1570">            this.tmppath.transform(getInverseTransform());</span>
+<span class="nc" id="L1571">            canvas.clipPath(this.tmppath, Region.Op.INTERSECT);</span>
+        } else {
+<span class="fc" id="L1573">            canvas.clipPath(path, Region.Op.INTERSECT);</span>
+        }
+<span class="fc" id="L1575">    }</span>
+    
+    public void clipRect(int x, int y, int width, int height) {
+        //System.out.println(&quot;Clipping rect &quot;+x+&quot;,&quot;+y+&quot;,&quot;+width+&quot;, &quot;+height);
+<span class="fc" id="L1579">        clipFresh = false;</span>
+<span class="pc bpc" id="L1580" title="1 of 4 branches missed.">        if (getTransform().isIdentity() || transformSemaphore &gt; 0) {</span>
+<span class="fc" id="L1581">            canvas.clipRect(x, y, x + width, y + height, Region.Op.INTERSECT);</span>
+        } else {
+<span class="fc" id="L1583">            this.tmppath.rewind();</span>
+<span class="fc" id="L1584">            this.tmppath.addRect(x, y, x + width, y + height, Path.Direction.CW);</span>
+<span class="fc" id="L1585">            this.tmppath.transform(getTransformMatrix());</span>
+
+<span class="fc" id="L1587">            canvas.clipPath(this.tmppath, Region.Op.INTERSECT);</span>
+        }
+<span class="fc" id="L1589">    }</span>
+
+    public int getColor() {
+<span class="fc" id="L1592">        return paint.getColor();</span>
+    }
+
+    public void resetAffine() {
+<span class="fc" id="L1596">        getTransform().setIdentity();</span>
+<span class="fc" id="L1597">        transformDirty = true;</span>
+<span class="fc" id="L1598">        inverseTransformDirty = true;</span>
+<span class="fc" id="L1599">        clipFresh = false;</span>
+        //canvas.restore();
+        //canvas.save();
+<span class="fc" id="L1602">    }</span>
+
+    public void scale(float x, float y) {
+<span class="fc" id="L1605">        getTransform().scale(x, y);</span>
+<span class="fc" id="L1606">        transformDirty = true;</span>
+<span class="fc" id="L1607">        inverseTransformDirty = true;</span>
+<span class="fc" id="L1608">        clipFresh = false;</span>
+
+<span class="fc" id="L1610">    }</span>
+
+    public void translateMatrix(float x, float y) {
+        // Composes T(x, y) onto the impl-side matrix, exactly like scale.
+        // Lets Graphics.translateMatrix produce matrix-correct translation
+        // semantics on Android -- see Graphics.translateMatrix javadoc for
+        // why this is a separate API from translate(int, int).
+<span class="fc" id="L1617">        getTransform().translate(x, y);</span>
+<span class="fc" id="L1618">        transformDirty = true;</span>
+<span class="fc" id="L1619">        inverseTransformDirty = true;</span>
+<span class="fc" id="L1620">        clipFresh = false;</span>
+<span class="fc" id="L1621">    }</span>
+
+    public void rotate(float angle) {
+<span class="nc" id="L1624">        getTransform().rotate(angle, 0, 0);</span>
+<span class="nc" id="L1625">        transformDirty = true;</span>
+<span class="nc" id="L1626">        inverseTransformDirty = true;</span>
+<span class="nc" id="L1627">        clipFresh = false;</span>
+<span class="nc" id="L1628">    }</span>
+
+    public void drawView(final View v, AndroidAsyncView.LayoutParams lp) {
+<span class="nc" id="L1631">    }</span>
+
+    public void rotate(float angle, int x, int y) {
+<span class="fc" id="L1634">        getTransform().rotate(angle, x, y);</span>
+<span class="fc" id="L1635">        transformDirty = true;</span>
+<span class="fc" id="L1636">        inverseTransformDirty = true;</span>
+<span class="fc" id="L1637">        clipFresh = false;</span>
+<span class="fc" id="L1638">    }</span>
+
+    public final void fillBitmap(int color) {
+<span class="fc" id="L1641">        canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);</span>
+<span class="fc" id="L1642">    }</span>
+
+    private int maxBitmapSize, maxBitmapHeight;
+    
+    public void drawPath(Path p, Stroke stroke) {
+<span class="fc bfc" id="L1647" title="All 2 branches covered.">        if (maxBitmapSize == 0) {</span>
+<span class="fc" id="L1648">            maxBitmapSize = Integer.parseInt(Display.getInstance().getProperty(&quot;android.maxBitmapSize&quot;, Math.max(CN.getDisplayWidth(), CN.getDisplayHeight())*2+&quot;&quot;));</span>
+        }
+        
+<span class="fc" id="L1651">        paint.setStyle(Paint.Style.STROKE);</span>
+<span class="fc" id="L1652">        Stroke old = setStroke(stroke);</span>
+        //canvas.save();
+        //System.out.println(&quot;Drawing path with transform &quot;+getTransform());
+        //applyTransform();
+        //System.out.println(&quot;Transform semaphore &quot;+transformSemaphore);
+<span class="fc bfc" id="L1657" title="All 2 branches covered.">        if (getTransform().isIdentity()) {</span>
+<span class="fc" id="L1658">            canvas.drawPath(p, paint);</span>
+        } else {
+<span class="fc" id="L1660">            RectF bounds = new RectF();</span>
+<span class="fc" id="L1661">            p.computeBounds(bounds, false);</span>
+<span class="fc" id="L1662">            Path p2 = new Path();</span>
+<span class="fc" id="L1663">            p.transform(getTransformMatrix(), p2);</span>
+<span class="fc" id="L1664">            RectF bounds2 = new RectF();</span>
+<span class="fc" id="L1665">            p2.computeBounds(bounds2, false);</span>
+<span class="fc" id="L1666">            float b2w = bounds2.width();</span>
+<span class="fc" id="L1667">            float bw = bounds.width();</span>
+<span class="fc" id="L1668">            float bw2 = Math.max(1, b2w) / Math.max(1, bw);</span>
+<span class="fc" id="L1669">            float bh2 = Math.max(1, bounds2.height())/Math.max(1, bounds.height());</span>
+<span class="fc" id="L1670">            float ratio = Math.max(bw2, bh2);</span>
+<span class="pc bpc" id="L1671" title="5 of 8 branches missed.">            if (ratio &gt; 2 &amp;&amp; !isMutableImageGraphics &amp;&amp; bounds2.width() &lt;= maxBitmapSize &amp;&amp; bounds2.height() &lt;= maxBitmapSize) {</span>
+                // If the canvas is hardware accelerated, then it will rasterize the path
+                // first, then apply the transform which leads to blurry paths if the transform does
+                // significant scaling.
+                // In such cases, we
+<span class="nc" id="L1676">                float strokeWidthUpperBound = ratio * stroke.getLineWidth();</span>
+<span class="nc" id="L1677">                int ww = Math.max(1, (int)(bounds2.width()+2*strokeWidthUpperBound));</span>
+<span class="nc" id="L1678">                int hh = Math.max(1, (int)(bounds2.height()+2*strokeWidthUpperBound));</span>
+<span class="nc" id="L1679">                Bitmap nativeBuffer = Bitmap.createBitmap(ww, hh, Bitmap.Config.ARGB_8888);</span>
+                //int restorePoint = canvas.saveLayer(bounds2, paint, Canvas.ALL_SAVE_FLAG);
+<span class="nc" id="L1681">                Canvas c = new Canvas(nativeBuffer);</span>
+<span class="nc" id="L1682">                Matrix translateM = new Matrix();</span>
+<span class="nc" id="L1683">                translateM.set(getTransformMatrix());</span>
+<span class="nc" id="L1684">                translateM.postTranslate(-bounds2.left + strokeWidthUpperBound, -bounds2.top + strokeWidthUpperBound);</span>
+<span class="nc" id="L1685">                c.concat(translateM);</span>
+<span class="nc" id="L1686">                c.drawPath(p, paint);</span>
+<span class="nc" id="L1687">                canvas.drawBitmap(nativeBuffer, bounds2.left-strokeWidthUpperBound, bounds2.top-strokeWidthUpperBound, paint);</span>
+
+<span class="nc" id="L1689">            } else {</span>
+<span class="fc" id="L1690">                canvas.save();</span>
+<span class="fc" id="L1691">                applyTransform();</span>
+<span class="fc" id="L1692">                canvas.drawPath(p, paint);</span>
+<span class="fc" id="L1693">                unapplyTransform();</span>
+<span class="fc" id="L1694">                canvas.restore();</span>
+            }
+        }
+<span class="fc" id="L1697">        setStroke(old);</span>
+<span class="fc" id="L1698">    }</span>
+
+    /**
+     * Sets the stroke of the current Paint object.
+     * @param stroke The stroke to set.
+     * @return The old stroke.
+     */
+    private Stroke setStroke(Stroke stroke){
+<span class="fc" id="L1706">        Stroke old = new Stroke(paint.getStrokeWidth(), convertStrokeCap(paint.getStrokeCap()),  convertStrokeJoin(paint.getStrokeJoin()), paint.getStrokeMiter());</span>
+<span class="fc" id="L1707">        paint.setStrokeCap(convertStrokeCap(stroke.getCapStyle()));</span>
+<span class="fc" id="L1708">        paint.setStrokeJoin(convertStrokeJoin(stroke.getJoinStyle()));</span>
+<span class="fc" id="L1709">        paint.setStrokeMiter(stroke.getMiterLimit());</span>
+<span class="fc" id="L1710">        paint.setStrokeWidth(stroke.getLineWidth());</span>
+
+<span class="fc" id="L1712">        return old;</span>
+    }
+
+    private int convertStrokeCap(Paint.Cap cap){
+<span class="fc bfc" id="L1716" title="All 2 branches covered.">        if ( Paint.Cap.BUTT.equals(cap)){</span>
+<span class="fc" id="L1717">            return Stroke.CAP_BUTT;</span>
+<span class="fc bfc" id="L1718" title="All 2 branches covered.">        } else if ( Paint.Cap.ROUND.equals(cap)){</span>
+<span class="fc" id="L1719">            return Stroke.CAP_ROUND;</span>
+<span class="pc bpc" id="L1720" title="1 of 2 branches missed.">        } else if ( Paint.Cap.SQUARE.equals(cap)){</span>
+<span class="fc" id="L1721">            return Stroke.CAP_SQUARE;</span>
+        } else {
+<span class="nc" id="L1723">            return Stroke.CAP_BUTT;</span>
+        }
+    }
+
+    private Paint.Cap convertStrokeCap(int cap){
+<span class="pc bpc" id="L1728" title="1 of 4 branches missed.">        switch ( cap ){</span>
+            case Stroke.CAP_BUTT:
+<span class="fc" id="L1730">                return Paint.Cap.BUTT;</span>
+            case Stroke.CAP_ROUND:
+<span class="fc" id="L1732">                return Paint.Cap.ROUND;</span>
+            case Stroke.CAP_SQUARE:
+<span class="fc" id="L1734">                return Paint.Cap.SQUARE;</span>
+            default:
+<span class="nc" id="L1736">                return Paint.Cap.BUTT;</span>
+        }
+    }
+
+    private int convertStrokeJoin(Paint.Join join){
+<span class="fc bfc" id="L1741" title="All 2 branches covered.">        if ( Paint.Join.BEVEL.equals(join)){</span>
+<span class="fc" id="L1742">            return Stroke.JOIN_BEVEL;</span>
+<span class="fc bfc" id="L1743" title="All 2 branches covered.">        } else if ( Paint.Join.MITER.equals(join)){</span>
+<span class="fc" id="L1744">            return Stroke.JOIN_MITER;</span>
+<span class="pc bpc" id="L1745" title="1 of 2 branches missed.">        } else if ( Paint.Join.ROUND.equals(join)){</span>
+<span class="fc" id="L1746">            return Stroke.JOIN_ROUND;</span>
+        } else {
+<span class="nc" id="L1748">            return Stroke.JOIN_BEVEL;</span>
+        }
+    }
+
+    private Paint.Join convertStrokeJoin(int join){
+<span class="pc bpc" id="L1753" title="1 of 4 branches missed.">        switch ( join ){</span>
+            case Stroke.JOIN_BEVEL:
+<span class="fc" id="L1755">                return Paint.Join.BEVEL;</span>
+            case Stroke.JOIN_MITER:
+<span class="fc" id="L1757">                return Paint.Join.MITER;</span>
+            case Stroke.JOIN_ROUND:
+<span class="fc" id="L1759">                return Paint.Join.ROUND;</span>
+            default:
+<span class="nc" id="L1761">                return Paint.Join.BEVEL;</span>
+        }
+    }
+
+    public void fillPath(Path p) {
+<span class="fc" id="L1766">        paint.setStyle(Paint.Style.FILL);</span>
+
+<span class="fc bfc" id="L1768" title="All 2 branches covered.">        if (getTransform().isIdentity()) {</span>
+<span class="fc" id="L1769">            canvas.drawPath(p, paint);</span>
+        } else {
+<span class="fc" id="L1771">            RectF bounds = new RectF();</span>
+<span class="fc" id="L1772">            p.computeBounds(bounds, false);</span>
+<span class="fc" id="L1773">            Path p2 = new Path();</span>
+<span class="fc" id="L1774">            p.transform(getTransformMatrix(), p2);</span>
+<span class="fc" id="L1775">            RectF bounds2 = new RectF();</span>
+<span class="fc" id="L1776">            p2.computeBounds(bounds2, false);</span>
+<span class="fc" id="L1777">            float ratio = Math.max(bounds2.width()/bounds.width(), bounds2.height()/bounds.height());</span>
+<span class="pc bpc" id="L1778" title="1 of 4 branches missed.">            if (ratio &gt; 2 &amp;&amp; !isMutableImageGraphics) {</span>
+                // If the canvas is hardware accelerated, then it will rasterize the path
+                // first, then apply the transform which leads to blurry paths if the transform does
+                // significant scaling.
+                // In such cases, we
+<span class="nc" id="L1783">                Bitmap nativeBuffer = Bitmap.createBitmap(</span>
+<span class="nc" id="L1784">                        (int)(bounds2.width()), (int)(bounds2.height()), Bitmap.Config.ARGB_8888);</span>
+                //int restorePoint = canvas.saveLayer(bounds2, paint, Canvas.ALL_SAVE_FLAG);
+<span class="nc" id="L1786">                Canvas c = new Canvas(nativeBuffer);</span>
+<span class="nc" id="L1787">                Matrix translateM = new Matrix();</span>
+<span class="nc" id="L1788">                translateM.set(getTransformMatrix());</span>
+<span class="nc" id="L1789">                translateM.postTranslate(-bounds2.left, -bounds2.top);</span>
+<span class="nc" id="L1790">                c.concat(translateM);</span>
+<span class="nc" id="L1791">                c.drawPath(p, paint);</span>
+<span class="nc" id="L1792">                canvas.drawBitmap(nativeBuffer, bounds2.left, bounds2.top, paint);</span>
+
+<span class="nc" id="L1794">            } else {</span>
+<span class="fc" id="L1795">                canvas.save();</span>
+<span class="fc" id="L1796">                applyTransform();</span>
+<span class="fc" id="L1797">                canvas.drawPath(p, paint);</span>
+<span class="fc" id="L1798">                unapplyTransform();</span>
+<span class="fc" id="L1799">                canvas.restore();</span>
+            }
+        }
+
+<span class="fc" id="L1803">    }</span>
+
+    public void setTransform(Transform transform) {
+<span class="fc" id="L1806">        Transform t = getTransform();</span>
+<span class="fc bfc" id="L1807" title="All 2 branches covered.">        if (t != transform) {</span>
+<span class="fc" id="L1808">            t.setTransform(transform);</span>
+        }
+<span class="fc" id="L1810">        transformDirty = true;</span>
+<span class="fc" id="L1811">        inverseTransformDirty = true;</span>
+<span class="fc" id="L1812">        clipFresh = false;</span>
+<span class="fc" id="L1813">    }</span>
+
+    public Transform getTransform() {
+<span class="pc bpc" id="L1816" title="1 of 2 branches missed.">        if (transform == null) {</span>
+<span class="nc" id="L1817">            transform = Transform.makeIdentity();</span>
+        }
+<span class="fc" id="L1819">        return transform;</span>
+    }
+
+
+<span class="fc" id="L1823">    private int transformSemaphore = 0;</span>
+    public void applyTransform() {
+<span class="pc bpc" id="L1825" title="1 of 2 branches missed.">        if (transformSemaphore == 0) {</span>
+<span class="fc" id="L1826">            canvas.concat(getTransformMatrix());</span>
+        }
+<span class="fc" id="L1828">        transformSemaphore++;</span>
+<span class="fc" id="L1829">    }</span>
+
+    public void unapplyTransform() {
+<span class="fc" id="L1832">        transformSemaphore--;</span>
+<span class="pc bpc" id="L1833" title="1 of 2 branches missed.">        if (transformSemaphore &lt; 0) {</span>
+<span class="nc" id="L1834">            new RuntimeException(&quot;TransformSemaphore unbalanced&quot;).printStackTrace();</span>
+        }
+<span class="fc" id="L1836">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,592 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidNfc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidNfc.java</span></div><h1>AndroidNfc.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import android.nfc.NfcAdapter;
+import android.nfc.Tag;
+import android.nfc.tech.IsoDep;
+import android.nfc.tech.MifareClassic;
+import android.nfc.tech.MifareUltralight;
+import android.nfc.tech.Ndef;
+import android.nfc.tech.NdefFormatable;
+import android.nfc.tech.NfcA;
+import android.nfc.tech.NfcB;
+import android.nfc.tech.NfcF;
+import android.nfc.tech.NfcV;
+import android.os.Bundle;
+
+import com.codename1.nfc.HostCardEmulationService;
+import com.codename1.nfc.NdefMessage;
+import com.codename1.nfc.NfcError;
+import com.codename1.nfc.NfcException;
+import com.codename1.nfc.NfcListener;
+import com.codename1.nfc.NfcReadOptions;
+import com.codename1.nfc.TagType;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Android implementation of {@link com.codename1.nfc.Nfc} that bridges to
+ * the platform NfcAdapter via reader-mode (API 19+).
+ *
+ * The host card emulation side is wired through CodenameOneHostApduService
+ * which the Codename One Maven plugin / build daemon register in the
+ * AndroidManifest when an app references com.codename1.nfc.* .
+ */
+class AndroidNfc extends com.codename1.nfc.Nfc {
+
+    private final AndroidImplementation impl;
+    private AsyncResource&lt;com.codename1.nfc.Tag&gt; pendingRead;
+    private NfcReadOptions pendingOptions;
+    private boolean readerArmed;
+<span class="nc" id="L69">    private final Set&lt;NfcListener&gt; listeners = new HashSet&lt;NfcListener&gt;();</span>
+    private HostCardEmulationService hceService;
+
+<span class="nc" id="L72">    AndroidNfc(AndroidImplementation impl) {</span>
+<span class="nc" id="L73">        this.impl = impl;</span>
+<span class="nc" id="L74">    }</span>
+
+    private NfcAdapter adapter() {
+<span class="nc" id="L77">        Activity a = AndroidImplementation.getActivity();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (a == null) {</span>
+<span class="nc" id="L79">            return null;</span>
+        }
+<span class="nc" id="L81">        return NfcAdapter.getDefaultAdapter(a);</span>
+    }
+
+    @Override
+    public boolean isSupported() {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        return adapter() != null;</span>
+    }
+
+    @Override
+    public boolean canRead() {
+<span class="nc" id="L91">        NfcAdapter a = adapter();</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        return a != null &amp;&amp; a.isEnabled();</span>
+    }
+
+    @Override
+    public boolean canWrite() {
+<span class="nc" id="L97">        return canRead();</span>
+    }
+
+    @Override
+    public boolean canHostEmulate() {
+<span class="nc" id="L102">        Context ctx = AndroidImplementation.getActivity();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (ctx == null) {</span>
+<span class="nc" id="L104">            return false;</span>
+        }
+<span class="nc" id="L106">        return ctx.getPackageManager()</span>
+<span class="nc" id="L107">                .hasSystemFeature(&quot;android.hardware.nfc.hce&quot;);</span>
+    }
+
+    @Override
+    public synchronized AsyncResource&lt;com.codename1.nfc.Tag&gt; readTag(NfcReadOptions options) {
+<span class="nc" id="L112">        AsyncResource&lt;com.codename1.nfc.Tag&gt; r = new AsyncResource&lt;com.codename1.nfc.Tag&gt;();</span>
+<span class="nc" id="L113">        NfcAdapter a = adapter();</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (a == null) {</span>
+<span class="nc" id="L115">            r.error(new NfcException(NfcError.NOT_AVAILABLE,</span>
+                    &quot;NfcAdapter is unavailable on this device&quot;));
+<span class="nc" id="L117">            return r;</span>
+        }
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (!a.isEnabled()) {</span>
+<span class="nc" id="L120">            r.error(new NfcException(NfcError.DISABLED,</span>
+                    &quot;NFC is disabled in system settings&quot;));
+<span class="nc" id="L122">            return r;</span>
+        }
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (pendingRead != null) {</span>
+<span class="nc" id="L125">            r.error(new NfcException(NfcError.SYSTEM_CANCELED,</span>
+                    &quot;another NFC read is already in progress&quot;));
+<span class="nc" id="L127">            return r;</span>
+        }
+<span class="nc" id="L129">        pendingRead = r;</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        pendingOptions = options != null ? options : new NfcReadOptions();</span>
+<span class="nc" id="L131">        armReader();</span>
+<span class="nc" id="L132">        long timeout = pendingOptions.getTimeoutMs();</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (timeout &gt; 0) {</span>
+<span class="nc" id="L134">            scheduleTimeout(timeout);</span>
+        }
+<span class="nc" id="L136">        return r;</span>
+    }
+
+    @Override
+    public synchronized boolean stopRead() {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        boolean had = pendingRead != null;</span>
+<span class="nc" id="L142">        disarmReader();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (had) {</span>
+<span class="nc" id="L144">            AsyncResource&lt;com.codename1.nfc.Tag&gt; r = pendingRead;</span>
+<span class="nc" id="L145">            pendingRead = null;</span>
+<span class="nc" id="L146">            pendingOptions = null;</span>
+<span class="nc" id="L147">            r.error(new NfcException(NfcError.USER_CANCELED,</span>
+                    &quot;NFC read cancelled&quot;));
+        }
+<span class="nc" id="L150">        return had;</span>
+    }
+
+    @Override
+    public synchronized void addTagListener(NfcListener listener) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (listener == null) {</span>
+<span class="nc" id="L156">            return;</span>
+        }
+<span class="nc" id="L158">        listeners.add(listener);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (!readerArmed) {</span>
+<span class="nc" id="L160">            pendingOptions = new NfcReadOptions();</span>
+<span class="nc" id="L161">            armReader();</span>
+        }
+<span class="nc" id="L163">    }</span>
+
+    @Override
+    public synchronized void removeTagListener(NfcListener listener) {
+<span class="nc" id="L167">        listeners.remove(listener);</span>
+<span class="nc bnc" id="L168" title="All 4 branches missed.">        if (listeners.isEmpty() &amp;&amp; pendingRead == null) {</span>
+<span class="nc" id="L169">            disarmReader();</span>
+        }
+<span class="nc" id="L171">    }</span>
+
+    @Override
+    public synchronized void registerHostCardEmulationService(
+            HostCardEmulationService service) {
+<span class="nc" id="L176">        this.hceService = service;</span>
+<span class="nc" id="L177">        CodenameOneHostApduService.bind(service);</span>
+<span class="nc" id="L178">    }</span>
+
+    @Override
+    public synchronized void unregisterHostCardEmulationService() {
+<span class="nc" id="L182">        this.hceService = null;</span>
+<span class="nc" id="L183">        CodenameOneHostApduService.bind(null);</span>
+<span class="nc" id="L184">    }</span>
+
+    private void armReader() {
+<span class="nc" id="L187">        final Activity activity = AndroidImplementation.getActivity();</span>
+<span class="nc" id="L188">        final NfcAdapter a = adapter();</span>
+<span class="nc bnc" id="L189" title="All 4 branches missed.">        if (activity == null || a == null) {</span>
+<span class="nc" id="L190">            return;</span>
+        }
+<span class="nc" id="L192">        final int flags = computeReaderFlags(pendingOptions);</span>
+<span class="nc" id="L193">        final Bundle extras = new Bundle();</span>
+        // 250 ms presence-check delay is the platform default.
+<span class="nc" id="L195">        extras.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);</span>
+        // Ports/Android compiles with -source 1.6, so locals captured by
+        // anonymous inner classes have to be explicitly declared final
+        // (Java 8's effectively-final semantics don't apply here).
+<span class="nc" id="L199">        activity.runOnUiThread(new Runnable() {</span>
+            public void run() {
+<span class="nc" id="L201">                a.enableReaderMode(activity, new NfcAdapter.ReaderCallback() {</span>
+                    public void onTagDiscovered(Tag tag) {
+<span class="nc" id="L203">                        deliverTag(tag);</span>
+<span class="nc" id="L204">                    }</span>
+                }, flags, extras);
+<span class="nc" id="L206">                readerArmed = true;</span>
+<span class="nc" id="L207">            }</span>
+        });
+<span class="nc" id="L209">    }</span>
+
+    private void disarmReader() {
+<span class="nc" id="L212">        final Activity activity = AndroidImplementation.getActivity();</span>
+<span class="nc" id="L213">        final NfcAdapter a = adapter();</span>
+<span class="nc bnc" id="L214" title="All 6 branches missed.">        if (activity == null || a == null || !readerArmed) {</span>
+<span class="nc" id="L215">            readerArmed = false;</span>
+<span class="nc" id="L216">            return;</span>
+        }
+<span class="nc" id="L218">        activity.runOnUiThread(new Runnable() {</span>
+            public void run() {
+                try {
+<span class="nc" id="L221">                    a.disableReaderMode(activity);</span>
+<span class="nc" id="L222">                } catch (Throwable ignore) {</span>
+<span class="nc" id="L223">                }</span>
+<span class="nc" id="L224">                readerArmed = false;</span>
+<span class="nc" id="L225">            }</span>
+        });
+<span class="nc" id="L227">    }</span>
+
+    private void scheduleTimeout(final long ms) {
+<span class="nc" id="L230">        new Thread(new Runnable() {</span>
+            public void run() {
+                try {
+<span class="nc" id="L233">                    Thread.sleep(ms);</span>
+<span class="nc" id="L234">                } catch (InterruptedException ignore) {</span>
+<span class="nc" id="L235">                }</span>
+                AsyncResource&lt;com.codename1.nfc.Tag&gt; r;
+<span class="nc" id="L237">                synchronized (AndroidNfc.this) {</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                    if (pendingRead == null) {</span>
+<span class="nc" id="L239">                        return;</span>
+                    }
+<span class="nc" id="L241">                    r = pendingRead;</span>
+<span class="nc" id="L242">                    pendingRead = null;</span>
+<span class="nc" id="L243">                    pendingOptions = null;</span>
+<span class="nc" id="L244">                    disarmReader();</span>
+<span class="nc" id="L245">                }</span>
+<span class="nc" id="L246">                r.error(new NfcException(NfcError.SYSTEM_CANCELED,</span>
+                        &quot;NFC read timed out&quot;));
+<span class="nc" id="L248">            }</span>
+<span class="nc" id="L249">        }, &quot;AndroidNfc-timeout&quot;).start();</span>
+<span class="nc" id="L250">    }</span>
+
+    private int computeReaderFlags(NfcReadOptions opts) {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (opts == null) {</span>
+<span class="nc" id="L254">            return NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_NFC_B</span>
+                    | NfcAdapter.FLAG_READER_NFC_F | NfcAdapter.FLAG_READER_NFC_V;
+        }
+<span class="nc" id="L257">        List&lt;TagType&gt; filter = opts.getTechFilter();</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (filter.isEmpty()) {</span>
+<span class="nc" id="L259">            return NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_NFC_B</span>
+                    | NfcAdapter.FLAG_READER_NFC_F | NfcAdapter.FLAG_READER_NFC_V;
+        }
+<span class="nc" id="L262">        int flags = 0;</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        for (TagType t : filter) {</span>
+<span class="nc bnc" id="L264" title="All 6 branches missed.">            switch (t) {</span>
+                case NFC_A:
+                case ISO_DEP:
+                case MIFARE_CLASSIC:
+                case MIFARE_ULTRALIGHT:
+<span class="nc" id="L269">                    flags |= NfcAdapter.FLAG_READER_NFC_A;</span>
+<span class="nc" id="L270">                    break;</span>
+                case NFC_B:
+<span class="nc" id="L272">                    flags |= NfcAdapter.FLAG_READER_NFC_B;</span>
+<span class="nc" id="L273">                    break;</span>
+                case NFC_F:
+<span class="nc" id="L275">                    flags |= NfcAdapter.FLAG_READER_NFC_F;</span>
+<span class="nc" id="L276">                    break;</span>
+                case NFC_V:
+<span class="nc" id="L278">                    flags |= NfcAdapter.FLAG_READER_NFC_V;</span>
+<span class="nc" id="L279">                    break;</span>
+                case NDEF:
+<span class="nc" id="L281">                    flags |= NfcAdapter.FLAG_READER_NFC_A</span>
+                            | NfcAdapter.FLAG_READER_NFC_B
+                            | NfcAdapter.FLAG_READER_NFC_F
+                            | NfcAdapter.FLAG_READER_NFC_V;
+<span class="nc" id="L285">                    break;</span>
+                default:
+                    break;
+            }
+<span class="nc" id="L289">        }</span>
+<span class="nc" id="L290">        return flags;</span>
+    }
+
+    private void deliverTag(Tag rawTag) {
+<span class="nc" id="L294">        Set&lt;TagType&gt; types = new HashSet&lt;TagType&gt;();</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        for (String t : rawTag.getTechList()) {</span>
+<span class="nc" id="L296">            TagType tt = mapTech(t);</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">            if (tt != null) {</span>
+<span class="nc" id="L298">                types.add(tt);</span>
+            }
+        }
+<span class="nc" id="L301">        AndroidTag wrapped = new AndroidTag(rawTag, types);</span>
+        AsyncResource&lt;com.codename1.nfc.Tag&gt; r;
+        Set&lt;NfcListener&gt; listenerSnapshot;
+<span class="nc" id="L304">        synchronized (this) {</span>
+<span class="nc" id="L305">            r = pendingRead;</span>
+<span class="nc" id="L306">            pendingRead = null;</span>
+<span class="nc" id="L307">            pendingOptions = null;</span>
+<span class="nc" id="L308">            listenerSnapshot = new HashSet&lt;NfcListener&gt;(listeners);</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            if (listeners.isEmpty()) {</span>
+<span class="nc" id="L310">                disarmReader();</span>
+            }
+<span class="nc" id="L312">        }</span>
+<span class="nc" id="L313">        scheduleTagDelivery(r, wrapped, listenerSnapshot);</span>
+<span class="nc" id="L314">    }</span>
+
+    // Static so the Runnable does not capture a synthetic outer-AndroidNfc
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void scheduleTagDelivery(
+            final AsyncResource&lt;com.codename1.nfc.Tag&gt; r,
+            final AndroidTag wrapped,
+            final Set&lt;NfcListener&gt; listenerSnapshot) {
+<span class="nc" id="L322">        Display.getInstance().callSerially(new Runnable() {</span>
+            public void run() {
+<span class="nc bnc" id="L324" title="All 2 branches missed.">                if (r != null) {</span>
+<span class="nc" id="L325">                    r.complete(wrapped);</span>
+                }
+<span class="nc bnc" id="L327" title="All 2 branches missed.">                for (NfcListener l : listenerSnapshot) {</span>
+                    try {
+<span class="nc" id="L329">                        l.tagDiscovered(wrapped);</span>
+<span class="nc" id="L330">                    } catch (Throwable ignore) {</span>
+<span class="nc" id="L331">                    }</span>
+<span class="nc" id="L332">                }</span>
+<span class="nc" id="L333">            }</span>
+        });
+<span class="nc" id="L335">    }</span>
+
+    static TagType mapTech(String s) {
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L339">            return null;</span>
+        }
+<span class="nc bnc" id="L341" title="All 4 branches missed.">        if (s.endsWith(&quot;.Ndef&quot;) || s.endsWith(&quot;.NdefFormatable&quot;)) {</span>
+<span class="nc" id="L342">            return TagType.NDEF;</span>
+        }
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        if (s.endsWith(&quot;.IsoDep&quot;)) {</span>
+<span class="nc" id="L345">            return TagType.ISO_DEP;</span>
+        }
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (s.endsWith(&quot;.MifareClassic&quot;)) {</span>
+<span class="nc" id="L348">            return TagType.MIFARE_CLASSIC;</span>
+        }
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        if (s.endsWith(&quot;.MifareUltralight&quot;)) {</span>
+<span class="nc" id="L351">            return TagType.MIFARE_ULTRALIGHT;</span>
+        }
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (s.endsWith(&quot;.NfcA&quot;)) {</span>
+<span class="nc" id="L354">            return TagType.NFC_A;</span>
+        }
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (s.endsWith(&quot;.NfcB&quot;)) {</span>
+<span class="nc" id="L357">            return TagType.NFC_B;</span>
+        }
+<span class="nc bnc" id="L359" title="All 2 branches missed.">        if (s.endsWith(&quot;.NfcF&quot;)) {</span>
+<span class="nc" id="L360">            return TagType.NFC_F;</span>
+        }
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (s.endsWith(&quot;.NfcV&quot;)) {</span>
+<span class="nc" id="L363">            return TagType.NFC_V;</span>
+        }
+<span class="nc" id="L365">        return null;</span>
+    }
+
+    /**
+     * Tag implementation that wraps the native android.nfc.Tag and exposes
+     * the Codename One tag-technology APIs.
+     */
+    static final class AndroidTag extends com.codename1.nfc.Tag {
+        private final Tag native_;
+
+        AndroidTag(Tag t, Set&lt;TagType&gt; types) {
+<span class="nc" id="L376">            super(types, t.getId());</span>
+<span class="nc" id="L377">            this.native_ = t;</span>
+<span class="nc" id="L378">        }</span>
+
+        @Override
+        public boolean isWritable() {
+<span class="nc" id="L382">            Ndef n = Ndef.get(native_);</span>
+<span class="nc bnc" id="L383" title="All 4 branches missed.">            return n != null &amp;&amp; n.isWritable();</span>
+        }
+
+        @Override
+        public int getMaxNdefSize() {
+<span class="nc" id="L388">            Ndef n = Ndef.get(native_);</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">            return n != null ? n.getMaxSize() : -1;</span>
+        }
+
+        @Override
+        public AsyncResource&lt;NdefMessage&gt; readNdef() {
+<span class="nc" id="L394">            final AsyncResource&lt;NdefMessage&gt; r = new AsyncResource&lt;NdefMessage&gt;();</span>
+<span class="nc" id="L395">            new Thread(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L397">                    Ndef n = Ndef.get(native_);</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                    if (n == null) {</span>
+<span class="nc" id="L399">                        r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                                &quot;tag has no NDEF technology&quot;));
+<span class="nc" id="L401">                        return;</span>
+                    }
+                    try {
+<span class="nc" id="L404">                        n.connect();</span>
+<span class="nc" id="L405">                        android.nfc.NdefMessage msg = n.getNdefMessage();</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                        if (msg == null) {</span>
+<span class="nc" id="L407">                            r.error(new NfcException(NfcError.INVALID_NDEF,</span>
+                                    &quot;tag has no NDEF message&quot;));
+<span class="nc" id="L409">                            return;</span>
+                        }
+<span class="nc" id="L411">                        r.complete(NdefMessage.parse(msg.toByteArray()));</span>
+<span class="nc" id="L412">                    } catch (IOException ioe) {</span>
+<span class="nc" id="L413">                        r.error(new NfcException(NfcError.IO_ERROR,</span>
+<span class="nc" id="L414">                                ioe.getMessage(), ioe));</span>
+<span class="nc" id="L415">                    } catch (Throwable t) {</span>
+<span class="nc" id="L416">                        r.error(new NfcException(NfcError.UNKNOWN,</span>
+<span class="nc" id="L417">                                t.getMessage(), t));</span>
+                    } finally {
+                        try {
+<span class="nc" id="L420">                            n.close();</span>
+<span class="nc" id="L421">                        } catch (Throwable ignore) {</span>
+<span class="nc" id="L422">                        }</span>
+                    }
+<span class="nc" id="L424">                }</span>
+<span class="nc" id="L425">            }, &quot;AndroidNfc-readNdef&quot;).start();</span>
+<span class="nc" id="L426">            return r;</span>
+        }
+
+        @Override
+        public AsyncResource&lt;Boolean&gt; writeNdef(final NdefMessage message) {
+<span class="nc" id="L431">            final AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L432">            new Thread(new Runnable() {</span>
+                public void run() {
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                    if (message == null) {</span>
+<span class="nc" id="L435">                        r.error(new NfcException(NfcError.INVALID_NDEF,</span>
+                                &quot;null message&quot;));
+<span class="nc" id="L437">                        return;</span>
+                    }
+<span class="nc" id="L439">                    Ndef n = Ndef.get(native_);</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">                    if (n != null) {</span>
+                        try {
+<span class="nc" id="L442">                            n.connect();</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                            if (!n.isWritable()) {</span>
+<span class="nc" id="L444">                                r.error(new NfcException(NfcError.READ_ONLY,</span>
+                                        &quot;tag is read-only&quot;));
+<span class="nc" id="L446">                                return;</span>
+                            }
+<span class="nc" id="L448">                            byte[] raw = message.toByteArray();</span>
+<span class="nc bnc" id="L449" title="All 4 branches missed.">                            if (n.getMaxSize() &gt; 0 &amp;&amp; raw.length &gt; n.getMaxSize()) {</span>
+<span class="nc" id="L450">                                r.error(new NfcException(</span>
+                                        NfcError.CAPACITY_EXCEEDED,
+                                        &quot;message exceeds tag capacity&quot;));
+<span class="nc" id="L453">                                return;</span>
+                            }
+<span class="nc" id="L455">                            n.writeNdefMessage(new android.nfc.NdefMessage(raw));</span>
+<span class="nc" id="L456">                            r.complete(Boolean.TRUE);</span>
+<span class="nc" id="L457">                        } catch (IOException ioe) {</span>
+<span class="nc" id="L458">                            r.error(new NfcException(NfcError.IO_ERROR,</span>
+<span class="nc" id="L459">                                    ioe.getMessage(), ioe));</span>
+<span class="nc" id="L460">                        } catch (Throwable t) {</span>
+<span class="nc" id="L461">                            r.error(new NfcException(NfcError.UNKNOWN,</span>
+<span class="nc" id="L462">                                    t.getMessage(), t));</span>
+                        } finally {
+                            try {
+<span class="nc" id="L465">                                n.close();</span>
+<span class="nc" id="L466">                            } catch (Throwable ignore) {</span>
+<span class="nc" id="L467">                            }</span>
+                        }
+<span class="nc" id="L469">                        return;</span>
+                    }
+<span class="nc" id="L471">                    NdefFormatable nf = NdefFormatable.get(native_);</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                    if (nf != null) {</span>
+                        try {
+<span class="nc" id="L474">                            nf.connect();</span>
+<span class="nc" id="L475">                            nf.format(new android.nfc.NdefMessage(message.toByteArray()));</span>
+<span class="nc" id="L476">                            r.complete(Boolean.TRUE);</span>
+<span class="nc" id="L477">                        } catch (IOException ioe) {</span>
+<span class="nc" id="L478">                            r.error(new NfcException(NfcError.IO_ERROR,</span>
+<span class="nc" id="L479">                                    ioe.getMessage(), ioe));</span>
+<span class="nc" id="L480">                        } catch (Throwable t) {</span>
+<span class="nc" id="L481">                            r.error(new NfcException(NfcError.UNKNOWN,</span>
+<span class="nc" id="L482">                                    t.getMessage(), t));</span>
+                        } finally {
+                            try {
+<span class="nc" id="L485">                                nf.close();</span>
+<span class="nc" id="L486">                            } catch (Throwable ignore) {</span>
+<span class="nc" id="L487">                            }</span>
+                        }
+<span class="nc" id="L489">                        return;</span>
+                    }
+<span class="nc" id="L491">                    r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                            &quot;tag does not support NDEF writing&quot;));
+<span class="nc" id="L493">                }</span>
+<span class="nc" id="L494">            }, &quot;AndroidNfc-writeNdef&quot;).start();</span>
+<span class="nc" id="L495">            return r;</span>
+        }
+
+        @Override
+        public AsyncResource&lt;Boolean&gt; makeReadOnly() {
+<span class="nc" id="L500">            final AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L501">            new Thread(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L503">                    Ndef n = Ndef.get(native_);</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">                    if (n == null) {</span>
+<span class="nc" id="L505">                        r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                                &quot;tag has no NDEF technology&quot;));
+<span class="nc" id="L507">                        return;</span>
+                    }
+                    try {
+<span class="nc" id="L510">                        n.connect();</span>
+<span class="nc" id="L511">                        boolean ok = n.makeReadOnly();</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">                        r.complete(ok ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="nc" id="L513">                    } catch (IOException ioe) {</span>
+<span class="nc" id="L514">                        r.error(new NfcException(NfcError.IO_ERROR,</span>
+<span class="nc" id="L515">                                ioe.getMessage(), ioe));</span>
+                    } finally {
+                        try {
+<span class="nc" id="L518">                            n.close();</span>
+<span class="nc" id="L519">                        } catch (Throwable ignore) {</span>
+<span class="nc" id="L520">                        }</span>
+                    }
+<span class="nc" id="L522">                }</span>
+<span class="nc" id="L523">            }, &quot;AndroidNfc-lock&quot;).start();</span>
+<span class="nc" id="L524">            return r;</span>
+        }
+
+        @Override
+        public com.codename1.nfc.IsoDep getIsoDep() {
+<span class="nc" id="L529">            IsoDep d = IsoDep.get(native_);</span>
+<span class="nc bnc" id="L530" title="All 2 branches missed.">            return d != null ? new AndroidIsoDep(d) : null;</span>
+        }
+
+        @Override
+        public com.codename1.nfc.MifareClassic getMifareClassic() {
+<span class="nc" id="L535">            MifareClassic m = MifareClassic.get(native_);</span>
+<span class="nc bnc" id="L536" title="All 2 branches missed.">            return m != null ? new AndroidMifareClassic(m) : null;</span>
+        }
+
+        @Override
+        public com.codename1.nfc.MifareUltralight getMifareUltralight() {
+<span class="nc" id="L541">            MifareUltralight m = MifareUltralight.get(native_);</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">            return m != null ? new AndroidMifareUltralight(m) : null;</span>
+        }
+
+        @Override
+        public com.codename1.nfc.NfcA getNfcA() {
+<span class="nc" id="L547">            NfcA t = NfcA.get(native_);</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">            return t != null ? new AndroidNfcA(t) : null;</span>
+        }
+
+        @Override
+        public com.codename1.nfc.NfcB getNfcB() {
+<span class="nc" id="L553">            NfcB t = NfcB.get(native_);</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">            return t != null ? new AndroidNfcB(t) : null;</span>
+        }
+
+        @Override
+        public com.codename1.nfc.NfcF getNfcF() {
+<span class="nc" id="L559">            NfcF t = NfcF.get(native_);</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">            return t != null ? new AndroidNfcF(t) : null;</span>
+        }
+
+        @Override
+        public com.codename1.nfc.NfcV getNfcV() {
+<span class="nc" id="L565">            NfcV t = NfcV.get(native_);</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">            return t != null ? new AndroidNfcV(t) : null;</span>
+        }
+    }
+
+    /** Helper that runs the given Callable on a worker thread and resolves
+     * the AsyncResource with its outcome. */
+    static &lt;T&gt; AsyncResource&lt;T&gt; asyncIo(final java.util.concurrent.Callable&lt;T&gt; c) {
+<span class="nc" id="L573">        final AsyncResource&lt;T&gt; r = new AsyncResource&lt;T&gt;();</span>
+<span class="nc" id="L574">        new Thread(new Runnable() {</span>
+            public void run() {
+                try {
+<span class="nc" id="L577">                    r.complete(c.call());</span>
+<span class="nc" id="L578">                } catch (NfcException ne) {</span>
+<span class="nc" id="L579">                    r.error(ne);</span>
+<span class="nc" id="L580">                } catch (IOException ioe) {</span>
+<span class="nc" id="L581">                    r.error(new NfcException(NfcError.IO_ERROR,</span>
+<span class="nc" id="L582">                            ioe.getMessage(), ioe));</span>
+<span class="nc" id="L583">                } catch (Throwable t) {</span>
+<span class="nc" id="L584">                    r.error(new NfcException(NfcError.UNKNOWN,</span>
+<span class="nc" id="L585">                            t.getMessage(), t));</span>
+<span class="nc" id="L586">                }</span>
+<span class="nc" id="L587">            }</span>
+<span class="nc" id="L588">        }, &quot;AndroidNfc-io&quot;).start();</span>
+<span class="nc" id="L589">        return r;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

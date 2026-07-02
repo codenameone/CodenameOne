@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidWifiPlatform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android.connectivity</a> &gt; <span class="el_source">AndroidWifiPlatform.java</span></div><h1>AndroidWifiPlatform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ */
+package com.codename1.impl.android.connectivity;
+
+import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.os.Build;
+import android.text.format.Formatter;
+import android.util.Log;
+
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.io.wifi.WiFiConnectCallback;
+import com.codename1.io.wifi.WiFiNetwork;
+import com.codename1.io.wifi.WiFiScanCallback;
+import com.codename1.io.wifi.WiFiSecurity;
+import com.codename1.io.wifi.WifiPlatform;
+import com.codename1.ui.CN;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/// Android implementation of WiFi info + scan + connect. The class deliberately
+/// imports only API 19-safe symbols. The API 29+ `WifiNetworkSpecifier` flow
+/// and any other &quot;modern&quot; Android APIs are reached via reflection or split
+/// into separate helpers so this class loads cleanly on KitKat (the minimum
+/// SDK supported by the Codename One Android port).
+<span class="nc" id="L43">public final class AndroidWifiPlatform extends WifiPlatform {</span>
+    private static final String TAG = &quot;CN1WiFi&quot;;
+    // Build.VERSION_CODES.Q (=29) isn't defined on the legacy compile SDK
+    // shipped with cn1-binaries (API 25); use the literal value.
+    private static final int SDK_Q = 29;
+    private BroadcastReceiver scanReceiver;
+
+    @Override
+    public boolean isInfoSupported() {
+<span class="nc" id="L52">        return true;</span>
+    }
+
+    @Override
+    public boolean isManagementSupported() {
+<span class="nc" id="L57">        return true;</span>
+    }
+
+    private WifiManager wifi() {
+<span class="nc" id="L61">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (ctx == null) return null;</span>
+        // applicationContext per Android docs to avoid leaking the activity
+        // through the singleton WifiManager.
+<span class="nc" id="L65">        return (WifiManager) ctx.getApplicationContext()</span>
+<span class="nc" id="L66">                .getSystemService(Context.WIFI_SERVICE);</span>
+    }
+
+    @Override
+    public String getCurrentSSID() {
+<span class="nc" id="L71">        WifiManager wm = wifi();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (wm == null) return null;</span>
+<span class="nc" id="L73">        WifiInfo info = wm.getConnectionInfo();</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (info == null) return null;</span>
+<span class="nc" id="L75">        String s = info.getSSID();</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (s == null) return null;</span>
+        // Android wraps SSID in quotes and returns &quot;&lt;unknown ssid&gt;&quot; when
+        // permission has not been granted.
+<span class="nc bnc" id="L79" title="All 6 branches missed.">        if (s.length() &gt; 1 &amp;&amp; s.startsWith(&quot;\&quot;&quot;) &amp;&amp; s.endsWith(&quot;\&quot;&quot;)) {</span>
+<span class="nc" id="L80">            s = s.substring(1, s.length() - 1);</span>
+        }
+<span class="nc bnc" id="L82" title="All 4 branches missed.">        if (&quot;&lt;unknown ssid&gt;&quot;.equals(s) || s.length() == 0) {</span>
+<span class="nc" id="L83">            return null;</span>
+        }
+<span class="nc" id="L85">        return s;</span>
+    }
+
+    @Override
+    public String getBSSID() {
+<span class="nc" id="L90">        WifiManager wm = wifi();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (wm == null) return null;</span>
+<span class="nc" id="L92">        WifiInfo info = wm.getConnectionInfo();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (info == null) return null;</span>
+<span class="nc" id="L94">        String s = info.getBSSID();</span>
+<span class="nc bnc" id="L95" title="All 4 branches missed.">        if (s == null || &quot;02:00:00:00:00:00&quot;.equals(s)) {</span>
+<span class="nc" id="L96">            return null;</span>
+        }
+<span class="nc" id="L98">        return s.toLowerCase(Locale.US);</span>
+    }
+
+    @Override
+    public String getGateway() {
+        // On Lollipop+ we'd prefer LinkProperties for the real default
+        // route. Read it through a helper that's only loaded on Lollipop+
+        // so this class verifies on KitKat.
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.LOLLIPOP) {</span>
+<span class="nc" id="L107">            String gw = AndroidWifiPlatformLollipop.getGateway();</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (gw != null) return gw;</span>
+        }
+<span class="nc" id="L110">        WifiManager wm = wifi();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (wm == null) return null;</span>
+        try {
+<span class="nc" id="L113">            return Formatter.formatIpAddress(wm.getDhcpInfo().gateway);</span>
+<span class="nc" id="L114">        } catch (Throwable t) {</span>
+<span class="nc" id="L115">            return null;</span>
+        }
+    }
+
+    @Override
+    public String getIp() {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.LOLLIPOP) {</span>
+<span class="nc" id="L122">            String ip = AndroidWifiPlatformLollipop.getWifiIp();</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (ip != null) return ip;</span>
+        }
+<span class="nc" id="L125">        WifiManager wm = wifi();</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (wm == null) return null;</span>
+<span class="nc" id="L127">        WifiInfo info = wm.getConnectionInfo();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (info == null) return null;</span>
+<span class="nc" id="L129">        int ip = info.getIpAddress();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (ip == 0) return null;</span>
+<span class="nc" id="L131">        return Formatter.formatIpAddress(ip);</span>
+    }
+
+    @Override
+    public void scan(final WiFiScanCallback cb) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (cb == null) return;</span>
+<span class="nc" id="L137">        final Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc" id="L138">        final WifiManager wm = wifi();</span>
+<span class="nc bnc" id="L139" title="All 4 branches missed.">        if (ctx == null || wm == null) {</span>
+<span class="nc" id="L140">            fail(cb, &quot;WiFi unavailable&quot;);</span>
+<span class="nc" id="L141">            return;</span>
+        }
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (!checkPermission(Manifest.permission.ACCESS_WIFI_STATE)) {</span>
+<span class="nc" id="L144">            fail(cb, &quot;ACCESS_WIFI_STATE not granted&quot;);</span>
+<span class="nc" id="L145">            return;</span>
+        }
+<span class="nc" id="L147">        IntentFilter filter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (scanReceiver != null) {</span>
+<span class="nc" id="L149">            try { ctx.unregisterReceiver(scanReceiver); } catch (Throwable t) { /* ignore */ }</span>
+        }
+<span class="nc" id="L151">        scanReceiver = new BroadcastReceiver() {</span>
+            @Override
+            public void onReceive(Context c, Intent i) {
+<span class="nc" id="L154">                try { c.unregisterReceiver(this); } catch (Throwable t) { /* ignore */ }</span>
+<span class="nc" id="L155">                scanReceiver = null;</span>
+<span class="nc" id="L156">                final List&lt;ScanResult&gt; results = wm.getScanResults();</span>
+<span class="nc" id="L157">                final WiFiNetwork[] mapped = new WiFiNetwork[results.size()];</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                for (int j = 0; j &lt; results.size(); j++) {</span>
+<span class="nc" id="L159">                    ScanResult r = results.get(j);</span>
+<span class="nc" id="L160">                    mapped[j] = new WiFiNetwork(</span>
+                            r.SSID,
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                            r.BSSID != null ? r.BSSID.toLowerCase(Locale.US) : null,</span>
+                            r.level,
+                            r.frequency,
+<span class="nc" id="L165">                            mapAndroidSecurity(r.capabilities));</span>
+                }
+<span class="nc" id="L167">                java.util.Arrays.sort(mapped, new Comparator&lt;WiFiNetwork&gt;() {</span>
+                    @Override public int compare(WiFiNetwork a, WiFiNetwork b) {
+<span class="nc" id="L169">                        return b.getRssi() - a.getRssi();</span>
+                    }
+                });
+<span class="nc" id="L172">                CN.callSerially(new Runnable() {</span>
+                    @Override public void run() {
+<span class="nc" id="L174">                        cb.onScanComplete(mapped, null);</span>
+<span class="nc" id="L175">                    }</span>
+                });
+<span class="nc" id="L177">            }</span>
+        };
+<span class="nc" id="L179">        ctx.registerReceiver(scanReceiver, filter);</span>
+<span class="nc" id="L180">        boolean started = wm.startScan();</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (!started) {</span>
+            // On API 28+ the OS throttles; deliver cached results.
+<span class="nc" id="L183">            CN.callSerially(new Runnable() {</span>
+                @Override public void run() {
+<span class="nc" id="L185">                    BroadcastReceiver r = scanReceiver;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                    if (r != null) {</span>
+<span class="nc" id="L187">                        r.onReceive(ctx, new Intent(</span>
+                                WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+                    }
+<span class="nc" id="L190">                }</span>
+            });
+        }
+<span class="nc" id="L193">    }</span>
+
+    private static WiFiSecurity mapAndroidSecurity(String capabilities) {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (capabilities == null) return WiFiSecurity.UNKNOWN;</span>
+<span class="nc" id="L197">        String c = capabilities.toUpperCase(Locale.US);</span>
+<span class="nc bnc" id="L198" title="All 4 branches missed.">        if (c.contains(&quot;WPA3&quot;) || c.contains(&quot;SAE&quot;)) return WiFiSecurity.WPA3_SAE;</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (c.contains(&quot;WPA&quot;)) return WiFiSecurity.WPA_PSK;</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (c.contains(&quot;WEP&quot;)) return WiFiSecurity.WEP;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (c.contains(&quot;EAP&quot;)) return WiFiSecurity.EAP;</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (c.contains(&quot;ESS&quot;)) return WiFiSecurity.OPEN;</span>
+<span class="nc" id="L203">        return WiFiSecurity.UNKNOWN;</span>
+    }
+
+    @Override
+    public void connect(final String ssid, final String password,
+                        final WiFiSecurity security,
+                        final WiFiConnectCallback cb) {
+<span class="nc" id="L210">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc" id="L211">        WifiManager wm = wifi();</span>
+<span class="nc bnc" id="L212" title="All 4 branches missed.">        if (ctx == null || wm == null) {</span>
+<span class="nc" id="L213">            failConnect(cb, &quot;WiFi unavailable&quot;);</span>
+<span class="nc" id="L214">            return;</span>
+        }
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= SDK_Q) {</span>
+<span class="nc" id="L217">            AndroidWifiPlatformLollipop.connectQ(ctx, ssid, password,</span>
+                    security, cb);
+        } else {
+<span class="nc" id="L220">            connectLegacy(wm, ssid, password, security, cb);</span>
+        }
+<span class="nc" id="L222">    }</span>
+
+    private static void connectLegacy(WifiManager wm, String ssid,
+                                      String password, WiFiSecurity security,
+                                      final WiFiConnectCallback cb) {
+        try {
+<span class="nc" id="L228">            WifiConfiguration cfg = new WifiConfiguration();</span>
+<span class="nc" id="L229">            cfg.SSID = &quot;\&quot;&quot; + ssid + &quot;\&quot;&quot;;</span>
+<span class="nc bnc" id="L230" title="All 4 branches missed.">            if (security == WiFiSecurity.OPEN || password == null) {</span>
+<span class="nc" id="L231">                cfg.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            } else if (security == WiFiSecurity.WEP) {</span>
+<span class="nc" id="L233">                cfg.wepKeys[0] = &quot;\&quot;&quot; + password + &quot;\&quot;&quot;;</span>
+<span class="nc" id="L234">                cfg.wepTxKeyIndex = 0;</span>
+<span class="nc" id="L235">                cfg.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);</span>
+<span class="nc" id="L236">                cfg.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP40);</span>
+            } else {
+<span class="nc" id="L238">                cfg.preSharedKey = &quot;\&quot;&quot; + password + &quot;\&quot;&quot;;</span>
+            }
+<span class="nc" id="L240">            int id = wm.addNetwork(cfg);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (id &lt; 0) { failConnect(cb, &quot;addNetwork failed&quot;); return; }</span>
+<span class="nc" id="L242">            wm.disconnect();</span>
+<span class="nc bnc" id="L243" title="All 4 branches missed.">            boolean ok = wm.enableNetwork(id, true) &amp;&amp; wm.reconnect();</span>
+<span class="nc" id="L244">            final boolean done = ok;</span>
+<span class="nc" id="L245">            CN.callSerially(new Runnable() {</span>
+                @Override public void run() {
+<span class="nc" id="L247">                    cb.onConnectResult(done,</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                            done ? null : new RuntimeException(&quot;Legacy enableNetwork failed&quot;));</span>
+<span class="nc" id="L249">                }</span>
+            });
+<span class="nc" id="L251">        } catch (Throwable t) {</span>
+<span class="nc" id="L252">            failConnect(cb, t.getMessage());</span>
+<span class="nc" id="L253">        }</span>
+<span class="nc" id="L254">    }</span>
+
+    @Override
+    public void disconnect(String ssid) {
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= SDK_Q) {</span>
+<span class="nc" id="L259">            AndroidWifiPlatformLollipop.disconnect(ssid);</span>
+        }
+<span class="nc" id="L261">    }</span>
+
+    private static boolean checkPermission(String perm) {
+<span class="nc" id="L264">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (ctx == null) return false;</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.M) {</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            return ctx.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED;</span>
+        }
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        return ctx.checkPermission(perm, android.os.Process.myPid(),</span>
+<span class="nc" id="L270">                android.os.Process.myUid()) == PackageManager.PERMISSION_GRANTED;</span>
+    }
+
+    private static void fail(final WiFiScanCallback cb, final String msg) {
+<span class="nc" id="L274">        CN.callSerially(new Runnable() {</span>
+            @Override public void run() {
+<span class="nc" id="L276">                cb.onScanComplete(null, new RuntimeException(msg));</span>
+<span class="nc" id="L277">            }</span>
+        });
+<span class="nc" id="L279">    }</span>
+
+    static void failConnect(final WiFiConnectCallback cb, final String msg) {
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (cb == null) return;</span>
+<span class="nc" id="L283">        CN.callSerially(new Runnable() {</span>
+            @Override public void run() {
+<span class="nc" id="L285">                cb.onConnectResult(false, new RuntimeException(msg));</span>
+<span class="nc" id="L286">            }</span>
+        });
+<span class="nc" id="L288">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

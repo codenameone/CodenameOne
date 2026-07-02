@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppReviewSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AppReviewSupport.java</span></div><h1>AppReviewSupport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import com.codename1.util.SuccessCallback;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Bridges {@link com.codename1.appreview.AppReview} to the Google Play In-App
+ * Review API ({@code com.google.android.play:review}).
+ *
+ * &lt;p&gt;The Play review library is only added to the app's Gradle build when the
+ * app references the app-review API (the {@code AndroidGradleBuilder} detects
+ * this during its class scan), so this class talks to the library purely
+ * through reflection. That keeps the Android port itself compilable without the
+ * extra dependency, and the {@code Task}/{@code OnCompleteListener} interfaces
+ * are resolved from the methods at runtime so the helper is agnostic to whether
+ * the library is on the legacy {@code com.google.android.play.core.tasks} or the
+ * newer {@code com.google.android.gms.tasks} package.&lt;/p&gt;
+ */
+class AppReviewSupport {
+    private static final String FACTORY = &quot;com.google.android.play.core.review.ReviewManagerFactory&quot;;
+
+    private AppReviewSupport() {
+    }
+
+    /**
+     * @return true if the Play In-App Review library is present in the running
+     * app (i.e. the app referenced the review API and the builder bundled it).
+     */
+    static boolean isSupported() {
+        try {
+<span class="nc" id="L60">            Class.forName(FACTORY);</span>
+<span class="nc" id="L61">            return true;</span>
+<span class="nc" id="L62">        } catch (Throwable t) {</span>
+<span class="nc" id="L63">            return false;</span>
+        }
+    }
+
+    /**
+     * Requests the native review flow. Must be called on the Android UI thread.
+     * Any failure (library missing, Play services unavailable, quota reached)
+     * completes {@code done} with {@code false} so the caller can fall back.
+     */
+    static void requestReview(final Activity activity, final SuccessCallback&lt;Boolean&gt; done) {
+        try {
+<span class="nc" id="L74">            Class&lt;?&gt; factory = Class.forName(FACTORY);</span>
+<span class="nc" id="L75">            Method create = factory.getMethod(&quot;create&quot;, Context.class);</span>
+<span class="nc" id="L76">            final Object manager = create.invoke(null, activity);</span>
+
+<span class="nc" id="L78">            Object requestFlow = manager.getClass().getMethod(&quot;requestReviewFlow&quot;).invoke(manager);</span>
+<span class="nc" id="L79">            addOnCompleteListener(requestFlow, new InvocationHandler() {</span>
+                public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+<span class="nc bnc" id="L81" title="All 6 branches missed.">                    if (!&quot;onComplete&quot;.equals(method.getName()) || args == null || args.length != 1) {</span>
+<span class="nc" id="L82">                        return defaultValue(method);</span>
+                    }
+<span class="nc" id="L84">                    Object task = args[0];</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                    if (isSuccessful(task)) {</span>
+<span class="nc" id="L86">                        Object reviewInfo = task.getClass().getMethod(&quot;getResult&quot;).invoke(task);</span>
+<span class="nc" id="L87">                        Object launchFlow = invokeNamed(manager, &quot;launchReviewFlow&quot;, activity, reviewInfo);</span>
+<span class="nc" id="L88">                        addOnCompleteListener(launchFlow, new InvocationHandler() {</span>
+                            public Object invoke(Object p2, Method m2, Object[] a2) throws Throwable {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                                if (&quot;onComplete&quot;.equals(m2.getName())) {</span>
+<span class="nc" id="L91">                                    complete(done, true);</span>
+                                }
+<span class="nc" id="L93">                                return defaultValue(m2);</span>
+                            }
+                        });
+<span class="nc" id="L96">                    } else {</span>
+<span class="nc" id="L97">                        complete(done, false);</span>
+                    }
+<span class="nc" id="L99">                    return defaultValue(method);</span>
+                }
+            });
+<span class="nc" id="L102">        } catch (Throwable t) {</span>
+<span class="nc" id="L103">            Logger.getLogger(&quot;Codename One&quot;).log(Level.WARNING, &quot;Native in-app review failed&quot;, t);</span>
+<span class="nc" id="L104">            complete(done, false);</span>
+<span class="nc" id="L105">        }</span>
+<span class="nc" id="L106">    }</span>
+
+    private static boolean isSuccessful(Object task) throws Exception {
+<span class="nc" id="L109">        Object result = task.getClass().getMethod(&quot;isSuccessful&quot;).invoke(task);</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        return result instanceof Boolean &amp;&amp; ((Boolean) result).booleanValue();</span>
+    }
+
+    /**
+     * Calls {@code task.addOnCompleteListener(listener)} for the single-argument
+     * overload, building the listener as a dynamic proxy of whatever
+     * {@code OnCompleteListener} interface that overload declares.
+     */
+    private static void addOnCompleteListener(Object task, InvocationHandler handler) throws Exception {
+<span class="nc" id="L119">        Method add = null;</span>
+<span class="nc" id="L120">        Method[] methods = task.getClass().getMethods();</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        for (int i = 0; i &lt; methods.length; i++) {</span>
+<span class="nc" id="L122">            Method m = methods[i];</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if (m.getName().equals(&quot;addOnCompleteListener&quot;) &amp;&amp; m.getParameterTypes().length == 1) {</span>
+<span class="nc" id="L124">                add = m;</span>
+<span class="nc" id="L125">                break;</span>
+            }
+        }
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (add == null) {</span>
+<span class="nc" id="L129">            throw new NoSuchMethodException(&quot;addOnCompleteListener&quot;);</span>
+        }
+<span class="nc" id="L131">        Class&lt;?&gt; listenerType = add.getParameterTypes()[0];</span>
+<span class="nc" id="L132">        Object listener = Proxy.newProxyInstance(listenerType.getClassLoader(),</span>
+                new Class[]{listenerType}, handler);
+<span class="nc" id="L134">        add.invoke(task, listener);</span>
+<span class="nc" id="L135">    }</span>
+
+    private static Object invokeNamed(Object target, String name, Object arg1, Object arg2) throws Exception {
+<span class="nc" id="L138">        Method[] methods = target.getClass().getMethods();</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        for (int i = 0; i &lt; methods.length; i++) {</span>
+<span class="nc" id="L140">            Method m = methods[i];</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">            if (m.getName().equals(name) &amp;&amp; m.getParameterTypes().length == 2) {</span>
+<span class="nc" id="L142">                return m.invoke(target, arg1, arg2);</span>
+            }
+        }
+<span class="nc" id="L145">        throw new NoSuchMethodException(name);</span>
+    }
+
+    private static void complete(SuccessCallback&lt;Boolean&gt; done, boolean value) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (done != null) {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            done.onSucess(value ? Boolean.TRUE : Boolean.FALSE);</span>
+        }
+<span class="nc" id="L152">    }</span>
+
+    private static Object defaultValue(Method method) {
+<span class="nc" id="L155">        Class&lt;?&gt; ret = method.getReturnType();</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (ret == Boolean.TYPE) {</span>
+<span class="nc" id="L157">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (ret == Integer.TYPE) {</span>
+<span class="nc" id="L160">            return Integer.valueOf(0);</span>
+        }
+<span class="nc" id="L162">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

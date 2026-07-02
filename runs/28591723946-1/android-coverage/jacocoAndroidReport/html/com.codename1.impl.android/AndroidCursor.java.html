@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidCursor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidCursor.java</span></div><h1>AndroidCursor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import com.codename1.db.Cursor;
+import com.codename1.db.Row;
+import com.codename1.db.RowExt;
+import java.io.IOException;
+
+/**
+ *
+ * @author Chen
+ */
+public class AndroidCursor implements Cursor, RowExt {
+    
+    private android.database.Cursor c;
+<span class="nc" id="L37">    private int last_read_column_index = -1;</span>
+    
+<span class="nc" id="L39">    public AndroidCursor(android.database.Cursor c) {</span>
+<span class="nc" id="L40">        this.c = c;</span>
+<span class="nc" id="L41">        this.last_read_column_index = -1;</span>
+<span class="nc" id="L42">    }</span>
+    
+    @Override
+    public boolean first() throws IOException {
+<span class="nc" id="L46">        return c.moveToFirst();</span>
+    }
+
+    @Override
+    public boolean last() throws IOException {
+<span class="nc" id="L51">        return c.moveToLast();</span>
+    }
+
+    @Override
+    public boolean next() throws IOException {
+<span class="nc" id="L56">        return c.moveToNext();</span>
+    }
+
+    @Override
+    public boolean prev() throws IOException {
+<span class="nc" id="L61">        return c.moveToPrevious();</span>
+    }
+
+    @Override
+    public int getColumnIndex(String columnName) throws IOException {
+<span class="nc" id="L66">        return c.getColumnIndex(columnName);</span>
+    }
+
+    @Override
+    public String getColumnName(int columnIndex) throws IOException {
+<span class="nc" id="L71">        return c.getColumnName(columnIndex);</span>
+    }
+
+    @Override
+    public int getPosition() throws IOException {
+<span class="nc" id="L76">        return c.getPosition();</span>
+    }
+
+    @Override
+    public Row getRow() throws IOException {
+<span class="nc" id="L81">        return this;</span>
+    }
+
+    @Override
+    public boolean position(int row) throws IOException {
+<span class="nc" id="L86">        return c.moveToPosition(row);</span>
+    }
+
+    @Override
+    public void close() throws IOException {
+<span class="nc" id="L91">        c.close();</span>
+<span class="nc" id="L92">    }</span>
+
+    @Override
+    public byte[] getBlob(int index) throws IOException {
+<span class="nc" id="L96">        last_read_column_index = index;</span>
+<span class="nc" id="L97">        return c.getBlob(index);</span>
+    }
+
+    @Override
+    public double getDouble(int index) throws IOException {
+<span class="nc" id="L102">        last_read_column_index = index;</span>
+<span class="nc" id="L103">        return c.getDouble(index);</span>
+    }
+
+    @Override
+    public float getFloat(int index) throws IOException {
+<span class="nc" id="L108">        last_read_column_index = index;</span>
+<span class="nc" id="L109">        return c.getFloat(index);</span>
+    }
+
+    @Override
+    public int getInteger(int index) throws IOException {
+<span class="nc" id="L114">        last_read_column_index = index;</span>
+<span class="nc" id="L115">        return c.getInt(index);</span>
+    }
+
+    @Override
+    public long getLong(int index) throws IOException {
+<span class="nc" id="L120">        last_read_column_index = index;</span>
+<span class="nc" id="L121">        return c.getLong(index);</span>
+    }
+
+    @Override
+    public short getShort(int index) throws IOException {
+<span class="nc" id="L126">        last_read_column_index = index;</span>
+<span class="nc" id="L127">        return c.getShort(index);</span>
+    }
+
+    @Override
+    public String getString(int index) throws IOException {
+<span class="nc" id="L132">        last_read_column_index = index;</span>
+<span class="nc" id="L133">        return c.getString(index);</span>
+    }
+    
+    public boolean isNull(int index) throws IOException {
+<span class="nc" id="L137">         return c.isNull(index);</span>
+    }
+    
+    @Override
+    public boolean wasNull() throws IOException {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (last_read_column_index&lt;0){return true;}</span>
+<span class="nc" id="L143">        return c.isNull(last_read_column_index);</span>
+    }
+
+    @Override
+    public int getColumnCount() throws IOException {
+<span class="nc" id="L148">        return c.getColumnCount();</span>
+    }
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

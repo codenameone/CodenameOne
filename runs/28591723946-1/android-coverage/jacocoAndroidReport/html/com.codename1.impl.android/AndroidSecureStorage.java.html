@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidSecureStorage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidSecureStorage.java</span></div><h1>AndroidSecureStorage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.hardware.fingerprint.FingerprintManager;
+import android.os.Build;
+import android.os.CancellationSignal;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
+
+import com.codename1.io.Log;
+import com.codename1.security.BiometricError;
+import com.codename1.security.BiometricException;
+import com.codename1.security.SecureStorage;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+
+/**
+ * Android backing for {@link SecureStorage}. Values are AES/CBC/PKCS7-encrypted
+ * with a key stored in the AndroidKeyStore (alias {@code BiometricsKey}), then
+ * persisted to a private {@code SharedPreferences} file along with the
+ * randomly-generated IV. The keystore key is created with
+ * {@code setUserAuthenticationRequired(true)} so a write or read forces a
+ * biometric prompt; if the user re-enrols biometrics the key becomes
+ * permanently invalidated and reads fail with
+ * {@link BiometricError#KEY_REVOKED}.
+ *
+ * &lt;p&gt;Carries forward two non-obvious workarounds from the original cn1lib that
+ * must NOT be reverted without re-testing:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;On API 33+ the {@code setUserAuthenticationRequired} call is skipped
+ *   to side-step &lt;a href=&quot;https://github.com/codenameone/FingerprintScanner/issues/8&quot;&gt;FingerprintScanner #8&lt;/a&gt;.
+ *   &lt;li&gt;On Samsung devices running 8.0.0 the cipher init can succeed but
+ *   final decryption then fails with a key-invalidated error; we delete the
+ *   key and recreate it on first failure to recover.
+ *   See &lt;a href=&quot;https://issuetracker.google.com/u/0/issues/65578763&quot;&gt;Google issue 65578763&lt;/a&gt;.
+ * &lt;/ul&gt;
+ */
+public final class AndroidSecureStorage extends SecureStorage {
+
+    private static final String KEY_ID = &quot;BiometricsKey&quot;;
+    private static final String PREFS = &quot;CN1BiometricSecureStorage&quot;;
+    private static final String ANDROID_KEY_STORE = &quot;AndroidKeyStore&quot;;
+
+    private KeyStore keyStore;
+    private KeyGenerator keyGenerator;
+    private Cipher cipher;
+    private boolean keyRevoked;
+    private CancellationSignal cancellationSignal;
+
+<span class="fc" id="L92">    AndroidSecureStorage() {</span>
+<span class="fc" id="L93">    }</span>
+
+    @Override
+    public void setKeychainAccessGroup(String group) {
+        // iOS-only; no-op on Android.
+<span class="nc" id="L98">    }</span>
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; set(final String reason, final String account, final String value) {
+<span class="nc" id="L102">        final AsyncResource&lt;Boolean&gt; result = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &lt; 23) {</span>
+<span class="nc" id="L104">            result.error(new BiometricException(BiometricError.NOT_AVAILABLE,</span>
+                    &quot;Android API 23 required for biometric secure storage&quot;));
+<span class="nc" id="L106">            return result;</span>
+        }
+<span class="nc" id="L108">        runAuthenticatedCipher(reason, account, Cipher.ENCRYPT_MODE, result,</span>
+                new EncryptCipherWork(account, value));
+<span class="nc" id="L110">        return result;</span>
+    }
+
+    private static final class EncryptCipherWork implements CipherWork&lt;Boolean&gt; {
+        private final String account;
+        private final String value;
+<span class="nc" id="L116">        EncryptCipherWork(String account, String value) {</span>
+<span class="nc" id="L117">            this.account = account;</span>
+<span class="nc" id="L118">            this.value = value;</span>
+<span class="nc" id="L119">        }</span>
+        @Override
+        public Boolean run(Cipher c) throws Exception {
+<span class="nc" id="L122">            byte[] enc = c.doFinal(value.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L123">            SharedPreferences sp = AndroidNativeUtil.getActivity()</span>
+<span class="nc" id="L124">                    .getApplicationContext()</span>
+<span class="nc" id="L125">                    .getSharedPreferences(PREFS, Context.MODE_PRIVATE);</span>
+<span class="nc" id="L126">            sp.edit()</span>
+<span class="nc" id="L127">                    .putString(&quot;v_&quot; + account, Base64.encodeToString(enc, Base64.DEFAULT))</span>
+<span class="nc" id="L128">                    .putString(&quot;iv_&quot; + account, Base64.encodeToString(c.getIV(), Base64.DEFAULT))</span>
+<span class="nc" id="L129">                    .apply();</span>
+<span class="nc" id="L130">            return Boolean.TRUE;</span>
+        }
+    }
+
+    @Override
+    public AsyncResource&lt;String&gt; get(final String reason, final String account) {
+<span class="nc" id="L136">        final AsyncResource&lt;String&gt; result = new AsyncResource&lt;String&gt;();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &lt; 23) {</span>
+<span class="nc" id="L138">            result.error(new BiometricException(BiometricError.NOT_AVAILABLE,</span>
+                    &quot;Android API 23 required for biometric secure storage&quot;));
+<span class="nc" id="L140">            return result;</span>
+        }
+<span class="nc" id="L142">        SharedPreferences sp = AndroidNativeUtil.getActivity()</span>
+<span class="nc" id="L143">                .getApplicationContext()</span>
+<span class="nc" id="L144">                .getSharedPreferences(PREFS, Context.MODE_PRIVATE);</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (sp.getString(&quot;iv_&quot; + account, null) == null) {</span>
+<span class="nc" id="L146">            result.error(new BiometricException(BiometricError.UNKNOWN,</span>
+                    &quot;No secure storage entry for account: &quot; + account));
+<span class="nc" id="L148">            return result;</span>
+        }
+<span class="nc" id="L150">        runAuthenticatedCipher(reason, account, Cipher.DECRYPT_MODE, result,</span>
+                new DecryptCipherWork(account));
+<span class="nc" id="L152">        return result;</span>
+    }
+
+    private static final class DecryptCipherWork implements CipherWork&lt;String&gt; {
+        private final String account;
+<span class="nc" id="L157">        DecryptCipherWork(String account) { this.account = account; }</span>
+        @Override
+        public String run(Cipher c) throws Exception {
+<span class="nc" id="L160">            SharedPreferences sp2 = AndroidNativeUtil.getActivity()</span>
+<span class="nc" id="L161">                    .getApplicationContext()</span>
+<span class="nc" id="L162">                    .getSharedPreferences(PREFS, Context.MODE_PRIVATE);</span>
+<span class="nc" id="L163">            byte[] enc = Base64.decode(sp2.getString(&quot;v_&quot; + account, &quot;&quot;), Base64.DEFAULT);</span>
+<span class="nc" id="L164">            byte[] dec = c.doFinal(enc);</span>
+<span class="nc" id="L165">            return new String(dec, &quot;UTF-8&quot;);</span>
+        }
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; remove(String reason, String account) {
+<span class="nc" id="L171">        AsyncResource&lt;Boolean&gt; result = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L172">        SharedPreferences sp = AndroidNativeUtil.getActivity()</span>
+<span class="nc" id="L173">                .getApplicationContext()</span>
+<span class="nc" id="L174">                .getSharedPreferences(PREFS, Context.MODE_PRIVATE);</span>
+<span class="nc" id="L175">        sp.edit().remove(&quot;v_&quot; + account).remove(&quot;iv_&quot; + account).apply();</span>
+<span class="nc" id="L176">        result.complete(Boolean.TRUE);</span>
+<span class="nc" id="L177">        return result;</span>
+    }
+
+    /**
+     * Generic helper that initialises the cipher under the keystore key,
+     * prompts the user via {@code BiometricPrompt} (or legacy
+     * {@code FingerprintManager}), and on success runs the supplied
+     * {@link CipherWork} against the authenticated cipher.
+     */
+    private &lt;V&gt; void runAuthenticatedCipher(final String reason, final String account,
+                                            final int mode, final AsyncResource&lt;V&gt; result,
+                                            final CipherWork&lt;V&gt; work) {
+<span class="nc" id="L189">        SecretKey secret = getSecretKey();</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (secret == null) {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">            if (mode == Cipher.ENCRYPT_MODE) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                if (!createKey()) {</span>
+<span class="nc" id="L193">                    failResult(result, BiometricError.UNKNOWN, &quot;Failed to create keystore key&quot;);</span>
+<span class="nc" id="L194">                    return;</span>
+                }
+            } else {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (keyRevoked) {</span>
+<span class="nc" id="L198">                    failResult(result, BiometricError.KEY_REVOKED, &quot;Key has been invalidated&quot;);</span>
+                } else {
+<span class="nc" id="L200">                    failResult(result, BiometricError.UNKNOWN, &quot;No keystore key for account&quot;);</span>
+                }
+<span class="nc" id="L202">                return;</span>
+            }
+        }
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (!initCipher(mode, account)) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (mode == Cipher.ENCRYPT_MODE) {</span>
+<span class="nc bnc" id="L207" title="All 4 branches missed.">                if (!createKey() || !initCipher(mode, account)) {</span>
+<span class="nc" id="L208">                    failResult(result, BiometricError.UNKNOWN, &quot;Failed to initialise cipher&quot;);</span>
+<span class="nc" id="L209">                    return;</span>
+                }
+            } else {
+<span class="nc" id="L212">                failResult(result, BiometricError.KEY_REVOKED,</span>
+                        &quot;Failed to initialise cipher; key must have been revoked&quot;);
+<span class="nc" id="L214">                return;</span>
+            }
+        }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= 29) {</span>
+<span class="nc" id="L218">            promptBiometric29(reason, mode, account, result, work);</span>
+        } else {
+<span class="nc" id="L220">            promptBiometricLegacy(mode, account, result, work);</span>
+        }
+<span class="nc" id="L222">    }</span>
+
+    private &lt;V&gt; void promptBiometric29(final String reason, final int mode, final String account,
+                                       final AsyncResource&lt;V&gt; result, final CipherWork&lt;V&gt; work) {
+<span class="nc" id="L226">        AndroidBiometrics.runOnUi(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                if (cancellationSignal != null) {</span>
+<span class="nc" id="L230">                    cancellationSignal.cancel();</span>
+                }
+<span class="nc" id="L232">                final CancellationSignal cs = new CancellationSignal();</span>
+<span class="nc" id="L233">                cancellationSignal = cs;</span>
+<span class="nc" id="L234">                BiometricsApi29.authenticateWithCipher(</span>
+<span class="nc" id="L235">                        AndroidNativeUtil.getActivity(),</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                        reason == null ? &quot;Authenticate&quot; : reason,</span>
+                        null, null, &quot;Cancel&quot;,
+                        cipher,
+                        cs,
+<span class="nc" id="L240">                        new BiometricsApi29.CipherAuthCallback() {</span>
+                            @Override
+                            public void onSuccess(Object authedCipher) {
+<span class="nc" id="L243">                                cs.cancel();</span>
+<span class="nc" id="L244">                                runCipherWork((Cipher) authedCipher, work, result, mode, account);</span>
+<span class="nc" id="L245">                            }</span>
+
+                            @Override
+                            public void onError(int errorCode, String errString) {
+<span class="nc" id="L249">                                failResult(result,</span>
+<span class="nc" id="L250">                                        AndroidBiometrics.mapBiometricPromptError(errorCode),</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">                                        errString == null ? &quot;&quot; : errString);</span>
+<span class="nc" id="L252">                            }</span>
+                        });
+<span class="nc" id="L254">            }</span>
+        });
+<span class="nc" id="L256">    }</span>
+
+    private &lt;V&gt; void promptBiometricLegacy(final int mode, final String account,
+                                           final AsyncResource&lt;V&gt; result, final CipherWork&lt;V&gt; work) {
+<span class="nc" id="L260">        AndroidBiometrics.runOnUi(new Runnable() {</span>
+            @Override
+            public void run() {
+                FingerprintManager fpm = (FingerprintManager)
+<span class="nc" id="L264">                        AndroidNativeUtil.getActivity()</span>
+<span class="nc" id="L265">                                .getSystemService(Activity.FINGERPRINT_SERVICE);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                if (fpm == null) {</span>
+<span class="nc" id="L267">                    failResult(result, BiometricError.NOT_AVAILABLE, &quot;No fingerprint hardware&quot;);</span>
+<span class="nc" id="L268">                    return;</span>
+                }
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                if (cancellationSignal != null) {</span>
+<span class="nc" id="L271">                    cancellationSignal.cancel();</span>
+                }
+<span class="nc" id="L273">                final CancellationSignal cs = new CancellationSignal();</span>
+<span class="nc" id="L274">                cancellationSignal = cs;</span>
+<span class="nc" id="L275">                FingerprintManager.CryptoObject crypto =</span>
+                        new FingerprintManager.CryptoObject(cipher);
+<span class="nc" id="L277">                fpm.authenticate(crypto, cs, 0, new FingerprintManager.AuthenticationCallback() {</span>
+                    int failures;
+
+                    @Override
+                    public void onAuthenticationError(int errorCode, CharSequence errString) {
+<span class="nc" id="L282">                        failResult(result, AndroidBiometrics.mapFingerprintManagerError(errorCode),</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                                errString == null ? &quot;&quot; : errString.toString());</span>
+<span class="nc" id="L284">                    }</span>
+
+                    @Override
+                    public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult r) {
+<span class="nc" id="L288">                        cs.cancel();</span>
+<span class="nc" id="L289">                        runCipherWork(r.getCryptoObject().getCipher(), work, result, mode, account);</span>
+<span class="nc" id="L290">                    }</span>
+
+                    @Override
+                    public void onAuthenticationFailed() {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                        if (failures++ &gt; 5) {</span>
+<span class="nc" id="L295">                            cs.cancel();</span>
+<span class="nc" id="L296">                            failResult(result, BiometricError.AUTHENTICATION_FAILED,</span>
+                                    &quot;Authentication failed&quot;);
+                        }
+<span class="nc" id="L299">                    }</span>
+                }, null);
+<span class="nc" id="L301">            }</span>
+        });
+<span class="nc" id="L303">    }</span>
+
+    private &lt;V&gt; void runCipherWork(Cipher authedCipher, CipherWork&lt;V&gt; work,
+                                   final AsyncResource&lt;V&gt; result, int mode, String account) {
+        try {
+<span class="nc" id="L308">            V v = work.run(authedCipher);</span>
+<span class="nc" id="L309">            succeedResult(result, v);</span>
+<span class="nc" id="L310">        } catch (Throwable t) {</span>
+            // Samsung 8.0.0 quirk: the cipher passes init but doFinal fails
+            // with a key-invalidated error. Delete the key and let the caller
+            // retry the entire operation.
+            // https://issuetracker.google.com/u/0/issues/65578763
+<span class="nc" id="L315">            removePermanentlyInvalidatedKey();</span>
+<span class="nc" id="L316">            cipher = null;</span>
+<span class="nc" id="L317">            failResult(result, BiometricError.KEY_REVOKED,</span>
+<span class="nc" id="L318">                    &quot;Cipher operation failed; key invalidated: &quot; + t.getMessage());</span>
+<span class="nc" id="L319">        }</span>
+<span class="nc" id="L320">    }</span>
+
+    private &lt;V&gt; void succeedResult(final AsyncResource&lt;V&gt; result, final V value) {
+<span class="nc" id="L323">        Display.getInstance().callSerially(new SucceedResultRunnable&lt;V&gt;(result, value));</span>
+<span class="nc" id="L324">    }</span>
+
+    private static final class SucceedResultRunnable&lt;V&gt; implements Runnable {
+        private final AsyncResource&lt;V&gt; result;
+        private final V value;
+<span class="nc" id="L329">        SucceedResultRunnable(AsyncResource&lt;V&gt; result, V value) {</span>
+<span class="nc" id="L330">            this.result = result;</span>
+<span class="nc" id="L331">            this.value = value;</span>
+<span class="nc" id="L332">        }</span>
+        @Override
+        public void run() {
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            if (!result.isDone()) {</span>
+<span class="nc" id="L336">                result.complete(value);</span>
+            }
+<span class="nc" id="L338">        }</span>
+    }
+
+    private static &lt;V&gt; void failResult(final AsyncResource&lt;V&gt; result,
+                                       final BiometricError err, final String msg) {
+<span class="nc" id="L343">        Display.getInstance().callSerially(new FailResultRunnable&lt;V&gt;(result, err, msg));</span>
+<span class="nc" id="L344">    }</span>
+
+    private static final class FailResultRunnable&lt;V&gt; implements Runnable {
+        private final AsyncResource&lt;V&gt; result;
+        private final BiometricError err;
+        private final String msg;
+<span class="nc" id="L350">        FailResultRunnable(AsyncResource&lt;V&gt; result, BiometricError err, String msg) {</span>
+<span class="nc" id="L351">            this.result = result;</span>
+<span class="nc" id="L352">            this.err = err;</span>
+<span class="nc" id="L353">            this.msg = msg;</span>
+<span class="nc" id="L354">        }</span>
+        @Override
+        public void run() {
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            if (!result.isDone()) {</span>
+<span class="nc" id="L358">                result.error(new BiometricException(err, msg));</span>
+            }
+<span class="nc" id="L360">        }</span>
+    }
+
+    // --- Keystore / cipher helpers (faithful port of the cn1lib idioms) -----
+
+    private KeyStore keyStore() {
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        if (keyStore == null) {</span>
+            try {
+<span class="nc" id="L368">                keyGenerator = KeyGenerator.getInstance(</span>
+                        KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
+<span class="nc" id="L370">                keyStore = KeyStore.getInstance(ANDROID_KEY_STORE);</span>
+<span class="nc" id="L371">            } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L372">                throw new RuntimeException(&quot;KeyGenerator init failed&quot;, e);</span>
+<span class="nc" id="L373">            } catch (NoSuchProviderException e) {</span>
+<span class="nc" id="L374">                throw new RuntimeException(&quot;KeyGenerator init failed&quot;, e);</span>
+<span class="nc" id="L375">            } catch (KeyStoreException e) {</span>
+<span class="nc" id="L376">                throw new RuntimeException(&quot;KeyStore init failed&quot;, e);</span>
+<span class="nc" id="L377">            }</span>
+        }
+<span class="nc" id="L379">        return keyStore;</span>
+    }
+
+    private boolean createKey() {
+        try {
+<span class="nc" id="L384">            keyStore().load(null);</span>
+<span class="nc" id="L385">            KeyGenParameterSpec.Builder b = new KeyGenParameterSpec.Builder(KEY_ID,</span>
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+<span class="nc" id="L387">                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)</span>
+<span class="nc" id="L388">                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7);</span>
+            // Skip setUserAuthenticationRequired on API 33+ per
+            // FingerprintScanner #8; the BiometricPrompt still authenticates
+            // the user, but the keystore no longer ties the key lifetime to
+            // biometric enrolment (which caused recovery failures).
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            if (Build.VERSION.SDK_INT &lt; 33) {</span>
+<span class="nc" id="L394">                b.setUserAuthenticationRequired(true);</span>
+            }
+<span class="nc" id="L396">            keyGenerator.init(b.build());</span>
+<span class="nc" id="L397">            keyGenerator.generateKey();</span>
+<span class="nc" id="L398">            return true;</span>
+<span class="nc" id="L399">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L400">            Log.e(e);</span>
+<span class="nc" id="L401">        } catch (InvalidAlgorithmParameterException e) {</span>
+<span class="nc" id="L402">            Log.e(e);</span>
+<span class="nc" id="L403">        } catch (CertificateException e) {</span>
+<span class="nc" id="L404">            Log.e(e);</span>
+<span class="nc" id="L405">        } catch (IOException e) {</span>
+<span class="nc" id="L406">            Log.e(e);</span>
+<span class="nc" id="L407">        }</span>
+<span class="nc" id="L408">        return false;</span>
+    }
+
+    private SecretKey getSecretKey() {
+<span class="nc" id="L412">        keyRevoked = false;</span>
+        try {
+<span class="nc" id="L414">            keyStore().load(null);</span>
+<span class="nc" id="L415">            return (SecretKey) keyStore.getKey(KEY_ID, null);</span>
+<span class="nc" id="L416">        } catch (UnrecoverableKeyException e) {</span>
+<span class="nc" id="L417">            keyRevoked = true;</span>
+<span class="nc" id="L418">        } catch (KeyStoreException e) {</span>
+<span class="nc" id="L419">            Log.e(e);</span>
+<span class="nc" id="L420">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L421">            Log.e(e);</span>
+<span class="nc" id="L422">        } catch (CertificateException e) {</span>
+<span class="nc" id="L423">            Log.e(e);</span>
+<span class="nc" id="L424">        } catch (IOException e) {</span>
+<span class="nc" id="L425">            Log.e(e);</span>
+<span class="nc" id="L426">        }</span>
+<span class="nc" id="L427">        return null;</span>
+    }
+
+    private Cipher cipher() {
+<span class="nc bnc" id="L431" title="All 2 branches missed.">        if (cipher == null) {</span>
+            try {
+<span class="nc" id="L433">                cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES</span>
+                        + &quot;/&quot; + KeyProperties.BLOCK_MODE_CBC
+                        + &quot;/&quot; + KeyProperties.ENCRYPTION_PADDING_PKCS7);
+<span class="nc" id="L436">            } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L437">                throw new RuntimeException(&quot;Cipher init failed&quot;, e);</span>
+<span class="nc" id="L438">            } catch (NoSuchPaddingException e) {</span>
+<span class="nc" id="L439">                throw new RuntimeException(&quot;Cipher init failed&quot;, e);</span>
+<span class="nc" id="L440">            }</span>
+        }
+<span class="nc" id="L442">        return cipher;</span>
+    }
+
+    private boolean initCipher(int mode, String account) {
+        try {
+<span class="nc" id="L447">            SecretKey key = getSecretKey();</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">            if (key == null) {</span>
+<span class="nc" id="L449">                return false;</span>
+            }
+<span class="nc bnc" id="L451" title="All 2 branches missed.">            if (mode == Cipher.ENCRYPT_MODE) {</span>
+<span class="nc" id="L452">                cipher().init(mode, key);</span>
+            } else {
+<span class="nc" id="L454">                SharedPreferences sp = AndroidNativeUtil.getActivity()</span>
+<span class="nc" id="L455">                        .getApplicationContext()</span>
+<span class="nc" id="L456">                        .getSharedPreferences(PREFS, Context.MODE_PRIVATE);</span>
+<span class="nc" id="L457">                byte[] iv = Base64.decode(sp.getString(&quot;iv_&quot; + account, &quot;&quot;), Base64.DEFAULT);</span>
+<span class="nc" id="L458">                cipher().init(mode, key, new IvParameterSpec(iv));</span>
+            }
+<span class="nc" id="L460">            return true;</span>
+<span class="nc" id="L461">        } catch (KeyPermanentlyInvalidatedException e) {</span>
+<span class="nc" id="L462">            removePermanentlyInvalidatedKey();</span>
+<span class="nc" id="L463">            return false;</span>
+<span class="nc" id="L464">        } catch (InvalidKeyException e) {</span>
+<span class="nc" id="L465">            Log.e(e);</span>
+<span class="nc" id="L466">            return false;</span>
+<span class="nc" id="L467">        } catch (InvalidAlgorithmParameterException e) {</span>
+<span class="nc" id="L468">            Log.e(e);</span>
+<span class="nc" id="L469">            return false;</span>
+        }
+    }
+
+    private void removePermanentlyInvalidatedKey() {
+        try {
+<span class="nc" id="L475">            keyStore().deleteEntry(KEY_ID);</span>
+<span class="nc" id="L476">            cipher = null;</span>
+<span class="nc" id="L477">        } catch (KeyStoreException e) {</span>
+<span class="nc" id="L478">            Log.e(e);</span>
+<span class="nc" id="L479">        }</span>
+<span class="nc" id="L480">    }</span>
+
+    /** Lambda-stand-in for Java 5 source level: cipher op that may throw. */
+    private interface CipherWork&lt;V&gt; {
+        V run(Cipher c) throws Exception;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

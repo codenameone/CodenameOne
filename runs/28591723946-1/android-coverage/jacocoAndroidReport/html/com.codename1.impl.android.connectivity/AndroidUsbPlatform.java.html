@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidUsbPlatform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android.connectivity</a> &gt; <span class="el_source">AndroidUsbPlatform.java</span></div><h1>AndroidUsbPlatform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ */
+package com.codename1.impl.android.connectivity;
+
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.hardware.usb.UsbConstants;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbEndpoint;
+import android.hardware.usb.UsbInterface;
+import android.hardware.usb.UsbManager;
+import android.os.Build;
+
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.io.usb.UsbDevice;
+import com.codename1.io.usb.UsbDeviceListener;
+import com.codename1.io.usb.UsbPlatform;
+import com.codename1.ui.CN;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/// Android USB host implementation. All Android USB symbols touched here
+/// are API 12+ so the class verifies on the minimum supported Android
+/// (KitKat / API 19).
+<span class="nc" id="L41">public final class AndroidUsbPlatform extends UsbPlatform {</span>
+    private static final String ACTION_PERM = &quot;com.codename1.usb.PERMISSION&quot;;
+    // Build.VERSION_CODES.S (=31) isn't on the legacy compile SDK; use the
+    // literal value.
+    private static final int SDK_S = 31;
+
+<span class="nc" id="L47">    private final List&lt;UsbDeviceListener&gt; listeners = new ArrayList&lt;UsbDeviceListener&gt;();</span>
+    private BroadcastReceiver attachReceiver;
+    private BroadcastReceiver permReceiver;
+
+    @Override
+    public boolean isSupported() {
+<span class="nc" id="L53">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (ctx == null) return false;</span>
+<span class="nc" id="L55">        return ctx.getPackageManager()</span>
+<span class="nc" id="L56">                .hasSystemFeature(PackageManager.FEATURE_USB_HOST);</span>
+    }
+
+    private UsbManager usb() {
+<span class="nc" id="L60">        return staticUsb();</span>
+    }
+
+    private static UsbManager staticUsb() {
+<span class="nc" id="L64">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (ctx == null) return null;</span>
+<span class="nc" id="L66">        return (UsbManager) ctx.getSystemService(Context.USB_SERVICE);</span>
+    }
+
+    @Override
+    public UsbDevice[] listDevices() {
+<span class="nc" id="L71">        UsbManager um = usb();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (um == null) return new UsbDevice[0];</span>
+<span class="nc" id="L73">        Map&lt;String, android.hardware.usb.UsbDevice&gt; map = um.getDeviceList();</span>
+<span class="nc" id="L74">        UsbDevice[] out = new UsbDevice[map.size()];</span>
+<span class="nc" id="L75">        int i = 0;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        for (android.hardware.usb.UsbDevice d : map.values()) {</span>
+<span class="nc" id="L77">            out[i++] = wrap(d);</span>
+<span class="nc" id="L78">        }</span>
+<span class="nc" id="L79">        return out;</span>
+    }
+
+    private static UsbDevice wrap(android.hardware.usb.UsbDevice d) {
+<span class="nc" id="L83">        String mfr = null, prod = null;</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.LOLLIPOP) {</span>
+<span class="nc" id="L85">            mfr = d.getManufacturerName();</span>
+<span class="nc" id="L86">            prod = d.getProductName();</span>
+        }
+<span class="nc" id="L88">        return new UsbDevice(d.getDeviceName(), d.getVendorId(),</span>
+<span class="nc" id="L89">                d.getProductId(), prod, mfr, d);</span>
+    }
+
+    @Override
+    public synchronized void addDeviceListener(UsbDeviceListener l) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (listeners.contains(l)) return;</span>
+<span class="nc" id="L95">        listeners.add(l);</span>
+<span class="nc" id="L96">        ensureReceiverInstalled();</span>
+<span class="nc" id="L97">    }</span>
+
+    @Override
+    public synchronized void removeDeviceListener(UsbDeviceListener l) {
+<span class="nc" id="L101">        listeners.remove(l);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (listeners.isEmpty()) {</span>
+<span class="nc" id="L103">            uninstallReceiver();</span>
+        }
+<span class="nc" id="L105">    }</span>
+
+    private void ensureReceiverInstalled() {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (attachReceiver != null) return;</span>
+<span class="nc" id="L109">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (ctx == null) return;</span>
+<span class="nc" id="L111">        attachReceiver = new BroadcastReceiver() {</span>
+            @Override public void onReceive(Context c, Intent i) {
+<span class="nc" id="L113">                android.hardware.usb.UsbDevice d = i.getParcelableExtra(UsbManager.EXTRA_DEVICE);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                if (d == null) return;</span>
+<span class="nc" id="L115">                final UsbDevice wrapped = wrap(d);</span>
+<span class="nc" id="L116">                final boolean attached = UsbManager.ACTION_USB_DEVICE_ATTACHED</span>
+<span class="nc" id="L117">                        .equals(i.getAction());</span>
+<span class="nc" id="L118">                CN.callSerially(new Runnable() {</span>
+                    @Override public void run() {
+                        UsbDeviceListener[] arr;
+<span class="nc" id="L121">                        synchronized (AndroidUsbPlatform.this) {</span>
+<span class="nc" id="L122">                            arr = listeners.toArray(new UsbDeviceListener[listeners.size()]);</span>
+<span class="nc" id="L123">                        }</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                        for (UsbDeviceListener l : arr) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                            if (attached) l.onDeviceAttached(wrapped);</span>
+<span class="nc" id="L126">                            else l.onDeviceDetached(wrapped);</span>
+                        }
+<span class="nc" id="L128">                    }</span>
+                });
+<span class="nc" id="L130">            }</span>
+        };
+<span class="nc" id="L132">        IntentFilter f = new IntentFilter();</span>
+<span class="nc" id="L133">        f.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);</span>
+<span class="nc" id="L134">        f.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);</span>
+<span class="nc" id="L135">        ctx.registerReceiver(attachReceiver, f);</span>
+<span class="nc" id="L136">    }</span>
+
+    private void uninstallReceiver() {
+<span class="nc" id="L139">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        if (ctx != null &amp;&amp; attachReceiver != null) {</span>
+<span class="nc" id="L141">            try { ctx.unregisterReceiver(attachReceiver); } catch (Throwable ignored) { }</span>
+        }
+<span class="nc" id="L143">        attachReceiver = null;</span>
+<span class="nc" id="L144">    }</span>
+
+    @Override
+    public void requestPermission(final UsbDevice device) {
+<span class="nc" id="L148">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc" id="L149">        UsbManager um = usb();</span>
+<span class="nc bnc" id="L150" title="All 6 branches missed.">        if (ctx == null || um == null || device == null) return;</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (permReceiver == null) {</span>
+<span class="nc" id="L152">            permReceiver = new BroadcastReceiver() {</span>
+                @Override public void onReceive(Context c, Intent i) {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                    if (!ACTION_PERM.equals(i.getAction())) return;</span>
+<span class="nc" id="L155">                    android.hardware.usb.UsbDevice native_ =</span>
+<span class="nc" id="L156">                            i.getParcelableExtra(UsbManager.EXTRA_DEVICE);</span>
+<span class="nc" id="L157">                    final boolean granted = i.getBooleanExtra(</span>
+                            UsbManager.EXTRA_PERMISSION_GRANTED, false);
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                    final UsbDevice wrapped = native_ != null ? wrap(native_) : device;</span>
+<span class="nc" id="L160">                    CN.callSerially(new Runnable() {</span>
+                        @Override public void run() {
+                            UsbDeviceListener[] arr;
+<span class="nc" id="L163">                            synchronized (AndroidUsbPlatform.this) {</span>
+<span class="nc" id="L164">                                arr = listeners.toArray(new UsbDeviceListener[listeners.size()]);</span>
+<span class="nc" id="L165">                            }</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                            for (UsbDeviceListener l : arr) {</span>
+<span class="nc" id="L167">                                l.onPermissionResult(wrapped, granted);</span>
+                            }
+<span class="nc" id="L169">                        }</span>
+                    });
+<span class="nc" id="L171">                }</span>
+            };
+<span class="nc" id="L173">            ctx.registerReceiver(permReceiver, new IntentFilter(ACTION_PERM));</span>
+        }
+<span class="nc" id="L175">        int flags = 0;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= SDK_S) {</span>
+<span class="nc" id="L177">            flags = PendingIntent.FLAG_IMMUTABLE;</span>
+        }
+<span class="nc" id="L179">        PendingIntent pi = PendingIntent.getBroadcast(ctx, 0,</span>
+                new Intent(ACTION_PERM), flags);
+<span class="nc" id="L181">        um.requestPermission((android.hardware.usb.UsbDevice) device.getNativeDevice(), pi);</span>
+<span class="nc" id="L182">    }</span>
+
+    @Override
+    public boolean hasPermission(UsbDevice device) {
+<span class="nc" id="L186">        UsbManager um = usb();</span>
+<span class="nc bnc" id="L187" title="All 4 branches missed.">        if (um == null || device == null) return false;</span>
+<span class="nc" id="L188">        return um.hasPermission((android.hardware.usb.UsbDevice) device.getNativeDevice());</span>
+    }
+
+    @Override
+    public InputStream openInputStream(UsbDevice device, int endpoint)
+            throws IOException {
+<span class="nc" id="L194">        return new UsbStream(device, endpoint, UsbConstants.USB_DIR_IN)</span>
+<span class="nc" id="L195">                .asInputStream();</span>
+    }
+
+    @Override
+    public OutputStream openOutputStream(UsbDevice device, int endpoint)
+            throws IOException {
+<span class="nc" id="L201">        return new UsbStream(device, endpoint, UsbConstants.USB_DIR_OUT)</span>
+<span class="nc" id="L202">                .asOutputStream();</span>
+    }
+
+    /// Adapter that bridges an Android USB endpoint to a Java stream.
+    /// Uses bulk transfers with a 5-second timeout. Declared static so it
+    /// doesn't pin an AndroidUsbPlatform instance for the stream's lifetime.
+    private static final class UsbStream {
+        private final UsbDeviceConnection conn;
+        private final UsbEndpoint endpoint;
+        private final UsbInterface iface;
+
+        UsbStream(UsbDevice device, int endpointAddr, int direction)
+<span class="nc" id="L214">                throws IOException {</span>
+<span class="nc" id="L215">            UsbManager um = staticUsb();</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            if (um == null) throw new IOException(&quot;UsbManager unavailable&quot;);</span>
+<span class="nc" id="L217">            android.hardware.usb.UsbDevice native_ =</span>
+<span class="nc" id="L218">                    (android.hardware.usb.UsbDevice) device.getNativeDevice();</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            if (native_ == null) throw new IOException(&quot;UsbDevice has no native handle&quot;);</span>
+<span class="nc" id="L220">            UsbInterface chosenIface = null;</span>
+<span class="nc" id="L221">            UsbEndpoint chosenEp = null;</span>
+<span class="nc bnc" id="L222" title="All 4 branches missed.">            for (int i = 0; i &lt; native_.getInterfaceCount() &amp;&amp; chosenEp == null; i++) {</span>
+<span class="nc" id="L223">                UsbInterface ui = native_.getInterface(i);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                for (int j = 0; j &lt; ui.getEndpointCount(); j++) {</span>
+<span class="nc" id="L225">                    UsbEndpoint ep = ui.getEndpoint(j);</span>
+<span class="nc bnc" id="L226" title="All 4 branches missed.">                    if (ep.getAddress() == endpointAddr &amp;&amp; ep.getDirection() == direction) {</span>
+<span class="nc" id="L227">                        chosenIface = ui;</span>
+<span class="nc" id="L228">                        chosenEp = ep;</span>
+<span class="nc" id="L229">                        break;</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (chosenEp == null) {</span>
+<span class="nc" id="L234">                throw new IOException(&quot;Endpoint 0x&quot; + Integer.toHexString(endpointAddr)</span>
+                        + &quot; not found in direction &quot; + direction);
+            }
+<span class="nc" id="L237">            this.conn = um.openDevice(native_);</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">            if (conn == null) throw new IOException(&quot;openDevice failed (no permission?)&quot;);</span>
+<span class="nc" id="L239">            this.iface = chosenIface;</span>
+<span class="nc" id="L240">            this.endpoint = chosenEp;</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (!conn.claimInterface(iface, true)) {</span>
+<span class="nc" id="L242">                conn.close();</span>
+<span class="nc" id="L243">                throw new IOException(&quot;claimInterface failed&quot;);</span>
+            }
+<span class="nc" id="L245">        }</span>
+
+        InputStream asInputStream() {
+<span class="nc" id="L248">            return new InputStream() {</span>
+<span class="nc" id="L249">                private final byte[] one = new byte[1];</span>
+                @Override public int read() throws IOException {
+<span class="nc" id="L251">                    int n = read(one, 0, 1);</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                    return n &lt;= 0 ? -1 : (one[0] &amp; 0xFF);</span>
+                }
+                @Override public int read(byte[] b, int off, int len) throws IOException {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                    byte[] buf = (off == 0) ? b : new byte[len];</span>
+<span class="nc" id="L256">                    int n = conn.bulkTransfer(endpoint, buf, len, 5000);</span>
+<span class="nc bnc" id="L257" title="All 4 branches missed.">                    if (off != 0 &amp;&amp; n &gt; 0) System.arraycopy(buf, 0, b, off, n);</span>
+<span class="nc" id="L258">                    return n;</span>
+                }
+                @Override public void close() {
+<span class="nc" id="L261">                    try { conn.releaseInterface(iface); } catch (Throwable t) { /* ignore */ }</span>
+<span class="nc" id="L262">                    try { conn.close(); } catch (Throwable t) { /* ignore */ }</span>
+<span class="nc" id="L263">                }</span>
+            };
+        }
+
+        OutputStream asOutputStream() {
+<span class="nc" id="L268">            return new OutputStream() {</span>
+                @Override public void write(int b) throws IOException {
+<span class="nc" id="L270">                    write(new byte[]{(byte) b}, 0, 1);</span>
+<span class="nc" id="L271">                }</span>
+                @Override public void write(byte[] b, int off, int len) throws IOException {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                    byte[] buf = (off == 0) ? b : new byte[len];</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                    if (off != 0) System.arraycopy(b, off, buf, 0, len);</span>
+<span class="nc" id="L275">                    int n = conn.bulkTransfer(endpoint, buf, len, 5000);</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                    if (n &lt; 0) throw new IOException(&quot;bulkTransfer write failed&quot;);</span>
+<span class="nc" id="L277">                }</span>
+                @Override public void close() {
+<span class="nc" id="L279">                    try { conn.releaseInterface(iface); } catch (Throwable t) { /* ignore */ }</span>
+<span class="nc" id="L280">                    try { conn.close(); } catch (Throwable t) { /* ignore */ }</span>
+<span class="nc" id="L281">                }</span>
+            };
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

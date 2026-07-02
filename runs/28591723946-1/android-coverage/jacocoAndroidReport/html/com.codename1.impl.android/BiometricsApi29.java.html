@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BiometricsApi29.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">BiometricsApi29.java</span></div><h1>BiometricsApi29.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.os.CancellationSignal;
+import android.os.Handler;
+import android.os.Looper;
+
+import com.codename1.io.Log;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.concurrent.Executor;
+
+/**
+ * Reflection adapter for {@code android.hardware.biometrics.BiometricPrompt}
+ * (API 28+) and {@code android.hardware.biometrics.BiometricManager}
+ * (API 29+). The cn1-binaries {@code android.jar} predates API 28, so direct
+ * symbol references would fail to compile; reflection lets us call these APIs
+ * at runtime on supported devices without lifting the compile-time SDK
+ * requirement of the Android port.
+ *
+ * &lt;p&gt;Only invoked from code paths guarded by
+ * {@code Build.VERSION.SDK_INT &gt;= 29} in {@link AndroidBiometrics} and
+ * {@link AndroidSecureStorage}; on older devices the reflection class is
+ * never loaded.&lt;/p&gt;
+ */
+final class BiometricsApi29 {
+
+    interface AuthCallback {
+        void onSuccess();
+
+        void onError(int errorCode, String errString);
+    }
+
+    interface CipherAuthCallback {
+        /** Invoked with the authenticated {@code javax.crypto.Cipher}. */
+        void onSuccess(Object cipher);
+
+        void onError(int errorCode, String errString);
+    }
+
+    private BiometricsApi29() {
+    }
+
+    /** {@code BiometricManager.canAuthenticate() == BIOMETRIC_SUCCESS}. */
+    static boolean canAuthenticate(Activity act) {
+        try {
+<span class="nc" id="L74">            Object bm = act.getSystemService(&quot;biometric&quot;);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (bm == null) {</span>
+<span class="nc" id="L76">                return false;</span>
+            }
+<span class="nc" id="L78">            Object result = bm.getClass().getMethod(&quot;canAuthenticate&quot;).invoke(bm);</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            return ((Integer) result).intValue() == 0; // BIOMETRIC_SUCCESS == 0</span>
+<span class="nc" id="L80">        } catch (Throwable t) {</span>
+<span class="nc" id="L81">            Log.e(t);</span>
+<span class="nc" id="L82">            return false;</span>
+        }
+    }
+
+    /** Builds + shows a BiometricPrompt for plain authentication (no crypto). */
+    static void authenticate(Activity act, String title, String subtitle,
+                             String description, String negative,
+                             CancellationSignal cs, AuthCallback cb) {
+        try {
+<span class="nc" id="L91">            Object prompt = buildPrompt(act, title, subtitle, description, negative, cb, null);</span>
+<span class="nc" id="L92">            Class&lt;?&gt; promptCls = Class.forName(&quot;android.hardware.biometrics.BiometricPrompt&quot;);</span>
+<span class="nc" id="L93">            Class&lt;?&gt; authCbCls = Class.forName(&quot;android.hardware.biometrics.BiometricPrompt$AuthenticationCallback&quot;);</span>
+<span class="nc" id="L94">            Executor exec = mainExecutor(act);</span>
+<span class="nc" id="L95">            Method authM = promptCls.getMethod(&quot;authenticate&quot;, CancellationSignal.class,</span>
+                    Executor.class, authCbCls);
+<span class="nc" id="L97">            authM.invoke(prompt, cs, exec, makeAuthProxy(authCbCls, cb, null));</span>
+<span class="nc" id="L98">        } catch (Throwable t) {</span>
+<span class="nc" id="L99">            Log.e(t);</span>
+<span class="nc" id="L100">            cb.onError(AndroidBiometrics.BIOMETRIC_ERROR_HW_UNAVAILABLE,</span>
+<span class="nc" id="L101">                    &quot;Failed to invoke BiometricPrompt: &quot; + t.getMessage());</span>
+<span class="nc" id="L102">        }</span>
+<span class="nc" id="L103">    }</span>
+
+    /**
+     * Builds + shows a BiometricPrompt that wraps a CryptoObject around the
+     * supplied {@code javax.crypto.Cipher}; on success the same cipher
+     * (now authenticated) is passed to {@code cb.onSuccess}.
+     */
+    static void authenticateWithCipher(Activity act, String title, String subtitle,
+                                       String description, String negative,
+                                       Object cipher, CancellationSignal cs,
+                                       CipherAuthCallback cb) {
+        try {
+<span class="nc" id="L115">            Object prompt = buildPrompt(act, title, subtitle, description, negative,</span>
+                    null, cb);
+<span class="nc" id="L117">            Class&lt;?&gt; promptCls = Class.forName(&quot;android.hardware.biometrics.BiometricPrompt&quot;);</span>
+<span class="nc" id="L118">            Class&lt;?&gt; cryptoCls = Class.forName(&quot;android.hardware.biometrics.BiometricPrompt$CryptoObject&quot;);</span>
+<span class="nc" id="L119">            Class&lt;?&gt; authCbCls = Class.forName(&quot;android.hardware.biometrics.BiometricPrompt$AuthenticationCallback&quot;);</span>
+<span class="nc" id="L120">            Constructor&lt;?&gt; cryptoCtor = cryptoCls.getConstructor(Class.forName(&quot;javax.crypto.Cipher&quot;));</span>
+<span class="nc" id="L121">            Object crypto = cryptoCtor.newInstance(cipher);</span>
+<span class="nc" id="L122">            Executor exec = mainExecutor(act);</span>
+<span class="nc" id="L123">            Method authM = promptCls.getMethod(&quot;authenticate&quot;, cryptoCls,</span>
+                    CancellationSignal.class, Executor.class, authCbCls);
+<span class="nc" id="L125">            authM.invoke(prompt, crypto, cs, exec, makeAuthProxy(authCbCls, null, cb));</span>
+<span class="nc" id="L126">        } catch (Throwable t) {</span>
+<span class="nc" id="L127">            Log.e(t);</span>
+<span class="nc" id="L128">            cb.onError(AndroidBiometrics.BIOMETRIC_ERROR_HW_UNAVAILABLE,</span>
+<span class="nc" id="L129">                    &quot;Failed to invoke BiometricPrompt with cipher: &quot; + t.getMessage());</span>
+<span class="nc" id="L130">        }</span>
+<span class="nc" id="L131">    }</span>
+
+    private static Object buildPrompt(final Activity act, String title, String subtitle,
+                                      String description, String negative,
+                                      final AuthCallback acb, final CipherAuthCallback ccb) throws Exception {
+<span class="nc" id="L136">        Class&lt;?&gt; builderCls = Class.forName(&quot;android.hardware.biometrics.BiometricPrompt$Builder&quot;);</span>
+<span class="nc" id="L137">        Object builder = builderCls.getConstructor(Context.class).newInstance(act);</span>
+<span class="nc" id="L138">        builderCls.getMethod(&quot;setTitle&quot;, CharSequence.class).invoke(builder, title);</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (subtitle != null) {</span>
+<span class="nc" id="L140">            builderCls.getMethod(&quot;setSubtitle&quot;, CharSequence.class).invoke(builder, subtitle);</span>
+        }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (description != null) {</span>
+<span class="nc" id="L143">            builderCls.getMethod(&quot;setDescription&quot;, CharSequence.class).invoke(builder, description);</span>
+        }
+<span class="nc" id="L145">        Executor exec = mainExecutor(act);</span>
+<span class="nc" id="L146">        DialogInterface.OnClickListener neg = new DialogInterface.OnClickListener() {</span>
+            @Override
+            public void onClick(DialogInterface d, int which) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                if (acb != null) {</span>
+<span class="nc" id="L150">                    acb.onError(AndroidBiometrics.BIOMETRIC_ERROR_USER_CANCELED, &quot;Cancelled&quot;);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                } else if (ccb != null) {</span>
+<span class="nc" id="L152">                    ccb.onError(AndroidBiometrics.BIOMETRIC_ERROR_USER_CANCELED, &quot;Cancelled&quot;);</span>
+                }
+<span class="nc" id="L154">            }</span>
+        };
+<span class="nc" id="L156">        builderCls.getMethod(&quot;setNegativeButton&quot;, CharSequence.class, Executor.class,</span>
+<span class="nc" id="L157">                DialogInterface.OnClickListener.class).invoke(builder, negative, exec, neg);</span>
+<span class="nc" id="L158">        return builderCls.getMethod(&quot;build&quot;).invoke(builder);</span>
+    }
+
+    private static Object makeAuthProxy(Class&lt;?&gt; authCbCls, final AuthCallback acb,
+                                        final CipherAuthCallback ccb) {
+<span class="nc" id="L163">        InvocationHandler handler = new InvocationHandler() {</span>
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) {
+<span class="nc" id="L166">                String name = method.getName();</span>
+                try {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                    if (&quot;onAuthenticationSucceeded&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                        if (ccb != null) {</span>
+                            // BiometricPrompt$AuthenticationResult.getCryptoObject().getCipher()
+<span class="nc" id="L171">                            Object ar = args[0];</span>
+<span class="nc" id="L172">                            Object crypto = ar.getClass().getMethod(&quot;getCryptoObject&quot;).invoke(ar);</span>
+<span class="nc" id="L173">                            Object cipher = crypto.getClass().getMethod(&quot;getCipher&quot;).invoke(crypto);</span>
+<span class="nc" id="L174">                            ccb.onSuccess(cipher);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                        } else if (acb != null) {</span>
+<span class="nc" id="L176">                            acb.onSuccess();</span>
+                        }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                    } else if (&quot;onAuthenticationError&quot;.equals(name)) {</span>
+<span class="nc" id="L179">                        int code = ((Integer) args[0]).intValue();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                        String msg = args[1] == null ? &quot;&quot; : args[1].toString();</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                        if (ccb != null) {</span>
+<span class="nc" id="L182">                            ccb.onError(code, msg);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                        } else if (acb != null) {</span>
+<span class="nc" id="L184">                            acb.onError(code, msg);</span>
+                        }
+                    }
+                    // onAuthenticationFailed / Help: ignore (soft-failure stream).
+<span class="nc" id="L188">                } catch (Throwable t) {</span>
+<span class="nc" id="L189">                    Log.e(t);</span>
+<span class="nc" id="L190">                }</span>
+<span class="nc" id="L191">                return null;</span>
+            }
+        };
+<span class="nc" id="L194">        return Proxy.newProxyInstance(authCbCls.getClassLoader(),</span>
+                new Class&lt;?&gt;[]{authCbCls}, handler);
+    }
+
+    /** Activity.getMainExecutor() is API 28+; fall back to a Handler-backed executor. */
+    static Executor mainExecutor(Context ctx) {
+        try {
+<span class="nc" id="L201">            return (Executor) Context.class.getMethod(&quot;getMainExecutor&quot;).invoke(ctx);</span>
+<span class="nc" id="L202">        } catch (Throwable t) {</span>
+<span class="nc" id="L203">            final Handler h = new Handler(Looper.getMainLooper());</span>
+<span class="nc" id="L204">            return new Executor() {</span>
+                @Override
+                public void execute(Runnable r) {
+<span class="nc" id="L207">                    h.post(r);</span>
+<span class="nc" id="L208">                }</span>
+            };
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

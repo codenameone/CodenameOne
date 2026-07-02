@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidWebSocketImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidWebSocketImpl.java</span></div><h1>AndroidWebSocketImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import com.codename1.impl.WebSocketImpl;
+import com.codename1.io.WebSocketState;
+
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+
+import android.util.Base64;
+import javax.net.ssl.SSLSocketFactory;
+
+/**
+ * Hand-rolled RFC 6455 WebSocket client used by the Android port. Runs over
+ * java.net.Socket / javax.net.ssl.SSLSocket. The same logic is duplicated in
+ * JavaSEWebSocketImpl -- the two ports cannot share source because they're
+ * separate Maven modules with different source levels; if you change one,
+ * change the other.
+ *
+ * Compiled at Java 6 source level -- no diamond operator, no try-with-resources,
+ * no multi-catch.
+ */
+class AndroidWebSocketImpl extends WebSocketImpl {
+
+    private static final String GUID = &quot;258EAFA5-E914-47DA-95CA-C5AB0DC85B11&quot;;
+<span class="fc" id="L61">    private static final Charset UTF8 = Charset.forName(&quot;UTF-8&quot;);</span>
+<span class="fc" id="L62">    private static final Charset ASCII = Charset.forName(&quot;ISO-8859-1&quot;);</span>
+    private static final int OP_CONTINUATION = 0x0;
+    private static final int OP_TEXT = 0x1;
+    private static final int OP_BINARY = 0x2;
+    private static final int OP_CLOSE = 0x8;
+    private static final int OP_PING = 0x9;
+    private static final int OP_PONG = 0xA;
+    private static final int MAX_FRAME_PAYLOAD = 65536;
+
+<span class="fc" id="L71">    private final SecureRandom random = new SecureRandom();</span>
+<span class="fc" id="L72">    private final AtomicReference&lt;WebSocketState&gt; state =</span>
+            new AtomicReference&lt;WebSocketState&gt;(WebSocketState.CONNECTING);
+<span class="fc" id="L74">    private final Object writeLock = new Object();</span>
+
+    private Socket socket;
+    private InputStream in;
+    private OutputStream out;
+
+    AndroidWebSocketImpl(String url) {
+<span class="fc" id="L81">        super(url);</span>
+<span class="fc" id="L82">    }</span>
+
+    @Override
+    public void connect(final int connectTimeoutMs) {
+<span class="fc" id="L86">        Thread t = new Thread(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L90">                    doHandshake(connectTimeoutMs);</span>
+<span class="fc" id="L91">                    state.set(WebSocketState.OPEN);</span>
+<span class="fc" id="L92">                    sink().onConnect();</span>
+<span class="nc" id="L93">                    readLoop();</span>
+<span class="nc" id="L94">                } catch (Exception ex) {</span>
+<span class="nc" id="L95">                    fail(ex);</span>
+<span class="nc" id="L96">                }</span>
+<span class="nc" id="L97">            }</span>
+<span class="fc" id="L98">        }, &quot;WebSocket-&quot; + getUrl());</span>
+<span class="fc" id="L99">        t.setDaemon(true);</span>
+<span class="fc" id="L100">        t.start();</span>
+<span class="fc" id="L101">    }</span>
+
+    private void doHandshake(int connectTimeoutMs) throws IOException {
+<span class="fc" id="L104">        URI uri = URI.create(getUrl());</span>
+<span class="fc" id="L105">        String scheme = uri.getScheme();</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (scheme == null) {</span>
+<span class="nc" id="L107">            throw new IOException(&quot;Missing scheme in WebSocket URL&quot;);</span>
+        }
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        boolean secure = scheme.equalsIgnoreCase(&quot;wss&quot;) || scheme.equalsIgnoreCase(&quot;https&quot;);</span>
+<span class="pc bpc" id="L110" title="3 of 4 branches missed.">        boolean plain = scheme.equalsIgnoreCase(&quot;ws&quot;) || scheme.equalsIgnoreCase(&quot;http&quot;);</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">        if (!secure &amp;&amp; !plain) {</span>
+<span class="nc" id="L112">            throw new IOException(&quot;Unsupported scheme: &quot; + scheme);</span>
+        }
+<span class="fc" id="L114">        String host = uri.getHost();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (host == null) {</span>
+<span class="nc" id="L116">            throw new IOException(&quot;Missing host in WebSocket URL&quot;);</span>
+        }
+<span class="fc" id="L118">        int port = uri.getPort();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (port &lt; 0) {</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            port = secure ? 443 : 80;</span>
+        }
+<span class="fc" id="L122">        String path = uri.getRawPath();</span>
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">        if (path == null || path.length() == 0) {</span>
+<span class="fc" id="L124">            path = &quot;/&quot;;</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (uri.getRawQuery() != null) {</span>
+<span class="nc" id="L127">            path = path + &quot;?&quot; + uri.getRawQuery();</span>
+        }
+
+        Socket s;
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (secure) {</span>
+<span class="nc" id="L132">            s = SSLSocketFactory.getDefault().createSocket();</span>
+        } else {
+<span class="fc" id="L134">            s = new Socket();</span>
+        }
+<span class="fc" id="L136">        s.connect(new InetSocketAddress(host, port), connectTimeoutMs);</span>
+<span class="fc" id="L137">        this.socket = s;</span>
+<span class="fc" id="L138">        this.in = s.getInputStream();</span>
+<span class="fc" id="L139">        this.out = s.getOutputStream();</span>
+
+<span class="fc" id="L141">        byte[] keyBytes = new byte[16];</span>
+<span class="fc" id="L142">        random.nextBytes(keyBytes);</span>
+<span class="fc" id="L143">        String key = Base64.encodeToString(keyBytes, Base64.NO_WRAP);</span>
+
+<span class="fc" id="L145">        StringBuilder req = new StringBuilder();</span>
+<span class="fc" id="L146">        req.append(&quot;GET &quot;).append(path).append(&quot; HTTP/1.1\r\n&quot;);</span>
+<span class="fc" id="L147">        req.append(&quot;Host: &quot;).append(host);</span>
+<span class="pc bpc" id="L148" title="5 of 8 branches missed.">        if ((secure &amp;&amp; port != 443) || (!secure &amp;&amp; port != 80)) {</span>
+<span class="fc" id="L149">            req.append(&quot;:&quot;).append(port);</span>
+        }
+<span class="fc" id="L151">        req.append(&quot;\r\n&quot;);</span>
+<span class="fc" id="L152">        req.append(&quot;Upgrade: websocket\r\n&quot;);</span>
+<span class="fc" id="L153">        req.append(&quot;Connection: Upgrade\r\n&quot;);</span>
+<span class="fc" id="L154">        req.append(&quot;Sec-WebSocket-Key: &quot;).append(key).append(&quot;\r\n&quot;);</span>
+<span class="fc" id="L155">        req.append(&quot;Sec-WebSocket-Version: 13\r\n&quot;);</span>
+<span class="fc" id="L156">        String[] subs = requestedSubprotocols();</span>
+<span class="pc bpc" id="L157" title="3 of 4 branches missed.">        if (subs != null &amp;&amp; subs.length &gt; 0) {</span>
+<span class="nc" id="L158">            req.append(&quot;Sec-WebSocket-Protocol: &quot;);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            for (int i = 0; i &lt; subs.length; i++) {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (i &gt; 0) req.append(&quot;, &quot;);</span>
+<span class="nc" id="L161">                req.append(subs[i]);</span>
+            }
+<span class="nc" id="L163">            req.append(&quot;\r\n&quot;);</span>
+        }
+<span class="fc" id="L165">        req.append(&quot;\r\n&quot;);</span>
+<span class="fc" id="L166">        out.write(req.toString().getBytes(ASCII));</span>
+<span class="fc" id="L167">        out.flush();</span>
+
+<span class="fc" id="L169">        String statusLine = readHeaderLine(in);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (statusLine == null) {</span>
+<span class="nc" id="L171">            throw new IOException(&quot;Server closed before handshake response&quot;);</span>
+        }
+<span class="pc bpc" id="L173" title="3 of 4 branches missed.">        if (!statusLine.startsWith(&quot;HTTP/1.1 101&quot;) &amp;&amp; !statusLine.startsWith(&quot;HTTP/1.0 101&quot;)) {</span>
+<span class="nc" id="L174">            throw new IOException(&quot;Unexpected handshake response: &quot; + statusLine);</span>
+        }
+<span class="fc" id="L176">        Map&lt;String, String&gt; headers = new HashMap&lt;String, String&gt;();</span>
+        while (true) {
+<span class="fc" id="L178">            String line = readHeaderLine(in);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (line == null) {</span>
+<span class="nc" id="L180">                throw new IOException(&quot;Server closed during handshake response&quot;);</span>
+            }
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (line.length() == 0) {</span>
+<span class="fc" id="L183">                break;</span>
+            }
+<span class="fc" id="L185">            int colon = line.indexOf(':');</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (colon &gt; 0) {</span>
+<span class="fc" id="L187">                String name = line.substring(0, colon).trim().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L188">                String value = line.substring(colon + 1).trim();</span>
+<span class="fc" id="L189">                headers.put(name, value);</span>
+            }
+<span class="fc" id="L191">        }</span>
+
+<span class="fc" id="L193">        String upgrade = headers.get(&quot;upgrade&quot;);</span>
+<span class="fc" id="L194">        String connection = headers.get(&quot;connection&quot;);</span>
+<span class="fc" id="L195">        String accept = headers.get(&quot;sec-websocket-accept&quot;);</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">        if (upgrade == null || !&quot;websocket&quot;.equalsIgnoreCase(upgrade)) {</span>
+<span class="nc" id="L197">            throw new IOException(&quot;Missing Upgrade: websocket in handshake response&quot;);</span>
+        }
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">        if (connection == null || connection.toLowerCase(Locale.ROOT).indexOf(&quot;upgrade&quot;) &lt; 0) {</span>
+<span class="nc" id="L200">            throw new IOException(&quot;Missing Connection: upgrade in handshake response&quot;);</span>
+        }
+<span class="fc" id="L202">        String expected = expectedAccept(key);</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">        if (accept == null || !accept.equals(expected)) {</span>
+<span class="nc" id="L204">            throw new IOException(&quot;Sec-WebSocket-Accept mismatch&quot;);</span>
+        }
+<span class="fc" id="L206">        setSelectedSubprotocol(headers.get(&quot;sec-websocket-protocol&quot;));</span>
+<span class="fc" id="L207">    }</span>
+
+    private static String readHeaderLine(InputStream in) throws IOException {
+<span class="fc" id="L210">        ByteArrayOutputStream buf = new ByteArrayOutputStream(64);</span>
+<span class="fc" id="L211">        int prev = -1;</span>
+        while (true) {
+<span class="fc" id="L213">            int b = in.read();</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (b &lt; 0) {</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                if (buf.size() == 0) {</span>
+<span class="nc" id="L216">                    return null;</span>
+                }
+<span class="nc" id="L218">                throw new EOFException(&quot;EOF in HTTP header&quot;);</span>
+            }
+<span class="pc bpc" id="L220" title="1 of 4 branches missed.">            if (prev == '\r' &amp;&amp; b == '\n') {</span>
+<span class="fc" id="L221">                byte[] bytes = buf.toByteArray();</span>
+<span class="fc" id="L222">                return new String(bytes, 0, bytes.length - 1, ASCII);</span>
+            }
+<span class="fc" id="L224">            buf.write(b);</span>
+<span class="fc" id="L225">            prev = b;</span>
+<span class="fc" id="L226">        }</span>
+    }
+
+    private static String expectedAccept(String key) {
+        try {
+<span class="fc" id="L231">            MessageDigest sha1 = MessageDigest.getInstance(&quot;SHA-1&quot;);</span>
+<span class="fc" id="L232">            byte[] digest = sha1.digest((key + GUID).getBytes(ASCII));</span>
+<span class="fc" id="L233">            return Base64.encodeToString(digest, Base64.NO_WRAP);</span>
+<span class="nc" id="L234">        } catch (Exception e) {</span>
+<span class="nc" id="L235">            throw new RuntimeException(e);</span>
+        }
+    }
+
+    private void readLoop() {
+<span class="fc" id="L240">        ByteArrayOutputStream fragmentBuffer = null;</span>
+<span class="fc" id="L241">        int fragmentOpcode = -1;</span>
+<span class="fc" id="L242">        DataInputStream dis = new DataInputStream(in);</span>
+        try {
+<span class="pc bpc" id="L244" title="3 of 4 branches missed.">            while (state.get() == WebSocketState.OPEN || state.get() == WebSocketState.CLOSING) {</span>
+<span class="fc" id="L245">                int b1 = dis.read();</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                if (b1 &lt; 0) {</span>
+<span class="nc" id="L247">                    throw new EOFException(&quot;Server closed connection&quot;);</span>
+                }
+<span class="fc" id="L249">                int b2 = dis.read();</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                if (b2 &lt; 0) {</span>
+<span class="nc" id="L251">                    throw new EOFException(&quot;Server closed connection&quot;);</span>
+                }
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                boolean fin = (b1 &amp; 0x80) != 0;</span>
+<span class="fc" id="L254">                int opcode = b1 &amp; 0x0F;</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">                boolean masked = (b2 &amp; 0x80) != 0;</span>
+<span class="fc" id="L256">                long payloadLen = b2 &amp; 0x7F;</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                if (payloadLen == 126) {</span>
+<span class="nc" id="L258">                    payloadLen = dis.readUnsignedShort();</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                } else if (payloadLen == 127) {</span>
+<span class="nc" id="L260">                    payloadLen = dis.readLong();</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                    if (payloadLen &lt; 0) {</span>
+<span class="nc" id="L262">                        throw new IOException(&quot;Payload too large&quot;);</span>
+                    }
+                }
+<span class="fc" id="L265">                byte[] mask = null;</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                if (masked) {</span>
+<span class="nc" id="L267">                    mask = new byte[4];</span>
+<span class="nc" id="L268">                    dis.readFully(mask);</span>
+                }
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">                if (payloadLen &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L271">                    throw new IOException(&quot;Payload exceeds int max&quot;);</span>
+                }
+<span class="fc" id="L273">                byte[] payload = new byte[(int) payloadLen];</span>
+<span class="fc" id="L274">                dis.readFully(payload);</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                if (masked) {</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                    for (int i = 0; i &lt; payload.length; i++) {</span>
+<span class="nc" id="L277">                        payload[i] = (byte) (payload[i] ^ mask[i &amp; 3]);</span>
+                    }
+                }
+
+<span class="pc bpc" id="L281" title="5 of 6 branches missed.">                switch (opcode) {</span>
+                    case OP_CONTINUATION:
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                        if (fragmentBuffer == null) {</span>
+<span class="nc" id="L284">                            throw new IOException(&quot;CONTINUATION without prior fragment&quot;);</span>
+                        }
+<span class="nc" id="L286">                        fragmentBuffer.write(payload);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                        if (fin) {</span>
+<span class="nc" id="L288">                            deliverMessage(fragmentOpcode, fragmentBuffer.toByteArray());</span>
+<span class="nc" id="L289">                            fragmentBuffer = null;</span>
+<span class="nc" id="L290">                            fragmentOpcode = -1;</span>
+                        }
+                        break;
+                    case OP_TEXT:
+                    case OP_BINARY:
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                        if (fin) {</span>
+<span class="fc" id="L296">                            deliverMessage(opcode, payload);</span>
+                        } else {
+<span class="nc" id="L298">                            fragmentBuffer = new ByteArrayOutputStream();</span>
+<span class="nc" id="L299">                            fragmentBuffer.write(payload);</span>
+<span class="nc" id="L300">                            fragmentOpcode = opcode;</span>
+                        }
+<span class="nc" id="L302">                        break;</span>
+                    case OP_PING:
+<span class="nc" id="L304">                        sendFrame(OP_PONG, payload, true);</span>
+<span class="nc" id="L305">                        break;</span>
+                    case OP_PONG:
+                        // ignore
+<span class="nc" id="L308">                        break;</span>
+                    case OP_CLOSE:
+<span class="nc" id="L310">                        handleClose(payload);</span>
+<span class="nc" id="L311">                        return;</span>
+                    default:
+<span class="nc" id="L313">                        throw new IOException(&quot;Unsupported opcode: &quot; + opcode);</span>
+                }
+<span class="fc" id="L315">            }</span>
+<span class="nc" id="L316">        } catch (Exception ex) {</span>
+<span class="nc" id="L317">            fail(ex);</span>
+<span class="nc" id="L318">        }</span>
+<span class="nc" id="L319">    }</span>
+
+    private void deliverMessage(int opcode, byte[] payload) {
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (opcode == OP_TEXT) {</span>
+<span class="fc" id="L323">            sink().onTextMessage(new String(payload, UTF8));</span>
+        } else {
+<span class="nc" id="L325">            sink().onBinaryMessage(payload);</span>
+        }
+<span class="fc" id="L327">    }</span>
+
+    private void handleClose(byte[] payload) {
+<span class="nc" id="L330">        int code = 1005;</span>
+<span class="nc" id="L331">        String reason = &quot;&quot;;</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (payload.length &gt;= 2) {</span>
+<span class="nc" id="L333">            code = ((payload[0] &amp; 0xFF) &lt;&lt; 8) | (payload[1] &amp; 0xFF);</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">            if (payload.length &gt; 2) {</span>
+<span class="nc" id="L335">                reason = new String(payload, 2, payload.length - 2, UTF8);</span>
+            }
+        }
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (state.compareAndSet(WebSocketState.OPEN, WebSocketState.CLOSING)) {</span>
+            try {
+<span class="nc" id="L340">                sendFrame(OP_CLOSE, payload, true);</span>
+<span class="nc" id="L341">            } catch (IOException ignore) {</span>
+<span class="nc" id="L342">            }</span>
+        }
+<span class="nc" id="L344">        closeSocketQuietly();</span>
+<span class="nc" id="L345">        state.set(WebSocketState.CLOSED);</span>
+<span class="nc" id="L346">        sink().onClose(code, reason);</span>
+<span class="nc" id="L347">    }</span>
+
+    private void fail(Exception ex) {
+<span class="nc" id="L350">        WebSocketState prev = state.getAndSet(WebSocketState.CLOSED);</span>
+<span class="nc" id="L351">        closeSocketQuietly();</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (prev != WebSocketState.CLOSED) {</span>
+<span class="nc" id="L353">            sink().onError(ex);</span>
+        }
+<span class="nc" id="L355">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc bnc" id="L359" title="All 2 branches missed.">        if (!state.compareAndSet(WebSocketState.OPEN, WebSocketState.CLOSING)) {</span>
+<span class="nc" id="L360">            return;</span>
+        }
+        try {
+<span class="nc" id="L363">            byte[] codeBytes = new byte[] { 0x03, (byte) 0xE8 }; // 1000</span>
+<span class="nc" id="L364">            sendFrame(OP_CLOSE, codeBytes, true);</span>
+<span class="nc" id="L365">        } catch (IOException ignore) {</span>
+<span class="nc" id="L366">        }</span>
+<span class="nc" id="L367">    }</span>
+
+    @Override
+    public void sendText(String message) {
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        if (state.get() != WebSocketState.OPEN) {</span>
+<span class="nc" id="L372">            throw new IllegalStateException(&quot;WebSocket is not open&quot;);</span>
+        }
+        try {
+<span class="fc" id="L375">            sendFrame(OP_TEXT, message.getBytes(UTF8), true);</span>
+<span class="nc" id="L376">        } catch (IOException ex) {</span>
+<span class="nc" id="L377">            fail(ex);</span>
+<span class="nc" id="L378">            throw new RuntimeException(ex);</span>
+<span class="fc" id="L379">        }</span>
+<span class="fc" id="L380">    }</span>
+
+    @Override
+    public void sendBinary(byte[] message) {
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        if (state.get() != WebSocketState.OPEN) {</span>
+<span class="nc" id="L385">            throw new IllegalStateException(&quot;WebSocket is not open&quot;);</span>
+        }
+        try {
+<span class="fc" id="L388">            sendFrame(OP_BINARY, message, true);</span>
+<span class="nc" id="L389">        } catch (IOException ex) {</span>
+<span class="nc" id="L390">            fail(ex);</span>
+<span class="nc" id="L391">            throw new RuntimeException(ex);</span>
+<span class="fc" id="L392">        }</span>
+<span class="fc" id="L393">    }</span>
+
+    @Override
+    public WebSocketState getReadyState() {
+<span class="fc" id="L397">        return state.get();</span>
+    }
+
+    private void sendFrame(int opcode, byte[] payload, boolean mask) throws IOException {
+<span class="fc" id="L401">        synchronized (writeLock) {</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (out == null) {</span>
+<span class="nc" id="L403">                throw new IOException(&quot;Connection not established&quot;);</span>
+            }
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            boolean control = (opcode &amp; 0x08) != 0;</span>
+<span class="pc bpc" id="L406" title="1 of 4 branches missed.">            if (control || payload.length &lt;= MAX_FRAME_PAYLOAD) {</span>
+<span class="fc" id="L407">                writeSingleFrame(opcode, payload, 0, payload.length, true, mask);</span>
+<span class="fc" id="L408">                return;</span>
+            }
+<span class="fc" id="L410">            int off = 0;</span>
+<span class="fc" id="L411">            boolean first = true;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            while (off &lt; payload.length) {</span>
+<span class="fc" id="L413">                int len = Math.min(MAX_FRAME_PAYLOAD, payload.length - off);</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">                int frameOp = first ? opcode : OP_CONTINUATION;</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                boolean fin = (off + len) == payload.length;</span>
+<span class="fc" id="L416">                writeSingleFrame(frameOp, payload, off, len, fin, mask);</span>
+<span class="fc" id="L417">                off += len;</span>
+<span class="fc" id="L418">                first = false;</span>
+<span class="fc" id="L419">            }</span>
+<span class="fc" id="L420">        }</span>
+<span class="fc" id="L421">    }</span>
+
+    private void writeSingleFrame(int opcode, byte[] payload, int off, int len,
+                                  boolean fin, boolean mask) throws IOException {
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        int b1 = (fin ? 0x80 : 0) | (opcode &amp; 0x0F);</span>
+<span class="fc" id="L426">        out.write(b1);</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        int maskBit = mask ? 0x80 : 0;</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (len &lt;= 125) {</span>
+<span class="fc" id="L429">            out.write(maskBit | len);</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        } else if (len &lt;= 0xFFFF) {</span>
+<span class="fc" id="L431">            out.write(maskBit | 126);</span>
+<span class="fc" id="L432">            out.write((len &gt;&gt;&gt; 8) &amp; 0xFF);</span>
+<span class="fc" id="L433">            out.write(len &amp; 0xFF);</span>
+        } else {
+<span class="fc" id="L435">            out.write(maskBit | 127);</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            for (int i = 7; i &gt;= 0; i--) {</span>
+<span class="fc" id="L437">                out.write((int) (((long) len &gt;&gt;&gt; (i * 8)) &amp; 0xFF));</span>
+            }
+        }
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">        if (mask) {</span>
+<span class="fc" id="L441">            byte[] m = new byte[4];</span>
+<span class="fc" id="L442">            random.nextBytes(m);</span>
+<span class="fc" id="L443">            out.write(m);</span>
+<span class="fc" id="L444">            byte[] masked = new byte[len];</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L446">                masked[i] = (byte) (payload[off + i] ^ m[i &amp; 3]);</span>
+            }
+<span class="fc" id="L448">            out.write(masked);</span>
+<span class="pc bnc" id="L449" title="All 2 branches missed.">        } else if (len &gt; 0) {</span>
+<span class="nc" id="L450">            out.write(payload, off, len);</span>
+        }
+<span class="fc" id="L452">        out.flush();</span>
+<span class="fc" id="L453">    }</span>
+
+    private void closeSocketQuietly() {
+<span class="nc" id="L456">        Socket s = socket;</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">        if (s != null) {</span>
+            try {
+<span class="nc" id="L459">                s.close();</span>
+<span class="nc" id="L460">            } catch (IOException ignore) {</span>
+<span class="nc" id="L461">            }</span>
+        }
+<span class="nc" id="L463">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

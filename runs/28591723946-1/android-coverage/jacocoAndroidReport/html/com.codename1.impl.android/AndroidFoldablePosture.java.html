@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidFoldablePosture.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidFoldablePosture.java</span></div><h1>AndroidFoldablePosture.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Rect;
+import com.codename1.ui.Display;
+import com.codename1.ui.DevicePosture;
+import com.codename1.ui.geom.Rectangle;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.List;
+import java.util.concurrent.Executor;
+
+/**
+ * Reads the device fold posture from androidx.window entirely through reflection so the core
+ * Android port carries no compile-time dependency on androidx.window. The dependency is added to
+ * the generated build only when the app opts in with the build hint
+ * {@code android.foldableSupport=true} (see AndroidGradleBuilder). When androidx.window is not on
+ * the classpath, or the device is not foldable, every query degrades safely to &quot;not foldable&quot;.
+ *
+ * &lt;p&gt;This avoids the Kotlin coroutine based WindowInfoTracker flow by using the Java friendly
+ * androidx.window.java.layout.WindowInfoTrackerCallbackAdapter and an androidx.core.util.Consumer
+ * implemented with a dynamic proxy.&lt;/p&gt;
+ */
+<span class="nc" id="L49">class AndroidFoldablePosture {</span>
+    private static volatile boolean foldable;
+<span class="fc" id="L51">    private static volatile int posture = DevicePosture.POSTURE_UNKNOWN;</span>
+<span class="fc" id="L52">    private static volatile int foldOrientation = DevicePosture.FOLD_ORIENTATION_NONE;</span>
+    private static volatile boolean separating;
+    private static volatile boolean hasBounds;
+    private static volatile int boundsX;
+    private static volatile int boundsY;
+    private static volatile int boundsW;
+    private static volatile int boundsH;
+    private static boolean started;
+
+    static boolean isFoldable() {
+<span class="fc" id="L62">        return foldable;</span>
+    }
+
+    static int getPosture() {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        return foldable ? posture : DevicePosture.POSTURE_UNKNOWN;</span>
+    }
+
+    static int getFoldOrientation() {
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        return foldable ? foldOrientation : DevicePosture.FOLD_ORIENTATION_NONE;</span>
+    }
+
+    static boolean isSeparating() {
+<span class="fc" id="L74">        return separating;</span>
+    }
+
+    static Rectangle getFoldBounds(Rectangle rect) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!hasBounds) {</span>
+<span class="fc" id="L79">            return null;</span>
+        }
+<span class="nc" id="L81">        return new Rectangle(boundsX, boundsY, boundsW, boundsH);</span>
+    }
+
+    /**
+     * Starts the androidx.window layout listener if it has not been started yet. Safe to call
+     * repeatedly and safe to call when androidx.window is absent (it simply does nothing).
+     */
+    static synchronized void start(final Activity activity) {
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">        if (started || activity == null) {</span>
+<span class="nc" id="L90">            return;</span>
+        }
+        try {
+<span class="nc" id="L93">            Class&lt;?&gt; trackerCls = Class.forName(&quot;androidx.window.layout.WindowInfoTracker&quot;);</span>
+<span class="nc" id="L94">            Object tracker = trackerCls.getMethod(&quot;getOrCreate&quot;, Context.class).invoke(null, activity);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (tracker == null) {</span>
+<span class="nc" id="L96">                return;</span>
+            }
+<span class="nc" id="L98">            Class&lt;?&gt; adapterCls = Class.forName(&quot;androidx.window.java.layout.WindowInfoTrackerCallbackAdapter&quot;);</span>
+<span class="nc" id="L99">            Object adapter = adapterCls.getConstructor(trackerCls).newInstance(tracker);</span>
+<span class="nc" id="L100">            final Class&lt;?&gt; foldingFeatureCls = Class.forName(&quot;androidx.window.layout.FoldingFeature&quot;);</span>
+<span class="nc" id="L101">            Class&lt;?&gt; consumerCls = Class.forName(&quot;androidx.core.util.Consumer&quot;);</span>
+<span class="nc" id="L102">            Executor executor = new Executor() {</span>
+                public void execute(Runnable command) {
+<span class="nc" id="L104">                    activity.runOnUiThread(command);</span>
+<span class="nc" id="L105">                }</span>
+            };
+<span class="nc" id="L107">            InvocationHandler handler = new InvocationHandler() {</span>
+                public Object invoke(Object proxy, Method method, Object[] args) {
+<span class="nc" id="L109">                    String name = method.getName();</span>
+<span class="nc bnc" id="L110" title="All 8 branches missed.">                    if (&quot;accept&quot;.equals(name) &amp;&amp; args != null &amp;&amp; args.length == 1 &amp;&amp; args[0] != null) {</span>
+                        try {
+<span class="nc" id="L112">                            onLayoutInfo(args[0], foldingFeatureCls);</span>
+<span class="nc" id="L113">                        } catch (Throwable t) {</span>
+                            // ignore - leave posture unchanged on a parse failure
+<span class="nc" id="L115">                        }</span>
+<span class="nc" id="L116">                        return null;</span>
+                    }
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                    if (&quot;toString&quot;.equals(name)) {</span>
+<span class="nc" id="L119">                        return &quot;CN1FoldConsumer&quot;;</span>
+                    }
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                    if (&quot;hashCode&quot;.equals(name)) {</span>
+<span class="nc" id="L122">                        return System.identityHashCode(proxy);</span>
+                    }
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                    if (&quot;equals&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                        return proxy == args[0];</span>
+                    }
+<span class="nc" id="L127">                    return null;</span>
+                }
+            };
+<span class="nc" id="L130">            Object consumer = Proxy.newProxyInstance(adapterCls.getClassLoader(),</span>
+                    new Class[]{consumerCls}, handler);
+<span class="nc" id="L132">            adapterCls.getMethod(&quot;addWindowLayoutInfoListener&quot;, Activity.class, Executor.class, consumerCls)</span>
+<span class="nc" id="L133">                    .invoke(adapter, activity, executor, consumer);</span>
+<span class="nc" id="L134">            started = true;</span>
+<span class="fc" id="L135">        } catch (Throwable t) {</span>
+            // androidx.window not present or an API mismatch: stay non-foldable.
+<span class="nc" id="L137">        }</span>
+<span class="fc" id="L138">    }</span>
+
+    private static void onLayoutInfo(Object info, Class&lt;?&gt; foldingFeatureCls) throws Exception {
+<span class="nc" id="L141">        List&lt;?&gt; features = (List&lt;?&gt;) info.getClass().getMethod(&quot;getDisplayFeatures&quot;).invoke(info);</span>
+<span class="nc" id="L142">        boolean foundFold = false;</span>
+<span class="nc" id="L143">        int newPosture = DevicePosture.POSTURE_FLAT;</span>
+<span class="nc" id="L144">        int newOrientation = DevicePosture.FOLD_ORIENTATION_NONE;</span>
+<span class="nc" id="L145">        boolean newSeparating = false;</span>
+<span class="nc" id="L146">        Rect bounds = null;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (features != null) {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            for (Object feature : features) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                if (foldingFeatureCls.isInstance(feature)) {</span>
+<span class="nc" id="L150">                    foundFold = true;</span>
+<span class="nc" id="L151">                    Object state = foldingFeatureCls.getMethod(&quot;getState&quot;).invoke(feature);</span>
+<span class="nc" id="L152">                    Object orientation = foldingFeatureCls.getMethod(&quot;getOrientation&quot;).invoke(feature);</span>
+<span class="nc" id="L153">                    newSeparating = Boolean.TRUE.equals(</span>
+<span class="nc" id="L154">                            foldingFeatureCls.getMethod(&quot;isSeparating&quot;).invoke(feature));</span>
+<span class="nc" id="L155">                    Object rect = foldingFeatureCls.getMethod(&quot;getBounds&quot;).invoke(feature);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                    if (rect instanceof Rect) {</span>
+<span class="nc" id="L157">                        bounds = (Rect) rect;</span>
+                    }
+<span class="nc" id="L159">                    String s = String.valueOf(state);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                    newPosture = s.contains(&quot;HALF&quot;) ? DevicePosture.POSTURE_HALF_OPENED</span>
+<span class="nc" id="L161">                            : DevicePosture.POSTURE_FLAT;</span>
+<span class="nc" id="L162">                    String o = String.valueOf(orientation);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                    if (o.contains(&quot;VERTICAL&quot;)) {</span>
+<span class="nc" id="L164">                        newOrientation = DevicePosture.FOLD_ORIENTATION_VERTICAL;</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                    } else if (o.contains(&quot;HORIZONTAL&quot;)) {</span>
+<span class="nc" id="L166">                        newOrientation = DevicePosture.FOLD_ORIENTATION_HORIZONTAL;</span>
+                    }
+                }
+<span class="nc" id="L169">            }</span>
+        }
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (foundFold) {</span>
+            // Once a folding feature is observed, the device is foldable for the rest of the session.
+<span class="nc" id="L173">            foldable = true;</span>
+<span class="nc" id="L174">            posture = newPosture;</span>
+<span class="nc" id="L175">            foldOrientation = newOrientation;</span>
+<span class="nc" id="L176">            separating = newSeparating;</span>
+<span class="nc bnc" id="L177" title="All 4 branches missed.">            if (bounds != null &amp;&amp; newSeparating) {</span>
+<span class="nc" id="L178">                boundsX = bounds.left;</span>
+<span class="nc" id="L179">                boundsY = bounds.top;</span>
+<span class="nc" id="L180">                boundsW = bounds.width();</span>
+<span class="nc" id="L181">                boundsH = bounds.height();</span>
+<span class="nc" id="L182">                hasBounds = true;</span>
+            } else {
+<span class="nc" id="L184">                hasBounds = false;</span>
+            }
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        } else if (foldable) {</span>
+            // A known foldable currently reporting no folding feature is open and flat.
+<span class="nc" id="L188">            posture = DevicePosture.POSTURE_FLAT;</span>
+<span class="nc" id="L189">            foldOrientation = DevicePosture.FOLD_ORIENTATION_NONE;</span>
+<span class="nc" id="L190">            separating = false;</span>
+<span class="nc" id="L191">            hasBounds = false;</span>
+        }
+<span class="nc" id="L193">        Display.getInstance().postureChanged();</span>
+<span class="nc" id="L194">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

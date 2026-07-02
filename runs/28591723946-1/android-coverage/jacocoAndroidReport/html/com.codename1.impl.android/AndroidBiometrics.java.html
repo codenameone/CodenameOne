@@ -1,0 +1,519 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidBiometrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidBiometrics.java</span></div><h1>AndroidBiometrics.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.hardware.fingerprint.FingerprintManager;
+import android.os.Build;
+import android.os.CancellationSignal;
+import android.os.Looper;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.security.keystore.KeyProperties;
+
+import com.codename1.io.Log;
+import com.codename1.security.AuthenticationOptions;
+import com.codename1.security.BiometricError;
+import com.codename1.security.BiometricException;
+import com.codename1.security.BiometricType;
+import com.codename1.security.Biometrics;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.security.KeyStore;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+
+/**
+ * Android backing for {@link Biometrics}. Uses
+ * {@code BiometricPrompt} on API 29+ (via reflection &amp;mdash; the cn1-binaries
+ * android.jar predates API 28 so direct calls would not compile) and the
+ * legacy {@code FingerprintManager} on API 23-28. Mirrors the dual-path
+ * behaviour of the historical {@code FingerprintScanner} cn1lib but completes
+ * per-call {@link AsyncResource} instances instead of a shared static
+ * callback.
+ *
+ * &lt;p&gt;FingerprintManager error codes documented at
+ * &lt;a href=&quot;https://developer.android.com/reference/android/hardware/fingerprint/FingerprintManager&quot;&gt;developer.android.com&lt;/a&gt;;
+ * the constants missing from the compile-time android.jar are inlined below.&lt;/p&gt;
+ */
+public final class AndroidBiometrics extends Biometrics {
+
+    // FingerprintManager constants not in the cn1-binaries android.jar.
+    private static final int FINGERPRINT_ERROR_NO_FINGERPRINTS = 11;
+    private static final int FINGERPRINT_ERROR_HW_NOT_PRESENT = 12;
+
+    // Probe key tying biometric success to a real KeyStore unlock so the
+    // success callback cannot be bypassed by app hooking tools (Frida etc.).
+    // See CodeQL alert &quot;Insecure local authentication&quot; (java/android/insecure-local-authentication).
+    private static final String PROBE_KEY_ID = &quot;CN1BiometricsAuthProbeKey&quot;;
+    private static final String ANDROID_KEY_STORE = &quot;AndroidKeyStore&quot;;
+<span class="nc" id="L77">    private static final byte[] PROBE_PLAINTEXT = new byte[]{0x42};</span>
+
+    // BiometricPrompt error codes (API 28+) -- values are stable per AOSP.
+    static final int BIOMETRIC_ERROR_HW_UNAVAILABLE = 1;
+    static final int BIOMETRIC_ERROR_HW_NOT_PRESENT = 12;
+    static final int BIOMETRIC_ERROR_LOCKOUT = 7;
+    static final int BIOMETRIC_ERROR_LOCKOUT_PERMANENT = 9;
+    static final int BIOMETRIC_ERROR_NO_BIOMETRICS = 11;
+    static final int BIOMETRIC_ERROR_USER_CANCELED = 10;
+    static final int BIOMETRIC_ERROR_NEGATIVE_BUTTON = 13;
+    static final int BIOMETRIC_ERROR_CANCELED = 5;
+    static final int BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL = 14;
+
+    private CancellationSignal cancellationSignal;
+    private AsyncResource&lt;Boolean&gt; pending;
+
+<span class="nc" id="L93">    AndroidBiometrics() {</span>
+<span class="nc" id="L94">    }</span>
+
+    @Override
+    public boolean isSupported() {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &lt; 23) {</span>
+<span class="nc" id="L99">            return false;</span>
+        }
+<span class="nc" id="L101">        PackageManager pm = AndroidNativeUtil.getActivity().getPackageManager();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {</span>
+<span class="nc" id="L103">            return true;</span>
+        }
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= 29) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (pm.hasSystemFeature(&quot;android.hardware.biometrics.face&quot;)</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                    || pm.hasSystemFeature(&quot;android.hardware.biometrics.iris&quot;)) {</span>
+<span class="nc" id="L108">                return true;</span>
+            }
+        }
+<span class="nc" id="L111">        return false;</span>
+    }
+
+    @Override
+    public boolean canAuthenticate() {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &lt; 23) {</span>
+<span class="nc" id="L117">            return false;</span>
+        }
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        return !getAvailableBiometrics().isEmpty();</span>
+    }
+
+    @Override
+    public List&lt;BiometricType&gt; getAvailableBiometrics() {
+<span class="nc" id="L124">        final List&lt;BiometricType&gt; out = new ArrayList&lt;BiometricType&gt;();</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &lt; 23) {</span>
+<span class="nc" id="L126">            return out;</span>
+        }
+<span class="nc" id="L128">        runOnUi(new CollectAvailableBiometricsRunnable(out));</span>
+<span class="nc" id="L129">        return out;</span>
+    }
+
+    private static final class CollectAvailableBiometricsRunnable implements Runnable {
+        private final List&lt;BiometricType&gt; out;
+<span class="nc" id="L134">        CollectAvailableBiometricsRunnable(List&lt;BiometricType&gt; out) { this.out = out; }</span>
+        @Override
+<span class="nc" id="L136">        public void run() { collectAvailableBiometrics(out); }</span>
+    }
+
+    private static void collectAvailableBiometrics(List&lt;BiometricType&gt; out) {
+        try {
+<span class="nc" id="L141">            Activity act = AndroidNativeUtil.getActivity();</span>
+<span class="nc" id="L142">            PackageManager pm = act.getPackageManager();</span>
+            boolean okBio;
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (Build.VERSION.SDK_INT &gt;= 29) {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                if (!AndroidNativeUtil.checkForPermission(&quot;android.permission.USE_BIOMETRIC&quot;,</span>
+                        &quot;Authorize using biometrics&quot;)) {
+<span class="nc" id="L147">                    return;</span>
+                }
+<span class="nc" id="L149">                okBio = BiometricsApi29.canAuthenticate(act);</span>
+            } else {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                if (!AndroidNativeUtil.checkForPermission(Manifest.permission.USE_FINGERPRINT,</span>
+                        &quot;Authorize using fingerprint&quot;)) {
+<span class="nc" id="L153">                    return;</span>
+                }
+<span class="nc" id="L155">                FingerprintManager fpm = (FingerprintManager)</span>
+<span class="nc" id="L156">                        act.getSystemService(Activity.FINGERPRINT_SERVICE);</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">                okBio = fpm != null &amp;&amp; fpm.isHardwareDetected()</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                        &amp;&amp; fpm.hasEnrolledFingerprints();</span>
+            }
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (!okBio) {</span>
+<span class="nc" id="L161">                return;</span>
+            }
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {</span>
+<span class="nc" id="L164">                FingerprintManager fpm = (FingerprintManager)</span>
+<span class="nc" id="L165">                        act.getSystemService(Activity.FINGERPRINT_SERVICE);</span>
+<span class="nc bnc" id="L166" title="All 4 branches missed.">                if (fpm != null &amp;&amp; fpm.hasEnrolledFingerprints()) {</span>
+<span class="nc" id="L167">                    out.add(BiometricType.FINGERPRINT);</span>
+                }
+            }
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (Build.VERSION.SDK_INT &gt;= 29) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                if (pm.hasSystemFeature(&quot;android.hardware.biometrics.face&quot;)) {</span>
+<span class="nc" id="L172">                    out.add(BiometricType.FACE);</span>
+                }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                if (pm.hasSystemFeature(&quot;android.hardware.biometrics.iris&quot;)) {</span>
+<span class="nc" id="L175">                    out.add(BiometricType.IRIS);</span>
+                }
+            }
+<span class="nc" id="L178">        } catch (Throwable t) {</span>
+<span class="nc" id="L179">            Log.e(t);</span>
+<span class="nc" id="L180">        }</span>
+<span class="nc" id="L181">    }</span>
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; authenticate(final AuthenticationOptions opts) {
+<span class="nc" id="L185">        final AsyncResource&lt;Boolean&gt; result = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &lt; 23) {</span>
+<span class="nc" id="L187">            result.error(new BiometricException(BiometricError.NOT_AVAILABLE,</span>
+                    &quot;Android API 23 (Marshmallow) required for biometric authentication&quot;));
+<span class="nc" id="L189">            return result;</span>
+        }
+<span class="nc bnc" id="L191" title="All 4 branches missed.">        final String reason = opts == null || opts.getReason() == null</span>
+<span class="nc" id="L192">                ? &quot;Authenticate&quot; : opts.getReason();</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">        final String title = opts == null || opts.getTitle() == null</span>
+<span class="nc" id="L194">                ? reason : opts.getTitle();</span>
+<span class="nc bnc" id="L195" title="All 4 branches missed.">        final String negative = opts == null || opts.getNegativeButtonText() == null</span>
+<span class="nc" id="L196">                ? &quot;Cancel&quot; : opts.getNegativeButtonText();</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        final String subtitle = opts == null ? null : opts.getSubtitle();</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        final String description = opts == null ? null : opts.getDescription();</span>
+
+<span class="nc" id="L200">        pending = result;</span>
+        // Initialise a CryptoObject-backed Cipher that the OS will unlock
+        // ONLY if real biometric authentication succeeds. The success callback
+        // then performs a doFinal() against the unlocked cipher; if a hooking
+        // tool bypasses the callback, doFinal() throws and the result fails.
+<span class="nc" id="L205">        final Cipher probeCipher = initProbeCipher(result);</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (probeCipher == null) {</span>
+            // initProbeCipher already errored the result.
+<span class="nc" id="L208">            return result;</span>
+        }
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= 29) {</span>
+<span class="nc" id="L211">            runOnUi(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                    if (cancellationSignal != null) {</span>
+<span class="nc" id="L215">                        cancellationSignal.cancel();</span>
+                    }
+<span class="nc" id="L217">                    cancellationSignal = new CancellationSignal();</span>
+<span class="nc" id="L218">                    BiometricsApi29.authenticateWithCipher(</span>
+<span class="nc" id="L219">                            AndroidNativeUtil.getActivity(),</span>
+                            title, subtitle, description, negative,
+                            probeCipher,
+                            cancellationSignal,
+<span class="nc" id="L223">                            new BiometricsApi29.CipherAuthCallback() {</span>
+                                @Override
+                                public void onSuccess(Object authedCipher) {
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                                    if (verifyProbeCipher((Cipher) authedCipher)) {</span>
+<span class="nc" id="L227">                                        completeSuccess(result);</span>
+                                    } else {
+<span class="nc" id="L229">                                        completeError(result, BiometricError.AUTHENTICATION_FAILED,</span>
+                                                &quot;Probe cipher rejected -- biometric success may have been spoofed&quot;);
+                                    }
+<span class="nc" id="L232">                                }</span>
+
+                                @Override
+                                public void onError(int code, String msg) {
+<span class="nc" id="L236">                                    completeError(result, mapBiometricPromptError(code), msg);</span>
+<span class="nc" id="L237">                                }</span>
+                            });
+<span class="nc" id="L239">                }</span>
+            });
+        } else {
+<span class="nc" id="L242">            authenticateLegacy(result, probeCipher);</span>
+        }
+<span class="nc" id="L244">        return result;</span>
+    }
+
+    private void authenticateLegacy(final AsyncResource&lt;Boolean&gt; result, final Cipher probeCipher) {
+<span class="nc" id="L248">        runOnUi(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L251" title="All 2 branches missed.">                if (!AndroidNativeUtil.checkForPermission(Manifest.permission.USE_FINGERPRINT,</span>
+                        &quot;Authorize using fingerprint&quot;)) {
+<span class="nc" id="L253">                    completeError(result, BiometricError.NOT_AVAILABLE,</span>
+                            &quot;USE_FINGERPRINT permission denied&quot;);
+<span class="nc" id="L255">                    return;</span>
+                }
+                FingerprintManager fpm = (FingerprintManager)
+<span class="nc" id="L258">                        AndroidNativeUtil.getActivity()</span>
+<span class="nc" id="L259">                                .getSystemService(Activity.FINGERPRINT_SERVICE);</span>
+<span class="nc bnc" id="L260" title="All 4 branches missed.">                if (fpm == null || !fpm.isHardwareDetected()) {</span>
+<span class="nc" id="L261">                    completeError(result, BiometricError.NOT_AVAILABLE,</span>
+                            &quot;No fingerprint hardware&quot;);
+<span class="nc" id="L263">                    return;</span>
+                }
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                if (!fpm.hasEnrolledFingerprints()) {</span>
+<span class="nc" id="L266">                    completeError(result, BiometricError.NOT_ENROLLED, &quot;No fingerprints enrolled&quot;);</span>
+<span class="nc" id="L267">                    return;</span>
+                }
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                if (cancellationSignal != null) {</span>
+<span class="nc" id="L270">                    cancellationSignal.cancel();</span>
+                }
+<span class="nc" id="L272">                final CancellationSignal cs = new CancellationSignal();</span>
+<span class="nc" id="L273">                cancellationSignal = cs;</span>
+<span class="nc" id="L274">                FingerprintManager.AuthenticationCallback cb = new FingerprintManager.AuthenticationCallback() {</span>
+                    int failures;
+
+                    @Override
+                    public void onAuthenticationError(int errorCode, CharSequence errString) {
+<span class="nc" id="L279">                        completeError(result, mapFingerprintManagerError(errorCode),</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                                errString == null ? &quot;&quot; : errString.toString());</span>
+<span class="nc" id="L281">                    }</span>
+
+                    @Override
+                    public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult r) {
+<span class="nc" id="L285">                        cs.cancel();</span>
+                        // Require the OS to return the same CryptoObject we
+                        // passed in, and confirm by running an actual crypto
+                        // operation on the unlocked cipher. A hooked / spoofed
+                        // success callback either lacks the CryptoObject or
+                        // hits a Keystore-locked cipher and doFinal() throws.
+<span class="nc" id="L291">                        FingerprintManager.CryptoObject crypto = r.getCryptoObject();</span>
+<span class="nc bnc" id="L292" title="All 4 branches missed.">                        if (crypto == null || !verifyProbeCipher(crypto.getCipher())) {</span>
+<span class="nc" id="L293">                            completeError(result, BiometricError.AUTHENTICATION_FAILED,</span>
+                                    &quot;Probe cipher rejected -- biometric success may have been spoofed&quot;);
+<span class="nc" id="L295">                            return;</span>
+                        }
+<span class="nc" id="L297">                        completeSuccess(result);</span>
+<span class="nc" id="L298">                    }</span>
+
+                    @Override
+                    public void onAuthenticationFailed() {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                        if (failures++ &gt; 5) {</span>
+<span class="nc" id="L303">                            cs.cancel();</span>
+<span class="nc" id="L304">                            completeError(result, BiometricError.AUTHENTICATION_FAILED,</span>
+                                    &quot;Authentication failed&quot;);
+                        }
+<span class="nc" id="L307">                    }</span>
+                };
+<span class="nc" id="L309">                fpm.authenticate(new FingerprintManager.CryptoObject(probeCipher), cs, 0, cb, null);</span>
+<span class="nc" id="L310">            }</span>
+        });
+<span class="nc" id="L312">    }</span>
+
+    /// Initialises an AES/CBC/PKCS7 Cipher under the Keystore probe key in
+    /// ENCRYPT_MODE. The Keystore enforces user-authentication-required, so
+    /// the Cipher only finalises after a real biometric prompt completes
+    /// (see [CodeQL &quot;Insecure local authentication&quot;](https://github.com/codenameone/CodenameOne/security/code-scanning)).
+    /// Returns `null` and errors the result if the key cannot be created or
+    /// initialised.
+    private Cipher initProbeCipher(AsyncResource&lt;Boolean&gt; result) {
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        for (int attempt = 0; attempt &lt; 2; attempt++) {</span>
+            try {
+<span class="nc" id="L323">                KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);</span>
+<span class="nc" id="L324">                ks.load(null);</span>
+<span class="nc" id="L325">                SecretKey key = (SecretKey) ks.getKey(PROBE_KEY_ID, null);</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">                if (key == null) {</span>
+<span class="nc" id="L327">                    createProbeKey();</span>
+<span class="nc" id="L328">                    key = (SecretKey) ks.getKey(PROBE_KEY_ID, null);</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                    if (key == null) {</span>
+<span class="nc" id="L330">                        completeError(result, BiometricError.UNKNOWN,</span>
+                                &quot;Failed to create biometric probe key&quot;);
+<span class="nc" id="L332">                        return null;</span>
+                    }
+                }
+<span class="nc" id="L335">                Cipher c = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES</span>
+                        + &quot;/&quot; + KeyProperties.BLOCK_MODE_CBC
+                        + &quot;/&quot; + KeyProperties.ENCRYPTION_PADDING_PKCS7);
+<span class="nc" id="L338">                c.init(Cipher.ENCRYPT_MODE, key);</span>
+<span class="nc" id="L339">                return c;</span>
+<span class="nc" id="L340">            } catch (KeyPermanentlyInvalidatedException e) {</span>
+                // User enrolled new biometrics since the probe key was created.
+                // Delete it and retry once -- the next iteration recreates it.
+<span class="nc" id="L343">                deleteProbeKey();</span>
+<span class="nc" id="L344">            } catch (Throwable t) {</span>
+<span class="nc" id="L345">                Log.e(t);</span>
+<span class="nc" id="L346">                completeError(result, BiometricError.UNKNOWN,</span>
+<span class="nc" id="L347">                        &quot;Failed to initialise biometric probe cipher: &quot; + t.getMessage());</span>
+<span class="nc" id="L348">                return null;</span>
+<span class="nc" id="L349">            }</span>
+        }
+<span class="nc" id="L351">        completeError(result, BiometricError.KEY_REVOKED,</span>
+                &quot;Biometric probe key permanently invalidated&quot;);
+<span class="nc" id="L353">        return null;</span>
+    }
+
+    private void createProbeKey() {
+        try {
+<span class="nc" id="L358">            KeyGenParameterSpec.Builder b = new KeyGenParameterSpec.Builder(PROBE_KEY_ID,</span>
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+<span class="nc" id="L360">                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)</span>
+<span class="nc" id="L361">                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)</span>
+<span class="nc" id="L362">                    .setUserAuthenticationRequired(true);</span>
+            // Invalidate the probe key whenever the user enrols a new biometric;
+            // this is the security property CodeQL is asking us to enforce.
+<span class="nc bnc" id="L365" title="All 2 branches missed.">            if (Build.VERSION.SDK_INT &gt;= 24) {</span>
+<span class="nc" id="L366">                b.setInvalidatedByBiometricEnrollment(true);</span>
+            }
+<span class="nc" id="L368">            KeyGenerator kg = KeyGenerator.getInstance(</span>
+                    KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
+<span class="nc" id="L370">            kg.init(b.build());</span>
+<span class="nc" id="L371">            kg.generateKey();</span>
+<span class="nc" id="L372">        } catch (Throwable t) {</span>
+<span class="nc" id="L373">            Log.e(t);</span>
+<span class="nc" id="L374">        }</span>
+<span class="nc" id="L375">    }</span>
+
+    private void deleteProbeKey() {
+        try {
+<span class="nc" id="L379">            KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);</span>
+<span class="nc" id="L380">            ks.load(null);</span>
+<span class="nc" id="L381">            ks.deleteEntry(PROBE_KEY_ID);</span>
+<span class="nc" id="L382">        } catch (Throwable t) {</span>
+<span class="nc" id="L383">            Log.e(t);</span>
+<span class="nc" id="L384">        }</span>
+<span class="nc" id="L385">    }</span>
+
+    /// Performs the actual cryptographic operation on the biometric-unlocked
+    /// Cipher. Returning `true` proves the user really authenticated; throws
+    /// indicate the success callback was reached without a valid biometric
+    /// unlock and the call must be rejected.
+    private boolean verifyProbeCipher(Cipher authedCipher) {
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        if (authedCipher == null) {</span>
+<span class="nc" id="L393">            return false;</span>
+        }
+        try {
+<span class="nc" id="L396">            authedCipher.doFinal(PROBE_PLAINTEXT);</span>
+<span class="nc" id="L397">            return true;</span>
+<span class="nc" id="L398">        } catch (Throwable t) {</span>
+<span class="nc" id="L399">            Log.e(t);</span>
+<span class="nc" id="L400">            return false;</span>
+        }
+    }
+
+    void completeSuccess(final AsyncResource&lt;Boolean&gt; result) {
+<span class="nc bnc" id="L405" title="All 2 branches missed.">        if (pending != result) {</span>
+<span class="nc" id="L406">            return;</span>
+        }
+<span class="nc" id="L408">        pending = null;</span>
+<span class="nc" id="L409">        Display.getInstance().callSerially(new CompleteSuccessRunnable(result));</span>
+<span class="nc" id="L410">    }</span>
+
+    private static final class CompleteSuccessRunnable implements Runnable {
+        private final AsyncResource&lt;Boolean&gt; result;
+<span class="nc" id="L414">        CompleteSuccessRunnable(AsyncResource&lt;Boolean&gt; result) { this.result = result; }</span>
+        @Override
+        public void run() {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            if (!result.isDone()) {</span>
+<span class="nc" id="L418">                result.complete(Boolean.TRUE);</span>
+            }
+<span class="nc" id="L420">        }</span>
+    }
+
+    void completeError(final AsyncResource&lt;Boolean&gt; result,
+                       final BiometricError err, final String msg) {
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        if (pending != result) {</span>
+<span class="nc" id="L426">            return;</span>
+        }
+<span class="nc" id="L428">        pending = null;</span>
+<span class="nc" id="L429">        Display.getInstance().callSerially(new CompleteErrorRunnable(result, err, msg));</span>
+<span class="nc" id="L430">    }</span>
+
+    private static final class CompleteErrorRunnable implements Runnable {
+        private final AsyncResource&lt;Boolean&gt; result;
+        private final BiometricError err;
+        private final String msg;
+<span class="nc" id="L436">        CompleteErrorRunnable(AsyncResource&lt;Boolean&gt; result, BiometricError err, String msg) {</span>
+<span class="nc" id="L437">            this.result = result;</span>
+<span class="nc" id="L438">            this.err = err;</span>
+<span class="nc" id="L439">            this.msg = msg;</span>
+<span class="nc" id="L440">        }</span>
+        @Override
+        public void run() {
+<span class="nc bnc" id="L443" title="All 2 branches missed.">            if (!result.isDone()) {</span>
+<span class="nc" id="L444">                result.error(new BiometricException(err, msg));</span>
+            }
+<span class="nc" id="L446">        }</span>
+    }
+
+    static BiometricError mapBiometricPromptError(int code) {
+<span class="nc bnc" id="L450" title="All 8 branches missed.">        switch (code) {</span>
+            case BIOMETRIC_ERROR_HW_UNAVAILABLE:
+            case BIOMETRIC_ERROR_HW_NOT_PRESENT:
+<span class="nc" id="L453">                return BiometricError.NOT_AVAILABLE;</span>
+            case BIOMETRIC_ERROR_LOCKOUT:
+<span class="nc" id="L455">                return BiometricError.LOCKED_OUT;</span>
+            case BIOMETRIC_ERROR_LOCKOUT_PERMANENT:
+<span class="nc" id="L457">                return BiometricError.PERMANENTLY_LOCKED_OUT;</span>
+            case BIOMETRIC_ERROR_NO_BIOMETRICS:
+<span class="nc" id="L459">                return BiometricError.NOT_ENROLLED;</span>
+            case BIOMETRIC_ERROR_USER_CANCELED:
+            case BIOMETRIC_ERROR_NEGATIVE_BUTTON:
+<span class="nc" id="L462">                return BiometricError.USER_CANCELED;</span>
+            case BIOMETRIC_ERROR_CANCELED:
+<span class="nc" id="L464">                return BiometricError.SYSTEM_CANCELED;</span>
+            case BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL:
+<span class="nc" id="L466">                return BiometricError.PASSCODE_NOT_SET;</span>
+            default:
+<span class="nc" id="L468">                return BiometricError.UNKNOWN;</span>
+        }
+    }
+
+    static BiometricError mapFingerprintManagerError(int code) {
+<span class="nc bnc" id="L473" title="All 7 branches missed.">        switch (code) {</span>
+            case FingerprintManager.FINGERPRINT_ERROR_HW_UNAVAILABLE:
+            case FINGERPRINT_ERROR_HW_NOT_PRESENT:
+<span class="nc" id="L476">                return BiometricError.NOT_AVAILABLE;</span>
+            case FingerprintManager.FINGERPRINT_ERROR_LOCKOUT:
+<span class="nc" id="L478">                return BiometricError.LOCKED_OUT;</span>
+            case FingerprintManager.FINGERPRINT_ERROR_LOCKOUT_PERMANENT:
+<span class="nc" id="L480">                return BiometricError.PERMANENTLY_LOCKED_OUT;</span>
+            case FINGERPRINT_ERROR_NO_FINGERPRINTS:
+<span class="nc" id="L482">                return BiometricError.NOT_ENROLLED;</span>
+            case FingerprintManager.FINGERPRINT_ERROR_USER_CANCELED:
+<span class="nc" id="L484">                return BiometricError.USER_CANCELED;</span>
+            case FingerprintManager.FINGERPRINT_ERROR_CANCELED:
+<span class="nc" id="L486">                return BiometricError.SYSTEM_CANCELED;</span>
+            default:
+<span class="nc" id="L488">                return BiometricError.UNKNOWN;</span>
+        }
+    }
+
+    @Override
+    public boolean stopAuthentication() {
+<span class="nc" id="L494">        final AsyncResource&lt;Boolean&gt; p = pending;</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">        if (p == null) {</span>
+<span class="nc" id="L496">            return false;</span>
+        }
+<span class="nc" id="L498">        runOnUi(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                if (cancellationSignal != null) {</span>
+<span class="nc" id="L502">                    cancellationSignal.cancel();</span>
+<span class="nc" id="L503">                    cancellationSignal = null;</span>
+                }
+<span class="nc" id="L505">            }</span>
+        });
+<span class="nc" id="L507">        completeError(p, BiometricError.USER_CANCELED, &quot;Authentication cancelled by app&quot;);</span>
+<span class="nc" id="L508">        return true;</span>
+    }
+
+    static void runOnUi(Runnable r) {
+<span class="nc bnc" id="L512" title="All 2 branches missed.">        if (Looper.getMainLooper().getThread() == Thread.currentThread()) {</span>
+<span class="nc" id="L513">            r.run();</span>
+        } else {
+<span class="nc" id="L515">            AndroidNativeUtil.getActivity().runOnUiThread(r);</span>
+        }
+<span class="nc" id="L517">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

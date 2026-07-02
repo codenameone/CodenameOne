@@ -1,0 +1,543 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidGraphicsDevice.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidGraphicsDevice.java</span></div><h1>AndroidGraphicsDevice.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.impl.android;
+
+import android.opengl.GLES20;
+
+import com.codename1.gpu.Camera;
+import com.codename1.gpu.GpuCapabilities;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.IndexBuffer;
+import com.codename1.gpu.Light;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Matrix4;
+import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PrimitiveType;
+import com.codename1.gpu.RenderState;
+import com.codename1.gpu.Texture;
+import com.codename1.gpu.VertexAttribute;
+import com.codename1.gpu.VertexBuffer;
+import com.codename1.gpu.VertexFormat;
+import com.codename1.impl.gpu.GlslShaderGenerator;
+import com.codename1.ui.Image;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.nio.ShortBuffer;
+import java.util.HashMap;
+import java.util.Map;
+
+/// OpenGL ES 2.0 implementation of the Codename One 3D `GraphicsDevice`.
+///
+/// Every method of this class must be invoked on the `GLSurfaceView` render
+/// thread because it issues `GLES20` calls against the current EGL context. The
+/// owning `AndroidGLSurface` guarantees this by only constructing the device and
+/// forwarding the application `Renderer` callbacks from inside the
+/// `GLSurfaceView.Renderer` hooks.
+///
+/// Shaders are generated once per (material variant, vertex format) pair using
+/// the shared `GlslShaderGenerator` and cached as linked programs. Vertex and
+/// index buffers are uploaded lazily from their SIMD aligned backing arrays via
+/// direct java.nio buffers and re-uploaded only while dirty. Textures are
+/// uploaded from packed ARGB pixels converted to GL's RGBA byte order.
+<span class="fc" id="L51">class AndroidGraphicsDevice extends GraphicsDevice {</span>
+    /// A linked GL program together with the uniform/attribute locations the
+    /// draw loop needs. A location of -1 means the program does not declare that
+    /// input and the binding is skipped.
+    private static final class Program {
+        int handle;
+        int aPosition;
+        int aNormal;
+        int aTexcoord;
+        int uMvp;
+        int uModel;
+        int uNormalMatrix;
+        int uColor;
+        int uTexture;
+        int uLightDir;
+        int uLightColor;
+        int uAmbient;
+        int uEye;
+        int uShininess;
+    }
+
+    /// GPU handle for an uploaded texture.
+    private static final class TexHandle {
+        final int id;
+        final int w;
+        final int h;
+
+<span class="fc" id="L78">        TexHandle(int id, int w, int h) {</span>
+<span class="fc" id="L79">            this.id = id;</span>
+<span class="fc" id="L80">            this.w = w;</span>
+<span class="fc" id="L81">            this.h = h;</span>
+<span class="fc" id="L82">        }</span>
+    }
+
+<span class="fc" id="L85">    private final Map&lt;String, Program&gt; programs = new HashMap&lt;String, Program&gt;();</span>
+
+    private GpuCapabilities caps;
+
+<span class="fc" id="L89">    private final float[] mvp = new float[16];</span>
+<span class="fc" id="L90">    private final float[] model = new float[16];</span>
+<span class="fc" id="L91">    private final float[] normalMatrix = new float[16];</span>
+
+    /// Lazily builds and caches the device capabilities by querying GL limits.
+    public GpuCapabilities getCapabilities() {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (caps == null) {</span>
+<span class="nc" id="L96">            int[] v = new int[1];</span>
+<span class="nc" id="L97">            GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, v, 0);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            int maxTex = v[0] &gt; 0 ? v[0] : 2048;</span>
+<span class="nc" id="L99">            GLES20.glGetIntegerv(GLES20.GL_MAX_VERTEX_ATTRIBS, v, 0);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            int maxAttribs = v[0] &gt; 0 ? v[0] : 8;</span>
+<span class="nc" id="L101">            String renderer = GLES20.glGetString(GLES20.GL_RENDERER);</span>
+<span class="nc" id="L102">            String version = GLES20.glGetString(GLES20.GL_VERSION);</span>
+<span class="nc" id="L103">            String name = &quot;Codename One OpenGL ES (Android)&quot;;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (renderer != null) {</span>
+<span class="nc" id="L105">                name = name + &quot; - &quot; + renderer;</span>
+            }
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (version != null) {</span>
+<span class="nc" id="L108">                name = name + &quot; / &quot; + version;</span>
+            }
+<span class="nc" id="L110">            caps = new GpuCapabilities(maxTex, maxAttribs, false, false, false, name);</span>
+        }
+<span class="nc" id="L112">        return caps;</span>
+    }
+
+    public Texture createTexture(Image image) {
+<span class="fc" id="L116">        return createTexture(image.getWidth(), image.getHeight(), image.getRGB());</span>
+    }
+
+    public Texture createTexture(int w, int h, int[] argb) {
+<span class="fc" id="L120">        Texture t = new Texture(w, h);</span>
+<span class="fc" id="L121">        int id = uploadTexture(w, h, argb);</span>
+<span class="fc" id="L122">        t.setHandle(new TexHandle(id, w, h));</span>
+<span class="fc" id="L123">        return t;</span>
+    }
+
+    private int uploadTexture(int w, int h, int[] argb) {
+<span class="fc" id="L127">        int[] ids = new int[1];</span>
+<span class="fc" id="L128">        GLES20.glGenTextures(1, ids, 0);</span>
+<span class="fc" id="L129">        int id = ids[0];</span>
+<span class="fc" id="L130">        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, id);</span>
+
+        // Convert packed ARGB ints into tightly packed RGBA bytes.
+<span class="fc" id="L133">        ByteBuffer pixels = ByteBuffer.allocateDirect(w * h * 4);</span>
+<span class="fc" id="L134">        pixels.order(ByteOrder.nativeOrder());</span>
+<span class="fc" id="L135">        int count = w * h;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L137">            int c = argb[i];</span>
+<span class="fc" id="L138">            pixels.put((byte) ((c &gt;&gt; 16) &amp; 0xff));</span>
+<span class="fc" id="L139">            pixels.put((byte) ((c &gt;&gt; 8) &amp; 0xff));</span>
+<span class="fc" id="L140">            pixels.put((byte) (c &amp; 0xff));</span>
+<span class="fc" id="L141">            pixels.put((byte) ((c &gt;&gt;&gt; 24) &amp; 0xff));</span>
+        }
+<span class="fc" id="L143">        pixels.position(0);</span>
+
+<span class="fc" id="L145">        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, w, h, 0,</span>
+                GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixels);
+<span class="fc" id="L147">        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);</span>
+<span class="fc" id="L148">        return id;</span>
+    }
+
+    public void clear(int argbColor, boolean clearColor, boolean clearDepth) {
+<span class="fc" id="L152">        int mask = 0;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (clearColor) {</span>
+<span class="fc" id="L154">            float a = ((argbColor &gt;&gt;&gt; 24) &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L155">            float r = ((argbColor &gt;&gt; 16) &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L156">            float g = ((argbColor &gt;&gt; 8) &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L157">            float b = (argbColor &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L158">            GLES20.glClearColor(r, g, b, a);</span>
+<span class="fc" id="L159">            mask |= GLES20.GL_COLOR_BUFFER_BIT;</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (clearDepth) {</span>
+<span class="fc" id="L162">            GLES20.glClearDepthf(1.0f);</span>
+            // Depth writes must be enabled for the depth buffer to be cleared.
+<span class="fc" id="L164">            GLES20.glDepthMask(true);</span>
+<span class="fc" id="L165">            mask |= GLES20.GL_DEPTH_BUFFER_BIT;</span>
+        }
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (mask != 0) {</span>
+<span class="fc" id="L168">            GLES20.glClear(mask);</span>
+        }
+<span class="fc" id="L170">    }</span>
+
+    public void setViewport(int x, int y, int w, int h) {
+<span class="fc" id="L173">        GLES20.glViewport(x, y, w, h);</span>
+<span class="fc" id="L174">    }</span>
+
+    public void draw(Mesh mesh, Material material, float[] modelMatrix) {
+<span class="fc" id="L177">        VertexBuffer vb = mesh.getVertices();</span>
+<span class="fc" id="L178">        VertexFormat fmt = vb.getFormat();</span>
+
+<span class="fc" id="L180">        Program program = getProgram(material, fmt);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (program.handle == 0) {</span>
+<span class="nc" id="L182">            return;</span>
+        }
+<span class="fc" id="L184">        GLES20.glUseProgram(program.handle);</span>
+
+        // Compose matrices: mvp = viewProjection * model.
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (modelMatrix != null) {</span>
+<span class="fc" id="L188">            Matrix4.copy(modelMatrix, model);</span>
+        } else {
+<span class="nc" id="L190">            Matrix4.setIdentity(model);</span>
+        }
+<span class="fc" id="L192">        Camera cam = getCamera();</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();</span>
+<span class="fc" id="L194">        Matrix4.multiply(vp, model, mvp);</span>
+<span class="fc" id="L195">        float[] nm = Matrix4.normalMatrix(model);</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L197">            normalMatrix[i] = nm[i];</span>
+        }
+
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (program.uMvp &gt;= 0) {</span>
+<span class="fc" id="L201">            GLES20.glUniformMatrix4fv(program.uMvp, 1, false, mvp, 0);</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (program.uModel &gt;= 0) {</span>
+<span class="fc" id="L204">            GLES20.glUniformMatrix4fv(program.uModel, 1, false, model, 0);</span>
+        }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (program.uNormalMatrix &gt;= 0) {</span>
+<span class="fc" id="L207">            GLES20.glUniformMatrix4fv(program.uNormalMatrix, 1, false, normalMatrix, 0);</span>
+        }
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (program.uColor &gt;= 0) {</span>
+<span class="fc" id="L210">            int c = material.getColor();</span>
+<span class="fc" id="L211">            float a = ((c &gt;&gt;&gt; 24) &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L212">            float r = ((c &gt;&gt; 16) &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L213">            float g = ((c &gt;&gt; 8) &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L214">            float b = (c &amp; 0xff) / 255.0f;</span>
+<span class="fc" id="L215">            GLES20.glUniform4f(program.uColor, r, g, b, a);</span>
+        }
+
+<span class="fc" id="L218">        Light light = getLight();</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (program.uLightDir &gt;= 0) {</span>
+<span class="fc" id="L220">            GLES20.glUniform3f(program.uLightDir,</span>
+<span class="fc" id="L221">                    light.getDirectionX(), light.getDirectionY(), light.getDirectionZ());</span>
+        }
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (program.uLightColor &gt;= 0) {</span>
+<span class="fc" id="L224">            int lc = light.getColor();</span>
+<span class="fc" id="L225">            GLES20.glUniform3f(program.uLightColor,</span>
+                    ((lc &gt;&gt; 16) &amp; 0xff) / 255.0f, ((lc &gt;&gt; 8) &amp; 0xff) / 255.0f, (lc &amp; 0xff) / 255.0f);
+        }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (program.uAmbient &gt;= 0) {</span>
+<span class="fc" id="L229">            int ac = light.getAmbientColor();</span>
+<span class="fc" id="L230">            GLES20.glUniform3f(program.uAmbient,</span>
+                    ((ac &gt;&gt; 16) &amp; 0xff) / 255.0f, ((ac &gt;&gt; 8) &amp; 0xff) / 255.0f, (ac &amp; 0xff) / 255.0f);
+        }
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (program.uEye &gt;= 0) {</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            float ex = cam != null ? cam.getEyeX() : 0;</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            float ey = cam != null ? cam.getEyeY() : 0;</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            float ez = cam != null ? cam.getEyeZ() : 0;</span>
+<span class="fc" id="L237">            GLES20.glUniform3f(program.uEye, ex, ey, ez);</span>
+        }
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (program.uShininess &gt;= 0) {</span>
+<span class="fc" id="L240">            GLES20.glUniform1f(program.uShininess, material.getShininess());</span>
+        }
+
+        // Bind the texture, if any, to unit 0.
+<span class="fc" id="L244">        Texture tex = material.getTexture();</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        if (tex != null &amp;&amp; program.uTexture &gt;= 0) {</span>
+<span class="fc" id="L246">            TexHandle th = (TexHandle) tex.getHandle();</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (th != null) {</span>
+<span class="fc" id="L248">                GLES20.glActiveTexture(GLES20.GL_TEXTURE0);</span>
+<span class="fc" id="L249">                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, th.id);</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                int wrap = tex.getWrap() == Texture.Wrap.REPEAT</span>
+<span class="pc" id="L251">                        ? GLES20.GL_REPEAT : GLES20.GL_CLAMP_TO_EDGE;</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">                int filter = tex.getFilter() == Texture.Filter.NEAREST</span>
+<span class="fc" id="L253">                        ? GLES20.GL_NEAREST : GLES20.GL_LINEAR;</span>
+<span class="fc" id="L254">                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, wrap);</span>
+<span class="fc" id="L255">                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, wrap);</span>
+<span class="fc" id="L256">                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter);</span>
+<span class="fc" id="L257">                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter);</span>
+<span class="fc" id="L258">                GLES20.glUniform1i(program.uTexture, 0);</span>
+            }
+        }
+
+<span class="fc" id="L262">        applyRenderState(material.getRenderState());</span>
+
+        // Upload (if dirty) and bind the vertex buffer, then wire the attribute
+        // pointers from the interleaved format offsets.
+<span class="fc" id="L266">        int vbo = uploadVertexBuffer(vb);</span>
+<span class="fc" id="L267">        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);</span>
+<span class="fc" id="L268">        int strideBytes = fmt.getStrideBytes();</span>
+<span class="fc" id="L269">        bindAttribute(program.aPosition, fmt, VertexAttribute.Usage.POSITION, strideBytes);</span>
+<span class="fc" id="L270">        bindAttribute(program.aNormal, fmt, VertexAttribute.Usage.NORMAL, strideBytes);</span>
+<span class="fc" id="L271">        bindAttribute(program.aTexcoord, fmt, VertexAttribute.Usage.TEXCOORD, strideBytes);</span>
+
+<span class="fc" id="L273">        int glMode = toGlPrimitive(mesh.getPrimitiveType());</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (mesh.isIndexed()) {</span>
+<span class="fc" id="L275">            IndexBuffer ib = mesh.getIndices();</span>
+<span class="fc" id="L276">            int ibo = uploadIndexBuffer(ib);</span>
+<span class="fc" id="L277">            GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);</span>
+<span class="fc" id="L278">            GLES20.glDrawElements(glMode, ib.getIndexCount(), GLES20.GL_UNSIGNED_SHORT, 0);</span>
+<span class="fc" id="L279">            GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);</span>
+<span class="fc" id="L280">        } else {</span>
+<span class="nc" id="L281">            GLES20.glDrawArrays(glMode, 0, vb.getVertexCount());</span>
+        }
+
+<span class="fc" id="L284">        disableAttribute(program.aPosition);</span>
+<span class="fc" id="L285">        disableAttribute(program.aNormal);</span>
+<span class="fc" id="L286">        disableAttribute(program.aTexcoord);</span>
+<span class="fc" id="L287">        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);</span>
+<span class="fc" id="L288">    }</span>
+
+    private void bindAttribute(int location, VertexFormat fmt,
+                               VertexAttribute.Usage usage, int strideBytes) {
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (location &lt; 0) {</span>
+<span class="fc" id="L293">            return;</span>
+        }
+<span class="fc" id="L295">        int offsetFloats = -1;</span>
+<span class="fc" id="L296">        int components = 0;</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        for (int i = 0; i &lt; fmt.getAttributeCount(); i++) {</span>
+<span class="fc" id="L298">            VertexAttribute a = fmt.getAttribute(i);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            if (a.getUsage() == usage) {</span>
+<span class="fc" id="L300">                offsetFloats = fmt.getAttributeOffset(i);</span>
+<span class="fc" id="L301">                components = a.getComponents();</span>
+<span class="fc" id="L302">                break;</span>
+            }
+        }
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (offsetFloats &lt; 0) {</span>
+<span class="nc" id="L306">            GLES20.glDisableVertexAttribArray(location);</span>
+<span class="nc" id="L307">            return;</span>
+        }
+<span class="fc" id="L309">        GLES20.glEnableVertexAttribArray(location);</span>
+<span class="fc" id="L310">        GLES20.glVertexAttribPointer(location, components, GLES20.GL_FLOAT, false,</span>
+                strideBytes, offsetFloats * 4);
+<span class="fc" id="L312">    }</span>
+
+    private void disableAttribute(int location) {
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        if (location &gt;= 0) {</span>
+<span class="fc" id="L316">            GLES20.glDisableVertexAttribArray(location);</span>
+        }
+<span class="fc" id="L318">    }</span>
+
+    private void applyRenderState(RenderState rs) {
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (rs.isDepthTest()) {</span>
+<span class="fc" id="L322">            GLES20.glEnable(GLES20.GL_DEPTH_TEST);</span>
+        } else {
+<span class="nc" id="L324">            GLES20.glDisable(GLES20.GL_DEPTH_TEST);</span>
+        }
+<span class="fc" id="L326">        GLES20.glDepthMask(rs.isDepthWrite());</span>
+
+<span class="fc" id="L328">        RenderState.BlendMode blend = rs.getBlendMode();</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (blend == RenderState.BlendMode.NONE) {</span>
+<span class="fc" id="L330">            GLES20.glDisable(GLES20.GL_BLEND);</span>
+        } else {
+<span class="nc" id="L332">            GLES20.glEnable(GLES20.GL_BLEND);</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            if (blend == RenderState.BlendMode.ADDITIVE) {</span>
+<span class="nc" id="L334">                GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE);</span>
+            } else {
+<span class="nc" id="L336">                GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);</span>
+            }
+        }
+
+<span class="fc" id="L340">        RenderState.CullMode cull = rs.getCullMode();</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (cull == RenderState.CullMode.NONE) {</span>
+<span class="nc" id="L342">            GLES20.glDisable(GLES20.GL_CULL_FACE);</span>
+        } else {
+<span class="fc" id="L344">            GLES20.glEnable(GLES20.GL_CULL_FACE);</span>
+            // The portable winding convention treats counter clockwise as front.
+<span class="fc" id="L346">            GLES20.glFrontFace(GLES20.GL_CCW);</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            GLES20.glCullFace(cull == RenderState.CullMode.FRONT</span>
+<span class="pc" id="L348">                    ? GLES20.GL_FRONT : GLES20.GL_BACK);</span>
+        }
+<span class="fc" id="L350">    }</span>
+
+    private static int toGlPrimitive(PrimitiveType type) {
+<span class="pc bpc" id="L353" title="4 of 5 branches missed.">        switch (type) {</span>
+            case POINTS:
+<span class="nc" id="L355">                return GLES20.GL_POINTS;</span>
+            case LINES:
+<span class="nc" id="L357">                return GLES20.GL_LINES;</span>
+            case LINE_STRIP:
+<span class="nc" id="L359">                return GLES20.GL_LINE_STRIP;</span>
+            case TRIANGLE_STRIP:
+<span class="nc" id="L361">                return GLES20.GL_TRIANGLE_STRIP;</span>
+            case TRIANGLES:
+            default:
+<span class="fc" id="L364">                return GLES20.GL_TRIANGLES;</span>
+        }
+    }
+
+    /// Per-buffer GPU state stored on the buffer handle: the GL buffer id and the
+    /// reusable direct nio view of the SIMD aligned backing array.
+    private static final class VboHandle {
+        final int id;
+        FloatBuffer view;
+
+<span class="fc" id="L374">        VboHandle(int id) {</span>
+<span class="fc" id="L375">            this.id = id;</span>
+<span class="fc" id="L376">        }</span>
+    }
+
+    private static final class IboHandle {
+        final int id;
+        ShortBuffer view;
+
+<span class="fc" id="L383">        IboHandle(int id) {</span>
+<span class="fc" id="L384">            this.id = id;</span>
+<span class="fc" id="L385">        }</span>
+    }
+
+    private int uploadVertexBuffer(VertexBuffer vb) {
+<span class="fc" id="L389">        VboHandle h = (VboHandle) vb.getHandle();</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (h == null) {</span>
+<span class="fc" id="L391">            int[] ids = new int[1];</span>
+<span class="fc" id="L392">            GLES20.glGenBuffers(1, ids, 0);</span>
+<span class="fc" id="L393">            h = new VboHandle(ids[0]);</span>
+<span class="fc" id="L394">            vb.setHandle(h);</span>
+        }
+<span class="fc" id="L396">        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, h.id);</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (vb.isDirty()) {</span>
+<span class="fc" id="L398">            int floatCount = vb.getFloatCount();</span>
+<span class="fc" id="L399">            float[] data = vb.getData();</span>
+<span class="pc bpc" id="L400" title="3 of 4 branches missed.">            if (h.view == null || h.view.capacity() &lt; floatCount) {</span>
+<span class="fc" id="L401">                ByteBuffer bb = ByteBuffer.allocateDirect(floatCount * 4);</span>
+<span class="fc" id="L402">                bb.order(ByteOrder.nativeOrder());</span>
+<span class="fc" id="L403">                h.view = bb.asFloatBuffer();</span>
+            }
+<span class="fc" id="L405">            h.view.position(0);</span>
+<span class="fc" id="L406">            h.view.put(data, 0, floatCount);</span>
+<span class="fc" id="L407">            h.view.position(0);</span>
+<span class="fc" id="L408">            GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, floatCount * 4, h.view, GLES20.GL_STATIC_DRAW);</span>
+<span class="fc" id="L409">            vb.clearDirty();</span>
+        }
+<span class="fc" id="L411">        return h.id;</span>
+    }
+
+    private int uploadIndexBuffer(IndexBuffer ib) {
+<span class="fc" id="L415">        IboHandle h = (IboHandle) ib.getHandle();</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (h == null) {</span>
+<span class="fc" id="L417">            int[] ids = new int[1];</span>
+<span class="fc" id="L418">            GLES20.glGenBuffers(1, ids, 0);</span>
+<span class="fc" id="L419">            h = new IboHandle(ids[0]);</span>
+<span class="fc" id="L420">            ib.setHandle(h);</span>
+        }
+<span class="fc" id="L422">        GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, h.id);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (ib.isDirty()) {</span>
+<span class="fc" id="L424">            int indexCount = ib.getIndexCount();</span>
+<span class="fc" id="L425">            short[] data = ib.getData();</span>
+<span class="pc bpc" id="L426" title="3 of 4 branches missed.">            if (h.view == null || h.view.capacity() &lt; indexCount) {</span>
+<span class="fc" id="L427">                ByteBuffer bb = ByteBuffer.allocateDirect(indexCount * 2);</span>
+<span class="fc" id="L428">                bb.order(ByteOrder.nativeOrder());</span>
+<span class="fc" id="L429">                h.view = bb.asShortBuffer();</span>
+            }
+<span class="fc" id="L431">            h.view.position(0);</span>
+<span class="fc" id="L432">            h.view.put(data, 0, indexCount);</span>
+<span class="fc" id="L433">            h.view.position(0);</span>
+<span class="fc" id="L434">            GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, indexCount * 2, h.view, GLES20.GL_STATIC_DRAW);</span>
+<span class="fc" id="L435">            ib.clearDirty();</span>
+        }
+<span class="fc" id="L437">        return h.id;</span>
+    }
+
+    private Program getProgram(Material material, VertexFormat fmt) {
+<span class="fc" id="L441">        String key = material.getShaderKey() + &quot;|&quot; + System.identityHashCode(fmt);</span>
+<span class="fc" id="L442">        Program p = programs.get(key);</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        if (p != null) {</span>
+<span class="fc" id="L444">            return p;</span>
+        }
+<span class="fc" id="L446">        GlslShaderGenerator gen = new GlslShaderGenerator(material, fmt);</span>
+<span class="fc" id="L447">        int handle = linkProgram(gen.getVertexSource(), gen.getFragmentSource());</span>
+<span class="fc" id="L448">        p = new Program();</span>
+<span class="fc" id="L449">        p.handle = handle;</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        if (handle != 0) {</span>
+<span class="fc" id="L451">            p.aPosition = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_POSITION);</span>
+<span class="fc" id="L452">            p.aNormal = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_NORMAL);</span>
+<span class="fc" id="L453">            p.aTexcoord = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_TEXCOORD);</span>
+<span class="fc" id="L454">            p.uMvp = GLES20.glGetUniformLocation(handle, &quot;u_mvp&quot;);</span>
+<span class="fc" id="L455">            p.uModel = GLES20.glGetUniformLocation(handle, &quot;u_model&quot;);</span>
+<span class="fc" id="L456">            p.uNormalMatrix = GLES20.glGetUniformLocation(handle, &quot;u_normalMatrix&quot;);</span>
+<span class="fc" id="L457">            p.uColor = GLES20.glGetUniformLocation(handle, &quot;u_color&quot;);</span>
+<span class="fc" id="L458">            p.uTexture = GLES20.glGetUniformLocation(handle, &quot;u_texture&quot;);</span>
+<span class="fc" id="L459">            p.uLightDir = GLES20.glGetUniformLocation(handle, &quot;u_lightDir&quot;);</span>
+<span class="fc" id="L460">            p.uLightColor = GLES20.glGetUniformLocation(handle, &quot;u_lightColor&quot;);</span>
+<span class="fc" id="L461">            p.uAmbient = GLES20.glGetUniformLocation(handle, &quot;u_ambient&quot;);</span>
+<span class="fc" id="L462">            p.uEye = GLES20.glGetUniformLocation(handle, &quot;u_eye&quot;);</span>
+<span class="fc" id="L463">            p.uShininess = GLES20.glGetUniformLocation(handle, &quot;u_shininess&quot;);</span>
+        }
+<span class="fc" id="L465">        programs.put(key, p);</span>
+<span class="fc" id="L466">        return p;</span>
+    }
+
+    private int linkProgram(String vertexSrc, String fragmentSrc) {
+<span class="fc" id="L470">        int vs = compileShader(GLES20.GL_VERTEX_SHADER, vertexSrc);</span>
+<span class="fc" id="L471">        int fs = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSrc);</span>
+<span class="pc bpc" id="L472" title="2 of 4 branches missed.">        if (vs == 0 || fs == 0) {</span>
+<span class="nc" id="L473">            return 0;</span>
+        }
+<span class="fc" id="L475">        int program = GLES20.glCreateProgram();</span>
+<span class="fc" id="L476">        GLES20.glAttachShader(program, vs);</span>
+<span class="fc" id="L477">        GLES20.glAttachShader(program, fs);</span>
+<span class="fc" id="L478">        GLES20.glLinkProgram(program);</span>
+<span class="fc" id="L479">        int[] status = new int[1];</span>
+<span class="fc" id="L480">        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, status, 0);</span>
+        // The individual shaders can be released once the program is linked.
+<span class="fc" id="L482">        GLES20.glDeleteShader(vs);</span>
+<span class="fc" id="L483">        GLES20.glDeleteShader(fs);</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (status[0] == 0) {</span>
+<span class="nc" id="L485">            android.util.Log.e(&quot;CN1Gpu&quot;, &quot;program link failed: &quot; + GLES20.glGetProgramInfoLog(program));</span>
+<span class="nc" id="L486">            GLES20.glDeleteProgram(program);</span>
+<span class="nc" id="L487">            return 0;</span>
+        }
+<span class="fc" id="L489">        return program;</span>
+    }
+
+    private int compileShader(int type, String source) {
+<span class="fc" id="L493">        int shader = GLES20.glCreateShader(type);</span>
+<span class="fc" id="L494">        GLES20.glShaderSource(shader, source);</span>
+<span class="fc" id="L495">        GLES20.glCompileShader(shader);</span>
+<span class="fc" id="L496">        int[] status = new int[1];</span>
+<span class="fc" id="L497">        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status, 0);</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        if (status[0] == 0) {</span>
+<span class="nc" id="L499">            android.util.Log.e(&quot;CN1Gpu&quot;, &quot;shader compile failed: &quot; + GLES20.glGetShaderInfoLog(shader)</span>
+                    + &quot;\n&quot; + source);
+<span class="nc" id="L501">            GLES20.glDeleteShader(shader);</span>
+<span class="nc" id="L502">            return 0;</span>
+        }
+<span class="fc" id="L504">        return shader;</span>
+    }
+
+    public void dispose(VertexBuffer buffer) {
+<span class="nc" id="L508">        VboHandle h = (VboHandle) buffer.getHandle();</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">        if (h != null) {</span>
+<span class="nc" id="L510">            GLES20.glDeleteBuffers(1, new int[]{h.id}, 0);</span>
+<span class="nc" id="L511">            buffer.setHandle(null);</span>
+        }
+<span class="nc" id="L513">    }</span>
+
+    public void dispose(IndexBuffer buffer) {
+<span class="nc" id="L516">        IboHandle h = (IboHandle) buffer.getHandle();</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">        if (h != null) {</span>
+<span class="nc" id="L518">            GLES20.glDeleteBuffers(1, new int[]{h.id}, 0);</span>
+<span class="nc" id="L519">            buffer.setHandle(null);</span>
+        }
+<span class="nc" id="L521">    }</span>
+
+    public void dispose(Texture texture) {
+<span class="nc" id="L524">        TexHandle h = (TexHandle) texture.getHandle();</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">        if (h != null) {</span>
+<span class="nc" id="L526">            GLES20.glDeleteTextures(1, new int[]{h.id}, 0);</span>
+<span class="nc" id="L527">            texture.setHandle(null);</span>
+        }
+<span class="nc" id="L529">    }</span>
+
+    /// Releases all cached GL programs. Called when the surface is destroyed and
+    /// the EGL context is lost so that nothing dangles into a new context.
+    void disposePrograms() {
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        for (Program p : programs.values()) {</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">            if (p.handle != 0) {</span>
+<span class="nc" id="L536">                GLES20.glDeleteProgram(p.handle);</span>
+            }
+<span class="nc" id="L538">        }</span>
+<span class="nc" id="L539">        programs.clear();</span>
+<span class="nc" id="L540">        caps = null;</span>
+<span class="nc" id="L541">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

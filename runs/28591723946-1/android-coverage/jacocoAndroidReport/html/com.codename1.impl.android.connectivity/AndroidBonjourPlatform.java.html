@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidBonjourPlatform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android.connectivity</a> &gt; <span class="el_source">AndroidBonjourPlatform.java</span></div><h1>AndroidBonjourPlatform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ */
+package com.codename1.impl.android.connectivity;
+
+import android.content.Context;
+import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
+import android.os.Build;
+import android.util.Log;
+
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.io.bonjour.BonjourPlatform;
+import com.codename1.io.bonjour.BonjourService;
+import com.codename1.io.bonjour.BonjourServiceListener;
+import com.codename1.ui.CN;
+
+import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Android implementation of `BonjourPlatform` backed by `NsdManager`
+/// (API 16+). NsdManager predates Lollipop so the entire class loads
+/// safely on the minimum supported Android (KitKat / API 19).
+<span class="nc" id="L31">public final class AndroidBonjourPlatform extends BonjourPlatform {</span>
+    private static final String TAG = &quot;CN1Bonjour&quot;;
+
+    @Override
+    public boolean isSupported() {
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        return AndroidImplementation.getContext() != null;</span>
+    }
+
+    @Override
+    public Object startBrowse(final String typeIn,
+                              final BonjourServiceListener listener) {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (listener == null) return null;</span>
+<span class="nc" id="L43">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (ctx == null) {</span>
+<span class="nc" id="L45">            CN.callSerially(new Runnable() { @Override public void run() {</span>
+<span class="nc" id="L46">                listener.onBrowseError(new RuntimeException(&quot;No application context&quot;)); } });</span>
+<span class="nc" id="L47">            return null;</span>
+        }
+<span class="nc" id="L49">        final NsdManager nsd = (NsdManager) ctx.getSystemService(Context.NSD_SERVICE);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (nsd == null) {</span>
+<span class="nc" id="L51">            CN.callSerially(new Runnable() { @Override public void run() {</span>
+<span class="nc" id="L52">                listener.onBrowseError(new RuntimeException(&quot;NsdManager unavailable&quot;)); } });</span>
+<span class="nc" id="L53">            return null;</span>
+        }
+<span class="nc" id="L55">        final String type = trimTrailingDot(typeIn);</span>
+<span class="nc" id="L56">        final NsdManager.DiscoveryListener disc = new NsdManager.DiscoveryListener() {</span>
+            @Override public void onStartDiscoveryFailed(String s, int errorCode) {
+<span class="nc" id="L58">                final int code = errorCode;</span>
+<span class="nc" id="L59">                CN.callSerially(new Runnable() { @Override public void run() {</span>
+<span class="nc" id="L60">                    listener.onBrowseError(new RuntimeException(&quot;startDiscovery failed: &quot; + code)); } });</span>
+<span class="nc" id="L61">            }</span>
+<span class="nc" id="L62">            @Override public void onStopDiscoveryFailed(String s, int errorCode) { }</span>
+<span class="nc" id="L63">            @Override public void onDiscoveryStarted(String s) { }</span>
+<span class="nc" id="L64">            @Override public void onDiscoveryStopped(String s) { }</span>
+            @Override public void onServiceFound(NsdServiceInfo info) {
+<span class="nc" id="L66">                nsd.resolveService(info, new NsdManager.ResolveListener() {</span>
+<span class="nc" id="L67">                    @Override public void onResolveFailed(NsdServiceInfo info, int errorCode) { }</span>
+                    @Override public void onServiceResolved(final NsdServiceInfo info) {
+<span class="nc" id="L69">                        final BonjourService svc = nsdToBonjour(info);</span>
+<span class="nc" id="L70">                        CN.callSerially(new Runnable() { @Override public void run() {</span>
+<span class="nc" id="L71">                            listener.onServiceResolved(svc); } });</span>
+<span class="nc" id="L72">                    }</span>
+                });
+<span class="nc" id="L74">            }</span>
+            @Override public void onServiceLost(NsdServiceInfo info) {
+<span class="nc" id="L76">                final BonjourService svc = nsdToBonjour(info);</span>
+<span class="nc" id="L77">                CN.callSerially(new Runnable() { @Override public void run() {</span>
+<span class="nc" id="L78">                    listener.onServiceLost(svc); } });</span>
+<span class="nc" id="L79">            }</span>
+        };
+        try {
+<span class="nc" id="L82">            nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, disc);</span>
+<span class="nc" id="L83">        } catch (Throwable t) {</span>
+<span class="nc" id="L84">            final Throwable err = t;</span>
+<span class="nc" id="L85">            CN.callSerially(new Runnable() { @Override public void run() {</span>
+<span class="nc" id="L86">                listener.onBrowseError(err); } });</span>
+<span class="nc" id="L87">            return null;</span>
+<span class="nc" id="L88">        }</span>
+<span class="nc" id="L89">        return new Object[]{nsd, disc};</span>
+    }
+
+    @Override
+    public void stopBrowse(Object handle) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (handle == null) return;</span>
+<span class="nc" id="L95">        Object[] arr = (Object[]) handle;</span>
+<span class="nc" id="L96">        NsdManager nsd = (NsdManager) arr[0];</span>
+<span class="nc" id="L97">        NsdManager.DiscoveryListener l = (NsdManager.DiscoveryListener) arr[1];</span>
+<span class="nc" id="L98">        try { nsd.stopServiceDiscovery(l); } catch (Throwable ignored) { }</span>
+<span class="nc" id="L99">    }</span>
+
+    @Override
+    public Object startPublish(String name, String type, int port,
+                               Map&lt;String, String&gt; txt) {
+<span class="nc" id="L104">        Context ctx = AndroidImplementation.getContext();</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (ctx == null) return null;</span>
+<span class="nc" id="L106">        NsdManager nsd = (NsdManager) ctx.getSystemService(Context.NSD_SERVICE);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (nsd == null) return null;</span>
+<span class="nc" id="L108">        NsdServiceInfo info = new NsdServiceInfo();</span>
+<span class="nc" id="L109">        info.setServiceName(name);</span>
+<span class="nc" id="L110">        info.setServiceType(trimTrailingDot(type));</span>
+<span class="nc" id="L111">        info.setPort(port);</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">        if (txt != null &amp;&amp; Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.LOLLIPOP) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; e : txt.entrySet()) {</span>
+<span class="nc" id="L114">                try { info.setAttribute(e.getKey(), e.getValue()); }</span>
+<span class="nc" id="L115">                catch (Throwable ignored) { }</span>
+<span class="nc" id="L116">            }</span>
+        }
+<span class="nc" id="L118">        NsdManager.RegistrationListener listener = new NsdManager.RegistrationListener() {</span>
+<span class="nc" id="L119">            @Override public void onRegistrationFailed(NsdServiceInfo info, int errorCode) { }</span>
+<span class="nc" id="L120">            @Override public void onUnregistrationFailed(NsdServiceInfo info, int errorCode) { }</span>
+<span class="nc" id="L121">            @Override public void onServiceRegistered(NsdServiceInfo info) { }</span>
+<span class="nc" id="L122">            @Override public void onServiceUnregistered(NsdServiceInfo info) { }</span>
+        };
+        try {
+<span class="nc" id="L125">            nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener);</span>
+<span class="nc" id="L126">        } catch (Throwable t) {</span>
+<span class="nc" id="L127">            Log.w(TAG, &quot;registerService failed&quot;, t);</span>
+<span class="nc" id="L128">            return null;</span>
+<span class="nc" id="L129">        }</span>
+<span class="nc" id="L130">        return new Object[]{nsd, listener};</span>
+    }
+
+    @Override
+    public void stopPublish(Object handle) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (handle == null) return;</span>
+<span class="nc" id="L136">        Object[] arr = (Object[]) handle;</span>
+<span class="nc" id="L137">        NsdManager nsd = (NsdManager) arr[0];</span>
+<span class="nc" id="L138">        NsdManager.RegistrationListener l = (NsdManager.RegistrationListener) arr[1];</span>
+<span class="nc" id="L139">        try { nsd.unregisterService(l); } catch (Throwable ignored) { }</span>
+<span class="nc" id="L140">    }</span>
+
+    private static BonjourService nsdToBonjour(NsdServiceInfo info) {
+<span class="nc" id="L143">        Map&lt;String, String&gt; txt = new HashMap&lt;String, String&gt;();</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.LOLLIPOP</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                &amp;&amp; info.getAttributes() != null) {</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            for (Map.Entry&lt;String, byte[]&gt; e : info.getAttributes().entrySet()) {</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                txt.put(e.getKey(), e.getValue() == null</span>
+<span class="nc" id="L148">                        ? &quot;&quot; : new String(e.getValue(), Charset.forName(&quot;UTF-8&quot;)));</span>
+<span class="nc" id="L149">            }</span>
+        }
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        String host = info.getHost() != null ? info.getHost().getHostAddress() : null;</span>
+<span class="nc" id="L152">        return new BonjourService(info.getServiceName(), info.getServiceType(),</span>
+<span class="nc" id="L153">                host, info.getPort(), txt);</span>
+    }
+
+    private static String trimTrailingDot(String s) {
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (s == null) return null;</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (s.endsWith(&quot;.&quot;)) return s.substring(0, s.length() - 1);</span>
+<span class="nc" id="L159">        return s;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

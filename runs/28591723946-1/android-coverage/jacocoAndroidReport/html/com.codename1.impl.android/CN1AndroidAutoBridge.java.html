@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CN1AndroidAutoBridge.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">CN1AndroidAutoBridge.java</span></div><h1>CN1AndroidAutoBridge.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.graphics.Bitmap;
+import androidx.car.app.CarContext;
+import androidx.car.app.CarToast;
+import androidx.car.app.Screen;
+import androidx.car.app.ScreenManager;
+import androidx.car.app.constraints.ConstraintManager;
+import androidx.car.app.model.Action;
+import androidx.car.app.model.ActionStrip;
+import androidx.car.app.model.CarColor;
+import androidx.car.app.model.CarIcon;
+import androidx.car.app.model.GridItem;
+import androidx.car.app.model.GridTemplate;
+import androidx.car.app.model.ItemList;
+import androidx.car.app.model.MessageTemplate;
+import androidx.car.app.model.Pane;
+import androidx.car.app.model.PaneTemplate;
+import androidx.car.app.model.Row;
+import androidx.car.app.model.SectionedItemList;
+import androidx.car.app.model.Template;
+import androidx.car.app.model.ListTemplate;
+import androidx.core.graphics.drawable.IconCompat;
+import com.codename1.car.CarAction;
+import com.codename1.car.CarActionListener;
+import com.codename1.car.CarActionStrip;
+import com.codename1.car.CarGridItem;
+import com.codename1.car.CarGridTemplate;
+import com.codename1.car.CarListTemplate;
+import com.codename1.car.CarMessageTemplate;
+import com.codename1.car.CarPaneTemplate;
+import com.codename1.car.CarRow;
+import com.codename1.car.CarSection;
+import com.codename1.car.CarTemplate;
+import com.codename1.car.spi.CarBridge;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The Android Auto backing for the portable com.codename1.car API. Translates the CarTemplate tree
+ * into androidx.car.app templates and drives the host ScreenManager. Injected by the Codename One
+ * build (typed against androidx.car.app, which is added as a dependency only when the app references
+ * com.codename1.car), so the runtime port carries no compile-time dependency on the car library.
+ *
+ * &lt;p&gt;Each portable CarScreen maps to a {@link CN1CarScreen} proxy. The root proxy is returned from
+ * {@link CN1CarSession} before the com.codename1.car session has produced its root screen; once the
+ * session calls {@link #pushScreen}, the proxy adopts that screen and invalidates. Selections are
+ * dispatched to the supplied {@link CarActionListener} on the Codename One EDT.&lt;/p&gt;
+ */
+final class CN1AndroidAutoBridge implements CarBridge {
+    private final CarContext carContext;
+<span class="nc" id="L77">    private final Map&lt;com.codename1.car.CarScreen, CN1CarScreen&gt; proxies =</span>
+            new HashMap&lt;com.codename1.car.CarScreen, CN1CarScreen&gt;();
+    private CN1CarScreen rootProxy;
+<span class="nc" id="L80">    private volatile boolean connected = true;</span>
+
+<span class="nc" id="L82">    private CN1AndroidAutoBridge(CarContext carContext) {</span>
+<span class="nc" id="L83">        this.carContext = carContext;</span>
+<span class="nc" id="L84">    }</span>
+
+    /** Entry point from CN1CarSession: builds the bridge, starts the portable session, returns root. */
+    static Screen start(CarContext carContext) {
+<span class="nc" id="L88">        CN1AndroidAutoBridge b = new CN1AndroidAutoBridge(carContext);</span>
+<span class="nc" id="L89">        AndroidCarSupport.setBridge(b);</span>
+<span class="nc" id="L90">        b.rootProxy = new CN1CarScreen(carContext, b, null, true);</span>
+<span class="nc" id="L91">        com.codename1.car.Car.startSession(b);</span>
+<span class="nc" id="L92">        return b.rootProxy;</span>
+    }
+
+    private ScreenManager screenManager() {
+<span class="nc" id="L96">        return carContext.getCarService(ScreenManager.class);</span>
+    }
+
+    // --- CarBridge -----------------------------------------------------------
+
+    @Override
+    public void pushScreen(final com.codename1.car.CarScreen screen) {
+<span class="nc bnc" id="L103" title="All 4 branches missed.">        if (rootProxy != null &amp;&amp; rootProxy.cn1Screen == null) {</span>
+<span class="nc" id="L104">            rootProxy.cn1Screen = screen;</span>
+<span class="nc" id="L105">            proxies.put(screen, rootProxy);</span>
+<span class="nc" id="L106">            carContext.getMainExecutor().execute(() -&gt; rootProxy.invalidate());</span>
+        } else {
+<span class="nc" id="L108">            final CN1CarScreen proxy = new CN1CarScreen(carContext, this, screen, false);</span>
+<span class="nc" id="L109">            proxies.put(screen, proxy);</span>
+<span class="nc" id="L110">            carContext.getMainExecutor().execute(() -&gt; screenManager().push(proxy));</span>
+        }
+<span class="nc" id="L112">    }</span>
+
+    @Override
+    public void popScreen() {
+<span class="nc" id="L116">        carContext.getMainExecutor().execute(() -&gt; {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (screenManager().getStackSize() &gt; 1) {</span>
+<span class="nc" id="L118">                screenManager().pop();</span>
+            }
+<span class="nc" id="L120">        });</span>
+<span class="nc" id="L121">    }</span>
+
+    @Override
+    public void invalidate(final com.codename1.car.CarScreen screen) {
+<span class="nc" id="L125">        final CN1CarScreen proxy = proxies.get(screen);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (proxy != null) {</span>
+<span class="nc" id="L127">            carContext.getMainExecutor().execute(() -&gt; proxy.invalidate());</span>
+        }
+<span class="nc" id="L129">    }</span>
+
+    @Override
+    public void finish() {
+<span class="nc" id="L133">        connected = false;</span>
+<span class="nc" id="L134">        carContext.getMainExecutor().execute(() -&gt; carContext.finishCarApp());</span>
+<span class="nc" id="L135">    }</span>
+
+    @Override
+    public boolean isConnected() {
+<span class="nc" id="L139">        return connected;</span>
+    }
+
+    @Override
+    public void showToast(final String message, final int durationSeconds) {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        carContext.getMainExecutor().execute(() -&gt; CarToast.makeText(carContext, message == null ? &quot;&quot; : message,</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                durationSeconds &gt; 1 ? CarToast.LENGTH_LONG : CarToast.LENGTH_SHORT).show());</span>
+<span class="nc" id="L146">    }</span>
+
+    @Override
+    public int getListRowLimit() {
+        try {
+<span class="nc" id="L151">            return carContext.getCarService(ConstraintManager.class)</span>
+<span class="nc" id="L152">                    .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST);</span>
+<span class="nc" id="L153">        } catch (Throwable t) {</span>
+<span class="nc" id="L154">            return 0;</span>
+        }
+    }
+
+    @Override
+    public int getGridItemLimit() {
+        try {
+<span class="nc" id="L161">            return carContext.getCarService(ConstraintManager.class)</span>
+<span class="nc" id="L162">                    .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_GRID);</span>
+<span class="nc" id="L163">        } catch (Throwable t) {</span>
+<span class="nc" id="L164">            return 0;</span>
+        }
+    }
+
+    // --- CarTemplate -&gt; androidx Template ------------------------------------
+
+    Template buildTemplate(com.codename1.car.CarScreen cn1Screen, boolean root) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        Action headerAction = root ? Action.APP_ICON : Action.BACK;</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (cn1Screen == null) {</span>
+<span class="nc" id="L173">            return new MessageTemplate.Builder(&quot;…&quot;)</span>
+<span class="nc" id="L174">                    .setHeaderAction(Action.APP_ICON)</span>
+<span class="nc" id="L175">                    .build();</span>
+        }
+<span class="nc" id="L177">        CarTemplate t = cn1Screen.dispatchCreateTemplate();</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (t instanceof CarListTemplate) {</span>
+<span class="nc" id="L179">            return buildList((CarListTemplate) t, headerAction);</span>
+        }
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (t instanceof CarGridTemplate) {</span>
+<span class="nc" id="L182">            return buildGrid((CarGridTemplate) t, headerAction);</span>
+        }
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (t instanceof CarPaneTemplate) {</span>
+<span class="nc" id="L185">            return buildPane((CarPaneTemplate) t, headerAction);</span>
+        }
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (t instanceof CarMessageTemplate) {</span>
+<span class="nc" id="L188">            return buildMessage((CarMessageTemplate) t, headerAction);</span>
+        }
+        // NowPlaying (media-session driven) and Navigation (needs the navigation surface) are not
+        // expressible as a plain template here; render an explanatory message so the screen is valid.
+<span class="nc" id="L192">        return new MessageTemplate.Builder(&quot;This screen type is not available on Android Auto.&quot;)</span>
+<span class="nc" id="L193">                .setHeaderAction(headerAction)</span>
+<span class="nc" id="L194">                .build();</span>
+    }
+
+    private Template buildList(CarListTemplate t, Action headerAction) {
+<span class="nc" id="L198">        ListTemplate.Builder b = new ListTemplate.Builder();</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (t.isLoading()) {</span>
+<span class="nc" id="L200">            b.setLoading(true);</span>
+        } else {
+<span class="nc" id="L202">            List&lt;CarSection&gt; sections = t.getSections();</span>
+<span class="nc bnc" id="L203" title="All 4 branches missed.">            boolean single = sections.size() == 1 &amp;&amp; sections.get(0).getHeader() == null;</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            if (single) {</span>
+<span class="nc" id="L205">                b.setSingleList(buildItemList(sections.get(0).getRows()));</span>
+            } else {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">                for (CarSection s : sections) {</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                    String header = s.getHeader() == null ? &quot; &quot; : s.getHeader();</span>
+<span class="nc" id="L209">                    b.addSectionedList(SectionedItemList.create(buildItemList(s.getRows()), header));</span>
+<span class="nc" id="L210">                }</span>
+            }
+        }
+<span class="nc" id="L213">        b.setHeaderAction(headerAction);</span>
+<span class="nc bnc" id="L214" title="All 4 branches missed.">        if (t.getTitle() != null &amp;&amp; t.getTitle().length() &gt; 0) {</span>
+<span class="nc" id="L215">            b.setTitle(t.getTitle());</span>
+        }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (t.getHeaderActions() != null) {</span>
+<span class="nc" id="L218">            b.setActionStrip(buildActionStrip(t.getHeaderActions()));</span>
+        }
+<span class="nc" id="L220">        return b.build();</span>
+    }
+
+    private ItemList buildItemList(List&lt;CarRow&gt; rows) {
+<span class="nc" id="L224">        ItemList.Builder il = new ItemList.Builder();</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        for (CarRow r : rows) {</span>
+<span class="nc" id="L226">            il.addItem(buildRow(r));</span>
+<span class="nc" id="L227">        }</span>
+<span class="nc" id="L228">        return il.build();</span>
+    }
+
+    private Row buildRow(CarRow r) {
+<span class="nc" id="L232">        Row.Builder rb = new Row.Builder();</span>
+<span class="nc" id="L233">        rb.setTitle(safe(r.getTitle()));</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (r.getText() != null) {</span>
+<span class="nc" id="L235">            rb.addText(r.getText());</span>
+        }
+<span class="nc" id="L237">        CarIcon ic = icon(r.getImage());</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (ic != null) {</span>
+<span class="nc" id="L239">            rb.setImage(ic);</span>
+        }
+<span class="nc" id="L241">        rb.setBrowsable(r.isBrowsable());</span>
+<span class="nc" id="L242">        final CarActionListener l = r.getOnAction();</span>
+<span class="nc bnc" id="L243" title="All 4 branches missed.">        if (r.isBrowsable() || l != null) {</span>
+<span class="nc" id="L244">            rb.setOnClickListener(() -&gt; dispatch(l));</span>
+        }
+<span class="nc" id="L246">        return rb.build();</span>
+    }
+
+    private Template buildGrid(CarGridTemplate t, Action headerAction) {
+<span class="nc" id="L250">        GridTemplate.Builder b = new GridTemplate.Builder();</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (t.isLoading()) {</span>
+<span class="nc" id="L252">            b.setLoading(true);</span>
+        } else {
+<span class="nc" id="L254">            ItemList.Builder il = new ItemList.Builder();</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            for (CarGridItem it : t.getItems()) {</span>
+<span class="nc" id="L256">                GridItem.Builder gb = new GridItem.Builder();</span>
+<span class="nc" id="L257">                gb.setTitle(safe(it.getTitle()));</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                if (it.getText() != null) {</span>
+<span class="nc" id="L259">                    gb.setText(it.getText());</span>
+                }
+<span class="nc" id="L261">                CarIcon ic = icon(it.getImage());</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                if (ic != null) {</span>
+<span class="nc" id="L263">                    gb.setImage(ic, GridItem.IMAGE_TYPE_LARGE);</span>
+                }
+<span class="nc" id="L265">                final CarActionListener l = it.getOnAction();</span>
+<span class="nc" id="L266">                gb.setOnClickListener(() -&gt; dispatch(l));</span>
+<span class="nc" id="L267">                il.addItem(gb.build());</span>
+<span class="nc" id="L268">            }</span>
+<span class="nc" id="L269">            b.setSingleList(il.build());</span>
+        }
+<span class="nc" id="L271">        b.setHeaderAction(headerAction);</span>
+<span class="nc bnc" id="L272" title="All 4 branches missed.">        if (t.getTitle() != null &amp;&amp; t.getTitle().length() &gt; 0) {</span>
+<span class="nc" id="L273">            b.setTitle(t.getTitle());</span>
+        }
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (t.getHeaderActions() != null) {</span>
+<span class="nc" id="L276">            b.setActionStrip(buildActionStrip(t.getHeaderActions()));</span>
+        }
+<span class="nc" id="L278">        return b.build();</span>
+    }
+
+    private Template buildPane(CarPaneTemplate t, Action headerAction) {
+<span class="nc" id="L282">        Pane.Builder pane = new Pane.Builder();</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (t.isLoading()) {</span>
+<span class="nc" id="L284">            pane.setLoading(true);</span>
+        } else {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            for (CarRow r : t.getRows()) {</span>
+<span class="nc" id="L287">                pane.addRow(buildRow(r));</span>
+<span class="nc" id="L288">            }</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            for (CarAction a : t.getActions()) {</span>
+<span class="nc" id="L290">                pane.addAction(buildAction(a));</span>
+<span class="nc" id="L291">            }</span>
+        }
+<span class="nc" id="L293">        PaneTemplate.Builder b = new PaneTemplate.Builder(pane.build());</span>
+<span class="nc" id="L294">        b.setHeaderAction(headerAction);</span>
+<span class="nc bnc" id="L295" title="All 4 branches missed.">        if (t.getTitle() != null &amp;&amp; t.getTitle().length() &gt; 0) {</span>
+<span class="nc" id="L296">            b.setTitle(t.getTitle());</span>
+        }
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (t.getHeaderActions() != null) {</span>
+<span class="nc" id="L299">            b.setActionStrip(buildActionStrip(t.getHeaderActions()));</span>
+        }
+<span class="nc" id="L301">        return b.build();</span>
+    }
+
+    private Template buildMessage(CarMessageTemplate t, Action headerAction) {
+<span class="nc" id="L305">        MessageTemplate.Builder b = new MessageTemplate.Builder(safe(t.getMessage()));</span>
+<span class="nc" id="L306">        b.setHeaderAction(headerAction);</span>
+<span class="nc bnc" id="L307" title="All 4 branches missed.">        if (t.getTitle() != null &amp;&amp; t.getTitle().length() &gt; 0) {</span>
+<span class="nc" id="L308">            b.setTitle(t.getTitle());</span>
+        }
+<span class="nc" id="L310">        CarIcon ic = icon(t.getIcon());</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">        if (ic != null) {</span>
+<span class="nc" id="L312">            b.setIcon(ic);</span>
+        }
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        for (CarAction a : t.getActions()) {</span>
+<span class="nc" id="L315">            b.addAction(buildAction(a));</span>
+<span class="nc" id="L316">        }</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (t.getHeaderActions() != null) {</span>
+<span class="nc" id="L318">            b.setActionStrip(buildActionStrip(t.getHeaderActions()));</span>
+        }
+<span class="nc" id="L320">        return b.build();</span>
+    }
+
+    private ActionStrip buildActionStrip(CarActionStrip strip) {
+<span class="nc" id="L324">        ActionStrip.Builder b = new ActionStrip.Builder();</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        for (CarAction a : strip.getActions()) {</span>
+<span class="nc" id="L326">            b.addAction(buildAction(a));</span>
+<span class="nc" id="L327">        }</span>
+<span class="nc" id="L328">        return b.build();</span>
+    }
+
+    private Action buildAction(CarAction a) {
+<span class="nc" id="L332">        Action.Builder b = new Action.Builder();</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        if (a.getTitle() != null) {</span>
+<span class="nc" id="L334">            b.setTitle(a.getTitle());</span>
+        }
+<span class="nc" id="L336">        CarIcon ic = icon(a.getIcon());</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (ic != null) {</span>
+<span class="nc" id="L338">            b.setIcon(ic);</span>
+        }
+<span class="nc" id="L340">        b.setBackgroundColor(color(a.getBackgroundColor()));</span>
+<span class="nc" id="L341">        final CarActionListener l = a.getOnAction();</span>
+<span class="nc" id="L342">        b.setOnClickListener(() -&gt; dispatch(l));</span>
+<span class="nc" id="L343">        return b.build();</span>
+    }
+
+    // --- helpers -------------------------------------------------------------
+
+    private void dispatch(final CarActionListener l) {
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (l == null) {</span>
+<span class="nc" id="L350">            return;</span>
+        }
+<span class="nc" id="L352">        Display.getInstance().callSerially(() -&gt; {</span>
+<span class="nc" id="L353">            com.codename1.car.CarContext ctx = com.codename1.car.Car.getCurrentContext();</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">            if (ctx != null) {</span>
+<span class="nc" id="L355">                l.actionPerformed(ctx);</span>
+            }
+<span class="nc" id="L357">        });</span>
+<span class="nc" id="L358">    }</span>
+
+    private static String safe(String s) {
+<span class="nc bnc" id="L361" title="All 4 branches missed.">        return (s == null || s.length() == 0) ? &quot; &quot; : s;</span>
+    }
+
+    private static CarIcon icon(Image img) {
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (img == null) {</span>
+<span class="nc" id="L366">            return null;</span>
+        }
+<span class="nc" id="L368">        Object n = img.getImage();</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (n instanceof Bitmap) {</span>
+<span class="nc" id="L370">            return new CarIcon.Builder(IconCompat.createWithBitmap((Bitmap) n)).build();</span>
+        }
+<span class="nc" id="L372">        return null;</span>
+    }
+
+    private static CarColor color(com.codename1.car.CarColor c) {
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L377">            return CarColor.DEFAULT;</span>
+        }
+<span class="nc bnc" id="L379" title="All 6 branches missed.">        switch (c) {</span>
+            case PRIMARY:
+<span class="nc" id="L381">                return CarColor.PRIMARY;</span>
+            case RED:
+<span class="nc" id="L383">                return CarColor.RED;</span>
+            case GREEN:
+<span class="nc" id="L385">                return CarColor.GREEN;</span>
+            case BLUE:
+<span class="nc" id="L387">                return CarColor.BLUE;</span>
+            case YELLOW:
+<span class="nc" id="L389">                return CarColor.YELLOW;</span>
+            default:
+<span class="nc" id="L391">                return CarColor.DEFAULT;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

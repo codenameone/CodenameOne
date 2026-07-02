@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalNotificationPublisher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">LocalNotificationPublisher.java</span></div><h1>LocalNotificationPublisher.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Bundle;
+import androidx.core.app.NotificationCompat;
+import android.util.Log;
+
+import com.codename1.background.BackgroundFetch;
+import com.codename1.impl.android.compat.app.NotificationCompatWrapper;
+import com.codename1.impl.android.compat.app.RemoteInputWrapper;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.Display;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ *
+ * @author Chen
+ */
+<span class="nc" id="L51">public class LocalNotificationPublisher extends BroadcastReceiver {</span>
+
+<span class="nc" id="L53">    public static String NOTIFICATION = &quot;notification&quot;;</span>
+<span class="nc" id="L54">    public static String NOTIFICATION_INTENT = &quot;notification-intent&quot;;</span>
+<span class="nc" id="L55">    public static String BACKGROUND_FETCH_INTENT = &quot;background-fetch-intent&quot;;</span>
+<span class="nc" id="L56">    public static String NOTIFICATION_CONTENT_TEMPLATE = &quot;notification-content-template&quot;;</span>
+
+    public void onReceive(Context context, Intent intent) {
+        //Fire the notification to the display
+<span class="nc" id="L60">        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);</span>
+        
+<span class="nc" id="L62">        Bundle extras=intent.getExtras();</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if(extras == null) {</span>
+<span class="nc" id="L64">            return;</span>
+        }
+<span class="nc" id="L66">        PendingIntent content = extras.getParcelable(NOTIFICATION_INTENT);</span>
+<span class="nc" id="L67">        Bundle b = extras.getParcelable(NOTIFICATION);</span>
+<span class="nc" id="L68">        LocalNotification notif = AndroidImplementation.createNotificationFromBundle(b);</span>
+
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (AndroidImplementation.BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {</span>
+<span class="nc" id="L71">            PendingIntent backgroundFetchIntent = extras.getParcelable(BACKGROUND_FETCH_INTENT);</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if (backgroundFetchIntent != null) {</span>
+                try {
+<span class="nc" id="L74">                    backgroundFetchIntent.send();</span>
+<span class="nc" id="L75">                } catch (Exception ex) {</span>
+<span class="nc" id="L76">                    Log.e(&quot;Codename One&quot;, &quot;Failed to send BackgroundFetchHandler intent&quot;, ex);</span>
+<span class="nc" id="L77">                }</span>
+            } else {
+<span class="nc" id="L79">                Log.d(&quot;Codename One&quot;, &quot;BackgroundFetch intent was null&quot;);</span>
+            }
+<span class="nc" id="L81">        } else {</span>
+<span class="nc" id="L82">            Intent contentTemplate = extras.getParcelable(NOTIFICATION_CONTENT_TEMPLATE);</span>
+<span class="nc" id="L83">            Notification notification = createAndroidNotification(context, notif, content, contentTemplate);</span>
+<span class="nc" id="L84">            notification.when = System.currentTimeMillis();</span>
+            try{
+<span class="nc" id="L86">                int notifId = Integer.parseInt(notif.getId());</span>
+<span class="nc" id="L87">                notificationManager.notify(&quot;CN1&quot;, notifId, notification);                </span>
+<span class="nc" id="L88">            }catch(Exception e){</span>
+                //that was a mistake, the first param is the tag not the id
+<span class="nc" id="L90">                notificationManager.notify(notif.getId(), 0, notification);</span>
+<span class="nc" id="L91">            }</span>
+        }
+<span class="nc" id="L93">    }</span>
+
+    private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content, Intent contentTemplate) {
+<span class="nc" id="L96">        Context ctx = context;</span>
+<span class="nc" id="L97">        int smallIcon = ctx.getResources().getIdentifier(&quot;ic_stat_notify&quot;, &quot;drawable&quot;, ctx.getApplicationInfo().packageName);</span>
+<span class="nc" id="L98">        int icon = ctx.getResources().getIdentifier(&quot;icon&quot;, &quot;drawable&quot;, ctx.getApplicationInfo().packageName);</span>
+        
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (smallIcon == 0) {</span>
+<span class="nc" id="L101">            smallIcon = icon;</span>
+        } else {
+<span class="nc" id="L103">            icon = smallIcon;</span>
+        }
+
+<span class="nc" id="L106">        NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx);</span>
+<span class="nc" id="L107">        builder.setContentTitle(localNotif.getAlertTitle());</span>
+<span class="nc" id="L108">        builder.setContentText(localNotif.getAlertBody());</span>
+<span class="nc" id="L109">        builder.setAutoCancel(true);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (localNotif.getBadgeNumber() &gt;= 0) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (android.os.Build.VERSION.SDK_INT &gt;= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {</span>
+<span class="nc" id="L112">                builder.setNumber(localNotif.getBadgeNumber());</span>
+            }
+        }
+<span class="nc" id="L115">        String image = localNotif.getAlertImage();</span>
+<span class="nc bnc" id="L116" title="All 4 branches missed.">        if (image != null &amp;&amp; image.length() &gt; 0) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (image.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L118">                image = image.substring(1);</span>
+            }
+            InputStream in;
+            try {
+<span class="nc" id="L122">                in = context.getAssets().open(image);</span>
+<span class="nc" id="L123">                BitmapFactory.Options opts = new BitmapFactory.Options();</span>
+<span class="nc" id="L124">                opts.inPreferredConfig = Bitmap.Config.ARGB_8888;</span>
+<span class="nc" id="L125">                Bitmap im = BitmapFactory.decodeStream(in, null, opts);</span>
+<span class="nc" id="L126">                builder.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(im));</span>
+<span class="nc" id="L127">            } catch (IOException ex) {</span>
+<span class="nc" id="L128">                Logger.getLogger(LocalNotificationPublisher.class.getName()).log(Level.SEVERE, null, ex);</span>
+<span class="nc" id="L129">            }</span>
+
+        }
+<span class="nc" id="L132">        builder.setSmallIcon(smallIcon);</span>
+<span class="nc" id="L133">        builder.setContentIntent(content);</span>
+
+        // grouping
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (localNotif.getGroupId() != null) {</span>
+<span class="nc" id="L137">            builder.setGroup(localNotif.getGroupId());</span>
+<span class="nc" id="L138">            builder.setGroupSummary(localNotif.isGroupSummary());</span>
+        }
+        // ongoing (cannot be dismissed)
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (localNotif.isOngoing()) {</span>
+<span class="nc" id="L142">            builder.setOngoing(true);</span>
+        }
+        // progress bar
+<span class="nc bnc" id="L145" title="All 4 branches missed.">        if (localNotif.getProgressMax() &gt; 0 || localNotif.isProgressIndeterminate()) {</span>
+<span class="nc" id="L146">            builder.setProgress(Math.max(1, localNotif.getProgressMax()), localNotif.getProgress(), localNotif.isProgressIndeterminate());</span>
+        }
+        // full screen intent (high priority interruptions)
+<span class="nc bnc" id="L149" title="All 4 branches missed.">        if (localNotif.isFullScreenIntent() &amp;&amp; content != null) {</span>
+<span class="nc" id="L150">            builder.setFullScreenIntent(content, true);</span>
+<span class="nc" id="L151">            builder.setPriority(NotificationCompat.PRIORITY_HIGH);</span>
+        }
+        // time sensitive: Android has no exact equivalent, approximate with category + priority
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (localNotif.isTimeSensitive()) {</span>
+<span class="nc" id="L155">            builder.setCategory(NotificationCompat.CATEGORY_MESSAGE);</span>
+<span class="nc" id="L156">            builder.setPriority(NotificationCompat.PRIORITY_HIGH);</span>
+        }
+        // messaging (conversation) style
+<span class="nc" id="L159">        LocalNotification.MessagingStyle ms = localNotif.getMessagingStyle();</span>
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        if (ms != null &amp;&amp; !ms.getMessages().isEmpty()) {</span>
+<span class="nc" id="L161">            NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                    ms.getSelfDisplayName() == null ? &quot;&quot; : ms.getSelfDisplayName());</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (ms.getConversationTitle() != null) {</span>
+<span class="nc" id="L164">                style.setConversationTitle(ms.getConversationTitle());</span>
+            }
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            for (LocalNotification.MessagingStyle.Message m : ms.getMessages()) {</span>
+<span class="nc" id="L167">                CharSequence sender = m.getSenderName();</span>
+<span class="nc" id="L168">                style.addMessage(m.getText(), m.getTimestamp(), sender);</span>
+<span class="nc" id="L169">            }</span>
+<span class="nc" id="L170">            builder.setStyle(style);</span>
+        }
+        // explicit channel id on the notification (Android O+), via reflection to stay
+        // compatible with the support library baseline
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (localNotif.getChannelId() != null) {</span>
+            try {
+<span class="nc" id="L176">                builder.getClass().getMethod(&quot;setChannelId&quot;, String.class).invoke(builder, localNotif.getChannelId());</span>
+<span class="nc" id="L177">            } catch (Throwable ignore) {</span>
+<span class="nc" id="L178">            }</span>
+        }
+
+        // action buttons (with optional inline quick-reply text input)
+<span class="nc bnc" id="L182" title="All 4 branches missed.">        if (!localNotif.getActions().isEmpty() &amp;&amp; contentTemplate != null) {</span>
+<span class="nc" id="L183">            int requestCode = 1;</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            for (LocalNotification.Action a : localNotif.getActions()) {</span>
+<span class="nc" id="L185">                Intent actionIntent = (Intent) contentTemplate.clone();</span>
+<span class="nc" id="L186">                actionIntent.putExtra(&quot;LocalNotificationActionId&quot;, a.getId());</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">                actionIntent.putExtra(&quot;LocalNotificationActionTitle&quot;, a.getTitle() == null ? &quot;&quot; : a.getTitle());</span>
+                // make the per-action intent unique so the PendingIntents don't collide
+<span class="nc" id="L189">                actionIntent.setData(android.net.Uri.parse(&quot;http://codenameone.com/a?LocalNotificationID=&quot;</span>
+<span class="nc" id="L190">                        + android.net.Uri.encode(localNotif.getId()) + &quot;&amp;action=&quot; + android.net.Uri.encode(a.getId())));</span>
+<span class="nc" id="L191">                PendingIntent actionPending = AndroidImplementation.createMutablePendingIntent(context, requestCode++, actionIntent);</span>
+                // The action icon is a drawable resource NAME (Codename One has no R.drawable
+                // int constants). Resolve it by name against the generated res/drawable; an
+                // unknown / null name yields 0 (no icon), which the action button tolerates.
+<span class="nc" id="L195">                int iconId = 0;</span>
+<span class="nc" id="L196">                String iconName = a.getIcon();</span>
+<span class="nc bnc" id="L197" title="All 4 branches missed.">                if (iconName != null &amp;&amp; iconName.length() &gt; 0) {</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                    if (iconName.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L199">                        iconName = iconName.substring(1);</span>
+                    }
+<span class="nc" id="L201">                    int dot = iconName.lastIndexOf('.');</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                    if (dot &gt; 0) {</span>
+<span class="nc" id="L203">                        iconName = iconName.substring(0, dot);</span>
+                    }
+<span class="nc" id="L205">                    iconId = ctx.getResources().getIdentifier(iconName, &quot;drawable&quot;, ctx.getApplicationInfo().packageName);</span>
+                }
+                try {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                    if (NotificationCompatWrapper.ActionWrapper.BuilderWrapper.isSupported()) {</span>
+<span class="nc" id="L209">                        NotificationCompatWrapper.ActionWrapper.BuilderWrapper actionBuilder =</span>
+<span class="nc" id="L210">                                new NotificationCompatWrapper.ActionWrapper.BuilderWrapper(iconId, a.getTitle(), actionPending);</span>
+<span class="nc bnc" id="L211" title="All 4 branches missed.">                        if (a.isTextInput() &amp;&amp; RemoteInputWrapper.isSupported()) {</span>
+<span class="nc" id="L212">                            RemoteInputWrapper.BuilderWrapper remoteInputBuilder =</span>
+<span class="nc" id="L213">                                    new RemoteInputWrapper.BuilderWrapper(a.getId() + &quot;$Result&quot;);</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                            if (a.getTextInputPlaceholder() != null) {</span>
+<span class="nc" id="L215">                                remoteInputBuilder.setLabel(a.getTextInputPlaceholder());</span>
+                            }
+<span class="nc" id="L217">                            actionBuilder.addRemoteInput(remoteInputBuilder.build());</span>
+                        }
+<span class="nc" id="L219">                        new NotificationCompatWrapper.BuilderWrapper(builder).addAction(actionBuilder.build());</span>
+<span class="nc" id="L220">                    } else {</span>
+<span class="nc" id="L221">                        builder.addAction(iconId, a.getTitle(), actionPending);</span>
+                    }
+<span class="nc" id="L223">                } catch (Exception ex) {</span>
+<span class="nc" id="L224">                    ex.printStackTrace();</span>
+<span class="nc" id="L225">                }</span>
+<span class="nc" id="L226">            }</span>
+        }
+
+<span class="nc" id="L229">        AndroidImplementation.setNotificationChannel((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE), builder, context);</span>
+<span class="nc" id="L230">        String sound = localNotif.getAlertSound();</span>
+<span class="nc bnc" id="L231" title="All 4 branches missed.">        if (sound != null &amp;&amp; sound.length() &gt; 0) {</span>
+<span class="nc" id="L232">            sound = sound.toLowerCase();</span>
+<span class="nc" id="L233">            builder.setSound(android.net.Uri.parse(&quot;android.resource://&quot;+ctx.getApplicationInfo().packageName+&quot;/raw&quot;+sound.substring(0, sound.indexOf(&quot;.&quot;))));</span>
+        }
+<span class="nc" id="L235">        Notification n = builder.build();</span>
+<span class="nc" id="L236">        n.icon = icon;</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        if (sound == null || sound.length() == 0) {</span>
+<span class="nc" id="L238">            n.defaults |= Notification.DEFAULT_SOUND;</span>
+        }
+<span class="nc" id="L240">        return n;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

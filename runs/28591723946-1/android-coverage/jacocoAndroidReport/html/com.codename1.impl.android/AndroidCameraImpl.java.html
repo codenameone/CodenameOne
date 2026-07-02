@@ -1,0 +1,629 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidCameraImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidCameraImpl.java</span></div><h1>AndroidCameraImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.ImageFormat;
+import android.graphics.Matrix;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
+import android.media.Image;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+
+import com.codename1.camera.CameraFacing;
+import com.codename1.camera.CameraFrame;
+import com.codename1.camera.CameraInfo;
+import com.codename1.camera.CameraSessionOptions;
+import com.codename1.camera.CapturedPhoto;
+import com.codename1.camera.FlashMode;
+import com.codename1.camera.FrameFormat;
+import com.codename1.camera.FrameListener;
+import com.codename1.camera.PhotoCaptureOptions;
+import com.codename1.impl.CameraImpl;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.ui.Display;
+import com.codename1.ui.PeerComponent;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.util.AsyncResource;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/// Android implementation of `CameraImpl` backed by CameraX
+/// (`androidx.camera:camera-core` + `camera-camera2` + `camera-lifecycle`
+/// + `camera-view` + `camera-video`). Those dependencies are added to the
+/// end-user app's `build.gradle` automatically by
+/// `AiDependencyTable` (entry &quot;com/codename1/camera/&quot;).
+///
+/// Because the Codename One Android port itself does not have CameraX on
+/// its compile classpath, all CameraX calls go through reflection. This
+/// matches the existing pattern in `com.codename1.io.oidc.OidcBrowserNativeImpl`
+/// and `com.codename1.io.webauthn.WebAuthnNativeImpl`.
+///
+/// @hidden
+public class AndroidCameraImpl extends CameraImpl {
+
+    private static final String TAG = &quot;AndroidCameraImpl&quot;;
+
+    // Reflectively-loaded CameraX class references. Resolved lazily because
+    // they may not be present at port load time -- only the end-user app
+    // build pulls them in via Gradle.
+    private static volatile boolean cxResolved;
+    private static Class&lt;?&gt; clsProcessCameraProvider;
+    private static Class&lt;?&gt; clsCameraSelector;
+    private static Class&lt;?&gt; clsCameraSelectorBuilder;
+    private static Class&lt;?&gt; clsPreview;
+    private static Class&lt;?&gt; clsPreviewBuilder;
+    private static Class&lt;?&gt; clsImageCapture;
+    private static Class&lt;?&gt; clsImageCaptureBuilder;
+    private static Class&lt;?&gt; clsImageAnalysis;
+    private static Class&lt;?&gt; clsImageAnalysisBuilder;
+    private static Class&lt;?&gt; clsImageAnalysisAnalyzer;
+    private static Class&lt;?&gt; clsUseCase;
+    private static Class&lt;?&gt; clsCameraXProxy;
+    private static Class&lt;?&gt; clsPreviewView;
+    private static Class&lt;?&gt; clsProcessLifecycleOwner;
+    private static Class&lt;?&gt; clsLifecycleOwner;
+    private static Object frontLensFacing;
+    private static Object backLensFacing;
+
+    private final Activity activity;
+    private Object cameraProvider;
+    private Object camera;
+    private Object preview;
+    private Object imageCapture;
+    private Object imageAnalysis;
+    private View previewView;
+<span class="fc" id="L117">    private final AtomicBoolean listenerBusy = new AtomicBoolean();</span>
+    private volatile FrameListener frameListener;
+<span class="fc" id="L119">    private volatile FrameFormat frameFormat = FrameFormat.JPEG;</span>
+    private CameraInfo info;
+    private CameraSessionOptions options;
+    private Executor cameraExecutor;
+    private boolean isFrontFacing;
+    private boolean closed;
+
+<span class="fc" id="L126">    public AndroidCameraImpl(Activity activity) {</span>
+<span class="fc" id="L127">        this.activity = activity;</span>
+<span class="fc" id="L128">    }</span>
+
+    // --------------------------------------------------------------------
+    // Reflection setup
+    // --------------------------------------------------------------------
+
+    private static synchronized boolean ensureCameraXResolved() {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (cxResolved) {</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            return clsProcessCameraProvider != null;</span>
+        }
+<span class="fc" id="L138">        cxResolved = true;</span>
+        try {
+<span class="fc" id="L140">            clsProcessCameraProvider = Class.forName(&quot;androidx.camera.lifecycle.ProcessCameraProvider&quot;);</span>
+<span class="fc" id="L141">            clsCameraSelector = Class.forName(&quot;androidx.camera.core.CameraSelector&quot;);</span>
+<span class="fc" id="L142">            clsCameraSelectorBuilder = Class.forName(&quot;androidx.camera.core.CameraSelector$Builder&quot;);</span>
+<span class="fc" id="L143">            clsPreview = Class.forName(&quot;androidx.camera.core.Preview&quot;);</span>
+<span class="fc" id="L144">            clsPreviewBuilder = Class.forName(&quot;androidx.camera.core.Preview$Builder&quot;);</span>
+<span class="fc" id="L145">            clsImageCapture = Class.forName(&quot;androidx.camera.core.ImageCapture&quot;);</span>
+<span class="fc" id="L146">            clsImageCaptureBuilder = Class.forName(&quot;androidx.camera.core.ImageCapture$Builder&quot;);</span>
+<span class="fc" id="L147">            clsImageAnalysis = Class.forName(&quot;androidx.camera.core.ImageAnalysis&quot;);</span>
+<span class="fc" id="L148">            clsImageAnalysisBuilder = Class.forName(&quot;androidx.camera.core.ImageAnalysis$Builder&quot;);</span>
+<span class="fc" id="L149">            clsImageAnalysisAnalyzer = Class.forName(&quot;androidx.camera.core.ImageAnalysis$Analyzer&quot;);</span>
+<span class="fc" id="L150">            clsUseCase = Class.forName(&quot;androidx.camera.core.UseCase&quot;);</span>
+<span class="fc" id="L151">            clsPreviewView = Class.forName(&quot;androidx.camera.view.PreviewView&quot;);</span>
+<span class="fc" id="L152">            clsProcessLifecycleOwner = Class.forName(&quot;androidx.lifecycle.ProcessLifecycleOwner&quot;);</span>
+<span class="fc" id="L153">            clsLifecycleOwner = Class.forName(&quot;androidx.lifecycle.LifecycleOwner&quot;);</span>
+
+<span class="fc" id="L155">            frontLensFacing = clsCameraSelector.getField(&quot;LENS_FACING_FRONT&quot;).get(null);</span>
+<span class="fc" id="L156">            backLensFacing = clsCameraSelector.getField(&quot;LENS_FACING_BACK&quot;).get(null);</span>
+<span class="fc" id="L157">            return true;</span>
+<span class="nc" id="L158">        } catch (Throwable t) {</span>
+<span class="nc" id="L159">            Log.w(TAG, &quot;CameraX classes not present on classpath: &quot; + t.getMessage());</span>
+<span class="nc" id="L160">            clsProcessCameraProvider = null;</span>
+<span class="nc" id="L161">            return false;</span>
+        }
+    }
+
+    // --------------------------------------------------------------------
+    // CameraImpl
+    // --------------------------------------------------------------------
+
+    @Override
+    public CameraInfo[] enumerateCameras() {
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (!ensureCameraXResolved()) {</span>
+<span class="nc" id="L172">            return new CameraInfo[] {</span>
+                new CameraInfo(&quot;back&quot;, CameraFacing.BACK,
+                        new Dimension[0], new Dimension[0], false, true)
+            };
+        }
+<span class="fc" id="L177">        return new CameraInfo[] {</span>
+            new CameraInfo(&quot;back&quot;, CameraFacing.BACK,
+                    new Dimension[] { new Dimension(1920, 1080), new Dimension(1280, 720) },
+                    new Dimension[] { new Dimension(1280, 720),  new Dimension(640, 480) },
+                    true, true),
+            new CameraInfo(&quot;front&quot;, CameraFacing.FRONT,
+                    new Dimension[] { new Dimension(1280, 720),  new Dimension(640, 480) },
+                    new Dimension[] { new Dimension(1280, 720) },
+                    false, true)
+        };
+    }
+
+    @Override
+    public void open(String cameraId, CameraSessionOptions opts) throws IOException {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        this.options = opts == null ? new CameraSessionOptions() : opts;</span>
+<span class="nc" id="L192">        this.isFrontFacing = &quot;front&quot;.equals(cameraId);</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        this.info = isFrontFacing ? enumerateCameras()[1] : enumerateCameras()[0];</span>
+
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (&quot;__permission_probe__&quot;.equals(cameraId)) {</span>
+<span class="nc" id="L196">            requireCameraPermission();</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (options.isCaptureAudio()) requireAudioPermission();</span>
+<span class="nc" id="L198">            return;</span>
+        }
+
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (!ensureCameraXResolved()) {</span>
+<span class="nc" id="L202">            throw new IOException(&quot;CameraX is not on the runtime classpath. &quot;</span>
+                    + &quot;Make sure the build server injected the androidx.camera deps.&quot;);
+        }
+
+<span class="nc" id="L206">        requireCameraPermission();</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (options.isCaptureAudio()) requireAudioPermission();</span>
+
+<span class="nc" id="L209">        cameraExecutor = Executors.newSingleThreadExecutor();</span>
+
+        try {
+            // Build a CameraSelector for our facing.
+<span class="nc" id="L213">            Object selectorBuilder = clsCameraSelectorBuilder.getConstructor().newInstance();</span>
+<span class="nc" id="L214">            clsCameraSelectorBuilder.getMethod(&quot;requireLensFacing&quot;, int.class)</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                    .invoke(selectorBuilder, isFrontFacing ? frontLensFacing : backLensFacing);</span>
+<span class="nc" id="L216">            Object selector = clsCameraSelectorBuilder.getMethod(&quot;build&quot;).invoke(selectorBuilder);</span>
+
+            // Preview
+<span class="nc" id="L219">            Object previewBuilder = clsPreviewBuilder.getConstructor().newInstance();</span>
+<span class="nc" id="L220">            preview = clsPreviewBuilder.getMethod(&quot;build&quot;).invoke(previewBuilder);</span>
+
+            // ImageCapture
+<span class="nc" id="L223">            Object icBuilder = clsImageCaptureBuilder.getConstructor().newInstance();</span>
+<span class="nc" id="L224">            imageCapture = clsImageCaptureBuilder.getMethod(&quot;build&quot;).invoke(icBuilder);</span>
+
+            // ImageAnalysis (only built if we need frame delivery)
+<span class="nc" id="L227">            Object iaBuilder = clsImageAnalysisBuilder.getConstructor().newInstance();</span>
+<span class="nc" id="L228">            clsImageAnalysisBuilder.getMethod(&quot;setTargetResolution&quot;,</span>
+<span class="nc" id="L229">                    Class.forName(&quot;android.util.Size&quot;))</span>
+<span class="nc" id="L230">                    .invoke(iaBuilder,</span>
+                            new android.util.Size(
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                                    options.getPreviewWidth() &gt; 0 ? options.getPreviewWidth() : 640,</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                                    options.getPreviewHeight() &gt; 0 ? options.getPreviewHeight() : 480));</span>
+            // STRATEGY_KEEP_ONLY_LATEST = 0 in CameraX
+            try {
+<span class="nc" id="L236">                clsImageAnalysisBuilder.getMethod(&quot;setBackpressureStrategy&quot;, int.class)</span>
+<span class="nc" id="L237">                        .invoke(iaBuilder, 0);</span>
+<span class="nc" id="L238">            } catch (Throwable ignored) { /* old CameraX */ }</span>
+<span class="nc" id="L239">            imageAnalysis = clsImageAnalysisBuilder.getMethod(&quot;build&quot;).invoke(iaBuilder);</span>
+
+<span class="nc" id="L241">            installFrameAnalyzer();</span>
+
+            // Get the singleton ProcessCameraProvider asynchronously and bind.
+<span class="nc" id="L244">            final Object cameraSelectorFinal = selector;</span>
+<span class="nc" id="L245">            Method getInstance = clsProcessCameraProvider.getMethod(&quot;getInstance&quot;, Context.class);</span>
+<span class="nc" id="L246">            final Object futureProvider = getInstance.invoke(null, activity.getApplicationContext());</span>
+            // ListenableFuture#addListener(Runnable, Executor)
+<span class="nc" id="L248">            Method addListener = futureProvider.getClass()</span>
+<span class="nc" id="L249">                    .getMethod(&quot;addListener&quot;, Runnable.class, Executor.class);</span>
+<span class="nc" id="L250">            final IOException[] openErr = new IOException[1];</span>
+<span class="nc" id="L251">            final Object lock = new Object();</span>
+<span class="nc" id="L252">            final boolean[] done = new boolean[1];</span>
+<span class="nc" id="L253">            addListener.invoke(futureProvider, new Runnable() {</span>
+                @Override public void run() {
+                    try {
+<span class="nc" id="L256">                        cameraProvider = futureProvider.getClass().getMethod(&quot;get&quot;).invoke(futureProvider);</span>
+<span class="nc" id="L257">                        Object lifecycleOwner = clsProcessLifecycleOwner</span>
+<span class="nc" id="L258">                                .getMethod(&quot;get&quot;).invoke(null);</span>
+                        // bindToLifecycle(LifecycleOwner, CameraSelector, UseCase[])
+<span class="nc" id="L260">                        Method bind = clsProcessCameraProvider.getMethod(&quot;bindToLifecycle&quot;,</span>
+                                clsLifecycleOwner, clsCameraSelector,
+<span class="nc" id="L262">                                java.lang.reflect.Array.newInstance(clsUseCase, 0).getClass());</span>
+<span class="nc" id="L263">                        Object useCases = java.lang.reflect.Array.newInstance(clsUseCase, 3);</span>
+<span class="nc" id="L264">                        java.lang.reflect.Array.set(useCases, 0, preview);</span>
+<span class="nc" id="L265">                        java.lang.reflect.Array.set(useCases, 1, imageCapture);</span>
+<span class="nc" id="L266">                        java.lang.reflect.Array.set(useCases, 2, imageAnalysis);</span>
+<span class="nc" id="L267">                        camera = bind.invoke(cameraProvider, lifecycleOwner, cameraSelectorFinal, useCases);</span>
+<span class="nc" id="L268">                    } catch (Throwable t) {</span>
+<span class="nc" id="L269">                        openErr[0] = new IOException(&quot;CameraX bind failed: &quot; + t.getMessage(), t);</span>
+                    } finally {
+<span class="nc" id="L271">                        synchronized (lock) { done[0] = true; lock.notifyAll(); }</span>
+                    }
+<span class="nc" id="L273">                }</span>
+<span class="nc" id="L274">            }, mainExecutor());</span>
+
+            // Wait up to 5s for binding.
+<span class="nc" id="L277">            synchronized (lock) {</span>
+<span class="nc" id="L278">                long deadline = System.currentTimeMillis() + 5000;</span>
+<span class="nc bnc" id="L279" title="All 4 branches missed.">                while (!done[0] &amp;&amp; System.currentTimeMillis() &lt; deadline) {</span>
+<span class="nc" id="L280">                    try { lock.wait(200); } catch (InterruptedException ignored) { }</span>
+                }
+<span class="nc" id="L282">            }</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            if (openErr[0] != null) throw openErr[0];</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            if (camera == null) throw new IOException(&quot;CameraX bind timed out&quot;);</span>
+<span class="nc" id="L285">        } catch (IOException e) {</span>
+<span class="nc" id="L286">            throw e;</span>
+<span class="nc" id="L287">        } catch (Throwable t) {</span>
+<span class="nc" id="L288">            throw new IOException(&quot;Could not open Android camera: &quot; + t.getMessage(), t);</span>
+<span class="nc" id="L289">        }</span>
+<span class="nc" id="L290">    }</span>
+
+    @Override
+    public PeerComponent createPreviewPeer() {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        if (!ensureCameraXResolved()) return null;</span>
+        try {
+            // PreviewView pv = new PreviewView(activity);
+<span class="nc" id="L297">            Constructor&lt;?&gt; ctor = clsPreviewView.getConstructor(Context.class);</span>
+<span class="nc" id="L298">            previewView = (View) ctor.newInstance(activity);</span>
+            // Hook the preview UseCase's surface provider to the PreviewView.
+<span class="nc" id="L300">            Object surfaceProvider = clsPreviewView.getMethod(&quot;getSurfaceProvider&quot;)</span>
+<span class="nc" id="L301">                    .invoke(previewView);</span>
+            // Preview#setSurfaceProvider(SurfaceProvider)
+<span class="nc" id="L303">            Class&lt;?&gt; surfaceProviderCls = Class.forName(</span>
+                    &quot;androidx.camera.core.Preview$SurfaceProvider&quot;);
+<span class="nc" id="L305">            clsPreview.getMethod(&quot;setSurfaceProvider&quot;, surfaceProviderCls)</span>
+<span class="nc" id="L306">                    .invoke(preview, surfaceProvider);</span>
+<span class="nc" id="L307">            return PeerComponent.create(previewView);</span>
+<span class="nc" id="L308">        } catch (Throwable t) {</span>
+<span class="nc" id="L309">            Log.e(TAG, &quot;Could not create preview view&quot;, t);</span>
+<span class="nc" id="L310">            return null;</span>
+        }
+    }
+
+    @Override
+    public void takePhoto(final PhotoCaptureOptions opts, final AsyncResource&lt;CapturedPhoto&gt; result) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (imageCapture == null) {</span>
+<span class="nc" id="L317">            result.error(new IllegalStateException(&quot;Camera not opened&quot;));</span>
+<span class="nc" id="L318">            return;</span>
+        }
+        // CameraX's in-memory OnImageCapturedCallback is an abstract class
+        // that java.lang.reflect.Proxy can't subclass. Use the to-file
+        // takePicture(OutputFileOptions, Executor, OnImageSavedCallback)
+        // overload instead -- OnImageSavedCallback is an interface, so Proxy
+        // works. We read the resulting JPEG back into memory before
+        // resolving the AsyncResource.
+        try {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            final String filePath = opts.getFilePath() != null</span>
+<span class="nc" id="L328">                    ? opts.getFilePath()</span>
+<span class="nc" id="L329">                    : tempPhotoPath();</span>
+<span class="nc" id="L330">            final File outputFile = new File(absolutePath(filePath));</span>
+<span class="nc" id="L331">            Class&lt;?&gt; ofoBuilderCls = Class.forName(</span>
+                    &quot;androidx.camera.core.ImageCapture$OutputFileOptions$Builder&quot;);
+<span class="nc" id="L333">            Constructor&lt;?&gt; ofoCtor = ofoBuilderCls.getConstructor(File.class);</span>
+<span class="nc" id="L334">            Object ofoBuilder = ofoCtor.newInstance(outputFile);</span>
+<span class="nc" id="L335">            Object outputFileOptions = ofoBuilderCls.getMethod(&quot;build&quot;).invoke(ofoBuilder);</span>
+
+<span class="nc" id="L337">            Class&lt;?&gt; savedCbCls = Class.forName(</span>
+                    &quot;androidx.camera.core.ImageCapture$OnImageSavedCallback&quot;);
+<span class="nc" id="L339">            Object savedCb = Proxy.newProxyInstance(savedCbCls.getClassLoader(),</span>
+                    new Class&lt;?&gt;[] { savedCbCls },
+                    new ImageSavedHandler(outputFile, filePath, result));
+
+<span class="nc" id="L343">            Class&lt;?&gt; ofoCls = Class.forName(</span>
+                    &quot;androidx.camera.core.ImageCapture$OutputFileOptions&quot;);
+<span class="nc" id="L345">            clsImageCapture.getMethod(&quot;takePicture&quot;, ofoCls, Executor.class, savedCbCls)</span>
+<span class="nc" id="L346">                    .invoke(imageCapture, outputFileOptions, cameraExecutor, savedCb);</span>
+<span class="nc" id="L347">        } catch (Throwable t) {</span>
+<span class="nc" id="L348">            result.error(t);</span>
+<span class="nc" id="L349">        }</span>
+<span class="nc" id="L350">    }</span>
+
+    /// Static inner class so SpotBugs doesn't flag it as SIC_INNER_SHOULD_BE_STATIC_ANON
+    /// (and so we don't pin the AndroidCameraImpl instance for the duration of
+    /// a slow shutter / write).
+    private static final class ImageSavedHandler implements InvocationHandler {
+        private final File outputFile;
+        private final String filePath;
+        private final AsyncResource&lt;CapturedPhoto&gt; result;
+
+<span class="nc" id="L360">        ImageSavedHandler(File outputFile, String filePath, AsyncResource&lt;CapturedPhoto&gt; result) {</span>
+<span class="nc" id="L361">            this.outputFile = outputFile;</span>
+<span class="nc" id="L362">            this.filePath = filePath;</span>
+<span class="nc" id="L363">            this.result = result;</span>
+<span class="nc" id="L364">        }</span>
+
+        @Override public Object invoke(Object p, Method m, Object[] a) {
+<span class="nc" id="L367">            String n = m.getName();</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">            if (&quot;onImageSaved&quot;.equals(n)) {</span>
+<span class="nc" id="L369">                Display.getInstance().callSerially(new Runnable() {</span>
+                    @Override public void run() {
+                        try {
+<span class="nc" id="L372">                            byte[] bytes = readAll(outputFile);</span>
+<span class="nc" id="L373">                            int[] wh = readJpegSize(bytes);</span>
+<span class="nc" id="L374">                            result.complete(new CapturedPhoto(</span>
+                                    bytes, filePath, wh[0], wh[1]));
+<span class="nc" id="L376">                        } catch (Throwable t) {</span>
+<span class="nc" id="L377">                            result.error(t);</span>
+<span class="nc" id="L378">                        }</span>
+<span class="nc" id="L379">                    }</span>
+                });
+<span class="nc" id="L381">                return null;</span>
+            }
+<span class="nc bnc" id="L383" title="All 2 branches missed.">            if (&quot;onError&quot;.equals(n)) {</span>
+<span class="nc" id="L384">                final Throwable t = (Throwable) a[0];</span>
+<span class="nc" id="L385">                Display.getInstance().callSerially(new Runnable() {</span>
+<span class="nc" id="L386">                    @Override public void run() { result.error(t); }</span>
+                });
+<span class="nc" id="L388">                return null;</span>
+            }
+<span class="nc" id="L390">            return null;</span>
+        }
+    }
+
+    @Override
+    public void startVideoRecording(String filePath, boolean audio) throws IOException {
+        // Video recording via CameraX requires VideoCapture which is shipped
+        // in androidx.camera:camera-video. Implementing it via reflection in
+        // this v1 is intentionally limited: most apps use the legacy
+        // com.codename1.capture.Capture#captureVideo for full-file recording
+        // and the new API for preview/photo/frames. A full reflective
+        // implementation would mirror the takePicture-to-file pattern above
+        // against Recorder + PendingRecording.
+<span class="nc" id="L403">        throw new IOException(&quot;Video recording via CameraX is not yet supported on Android. &quot;</span>
+                + &quot;Use com.codename1.capture.Capture.captureVideo() for video.&quot;);
+    }
+
+    @Override
+    public void stopVideoRecording(AsyncResource&lt;String&gt; result) {
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        if (result != null) {</span>
+<span class="nc" id="L410">            result.error(new IllegalStateException(&quot;Video recording not active&quot;));</span>
+        }
+<span class="nc" id="L412">    }</span>
+
+    @Override
+    public void setFrameListener(FrameListener listener, FrameFormat format, int maxFps) {
+<span class="nc" id="L416">        this.frameListener = listener;</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        this.frameFormat = format == null ? FrameFormat.JPEG : format;</span>
+<span class="nc" id="L418">    }</span>
+
+    private void installFrameAnalyzer() {
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (imageAnalysis == null) return;</span>
+        try {
+<span class="nc" id="L423">            Object analyzer = Proxy.newProxyInstance(</span>
+<span class="nc" id="L424">                    clsImageAnalysisAnalyzer.getClassLoader(),</span>
+                    new Class&lt;?&gt;[] { clsImageAnalysisAnalyzer },
+<span class="nc" id="L426">                    new InvocationHandler() {</span>
+                        @Override public Object invoke(Object p, Method m, Object[] a) {
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                            if (&quot;analyze&quot;.equals(m.getName())) {</span>
+<span class="nc" id="L429">                                onImageProxy(a[0]);</span>
+                            }
+<span class="nc" id="L431">                            return null;</span>
+                        }
+                    });
+<span class="nc" id="L434">            clsImageAnalysis.getMethod(&quot;setAnalyzer&quot;, Executor.class, clsImageAnalysisAnalyzer)</span>
+<span class="nc" id="L435">                    .invoke(imageAnalysis, cameraExecutor, analyzer);</span>
+<span class="nc" id="L436">        } catch (Throwable t) {</span>
+<span class="nc" id="L437">            Log.w(TAG, &quot;Could not install frame analyzer: &quot; + t.getMessage());</span>
+<span class="nc" id="L438">        }</span>
+<span class="nc" id="L439">    }</span>
+
+    private void onImageProxy(Object imageProxy) {
+<span class="nc" id="L442">        FrameListener l = frameListener;</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if (l == null) {</span>
+            // Always close the proxy or CameraX will stop delivering.
+<span class="nc" id="L445">            closeImageProxy(imageProxy);</span>
+<span class="nc" id="L446">            return;</span>
+        }
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        if (!listenerBusy.compareAndSet(false, true)) {</span>
+<span class="nc" id="L449">            closeImageProxy(imageProxy);</span>
+<span class="nc" id="L450">            return;</span>
+        }
+        try {
+            // Convert ImageProxy -&gt; Image -&gt; JPEG bytes
+<span class="nc" id="L454">            byte[] jpeg = null;</span>
+<span class="nc" id="L455">            int w = 0, h = 0;</span>
+<span class="nc" id="L456">            int rotation = 0;</span>
+            try {
+<span class="nc" id="L458">                Image img = (Image) imageProxy.getClass().getMethod(&quot;getImage&quot;).invoke(imageProxy);</span>
+<span class="nc" id="L459">                Object imageInfo = imageProxy.getClass().getMethod(&quot;getImageInfo&quot;).invoke(imageProxy);</span>
+<span class="nc" id="L460">                rotation = (Integer) imageInfo.getClass().getMethod(&quot;getRotationDegrees&quot;).invoke(imageInfo);</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                if (img != null) {</span>
+<span class="nc" id="L462">                    w = img.getWidth();</span>
+<span class="nc" id="L463">                    h = img.getHeight();</span>
+<span class="nc" id="L464">                    jpeg = yuvImageToJpeg(img);</span>
+                }
+<span class="nc" id="L466">            } catch (Throwable t) {</span>
+<span class="nc" id="L467">                Log.w(TAG, &quot;Frame conversion failed: &quot; + t.getMessage());</span>
+<span class="nc" id="L468">            }</span>
+<span class="nc bnc" id="L469" title="All 2 branches missed.">            if (jpeg != null) {</span>
+<span class="nc" id="L470">                l.onFrame(new CameraFrame(jpeg, null, w, h, rotation,</span>
+<span class="nc" id="L471">                        System.nanoTime(), frameFormat));</span>
+            }
+        } finally {
+<span class="nc" id="L474">            listenerBusy.set(false);</span>
+<span class="nc" id="L475">            closeImageProxy(imageProxy);</span>
+        }
+<span class="nc" id="L477">    }</span>
+
+    private static void closeImageProxy(Object imageProxy) {
+        try {
+<span class="nc" id="L481">            imageProxy.getClass().getMethod(&quot;close&quot;).invoke(imageProxy);</span>
+<span class="nc" id="L482">        } catch (Throwable ignored) { }</span>
+<span class="nc" id="L483">    }</span>
+
+    private static byte[] yuvImageToJpeg(Image image) {
+<span class="nc bnc" id="L486" title="All 2 branches missed.">        if (image.getFormat() == ImageFormat.JPEG) {</span>
+<span class="nc" id="L487">            ByteBuffer buf = image.getPlanes()[0].getBuffer();</span>
+<span class="nc" id="L488">            byte[] out = new byte[buf.remaining()];</span>
+<span class="nc" id="L489">            buf.get(out);</span>
+<span class="nc" id="L490">            return out;</span>
+        }
+        // YUV_420_888 -&gt; NV21 -&gt; JPEG via YuvImage
+<span class="nc" id="L493">        int w = image.getWidth();</span>
+<span class="nc" id="L494">        int h = image.getHeight();</span>
+<span class="nc" id="L495">        Image.Plane[] planes = image.getPlanes();</span>
+<span class="nc" id="L496">        ByteBuffer y = planes[0].getBuffer();</span>
+<span class="nc" id="L497">        ByteBuffer u = planes[1].getBuffer();</span>
+<span class="nc" id="L498">        ByteBuffer v = planes[2].getBuffer();</span>
+<span class="nc" id="L499">        int ySize = y.remaining();</span>
+<span class="nc" id="L500">        int uSize = u.remaining();</span>
+<span class="nc" id="L501">        int vSize = v.remaining();</span>
+<span class="nc" id="L502">        byte[] nv21 = new byte[ySize + uSize + vSize];</span>
+<span class="nc" id="L503">        y.get(nv21, 0, ySize);</span>
+<span class="nc" id="L504">        v.get(nv21, ySize, vSize);</span>
+<span class="nc" id="L505">        u.get(nv21, ySize + vSize, uSize);</span>
+<span class="nc" id="L506">        YuvImage yuv = new YuvImage(nv21, ImageFormat.NV21, w, h, null);</span>
+<span class="nc" id="L507">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L508">        yuv.compressToJpeg(new Rect(0, 0, w, h), 80, baos);</span>
+<span class="nc" id="L509">        return baos.toByteArray();</span>
+    }
+
+    @Override
+    public void setFlashMode(FlashMode mode) {
+<span class="nc bnc" id="L514" title="All 2 branches missed.">        if (imageCapture == null) return;</span>
+        try {
+<span class="nc bnc" id="L516" title="All 2 branches missed.">            int code = mode == null ? 2</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">                    : mode == FlashMode.OFF ? 2</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                    : mode == FlashMode.ON ? 1</span>
+<span class="nc" id="L519">                    : 0; // AUTO</span>
+<span class="nc" id="L520">            clsImageCapture.getMethod(&quot;setFlashMode&quot;, int.class).invoke(imageCapture, code);</span>
+<span class="nc" id="L521">        } catch (Throwable ignored) { }</span>
+<span class="nc" id="L522">    }</span>
+
+    @Override
+    public void setZoom(float ratio) {
+<span class="nc bnc" id="L526" title="All 2 branches missed.">        if (camera == null) return;</span>
+        try {
+<span class="nc" id="L528">            Object cameraControl = camera.getClass().getMethod(&quot;getCameraControl&quot;).invoke(camera);</span>
+<span class="nc" id="L529">            cameraControl.getClass().getMethod(&quot;setZoomRatio&quot;, float.class).invoke(cameraControl, ratio);</span>
+<span class="nc" id="L530">        } catch (Throwable ignored) { }</span>
+<span class="nc" id="L531">    }</span>
+
+    @Override
+    public void focus(float xNorm, float yNorm) {
+        // Reflective focus would need MeteringPointFactory + FocusMeteringAction
+        // builder reflection. Left as a documented no-op in v1.
+<span class="nc" id="L537">    }</span>
+
+    @Override
+    public void pause() {
+        // CameraX is bound to ProcessLifecycleOwner -- it pauses automatically
+        // when the activity does. Explicit pause for a custom session would
+        // require unbinding/rebinding; deferred.
+<span class="nc" id="L544">    }</span>
+
+    @Override
+    public void resume() {
+        // See pause().
+<span class="nc" id="L549">    }</span>
+
+    @Override
+    public void close() {
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        if (closed) return;</span>
+<span class="fc" id="L554">        closed = true;</span>
+        try {
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">            if (cameraProvider != null) {</span>
+<span class="nc" id="L557">                clsProcessCameraProvider.getMethod(&quot;unbindAll&quot;).invoke(cameraProvider);</span>
+            }
+<span class="pc" id="L559">        } catch (Throwable ignored) { }</span>
+<span class="fc" id="L560">        previewView = null;</span>
+<span class="fc" id="L561">        camera = null;</span>
+<span class="fc" id="L562">        preview = null;</span>
+<span class="fc" id="L563">        imageCapture = null;</span>
+<span class="fc" id="L564">        imageAnalysis = null;</span>
+<span class="fc" id="L565">        cameraProvider = null;</span>
+<span class="fc" id="L566">        frameListener = null;</span>
+<span class="fc" id="L567">    }</span>
+
+    // --------------------------------------------------------------------
+    // Helpers
+    // --------------------------------------------------------------------
+
+    private void requireCameraPermission() throws IOException {
+<span class="nc bnc" id="L574" title="All 2 branches missed.">        if (!AndroidNativeUtil.checkForPermission(Manifest.permission.CAMERA,</span>
+                &quot;Required to access the camera.&quot;)) {
+<span class="nc" id="L576">            throw new IOException(&quot;Camera permission denied&quot;);</span>
+        }
+<span class="nc" id="L578">    }</span>
+
+    private void requireAudioPermission() throws IOException {
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        if (!AndroidNativeUtil.checkForPermission(Manifest.permission.RECORD_AUDIO,</span>
+                &quot;Required to capture audio for video recording.&quot;)) {
+<span class="nc" id="L583">            throw new IOException(&quot;Microphone permission denied&quot;);</span>
+        }
+<span class="nc" id="L585">    }</span>
+
+    private static Executor mainExecutor() {
+<span class="nc" id="L588">        final Handler h = new Handler(Looper.getMainLooper());</span>
+<span class="nc" id="L589">        return new Executor() {</span>
+<span class="nc" id="L590">            @Override public void execute(Runnable r) { h.post(r); }</span>
+        };
+    }
+
+    private static String tempPhotoPath() {
+<span class="nc" id="L595">        FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L596">        String dir = fs.getAppHomePath();</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        if (!dir.endsWith(&quot;/&quot;)) dir += &quot;/&quot;;</span>
+<span class="nc" id="L598">        return dir + &quot;cn1_photo_&quot; + System.currentTimeMillis() + &quot;.jpg&quot;;</span>
+    }
+
+    private static String absolutePath(String fsStoragePath) {
+        // Map FileSystemStorage path (file://...) to a plain filesystem path.
+<span class="nc bnc" id="L603" title="All 2 branches missed.">        if (fsStoragePath.startsWith(&quot;file:&quot;)) {</span>
+<span class="nc" id="L604">            return fsStoragePath.substring(fsStoragePath.indexOf(':') + 1);</span>
+        }
+<span class="nc" id="L606">        return fsStoragePath;</span>
+    }
+
+    private static byte[] readAll(File f) throws IOException {
+<span class="nc" id="L610">        java.io.InputStream in = new java.io.FileInputStream(f);</span>
+        try {
+<span class="nc" id="L612">            ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L613">            byte[] buf = new byte[8192];</span>
+            int n;
+<span class="nc bnc" id="L615" title="All 2 branches missed.">            while ((n = in.read(buf)) &gt;= 0) baos.write(buf, 0, n);</span>
+<span class="nc" id="L616">            return baos.toByteArray();</span>
+        } finally {
+<span class="nc" id="L618">            in.close();</span>
+        }
+    }
+
+    private static int[] readJpegSize(byte[] bytes) {
+<span class="nc" id="L623">        BitmapFactory.Options o = new BitmapFactory.Options();</span>
+<span class="nc" id="L624">        o.inJustDecodeBounds = true;</span>
+<span class="nc" id="L625">        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);</span>
+<span class="nc" id="L626">        return new int[] { o.outWidth, o.outHeight };</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

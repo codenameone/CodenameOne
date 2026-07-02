@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodenameOneForegroundService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">CodenameOneForegroundService.java</span></div><h1>CodenameOneForegroundService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.os.IBinder;
+import androidx.core.app.NotificationCompat;
+import com.codename1.background.ForegroundService;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Android foreground service backing `com.codename1.background.ForegroundService`. Shows
+/// an ongoing notification and runs the supplied task on a background thread until the task
+/// returns or `stop()` is called. Tasks are live Java objects, so they are held in a static
+/// registry keyed by an integer token passed through the start intent.
+<span class="nc" id="L40">public class CodenameOneForegroundService extends Service {</span>
+
+    static final String ACTION_START = &quot;com.codename1.impl.android.FGS_START&quot;;
+    static final String ACTION_UPDATE = &quot;com.codename1.impl.android.FGS_UPDATE&quot;;
+    static final String ACTION_STOP = &quot;com.codename1.impl.android.FGS_STOP&quot;;
+    static final String EXTRA_TOKEN = &quot;token&quot;;
+    static final String EXTRA_CHANNEL = &quot;channel&quot;;
+    static final String EXTRA_TITLE = &quot;title&quot;;
+    static final String EXTRA_BODY = &quot;body&quot;;
+    static final String EXTRA_ICON = &quot;icon&quot;;
+
+<span class="nc" id="L51">    private static int nextToken = 1;</span>
+<span class="nc" id="L52">    private static final Map&lt;Integer, Registration&gt; REGISTRATIONS = new HashMap&lt;Integer, Registration&gt;();</span>
+
+    private static class Registration {
+        ForegroundService.Task task;
+        ForegroundService handle;
+        String channelId;
+        String title;
+        String body;
+        String iconName;
+        boolean started;
+    }
+
+    static synchronized int registerTask(ForegroundService.Task task, ForegroundService handle, String channelId, String title, String body, String iconName) {
+<span class="nc" id="L65">        int token = nextToken++;</span>
+<span class="nc" id="L66">        Registration r = new Registration();</span>
+<span class="nc" id="L67">        r.task = task;</span>
+<span class="nc" id="L68">        r.handle = handle;</span>
+<span class="nc" id="L69">        r.channelId = channelId;</span>
+<span class="nc" id="L70">        r.title = title;</span>
+<span class="nc" id="L71">        r.body = body;</span>
+<span class="nc" id="L72">        r.iconName = iconName;</span>
+<span class="nc" id="L73">        REGISTRATIONS.put(token, r);</span>
+<span class="nc" id="L74">        return token;</span>
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+<span class="nc" id="L79">        return null;</span>
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (intent == null) {</span>
+<span class="nc" id="L85">            return START_NOT_STICKY;</span>
+        }
+<span class="nc" id="L87">        String action = intent.getAction();</span>
+<span class="nc" id="L88">        final int token = intent.getIntExtra(EXTRA_TOKEN, -1);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (ACTION_STOP.equals(action)) {</span>
+<span class="nc" id="L90">            stopForeground(true);</span>
+<span class="nc" id="L91">            stopSelf();</span>
+<span class="nc" id="L92">            REGISTRATIONS.remove(token);</span>
+<span class="nc" id="L93">            return START_NOT_STICKY;</span>
+        }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (ACTION_UPDATE.equals(action)) {</span>
+<span class="nc" id="L96">            String title = intent.getStringExtra(EXTRA_TITLE);</span>
+<span class="nc" id="L97">            String body = intent.getStringExtra(EXTRA_BODY);</span>
+<span class="nc" id="L98">            Registration r = REGISTRATIONS.get(token);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            String channel = r != null ? r.channelId : intent.getStringExtra(EXTRA_CHANNEL);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            String icon = r != null ? r.iconName : intent.getStringExtra(EXTRA_ICON);</span>
+<span class="nc" id="L101">            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);</span>
+<span class="nc" id="L102">            nm.notify(token, buildNotification(channel, title, body, icon));</span>
+<span class="nc" id="L103">            return START_NOT_STICKY;</span>
+        }
+
+        // ACTION_START
+<span class="nc" id="L107">        final Registration reg = REGISTRATIONS.get(token);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        String channel = reg != null ? reg.channelId : intent.getStringExtra(EXTRA_CHANNEL);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        String title = reg != null ? reg.title : intent.getStringExtra(EXTRA_TITLE);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        String body = reg != null ? reg.body : intent.getStringExtra(EXTRA_BODY);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        String icon = reg != null ? reg.iconName : intent.getStringExtra(EXTRA_ICON);</span>
+<span class="nc" id="L112">        startForeground(token, buildNotification(channel, title, body, icon));</span>
+<span class="nc bnc" id="L113" title="All 6 branches missed.">        if (reg != null &amp;&amp; reg.task != null &amp;&amp; !reg.started) {</span>
+<span class="nc" id="L114">            reg.started = true;</span>
+<span class="nc" id="L115">            final ForegroundService.Task task = reg.task;</span>
+<span class="nc" id="L116">            final ForegroundService handle = reg.handle;</span>
+<span class="nc" id="L117">            new Thread(new Runnable() {</span>
+                public void run() {
+                    try {
+<span class="nc" id="L120">                        task.run(handle);</span>
+<span class="nc" id="L121">                    } catch (Throwable t) {</span>
+<span class="nc" id="L122">                        com.codename1.io.Log.e(t);</span>
+                    } finally {
+<span class="nc" id="L124">                        stopForeground(true);</span>
+<span class="nc" id="L125">                        stopSelf();</span>
+<span class="nc" id="L126">                        REGISTRATIONS.remove(token);</span>
+                    }
+<span class="nc" id="L128">                }</span>
+<span class="nc" id="L129">            }, &quot;cn1-foreground-service&quot;).start();</span>
+        }
+<span class="nc" id="L131">        return START_NOT_STICKY;</span>
+    }
+
+    private Notification buildNotification(String channelId, String title, String body, String iconName) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        int smallIcon = getResources().getIdentifier(iconName != null ? iconName : &quot;ic_stat_notify&quot;, &quot;drawable&quot;, getApplicationInfo().packageName);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (smallIcon == 0) {</span>
+<span class="nc" id="L137">            smallIcon = getResources().getIdentifier(&quot;icon&quot;, &quot;drawable&quot;, getApplicationInfo().packageName);</span>
+        }
+<span class="nc" id="L139">        NotificationCompat.Builder builder = new NotificationCompat.Builder(this);</span>
+<span class="nc" id="L140">        builder.setContentTitle(title);</span>
+<span class="nc" id="L141">        builder.setContentText(body);</span>
+<span class="nc" id="L142">        builder.setOngoing(true);</span>
+<span class="nc" id="L143">        builder.setSmallIcon(smallIcon);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (channelId != null) {</span>
+            try {
+<span class="nc" id="L146">                builder.getClass().getMethod(&quot;setChannelId&quot;, String.class).invoke(builder, channelId);</span>
+<span class="nc" id="L147">            } catch (Throwable ignore) {</span>
+<span class="nc" id="L148">            }</span>
+        }
+<span class="nc" id="L150">        AndroidImplementation.setNotificationChannel((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE), builder, this);</span>
+<span class="nc" id="L151">        return builder.build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
