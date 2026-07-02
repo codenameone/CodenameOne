@@ -447,6 +447,9 @@ public class ByteCodeClass {
             if(m.isEliminated()) {
                 continue;
             }
+            // late fold-dependency re-scan (see the method's javadoc): must run
+            // now, when all classes are parsed, before the dep list is copied
+            m.updateInlinableFieldDependencies();
 
             for(String s : m.getDependentClasses()) {
                 if(!dependsClassesInterfaces.contains(s)) {

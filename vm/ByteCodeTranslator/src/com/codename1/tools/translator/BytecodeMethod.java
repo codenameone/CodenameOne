@@ -1177,6 +1177,29 @@ public class BytecodeMethod implements SignatureSet {
     public List<String> getDependentClasses() {
         return dependentClasses;
     }
+
+    /**
+     * Late dependency re-scan for the trivial-accessor inlining
+     * (Invoke.asInlinableFieldAccess): the swapped-in GETSTATIC/GETFIELD
+     * references the FIELD's declaring class directly, which can differ from
+     * the invoke's owner (the lazy-holder idiom: Border.getEmpty() reads
+     * Border$EmptyBorderHolder.EMPTY). Instruction addDependencies runs at
+     * PARSE time, when the target class may not be loaded and the fold can't
+     * be resolved -- so, like the @Concrete re-scan, this runs from
+     * ByteCodeClass.updateAllDependencies when every class has been parsed.
+     * Without it the caller's include list misses the field owner's header
+     * and the generated C does not compile.
+     */
+    public void updateInlinableFieldDependencies() {
+        for (Instruction i : instructions) {
+            if (i instanceof Invoke) {
+                Field folded = ((Invoke) i).asInlinableFieldAccess();
+                if (folded != null) {
+                    folded.addDependencies(dependentClasses);
+                }
+            }
+        }
+    }
     
     //public List<String> getExportedClasses() {
     //    return exportedClasses;
