@@ -37,14 +37,14 @@ For example, you can bind an event callback for a https://www.codenameone.com/ja
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-001,indent=0]
 ----
 
 Or thanks to the Java 8 lambdas you can write it as:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-002,indent=0]
 ----
 
 Notice that the click will work whether the button was touched using a mouse, finger or keypad shortcut seamlessly with an action listener. Many components work with action events for example, buttons, text components, slider etc.
@@ -76,7 +76,7 @@ For example, the event dispatch thread allows you to listen to errors on the EDT
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-003,indent=0]
 ----
 
 This will work great but you will still get the default error message from the EDT over that exception. To prevent the event from proceeding to the default error handling you can do this:
@@ -84,7 +84,7 @@ This will work great but you will still get the default error message from the E
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-004,indent=0]
 ----
 
 Notice that you can check if an event was already consumed using the `isConsumed()` method but it's pretty unlikely that you will receive a consumed event as the system will stop sending it.
@@ -95,28 +95,28 @@ https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html[NetworkEv
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-005,indent=0]
 ----
 
 Or with Java 8 lambdas:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-006,indent=0]
 ----
 
 The `NetworkEvent` allows the networking code to reuse the `EventDispatcher` infrastructure and to simplify event firing through the EDT. But you should notice that some code might not be equivalent for example, you could do this to read the input stream:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-007,indent=0]
 ----
 
 Or you can do something similar using this code:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-008,indent=0]
 ----
 
 These seem similar but they have one important distinction. The latter code is invoked on the EDT, so if `data` is big it might slow down processing. The `ConnectionRequest` is invoked on the network thread and so can process any amount of data without slowing down the UI.
@@ -160,7 +160,7 @@ For example, in this code from the `Flickr` demo the https://www.codenameone.com
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-009,indent=0]
 ----
 
 // HTML_ONLY_START
@@ -183,7 +183,7 @@ https://www.codenameone.com/javadoc/com/codename1/ui/events/StyleListener.html[S
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-010,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-010,indent=0]
 ----
 
 This will trigger a style event that will eventually lead to the component being repainted. This is quite important
@@ -201,14 +201,14 @@ For example, if you wish to provide an https://www.codenameone.com/javadoc/com/c
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-011,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-011,indent=0]
 ----
 
 Then when you need to broadcast the event use:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-012,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-012,indent=0]
 ----
 
 
@@ -262,7 +262,7 @@ The pointer events (touch events) can be intercepted by overriding one or more o
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-013,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-013,indent=0]
 ----
 
 Notice that most pointer events have a version that accepts an array as an argument, this allows for multi-touch event handling by sending all the touched coordinates. Desktop and pen-enabled devices can also trigger hover events without a press. To respond to those you can override the `pointerHover*` callbacks on `Form` or `Component`, which are invoked before a button receives focus or a drag begins on those platforms.
@@ -281,7 +281,7 @@ For example, if your component is a painting app where you're trying to draw usi
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-014,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-014,indent=0]
 ----
 
 This indicates that you want all drag events on both AXIS to be sent as soon as possible. Notice that this doesn't disable event sanitation.
@@ -298,5 +298,5 @@ You can use the browser navigation callback to change the UI or even to invoke J
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/events.java[tag=events-java-015,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/events.java.txt[tag=events-java-015,indent=0]
 ----

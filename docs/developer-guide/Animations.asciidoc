@@ -394,7 +394,7 @@ builder:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/animations.java[tag=animations-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/animations.java.txt[tag=animations-java-001,indent=0]
 ----
 
 `snapshotMode(true)` captures each `(source, dest)` pair as a clipped
@@ -423,7 +423,7 @@ That one command will enable swiping back from `currentForm`. https://www.codena
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/animations.java[tag=animations-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/animations.java.txt[tag=animations-java-002,indent=0]
 ----
 
 This effectively allows you to pass a form and create it as necessary (for example, for a GUI builder app you don't

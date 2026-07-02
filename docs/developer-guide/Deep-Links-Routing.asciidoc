@@ -18,14 +18,14 @@ Annotate the target `Form` class:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java[tag=deep-links-routing-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java.txt[tag=deep-links-routing-java-001,indent=0]
 ----
 
 Or annotate a static factory method:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java[tag=deep-links-routing-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java.txt[tag=deep-links-routing-java-002,indent=0]
 ----
 
 Both forms are supported and a project can mix them. Path variables in
@@ -58,7 +58,7 @@ navigation stack, and shows it.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java[tag=deep-links-routing-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java.txt[tag=deep-links-routing-java-003,indent=0]
 ----
 
 The five-method surface (`navigate`, `back`, `getCurrent`, `getStack`,
@@ -91,7 +91,7 @@ without redirects. The plugin's `AasaBuilder` produces the payload:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java[tag=deep-links-routing-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java.txt[tag=deep-links-routing-java-004,indent=0]
 ----
 
 Tell iOS which domains your app claims by setting the
@@ -113,7 +113,7 @@ Host an `assetlinks.json` file at
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java[tag=deep-links-routing-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java.txt[tag=deep-links-routing-java-005,indent=0]
 ----
 
 Tell Android which URLs to intercept by setting the
@@ -152,7 +152,7 @@ attempts so they can confirm before discarding unsaved work:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java[tag=deep-links-routing-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.java.txt[tag=deep-links-routing-java-006,indent=0]
 ----
 
 The guard fires for the toolbar back button, the Android hardware back

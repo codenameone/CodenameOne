@@ -140,6 +140,14 @@ def validate_includes(includes):
                 f"{item['sourceFile']}:{item['line']}: include target not found: {item['target']}"
             )
             continue
+        if (
+            item["target"].startswith("../demos/common/src/main/snippets/developer-guide/")
+            and item["target"].endswith(".java")
+        ):
+            errors.append(
+                f"{item['sourceFile']}:{item['line']}: guide-only snippets must not use .java files: "
+                f"{item['target']}"
+            )
 
         tag_match = TAG_RE.search(item["attrs"])
         if not tag_match:

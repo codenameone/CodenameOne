@@ -18,7 +18,7 @@ The fastest way to know whether the user is on WiFi, what SSID they joined, and 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-001,indent=0]
 ----
 
 Any of these calls may return `null` if the device isn't on WiFi, if the user denied a runtime permission, or if the platform never exposed the value to apps. The framework normalizes the wrapping that Android adds to the SSID and treats `<unknown ssid>` and the obfuscated BSSID `02:00:00:00:00:00` as `null`.
@@ -51,7 +51,7 @@ Scanning returns an array of `WiFiNetwork`s sorted by signal strength. The callb
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-002,indent=0]
 ----
 
 [NOTE]
@@ -67,7 +67,7 @@ To associate the device with a specific SSID:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-003,indent=0]
 ----
 
 * On Android 10+ the OS shows a system confirmation dialog with the SSID before joining; this dialog can't be bypassed.
@@ -88,14 +88,14 @@ On iOS the build pipeline also enables the `NetworkExtension.framework` and the 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-004,indent=0]
 ----
 
 To advertise an HTTP server you wrote on port 8080:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-005,indent=0]
 ----
 
 ==== iOS requirements
@@ -139,14 +139,14 @@ Subscribe to network type transitions (`WiFi <-> Cellular <-> Ethernet <-> None`
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-006,indent=0]
 ----
 
 The current snapshot is available without subscribing:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-007,indent=0]
 ----
 
 The platform implementations are:
@@ -163,7 +163,7 @@ WiFi Direct lets two devices form a peer-to-peer link without an access point. T
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-008,indent=0]
 ----
 
 The build pipeline injects `CHANGE_WIFI_STATE`, `ACCESS_WIFI_STATE`, `ACCESS_NETWORK_STATE`, `ACCESS_FINE_LOCATION` and `NEARBY_WIFI_DEVICES` automatically when `WiFiDirect` is on the classpath, plus a `<uses-feature android:name="android.hardware.wifi.direct"/>` declaration so devices without the radio can still install the app via Play Store filtering.
@@ -174,7 +174,7 @@ The USB API in `com.codename1.io.usb` lets the device act as a USB host and talk
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java[tag=network-connectivity-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/network-connectivity.java.txt[tag=network-connectivity-java-009,indent=0]
 ----
 
 The build pipeline injects:

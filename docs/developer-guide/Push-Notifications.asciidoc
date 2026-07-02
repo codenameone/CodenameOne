@@ -22,7 +22,7 @@ Enabling push support in your application is a matter of implementing the `PushC
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-001,indent=0]
 ----
 
 
@@ -73,7 +73,7 @@ Example:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-002,indent=0]
 ----
 
 **How it works:**
@@ -106,7 +106,7 @@ Assuming your `push()` method looks like:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-003,indent=0]
 ----
 
 You should see the following output in your console:
@@ -289,7 +289,7 @@ To avoid hand-coding this XML you can use the `com.codename1.push.PushBuilder` h
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-004,indent=0]
 ----
 
 You can then send `payload` as the message body with `pushType` as the type through the REST API, the `Push` helper, or any of the other examples below.
@@ -313,7 +313,7 @@ You can access more information about the push content using the `com.codename1.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-005,indent=0]
 ----
 
 WARNING: Make sure to call `PushContent.get()` *once* inside your `push()` callback, and store the return value. `PushContent.get()` works like a queue of size=1, and it pops off the item from the front of the queue when it's called. If you call it twice, the second time will return `null`.
@@ -338,7 +338,7 @@ For example:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-006,indent=0]
 ----
 
 In the above example, you create a single category, "invite" that has actions "yes," "no," "maybe," and a "reply" action that prompts the user for text input. A text-input action is enabled by providing either a placeholder, button text, or both when constructing the `PushAction`.
@@ -372,7 +372,7 @@ For example:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-007,indent=0]
 ----
 
 === Deploying Push-Enabled apps to device
@@ -529,7 +529,7 @@ You can send a push message in many ways for example: from another device or any
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-008,indent=0]
 -----
 
 The push token is a unique "key" that you can use to send push through your Codename One account. It allows you to send push messages without placing your Codename One email or password into your source files.
@@ -545,7 +545,7 @@ The instructions for extracting the API key for Google are <<push-bureaucracy-an
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-009,indent=0]
 -----
 
 Historical UWP push credentials (SID/client secret) were used by the discontinued UWP target, which was removed in release 7.0.229.
@@ -559,7 +559,7 @@ This allows you to debug the push related functionality without risking the poss
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-010,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-010,indent=0]
 -----
 
 iOS needs a certificate to send a push, this allows you to prove to Apples push servers that you're who you claim to be (the author of the app).
@@ -570,7 +570,7 @@ You can get these two certificates (for development/App Store) through the certi
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-011,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-011,indent=0]
 -----
 
 ==== Sending a push message from Codename One
@@ -583,14 +583,14 @@ To send a message to another device use:
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-012,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-012,indent=0]
 -----
 
 The "builder" style API used in the above sample was added post Codename One 3.6 to ease the addition of new Push services. If you're building against Codename one 3.6 or earlier, you should use the static `Push.sendPushMessage()` instead as shown below:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-013,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-013,indent=0]
 ----
 
 This will send the push message "Hello World" to the device with the key `deviceKey`. The `1` argument represents the standard push message type, which you discussed <<push-message-types-section,earlier>>.
@@ -614,7 +614,7 @@ You can thus send a push from Java EE using code like this:
 
 [source,java]
 -----
-include::../demos/common/src/main/snippets/developer-guide/push-notifications.java[tag=push-notifications-java-014,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.java.txt[tag=push-notifications-java-014,indent=0]
 -----
 
 Notice that you can send a push to 500 devices. To send in larger batches you need to split the push requests into 500 device batches.

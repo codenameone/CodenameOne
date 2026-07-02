@@ -35,21 +35,21 @@ There are two simple methods in the `Util` class:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-001,indent=0]
 ----
 
 They use a simple xor based obfuscation to make a String less readable. For example, if you've code like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-002,indent=0]
 ----
 
 You might be concerned about the secret, then this would make it slightly harder to find out:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-003,indent=0]
 ----
 
 Notice that this **isn't secure**, if you have a crucial value that must not be found you need to store it in the server. No alternative exists because everything that's sent to the client can be compromised by a determined hacker.
@@ -60,7 +60,7 @@ Codename One's built-in user-specific constants are obfuscated with this method.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-004,indent=0]
 ----
 
 This allows you to type in the first text field and the second text area shows the encoded result. A text area is used so copy/paste is easy.
@@ -78,7 +78,7 @@ This is available by installing the bouncy castle cn1lib from the extensions men
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-005,indent=0]
 ----
 
 TIP: You would want that code within your `init(Object)` method
@@ -92,14 +92,14 @@ This works through a new mechanism in storage where you can replace the storage 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-006,indent=0]
 ----
 
 You can leverage that knowledge to change the encryption password on the encryption storage using pseudo-code like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-007,indent=0]
 ----
 
 NOTE: It isn't a good idea to replace storage objects when an app is running so this is purely for this special case...
@@ -118,7 +118,7 @@ Some values are too sensitive for `Storage` or `Preferences`, which are plaintex
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-008,indent=0]
 ----
 
 On a platform without a keychain the base implementation returns `false` / `null`, so treat a `null` read as "not available" and fall back accordingly.
@@ -129,7 +129,7 @@ Baking an API key (for example a Google Maps key) into your app is unsafe: anyon
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-009,indent=0]
 ----
 
 `get` returns the keychain-cached value when present, otherwise it fetches from the vault over TLS, caches it, and returns it. `refresh(name)` forces a fresh fetch (after you rotate the value server-side) and `clear(name)` drops the cached copy.
@@ -163,14 +163,14 @@ To block copy & paste globally use:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-010,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-010,indent=0]
 ----
 
 To block copy & paste on a specific field do:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-011,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-011,indent=0]
 ----
 
 NOTE: Notice that the inverse of using `false` might not work as expected
@@ -185,7 +185,7 @@ For obvious reasons it's hard to accurately detect a jailbroken or rooted device
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-012,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-012,indent=0]
 ----
 
 Notice that this isn't right, you can't be 100% sure as there are no official ways to detect jailbreak. That's why it's crucial to encrypt everything and assume the device was compromised to begin with when dealing with sensitive data. Still it's worthwhile to use these APIs to make the life of an attacker a little bit harder.
@@ -208,7 +208,7 @@ When you'd rather respond in-app than be hard-killed -- for example to block onl
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-013,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-013,indent=0]
 ----
 
 `isDeviceCompromised()` aggregates the same root/jailbreak/Frida signals as the launch gates plus emulator heuristics, but never terminates the app. On the simulator and unsupported ports it simply returns `false`.
@@ -228,7 +228,7 @@ The runtime API is identical on both platforms -- request a token bound to a fre
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-014,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-014,indent=0]
 ----
 
 `DeviceIntegrity.isAttestationSupported()` reports whether attestation is available and was bundled into this build. On the simulator, on unsupported ports, or when the build hint is off, `requestIntegrityToken()` completes with an error rather than throwing.
@@ -248,14 +248,14 @@ At runtime you get the same information for granular control:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-015,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-015,indent=0]
 ----
 
 For the screens that actually matter (PIN entry, transfer confirmation), mark them secure so the OS blocks screenshots, screen recording, and accessibility screen scraping while they're displayed:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-016,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-016,indent=0]
 ----
 
 NOTE: Accessibility-service enumeration and `setSecureScreen()` are Android concepts; on iOS they're no-ops (iOS has no equivalent third-party accessibility-service threat model). Use `ios.disableScreenshots=true` to block screen capture on iOS as described in <<Disabling screenshots>>.
@@ -314,7 +314,7 @@ To do this you have a https://github.com/codenameone/SSLCertificateFingerprint/[
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-017,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-017,indent=0]
 ----
 
 Notice that once connection is established you don't need to verify again for the current application run.
@@ -339,7 +339,7 @@ NOTE: Cryptographic operations only throw `com.codename1.security.CryptoExceptio
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-018,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-018,indent=0]
 ----
 
 The algorithm identifier strings (`Hash.MD5`, `Hash.SHA256`, etc.) are also accepted with or without dashes and in any case (`"sha256"` and `"SHA-256"` are equivalent).
@@ -350,7 +350,7 @@ The algorithm identifier strings (`Hash.MD5`, `Hash.SHA256`, etc.) are also acce
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-019,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-019,indent=0]
 ----
 
 When comparing authentication tags, use `Hmac.constantTimeEquals(a, b)` instead of `Arrays.equals(a, b)` -- the latter short-circuits on the first mismatch and is vulnerable to timing attacks.
@@ -361,7 +361,7 @@ When comparing authentication tags, use `Hmac.constantTimeEquals(a, b)` instead 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-020,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-020,indent=0]
 ----
 
 ==== Symmetric encryption (AES)
@@ -370,7 +370,7 @@ include::../demos/common/src/main/snippets/developer-guide/security.java[tag=sec
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-021,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-021,indent=0]
 ----
 
 The `Cipher` class exposes the standard JCE-style transformation strings as constants: `Cipher.AES_GCM`, `Cipher.AES_CBC_PKCS5`, `Cipher.AES_CBC`, and `Cipher.AES_ECB_PKCS5`. For GCM, the 16-byte authentication tag is appended to the ciphertext (matching the JCE convention). ECB is exposed only for interop with legacy systems -- it leaks structure and should never be used for new designs.
@@ -381,14 +381,14 @@ The `Cipher` class exposes the standard JCE-style transformation strings as cons
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-022,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-022,indent=0]
 ----
 
 To use a key that was generated outside the app, feed the DER bytes to the static factory methods:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-023,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-023,indent=0]
 ----
 
 The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WITH_RSA`, `SHA384_WITH_RSA`, `SHA512_WITH_RSA`, `SHA256_WITH_ECDSA`, `SHA384_WITH_ECDSA`, and `SHA512_WITH_ECDSA`.
@@ -399,14 +399,14 @@ The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WI
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-024,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-024,indent=0]
 ----
 
 For RSA-signed tokens (RS256/384/512) and ECDSA-signed tokens (ES256/384/512), pass the key to the dynamic overloads:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-025,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-025,indent=0]
 ----
 
 WARNING: `Jwt.parse(token)` doesn't verify the signature -- you must call one of the `verify*` methods afterwards. Tokens with an `alg` header of `none` are rejected by `verify` unless you explicitly call `setVerifyAllowNoneAlgorithm(true)` on the parsed JWT. Accepting unsigned tokens is a critical security bug in almost every deployment, so leave it off unless you have decided that the transport is trusted.
@@ -419,14 +419,14 @@ Shared secrets are commonly distributed as Base32 strings (the format embedded i
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-026,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-026,indent=0]
 ----
 
 For HOTP, supply the counter explicitly and increment it after every successful authentication:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-027,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-027,indent=0]
 ----
 
 ==== Walkthrough: Adding two-factor authentication to a sign-in flow
@@ -442,7 +442,7 @@ The TOTP secret should be generated and stored on your *server*, not on the Code
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-028,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-028,indent=0]
 ----
 
 [NOTE]
@@ -462,7 +462,7 @@ The maximum-compatibility settings -- 6 digits, 30 second step, SHA-1 -- are the
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-029,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-029,indent=0]
 ----
 
 *Server-side verification.* When your backend does the verification, the corresponding Java looks the same -- `Otp.verifyTotp(storedSecret, codeFromClient, 1)`. Make sure you rate-limit verification attempts (for example, lock the account after 5 wrong codes within a minute) and log failures, since the 6-digit search space is small enough to be brute-forced without that.
@@ -473,7 +473,7 @@ include::../demos/common/src/main/snippets/developer-guide/security.java[tag=sec
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/security.java[tag=security-java-030,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/security.java.txt[tag=security-java-030,indent=0]
 ----
 
 Style the boxes through the UIIDs `OtpField` (the container) and `OtpDigit` (each box). The component supports alphanumeric input via the two-argument constructor (`new OtpField(8, false)`), and pasting a full code into any one box distributes the characters across the remaining boxes automatically.

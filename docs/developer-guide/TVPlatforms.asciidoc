@@ -30,7 +30,7 @@ TV at runtime. This is the living-room analog of the existing `isTablet()`,
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/tvplatforms.java[tag=tvplatforms-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/tvplatforms.java.txt[tag=tvplatforms-java-001,indent=0]
 ----
 
 Codename One's existing D-pad/arrow focus traversal (the same mechanism that

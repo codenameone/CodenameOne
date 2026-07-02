@@ -226,7 +226,7 @@ is registered as solid. Applications add their own without changing the level fo
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-assets.java[tag=game-assets-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/game-assets.java.txt[tag=game-assets-java-001,indent=0]
 ----
 
 Unknown ids resolve to a neutral gray placeholder, so a level that references a

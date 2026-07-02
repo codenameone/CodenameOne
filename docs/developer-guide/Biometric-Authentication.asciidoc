@@ -8,7 +8,7 @@ A sibling `SecureStorage` API stores secret strings (auth tokens, refresh tokens
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java[tag=biometric-authentication-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java.txt[tag=biometric-authentication-java-001,indent=0]
 ----
 
 Always gate the call on `canAuthenticate()` and never on `isSupported()` alone. `isSupported()` only checks for hardware, while `canAuthenticate()` also requires at least one enrolled credential and that the device isn't in a locked-out state.
@@ -17,7 +17,7 @@ Always gate the call on `canAuthenticate()` and never on `isSupported()` alone. 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java[tag=biometric-authentication-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java.txt[tag=biometric-authentication-java-002,indent=0]
 ----
 
 Entries are bound to the current set of enrolled biometrics. If the user enrols a new fingerprint or face after writing, the next `get` fails with `BiometricError.KEY_REVOKED` and the application must re-prompt for the original value and write it again.
@@ -63,7 +63,7 @@ include::../demos/common/src/main/snippets/developer-guide/biometric-authenticat
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java[tag=biometric-authentication-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java.txt[tag=biometric-authentication-java-003,indent=0]
 ----
 
 The Team ID prefix is required; omitting it produces `errSecMissingEntitlement`.
@@ -74,7 +74,7 @@ Use `AuthenticationOptions` to control prompt copy and security policy:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java[tag=biometric-authentication-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/biometric-authentication.java.txt[tag=biometric-authentication-java-004,indent=0]
 ----
 
 Unrecognised options are ignored, so callers can set the union without platform-checking.

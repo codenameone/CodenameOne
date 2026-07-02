@@ -76,14 +76,14 @@ The `@GrpcClient` interface looks like:
 
 [source, java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-grpc.java[tag=appendix-goal-generate-grpc-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-grpc.java.txt[tag=appendix-goal-generate-grpc-java-001,indent=0]
 ----
 
 Call sites use the static factory:
 
 [source, java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-grpc.java[tag=appendix-goal-generate-grpc-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-grpc.java.txt[tag=appendix-goal-generate-grpc-java-002,indent=0]
 ----
 
 The `<Service>GrpcImpl` class that actually performs the gRPC-Web

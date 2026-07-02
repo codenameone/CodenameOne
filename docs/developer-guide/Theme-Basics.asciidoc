@@ -23,14 +23,14 @@ You can also add many resource files to a project and work with them. In code, i
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/theme-basics.java[tag=theme-basics-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/theme-basics.java.txt[tag=theme-basics-java-001,indent=0]
 ----
 
 The `initFirstTheme` method is a helper method that hides some `try`/`catch` logic and some verbosity. It could be expressed as:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/theme-basics.java[tag=theme-basics-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/theme-basics.java.txt[tag=theme-basics-java-002,indent=0]
 ----
 
 === Customizing your theme
@@ -379,7 +379,7 @@ For example: Lets say you created a component that's supposed to look like a tit
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/theme-basics.java[tag=theme-basics-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/theme-basics.java.txt[tag=theme-basics-java-003,indent=0]
 ----
 
 However, title might sometimes be aligned to the left (based on theme) and you always want your component to be center aligned. For example, you don't want that to affect the actual titles in the app...
@@ -433,7 +433,7 @@ You can load a truetype font from code using:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/theme-basics.java[tag=theme-basics-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/theme-basics.java.txt[tag=theme-basics-java-004,indent=0]
 ----
 
 Notice that, in code, pixel sizes are supported, so it’s up to you to decide how to convert that. Recommend using millimeters with the `convertToPixels` method. You also need to derive the font with the proper size, unless you want a 0 sized font which isn't useful.
@@ -446,7 +446,7 @@ The code below demonstrates all the major fonts available in Codename One with t
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/theme-basics.java[tag=theme-basics-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/theme-basics.java.txt[tag=theme-basics-java-005,indent=0]
 ----
 
 .The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC

@@ -74,7 +74,7 @@ emitted method shape:
 
 [source, java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.java[tag=appendix-goal-generate-openapi-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.java.txt[tag=appendix-goal-generate-openapi-java-001,indent=0]
 ----
 
 Model types are emitted as fully qualified names (the API interface
@@ -86,7 +86,7 @@ Call sites use the static factory:
 
 [source, java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.java[tag=appendix-goal-generate-openapi-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.java.txt[tag=appendix-goal-generate-openapi-java-002,indent=0]
 ----
 
 The `<Tag>ApiImpl` class that actually performs the HTTP call lives

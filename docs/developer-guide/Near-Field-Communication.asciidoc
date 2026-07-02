@@ -8,7 +8,7 @@ A single entry point exposes the platform NFC controller, a typed enum reports t
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java[tag=near-field-communication-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java.txt[tag=near-field-communication-java-001,indent=0]
 ----
 
 `setNdefOnly(true)` picks the fastest iOS Core NFC session (`NFCNDEFReaderSession`) and matches the most common tag layout. For mixed payloads use `readTag(...)` and inspect `tag.getTypes()`.
@@ -17,7 +17,7 @@ include::../demos/common/src/main/snippets/developer-guide/near-field-communicat
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java[tag=near-field-communication-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java.txt[tag=near-field-communication-java-002,indent=0]
 ----
 
 NDEF records carry one of the well-known types (`T`, `U`, `Sp`), a MIME media type, an absolute URI, or an external `domain:type`. Use the factory methods on `NdefRecord` rather than constructing raw byte arrays:
@@ -38,7 +38,7 @@ Beyond NDEF, the discovered `Tag` exposes accessors for the underlying technolog
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java[tag=near-field-communication-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java.txt[tag=near-field-communication-java-003,indent=0]
 ----
 
 Each accessor returns `null` when the tag doesn't advertise the corresponding technology, so always null-check before calling.
@@ -59,7 +59,7 @@ For FeliCa on iOS, set the system codes in `NfcReadOptions`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java[tag=near-field-communication-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java.txt[tag=near-field-communication-java-004,indent=0]
 ----
 
 The Codename One Maven plugin and build daemon automatically register `com.apple.developer.nfc.readersession.felica.systemcodes` from these values.
@@ -70,7 +70,7 @@ Host Card Emulation (HCE) lets the device pretend to be a contactless smart card
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java[tag=near-field-communication-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/near-field-communication.java.txt[tag=near-field-communication-java-005,indent=0]
 ----
 
 Set the AIDs as a build hint so they appear in the platform routing tables:

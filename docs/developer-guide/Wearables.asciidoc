@@ -31,7 +31,7 @@ and `isDesktop()` checks:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/wearables.java[tag=wearables-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/wearables.java.txt[tag=wearables-java-001,indent=0]
 ----
 
 On Android `isWatch()` is derived from `PackageManager.FEATURE_WATCH`

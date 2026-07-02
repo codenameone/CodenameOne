@@ -45,7 +45,7 @@ In Java, publish the user's cards whenever they change (typically after login) a
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.java[tag=apple-wallet-extension-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.java.txt[tag=apple-wallet-extension-java-001,indent=0]
 ----
 
 Call `WalletExtension.clear()` on logout. The card art must be a PNG without personally identifiable information (Apple requires square corners and no full card number). The extension automatically filters out cards that are already provisioned on the device or the paired watch.

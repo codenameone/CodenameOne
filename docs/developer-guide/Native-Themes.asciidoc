@@ -340,7 +340,7 @@ A/B tests - push the same constants through
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/native-themes.java[tag=native-themes-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/native-themes.java.txt[tag=native-themes-java-001,indent=0]
 ----
 
 Values can be passed with or without the leading `#` and in any

@@ -83,5 +83,5 @@ To handle the dealing an action listener is added to the deck button, this actio
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/casual-game-programming.java[tag=casual-game-programming-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/casual-game-programming.java.txt[tag=casual-game-programming-java-001,indent=0]
 ----

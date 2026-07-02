@@ -10,7 +10,7 @@ The simplest usage is a single call at a moment that makes sense in your app -- 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/app-review.java[tag=app-review-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/app-review.java.txt[tag=app-review-java-001,indent=0]
 ----
 
 `requestReview()` shows the native review sheet when the platform supports it. On platforms without a native prompt it shows the built-in rating widget instead. You decide the timing.
@@ -21,7 +21,7 @@ Rather than picking the moment yourself, you can let `AppReview` decide based on
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/app-review.java[tag=app-review-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/app-review.java.txt[tag=app-review-java-002,indent=0]
 ----
 
 `registerSession()` records the launch and, once the thresholds are met and the user hasn't already rated or opted out, prompts. The bookkeeping (launch count, install date, last-prompt time and a completion flag) is stored in https://www.codenameone.com/javadoc/com/codename1/io/Preferences.html[Preferences] so it survives restarts. Once the user rates the app or chooses to stop, `AppReview` stops prompting. Call `reset()` to clear this state.
@@ -39,7 +39,7 @@ By default the low-rating feedback is collected through an e-mail to the address
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/app-review.java[tag=app-review-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/app-review.java.txt[tag=app-review-java-003,indent=0]
 ----
 
 === How the platform decides

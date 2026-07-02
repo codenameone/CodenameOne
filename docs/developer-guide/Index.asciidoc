@@ -294,7 +294,7 @@ After clicking finish in the new project wizard you have a `HelloWorld` project 
 
 [source,java,title='HelloWorld Class']
 ----
-include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/index.java.txt[tag=index-java-001,indent=0]
 ----
 
 <1> This is the main class, it's the entry point to the app, notice it doesn't have a `main` method but rather callback which this guide covers soon
@@ -307,7 +307,7 @@ Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecy
 
 [source,java,title='HelloWorld init(Object)']
 ----
-include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/index.java.txt[tag=index-java-002,indent=0]
 ----
 
 <1> `init` is the first of the four lifecycle methods. It's responsible for initialization of variables and values
@@ -336,7 +336,7 @@ In a cold start `init(Object)` is invoked followed by the `start()` method. For 
 
 [source,java,title='HelloWorld start()']
 ----
-include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/index.java.txt[tag=index-java-003,indent=0]
 ----
 
 <1> If the app was minimized you don't want to do much, show the last `Form` of the application
@@ -388,7 +388,7 @@ Now that you have a general sense of the lifecycle lets look at the last two lif
 
 [source,java,title='HelloWorld stop() and destroy()']
 ----
-include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/index.java.txt[tag=index-java-004,indent=0]
 ----
 
 <1> `stop()` is invoked when the app is minimized or a different app is opened
@@ -550,7 +550,7 @@ The hello world Java source file looks like this (removed some comments and whit
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/index.java[tag=index-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/index.java.txt[tag=index-java-005,indent=0]
 ----
 
 When you select that file and select the menu option #Code# -> #Convert Java file to Kotlin File# you should get this:

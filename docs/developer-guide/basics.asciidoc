@@ -57,7 +57,7 @@ and `setSameHeight` methods, for example:
 
 [source,java,title="setSameWidth/Height"]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-001,indent=0]
 ----
 
 Codename One has a `setPreferredSize` method that lets developers explicitly request a component size. But, that caused many problems. For example, preferred size should change with device orientation or similar operations. The API also encouraged accidental hardcoding of UI values such as forcing pixel sizes. As a result, the method was deprecated.
@@ -107,14 +107,14 @@ When you add a `Component` to a `Container` with a regular layout you do so with
 
 [source,java,title='Adding to a Regular Container']
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-002,indent=0]
 ----
 
 This works great for regular layouts but might not for constraint based layouts. A constraint based layout accepts another argument. For example: `BorderLayout` needs a location for the `Component`:
 
 [source,java,title='Adding to a Regular Container']
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-003,indent=0]
 ----
 
 This line assumes you have an `import static com.codename1.ui.CN.*;` in the top of the file. In `BorderLayout` (which is a constraint based layout) placing an item in the `NORTH` places it in the top of the `Container`.
@@ -127,7 +127,7 @@ The `CN` class is a thin wrapper around features in `Display`, `NetworkManager`,
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-004,indent=0]
 ----
 
 TIP: That's optional, if you don't like static imports you can just write `CN.` for every element
@@ -136,35 +136,35 @@ From that point on you can write code that looks like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-005,indent=0]
 ----
 
 Instead of:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-006,indent=0]
 ----
 
 The same applies for most network manager calls e.g.:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-007,indent=0]
 ----
 
 Instead of:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-008,indent=0]
 ----
 
 Some things were changed so you won't have too many conflicts for example, `Log.p` or `Log.e` would have been problematic so you now have:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-009,indent=0]
 ----
 
 Instead of `Display.getInstance().getCurrent()` you now have `getCurrentForm()` since `getCurrent()` is too generic. For most methods you should just be able to remove the `NetworkManager` or `Display` access and it should "just work."
@@ -184,7 +184,7 @@ Almost every layout allows you to `add` a component using many variants of the a
 
 [source,java,title='Versions of add']
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-010,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-010,indent=0]
 ----
 
 <1> Regular add
@@ -197,7 +197,7 @@ In the race to make code "`tighter`" you can make this even shorter. Most layout
 
 [source,java,title='Terse Syntax']
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-011,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-011,indent=0]
 ----
 
 <1> Most layouts have a version of enclose to encapsulate components within (((Encapsulate)))
@@ -216,14 +216,14 @@ link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.htm
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-012,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-012,indent=0]
 ----
 
 Flow layout also supports terse syntax shorthand such as:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-013,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-013,indent=0]
 ----
 
 Flow layout can be aligned to the left (the default), to the <<flow-layout-center,center>>, or to the <<flow-layout-right,right>>. It can also be vertically aligned to the top (the default), <<flow-layout-center-middle,middle (center)>>, or bottom.
@@ -252,7 +252,7 @@ You can create a box layout Y using something like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-014,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-014,indent=0]
 ----
 
 Which results in <<box-layout-y,this>>
@@ -265,7 +265,7 @@ Box layout also supports a shorter terse notation which you use here to <<box-la
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-015,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-015,indent=0]
 ----
 
 [[box-layout-x]]
@@ -295,7 +295,7 @@ link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.h
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-016,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-016,indent=0]
 ----
 
 .The Constraints are Included in the `CN` class
@@ -307,7 +307,7 @@ For example:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-017,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-017,indent=0]
 ----
 
 Results in:
@@ -348,7 +348,7 @@ added turning the grid to a 3×2 grid implicitly and leaving one blank cell:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-018,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-018,indent=0]
 ----
 
 .Grid Layout 2×2
@@ -371,7 +371,7 @@ of the same code in two orientations:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-019,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-019,indent=0]
 ----
 
 .Grid Layout autofit portrait
@@ -395,7 +395,7 @@ WARNING: Unlike `GridLayout` `TableLayout` won't implicitly add a row if the row
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-020,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-020,indent=0]
 ----
 
 .2×2 TableLayout with 5 elements, notice that the last element is missing
@@ -407,7 +407,7 @@ The default usage of the `encloseIn` method below uses the `setGrowHorizontally`
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-021,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-021,indent=0]
 ----
 
 .`TableLayout.encloseIn()` with default behavior of growing the last column
@@ -442,7 +442,7 @@ The <<table-layout-constraint-sample,table layout constraint sample>> tries to s
 [[table-layout-constraint-sample]]
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-022,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-022,indent=0]
 ----
 
 <1> You need the `TableLayout` instance to create constraints. A constraint must be created for every component and must be used with the same layout as the parent container
@@ -458,7 +458,7 @@ Here is the full code mentioned in item 3:
 [[full-code-tablelayout-constraint]]
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-023,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-023,indent=0]
 ----
 
 [[table-layout-constraints]]
@@ -473,7 +473,7 @@ For example: this is a sample usage of `TextModeLayout`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-024,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-024,indent=0]
 ----
 
 .TextModeLayout on iOS
@@ -505,7 +505,7 @@ The code to generate this UI is slightly complex and contains few relevant piece
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-025,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-025,indent=0]
 ----
 
 You're doing three distinct things here:
@@ -520,7 +520,7 @@ This is the full source of the example for completeness:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-026,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-026,indent=0]
 ----
 
 Forms have a built in layered layout that you can access through `getLayeredPane()`, this allows you to overlay elements on top of the content pane.
@@ -538,7 +538,7 @@ As an example, suppose you wanted to position a button in the lower right corner
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-027,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-027,indent=0]
 ----
 
 The result is:
@@ -549,7 +549,7 @@ The thing new here is this line:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-028,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-028,indent=0]
 ----
 
 This is called after `btn` has already been added to the container. It says that you want its insets to be "auto" on the top and left, and `0` on the right and bottom. This *insets* string follows the CSS notation of `top right bottom left` (that's: start on top and go clockwise), and the values of each inset may be provided in pixels (px), millimetres (mm), percent (%), or the special "auto" value. Like CSS, you can also specify the insets using a 1, 2, or 3 values. For example:
@@ -569,7 +569,7 @@ If one inset is fixed (that's: defined in px, mm, or %), and the opposite inset 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-029,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-029,indent=0]
 ----
 
 Resulting in:
@@ -581,7 +581,7 @@ Move it to the right edge with:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-030,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-030,indent=0]
 ----
 
 ===== `%` insets
@@ -612,7 +612,7 @@ For example, suppose you want to place a text field in the center of the form (b
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-031,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-031,indent=0]
 ----
 
 This would result in:
@@ -624,7 +624,7 @@ The two active lines here are the last two:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-032,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-032,indent=0]
 ----
 <1> Sets the left inset on `btn` to 0.
 <2> Links `btn`'s left inset to `tf` so that it's measured from the text field. The third parameter (`1.0`) is the reference position. This will either be `0` (meaning the reference point is the left edge of the text field), or `1` (meaning the reference point is the right edge of the text field). In this case you set a reference position of `1.0` because you want the button to be aligned to the text field's right edge.
@@ -673,7 +673,7 @@ To show `GridBagLayout` you ported http://docs.oracle.com/Java SE/tutorial/uiswi
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-033,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-033,indent=0]
 ----
 
 Notice that because of the way gridbag works you didn't provide any terse syntax API for it although it should be possible.
@@ -693,7 +693,7 @@ Unlike any other layout manager `GroupLayout` adds the components into the conta
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-034,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-034,indent=0]
 ----
 
 .GroupLayout Matisse generated UI running in Codename One
@@ -716,7 +716,7 @@ The best reference for MiG would probably be its http://www.miglayout.com/QuickS
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-035,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-035,indent=0]
 ----
 
 .MiG layout sample ported to Codename One
@@ -743,7 +743,7 @@ For example: see this code where:
 
 [source,java,title='setUIID on TextField']
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-036,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-036,indent=0]
 ----
 
 This is a text field component (user input field) but it will look like a `Label`.
@@ -754,7 +754,7 @@ The UIID's translate the theme elements into a set of `Style` objects. These `St
 
 [source,java,title='setUIID on TextField']
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-037,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-037,indent=0]
 ----
 
 The color is in hexadecimal `RRGGBB` format so `0xff00` would be green and `0xff0000` would be red.
@@ -788,7 +788,7 @@ You load the theme file using this line of code in the `init(Object)` method in 
 
 [source,java,title='Theme Loading Code']
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-038,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-038,indent=0]
 ----
 
 In a CSS project this file is generated automatically from the stylesheet. Legacy applications that still edit the resource file by hand can continue to do so, but new projects should prefer the CSS workflow described below.
@@ -912,7 +912,7 @@ Once an event is bound the IDE will open to the event code for example:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-039,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-039,indent=0]
 ----
 
 TIP: Some IDEs generate the project source code after you explicitly build the project so if your code needs to access variables etc. try building first
@@ -922,7 +922,7 @@ UI is represented as:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-040,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-040,indent=0]
 ----
 
 ===== Underlying XML
@@ -946,7 +946,7 @@ This format is simple. The file triggers the following Java source file:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/basics.java[tag=basics-java-041,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/basics.java.txt[tag=basics-java-041,indent=0]
 ----
 
 WARNING: Don't touch the code within the don't EDIT comments...

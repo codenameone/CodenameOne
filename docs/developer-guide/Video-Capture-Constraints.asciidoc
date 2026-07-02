@@ -16,14 +16,14 @@ Suppose you want to allow the user to capture a short (5 second) clip, in a low 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java[tag=video-capture-constraints-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java.txt[tag=video-capture-constraints-java-001,indent=0]
 ----
 
 This constraint can then be passed to `Capture.captureVideo()` to get the captured file:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java[tag=video-capture-constraints-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java.txt[tag=video-capture-constraints-java-002,indent=0]
 ----
 
 === Not all platforms support all constraints
@@ -34,7 +34,7 @@ For example:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java[tag=video-capture-constraints-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java.txt[tag=video-capture-constraints-java-003,indent=0]
 ----
 
 You can probe a constraint to see whether the entire constraint is supported (i.e will be obeyed), or whether any particular aspect of it will be supported using the following methods:
@@ -51,7 +51,7 @@ Suppose you want to capture a video with resolution 320×240. You would begin wi
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java[tag=video-capture-constraints-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java.txt[tag=video-capture-constraints-java-004,indent=0]
 ----
 
 Explicit width and height constraints aren't well supported across platforms. Android doesn't support them at all. iOS supports 3 specific sizes. JavaScript supports it when running on a desktop browser or on Android - but not on iOS. Etc.
@@ -60,7 +60,7 @@ Find out if this constraint will be obeyed:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java[tag=video-capture-constraints-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/video-capture-constraints.java.txt[tag=video-capture-constraints-java-005,indent=0]
 ----
 
 === Constraint support by platform

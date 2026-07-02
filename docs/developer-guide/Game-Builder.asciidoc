@@ -62,7 +62,7 @@ Loading and playing a level at runtime is three lines:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-builder.java[tag=game-builder-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/game-builder.java.txt[tag=game-builder-java-001,indent=0]
 ----
 
 === Getting started
@@ -185,7 +185,7 @@ the editor:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-builder.java[tag=game-builder-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/game-builder.java.txt[tag=game-builder-java-002,indent=0]
 ----
 
 Win/lose conditions, scoring, enemy AI and level transitions (using a door's `target`)
@@ -246,7 +246,7 @@ companion `<Scene>.java`. To show the scene in your app, instantiate the compani
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-builder.java[tag=game-builder-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/game-builder.java.txt[tag=game-builder-java-003,indent=0]
 ----
 
 The level is plain data, so you can ship many `.game` files and load whichever level the

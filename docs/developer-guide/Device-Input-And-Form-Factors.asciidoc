@@ -26,7 +26,7 @@ Any pointer listener receives an `ActionEvent`; call `getPointerEvent()` on it:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-001,indent=0]
 ----
 
 ==== By polling
@@ -36,7 +36,7 @@ When you're inside a pointer callback you can also poll the current values direc
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-002,indent=0]
 ----
 
 TIP: Values have safe defaults. On a plain touch screen the button is `BUTTON_PRIMARY`, the pressure
@@ -58,7 +58,7 @@ handles desktop and touch:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-003,indent=0]
 ----
 
 === Mouse wheel and trackpad scrolling
@@ -71,7 +71,7 @@ consuming it prevents the default scroll.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-004,indent=0]
 ----
 
 A positive `getDeltaY()` reveals content above (the user scrolled down); a positive `getDeltaX()`
@@ -104,7 +104,7 @@ gesture, so it also arrives through the universal wheel API. Handle that case wi
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-005,indent=0]
 ----
 
 === Stylus and pen support
@@ -121,7 +121,7 @@ pointer is a stylus or eraser:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-006,indent=0]
 ----
 
 Pen hover (the pen moving above the screen without touching, available on devices such as the S-Pen
@@ -141,7 +141,7 @@ https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DeviceP
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-007,indent=0]
 ----
 
 * `getPosture()` - `POSTURE_FLAT`, `POSTURE_HALF_OPENED`, `POSTURE_CLOSED` or `POSTURE_UNKNOWN`.
@@ -155,7 +155,7 @@ React to fold changes with a posture listener:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java[tag=device-input-and-form-factors-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/device-input-and-form-factors.java.txt[tag=device-input-and-form-factors-java-008,indent=0]
 ----
 
 To exercise this in the desktop simulator, use the *Simulate -> Foldable* menu: enable foldable

@@ -13,7 +13,7 @@ You can visualize the EDT as a loop such as this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-001,indent=0]
 ----
 
 Normally, every call you receive from Codename One will occur on the EDT. For example, every event, calls to paint(), and lifecycle calls (start etc.) should all occur on the EDT.
@@ -41,14 +41,14 @@ IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` m
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-002,indent=0]
 ----
 
 TIP: You can write this code more concisely using Java 8 lambda code as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-003,indent=0]
 ----
 
 This allows code to leave the EDT and then later on return to it to perform things within the EDT.
@@ -57,7 +57,7 @@ The `callSeriallyAndWait(Runnable)` method blocks the current thread until the m
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-004,indent=0]
 ----
 
 TIP: If you're unsure use `callSerially`. The use cases for `callSeriallyAndWait` are rare. When you do need to wait, the overload that accepts a timeout lets background threads marshal results back to the EDT without risking an indefinite stall if the EDT is busy.
@@ -117,14 +117,14 @@ This is best explained by an example. Typical Java code reads as a single sequen
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-005,indent=0]
 ----
 
 This works well normally but on the EDT it might be a problem, if one of the operations is slow it might slow the whole EDT (painting, event processing etc.). Normally you can move operations into a separate thread e.g.:
 [source,java]
 
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-006,indent=0]
 ----
 
 This means that operation C will happen in parallel to operation B which might be a problem... +
@@ -132,7 +132,7 @@ For example, instead of using operation names lets use a more "real world" examp
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-007,indent=0]
 ----
 
 Notice that the first and last operations must be conducted on the EDT but the middle operation might be slow!
@@ -142,14 +142,14 @@ A simplistic approach is to do something like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-008,indent=0]
 ----
 
 However, `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. The right way to do this would therefore be something like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-009,indent=0]
 ----
 
 This is legal and would work reasonably well, however it gets complicated as you add more and more features that need to be chained serially after all these are 3 methods!
@@ -158,14 +158,14 @@ Invoke and block solves this in a unique way you can get almost the exact same b
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-010,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-010,indent=0]
 ----
 
 Or this with Java 8 syntax:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-011,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-011,indent=0]
 ----
 
 Invoke and block effectively blocks the current EDT in a legal way. It spawns a separate thread that runs the `run()` method and when that run method completes it goes back to the EDT.
@@ -179,7 +179,7 @@ Even if you never call `invokeAndBlock` directly you're probably using it indire
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-012,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-012,indent=0]
 ----
 
 Notice that the dialog show method will block the calling thread until the user clicks OK or Not OK...
@@ -190,14 +190,14 @@ To explain how invokeAndBlock works you can return to the sample above of how th
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-013,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-013,indent=0]
 ----
 
 `invokeAndBlock()` works in a similar way to this pseudo-code:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java[tag=the-edt-event-dispatch-thread-java-014,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.java.txt[tag=the-edt-event-dispatch-thread-java-014,indent=0]
 ----
 
 The EDT is effectively "blocked" but `invokeAndBlock` "redoes" it from within...

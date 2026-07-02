@@ -63,7 +63,7 @@ is no shader code anywhere.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java[tag=3d-graphics-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java.txt[tag=3d-graphics-java-001,indent=0]
 ----
 
 `setContinuous(true)` runs an animation loop. For a static scene leave it off and
@@ -94,7 +94,7 @@ ARGB pixels:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java[tag=3d-graphics-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java.txt[tag=3d-graphics-java-002,indent=0]
 ----
 
 .An UNLIT cube with a checkerboard texture (NEAREST filtering)
@@ -109,7 +109,7 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/IndexBuffer.html[IndexBuff
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java[tag=3d-graphics-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java.txt[tag=3d-graphics-java-003,indent=0]
 ----
 
 Vertex buffers are allocated through the platform SIMD allocator, which on iOS
@@ -126,7 +126,7 @@ own material, so a textured model renders with no extra setup:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java[tag=3d-graphics-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java.txt[tag=3d-graphics-java-004,indent=0]
 ----
 
 The model below is the Khronos "BoomBox" glTF sample (a CC0 model carrying its own
@@ -172,7 +172,7 @@ Querying capabilities at runtime:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java[tag=3d-graphics-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/3d-graphics.java.txt[tag=3d-graphics-java-005,indent=0]
 ----
 
 === Threading
