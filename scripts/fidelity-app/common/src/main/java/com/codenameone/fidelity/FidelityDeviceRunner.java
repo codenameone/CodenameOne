@@ -292,23 +292,28 @@ public class FidelityDeviceRunner {
         final int w = pixels(spec.tileWidthMm(c), true);
         final int h = pixels(spec.tileHeightMm(c), false);
         final List frames = c.getFrames();
-        final List tabsComponents = new ArrayList();
-        final List wrappers = new ArrayList();
-        final List names = new ArrayList();
-        runOnEdtSync(new Runnable() {
-            public void run() {
-                applyAppearance(appearance);
-                Form form = new Form("fidelity", BoxLayout.y());
-                form.getAllStyles().setBgColor(bgColor(appearance));
-                form.getAllStyles().setBgTransparency(255);
-                form.getContentPane().getAllStyles().setBgColor(bgColor(appearance));
-                form.getContentPane().getAllStyles().setBgTransparency(255);
-                for (int i = 0; i < frames.size(); i++) {
-                    String frame = ((String) frames.get(i)).trim();
+        // One form + one capture PER FRAME: all the frames of a morph on a single
+        // form can exceed the phone's screen height, and a tile below the fold
+        // would be cropped short -- silently corrupting the frame goldens.
+        for (int i = 0; i < frames.size(); i++) {
+            final String frame = ((String) frames.get(i)).trim();
+            final int value = parseFrameValue(frame);
+            final List wrappers = new ArrayList();
+            final List names = new ArrayList();
+            final Component[] compHolder = new Component[1];
+            runOnEdtSync(new Runnable() {
+                public void run() {
+                    applyAppearance(appearance);
+                    Form form = new Form("fidelity", BoxLayout.y());
+                    form.getAllStyles().setBgColor(bgColor(appearance));
+                    form.getAllStyles().setBgTransparency(255);
+                    form.getContentPane().getAllStyles().setBgColor(bgColor(appearance));
+                    form.getContentPane().getAllStyles().setBgTransparency(255);
                     Component comp = Cn1WidgetRenderer.build(c, "normal", appearance);
                     if (comp == null) {
-                        continue;
+                        return;
                     }
+                    compHolder[0] = comp;
                     com.codename1.ui.plaf.Style st = comp.getAllStyles();
                     st.setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
@@ -317,24 +322,23 @@ public class FidelityDeviceRunner {
                     st.setMargin(0, 0, 0, 0);
                     Container tile = newTile(comp, c.getId(), w, h, appearance, resolveBackdrop(c));
                     form.add(centerRow(tile));
-                    tabsComponents.add(comp);
                     wrappers.add(tile);
                     names.add(c.getId() + "_t" + pad3(frame) + "_" + appearance + "_cn1");
+                    form.setTransitionInAnimator(CommonTransitions.createEmpty());
+                    form.setTransitionOutAnimator(CommonTransitions.createEmpty());
+                    form.show();
                 }
-                form.setTransitionInAnimator(CommonTransitions.createEmpty());
-                form.setTransitionOutAnimator(CommonTransitions.createEmpty());
-                form.show();
+            });
+            if (compHolder[0] == null) {
+                println("CN1SS:ERR:fidelity frame build failed " + c.getId() + " t" + frame);
+                continue;
             }
-        });
-        // Freeze each tile's morph AFTER layout (the probe resolves the real laid-out
-        // cell bounds), then let the frozen frames paint before the capture.
-        settle();
-        runOnEdtSync(new Runnable() {
-            public void run() {
-                for (int i = 0; i < tabsComponents.size(); i++) {
-                    Component comp = (Component) tabsComponents.get(i);
-                    String frame = ((String) frames.get(i)).trim();
-                    int value = parseFrameValue(frame);
+            // Freeze the morph AFTER layout (the probe resolves the real laid-out
+            // cell bounds), then let the frozen frame paint before the capture.
+            settle();
+            runOnEdtSync(new Runnable() {
+                public void run() {
+                    Component comp = compHolder[0];
                     if (comp instanceof com.codename1.ui.Tabs) {
                         com.codename1.ui.Tabs tabs = (com.codename1.ui.Tabs) comp;
                         int last = Math.max(0, tabs.getTabCount() - 1);
@@ -343,10 +347,10 @@ public class FidelityDeviceRunner {
                         ((com.codename1.components.Switch) comp).setMorphTestProgress(value / 100f);
                     }
                 }
-            }
-        });
-        settle();
-        cropAndEmit(captureScreen(), wrappers, names, w, h);
+            });
+            settle();
+            cropAndEmit(captureScreen(), wrappers, names, w, h);
+        }
     }
 
     /// Frame value "0".."100" -> int, defensively clamped.
