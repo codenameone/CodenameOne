@@ -558,8 +558,12 @@ lens. The effect is opt-in: the iOS modern theme sets
 `tabsSelectionCapsuleBool: true` and `glassMaterialBool: true`. Without the
 glass flag the capsule degrades to a plain translucent pill.
 
-The whole animation is tuned from theme constants -- redeclare any of them
-in your own `theme.css` to retune the drop:
+The animation is controlled by a *named motion preset* plus a handful of
+high-level knobs. The detailed envelopes (stretch, squash, lift, lens
+magnification, aberration, tint timing) live inside the preset in the
+motion model (`TabSelectionMorph`), where they are pinned by unit test and
+validated frame-by-frame by the fidelity suite -- a theme picks a preset
+and scales it rather than tuning a dozen loose constants:
 
 [cols="3,1,4", options="header"]
 |===
@@ -570,55 +574,48 @@ in your own `theme.css` to retune the drop:
 |Master switch for the selection drop. Off falls back to the legacy
 colored underline indicator (`tabsAnimatedIndicatorBool`).
 
+|`@tabsMorphPreset`
+|`ios26`
+|The named motion preset: `ios26` (the measured Liquid Glass morph) or
+`subtle` (half the deformation and optics, for a calmer selection change).
+
 |`@tabsAnimatedIndicatorDurationInt`
 |`480`
 |Morph duration in milliseconds. Lower is snappier.
 
-|`@tabSelLensMagnifyPct` / `@tabSelLensRestMagPct`
-|`118` / `108`
-|Magnification at the peak of travel vs. when settled (`100` = none). The
-drop magnifies more mid-flight, like a real lens passing over the glyphs.
+|`@tabsMorphLensIntensityPct`
+|`100`
+|Scales the drop's *optics* (magnification, chromatic aberration, accent
+tint) around the preset: `0` is an optically flat drop, `200` doubles the
+lens strength. Geometry is unaffected.
 
-|`@tabSelLensTintColorInt` / `@tabSelLensTintPct`
-|`0x0a84ff` / `100`
-|The accent the dark glyph is tinted to inside the drop, and how strongly
-(`0`..`100`).
+|`@tabsMorphSpringPct`
+|`100`
+|Scales the settle overshoot: `0` stops dead on a plain ease-out, `200`
+doubles the bounce.
 
-|`@tabSelLensAberrationPct`
-|`2`
-|Chromatic aberration at the drop's rim (a faint blue/cyan fringe); `0`
-disables it.
-
-|`@tabSelBubbleWidthPct`
-|`96`
-|Drop width as a percentage of the tab cell. Narrower reads as a tighter
-droplet.
-
-|`@tabSelLensOverflowPct` / `@tabSelGrowPct`
-|`18` / `14`
-|How far the drop bulges past the bar at rest vs. the extra vertical grow
-at the peak of travel.
-
-|`@tabSelStretchPct`
-|`32`
-|Horizontal elongation while travelling -- the droplet stretches toward the
-direction of motion, then squashes back at the stop.
-
-|`@tabSelSquashHPct` / `@tabSelSquashWPct`
-|`18` / `16`
-|The settle squash: a brief extra height / reduced width as the drop
-decelerates onto the target tab.
-
-|`@tabSelLiftMm` / `@tabSelDownBiasMm`
-|`0.5` / `0`
-|Millimetres the content is lifted up inside the drop, and a vertical bias
-applied to the whole drop.
+|`@tabSelLensTintColorInt`
+|`0x0a84ff`
+|The accent the dark glyph is tinted to inside the drop.
 |===
 
-NOTE: All `*Pct` values are relative -- `100` means "no change". The drop's
-glass cues (rim shrink, refraction, glare, edge shadow) fade out as it
-settles, so a resting selection reads as a calm frosted pill rather than a
-distorting lens.
+Similarly, the *Liquid Glass backdrop materials* themselves are typed,
+named recipes (`GlassRecipe`): a theme assigns `chrome` (edge-anchored
+bars), `pill` (the floating tab bar) or `panel` (buttons, dialogs, panels
+-- the default) per UIID with `<UIID>GlassRecipe` constants, e.g.
+`ToolbarGlassRecipe: "chrome"`. Each recipe bundles the measured
+saturation/scale/offset colour transform and edge optics of one native
+material, so similar glass surfaces cannot drift apart one constant at a
+time.
+
+NOTE: The drop's glass cues (rim shrink, refraction, glare, edge shadow)
+fade out as it settles, so a resting selection reads as a calm frosted
+pill rather than a distorting lens. Every motion preset is validated
+deterministically: the fidelity suite freezes the morph at fixed progress
+points (0/10/25/50/75/90/100%) and regression-compares each frame, and the
+same points are pinned numerically against the motion model in unit tests.
+The `Switch` thumb uses the same discipline for its liquid *droplet* morph
+(`switchLiquidGlassBool`, stretch/squash while sliding, frame-validated).
 
 === Customizing in your own theme
 
