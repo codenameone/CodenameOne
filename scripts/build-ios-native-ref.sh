@@ -14,7 +14,14 @@ UDID="${1:-17853196-A8A7-45F2-8F06-24E8257945E6}"
 BUNDLE_ID="com.codenameone.fidelity.nativeref"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/scripts/fidelity-app/ios-native-ref/NativeRef.swift"
-GOLDENS="$ROOT/scripts/fidelity-app/goldens/ios-metal"
+# The golden SET this capture belongs to: the OS design generation of the
+# booted simulator (ios-26-metal). Capturing iOS 27 references later = boot a
+# 27 runtime and run with CN1SS_FIDELITY_GOLDEN_SET=ios-27-metal; the 26 set
+# stays untouched, so both looks can be gated side by side during a phased
+# migration.
+GOLDEN_SET="${CN1SS_FIDELITY_GOLDEN_SET:-ios-26-metal}"
+GOLDENS="$ROOT/scripts/fidelity-app/goldens/$GOLDEN_SET"
+mkdir -p "$GOLDENS"
 BUILD="$(mktemp -d)/NativeRef.app"
 XCODE_APP="${XCODE_APP:-/Applications/Xcode.app}"
 DEV="$XCODE_APP/Contents/Developer"

@@ -136,10 +136,17 @@ jobs:
       - name: Run fidelity suite (emulator)
         uses: reactivecircus/android-emulator-runner@v2
         with:
+          # The emulator profile is part of the android-m3 golden-set contract:
+          # the committed native references (scripts/build-android-native-ref.sh)
+          # are captured LOCALLY on this same API level, so CI never generates
+          # references -- it only renders the CN1 side and diffs.
           api-level: 36
           arch: x86_64
           target: google_apis
           disk-size: 2048M
+          # TRANSITIONAL: the first run under committed-goldens scoring re-anchors
+          # the baseline (upload below); once that baseline is committed, drop
+          # FIDELITY_UPDATE_BASELINE so the ratchet gates for real.
           script: FIDELITY_UPDATE_BASELINE=1 ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
       - name: Upload fidelity artifacts
         if: always()
@@ -148,8 +155,7 @@ jobs:
           name: android-fidelity
           path: |
             artifacts/android-fidelity/**
-            scripts/fidelity-app/goldens/android/**
-            scripts/fidelity-app/baseline/android-fidelity-baseline.json
+            scripts/fidelity-app/baseline/android-m3-fidelity-baseline.json
           if-no-files-found: warn
           retention-days: 14
 
@@ -221,14 +227,33 @@ jobs:
             CODE_SIGNING_ALLOWED=NO build
           APP="$(find "$DD/Build/Products" -maxdepth 2 -name '*.app' -type d | head -n1)"
           echo "app_path=$APP" >> "$GITHUB_OUTPUT"
-      - name: Boot simulator
+      - name: Boot simulator (runtime matching the golden set)
         id: sim
         run: |
-          UDID="$(xcrun simctl list devices available | grep -E 'iPhone 16 \(' | grep -Eo '[0-9A-F-]{36}' | head -n1)"
+          set -euo pipefail
+          # The golden set names the OS design generation it was captured on
+          # (ios-26-metal). The suite MUST run on a matching runtime: a different
+          # iOS generation renders different SF fonts/glyphs and produces phantom
+          # regressions. Fail loudly if the runner lacks the runtime -- the fix is
+          # pinning a runner image/Xcode that ships it, never regenerating
+          # references on whatever the runner happens to have.
+          RUNTIME="$(xcrun simctl list runtimes | grep -Eo 'com.apple.CoreSimulator.SimRuntime.iOS-26[0-9-]*' | head -n1)"
+          if [ -z "$RUNTIME" ]; then
+            echo "::error::No iOS 26 simulator runtime on this runner (required by golden set ios-26-metal)."
+            xcrun simctl list runtimes
+            exit 78
+          fi
+          UDID="$(xcrun simctl list devices "$RUNTIME" available | grep -E 'iPhone 16 \(' | grep -Eo '[0-9A-F-]{36}' | head -n1 || true)"
+          if [ -z "$UDID" ]; then
+            UDID="$(xcrun simctl create "iPhone16-fidelity" "iPhone 16" "$RUNTIME")"
+          fi
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
       - name: Run fidelity suite (simulator, Metal)
+        # TRANSITIONAL: the first run on the runner's own iOS 26 runtime
+        # re-anchors the baseline (upload below); once committed, drop
+        # FIDELITY_UPDATE_BASELINE so the ratchet gates for real.
         run: FIDELITY_UPDATE_BASELINE=1 ./scripts/run-ios-fidelity-tests.sh "${{ steps.simapp.outputs.app_path }}" "${{ steps.sim.outputs.udid }}"
       - name: Upload fidelity artifacts
         if: always()
@@ -237,7 +262,6 @@ jobs:
           name: ios-fidelity
           path: |
             artifacts/ios-fidelity/**
-            scripts/fidelity-app/goldens/ios-metal/**
-            scripts/fidelity-app/baseline/ios-metal-fidelity-baseline.json
+            scripts/fidelity-app/baseline/ios-26-metal-fidelity-baseline.json
           if-no-files-found: warn
           retention-days: 14

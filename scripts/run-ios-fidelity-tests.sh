@@ -23,8 +23,16 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 APP_DIR="${CN1_APP_DIR:-scripts/fidelity-app}"
-GOLDENS_DIR="$APP_DIR/goldens/ios-metal"
-BASELINE_FILE="$APP_DIR/baseline/ios-metal-fidelity-baseline.json"
+# The golden SET names the native look this run compares against (the OS
+# design generation, not just the platform): ios-26-metal today, ios-27-metal
+# when the next design lands. Sets live side by side with their own committed
+# goldens + baseline, so a phased 26->27 migration keeps both gated until 26
+# is retired. Native references are captured LOCALLY by the standalone
+# native-ref app (scripts/build-ios-native-ref.sh) -- never by CI runners,
+# which may not even have the newer OS.
+GOLDEN_SET="${CN1SS_FIDELITY_GOLDEN_SET:-ios-26-metal}"
+GOLDENS_DIR="$APP_DIR/goldens/$GOLDEN_SET"
+BASELINE_FILE="$APP_DIR/baseline/${GOLDEN_SET}-fidelity-baseline.json"
 mkdir -p "$GOLDENS_DIR" "$(dirname "$BASELINE_FILE")"
 
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
@@ -152,7 +160,7 @@ cp -f "$WORK_DIR/fidelity-comment.md" "$ARTIFACTS_DIR/fidelity-comment.md" 2>/de
 # seeded from the run (and must be committed); the strips land in artifacts so
 # reviewers can see the whole motion at a glance.
 if [ "$FRAME_COUNT" -gt 0 ]; then
-  FRAME_GOLDENS_DIR="$APP_DIR/goldens/ios-metal-frames"
+  FRAME_GOLDENS_DIR="$APP_DIR/goldens/${GOLDEN_SET}-frames"
   rf_log "STAGE:MORPH_FRAMES -> validating ${FRAME_COUNT} animation frame(s)"
   frame_rc=0
   cn1ss_java_run MorphFrameValidator \

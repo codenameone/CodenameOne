@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Run the native-fidelity suite on a booted Android emulator: launch the
 # fidelity app (it auto-runs the suite), collect the per-tile PNGs over the
-# CN1SS WebSocket, (re)generate native goldens from the "_native" frames, then
-# score the "_cn1" renders against the goldens and apply the ratchet gate.
+# CN1SS WebSocket, then score the "_cn1" renders against the COMMITTED native
+# goldens (captured locally by scripts/build-android-native-ref.sh, selected
+# by CN1SS_FIDELITY_GOLDEN_SET, default android-m3) and apply the ratchet gate.
 #
 # Usage: run-android-fidelity-tests.sh <gradle_project_dir>
 # Assumes an emulator is already booted (adb device online) and the app APK is
-# built. Honors FIDELITY_UPDATE_GOLDENS=1 (refresh committed goldens from this
-# run) and FIDELITY_UPDATE_BASELINE=1 (record current fidelity as baseline).
+# built. FIDELITY_UPDATE_BASELINE=1 records current fidelity as the baseline
+# (a deliberate, reviewed act -- normally done locally, committed with the PR).
 set -euo pipefail
 
 rf_log() { echo "[run-android-fidelity-tests] $1"; }
@@ -23,8 +24,15 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 APP_DIR="${CN1_APP_DIR:-scripts/fidelity-app}"
-GOLDENS_DIR="$APP_DIR/goldens/android"
-BASELINE_FILE="$APP_DIR/baseline/android-fidelity-baseline.json"
+# The golden SET names the native look this run compares against (the design
+# generation, not just the platform): android-m3 today, android-m3e (or
+# whatever the next Material generation is called) when it lands. Sets live
+# side by side with their own committed goldens + baseline for a phased
+# migration. Native references are captured LOCALLY by the standalone
+# native-ref app (scripts/build-android-native-ref.sh) -- never by CI.
+GOLDEN_SET="${CN1SS_FIDELITY_GOLDEN_SET:-android-m3}"
+GOLDENS_DIR="$APP_DIR/goldens/$GOLDEN_SET"
+BASELINE_FILE="$APP_DIR/baseline/${GOLDEN_SET}-fidelity-baseline.json"
 mkdir -p "$GOLDENS_DIR" "$(dirname "$BASELINE_FILE")"
 
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
@@ -92,32 +100,42 @@ kill "$LOGCAT_PID" >/dev/null 2>&1 || true
 
 rf_log "CN1SS log lines:"; (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/  /' | tail -60
 
-# Split delivered PNGs. The fidelity comparison uses the SAME-RUN native render
-# as the reference, not the committed golden: both the CN1 and native tiles are
-# produced in the *same* environment this run, so the score is robust to the
-# subtle rendering differences between environments (emulator GPU, OS version,
-# font hinting) that would otherwise make a golden captured elsewhere mismatch.
-# The committed goldens are a re-seedable drift artifact for human review.
-NATIVE_REF_DIR="$WORK_DIR/native-ref"; mkdir -p "$NATIVE_REF_DIR"
+# Split delivered PNGs. The comparison references are the COMMITTED goldens
+# captured locally by the standalone native-ref app -- CI never (re)generates
+# them: the runners may not even have the OS generation under test, and
+# committed references are what makes a phased old-look/new-look migration
+# possible (each golden set is pinned to the design generation it was captured
+# on). Capture on the same AVD profile the CI emulator uses so cross-
+# environment rendering noise stays inside the ratchet's epsilon. Any _native
+# renders the app still delivers (the legacy in-app factory) are archived for
+# debugging only.
 NATIVE_COUNT=0; CN1_COUNT=0
 shopt -s nullglob
 for png in "$WS_RAW_DIR"/*_native.png; do
   base="$(basename "$png" .png)"; name="${base%_native}"
-  cp -f "$png" "$NATIVE_REF_DIR/$name.png"          # same-run reference (comparison)
-  if [ "${FIDELITY_UPDATE_GOLDENS:-0}" = "1" ] || [ ! -f "$GOLDENS_DIR/$name.png" ]; then
-    cp -f "$png" "$GOLDENS_DIR/$name.png"           # committed drift artifact (re-seedable)
-  fi
+  cp -f "$png" "$ARTIFACTS_DIR/${name}_native.png" 2>/dev/null || true
   NATIVE_COUNT=$(( NATIVE_COUNT + 1 ))
 done
 declare -a COMPARE_ENTRIES=()
 for png in "$WS_RAW_DIR"/*_cn1.png; do
   base="$(basename "$png" .png)"; name="${base%_cn1}"
+  # Animation-frame captures have no native golden; they are validated by
+  # MorphFrameValidator on iOS and defensively excluded here (see the iOS
+  # runner for the full frames flow).
+  if [[ "$name" =~ _t[0-9]{3}_ ]]; then
+    continue
+  fi
   dest="$WORK_DIR/${name}_cn1.png"; cp -f "$png" "$dest"
   COMPARE_ENTRIES+=("${name}=${dest}")
   CN1_COUNT=$(( CN1_COUNT + 1 ))
 done
+GOLDEN_COUNT=$(ls "$GOLDENS_DIR"/*.png 2>/dev/null | wc -l | tr -d ' ')
 shopt -u nullglob
-rf_log "Delivered: ${NATIVE_COUNT} native, ${CN1_COUNT} cn1. Same-run native ref: $NATIVE_REF_DIR; committed goldens: $GOLDENS_DIR"
+rf_log "Delivered: ${NATIVE_COUNT} native (archived), ${CN1_COUNT} cn1. Committed goldens ($GOLDEN_SET): ${GOLDEN_COUNT}"
+if [ "$GOLDEN_COUNT" -eq 0 ]; then
+  rf_log "FATAL: no committed Android goldens in $GOLDENS_DIR (run scripts/build-android-native-ref.sh locally)"
+  exit 12
+fi
 
 if [ "$CN1_COUNT" -eq 0 ]; then
   rf_log "FATAL: no CN1 renders delivered over WebSocket"
@@ -132,32 +150,17 @@ export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_ANDROID_COMMENT -->"
 export CN1SS_FIDELITY_SPEC="${CN1SS_FIDELITY_SPEC:-$APP_DIR/common/src/main/resources/fidelity-tests.yaml}"
 export CN1SS_FIDELITY_PLATFORM="${CN1SS_FIDELITY_PLATFORM:-android}"
 
-# Animation-frame captures ("<id>_tNNN_<appearance>") have no native golden and
-# are validated by MorphFrameValidator on iOS; keep any future Android frames
-# delivery out of the native-fidelity comparison so it cannot break the gate
-# with a phantom "missing golden".
-if [ ${#COMPARE_ENTRIES[@]} -gt 0 ]; then
-  declare -a FILTERED_ENTRIES=()
-  for entry in "${COMPARE_ENTRIES[@]}"; do
-    if [[ "${entry%%=*}" =~ _t[0-9]{3}_ ]]; then
-      rf_log "Skipping animation frame in fidelity compare: ${entry%%=*}"
-      continue
-    fi
-    FILTERED_ENTRIES+=("$entry")
-  done
-  COMPARE_ENTRIES=("${FILTERED_ENTRIES[@]}")
-fi
 export CN1SS_PREVIEW_SUBDIR="android-fidelity"
 COMPARE_JSON="$WORK_DIR/fidelity-compare.json"
 SUMMARY_FILE="$WORK_DIR/fidelity-summary.txt"
 COMMENT_FILE="$WORK_DIR/fidelity-comment.md"
 
+rc=0
 cn1ss_process_fidelity \
   "Native fidelity (Android, Material 3)" \
   "$COMPARE_JSON" "$SUMMARY_FILE" "$COMMENT_FILE" \
-  "$NATIVE_REF_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" "$BASELINE_FILE" \
-  "${COMPARE_ENTRIES[@]}"
-rc=$?
+  "$GOLDENS_DIR" "$PREVIEW_DIR" "$ARTIFACTS_DIR" "$BASELINE_FILE" \
+  "${COMPARE_ENTRIES[@]}" || rc=$?
 cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/fidelity-comment.md" 2>/dev/null || true
 rf_log "Done (rc=$rc). Artifacts in $ARTIFACTS_DIR"
 exit $rc
