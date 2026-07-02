@@ -34,7 +34,12 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.0 See Also:ByteArrayOutputStream, String
  */
 public final class StringBuilder implements CharSequence, Appendable {
-    static final int INITIAL_CAPACITY = 16;
+    // 32 (was 16): the dominant StringBuilder lifecycle is javac-generated
+    // concatenation of a handful of segments totalling 17..32 chars, and a
+    // 16-char initial buffer forced a grow-and-copy on nearly every such
+    // builder. 32 chars = one BiBOP size class up on the transient buffer,
+    // in exchange for eliminating that per-builder reallocation.
+    static final int INITIAL_CAPACITY = 32;
 
     private char[] value;
 
@@ -584,7 +589,7 @@ public final class StringBuilder implements CharSequence, Appendable {
         }
         // Share the buffer with the String (no copy); the editing mutators copy-on-write.
         shared = true;
-        return new String(0, count, value);
+        return new String(value, count); // unchecked alias: value/count are ours
     }
 
     private java.lang.String toStringOld(){

@@ -66,6 +66,79 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<>();
+
+    // ---- CLOSED-WORLD DEVIRTUALIZATION -----------------------------------
+    // ParparVM compiles a closed world: after dead-code elimination the class
+    // list is final, so an INVOKEVIRTUAL whose method has NO reachable override
+    // below the static receiver type can be emitted as a DIRECT call to the
+    // implementing class's C function -- removing the vtable load + indirect
+    // branch AND letting ThinLTO inline it (a vtable-dispatched getter like
+    // String.length()/HashMap.size() otherwise stays an opaque call in every
+    // hot loop). The subclass index is (re)built lazily whenever the class list
+    // changed; emission runs after the list is final.
+    private static java.util.Map<String, java.util.List<ByteCodeClass>> cn1SubclassIndex;
+    private static int cn1SubclassIndexSize = -1;
+
+    private static void cn1EnsureSubclassIndex() {
+        if (cn1SubclassIndexSize == classes.size()) {
+            return;
+        }
+        cn1SubclassIndex = new java.util.HashMap<String, java.util.List<ByteCodeClass>>();
+        for (ByteCodeClass c : classes) {
+            if (c.getBaseClass() != null) {
+                String b = c.getBaseClass().replace('/', '_').replace('$', '_');
+                java.util.List<ByteCodeClass> l = cn1SubclassIndex.get(b);
+                if (l == null) {
+                    l = new java.util.ArrayList<ByteCodeClass>();
+                    cn1SubclassIndex.put(b, l);
+                }
+                l.add(c);
+            }
+        }
+        cn1SubclassIndexSize = classes.size();
+    }
+
+    /**
+     * If (name, desc) invoked virtually on {@code owner} has no reachable
+     * override in any non-eliminated subclass, returns the mangled name of the
+     * class whose non-abstract declaration implements it (owner or an
+     * ancestor); otherwise null (the call must stay a vtable dispatch).
+     */
+    public static synchronized String resolveDevirtualizedOwner(ByteCodeClass owner, String name, String desc) {
+        if (owner == null) {
+            return null;
+        }
+        cn1EnsureSubclassIndex();
+        // any subclass DECLARING the method (abstract or not) keeps it virtual
+        java.util.ArrayDeque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
+        java.util.List<ByteCodeClass> kids = cn1SubclassIndex.get(owner.getClsName());
+        if (kids != null) {
+            stack.addAll(kids);
+        }
+        while (!stack.isEmpty()) {
+            ByteCodeClass c = stack.pop();
+            if (!c.isEliminated() && c.hasDeclaredMethod(name, desc)) {
+                return null;
+            }
+            kids = cn1SubclassIndex.get(c.getClsName());
+            if (kids != null) {
+                stack.addAll(kids);
+            }
+        }
+        // resolve the implementing declaration at or above the static type
+        ByteCodeClass c = owner;
+        while (c != null) {
+            if (c.hasDeclaredNonAbstractMethod(name, desc)) {
+                return c.getClsName();
+            }
+            String b = c.getBaseClass();
+            if (b == null) {
+                return null;
+            }
+            c = getClassObject(b.replace('/', '_').replace('$', '_'));
+        }
+        return null;
+    }
     private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     private int stringConcatCounter;

@@ -433,8 +433,20 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         }
         JAVA_INT end = t->java_lang_String_count + t->java_lang_String_offset;
         JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
-        for (JAVA_INT i = t->java_lang_String_offset; i < end; ++i) {
-            hash = 31*hash + chars[i];
+        JAVA_INT i = t->java_lang_String_offset;
+        // 4-way polynomial reassociation: h = h*31^4 + c0*31^3 + c1*31^2 + c2*31 + c3.
+        // The naive loop is a serially-dependent multiply chain (one 31*h per char);
+        // this breaks the dependency so the four products issue in parallel.
+        // -fwrapv makes the int overflow wrap exactly like Java's.
+        for (; i + 4 <= end; i += 4) {
+            hash = hash * 923521
+                 + chars[i] * 29791
+                 + chars[i + 1] * 961
+                 + chars[i + 2] * 31
+                 + chars[i + 3];
+        }
+        for (; i < end; ++i) {
+            hash = 31 * hash + chars[i];
         }
         t->java_lang_String_hashCode = hash;
     }

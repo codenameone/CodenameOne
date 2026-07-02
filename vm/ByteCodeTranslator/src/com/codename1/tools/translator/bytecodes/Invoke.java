@@ -95,6 +95,13 @@ public class Invoke extends Instruction {
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
                 dependencyOwner = resolvedConcreteOwner;
+            } else {
+                // keep in sync with the closed-world devirt in appendInstruction:
+                // the direct call needs the implementing class's declaration.
+                String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                if (devirt != null) {
+                    dependencyOwner = devirt;
+                }
             }
         }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
@@ -306,6 +313,14 @@ public class Invoke extends Instruction {
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
+                        } else {
+                            // CLOSED-WORLD DEVIRT: no reachable override -> direct call
+                            // (and ThinLTO can then inline it).
+                            String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                            if (devirt != null) {
+                                invokeOwner = devirt;
+                                isVirtual = false;
+                            }
                         }
                     }
                 }

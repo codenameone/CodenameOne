@@ -369,6 +369,11 @@ public class ByteCodeClass {
         return declaredMethod != null && !declaredMethod.isAbstract();
     }
 
+    /** any declaration (abstract or not) of the given method in THIS class. */
+    public boolean hasDeclaredMethod(String name, String desc) {
+        return findDeclaredMethod(name, desc) != null;
+    }
+
     public void unmark() {
         marked = false;
     }

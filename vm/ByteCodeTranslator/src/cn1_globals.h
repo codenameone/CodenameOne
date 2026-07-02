@@ -1682,6 +1682,10 @@ static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, s
 }
 // Register an object referenced only from C globals as a permanent GC root.
 extern void cn1AddImmortalRoot(JAVA_OBJECT o);
+// Flag a BiBOP object's page as holding a native peer (cached NSString etc.):
+// its dead slots then always reach cn1BibopReclaimSlot, which releases the
+// peer -- instead of the O(1) all-dead page reclaim, which would leak it.
+extern void cn1BibopNoteNativePeer(JAVA_OBJECT o);
 extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primitiveSize, int dim);
 #define CN1_SIMD_ALIGNMENT 16
 /* Maximum payload size we are willing to alloca() on the per-thread stack

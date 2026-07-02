@@ -106,6 +106,12 @@ public class CustomInvoke extends Instruction {
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
                 dependencyOwner = resolvedConcreteOwner;
+            } else {
+                // keep in sync with the closed-world devirt in the emission paths
+                String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                if (devirt != null) {
+                    dependencyOwner = devirt;
+                }
             }
         }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
@@ -288,6 +294,13 @@ public class CustomInvoke extends Instruction {
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
+                        } else {
+                            // CLOSED-WORLD DEVIRT: no reachable override -> direct call
+                            String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                            if (devirt != null) {
+                                invokeOwner = devirt;
+                                isVirtual = false;
+                            }
                         }
                     }
                 }
@@ -525,6 +538,13 @@ public class CustomInvoke extends Instruction {
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
+                        } else {
+                            // CLOSED-WORLD DEVIRT: no reachable override -> direct call
+                            String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                            if (devirt != null) {
+                                invokeOwner = devirt;
+                                isVirtual = false;
+                            }
                         }
                     }
                 }

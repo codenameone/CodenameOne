@@ -156,6 +156,19 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         this.value = data;
         this.count = charCount;
     }
+
+    /**
+     * UNCHECKED aliasing constructor for VM-internal callers that construct the
+     * exact-length private array themselves (StringBuilder's copy-on-write
+     * share, concat's scratch buffer): no bounds guard, so the translator can
+     * inline it to three plain field stores at the allocation site. Same
+     * ownership rules as the guarded aliasing constructor above.
+     */
+    String(char[] data, int charCount) {
+        this.offset = 0;
+        this.value = data;
+        this.count = charCount;
+    }
     
     /**
      * Initializes a newly created String object so that it represents the same sequence of characters as the argument; in other words, the newly created string is a copy of the argument string.
@@ -252,7 +265,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         char[] n = new char[length() + str.length()];
         System.arraycopy(value, offset, n, 0, count);
         System.arraycopy(str.value, str.offset, n, count, str.count);
-        return new String(0, n.length, n); // n is fresh + private: alias, no copy
+        return new String(n, n.length); // n is fresh + private: alias, no copy
     }
 
     /**
@@ -878,7 +891,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Returns the string representation of the char argument.
      */
     public static java.lang.String valueOf(char value){
-        String s = new String(0, 1, new char[] { value });
+        String s = new String(new char[] { value }, 1);
         s.hashCode = value;
         return s;
     }
@@ -939,15 +952,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return substring(start, end);
     }
 
-    protected void finalize() {
-        if(nsString != 0) {
-            releaseNSString(nsString);
-        }
-        nsString = 0;
-    }
-    
-    private native static void releaseNSString(long ns);
-    
+    // NOTE: String deliberately has NO finalize(). Its old finalizer existed only
+    // to release the cached NSString peer (nsString) -- but a finalizer's mere
+    // existence forces the VM's page sweep to walk every slot of every page that
+    // ever held a dead String, on EVERY platform. The peer is now released by the
+    // VM's reclaim path natively (see cn1ReleaseStringPeer in cn1_globals.m),
+    // which only iOS pays for, and only on pages that actually hold peer-cached
+    // strings.
+
     
     public native static String format(String format, Object... args);
     

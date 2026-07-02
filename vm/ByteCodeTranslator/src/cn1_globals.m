@@ -458,11 +458,32 @@ typedef void (*finalizerFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 void flushReleaseQueue() {
 }
 
+// java.lang.String has NO Java finalizer (it would tax every string-bearing
+// page with per-slot reclaim walks on every platform). Its cached NSString
+// peer is released here instead -- a cost only ObjC targets pay, and (for
+// BiBOP pages) only on pages flagged by cn1BibopNoteNativePeer at cache time.
+#if defined(__APPLE__) && defined(__OBJC__)
+extern struct clazz class__java_lang_String;
+static inline void cn1ReleaseStringPeer(JAVA_OBJECT o) {
+    if(o->__codenameOneParentClsReference == &class__java_lang_String) {
+        struct obj__java_lang_String* s = (struct obj__java_lang_String*)o;
+        if(s->java_lang_String_nsString != 0) {
+            void* v = (void*)s->java_lang_String_nsString;
+            [(__bridge NSString*)v release];
+            s->java_lang_String_nsString = 0;
+        }
+    }
+}
+#else
+#define cn1ReleaseStringPeer(o) do {} while(0)
+#endif
+
 void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     finalizerFunctionPointer ptr = (finalizerFunctionPointer)obj->__codenameOneParentClsReference->finalizerFunction;
     if(ptr != 0) {
         ptr(threadStateData, obj);
     }
+    cn1ReleaseStringPeer(obj);
     codenameOneGcFree(threadStateData, obj);
 }
 
@@ -1774,6 +1795,7 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     if(ptr != 0) {
         ptr(threadStateData, o);
     }
+    cn1ReleaseStringPeer(o);
     void* md = cn1MonitorDataRemove(o);
     if(md) {
         free(md);
@@ -1781,6 +1803,17 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
 }
 
 #ifndef CN1_BIBOP_NO_FASTSWEEP
+// A native peer (cached NSString) was attached to a BiBOP object: flag its
+// page exactly like a monitor so the dead slot always reaches
+// cn1BibopReclaimSlot (which releases the peer) instead of the O(1) all-dead
+// page reclaim. Same sticky-flag visibility argument as monitors.
+void cn1BibopNoteNativePeer(JAVA_OBJECT obj) {
+    if(obj != JAVA_NULL && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+        CN1BibopPage* p = (CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
+        p->gcHasMonitors = JAVA_TRUE;
+    }
+}
+
 void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
     if(obj != JAVA_NULL && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
         // STICKY per-page flag (plain store): visible to any sweep that could
@@ -3847,6 +3880,8 @@ NSString* toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     NSString* st = [[NSString stringWithUTF8String:chrs] retain];
     void *x = (__bridge void *)(st);
     str->java_lang_String_nsString = (JAVA_LONG)x;
+    // ensure the dead slot reaches cn1BibopReclaimSlot to release the peer
+    cn1BibopNoteNativePeer(o);
     return st;
 }
 #endif

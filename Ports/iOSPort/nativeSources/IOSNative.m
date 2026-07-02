@@ -8289,6 +8289,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long
     JAVA_OBJECT str = __NEW_INSTANCE_java_lang_String(threadStateData);
     struct obj__java_lang_String* ss = (struct obj__java_lang_String*)str;
     ss->java_lang_String_nsString = (JAVA_LONG)ns;
+    // String has no finalizer anymore: the peer is released by the VM reclaim
+    // path, which needs the page flagged (see cn1BibopNoteNativePeer).
+    cn1BibopNoteNativePeer(str);
 
     NSUInteger len = [ns length];
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
