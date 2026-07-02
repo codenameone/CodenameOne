@@ -394,7 +394,11 @@ OnOffSwitch {
 OnOffSwitch.selected { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); }
 
 Toolbar {
-    background-color: transparent;
+    /* M3 small top app bar container = surface. EXPLICIT, not transparent:
+       a transparent bar only looks right when whatever is behind it happens
+       to be the surface colour -- the dark fidelity tile showed the bar
+       vanishing entirely into a black backdrop (57% fidelity). */
+    background-color: #fef7ff;
     color: #1d1b20;
     padding: 2mm 1mm 2mm 1mm;
     margin: 0;
@@ -693,7 +697,10 @@ PopupContent {
        primary container -- the Android factory builds it via colorSecondaryContainer. */
     RaisedButton { color: #e8def8; background-color: #4a4458; cn1-background-type: cn1-pill-border; }
     RaisedButton.pressed { color: #e8def8; background-color: #4a4458; cn1-background-type: cn1-pill-border; }
-    RaisedButton.disabled { background-color: rgba(255,255,255,0.05); color: #5c5967; cn1-background-type: cn1-pill-border; }
+    /* Native disabled fill measures #2d2b31 (onSurface 12% over the dark
+       surface) with #737077 text (38% onSurface); the old 5% white over the
+       black tile read as near-black (12,12,12). */
+    RaisedButton.disabled { background-color: #2d2b31; color: #737077; cn1-background-type: cn1-pill-border; }
 
     FlatButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
     FlatButton.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
@@ -731,7 +738,7 @@ PopupContent {
     OnOffSwitch { color: var(--accent-on-color-dark, #381e72); background-color: #49454f; }
     OnOffSwitch.selected { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); }
 
-    Toolbar { background-color: transparent; color: #e6e0e9; }
+    Toolbar { background-color: #141218; color: #e6e0e9; }
     TitleArea { background-color: transparent; color: #e6e0e9; }
     Title { color: #e6e0e9; background-color: transparent; }
     MainTitle { color: #e6e0e9; background-color: transparent; }
