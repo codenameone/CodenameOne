@@ -495,7 +495,9 @@ TabsDivider { background-color: #cac4d0; }
 Tab {
     color: #49454f;
     background-color: #fef7ff;
-    padding: 2.2mm 2mm 2.1mm 2mm;
+    /* Top padding tuned against the native tile: 2.2mm sat the icon+label
+       ~6px lower than TabLayout and grew the bar by the same 6px. */
+    padding: 1.25mm 2mm 2.1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
     font-size: 2.5mm;
