@@ -51,6 +51,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.media.VideoIO;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.NotificationChannelBuilder;
@@ -9364,6 +9365,16 @@ public abstract class CodenameOneImplementation {
     ///
     /// the image IO instance
     public ImageIO getImageIO() {
+        return null;
+    }
+
+    /// Returns the video IO instance for encoding and frame accurate decoding, or null
+    /// when video encoding/decoding isn't supported on this platform.
+    ///
+    /// #### Returns
+    ///
+    /// the video IO instance or null
+    public VideoIO getVideoIO() {
         return null;
     }
 
