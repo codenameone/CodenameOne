@@ -305,6 +305,17 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         buildZip("nativewin", getWinPaths());
     }
 
+    private File[] getLinuxPaths() {
+        return new File[]{
+                new File(getModuleProject("linux"), path("src", "main", "c")),
+                new File(getModuleProject("linux"), path("src", "main", "resources"))
+        };
+    }
+
+    private void buildLinux() {
+        buildZip("nativelinux", getLinuxPaths());
+    }
+
 
     private File[] getCSSPaths() {
         return new File[]{
@@ -327,6 +338,7 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
         buildJavase();
         buildStubs();
         buildWin();
+        buildLinux();
 
         Zip zip = (Zip)antProject.createTask("zip");
         zip.setDestFile(getFinalCn1lib());

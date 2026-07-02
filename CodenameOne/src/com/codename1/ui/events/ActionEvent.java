@@ -48,6 +48,9 @@ public class ActionEvent {
     /// 8.0
     private boolean pointerPressedDuringDrag;
 
+    /// The rich pointer detail attached to this event, populated for pointer events.
+    private PointerEvent pointerEvent;
+
     /// Creates a new instance of ActionEvent.  This is unused locally, but provided so existing customer code
     /// with still work.
     ///
@@ -405,6 +408,42 @@ public class ActionEvent {
         return longEvent;
     }
 
+    /// Returns the rich pointer detail for this event such as the triggering mouse button, the
+    /// pointing device type (finger, mouse, stylus or eraser), the pressure applied and the stylus
+    /// tilt. For pointer events that did not have an explicit snapshot attached this falls back to
+    /// the pointer event currently being dispatched, so the detail is available from any pointer
+    /// listener. Returns null for non pointer events.
+    ///
+    /// #### Returns
+    ///
+    /// the `PointerEvent` detail or null when this is not a pointer event
+    public PointerEvent getPointerEvent() {
+        if (pointerEvent != null) {
+            return pointerEvent;
+        }
+        switch (trigger) {
+            case Pointer:
+            case PointerPressed:
+            case PointerReleased:
+            case PointerDrag:
+            case PointerWheel:
+            case LongPointerPress:
+            case Swipe:
+                return com.codename1.ui.Display.getInstance().getCurrentPointerEvent();
+            default:
+                return null;
+        }
+    }
+
+    /// Attaches an explicit rich pointer detail snapshot to this event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointerEvent`: the snapshot to attach
+    public void setPointerEvent(PointerEvent pointerEvent) {
+        this.pointerEvent = pointerEvent;
+    }
+
     /// Set in the case of a drop listener, returns the component being dragged
     ///
     /// #### Returns
@@ -469,6 +508,13 @@ public class ActionEvent {
 
         /// Pointer event
         PointerDrag,
+
+
+        /// Mouse wheel or trackpad scroll event delivered as a `com.codename1.ui.events.WheelEvent`
+        PointerWheel,
+
+        /// Device fold posture change delivered when a foldable device is folded or unfolded
+        PostureChange,
 
 
         /// Pointer swipe event currently fired by `com.codename1.ui.SwipeableContainer#addSwipeOpenListener(com.codename1.ui.events.ActionListener)`

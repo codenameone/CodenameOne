@@ -222,6 +222,20 @@ public final class IOSNative {
 
     native void vibrate(int duration);
 
+    native boolean isMotionSensorSupported(int type);
+
+    native void startMotionSensor(int type, int rateMillis);
+
+    native void stopMotionSensor(int type);
+
+    native boolean hasMotionData(int type);
+
+    native float getMotionSensorX(int type);
+
+    native float getMotionSensorY(int type);
+
+    native float getMotionSensorZ(int type);
+
     native int getAudioDuration(long peer);
 
     native void playAudio(long peer);
@@ -928,6 +942,34 @@ public final class IOSNative {
      * for the backend to verify with Apple.
      */
     native void requestAppAttestToken(int requestId, String nonce);
+
+    // --- CarPlay (CarPlay.framework) ----------------------------------------
+    // All gated natively by CN1_USE_CARPLAY (the build flips it on when the app references
+    // com.codename1.car). When the define is off these compile to harmless stubs so the symbols
+    // always resolve. The Java side (IOSCarBridge) describes each CarTemplate as a compact JSON
+    // string; native (CodenameOne_CarPlaySceneDelegate) parses it and builds the CPTemplate tree.
+
+    /** True while a CarPlay head unit is connected and the interface controller is live. */
+    native boolean isCarPlayConnected();
+
+    /**
+     * Renders the supplied template description on the CarPlay interface controller. When
+     * {@code isRoot} is true it becomes the root template, otherwise it is pushed onto the stack.
+     * {@code screenId} ties native selection callbacks back to the originating CarScreen.
+     */
+    native void carPlaySetTemplate(int screenId, String json, boolean isRoot);
+
+    /** Pops the top CarPlay template (returns to the previous screen). */
+    native void carPlayPopTemplate();
+
+    /** Rebuilds the template for an already-pushed screen in place (CarScreen.invalidate()). */
+    native void carPlayUpdateTemplate(int screenId, String json);
+
+    /** Registers a PNG image referenced by {@code key} in a subsequent template JSON. */
+    native void carPlayRegisterImage(String key, byte[] png);
+
+    /** Shows a transient CarPlay alert/banner with the supplied message for {@code seconds}. */
+    native void carPlayShowToast(String message, int seconds);
 
     // --- Secure storage (Security.framework keychain) -----------------------
 

@@ -19,6 +19,9 @@ Here is the current list of supported arguments. Build hints change over time, s
 |===
 |Name	|Description
 
+|build.cn1Version
+|Pro/Enterprise only. Pins the cloud build to a specific released Codename One version using the Maven release scheme (for example `7.0.182`), or to `master` to build against the current development head. The build server fetches that version's framework artifacts. Pro accounts can target versions published within the last two months; Enterprise within the last six months. Requesting an older version, a version that was never published, or using this hint without a Pro/Enterprise subscription fails the build with an explanatory error. See <<Versioned builds>>.
+
 |android.debug
 |true/false defaults to true - indicates whether to include the debug version in the build
 
@@ -689,6 +692,39 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Native Windows port only. `true`/`false` (default `true`). Set `false` to force an unsigned build even when a certificate is available.
 
 |===
+
+=== Versioned builds
+
+By default a cloud build always uses the current Codename One release. With a _versioned build_ you can instead pin the build to a specific previously released framework version, so you get reproducible output over time. This helps when stabilizing a release, supporting an older app, or isolating a regression: if an app that built correctly in the past starts failing, rebuilding against the last known good version tells you whether the change came from your code or from the framework and build server.
+
+Set the `build.cn1Version` build hint to the version you want to target. Versions use the standard Maven release scheme published to Maven Central, for example `7.0.182`:
+
+----
+codename1.arg.build.cn1Version=7.0.182
+----
+
+The build server fetches that version's framework artifacts from Maven Central and builds against them. To keep your simulator and local compile classpath aligned with the same release, set the matching `cn1.version` in your project `pom.xml`.
+
+Versioned builds are a Pro and Enterprise feature, and how far back you can target depends on the subscription tier:
+
+[options="header"]
+|===
+|Tier |Versions you can target
+|Pro |Any version released within the last two months
+|Enterprise |Any version released within the last six months
+|===
+
+If you request a version older than your tier's window, a version that was never published, or you aren't on a Pro or Enterprise plan, the build fails with an explanatory message instead of falling back to the current release.
+
+==== Building against master
+
+Set `build.cn1Version` to `master` to build against the current development head (the latest `master` of the Codename One repository) instead of a released version:
+
+----
+codename1.arg.build.cn1Version=master
+----
+
+Every push to `master` publishes a fresh set of framework artifacts and the build server always grabs the latest, so this is the quickest way to verify an unreleased fix or feature end to end on a device. Because `master` tracks active development it can be less stable than a release, so use it for verification rather than for shipping production builds. Building against `master` is available to Pro and Enterprise subscribers.
 
 === Android permissions
 

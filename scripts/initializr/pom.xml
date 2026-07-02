@@ -19,8 +19,8 @@
 <module>common</module>
 </modules>
   <properties>
-    <cn1.version>7.0.251</cn1.version>
-    <cn1.plugin.version>7.0.251</cn1.plugin.version>
+    <cn1.version>7.0.255</cn1.version>
+    <cn1.plugin.version>7.0.255</cn1.plugin.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java.version>1.8</java.version>
     <java-tests.version>11</java-tests.version>
@@ -121,7 +121,9 @@
            instead of the pinned release, so the local ParparVM JavaScript
            build reflects repo source. The website CI bootstraps these
            8.0-SNAPSHOT artifacts via bootstrap_local_cn1_snapshots before
-           building the initializr with -Dcn1.localWorkspace=true. -->
+           building the initializr with -Dcn1.localWorkspace=true. Must match the
+           repo snapshot version (and the cn1playground cn1-local-workspace
+           profile) so the repo JavaScript port compiles against repo-HEAD core. -->
       <properties>
         <cn1.version>8.0-SNAPSHOT</cn1.version>
         <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>

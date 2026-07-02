@@ -1569,6 +1569,410 @@
     return hostResult(event);
   });
 
+  // Copy text to the system clipboard ON THE MAIN THREAD. The worker that runs
+  // the translated Java cannot reach the clipboard itself: document/execCommand
+  // do not exist in a Web Worker and navigator.clipboard is a Window-only API.
+  // The Java copyToClipboard() therefore routes the actual write here, where it
+  // still runs inside the transient user-activation window carried by the
+  // forwarded click that triggered it. Returns 1 on success, 0 on failure so the
+  // worker can fall back to its permission-prompt path.
+  function execCommandClipboardFallback(text) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) {
+      return false;
+    }
+    var textArea = doc.createElement('textarea');
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-1000px';
+    textArea.style.left = '0';
+    textArea.style.opacity = '0';
+    doc.body.appendChild(textArea);
+    textArea.value = text;
+    var ok = false;
+    try {
+      textArea.focus();
+      textArea.select();
+      ok = !!doc.execCommand('copy');
+    } catch (err) {
+      ok = false;
+    }
+    doc.body.removeChild(textArea);
+    return ok;
+  }
+
+  hostBridge.register('__cn1_copy_to_clipboard__', function(request) {
+    var text = (request && request.text != null) ? String(request.text) : '';
+    var nav = global.navigator || (global.window && global.window.navigator);
+    try {
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        return nav.clipboard.writeText(text).then(function() {
+          return 1;
+        }, function() {
+          return execCommandClipboardFallback(text) ? 1 : 0;
+        });
+      }
+    } catch (err) {
+      // navigator.clipboard can throw synchronously in insecure contexts.
+    }
+    return execCommandClipboardFallback(text) ? 1 : 0;
+  });
+
+  // Web Share API (navigator.share / navigator.canShare) is Window-only and so
+  // is unreachable from the worker that runs the translated Java. Both the
+  // capability check and the share invocation are routed here to the main
+  // thread, where navigator.share lives and the forwarded click's user
+  // activation is still valid. Mirrors the clipboard handlers above.
+  hostBridge.register('__cn1_native_share_supported__', function() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    var loc = (global.window || global).location;
+    var secure = !!(loc && (loc.protocol === 'https:'
+      || loc.hostname === 'localhost' || loc.hostname === '127.0.0.1'));
+    return (nav && typeof nav.share === 'function' && secure) ? 1 : 0;
+  });
+
+  hostBridge.register('__cn1_native_share__', function(request) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    if (!nav || typeof nav.share !== 'function') {
+      return 0;
+    }
+    var data = {};
+    if (request && request.text != null && String(request.text).length) {
+      data.text = String(request.text);
+    }
+    if (request && request.url != null && String(request.url).length) {
+      data.url = String(request.url);
+    }
+    try {
+      // Resolves 0 on user-cancel/abort -- a rejection here is not an error.
+      return nav.share(data).then(function() {
+        return 1;
+      }, function() {
+        return 0;
+      });
+    } catch (err) {
+      return 0;
+    }
+  });
+
+  // The build version is published as the data-cn1-app-version attribute on the
+  // host page's <html> element, which the worker can't read (no document). Used
+  // for cache-busting resource URLs; returns null when absent.
+  hostBridge.register('__cn1_build_version__', function() {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.documentElement) {
+      return null;
+    }
+    return doc.documentElement.getAttribute('data-cn1-app-version');
+  });
+
+  // Create a DOM element on the MAIN thread and return its host-ref. The worker
+  // cannot create DOM nodes (no document, and jQuery isn't loaded there), so the
+  // jQuery/`createElement`-based @JSBody helpers (showButton_, FileChooser's
+  // file inputs + buttons) route here. ``spec`` = {tag, attrs, text, appendToBody};
+  // ``clickCallback`` (optional, a separate top-level arg so mapHostArgs
+  // materialises it into a worker-callback proxy) is wired as a click listener.
+  // text is set via textContent, never innerHTML -- no markup injection from
+  // user-controlled labels.
+  hostBridge.register('__cn1_create_dom_element__', function(spec, clickCallback) {
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof doc.createElement !== 'function') {
+      return null;
+    }
+    spec = spec || {};
+    var el = doc.createElement(String(spec.tag || 'div'));
+    if (spec.attrs) {
+      for (var k in spec.attrs) {
+        if (Object.prototype.hasOwnProperty.call(spec.attrs, k)) {
+          el.setAttribute(k, String(spec.attrs[k]));
+        }
+      }
+    }
+    if (spec.text != null) {
+      el.textContent = String(spec.text);
+    }
+    // hostBridge.invoke passes args raw (no mapHostArgs), so a worker-side
+    // EventListener arrives as a {__cn1WorkerCallback} marker -- materialise it
+    // into a proxy that posts the click back to the worker.
+    var cb = clickCallback;
+    if (cb && typeof cb === 'object' && typeof cb.__cn1WorkerCallback === 'number') {
+      cb = makeWorkerCallback(cb.__cn1WorkerCallback);
+    }
+    if (typeof cb === 'function') {
+      el.addEventListener('click', cb);
+    }
+    if (spec.appendToBody && doc.body) {
+      doc.body.appendChild(el);
+    }
+    // hostResult stores the element as a host-ref and returns a cloneable
+    // {__cn1HostRef} marker -- returning the raw element makes postHostCallback's
+    // structured-clone postMessage throw DataCloneError.
+    return hostResult(el);
+  });
+
+  // Fullscreen lives on the main-thread document. The worker routes the
+  // capability/state queries and the enter/exit requests here; enter/exit
+  // resolve to 1/0 once the browser's requestFullscreen()/exitFullscreen()
+  // promise settles, and the worker invokes the Java callback with that result.
+  function fullscreenDoc() {
+    return global.document || (global.window && global.window.document);
+  }
+  hostBridge.register('__cn1_fullscreen_supported__', function() {
+    var doc = fullscreenDoc();
+    return (doc && doc.body && typeof doc.body.requestFullscreen === 'function') ? 1 : 0;
+  });
+  hostBridge.register('__cn1_is_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    return (doc && doc.fullscreenElement) ? 1 : 0;
+  });
+  hostBridge.register('__cn1_request_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    if (!doc || !doc.body || typeof doc.body.requestFullscreen !== 'function') {
+      return 0;
+    }
+    try {
+      var p = doc.body.requestFullscreen();
+      if (p && typeof p.then === 'function') {
+        return p.then(function() { return 1; }, function() { return 0; });
+      }
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  });
+  // Print: build the Blob + object URL on the MAIN thread from the base64
+  // document bytes the worker sent (a worker-created blob: URL is invalid in a
+  // main-thread iframe, and document/iframe don't exist in the worker), load it
+  // into a hidden iframe and invoke the browser print dialog. Resolves {ok,
+  // error} once afterprint fires or the 1s fallback elapses; the worker then
+  // invokes the Java PrintFrameCallback with the outcome.
+  // FileChooser: read the file the user picked in the <input type=file>. The
+  // input host-ref is resolved here; the worker only ever sees the bytes.
+  hostBridge.register('__cn1_input_file_count__', function(request) {
+    var el = resolveHostRef(request && request.el);
+    return (el && el.files) ? el.files.length : 0;
+  });
+
+  hostBridge.register('__cn1_read_input_file__', function(request) {
+    var el = resolveHostRef(request && request.el);
+    var index = (request && request.index) | 0;
+    var f = (el && el.files) ? el.files[index] : null;
+    if (!f) {
+      return null;
+    }
+    return new Promise(function(resolve) {
+      try {
+        var fr = new FileReader();
+        fr.onload = function() {
+          var res = String(fr.result || '');
+          var comma = res.indexOf(',');
+          var b64 = comma >= 0 ? res.substring(comma + 1) : res;
+          resolve((f.name || '') + '\n' + b64);
+        };
+        fr.onerror = function() { resolve(null); };
+        fr.readAsDataURL(f);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  });
+
+  // Live camera (com.codename1.camera.Camera). The whole getUserMedia/<video>/
+  // capture-<canvas> session runs here on the main thread; the worker only holds
+  // the opaque <video> host-ref.
+  hostBridge.register('__cn1_camera_supported__', function() {
+    return (typeof navigator !== 'undefined' && navigator.mediaDevices
+      && navigator.mediaDevices.getUserMedia) ? 1 : 0;
+  });
+
+  hostBridge.register('__cn1_camera_last_error__', function() {
+    return global.__cn1_camera_error || '';
+  });
+
+  hostBridge.register('__cn1_camera_open__', function(request) {
+    var facing = (request && request.facing) ? String(request.facing) : 'environment';
+    var audio = !!(request && request.audio);
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof navigator === 'undefined' || !navigator.mediaDevices
+        || !navigator.mediaDevices.getUserMedia) {
+      global.__cn1_camera_error = 'NotSupportedError';
+      return null;
+    }
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: audio })
+      .then(function(stream) {
+        var v = doc.createElement('video');
+        v.autoplay = true;
+        v.muted = true;
+        v.setAttribute('muted', '');
+        v.setAttribute('playsinline', '');
+        v.setAttribute('autoplay', '');
+        v.srcObject = stream;
+        try { var p = v.play(); if (p && p.catch) { p.catch(function() {}); } } catch (e) {}
+        global.__cn1_camera_error = '';
+        return hostResult(v);
+      })
+      .catch(function(e) {
+        global.__cn1_camera_error = (e && e.name) ? e.name : ('' + e);
+        return null;
+      });
+  });
+
+  hostBridge.register('__cn1_camera_grab__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v) { return null; }
+    var w = (request && request.w) | 0;
+    var h = (request && request.h) | 0;
+    if (w <= 0) { w = v.videoWidth || 640; }
+    if (h <= 0) { h = v.videoHeight || 480; }
+    var quality = (request && typeof request.quality === 'number') ? request.quality : 0.9;
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc) { return null; }
+    try {
+      var c = doc.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(v, 0, 0, w, h);
+      var dataUrl = c.toDataURL('image/jpeg', quality);
+      var comma = dataUrl.indexOf(',');
+      var b64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;
+      return w + ',' + h + ',' + b64;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  hostBridge.register('__cn1_camera_close__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v) { return 0; }
+    try {
+      if (v.srcObject) {
+        var t = v.srcObject.getTracks();
+        for (var i = 0; i < t.length; i++) { t[i].stop(); }
+      }
+    } catch (e) {}
+    try { v.pause(); } catch (e) {}
+    try { if (v.parentNode) { v.parentNode.removeChild(v); } } catch (e) {}
+    try { v.srcObject = null; } catch (e) {}
+    return 1;
+  });
+
+  hostBridge.register('__cn1_print_data__', function(request) {
+    var b64 = (request && request.b64 != null) ? String(request.b64) : '';
+    var mimeType = (request && request.mimeType != null) ? String(request.mimeType) : 'application/octet-stream';
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.body) {
+      return { ok: 0, error: 'Printing requires a browser document context' };
+    }
+    var isImage = mimeType.indexOf('image/') === 0;
+    var urlApi = (typeof URL !== 'undefined' && URL) ? URL
+      : ((global.window && global.window.webkitURL) ? global.window.webkitURL : null);
+    var url = null;
+    if (!isImage) {
+      // PDF and other binary formats the browser can render natively go through
+      // an object URL loaded directly into the iframe.
+      try {
+        var bin = atob(b64);
+        var u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }
+        var blob = new Blob([u8], { type: mimeType });
+        url = urlApi ? urlApi.createObjectURL(blob) : null;
+      } catch (err) {
+        return { ok: 0, error: 'Failed to decode document for printing: ' + err };
+      }
+      if (!url) {
+        return { ok: 0, error: 'Object URLs are not supported in this browser' };
+      }
+    }
+    return new Promise(function(resolve) {
+      var done = false, cleaned = false, iframe = null;
+      var finish = function(ok, msg) {
+        if (done) { return; }
+        done = true;
+        resolve({ ok: ok ? 1 : 0, error: msg == null ? null : String(msg) });
+      };
+      var cleanup = function() {
+        if (cleaned) { return; }
+        cleaned = true;
+        try { if (urlApi && url) { urlApi.revokeObjectURL(url); } } catch (e) {}
+        try { if (iframe && iframe.parentNode) { iframe.parentNode.removeChild(iframe); } } catch (e) {}
+      };
+      iframe = doc.createElement('iframe');
+      // Off-screen but laid out and rendered. A zero-size or visibility:hidden
+      // iframe prints blank in several browsers (the "white page" symptom).
+      iframe.style.cssText = 'position:fixed;left:-100000px;top:0;width:794px;height:1123px;border:0;background:#fff';
+      iframe.onload = function() {
+        try {
+          var win = iframe.contentWindow;
+          try { win.addEventListener('afterprint', function() { finish(1, null); setTimeout(cleanup, 0); }); } catch (e) {}
+          var doPrint = function() {
+            try { win.focus(); win.print(); }
+            catch (e) { finish(0, '' + e); cleanup(); return; }
+            setTimeout(function() { finish(1, null); }, 1000);
+          };
+          if (isImage) {
+            // Wait for the (data-URL) image to decode/paint before printing,
+            // otherwise the print captures an empty page.
+            var idoc = null;
+            try { idoc = iframe.contentDocument || win.document; } catch (e) {}
+            var img = (idoc && idoc.images && idoc.images.length) ? idoc.images[0] : null;
+            if (img && !(img.complete && img.naturalWidth > 0)) {
+              var tries = 0;
+              var waitImg = function() {
+                if ((img.complete && img.naturalWidth > 0) || tries++ > 100) { doPrint(); }
+                else { setTimeout(waitImg, 20); }
+              };
+              waitImg();
+              return;
+            }
+          }
+          doPrint();
+        } catch (e) {
+          finish(0, '' + e);
+          cleanup();
+        }
+      };
+      iframe.onerror = function() { finish(0, 'Failed to load document for printing'); cleanup(); };
+      if (isImage) {
+        // Printing a raw image blob as the iframe src yields a tiny centred
+        // thumbnail on a white page in most browsers. Wrap it in a page-filling
+        // <img> so the printout actually shows the image.
+        var dataUrl = 'data:' + mimeType + ';base64,' + b64;
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+          + '<style>@page{margin:0}html,body{margin:0;padding:0;background:#fff}'
+          + 'img{display:block;width:100%;height:auto}</style></head>'
+          + '<body><img src="' + dataUrl + '"></body></html>';
+        try { iframe.srcdoc = html; }
+        catch (e) { iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(html); }
+      } else {
+        iframe.src = url;
+      }
+      doc.body.appendChild(iframe);
+      // afterprint doesn't fire reliably for an off-screen iframe, which would
+      // leave the promise -- and the caller's listener -- hanging. Resolve as
+      // completed after a grace period regardless; the print dialog still
+      // triggers from onload when it fires.
+      setTimeout(function() { finish(1, null); }, 3000);
+      setTimeout(cleanup, 60000);
+    });
+  });
+
+  hostBridge.register('__cn1_exit_fullscreen__', function() {
+    var doc = fullscreenDoc();
+    if (!doc || typeof doc.exitFullscreen !== 'function') {
+      return 0;
+    }
+    try {
+      var p = doc.exitFullscreen();
+      if (p && typeof p.then === 'function') {
+        return p.then(function() { return 1; }, function() { return 0; });
+      }
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  });
+
   function afterPaint(frames) {
     return new Promise(function(resolve) {
       var win = global.window || global;

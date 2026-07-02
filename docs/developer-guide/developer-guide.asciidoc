@@ -59,6 +59,8 @@ include::css.asciidoc[]
 
 include::The-Components-Of-Codename-One.asciidoc[]
 
+include::Media-And-Audio.asciidoc[]
+
 include::Animations.asciidoc[]
 
 include::The-EDT---Event-Dispatch-Thread.asciidoc[]
@@ -75,6 +77,8 @@ include::Game-Assets.asciidoc[]
 
 include::Events.asciidoc[]
 
+include::Device-Input-And-Form-Factors.asciidoc[]
+
 include::io.asciidoc[]
 
 include::Push-Notifications.asciidoc[]
@@ -82,6 +86,10 @@ include::Push-Notifications.asciidoc[]
 include::Notifications-And-Background-Execution.asciidoc[]
 
 include::Maps.asciidoc[]
+
+include::In-Car-Experiences.asciidoc[]
+
+include::Motion-Sensors.asciidoc[]
 
 include::Miscellaneous-Features.asciidoc[]
 
@@ -94,6 +102,9 @@ include::Advertising.asciidoc[]
 include::Crash-Protection.asciidoc[]
 
 include::Analytics.asciidoc[]
+
+include::Commerce.asciidoc[]
+
 
 include::Monetization.asciidoc[]
 
@@ -164,4 +175,3 @@ include::Maven-Appendix-Rich-Properties.adoc[]
 = Historical reference
 
 include::Working-with-UWP.asciidoc[]
-

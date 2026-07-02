@@ -17,6 +17,7 @@ public class OrientationLockScreenshotTest extends BaseTest {
     // test). 80 * 100ms = 8s still leaves comfortable headroom under the 30s
     // native test timeout even with the trailing wait-back-to-portrait poll.
     private static final int ORIENTATION_POLL_ATTEMPTS = 80;
+    private static final int POST_PORTRAIT_SETTLE_MS = 1000;
 
     @Override
     public boolean runTest() {
@@ -44,7 +45,11 @@ public class OrientationLockScreenshotTest extends BaseTest {
                         markCaptureStarted();
                         Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
                             CN.lockOrientation(true);
-                            waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
+                            waitForOrientation(this, true, () -> {
+                                revalidate();
+                                UITimer.timer(POST_PORTRAIT_SETTLE_MS, false, this,
+                                        OrientationLockScreenshotTest.this::done);
+                            });
                         });
                     });
                 });
@@ -60,10 +65,18 @@ public class OrientationLockScreenshotTest extends BaseTest {
     }
 
     private void waitForOrientation(Form form, boolean portrait, int attemptsLeft, Runnable onDone) {
-        if (CN.isPortrait() == portrait || attemptsLeft <= 0) {
+        form.revalidate();
+        if (isOrientationSettled(form, portrait) || attemptsLeft <= 0) {
             onDone.run();
             return;
         }
         UITimer.timer(ORIENTATION_POLL_INTERVAL_MS, false, form, () -> waitForOrientation(form, portrait, attemptsLeft - 1, onDone));
+    }
+
+    private boolean isOrientationSettled(Form form, boolean portrait) {
+        boolean dimensionsMatch = portrait
+                ? form.getHeight() >= form.getWidth()
+                : form.getWidth() > form.getHeight();
+        return CN.isPortrait() == portrait && dimensionsMatch;
     }
 }

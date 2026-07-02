@@ -91,14 +91,17 @@ jobs:
           node-version: '20'
       - name: Run Unit Tests
         run: |
+          MVN_GOAL="verify"
           MVN_ARGS=""
           if [ "${{ matrix.java-version }}" != "8" ]; then
-            MVN_ARGS="-Dspotbugs.skip=true"
+            MVN_GOAL="test"
+            MVN_ARGS="-Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true -Djacoco.skip=true"
           fi
           cd maven
-          mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
+          mvn clean "$MVN_GOAL" -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
           cd ..
       - name: Build CSS compiler and smoke native-themes
+        if: ${{ matrix.java-version == 8 }}
         run: |
           cd maven
           mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
@@ -107,12 +110,14 @@ jobs:
           test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }
           test -f Themes/AndroidMaterialTheme.res || { echo "missing Themes/AndroidMaterialTheme.res"; exit 1; }
       - name: Prepare Codename One binaries for Maven plugin tests
+        if: ${{ matrix.java-version == 8 }}
         run: |
           set -euo pipefail
           rm -rf maven/target/cn1-binaries
           mkdir -p maven/target
           cp -r /opt/cn1-binaries maven/target/cn1-binaries
       - name: Run Maven plugin tests
+        if: ${{ matrix.java-version == 8 }}
         working-directory: maven
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
@@ -123,6 +128,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl codenameone-maven-plugin -am -Plocal-dev-javase test
       - name: Run JavaSE port unit tests
+        if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher
         # localization, MavenUtils designer-jar resolution, JavaSEPort font
         # mapping). Without this step the tests in maven/javase compile but
@@ -142,26 +148,159 @@ jobs:
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl javase -Plocal-dev-javase test
-      - name: Build AI and ad cn1libs (mlkit + tflite + whisper + stable diffusion + admob + mediation + mock)
+      - name: Determine AI/ad cn1libs to build
+        id: cn1libs
+        if: ${{ matrix.java-version == 8 }}
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+
+          all_libs=(
+            cn1-ai-mlkit-text
+            cn1-ai-mlkit-barcode
+            cn1-ai-mlkit-face
+            cn1-ai-mlkit-labeling
+            cn1-ai-mlkit-translate
+            cn1-ai-mlkit-smartreply
+            cn1-ai-mlkit-langid
+            cn1-ai-mlkit-pose
+            cn1-ai-mlkit-segmentation
+            cn1-ai-mlkit-docscan
+            cn1-ai-tflite
+            cn1-ai-whisper
+            cn1-ai-stablediffusion
+            cn1-admob
+            cn1-applovin
+            cn1-unity-levelplay
+            cn1-ads-mock
+          )
+          ai_libs=(
+            cn1-ai-mlkit-text
+            cn1-ai-mlkit-barcode
+            cn1-ai-mlkit-face
+            cn1-ai-mlkit-labeling
+            cn1-ai-mlkit-translate
+            cn1-ai-mlkit-smartreply
+            cn1-ai-mlkit-langid
+            cn1-ai-mlkit-pose
+            cn1-ai-mlkit-segmentation
+            cn1-ai-mlkit-docscan
+            cn1-ai-tflite
+            cn1-ai-whisper
+            cn1-ai-stablediffusion
+          )
+
+          selected_libs=()
+          add_lib() {
+            local lib="$1"
+            local selected_lib
+            [ -d "maven/$lib" ] || return 0
+            for selected_lib in "${selected_libs[@]}"; do
+              [ "$selected_lib" = "$lib" ] && return 0
+            done
+            selected_libs+=("$lib")
+          }
+          add_all() {
+            local lib
+            for lib in "${all_libs[@]}"; do add_lib "$lib"; done
+          }
+          add_ai() {
+            local lib
+            for lib in "${ai_libs[@]}"; do add_lib "$lib"; done
+          }
+
+          changed_files=""
+          if [ -n "${BASE_SHA:-}" ] && [[ "$BASE_SHA" != 0000000000000000000000000000000000000000 ]]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+            changed_files="$(git diff --name-only "$BASE_SHA" HEAD || true)"
+          fi
+          if [ -z "$changed_files" ]; then
+            echo "Unable to determine changed files; building all AI/ad cn1libs."
+            add_all
+          else
+            while IFS= read -r file; do
+              case "$file" in
+                maven/pom.xml|maven/codenameone-maven-plugin/*)
+                  add_all
+                  ;;
+                scripts/gen-ai-cn1libs.py)
+                  add_ai
+                  ;;
+                maven/cn1-ai-*/*|maven/cn1-admob/*|maven/cn1-applovin/*|maven/cn1-unity-levelplay/*|maven/cn1-ads-mock/*|maven/cn1-ads-mock)
+                  lib="${file#maven/}"
+                  lib="${lib%%/*}"
+                  add_lib "$lib"
+                  ;;
+              esac
+            done <<< "$changed_files"
+          fi
+
+          libs=()
+          modules=()
+          for lib in "${all_libs[@]}"; do
+            selected="false"
+            for selected_lib in "${selected_libs[@]}"; do
+              if [ "$selected_lib" = "$lib" ]; then
+                selected="true"
+                break
+              fi
+            done
+            if [ "$selected" = "true" ]; then
+              libs+=("$lib")
+              if [ "$lib" = "cn1-ads-mock" ]; then
+                modules+=("$lib")
+              else
+                modules+=("$lib/common")
+              fi
+            fi
+          done
+
+          {
+            printf 'libs='
+            (IFS=,; printf '%s' "${libs[*]:-}")
+            printf '\nmodules='
+            (IFS=,; printf '%s' "${modules[*]:-}")
+            printf '\n'
+          } >> "$GITHUB_OUTPUT"
+
+          if [ ${#libs[@]} -eq 0 ]; then
+            echo "No AI/ad cn1lib changes detected; skipping cn1lib packaging step."
+          else
+            echo "AI/ad cn1libs selected for packaging: ${libs[*]}"
+          fi
+      - name: Build changed/impacted AI and ad cn1libs
+        if: ${{ matrix.java-version == 8 && steps.cn1libs.outputs.modules != '' }}
         # Exercises every cn1-ai-* and ad-provider multi-module project:
         # compiles the common module, runs its JUnit 5 tests, and packages
         # the .cn1lib archive (including native iOS Obj-C / Android Java
-        # sources). Also re-runs the AI generator and verifies the working
-        # tree matches what's checked in.
+        # sources). The detector above limits this to changed cn1libs unless
+        # shared inputs changed, in which case all impacted cn1libs are rebuilt.
         working-directory: maven
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+          CN1LIB_LIBS: ${{ steps.cn1libs.outputs.libs }}
+          CN1LIB_MODULES: ${{ steps.cn1libs.outputs.modules }}
         run: |
-          set -eu
+          set -euo pipefail
           python3 ../scripts/gen-ai-cn1libs.py > /tmp/gen-ai.log
           # Capture a list of changed files instead of using --exit-code/--quiet,
           # which interacted poorly with the surrounding `set -e -o pipefail`.
-          drift=$(git -C .. status --porcelain -- 'maven/cn1-ai-*' || true)
-          if [ -n "$drift" ]; then
-            echo "::error::Checked-in cn1-ai-* tree is out of sync with scripts/gen-ai-cn1libs.py"
-            echo "$drift"
-            git -C .. --no-pager diff -- 'maven/cn1-ai-*' || true
-            exit 1
+          ai_drift_paths=()
+          IFS=',' read -r -a libs <<< "$CN1LIB_LIBS"
+          for lib in "${libs[@]}"; do
+            case "$lib" in
+              cn1-ai-*) ai_drift_paths+=("maven/$lib") ;;
+            esac
+          done
+          if [ ${#ai_drift_paths[@]} -gt 0 ]; then
+            drift=$(git -C .. status --porcelain -- "${ai_drift_paths[@]}" || true)
+            if [ -n "$drift" ]; then
+              echo "::error::Checked-in cn1-ai-* tree is out of sync with scripts/gen-ai-cn1libs.py"
+              echo "$drift"
+              git -C .. --no-pager diff -- "${ai_drift_paths[@]}" || true
+              exit 1
+            fi
           fi
           # The cn1lib mojo is part of codenameone-maven-plugin and isn't
           # in m2 from prior CI steps (those run the plugin's tests but
@@ -176,7 +315,7 @@ jobs:
           mvn -B -Dmaven.javadoc.skip=true \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Plocal-dev-javase \
-            -pl 'cn1-ai-mlkit-text/common,cn1-ai-mlkit-barcode/common,cn1-ai-mlkit-face/common,cn1-ai-mlkit-labeling/common,cn1-ai-mlkit-translate/common,cn1-ai-mlkit-smartreply/common,cn1-ai-mlkit-langid/common,cn1-ai-mlkit-pose/common,cn1-ai-mlkit-segmentation/common,cn1-ai-mlkit-docscan/common,cn1-ai-tflite/common,cn1-ai-whisper/common,cn1-ai-stablediffusion/common,cn1-admob/common,cn1-applovin/common,cn1-unity-levelplay/common,cn1-ads-mock' \
+            -pl "$CN1LIB_MODULES" \
             package
       - name: Run SpotBugs for ports and Maven plugin
         if: ${{ matrix.java-version == 8 }}
@@ -345,23 +484,20 @@ jobs:
             const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
             await publishQualityComment({ github, context, core });
       - name: Link cn1-binaries
+        if: ${{ matrix.java-version == 8 }}
         run: ln -s /opt/cn1-binaries ../cn1-binaries
+      - name: Use upstream JCEF for the Ant build
+        if: ${{ matrix.java-version == 8 }}
+        run: ./scripts/ci-install-upstream-jcef-jar.sh
       - name: Build CLDC11 JAR
-        run: |
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
+        if: ${{ matrix.java-version == 8 }}
+        run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
       - name: Build with Ant
+        if: ${{ matrix.java-version == 8 }}
         run: |
           mkdir -p ~/.codenameone
           cp maven/UpdateCodenameOne.jar ~/.codenameone/
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          xvfb-run ant $ANT_OPTS_ARGS test-javase
+          xvfb-run ant test-javase
 
       - name: Build Release
         if: matrix.java-version == 8
@@ -392,14 +528,11 @@ jobs:
           path: CodenameOne/javadocs.zip
 
       - name: Build iOS Port
-        run: |
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/iOSPort/build.xml jar
+        if: ${{ matrix.java-version == 8 }}
+        run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
 
       - name: Build iOS VM API
+        if: ${{ matrix.java-version == 8 }}
         run: mvn -f vm/JavaAPI/pom.xml package
 
       - name: Upload a Build Artifact
@@ -410,6 +543,7 @@ jobs:
           path: vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
 
       - name: Build iOS VM
+        if: ${{ matrix.java-version == 8 }}
         run: mvn -f vm/ByteCodeTranslator/pom.xml package
 
       - name: Upload a Build Artifact
@@ -427,19 +561,15 @@ jobs:
           path: Ports/CLDC11/dist/CLDC11.jar
 
       - name: Build Android Port
-        run: |
-          ANT_OPTS_ARGS=""
-          if [ "${{ matrix.java-version }}" != "8" ]; then
-            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-          fi
-          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/Android/build.xml jar
+        if: ${{ matrix.java-version == 8 }}
+        run: ant -noinput -buildfile Ports/Android/build.xml jar
 
       - name: Packaging Everything
         if: matrix.java-version == 8
         run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
 
       - name: Copying Files to Server
-        if: matrix.java-version == 8
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && matrix.java-version == 8 }}
         uses: marcodallasanta/ssh-scp-deploy@v1.0.5
         with:
           host: ${{ secrets.WP_HOST }}

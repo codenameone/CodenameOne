@@ -25,9 +25,14 @@ package com.codename1.maps;
 import com.codename1.maps.spi.MapProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.SuccessCallback;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /// A cross-platform [MapProvider] that hosts a JavaScript map SDK (Google Maps
 /// JS, Azure Maps, ...) inside a [BrowserComponent]. Because it relies only on
@@ -46,6 +51,10 @@ public class WebMapProvider implements MapProvider {
     private final String apiKey;
     private final String htmlTemplate;
     private final Map peers = new HashMap();
+    /// mapIds whose web map has fired its first 'tilesloaded' (see createPeer's
+    /// JS bridge). A plain Set read so isReady(int) is a cheap, non-blocking
+    /// check -- never a synchronous JS round-trip on the EDT.
+    private final Set readyMapIds = new HashSet();
 
     /// Creates a web provider.
     ///
@@ -98,15 +107,52 @@ public class WebMapProvider implements MapProvider {
         html = replace(html, "{lat}", Double.toString(lat));
         html = replace(html, "{lon}", Double.toString(lon));
         html = replace(html, "{zoom}", Integer.toString(zoom));
-        BrowserComponent bc = new BrowserComponent();
+        final BrowserComponent bc = new BrowserComponent();
+        final Integer readyKey = Integer.valueOf(mapId);
+        // Bridge the map's readiness to Java once, event-style (a cheap Set flag,
+        // not a synchronous executeAndReturnString poll which routes through the
+        // costly invokeAndBlock on iOS). The bridge MUST be installed only after
+        // the page has loaded: doing it here, inline, runs execute() on a
+        // BrowserComponent whose native peer isn't initialised yet, so it blocks
+        // in invokeAndBlock and hangs the map's creation (the form never finishes
+        // showing -> the test produced no capture at all). Install it from the
+        // onLoad event, when the component is attached and ready. An in-page
+        // interval (runs cheaply in the browser) then watches the cn1mapReady
+        // flag the HTML sets on the SDK's 'tilesloaded' event and calls back into
+        // Java exactly once.
+        bc.addWebEventListener(BrowserComponent.onLoad, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                bc.addJSCallback(
+                        "window.cn1NotifyMapReady=function(){callback.onSuccess('ready');};"
+                        + "(function(){var t=setInterval(function(){"
+                        + "if(window.cn1mapReady===true){clearInterval(t);window.cn1NotifyMapReady();}"
+                        + "},200);})();",
+                        new SuccessCallback<BrowserComponent.JSRef>() {
+                            @Override
+                            public void onSucess(BrowserComponent.JSRef value) {
+                                readyMapIds.add(readyKey);
+                            }
+                        });
+            }
+        });
         bc.setPage(html, "https://maps.example/");
         peers.put(Integer.valueOf(mapId), bc);
         return bc;
     }
 
+    /// Whether the web map for `mapId` has finished painting its tiles, i.e. the
+    /// SDK has fired its first `tilesloaded` event. Lets a caller wait for the
+    /// real render rather than a fixed delay. Cheap and non-blocking: reads a
+    /// Set updated by the one-shot JS->Java readiness bridge in createPeer.
+    public boolean isReady(int mapId) {
+        return readyMapIds.contains(Integer.valueOf(mapId));
+    }
+
     /// {@inheritDoc}
     @Override
     public void deinitialize(int mapId) {
+        readyMapIds.remove(Integer.valueOf(mapId));
         BrowserComponent bc = (BrowserComponent) peers.remove(Integer.valueOf(mapId));
         if (bc != null) {
             try {
@@ -292,7 +338,11 @@ public class WebMapProvider implements MapProvider {
             + "<body><div id=\"map\"></div><script>"
             + "function initMap(){window.cn1map=new google.maps.Map(document.getElementById('map'),"
             + "{center:{lat:{lat},lng:{lon}},zoom:{zoom},disableDefaultUI:true,"
-            + "gestureHandling:'none',clickableIcons:false});}"
+            + "gestureHandling:'none',clickableIcons:false});"
+            // Expose a readiness flag once the map has actually painted its
+            // tiles, so callers can wait for the real render instead of guessing
+            // a fixed delay (the screenshot test polls isReady(int)).
+            + "google.maps.event.addListenerOnce(window.cn1map,'tilesloaded',function(){window.cn1mapReady=true;});}"
             + "</script>"
             + "<script async src=\"https://maps.googleapis.com/maps/api/js?key={key}&callback=initMap\"></script>"
             + "</body></html>";

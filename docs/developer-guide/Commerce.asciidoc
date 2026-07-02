@@ -1,0 +1,134 @@
+== Commerce
+
+Commerce is an optional service that validates your in-app purchases and subscriptions server-side and gives your app a single, store-agnostic question to ask: _does this user have this entitlement right now?_ It wraps the existing Purchase API (see the _Monetization_ chapter) -- purchases still go through the platform store -- and adds cloud receipt validation, a normalized subscription state machine across Apple and Google, lifecycle webhooks to your backend, and a revenue console.
+
+Codename One doesn't process payments and never touches your money -- the stores (and, for physical goods, your own payment processor) do. Commerce is infrastructure that sits beside the money flow, exactly like the third-party services it replaces.
+
+=== Entitlements, not SKUs
+
+The core idea is the *entitlement*: an abstract access right such as `pro` or `remove_ads`. You map one or more store products to an entitlement, and your code only ever checks the entitlement:
+
+[source,java]
+----
+if (CommerceManager.getInstance().isEntitled("pro")) {
+    // unlock pro features
+}
+----
+
+An entitlement is active when *any* of its granting products is active. This matters: a promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single authoritative rule -- the latest expiry over the active grants, evaluated against a server timestamp -- so a tampered device clock can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access on its own.
+
+=== Client usage
+
+In your `Lifecycle.init` (or wherever you set up purchases):
+
+[source,java]
+----
+CommerceManager cm = CommerceManager.getInstance();
+cm.setAppUserId(myAccountId);   // optional; a stable id for the signed-in user
+----
+
+Drive purchases through the manager (these delegate to the `Purchase` API):
+
+[source,java]
+----
+cm.subscribe("pro_monthly");
+// or cm.purchase("remove_ads");
+----
+
+After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` makes a blocking network call, so run it off the EDT:
+
+[source,java]
+----
+CN.callSerially(() -> {});                // (illustrative)
+new Thread(() -> {
+    cm.refresh();
+    if (cm.isEntitled("pro")) { /* ... */ }
+}).start();
+----
+
+`isEntitled` returns the last cloud-validated answer when one is available, and otherwise falls back to the platform's own receipt (treating the entitlement id as a subscription SKU) so a paying user is never locked out while the network is down.
+
+=== How the app finds the service
+
+Commerce reuses the standard `build_key` that every Codename One cloud build already carries, the same token the analytics provider sends -- so there is *nothing to wire into the build*. `CommerceManager.isCloudEnabled()` is true on any cloud build and false in the simulator or a local build (where every call defers to `Purchase`). Two optional build hints tune it:
+
+[cols="2,1,4"]
+|===
+|Build hint |Default |Description
+
+|`commerce.cloud.enabled`
+|`true`
+|Set to `false` to switch the cloud path off in a cloud build; every call then defers to the platform `Purchase` API.
+
+|`commerce.cloud.endpoint`
+|_(Codename One cloud)_
+|Base URL of the commerce service. Override only if you self-host.
+|===
+
+=== Server notifications
+
+For the entitlement state to stay correct after the initial purchase -- renewals, cancellations, refunds, billing retries, grace periods, holds -- point the stores' server notifications at the service:
+
+. *Apple* -- in App Store Connect, set the App Store Server Notifications V2 URL to `https://cloud.codenameone.com/api/v2/commerce/notifications/apple`.
+. *Google* -- in the Play Console, set Real-time developer notifications and route the Pub/Sub topic to `https://cloud.codenameone.com/api/v2/commerce/notifications/google`.
+
+Notifications are idempotent (deduplicated on Apple's `notificationUUID` / Google's Pub/Sub `messageId`), so a redelivery never double-counts.
+
+=== Server-side validation (connect your store credentials)
+
+By default the service validates the store-signed receipt the device presents -- enough to gate features, and it works with no setup. For *server-authoritative* validation -- where the service calls Apple's and Google's own server APIs to confirm the real subscription state -- provide your store credentials in the console *Secrets* page:
+
+- *Apple* -- an App Store Connect API key, as three secrets: `commerce.apple.keyId`, `commerce.apple.issuerId`, and `commerce.apple.privateKey` (the contents of the `.p8` file).
+- *Google* -- a service account with Android Publisher access, as `commerce.google.serviceAccountJson` (the full JSON key).
+
+Secrets are stored AES-256-GCM encrypted in the BuildCloud vault; they're decrypted only server-side at call time and are never shown in the console again. Once set:
+
+- Entitlements are confirmed against Apple's `Get All Subscription Statuses` and Google's `subscriptionsv2.get`, so a grant is server-verified rather than device-trusted, and
+- Subscription *renewals* signalled by store notifications are recorded at their real amount (the renewal price lives only in the store's server response).
+
+Without credentials the service stays in device-trusted mode -- everything still works, you just don't get the server cross-check or accurate renewal revenue.
+
+=== Lifecycle webhooks to your backend
+
+Commerce can forward every normalized state change to your own backend. Configure a URL and a signing secret on the *Commerce* page of the console. Each event is HMAC-SHA256 signed (header `CN1-Commerce-Signature`) and carries:
+
+- A *per-customer monotonic `sequence`* -- so your consumer can reject stale events and never has to reorder defensively,
+- The grant's *`state_version`* -- reconcile against this,
+- An always-present *`effective_expiration_at`*, and
+- The event `id` for idempotent dedup.
+
+Delivery is at-least-once, in sequence order per customer, with retries that back off exponentially. Event types mirror the familiar set: `INITIAL_PURCHASE`, `RENEWAL`, `CANCELLATION`, `UNCANCELLATION`, `EXPIRATION`, `BILLING_ISSUE`, `PRODUCT_CHANGE`, `SUBSCRIPTION_PAUSED`, `REFUND_REVERSED`, `TRANSFER`.
+
+=== The console
+
+The *Commerce* section in the console at https://cloud.codenameone.com/console/index.html is account-level by default, with an app filter to narrow to one app:
+
+- *Overview* -- the subscription dashboard: headline KPIs (MRR, ARR, ARPU, active subscriptions, active trials, churn, trial conversion, customers) and trend charts for MRR, active subscriptions and revenue.
+- *Insights* -- MRR movement (new vs churned), MRR forecast, realized-LTV curve, active subscriptions by store and by product, cohort-retention, and period-over-period MRR.
+- *Customers* -- each app user and their active entitlements.
+- *Transactions* -- the recent validated-event ledger.
+- *Webhook* -- your delivery endpoint and signing secret.
+
+=== Analytics
+
+Commerce normalizes every active subscription to a monthly figure (MRR) and reconstructs the trends from the subscription history, so the dashboard matches what dedicated subscription-analytics tools provide:
+
+- *MRR / ARR / ARPU* -- normalized recurring revenue, annualized, and per active subscription.
+- *Churn* and *trial conversion* rates, *refund rate*.
+- *Cohort retention* -- monthly acquisition cohorts and the percentage still active each subsequent month.
+- *Realized LTV* -- average cumulative revenue per paying customer by months since acquisition.
+- *Forecast* -- projected MRR for the coming months from the current run-rate and recent growth.
+- *Breakdowns* by store and by product, and *period-over-period* comparison.
+
+Every chart pairs a graph with its underlying data table (one tab-flip away) for export-friendly inspection. All money is shown in your reporting currency; transactions in other currencies are normalized to USD via daily exchange rates.
+
+=== Privacy
+
+Commerce stores entitlement state and transaction metadata (store, product id, event type, amount, validation state) keyed by your app-user id. It never stores card numbers or payment credentials -- those stay with Apple, Google, or your processor. Family shared purchases grant access but are excluded from revenue. The minimum lookup state needed to resolve the next notification is kept; grants are retained as the durable record, while the high-churn ledger and delivered webhook rows are purged on a rolling window.
+
+=== Setup checklist
+
+. Map your store products to entitlements in the console.
+. In the app, call `CommerceManager.getInstance().subscribe(...)` / `.purchase(...)`, then `.refresh()` off the EDT, and gate features with `.isEntitled(...)`.
+. Point Apple App Store Server Notifications V2 and Google RTDN at the service notification URLs.
+. (Optional) Set a webhook URL + secret on the *Commerce* console page to receive lifecycle events on your backend.

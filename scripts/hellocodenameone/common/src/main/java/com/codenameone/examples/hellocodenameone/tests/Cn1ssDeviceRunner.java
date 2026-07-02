@@ -116,6 +116,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MorphTransitionTest(),
             new MorphTransitionScrolledSourceTest(),
             new MorphTransitionSnapshotTest(),
+            new MorphTransitionScrubScreenshotTest(),
+            new MorphElementMorphScreenshotTest(),
             new TabsAnimatedIndicatorScreenshotTest(),
             new PullToRefreshSpinnerScreenshotTest(),
             new AnimateLayoutScreenshotTest(),
@@ -274,6 +276,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // Build-time Lottie transcoder -- same pipeline as SVG, lowers
             // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
             new LottieAnimatedScreenshotTest(),
+            new AudioMixerApiTest(),
             // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube, a
             // textured cube, a loaded glTF model, and a behavioral animation-loop
             // test. Positioned immediately before OrientationLock on purpose, to
@@ -313,12 +316,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StringApiTest(),
             new TimeApiTest(),
             new NanoTimeApiTest(),
+            new FloatingToStringTest(),
+            new MotionSensorDeviceTest(),
             new CryptoApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),
             new BridgeBulkTransferGuardTest(),
             new VPNDetectionAPITest(),
             new CallDetectionAPITest(),
+            new DeviceInputApiTest(),
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),
@@ -344,6 +350,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// the index guarantees at most one retry per test so a genuinely broken
     /// test still fails after ~2x its timeout instead of looping.
     private int retriedTestIndex = -1;
+    private int retriedTransportTestIndex = -1;
+    private int retriedCaptureTimeoutTestIndex = -1;
 
     public static void addTest(BaseTest test) {
         prependedTest = test;
@@ -378,6 +386,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             return;
         }
         CN.callSerially(() -> {
+            Cn1ssDeviceRunnerHelper.clearTransportFailure();
             log("CN1SS:INFO:suite starting test=" + testName);
             if (shouldForceTimeoutInHtml5(testName)) {
                 log("CN1SS:ERR:suite test=" + testName + " forced timeout (HTML5 fallback)");
@@ -547,10 +556,28 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                     runNextTest(index);
                     return;
                 }
+                if (shouldRetryAfterCaptureTimeout(index, testClass)) {
+                    retriedCaptureTimeoutTestIndex = index;
+                    log("CN1SS:WARN:suite test=" + testName
+                            + " retrying once: capture was requested but did not complete");
+                    testClass.resetForRetry();
+                    runNextTest(index);
+                    return;
+                }
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testName + " failed: " + testClass.getFailMessage());
             } else if (!testClass.shouldTakeScreenshot()) {
                 log("CN1SS:INFO:test=" + testName + " screenshot=none");
+            } else {
+                String failedTransport = Cn1ssDeviceRunnerHelper.consumeTransportFailure();
+                if (failedTransport != null && shouldRetryAfterTransportFailure(index, testClass)) {
+                    retriedTransportTestIndex = index;
+                    log("CN1SS:WARN:suite test=" + testName
+                            + " retrying once: websocket delivery was not acknowledged for " + failedTransport);
+                    testClass.resetForRetry();
+                    runNextTest(index);
+                    return;
+                }
             }
         } catch (Throwable t) {
             log("CN1SS:ERR:suite test=" + testName + " finalize exception=" + t);
@@ -581,6 +608,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && !"HTML5".equals(Display.getInstance().getPlatformName())
                 && !testClass.isFailed()
                 && !testClass.isCaptureStarted()
+                && testClass.shouldTakeScreenshot();
+    }
+
+    private boolean shouldRetryAfterTransportFailure(int index, BaseTest testClass) {
+        return retriedTransportTestIndex != index
+                && !"HTML5".equals(Display.getInstance().getPlatformName())
+                && !testClass.isFailed()
+                && testClass.shouldTakeScreenshot();
+    }
+
+    private boolean shouldRetryAfterCaptureTimeout(int index, BaseTest testClass) {
+        return retriedCaptureTimeoutTestIndex != index
+                && !"HTML5".equals(Display.getInstance().getPlatformName())
+                && !testClass.isFailed()
+                && testClass.isCaptureStarted()
                 && testClass.shouldTakeScreenshot();
     }
 

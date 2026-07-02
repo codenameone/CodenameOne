@@ -89,6 +89,35 @@ var o = {};
         }
     };
 
+    // Horizontal clearance (CSS px) the host page's Crisp chat launcher needs at
+    // the bottom-right, so the generate button can be nudged left of it. The
+    // default Crisp launcher bubble (~64px) sits ~24px from the page edge;
+    // CHAT_CLEARANCE_PX reserves enough to clear it with a small visual gap.
+    var CHAT_CLEARANCE_PX = 96;
+
+    function chatLauncherVisible() {
+        try {
+            var parentWindow = (window.parent && window.parent !== window) ? window.parent : window;
+            var doc = parentWindow.document;
+            var client = doc ? doc.querySelector(".crisp-client") : null;
+            if (!client) {
+                return false;
+            }
+            var cs = parentWindow.getComputedStyle ? parentWindow.getComputedStyle(client) : null;
+            if (cs && (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity || "1") === 0)) {
+                return false;
+            }
+            return true;
+        } catch (ignored) {
+            // Cross-origin / sandbox / missing widget: reserve nothing.
+            return false;
+        }
+    }
+
+    o.chatLauncherClearance_ = function(callback) {
+        callback.complete(chatLauncherVisible() ? CHAT_CLEARANCE_PX : 0);
+    };
+
     o.isSupported_ = function(callback) {
         callback.complete(true);
     };

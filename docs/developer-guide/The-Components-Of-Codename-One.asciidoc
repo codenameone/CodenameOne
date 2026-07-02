@@ -2521,58 +2521,6 @@ spec). Rapid double-taps start the animation from the *current
 interpolated position* rather than from a stale baseline, so the
 indicator chains cleanly.
 
-[[mediamanager-section]]
-=== MediaManager & MediaPlayer
-
-// HTML_ONLY_START
-IMPORTANT: `MediaPlayer` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues https://www.codenameone.com/manual/advanced-topics.html#native-peer-components[here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
-IMPORTANT: `MediaPlayer` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues <<native-peer-components,here>>.
-////
-
-The https://www.codenameone.com/javadoc/com/codename1/components/MediaPlayer.html[MediaPlayer] allows you to control video playback. To use the `MediaPlayer` you need to first load the `Media` object from the https://www.codenameone.com/javadoc/com/codename1/media/MediaManager.html[MediaManager].
-
-The `MediaManager` is the core class responsible for media interaction in Codename One.
-
-TIP: You should also check out the https://www.codenameone.com/javadoc/com/codename1/capture/Capture.html[Capture] class for things that aren't covered by the `MediaManager`.
-
-In the demo code below you use the gallery functionality to pick a video from the device's video gallery:
-
-[source,java]
-----
-final Form hi = new Form("MediaPlayer", new BorderLayout());
-hi.setToolbar(new Toolbar());
-Style s = UIManager.getInstance().getComponentStyle("Title");
-FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_VIDEO_LIBRARY, s);
-hi.getToolbar().addCommandToRightBar("", icon, (evt) -> {
-    Display.getInstance().openGallery((e) -> {
-        if(e != null && e.getSource() != null) {
-            String file = (String)e.getSource();
-            try {
-                Media video = MediaManager.createMedia(file, true);
-                hi.removeAll();
-                hi.add(BorderLayout.CENTER, new MediaPlayer(video));
-                hi.revalidate();
-            } catch(IOException err) {
-                Log.e(err);
-            }
-        }
-    }, Display.GALLERY_VIDEO);
-});
-hi.show();
-----
-
-.Video playback running on the simulator
-image::img/components-mediaplayer.png[Video playback running on the simulator,scaledwidth=25%]
-
-
-.Video playback running on an Android device. Notice the native playback controls that appear when the video is tapped
-image::img/components-mediaplayer-android.png[Video playback running on an Android device. Notice the native playback controls that appear when the video is tapped,scaledwidth=25%]
-
-IMPORTANT: Video playback in the simulator will work with JavaFX enabled. This is the default for Java 8 or newer so recommend using that.
-
 === ImageViewer
 
 The https://www.codenameone.com/javadoc/com/codename1/components/ImageViewer.html[ImageViewer] allows you to inspect, zoom and pan into an image. It also allows swiping between images if

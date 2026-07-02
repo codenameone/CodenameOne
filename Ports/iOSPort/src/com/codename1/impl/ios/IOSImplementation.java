@@ -349,6 +349,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isRunningOnTV();
     }
 
+    private IOSCarBridge carBridge;
+
+    @Override
+    public com.codename1.car.spi.CarBridge getCarBridge() {
+        // Only meaningful in builds that linked the CarPlay natives (CN1_USE_CARPLAY, flipped by the
+        // builder when the app references com.codename1.car). The native scene delegate creates the
+        // bridge lazily on connect via IOSCarPlayCallbacks; expose it here for the framework.
+        if (carBridge == null) {
+            carBridge = IOSCarPlayCallbacks.getBridge(nativeInstance);
+        }
+        return carBridge;
+    }
+
+    @Override
+    public boolean isCarConnected() {
+        return nativeInstance.isCarPlayConnected();
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {
@@ -1444,7 +1462,50 @@ public class IOSImplementation extends CodenameOneImplementation {
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerDragged(singleDimensionX, singleDimensionY);
     }
-    
+
+    /// Invoked from the native touch handler immediately before a pointer event to forward the
+    /// rich pointer detail (pointer type, pressure, Apple Pencil tilt and contact size) so the
+    /// cross-platform stylus and pressure APIs work on iOS. pointerType uses the
+    /// `com.codename1.ui.events.PointerEvent` TYPE_* constants.
+    public static void pointerMetadataCallback(int pointerType, float pressure, float tiltX, float tiltY, float contactSize) {
+        if (instance == null) {
+            return;
+        }
+        instance.setPointerEventMetadata(
+                com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY,
+                com.codename1.ui.events.PointerEvent.MASK_PRIMARY,
+                pointerType, pressure, tiltX, tiltY, contactSize, 0, false);
+    }
+
+    /// Invoked from the native trackpad / Magic Mouse / wheel scroll handler. Routes the scroll
+    /// through the shared wheel pipeline so that `com.codename1.ui.events.WheelEvent` is a single
+    /// universal scroll-gesture API across desktop, Android and iOS. The deltas come from a high
+    /// resolution device so the event is flagged as precise.
+    public static void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        instance.pointerWheelMoved(x, y, scrollX, scrollY, true, 0);
+    }
+
+    /// Invoked from the native magnify (pinch) gesture recognizer, used by the Mac Catalyst trackpad
+    /// pinch and the iOS two finger pinch. Routes to the cross-platform pinch gesture dispatch.
+    public static void pinchMagnifyCallback(float scale, int x, int y) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().fireMagnifyGesture(x, y, scale);
+    }
+
+    /// Invoked from the native rotation gesture recognizer (Mac Catalyst trackpad rotate / iOS two
+    /// finger rotate). Routes to the cross-platform rotation gesture dispatch.
+    public static void rotationGestureCallback(float radians, int x, int y) {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().fireRotationGesture(x, y, radians);
+    }
+
     protected void pointerPressed(final int[] x, final int[] y) {
         super.pointerPressed(x, y);
     }
@@ -4153,6 +4214,18 @@ public class IOSImplementation extends CodenameOneImplementation {
                 lm = new Loc();
             }
             return lm;
+        }
+    }
+
+    private IOSMotionSensorManager motionSensorManager;
+
+    @Override
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        synchronized (IOSImplementation.class) {
+            if (motionSensorManager == null) {
+                motionSensorManager = new IOSMotionSensorManager();
+            }
+            return motionSensorManager;
         }
     }
 
@@ -10189,7 +10262,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         minimized = true;
         callInterruptionActive = true;
         if(instance.life != null) {
-            instance.life.applicationWillResignActive();
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationWillResignActive();
+                    }
+                }
+            });
         }
         instance.isActive = false;
     }
@@ -10239,10 +10318,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void applicationDidEnterBackground() {
         minimized = true;
         if(instance.life != null) {
-            instance.life.applicationDidEnterBackground();
-            if (instance.isEditingText()) {
-                instance.stopTextEditing();
-            }
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationDidEnterBackground();
+                        if (instance.isEditingText()) {
+                            instance.stopTextEditing();
+                        }
+                    }
+                }
+            });
         }
     }
     /**
@@ -10271,7 +10356,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void applicationWillEnterForeground() {
         minimized = false;
         if(instance.life != null) {
-            instance.life.applicationWillEnterForeground();
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationWillEnterForeground();
+                    }
+                }
+            });
         }
         
     }
@@ -10346,7 +10437,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private void callOnActive(Runnable r) {
         synchronized(onActiveListeners) {
             if (isActive) {
-                r.run();
+                safeCallSerially(r);
             } else {
                 onActiveListeners.add(r);
             }
@@ -10359,7 +10450,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public static void applicationDidBecomeActive() {
         callInterruptionActive = false;
-        ArrayList<Runnable> callbacks = null;
+        final ArrayList<Runnable> callbacks;
         synchronized(instance.onActiveListeners) {
             instance.isActive = true;
             callbacks = new ArrayList<Runnable>(instance.onActiveListeners.size());
@@ -10367,24 +10458,24 @@ public class IOSImplementation extends CodenameOneImplementation {
             callbacks.addAll(instance.onActiveListeners);
             instance.onActiveListeners.clear();
         }
-        for (Runnable callback : callbacks) {
-            callback.run();
-        }
         minimized = false;
-        if(instance.life != null) {
-            instance.life.applicationDidBecomeActive();
-        }
-        if(Display.getInstance() != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
+        safeCallSerially(new Runnable() {
+            @Override
+            public void run() {
+                for (Runnable callback : callbacks) {
+                    callback.run();
+                }
+                if(instance.life != null) {
+                    instance.life.applicationDidBecomeActive();
+                }
+                if(Display.getInstance() != null) {
                     Form f = Display.getInstance().getCurrent();
                     if(f != null) {
                         f.revalidate();
                     }
                 }
-            });
-        }
+            }
+        });
     }
     
     public static void paintNow() {

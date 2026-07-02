@@ -14,6 +14,7 @@ import pathlib
 import shutil
 import textwrap
 from dataclasses import dataclass
+from typing import Dict, Tuple
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MAVEN = ROOT / "maven"
@@ -2626,8 +2627,62 @@ def write(path: pathlib.Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+WHISPER_OVERLAY_PATHS = (
+    "pom.xml",
+    "lib/pom.xml",
+    "android/pom.xml",
+    "android/src/main/java/com/codename1/ai/whisper/NativeWhisperRecognizerImpl.java",
+    "android/src/main/resources/cn1-ai-whisper-android.aar",
+    "android-aar/.gitignore",
+    "android-aar/README.md",
+    "android-aar/build-aar.sh",
+    "android-aar/build.gradle",
+    "android-aar/settings.gradle",
+    "android-aar/cn1-ai-whisper-android/build.gradle",
+    "android-aar/cn1-ai-whisper-android/src/main/AndroidManifest.xml",
+    "android-aar/cn1-ai-whisper-android/src/main/cpp/CMakeLists.txt",
+    "android-aar/cn1-ai-whisper-android/src/main/cpp/native_whisper_jni.cpp",
+    "common/src/main/java/com/codename1/ai/whisper/NativeWhisperRecognizer.java",
+    "common/src/main/java/com/codename1/ai/whisper/WhisperRecognizer.java",
+    "common/src/test/java/com/codename1/ai/whisper/AndroidWhisperAarProjectTest.java",
+    "common/src/test/java/com/codename1/ai/whisper/WhisperRecognizerTest.java",
+    "ios/src/main/objectivec/com_codename1_ai_whisper_NativeWhisperRecognizerImpl.h",
+    "ios/src/main/objectivec/com_codename1_ai_whisper_NativeWhisperRecognizerImpl.m",
+    "javascript/src/main/javascript/com_codename1_ai_whisper_NativeWhisperRecognizer.js",
+    "javase/src/main/java/com/codename1/ai/whisper/NativeWhisperRecognizerImpl.java",
+    "linux/pom.xml",
+    "linux/src/main/c/com/codename1/ai/whisper/NativeWhisperRecognizerImplCodenameOne.c",
+    "win/pom.xml",
+    "win/src/main/c/com/codename1/ai/whisper/NativeWhisperRecognizerImplCodenameOne.c",
+)
+
+
+def snapshot_overlay(base: pathlib.Path, paths: tuple) -> Dict[str, Tuple[bytes, int]]:
+    overlay = {}
+    for rel in paths:
+        path = base / rel
+        if path.is_file():
+            overlay[rel] = (path.read_bytes(), path.stat().st_mode)
+    return overlay
+
+
+def restore_overlay(base: pathlib.Path, overlay: Dict[str, Tuple[bytes, int]]) -> None:
+    for rel, (content, mode) in overlay.items():
+        path = base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        path.chmod(mode)
+
+
 def generate(lib: Lib) -> None:
     base = MAVEN / lib.artifact
+    overlay = {}
+    if lib.artifact == "cn1-ai-whisper":
+        # Whisper has hand-maintained native packaging beyond the standard
+        # ML facade shape: Android JNI/AAR, desktop C bridges, and timed
+        # transcription helpers. Preserve those checked-in files so this
+        # generator remains compatible with the PR CI drift check.
+        overlay = snapshot_overlay(base, WHISPER_OVERLAY_PATHS)
     if base.exists():
         shutil.rmtree(base)
 
@@ -2691,6 +2746,8 @@ def generate(lib: Lib) -> None:
           js_native(lib.pkg, lib.facade, lib.js_method_keys))
 
     # win/ module intentionally absent -- UWP is not a runtime target.
+    if overlay:
+        restore_overlay(base, overlay)
 
 
 def main() -> None:

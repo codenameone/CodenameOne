@@ -64,6 +64,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
+import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
@@ -236,6 +237,7 @@ public final class Display extends CN1Constants {
     private Runnable bookmark;
     private EventDispatcher messageListeners;
     private EventDispatcher windowListeners;
+    private EventDispatcher postureListeners;
     /// Tracks whether the initial window size hint has already been consumed for the first shown form.
     private boolean initialWindowSizeApplied;
     private boolean disableInvokeAndBlock;
@@ -288,6 +290,7 @@ public final class Display extends CN1Constants {
     private boolean recursivePointerReleaseB;
     private int pointerX;
     private int pointerY;
+    private PointerEvent currentPointerEvent;
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
     private long longKeyPressTime;
@@ -1969,6 +1972,167 @@ public final class Display extends CN1Constants {
         return impl.isShiftKeyDown();
     }
 
+    /// Returns a snapshot of the rich detail for the pointer event currently being dispatched
+    /// such as the mouse button, pointer type (finger/mouse/stylus), pressure and stylus tilt.
+    ///
+    /// This is most useful when called from within a pointer listener. When no pointer event has
+    /// been dispatched yet a default snapshot at the last known pointer location is returned.
+    ///
+    /// #### Returns
+    ///
+    /// the current `PointerEvent`, never null
+    public PointerEvent getCurrentPointerEvent() {
+        if (currentPointerEvent != null) {
+            return currentPointerEvent;
+        }
+        return impl.buildPointerEvent(pointerX, pointerY, impl.isPointerHovering());
+    }
+
+    /// The mouse button associated with the current pointer event, one of the
+    /// `PointerEvent` `BUTTON_*` constants.
+    public int getPointerButton() {
+        return impl.getPointerButton();
+    }
+
+    /// A bitmask of the mouse buttons currently held down, built from the
+    /// `PointerEvent` `MASK_*` constants.
+    public int getPressedButtonMask() {
+        return impl.getPointerButtonMask();
+    }
+
+    /// The current pointing device type, one of the `PointerEvent` `TYPE_*`
+    /// constants (finger, mouse, stylus or eraser).
+    public int getPointerType() {
+        return impl.getPointerType();
+    }
+
+    /// The normalized pressure of the current pointer event between `0.0` and `1.0`. Devices and
+    /// ports that do not report pressure return `1.0`.
+    public float getPointerPressure() {
+        return impl.getPointerPressure();
+    }
+
+    /// The stylus tilt across the x axis of the current pointer event in degrees, or `0` when not reported.
+    public float getPointerTiltX() {
+        return impl.getPointerTiltX();
+    }
+
+    /// The stylus tilt across the y axis of the current pointer event in degrees, or `0` when not reported.
+    public float getPointerTiltY() {
+        return impl.getPointerTiltY();
+    }
+
+    /// The normalized contact size of the current pointer event between `0.0` and `1.0`, or `0` when not reported.
+    public float getPointerContactSize() {
+        return impl.getPointerContactSize();
+    }
+
+    /// True if the current pointer is a stylus or pen (Apple Pencil, S-Pen and similar).
+    public boolean isStylusPointer() {
+        int t = impl.getPointerType();
+        return t == PointerEvent.TYPE_STYLUS
+                || t == PointerEvent.TYPE_ERASER;
+    }
+
+    /// Dispatches a mouse wheel event to the component under the given coordinates. Invoked by the
+    /// implementation on the EDT before the default scrolling gesture is synthesized. Returns true
+    /// if a listener consumed the event, in which case the default scroll should be skipped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the pointer x position in display pixels
+    ///
+    /// - `y`: the pointer y position in display pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a trackpad
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    ///
+    /// #### Returns
+    ///
+    /// true if a listener consumed the wheel event
+    public boolean fireMouseWheelEvent(int x, int y, int scrollX, int scrollY, boolean precise, int modifiers) {
+        Form f = getCurrent();
+        if (f == null) {
+            return false;
+        }
+        Component cmp;
+        try {
+            cmp = f.getComponentAt(x, y);
+        } catch (Throwable t) {
+            cmp = null;
+        }
+        if (cmp == null) {
+            return false;
+        }
+        com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
+        return cmp.fireMouseWheelEvent(we);
+    }
+
+    /// Dispatches a magnify (pinch) gesture to the component under the given coordinates, walking up
+    /// the hierarchy until a component handles it. Invoked by the implementation for native
+    /// trackpad / multi touch magnify gestures; routes to `com.codename1.ui.Component#pinch(float)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the gesture x position in display pixels
+    ///
+    /// - `y`: the gesture y position in display pixels
+    ///
+    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
+    public void fireMagnifyGesture(int x, int y, float scale) {
+        Form f = getCurrent();
+        if (f == null) {
+            return;
+        }
+        Component cmp;
+        try {
+            cmp = f.getComponentAt(x, y);
+        } catch (Throwable t) {
+            cmp = null;
+        }
+        while (cmp != null) {
+            if (cmp.pinch(scale)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
+    /// Dispatches a rotation (twist) gesture to the component under the given coordinates, walking
+    /// up the hierarchy until a component handles it. Invoked by the implementation for native
+    /// trackpad / multi touch rotation gestures; routes to `com.codename1.ui.Component#rotation(float)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the gesture x position in display pixels
+    ///
+    /// - `y`: the gesture y position in display pixels
+    ///
+    /// - `radians`: the incremental rotation in radians, positive is clockwise
+    public void fireRotationGesture(int x, int y, float radians) {
+        Form f = getCurrent();
+        if (f == null) {
+            return;
+        }
+        Component cmp;
+        try {
+            cmp = f.getComponentAt(x, y);
+        } catch (Throwable t) {
+            cmp = null;
+        }
+        while (cmp != null) {
+            if (cmp.rotation(radians)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
     /// Pushes a key press event with the given keycode into Codename One
     ///
     /// #### Parameters
@@ -2391,6 +2555,7 @@ public final class Display extends CN1Constants {
                 offset++;
                 yArray1[0] = inputEventStackTmp[offset];
                 offset++;
+                currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
                 f.pointerPressed(xArray1, yArray1);
                 eventForm = f;
                 break;
@@ -2405,6 +2570,7 @@ public final class Display extends CN1Constants {
                 offset += array1.length + 1;
                 int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array2.length + 1;
+                currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
                 f.pointerPressed(array1, array2);
                 eventForm = f;
                 break;
@@ -2426,6 +2592,7 @@ public final class Display extends CN1Constants {
                     offset++;
                     yArray1[0] = inputEventStackTmp[offset];
                     offset++;
+                    currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
                     f.pointerReleased(xArray1, yArray1);
                 }
                 recursivePointerReleaseA = false;
@@ -2448,6 +2615,7 @@ public final class Display extends CN1Constants {
                     offset += array1.length + 1;
                     int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array2.length + 1;
+                    currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
                     f.pointerReleased(array1, array1);
                 }
                 recursivePointerReleaseA = false;
@@ -2465,6 +2633,7 @@ public final class Display extends CN1Constants {
                 pointerPressedAndNotReleasedOrDragged = false;
                 xArray1[0] = arg1;
                 yArray1[0] = arg2;
+                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, false);
                 f.pointerDragged(xArray1, yArray1);
                 break;
             }
@@ -2475,6 +2644,7 @@ public final class Display extends CN1Constants {
                 offset += array1.length + 1;
                 int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array2.length + 1;
+                currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
                 f.pointerDragged(array1, array2);
                 break;
             }
@@ -2488,6 +2658,7 @@ public final class Display extends CN1Constants {
                 updateDragSpeedStatus(arg1, arg2, timestamp);
                 xArray1[0] = arg1;
                 yArray1[0] = arg2;
+                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
                 f.pointerHover(xArray1, yArray1);
                 break;
             }
@@ -2498,6 +2669,7 @@ public final class Display extends CN1Constants {
                 offset++;
                 xArray1[0] = arg1;
                 yArray1[0] = arg2;
+                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
                 f.pointerHoverReleased(xArray1, yArray1);
                 break;
             }
@@ -2508,6 +2680,7 @@ public final class Display extends CN1Constants {
                 offset++;
                 xArray1[0] = arg1;
                 yArray1[0] = arg2;
+                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
                 f.pointerHoverPressed(xArray1, yArray1);
                 break;
             }
@@ -4403,6 +4576,114 @@ public final class Display extends CN1Constants {
         return impl.isTV();
     }
 
+    /// Indicates whether a head unit (Apple CarPlay / Google Android Auto) is currently connected and
+    /// projecting the `com.codename1.car` experience. See `com.codename1.car.Car#isCarConnected()`.
+    ///
+    /// #### Returns
+    ///
+    /// true if a car is connected
+    public boolean isCarConnected() {
+        return impl.isCarConnected();
+    }
+
+    /// True if the device is a foldable or dual screen device such as a Galaxy Fold, Galaxy Flip,
+    /// Pixel Fold or Surface Duo.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is foldable
+    public boolean isFoldable() {
+        return impl.isFoldable();
+    }
+
+    /// Returns the live device fold posture. See `com.codename1.ui.DevicePosture` for details.
+    ///
+    /// #### Returns
+    ///
+    /// the device posture, never null
+    public DevicePosture getDevicePosture() {
+        return DevicePosture.getInstance();
+    }
+
+    /// Adds a listener that is notified when the device is folded, unfolded or changes posture. The
+    /// delivered `com.codename1.ui.events.ActionEvent` has the type `PostureChange`; query the new
+    /// posture from `com.codename1.ui.DevicePosture#getInstance()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public void addPostureListener(ActionListener l) {
+        if (postureListeners == null) {
+            postureListeners = new EventDispatcher();
+        }
+        postureListeners.addListener(l);
+    }
+
+    /// Removes a posture listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public void removePostureListener(ActionListener l) {
+        if (postureListeners != null) {
+            postureListeners.removeListener(l);
+        }
+    }
+
+    /// Invoked by the implementation when the device fold posture changes. Fires the registered
+    /// posture listeners on the EDT.
+    public void postureChanged() {
+        if (postureListeners != null && postureListeners.hasListeners()) {
+            callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    postureListeners.fireActionEvent(new ActionEvent(DevicePosture.getInstance(),
+                            ActionEvent.Type.PostureChange));
+                }
+            });
+        }
+    }
+
+    /// True if the application is currently running in a desktop windowing mode such as Samsung DeX,
+    /// Android desktop windowing or iPad Stage Manager. This is distinct from `#isDesktop()` which
+    /// reports a genuine desktop platform (Windows, macOS or Linux).
+    ///
+    /// #### Returns
+    ///
+    /// true if running in a desktop windowing mode
+    public boolean isDesktopMode() {
+        return impl.isDesktopMode();
+    }
+
+    /// Returns the number of displays (monitors or external screens) currently attached.
+    ///
+    /// #### Returns
+    ///
+    /// the number of attached displays, at least 1
+    public int getDisplayCount() {
+        return impl.getDisplayCount();
+    }
+
+    /// True if an external or secondary display is currently attached.
+    ///
+    /// #### Returns
+    ///
+    /// true if an external display is connected
+    public boolean isExternalDisplayConnected() {
+        return impl.isExternalDisplayConnected();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.car` API to render in-car templates, or
+    /// null when in-car projection is unsupported on this port. Internal -- application code uses the
+    /// `com.codename1.car` API rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the car bridge, or null
+    public com.codename1.car.spi.CarBridge getCarBridge() {
+        return impl.getCarBridge();
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns
@@ -4486,6 +4767,15 @@ public final class Display extends CN1Constants {
     /// LocationManager Object
     public LocationManager getLocationManager() {
         return impl.getLocationManager();
+    }
+
+    /// Returns the platform motion sensor entry point or {@code null} when the
+    /// current port does not provide motion sensors. Prefer
+    /// {@link com.codename1.sensors.MotionSensorManager#getInstance()} in
+    /// application code --- it handles the fallback to a no-op manager when the
+    /// current port returns {@code null}.
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        return impl.getMotionSensorManager();
     }
 
     /// Returns the platform biometric authentication entry point. Prefer

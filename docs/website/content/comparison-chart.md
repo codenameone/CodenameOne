@@ -45,7 +45,7 @@ $79/mo
 - Online Training
 - On Device Unit Tests
 - Concurrent Builds
-- Versioning
+- Versioning (2 months)
 - Live Preview
 - Crash Reporting
 - E-Mail Support
@@ -61,6 +61,7 @@ $399/mo
 
 - High Priority Builds
 - JavaScript App Generation
+- Versioning (6 months)
 - Continuous Integration
 - Office Hours/Phone Support
 - Optional SLA
@@ -73,7 +74,7 @@ We created videos detailing some of the benefits of a pro subscription. The bigg
 
 - Push notification
 - Codename One LIVE!
-- Versioning
+- Versioning (2 months)
 - Cloud storage/files
 - Crash protection
 - Use source download

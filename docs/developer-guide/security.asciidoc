@@ -129,6 +129,47 @@ If you use preferences it might be a good idea to set their built-in location to
 
 This is useful as it prevents the encrypted preferences from colliding with the regular preferences.
 
+=== Secure storage and secrets
+
+Some values are too sensitive for `Storage` or `Preferences`, which are plaintext on disk: auth tokens, refresh tokens, and API keys. Codename One gives you two complementary tools for them.
+
+==== SecureStorage (the platform keychain)
+
+`com.codename1.security.SecureStorage` keeps small string values in the operating system's secure keychain (iOS Keychain Services and the Android Keystore) so they're protected by the platform's secure enclave instead of being written to app storage. The quiet, no-prompt API is three calls:
+
+[source,java]
+----
+SecureStorage ss = SecureStorage.getInstance();
+ss.set("auth.token", token);
+String token = ss.get("auth.token");   // null if absent
+ss.remove("auth.token");
+----
+
+On a platform without a keychain the base implementation returns `false` / `null`, so treat a `null` read as "not available" and fall back accordingly.
+
+==== Secrets (fetched from the cloud, never shipped in the binary)
+
+Baking an API key (for example a Google Maps key) into your app is unsafe: anyone can extract it from the binary, and rotating it means shipping a new build. `com.codename1.security.Secrets` solves this. You define the secret once in the Codename One Cloud vault, and the app fetches it at runtime and caches it in `SecureStorage`:
+
+[source,java]
+----
+// off the EDT -- the first call may hit the network:
+String mapsKey = Secrets.get("googlemaps.key");
+----
+
+`get` returns the keychain-cached value when present, otherwise it fetches from the vault over TLS, caches it, and returns it. `refresh(name)` forces a fresh fetch (after you rotate the value server-side) and `clear(name)` drops the cached copy.
+
+To publish a secret, open the *Secrets* page of the build console and add it under the app-readable namespace (the `app.` prefix; you reference it by its bare name from `Secrets.get`). Only secrets in that namespace are ever served to a device, so your server-only credentials (such as the store API keys used by commerce validation) stay in the vault and can't be fetched from a client. Authentication uses the build key every cloud build already carries, so there's nothing to wire up; on the simulator or a local build there's no build key, so `get` returns the cached value if any and otherwise `null`.
+
+[cols="2,1,4"]
+|===
+|Build hint |Default |Description
+
+|`secrets.cloud.endpoint`
+|_(Codename One cloud)_
+|Base URL of the secrets service. Override only if you self-host.
+|===
+
 === Disabling screenshots
 
 One of the common security features some apps expect is the ability to block a screenshot. In the past apps like snapchat required that you touch the screen to view a photo to block the ability to grab a screenshot (on iOS). This no longer works...

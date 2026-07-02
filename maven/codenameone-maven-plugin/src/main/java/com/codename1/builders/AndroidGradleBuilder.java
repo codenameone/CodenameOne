@@ -290,6 +290,9 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesNfcHce;
     private boolean usesForegroundService;
     private boolean usesSharedContent;
+    // Set when the app references com.codename1.car.* (Google Android Auto support). Gates the
+    // androidx.car.app gradle dependency, the CarAppService manifest entry and the injected glue.
+    private boolean usesCar;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -1376,6 +1379,13 @@ public class AndroidGradleBuilder extends Executor {
                         }
                     }
 
+                    // Google Android Auto (com.codename1.car.*). Gated on actual usage so the
+                    // androidx.car.app dependency, the CarAppService and the injected glue are only
+                    // added for apps that build an in-car experience.
+                    if (cls.indexOf("com/codename1/car/") == 0) {
+                        usesCar = true;
+                    }
+
                     if (cls.equals("com/codename1/background/ForegroundService")) {
                         usesForegroundService = true;
                     }
@@ -1757,6 +1767,23 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // Foldable / dual-screen support. The com.codename1.ui.DevicePosture API reads the device
+        // fold posture through androidx.window using reflection, so the gradle dependency is added
+        // ONLY when the app opts in with the build hint android.foldableSupport=true. Apps that do
+        // not use the foldable APIs get zero added weight. The version can be overridden with
+        // android.windowVersion.
+        boolean useFoldableSupport = "true".equals(request.getArg("android.foldableSupport", "false"));
+        if (useFoldableSupport) {
+            if (!request.getArg("gradleDependencies", "").contains("androidx.window:window")) {
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"androidx.window:window:" +
+                                request.getArg("android.windowVersion", "1.3.0") + "\"\n"
+                );
+            }
+        }
+
 
 
         // if a flag is declared we don't want the default play flag to be true
@@ -1948,6 +1975,53 @@ public class AndroidGradleBuilder extends Executor {
             unzip(androidPortSrcJar, srcDir, assetsDir, srcDir);
         } catch (IOException ex) {
             throw new BuildException("Failed to extract android port sources from "+androidPortSrcJar, ex);
+        }
+
+        // Android Auto glue: when the app references com.codename1.car, copy the injected
+        // CarAppService / Session / Screen + the CarBridge converter (typed against androidx.car.app)
+        // into the generated project and add the car-app gradle dependency. These ship as real .java
+        // resources in the plugin (not reflection blobs) and are only added for in-car apps, so apps
+        // that never touch the API pay nothing.
+        if (usesCar) {
+            // androidx.car.app requires minSdk 23 (app-projected requires 21). Any Android Auto app
+            // inherently needs API 23+, so raise the floor here -- otherwise the manifest merge fails
+            // with "uses-sdk:minSdkVersion N cannot be smaller than version 21/23 declared in library".
+            try {
+                if (Integer.parseInt(minSDK) < 23) {
+                    log("Android Auto (com.codename1.car) requires minSdk 23; raising android.min_sdk_version from " + minSDK + " to 23");
+                    minSDK = "23";
+                }
+            } catch (NumberFormatException ex) {
+                minSDK = "23";
+            }
+            File carImpl = new File(srcDir, "com/codename1/impl/android");
+            carImpl.mkdirs();
+            String[] glue = {"CN1CarAppService.java", "CN1CarSession.java",
+                    "CN1CarScreen.java", "CN1AndroidAutoBridge.java"};
+            for (String g : glue) {
+                InputStream gin = getResourceAsStream("/com/codename1/builders/car/" + g);
+                if (gin == null) {
+                    throw new BuildException("Missing Android Auto glue resource " + g);
+                }
+                try {
+                    copy(gin, new FileOutputStream(new File(carImpl, g)));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to write Android Auto glue " + g, ex);
+                }
+            }
+            if (!request.getArg("gradleDependencies", "").contains("androidx.car.app:app")) {
+                String carAppVersion = request.getArg("android.carAppVersion", "1.4.0");
+                // Exclude androidx.media: the Codename One Android port still uses the (jetified)
+                // support-media-compat MediaControllerCompat whose constructor throws RemoteException.
+                // androidx.car.app pulls a newer androidx.media:media where that constructor no longer
+                // throws, which turns the port's existing catch into an "exception never thrown"
+                // compile error. car-app's own media uses androidx.car.app.media, so excluding the
+                // transitive androidx.media is safe.
+                request.putArgument("gradleDependencies",
+                        request.getArg("gradleDependencies", "")
+                                + "\n" + compile + "(\"androidx.car.app:app:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n"
+                                + compile + "(\"androidx.car.app:app-projected:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n");
+            }
         }
 
 
@@ -2643,6 +2717,42 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
+        // Google Android Auto: register the injected CarAppService with one intent-filter category
+        // per opted-in app category (android.androidAuto.navigation / .messaging / .poi; POI is the
+        // default). Emitted only when the app references com.codename1.car. The androidx.car.app
+        // dependency and the glue source files are added below in lockstep.
+        String carAppService = "";
+        String carAppPermissions = "";
+        if (usesCar) {
+            boolean navigation = "true".equals(request.getArg("android.androidAuto.navigation", "false"));
+            boolean messaging = "true".equals(request.getArg("android.androidAuto.messaging", "false"));
+            boolean poi = "true".equals(request.getArg("android.androidAuto.poi", "false"));
+            if (!navigation && !messaging && !poi) {
+                poi = true;
+            }
+            StringBuilder categories = new StringBuilder();
+            if (navigation) {
+                categories.append("                <category android:name=\"androidx.car.app.category.NAVIGATION\" />\n");
+            }
+            if (messaging) {
+                categories.append("                <category android:name=\"androidx.car.app.category.MESSAGING\" />\n");
+            }
+            if (poi) {
+                categories.append("                <category android:name=\"androidx.car.app.category.POI\" />\n");
+            }
+            carAppService = "        <service android:name=\"com.codename1.impl.android.CN1CarAppService\" android:exported=\"true\">\n"
+                    + "            <intent-filter>\n"
+                    + "                <action android:name=\"androidx.car.app.CarAppService\" />\n"
+                    + categories
+                    + "            </intent-filter>\n"
+                    + "        </service>\n"
+                    + "        <meta-data android:name=\"androidx.car.app.minCarApiLevel\" android:value=\"" + request.getArg("android.androidAuto.minCarApiLevel", "1") + "\" />\n";
+            if (navigation) {
+                carAppPermissions += permissionAdd(request, "\"androidx.car.app.MAP_TEMPLATES\"",
+                        "    <uses-permission android:name=\"androidx.car.app.MAP_TEMPLATES\" />\n");
+            }
+        }
+
         if (foregroundServicePermission) {
             permissions += permissionAdd(request, "\"android.permission.FOREGROUND_SERVICE\"",
                     "    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n");
@@ -3016,12 +3126,14 @@ public class AndroidGradleBuilder extends Executor {
                 + mediaService
                 + remoteControlService
                 + hceService
+                + carAppService
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
                 + basePermissions
                 + externalStoragePermission
                 + readMediaPermissions
                 + permissions
+                + carAppPermissions
                 + "  " + xPermissions
                 + "  " + xQueries
                 + "</manifest>\n";

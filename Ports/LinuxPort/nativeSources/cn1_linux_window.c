@@ -225,21 +225,94 @@ static gboolean cn1OnConfigure(GtkWidget* widget, GdkEventConfigure* e, gpointer
     return FALSE;
 }
 
+/* Maps a GdkEventButton.button (1=left, 2=middle, 3=right, 8=back, 9=forward)
+ * to a CN1_PE_MASK_* bit. */
+static int cn1LinuxButtonMask(guint button) {
+    switch (button) {
+        case 1:  return CN1_PE_MASK_PRIMARY;
+        case 2:  return CN1_PE_MASK_MIDDLE;
+        case 3:  return CN1_PE_MASK_SECONDARY;
+        case 8:  return CN1_PE_MASK_BACK;
+        case 9:  return CN1_PE_MASK_FORWARD;
+        default: return CN1_PE_MASK_PRIMARY;
+    }
+}
+
+/* Buttons held down according to a GdkEvent state mask, used to label a drag. */
+static int cn1LinuxStateMask(guint state) {
+    int mask = 0;
+    if (state & GDK_BUTTON1_MASK) mask |= CN1_PE_MASK_PRIMARY;
+    if (state & GDK_BUTTON2_MASK) mask |= CN1_PE_MASK_MIDDLE;
+    if (state & GDK_BUTTON3_MASK) mask |= CN1_PE_MASK_SECONDARY;
+    if (state & GDK_BUTTON4_MASK) mask |= CN1_PE_MASK_BACK;
+    if (state & GDK_BUTTON5_MASK) mask |= CN1_PE_MASK_FORWARD;
+    return mask;
+}
+
+/* True when an event originated from a touchscreen. GTK also synthesizes button
+ * / motion events from touch for widgets that ignore touch, so we drop those
+ * here and let cn1OnTouch drive the pointer instead (avoids double dispatch). */
+static int cn1LinuxIsTouchSource(GdkEvent* e) {
+    GdkDevice* dev = gdk_event_get_source_device(e);
+    return dev != NULL && gdk_device_get_source(dev) == GDK_SOURCE_TOUCHSCREEN;
+}
+
 static gboolean cn1OnButton(GtkWidget* widget, GdkEventButton* e, gpointer data) {
     (void) widget;
     (void) data;
+    if (cn1LinuxIsTouchSource((GdkEvent*) e)) {
+        return TRUE;
+    }
     cn1LinuxPushEvent(e->type == GDK_BUTTON_PRESS ? CN1_EVENT_POINTER_PRESSED : CN1_EVENT_POINTER_RELEASED,
-            (int) e->x, (int) e->y, 0);
+            (int) e->x, (int) e->y, cn1LinuxButtonMask(e->button));
     return TRUE;
 }
 
 static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data) {
     (void) widget;
     (void) data;
-    if (e->state & GDK_BUTTON1_MASK) {
-        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y, 0);
+    if (cn1LinuxIsTouchSource((GdkEvent*) e)) {
+        return TRUE;
+    }
+    int mask = cn1LinuxStateMask(e->state);
+    if (mask != 0) {
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y, mask);
     }
     return TRUE;
+}
+
+/* The primary touch sequence currently driving the pointer (single-touch
+ * model). Additional concurrent fingers are ignored until it ends. */
+static GdkEventSequence* cn1TouchSeq = NULL;
+
+static gboolean cn1OnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
+    (void) widget;
+    (void) data;
+    switch (e->type) {
+        case GDK_TOUCH_BEGIN:
+            if (cn1TouchSeq == NULL) {
+                cn1TouchSeq = e->sequence;
+                cn1LinuxPushEvent(CN1_EVENT_POINTER_PRESSED, (int) e->x, (int) e->y,
+                        CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
+            }
+            return TRUE;
+        case GDK_TOUCH_UPDATE:
+            if (e->sequence == cn1TouchSeq) {
+                cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y,
+                        CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
+            }
+            return TRUE;
+        case GDK_TOUCH_END:
+        case GDK_TOUCH_CANCEL:
+            if (e->sequence == cn1TouchSeq) {
+                cn1TouchSeq = NULL;
+                cn1LinuxPushEvent(CN1_EVENT_POINTER_RELEASED, (int) e->x, (int) e->y,
+                        CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
+            }
+            return TRUE;
+        default:
+            return FALSE;
+    }
 }
 
 static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
@@ -267,6 +340,42 @@ static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
         code = (int) e->keyval;
     }
     cn1LinuxPushEvent(e->type == GDK_KEY_PRESS ? CN1_EVENT_KEY_PRESSED : CN1_EVENT_KEY_RELEASED, 0, 0, code);
+    return TRUE;
+}
+
+/* Touchpad pinch / rotate (GDK_TOUCHPAD_PINCH, libinput). scale is cumulative
+ * relative to the gesture's BEGIN, so we forward the incremental multiplier;
+ * angle_delta is already a per-event delta in degrees, forwarded as incremental
+ * radians. These map to Display.fireMagnifyGesture / fireRotationGesture, the
+ * same hooks the macOS trackpad drives. Delivered through the generic "event"
+ * signal, so we return FALSE for anything else to leave other handlers intact. */
+static double cn1PinchLastScale = 1.0;
+
+static gboolean cn1OnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointer data) {
+    (void) widget;
+    (void) data;
+    if (e->type != GDK_TOUCHPAD_PINCH) {
+        return FALSE;
+    }
+    GdkEventTouchpadPinch* pe = (GdkEventTouchpadPinch*) e;
+    if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_BEGIN) {
+        cn1PinchLastScale = pe->scale > 0 ? pe->scale : 1.0;
+    } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_UPDATE) {
+        int x = (int) pe->x;
+        int y = (int) pe->y;
+        if (pe->scale > 0 && cn1PinchLastScale > 0) {
+            double inc = pe->scale / cn1PinchLastScale;
+            cn1PinchLastScale = pe->scale;
+            if (inc != 1.0) {
+                cn1LinuxPushEvent(CN1_EVENT_PINCH, x, y, (int) (inc * CN1_GESTURE_FIXED + 0.5));
+            }
+        }
+        if (pe->angle_delta != 0.0) {
+            double rad = pe->angle_delta * G_PI / 180.0;
+            cn1LinuxPushEvent(CN1_EVENT_ROTATE, x, y,
+                    (int) (rad * CN1_GESTURE_FIXED + (rad >= 0 ? 0.5 : -0.5)));
+        }
+    }
     return TRUE;
 }
 
@@ -416,7 +525,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     cn1DrawingArea = gtk_drawing_area_new();
     gtk_widget_set_events(cn1DrawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_POINTER_MOTION_MASK |
-            GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_SCROLL_MASK | GDK_STRUCTURE_MASK);
+            GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_SCROLL_MASK | GDK_TOUCH_MASK |
+            GDK_TOUCHPAD_GESTURE_MASK | GDK_STRUCTURE_MASK);
     gtk_widget_set_can_focus(cn1DrawingArea, TRUE);
 
     /* A GtkOverlay layers a transparent, pass-through GtkFixed over the drawing
@@ -435,6 +545,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     g_signal_connect(cn1DrawingArea, "button-press-event", G_CALLBACK(cn1OnButton), 0);
     g_signal_connect(cn1DrawingArea, "button-release-event", G_CALLBACK(cn1OnButton), 0);
     g_signal_connect(cn1DrawingArea, "motion-notify-event", G_CALLBACK(cn1OnMotion), 0);
+    g_signal_connect(cn1DrawingArea, "touch-event", G_CALLBACK(cn1OnTouch), 0);
+    g_signal_connect(cn1DrawingArea, "event", G_CALLBACK(cn1OnGenericEvent), 0);
     g_signal_connect(cn1Window, "key-press-event", G_CALLBACK(cn1OnKey), 0);
     g_signal_connect(cn1Window, "key-release-event", G_CALLBACK(cn1OnKey), 0);
     g_signal_connect(cn1DrawingArea, "scroll-event", G_CALLBACK(cn1OnScroll), 0);
@@ -465,6 +577,30 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_screenDpi___R_int(CODENAME_ONE_THR
         }
     }
     return 96;
+}
+
+/* True when the default seat has a touchscreen pointing device attached, so the
+ * framework reports a touch device (Display.isTouchScreen()). */
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_isTouchDevice___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    GdkDisplay* display = gdk_display_get_default();
+    if (display == NULL) {
+        return JAVA_FALSE;
+    }
+    GdkSeat* seat = gdk_display_get_default_seat(display);
+    if (seat == NULL) {
+        return JAVA_FALSE;
+    }
+    GList* devices = gdk_seat_get_slaves(seat, GDK_SEAT_CAPABILITY_ALL_POINTING);
+    int found = 0;
+    for (GList* l = devices; l != NULL; l = l->next) {
+        GdkDevice* dev = (GdkDevice*) l->data;
+        if (dev != NULL && gdk_device_get_source(dev) == GDK_SOURCE_TOUCHSCREEN) {
+            found = 1;
+            break;
+        }
+    }
+    g_list_free(devices);
+    return found ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_getWindowGraphics___R_long(CODENAME_ONE_THREAD_STATE) {

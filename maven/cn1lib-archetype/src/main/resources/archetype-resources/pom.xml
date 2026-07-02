@@ -69,6 +69,7 @@
         <module>javascript</module>
         <module>javase</module>
         <module>win</module>
+        <module>linux</module>
         <module>lib</module>
     </modules>
     <dependencyManagement>
