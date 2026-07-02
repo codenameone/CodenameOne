@@ -59,6 +59,24 @@ public class DialogThemeScreenshotTest extends DualAppearanceBaseTest {
         commands.add(new Button("Cancel")).add(new Button("OK"));
 
         dialog.add(BorderLayout.CENTER, body).add(BorderLayout.SOUTH, commands);
-        form.add(dialog);
+
+        // Constrain the inline dialog to a centered card width so the screenshot
+        // reads as a real dialog on wide screens (desktop / Mac native) instead of
+        // a full-width strip. Mirrors the ~72% width a packed Dialog.show() now caps
+        // to (dialogMaxWidthPercentInt); narrow phone/JS screens were already
+        // card-width, so this only tightens the wide-screen render.
+        // The cap goes on the SPAN LABEL, not the card container:
+        // Component.setPreferredW would freeze the card's preferred HEIGHT at its
+        // unwrapped value (clipping the message wherever the cap binds, as the
+        // 375px JavaScript-port screen showed), while SpanLabel.setPreferredW
+        // keeps the height dynamic -- it re-measures the wrapped rows -- and the
+        // card's width simply follows its widest child.
+        int cap = com.codename1.ui.Display.getInstance().getDisplayWidth() * 72 / 100;
+        message.setPreferredW(cap
+                - dialog.getStyle().getHorizontalPadding()
+                - body.getStyle().getHorizontalPadding());
+        Container center = new Container(new FlowLayout(Component.CENTER));
+        center.add(dialog);
+        form.add(center);
     }
 }

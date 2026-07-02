@@ -42,8 +42,10 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.GlassRecipe;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -3022,6 +3024,67 @@ public class Component implements Animation, StyleListener, Editable {
 
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
         g.clipRect(getX(), getY(), getWidth(), getHeight());
+        // CSS backdrop-filter:blur() -- the "liquid glass" effect. Blur whatever has
+        // already been painted behind this component (the clip confines it to our
+        // bounds) BEFORE our own translucent background and content paint on top. This
+        // runs regardless of opacity, since a glass surface is by definition
+        // translucent (opaque would be false and skip paintComponentBackground). The
+        // port blurs the destination region in place; an unsupported port returns
+        // false and the component simply paints without the blur.
+        // COST/CACHING POLICY (per paint path):
+        //  * A glass surface only pays when it repaints; static chrome over static
+        //    content costs nothing between repaints.
+        //  * iOS live screen, selection lens: a pure GPU fragment shader on the
+        //    frame's own command buffer -- no sync, no readback, no cache needed.
+        //  * iOS live screen, glass material: the backdrop readback is required
+        //    (the material is a function of the pixels behind the glass), but the
+        //    composed patch is CACHED per rect+params+backdrop-hash in the port
+        //    (METALView glass patch cache), so a repaint over an unchanged
+        //    backdrop skips the colour transform + blur + optics; scrolling
+        //    content under the glass recomposes that frame from the real bytes.
+        //  * Offscreen mutable images (capture tooling) and the desktop simulator
+        //    blur per paint -- capture renders once, and the simulator is not a
+        //    shipping surface.
+        float backdropBlur = getStyle().getBackdropFilterBlurRadius();
+        if (backdropBlur > 0) {
+            // The glass surface's material INTENT comes from a typed, named
+            // recipe (GlassRecipe -- plain blur, chrome bar, floating pill,
+            // glass panel), resolved per UIID via <UIID>GlassRecipe /
+            // glassRecipeDefault. The recipe carries the bounded, measured
+            // material parameters; this paint path only forwards them to the
+            // port, so similar glass surfaces share one definition instead of
+            // reconstructing the material from loose per-parameter constants.
+            // glassMaterialBool remains the theme-wide opt-in to the Liquid
+            // Glass materials; without it backdrop-filter stays a plain blur.
+            GlassRecipe recipe = null;
+            if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
+                int fg = getStyle().getFgColor();
+                int fgLuma = (int) (0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff));
+                boolean darkMat = fgLuma > 128; // dark theme uses a light fg
+                recipe = GlassRecipe.resolve(getUIManager(), getUIID(), darkMat);
+                if (recipe.getKind() == GlassRecipe.Kind.PLAIN_BLUR) {
+                    recipe = null;
+                }
+            }
+            if (recipe != null) {
+                // Match the glass material to the component's rounded/pill shape so it
+                // does not spill into a square. RoundBorder is a capsule (-1 sentinel);
+                // RoundRectBorder carries an explicit corner radius (mm -> px); any
+                // other border leaves the patch rectangular (0).
+                Border bd = getStyle().getBorder();
+                float cornerRadius = 0f;
+                if (bd instanceof RoundBorder) {
+                    cornerRadius = -1f;
+                } else if (bd instanceof RoundRectBorder) {
+                    cornerRadius = Display.getInstance().convertToPixels(((RoundRectBorder) bd).getCornerRadius());
+                }
+                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius,
+                        recipe.getSaturation(), recipe.getScale(), recipe.getOffset(),
+                        recipe.getRefraction(), recipe.getSpecular());
+            } else {
+                g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
+            }
+        }
         paintComponentBackground(g);
 
         if (isScrollable()) {

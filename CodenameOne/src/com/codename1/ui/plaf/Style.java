@@ -116,6 +116,8 @@ public class Style {
     /// #### Since
     ///
     /// 8.0
+    public static final String LETTER_SPACING = "letterSpacing";
+
     public static final String ICON_GAP = "iconGap";
     /// Icon gap unit attribute.
     ///
@@ -291,6 +293,7 @@ public class Style {
     private static final int BACKDROP_FILTER_BLUR_MODIFIED = 4194304;
     private static final int FILTER_COLOR_MATRIX_MODIFIED = 8388608;
     private static final int BACKDROP_FILTER_COLOR_MATRIX_MODIFIED = 16777216;
+    private static final int LETTER_SPACING_MODIFIED = 33554432;
     float[] padding = new float[4];
     float[] margin = new float[4];
     /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
@@ -320,6 +323,7 @@ public class Style {
     private int elevation; // the elevation.
     private float iconGap = -1;
     private byte iconGapUnit;
+    private float letterSpacing; // EM units, 0 = default (no extra spacing)
     private boolean surface; // whether this should be treated as a surface
     private byte backgroundType = BACKGROUND_IMAGE_SCALED;
     private byte backgroundAlignment = BACKGROUND_IMAGE_ALIGN_TOP;
@@ -372,6 +376,7 @@ public class Style {
         elevation = style.elevation;
         iconGap = style.iconGap;
         iconGapUnit = style.iconGapUnit;
+        letterSpacing = style.letterSpacing;
         surface = style.surface;
         opacity = style.opacity;
         modifiedFlag = 0;
@@ -583,6 +588,9 @@ public class Style {
         if ((modifiedFlag & ICON_GAP_MODIFIED) == 0) {
             setIconGap(style.iconGap, style.iconGapUnit);
         }
+        if ((modifiedFlag & LETTER_SPACING_MODIFIED) == 0) {
+            setLetterSpacing(style.letterSpacing);
+        }
         if ((modifiedFlag & SURFACE_MODIFIED) == 0) {
             setSurface(style.isSurface());
         }
@@ -627,6 +635,37 @@ public class Style {
             return -1;
         }
         return CN.convertToPixels(iconGap, iconGapUnit);
+    }
+
+    /// Returns the letter spacing (in EM units, font-size relative) applied to text
+    /// drawn with this style. 0 means the platform default (no extra spacing).
+    public float getLetterSpacing() {
+        return letterSpacing;
+    }
+
+    /// Sets the letter spacing in EM units (font-size relative). A native theme uses
+    /// this to match a Material/iOS text appearance's tracking per component. The
+    /// spacing is carried by the style's font so it affects both layout measurement
+    /// and rendering.
+    public void setLetterSpacing(float letterSpacing) {
+        setLetterSpacing(letterSpacing, false);
+    }
+
+    /// Sets the letter spacing in EM units. See [#setLetterSpacing(float)].
+    public void setLetterSpacing(float spacing, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setLetterSpacing(spacing, override);
+            }
+            return;
+        }
+        if (Math.abs(spacing - letterSpacing) > 0.00001) {
+            letterSpacing = spacing;
+            if (!override) {
+                modifiedFlag |= LETTER_SPACING_MODIFIED;
+            }
+            firePropertyChanged(LETTER_SPACING);
+        }
     }
 
     /// Sets the icon gap in the current units.

@@ -2245,6 +2245,23 @@ public class CSSTheme {
                 }
 
 
+                currToken = "letterSpacing";
+                if (unselectedStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, unselId+".letterSpacing", el.getThemeLetterSpacing(unselectedStyles));
+                }
+                currToken = "selected letterSpacing";
+                if (selectedStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, selId+"#letterSpacing", el.getThemeLetterSpacing(selectedStyles));
+                }
+                currToken = "pressed letterSpacing";
+                if (pressedStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, pressedId+"#letterSpacing", el.getThemeLetterSpacing(pressedStyles));
+                }
+                currToken = "disabled letterSpacing";
+                if (disabledStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, disabledId+"#letterSpacing", el.getThemeLetterSpacing(disabledStyles));
+                }
+
                 currToken = "surface";
                 if (unselectedStyles.containsKey("surface")) {
                     res.setThemeProperty(themeName, unselId + ".surface", el.getThemeSurface(unselectedStyles));
@@ -5225,6 +5242,13 @@ public class CSSTheme {
             return -1;
         }
 
+        public float getThemeLetterSpacing(Map<String, LexicalUnit> style) {
+            if (style.containsKey("letter-spacing")) {
+                return ((ScaledUnit)style.get("letter-spacing")).getFloatValue();
+            }
+            return 0;
+        }
+
         public byte getThemeIconGapUnit(Map<String, LexicalUnit> style) {
             if (style.containsKey("icon-gap")) {
                 FloatValue value = getFloatValue(style.get("icon-gap"));
@@ -6451,6 +6475,11 @@ public class CSSTheme {
 
             case "icon-gap" : {
                 style.put("icon-gap", value);
+                break;
+            }
+
+            case "letter-spacing" : {
+                style.put("letter-spacing", value);
                 break;
             }
 

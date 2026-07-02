@@ -57,6 +57,18 @@
         <exclude name="ReturnEmptyCollectionRatherThanNull"/>
         <exclude name="UncommentedEmptyMethodBody"/>
         <exclude name="UseLocaleWithCaseConversions"/>
+        <!-- Re-added below with allowCommentedBlocks so a catch documented with a
+             comment explaining why the exception is ignored is accepted. -->
+        <exclude name="EmptyCatchBlock"/>
+    </rule>
+
+    <!-- A catch block whose body is a comment explaining the deliberate ignore
+         (e.g. "malformed theme constant -> fall back to the default") is an
+         intentional, documented no-op, not a swallowed error. -->
+    <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+        <properties>
+            <property name="allowCommentedBlocks" value="true"/>
+        </properties>
     </rule>
 
     <!-- The com.codename1.gaming.physics.box2d package is a vendored, lightly

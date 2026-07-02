@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class NativeThemeBindingsTest extends UITestBase {
 
     @Test
-    public void iosModernThemeBindingRetunesButton() throws Exception {
+    public void iosModernThemeBindingRetunesRaisedButton() throws Exception {
         File themeFile = locateNativeTheme("iOSModernTheme.res");
         if (themeFile == null) {
             return;
@@ -47,12 +47,15 @@ public class NativeThemeBindingsTest extends UITestBase {
         Hashtable theme = res.getTheme(themeNames[0]);
         assertNotNull(theme);
 
-        // Compiler should have emitted both the baked-in default AND
-        // the binding entry. Resources.loadTheme stores colors as the
-        // unpadded hex of their int value (Integer.toHexString), so the
+        // The iOS 26 Liquid Glass redesign made the plain Button a frosted
+        // capsule with a BLACK label (no accent binding any more); the accent
+        // now drives the prominent (Raised) button's FILL, so that is the
+        // binding this test pins. The compiler must emit both the baked-in
+        // default AND the binding entry. Resources.loadTheme stores colors as
+        // the unpadded hex of their int value (Integer.toHexString), so the
         // expected default is "7aff" rather than "007aff".
-        assertEquals("7aff", theme.get("Button.fgColor"));
-        assertEquals("accent-color", theme.get("@cn1-bind:Button.fgColor"));
+        assertEquals("7aff", theme.get("RaisedButton.bgColor"));
+        assertEquals("accent-color", theme.get("@cn1-bind:RaisedButton.bgColor"));
         // `#Constants { --accent-color: #007aff; }` in the native
         // theme.css is exported as a `@accent-color` theme constant so
         // a user app's theme.css can override it via the same syntax.
@@ -61,17 +64,17 @@ public class NativeThemeBindingsTest extends UITestBase {
         UIManager.getInstance().setThemeProps(theme);
 
         Button defaultBtn = new Button("default");
-        defaultBtn.setUIID("Button");
-        assertEquals(0x007aff, defaultBtn.getUnselectedStyle().getFgColor(),
-                "Native theme button should pick up the inlined fallback when no override is supplied");
+        defaultBtn.setUIID("RaisedButton");
+        assertEquals(0x007aff, defaultBtn.getUnselectedStyle().getBgColor(),
+                "Native theme raised button should pick up the inlined fallback when no override is supplied");
 
         Hashtable override = new Hashtable();
         override.put("@accent-color", "ff2d95");
         UIManager.getInstance().addThemeProps(override);
 
         Button retuned = new Button("magenta");
-        retuned.setUIID("Button");
-        assertEquals(0xff2d95, retuned.getUnselectedStyle().getFgColor(),
+        retuned.setUIID("RaisedButton");
+        assertEquals(0xff2d95, retuned.getUnselectedStyle().getBgColor(),
                 "@accent-color override should retune every UIID bound to --accent-color");
     }
 

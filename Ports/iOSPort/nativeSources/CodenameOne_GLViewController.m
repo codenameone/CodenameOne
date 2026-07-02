@@ -32,6 +32,7 @@
 #import "FillRect.h"
 #import "ClipRect.h"
 #import "DrawLine.h"
+#import "BlurRegion.h"
 #import "DrawRect.h"
 #import "ClearRect.h"
 #import "FillPolygon.h"
@@ -2284,6 +2285,39 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
     [f release];
 #endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeBlurScreenRegionImpl
+(int x, int y, int width, int height, float radius) {
+    BlurRegion* f = [[BlurRegion alloc] initWithArgs:x ypos:y w:width h:height r:radius];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl
+(int x, int y, int width, int height, float radius, float cornerRadius, float sat,
+ float scale, float offset, float refract, float specular) {
+    BlurRegion* f = [[BlurRegion alloc] initWithGlassArgs:x ypos:y w:width h:height r:radius
+                                             cornerRadius:cornerRadius sat:sat scale:scale
+                                                   offset:offset refract:refract specular:specular];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl
+(int x, int y, int width, int height, float cornerRadius, float magnify,
+ float aberration, int tintColor, float tintStrength) {
+    BlurRegion* f = [[BlurRegion alloc] initWithLensArgs:x ypos:y w:width h:height
+                                            cornerRadius:cornerRadius magnify:magnify
+                                              aberration:aberration tintColor:tintColor tintStrength:tintStrength];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl

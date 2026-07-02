@@ -3678,6 +3678,26 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// In-place region "Liquid Glass" material for backdrop-filter. Default falls
+    /// back to a plain blur (so non-iOS ports still blur, just without the colour
+    /// transform). Ports that support the full material override this.
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        return blurRegion(graphics, x, y, width, height, radius);
+    }
+
+    /// In-place iOS 26 selection-drop LENS (magnify + chromatic aberration +
+    /// dark-&gt;accent tint over the painted content). Default unsupported; the iOS
+    /// port overrides it. Returns false so callers can fall back (e.g. to a tint).
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        return false;
+    }
+
+    /// Renders an Apple SF Symbol to an image. Default returns null (only iOS
+    /// implements this); callers fall back to the Material icon font.
+    public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {
+        return null;
+    }
+
     private boolean checkIntersection(Object g, int y0, int x1, int x2, int y1, int y2, int[] intersections, int intersectionsCount) {
         if (y0 > y1 && y0 < y2 || y0 > y2 && y0 < y1) {
             if (y1 == y2) {
@@ -4124,6 +4144,15 @@ public abstract class CodenameOneImplementation {
     /// scaled font instance
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         throw new RuntimeException("Unsupported operation");
+    }
+
+    /// Returns a variant of the given native TrueType font with the supplied letter
+    /// spacing (in EM units) applied to its glyph advances, or the same font when the
+    /// platform does not support letter spacing. Used by Style.letterSpacing so a
+    /// per-component spacing is carried by the font itself (consistent for layout
+    /// measurement and rendering). The default is a no-op.
+    public Object deriveTrueTypeFontWithLetterSpacing(Object font, float letterSpacing) {
+        return font;
     }
 
     /// Returns true if the system supports dynamically loading truetype fonts from

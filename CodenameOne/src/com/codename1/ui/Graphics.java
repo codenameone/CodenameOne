@@ -1528,6 +1528,32 @@ public final class Graphics {
         return impl.blurRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius);
     }
 
+    /// Applies the iOS "Liquid Glass" material to the contents already painted
+    /// into the rectangular region. This is a blur followed by an affine colour
+    /// transform (saturation boost + scale + offset). The material is masked to a
+    /// rounded rectangle of the given corner radius (in pixels; a negative value
+    /// means a full capsule/pill) so it matches the host component's shape rather
+    /// than spilling into a square. Used to realize the frosted glass
+    /// backdrop-filter material.
+    public boolean glassRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+        return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
+    }
+
+    /// Applies the iOS 26 selection "drop" LENS to the contents already painted into
+    /// the region (the bar + glyphs UNDER it): radial magnification, edge chromatic
+    /// aberration, and a luminance-keyed dark-&gt;accent tint so dark glyphs read in
+    /// the accent colour only where the lens covers them. Unlike glassRegion this is
+    /// drawn OVER the content. cornerRadius&lt;0 = capsule. tintColor is 0xRRGGBB.
+    public boolean lensRegion(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+        return impl.lensRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, cornerRadius, magnify, aberration, tintColor, tintStrength);
+    }
+
     /// Fills a rectangle with an optionally translucent fill color
     ///
     /// #### Parameters

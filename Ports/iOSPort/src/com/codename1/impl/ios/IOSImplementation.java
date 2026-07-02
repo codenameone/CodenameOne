@@ -422,9 +422,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// renders through the actual Metal draw path (not an off-screen re-paint),
     /// so the screenshot remains a genuine test of the display pipeline.
     private void forceScreenRenderForCapture() {
-        if (!isDesktop()) {
-            return;
-        }
+        // Runs on desktop (Mac Catalyst) AND the iOS simulator/device: the native
+        // screenshot now reads the Metal screenTexture on ALL of them (see
+        // cn1_renderViewToContext), and a STATIC form's show() does not reliably
+        // re-drive a screen frame on any of them -- so without forcing a paint the
+        // texture holds a stale/empty frame and the capture comes back null (the
+        // cause of the fidelity suite's "screenshot returned null" timeouts). The
+        // force-render also drives the live backdrop-filter glass into the texture
+        // so the screenshot captures it. Driving a real EDT paint+flush every
+        // capture is correct everywhere (the capture reflects the current UI).
         final Runnable paintAndFlush = new Runnable() {
             @Override
             public void run() {
@@ -1854,6 +1860,336 @@ public class IOSImplementation extends CodenameOneImplementation {
         n.height = im.height;
         n.peer = nativeInstance.gausianBlurImage(im.peer, radius);
         return Image.createImage(n);
+    }
+
+    /// Parses a theme-constant string as an int, returning {@code def} on null/blank/malformed.
+    private static int parseIntConstant(String v, int def) {
+        if (v == null) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(v.trim());
+        } catch (NumberFormatException nfe) {
+            return def;
+        }
+    }
+
+    @Override
+    public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {
+        // wh[0],[1] receive the rendered pixel w/h. wh[2],[3] pass optional layout
+        // tuning to the native render: a uniform icon SLOT height (percent of size)
+        // and the glyph's VERTICAL bias in that slot (percent; 50 = centred). This
+        // lets a native-style tab bar give a tall glyph (e.g. star.fill) a full-height
+        // slot positioned like UIKit's SF baseline instead of shrinking it to the
+        // nominal size. Defaults 100/50 reproduce the legacy centred behaviour, so
+        // non-tab icons are unaffected unless the theme opts in.
+        int[] wh = new int[4];
+        com.codename1.ui.plaf.UIManager uim = com.codename1.ui.plaf.UIManager.getInstance();
+        wh[2] = parseIntConstant(uim.getThemeConstant("iosSFSlotPct", "100"), 100);
+        wh[3] = parseIntConstant(uim.getThemeConstant("iosSFVBias", "50"), 50);
+        long peer = nativeInstance.nativeCreateSFSymbol(name, color, sizePixels, weight, wh);
+        if (peer == 0) {
+            return null;
+        }
+        NativeImage n = new NativeImage("SF Symbol " + name);
+        n.peer = peer;
+        n.width = wh[0];
+        n.height = wh[1];
+        return Image.createImage(n);
+    }
+
+    @Override
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        if (radius <= 0f || width <= 0 || height <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // Live screen (no backing mutable image): enqueue a BlurRegion op in paint
+        // order. During the drain it blurs the already-drawn screenTexture region
+        // (the backdrop) and draws it back, so the component's translucent fill +
+        // foreground (queued right after this returns) paint on top -- real
+        // "Liquid Glass" on a running app, not just the offscreen fidelity tiles.
+        if (ng.associatedImage == null) {
+            nativeInstance.nativeBlurScreenRegion(x, y, width, height, radius);
+            return true;
+        }
+        // Flush whatever has been painted into the image so its peer is current, read
+        // the region behind us, Gaussian-blur it (Metal-backed CIGaussianBlur) and draw
+        // the blurred patch back where it was read.
+        ng.checkControl();
+        ng.associatedImage.peer = finishDrawingOnImage();
+        currentlyDrawingOn = null;
+        NativeImage target = ng.associatedImage;
+        int rx = Math.max(0, x), ry = Math.max(0, y);
+        int rw = Math.min(width, target.width - rx), rh = Math.min(height, target.height - ry);
+        if (rw <= 0 || rh <= 0) {
+            return true;
+        }
+        int[] rgb = new int[rw * rh];
+        getRGB(target, rgb, 0, rx, ry, rw, rh);
+        // UIKit "Liquid Glass" doesn't just blur the backdrop -- it boosts the
+        // backdrop's saturation (vibrancy) so colours pop through the frost. A plain
+        // CIGaussianBlur leaves the glass washed-out vs the native material; lift
+        // saturation here (this is the backdrop-filter path only -- blurRegion is
+        // never invoked for a plain filter:blur) before blurring.
+        saturateInPlace(rgb, GLASS_SATURATION);
+        NativeImage blurred = new NativeImage("backdrop-filter blur");
+        blurred.peer = nativeInstance.gausianBlurImage(createImageFromARGB(rgb, rw, rh), radius);
+        blurred.width = rw;
+        blurred.height = rh;
+        // drawImage applies this graphics' transform; pass coordinates relative to that
+        // transform's translation so the blurred patch lands back where we read it.
+        int tx = (int) Math.round(ng.transform.getTranslateX());
+        int ty = (int) Math.round(ng.transform.getTranslateY());
+        drawImage(ng, blurred, rx - tx, ry - ty);
+        return true;
+    }
+
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        if (radius <= 0f || width <= 0 || height <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // Live screen path: queue a GlassRegion op carrying the full material
+        // params. During the drain it reads the already-drawn screenTexture region
+        // (padded + edge-replicated), applies the material, blurs, runs the optics
+        // (rounded-rect mask + refraction + specular rim) and draws the pill-shaped
+        // glass patch back -- the SAME recipe as the offscreen branch below, so a
+        // running app gets real Liquid Glass, not just a plain blur.
+        if (ng.associatedImage == null) {
+            nativeInstance.nativeGlassScreenRegion(x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
+            return true;
+        }
+        // Flush whatever has been painted into the image so its peer is current, read
+        // the region behind us, apply the "Liquid Glass" affine colour material and
+        // Gaussian-blur it (Metal-backed CIGaussianBlur) and draw the patch back where
+        // it was read.
+        ng.checkControl();
+        ng.associatedImage.peer = finishDrawingOnImage();
+        currentlyDrawingOn = null;
+        NativeImage target = ng.associatedImage;
+        int rx = Math.max(0, x), ry = Math.max(0, y);
+        int rw = Math.min(width, target.width - rx), rh = Math.min(height, target.height - ry);
+        if (rw <= 0 || rh <= 0) {
+            return true;
+        }
+        // Build a buffer PADDED by the full blur radius on every side and fill the
+        // out-of-component area with EDGE-REPLICATED backdrop pixels. CIGaussianBlur
+        // fades to transparency at its buffer edge; without a full radius of margin
+        // (e.g. when the component sits within ~1mm of the tile edge, less than the
+        // blur radius) that fade reaches into the component and feathers its edge,
+        // making the glass read smaller than native's crisp panel. Replicating the
+        // edge gives the blur a clean clamp-to-extent margin so the component edge
+        // stays crisp. We blur the padded buffer then crop the centre back out.
+        // CIGaussianBlur's kernel spreads ~3*radius, so the buffer-edge fade reaches
+        // that far in. Pad by 3*radius of replicated backdrop so the fade is fully
+        // contained outside the component and its own edge stays crisp like native.
+        int pad = (int) Math.ceil(radius) * 3 + 1;
+        int bw = rw + 2 * pad, bh = rh + 2 * pad;
+        // Available (clamped) slice of the real backdrop around the component.
+        int ax0 = Math.max(0, rx - pad), ay0 = Math.max(0, ry - pad);
+        int ax1 = Math.min(target.width, rx + rw + pad), ay1 = Math.min(target.height, ry + rh + pad);
+        int aw = ax1 - ax0, ah = ay1 - ay0;
+        int[] avail = new int[aw * ah];
+        getRGB(target, avail, 0, ax0, ay0, aw, ah);
+        // Padded buffer origin in absolute coords is (rx-pad, ry-pad); sample the
+        // available slice with edge clamping to replicate beyond the tile.
+        int[] prgb = new int[bw * bh];
+        for (int by = 0; by < bh; by++) {
+            int ay = (ry - pad + by) - ay0;
+            if (ay < 0) ay = 0; else if (ay >= ah) ay = ah - 1;
+            int arow = ay * aw, brow = by * bw;
+            for (int bx = 0; bx < bw; bx++) {
+                int ax = (rx - pad + bx) - ax0;
+                if (ax < 0) ax = 0; else if (ax >= aw) ax = aw - 1;
+                prgb[brow + bx] = avail[arow + ax];
+            }
+        }
+        // Reverse-engineered iOS UIVisualEffectView material: an affine colour
+        // transform (saturation boost + scale + offset floor) of the backdrop before
+        // blurring (this is the backdrop-filter path only).
+        glassMaterialInPlace(prgb, sat, scale, offset);
+        NativeImage blurredPadded = new NativeImage("backdrop-filter glass");
+        blurredPadded.peer = nativeInstance.gausianBlurImage(createImageFromARGB(prgb, bw, bh), radius);
+        blurredPadded.width = bw;
+        blurredPadded.height = bh;
+        // Read the blurred padded buffer back, then apply the Liquid Glass OPTICS:
+        // edge refraction (lensing) + specular rim, with a rounded-rect SDF used for
+        // both the displacement profile and the anti-aliased shape mask. The component
+        // sits at offset (pad,pad) in the padded buffer; refraction samples that buffer
+        // (its replicated margin keeps edge samples valid).
+        int[] pbargb = new int[bw * bh];
+        getRGB(blurredPadded, pbargb, 0, 0, 0, bw, bh);
+        int[] out = new int[rw * rh];
+        applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, cornerRadius, refract, specular);
+        NativeImage blurred = new NativeImage("backdrop-filter glass");
+        blurred.peer = createImageFromARGB(out, rw, rh);
+        blurred.width = rw;
+        blurred.height = rh;
+        // drawImage applies this graphics' transform; pass coordinates relative to that
+        // transform's translation so the blurred patch lands back where we read it.
+        int tx = (int) Math.round(ng.transform.getTranslateX());
+        int ty = (int) Math.round(ng.transform.getTranslateY());
+        drawImage(ng, blurred, rx - tx, ry - ty);
+        return true;
+    }
+
+    @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // Live screen only: queue the iOS 26 selection-drop LENS op carrying the
+        // params. During the drain it reads the already-painted content (bar +
+        // black glyphs) UNDER the drop and magnifies + chromatically aberrates +
+        // dark->accent tints it. The offscreen-image path (rare now that the
+        // fidelity capture renders live) has no lens -- return false to fall back.
+        if (ng.associatedImage == null) {
+            nativeInstance.nativeLensScreenRegion(x, y, width, height, cornerRadius, magnify, aberration, tintColor, tintStrength);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Applies the Liquid Glass OPTICS to the blurred, colour-transformed backdrop
+     * (src, the bw x bh padded buffer; the component occupies rw x rh at offset
+     * (pad,pad)) and writes the rw x rh result into out. Three effects, all keyed off
+     * a rounded-rect signed distance field so they follow the host shape (capsule when
+     * cornerRadius &lt; 0):
+     * <ul>
+     * <li><b>Edge refraction / lensing</b>: near the edges the backdrop sample is
+     * displaced radially toward the centre following a quarter-circle profile
+     * (1 - sqrt(1 - t^2)), magnifying/bending the backdrop so the panel reads as a
+     * real glass layer ON TOP rather than a flat see-through hole. Invisible over a
+     * flat backdrop (displacing a uniform field is a no-op), pronounced over busy
+     * content -- exactly like iOS.</li>
+     * <li><b>Specular rim</b>: a bright highlight in a thin band at the very edge,
+     * brightest at the top (the iOS "glint"). </li>
+     * <li><b>Shape mask</b>: anti-aliased coverage from the SDF, so the glass clips to
+     * the rounded/pill shape with a crisp 1px edge.</li>
+     * </ul>
+     */
+    private static void applyGlassOptics(int[] src, int bw, int bh, int pad, int[] out,
+            int rw, int rh, float cornerRadius, float refract, float specular) {
+        float hw = rw / 2f, hh = rh / 2f;
+        float r = cornerRadius < 0f ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
+        if (r < 0f) r = 0f;
+        float band = Math.min(hw, hh) * 0.6f;       // refraction active in the outer 60%
+        float rimW = 3.0f;                          // specular rim width (px)
+        for (int y = 0; y < rh; y++) {
+            float py = y + 0.5f;
+            for (int x = 0; x < rw; x++) {
+                float px = x + 0.5f;
+                // Rounded-rect signed distance: negative inside, 0 at the edge.
+                float dx = Math.abs(px - hw) - (hw - r);
+                float dy = Math.abs(py - hh) - (hh - r);
+                float ax = dx > 0 ? dx : 0, ay = dy > 0 ? dy : 0;
+                float outside = (float) Math.sqrt(ax * ax + ay * ay);
+                float inside = Math.min(Math.max(dx, dy), 0f);
+                float sdf = outside + inside - r;
+                float depth = -sdf;                 // >0 inside the shape, 0 at edge
+                if (depth <= 0f) { out[y * rw + x] = 0; continue; }
+                float alpha = depth >= 1f ? 1f : depth;   // 1px AA edge
+                // Edge refraction: sample the backdrop displaced toward the centre.
+                // Base on the integer coord so a zero displacement samples the source
+                // pixel EXACTLY (a px+0.5 base would bilinear-soften the whole patch).
+                float sx = x, sy = y;
+                if (refract > 0f && band > 0f && depth < band) {
+                    float t = 1f - depth / band;            // 1 at edge -> 0 at band
+                    float distortion = 1f - (float) Math.sqrt(Math.max(0f, 1f - t * t));
+                    sx = x - (px - hw) * distortion * refract;
+                    sy = y - (py - hh) * distortion * refract;
+                }
+                int col = sampleBilinear(src, bw, bh, sx + pad, sy + pad);
+                int rr = (col >> 16) & 0xff, gg = (col >> 8) & 0xff, bb = col & 0xff;
+                // Specular rim: bright glint in the outer rimW px, brightest at top.
+                if (specular > 0f && depth < rimW) {
+                    float rim = 1f - depth / rimW;
+                    float topBias = 0.55f + 0.45f * (1f - py / rh);
+                    int add = (int) (specular * rim * topBias * 70f);
+                    rr = rr + add > 255 ? 255 : rr + add;
+                    gg = gg + add > 255 ? 255 : gg + add;
+                    bb = bb + add > 255 ? 255 : bb + add;
+                }
+                int a = (int) (alpha * 255f);
+                out[y * rw + x] = (a << 24) | (rr << 16) | (gg << 8) | bb;
+            }
+        }
+    }
+
+    /** Bilinear ARGB sample with edge clamping; used by the glass edge refraction. */
+    private static int sampleBilinear(int[] buf, int w, int h, float fx, float fy) {
+        if (fx < 0f) fx = 0f; else if (fx > w - 1) fx = w - 1;
+        if (fy < 0f) fy = 0f; else if (fy > h - 1) fy = h - 1;
+        int x0 = (int) fx, y0 = (int) fy;
+        int x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+        float tx = fx - x0, ty = fy - y0;
+        int p00 = buf[y0 * w + x0], p10 = buf[y0 * w + x1];
+        int p01 = buf[y1 * w + x0], p11 = buf[y1 * w + x1];
+        int r = bilerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, (p01 >> 16) & 0xff, (p11 >> 16) & 0xff, tx, ty);
+        int g = bilerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, (p01 >> 8) & 0xff, (p11 >> 8) & 0xff, tx, ty);
+        int b = bilerp(p00 & 0xff, p10 & 0xff, p01 & 0xff, p11 & 0xff, tx, ty);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static int bilerp(int c00, int c10, int c01, int c11, float tx, float ty) {
+        float top = c00 + (c10 - c00) * tx;
+        float bot = c01 + (c11 - c01) * tx;
+        return (int) (top + (bot - top) * ty + 0.5f);
+    }
+
+    /**
+     * Reverse-engineered iOS "Liquid Glass" material (empirically derived from a
+     * real UIVisualEffectView, validated &lt;1 LSB): an affine colour transform of
+     * each (blurred) backdrop pixel. For each channel c:
+     * c' = clamp( (lum + (c - lum) * sat) * scale + offset ) where lum is the
+     * pixel luma. The offset term is the white/dark frost floor. Alpha preserved.
+     */
+    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset) {
+        for (int i = 0; i < argb.length; i++) {
+            int p = argb[i];
+            int a = p & 0xff000000;
+            float r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            r = (lum + (r - lum) * sat) * scale + offset;
+            g = (lum + (g - lum) * sat) * scale + offset;
+            b = (lum + (b - lum) * sat) * scale + offset;
+            int ri = r < 0 ? 0 : (r > 255 ? 255 : (int) r);
+            int gi = g < 0 ? 0 : (g > 255 ? 255 : (int) g);
+            int bi = b < 0 ? 0 : (b > 255 ? 255 : (int) b);
+            argb[i] = a | (ri << 16) | (gi << 8) | bi;
+        }
+    }
+
+    /** Liquid-glass vibrancy: how far backdrop colours are pushed from grey (1.0 = off). */
+    private static final float GLASS_SATURATION = 1.35f;
+
+    /**
+     * Boosts the saturation of an ARGB buffer in place by interpolating each pixel
+     * away from its perceptual luminance (the standard saturation-matrix approach):
+     * c' = lum + (c - lum) * factor. Alpha is preserved. Used to give the
+     * backdrop-filter glass the vibrancy UIKit's real material has.
+     */
+    private static void saturateInPlace(int[] argb, float factor) {
+        if (factor == 1f) {
+            return;
+        }
+        for (int i = 0; i < argb.length; i++) {
+            int p = argb[i];
+            int a = p & 0xff000000;
+            int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            r = (int) (lum + (r - lum) * factor);
+            g = (int) (lum + (g - lum) * factor);
+            b = (int) (lum + (b - lum) * factor);
+            if (r < 0) { r = 0; } else if (r > 255) { r = 255; }
+            if (g < 0) { g = 0; } else if (g > 255) { g = 255; }
+            if (b < 0) { b = 0; } else if (b > 255) { b = 255; }
+            argb[i] = a | (r << 16) | (g << 8) | b;
+        }
     }
 
     

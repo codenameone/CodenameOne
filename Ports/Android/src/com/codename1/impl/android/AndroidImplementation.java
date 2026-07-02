@@ -2208,6 +2208,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Returns a copy of the given native font with its paint's letter spacing set
+    /// to the supplied value (Android letter spacing is in EM units, independent of
+    /// font size). Used by Style.letterSpacing so a per-UIID spacing -- matching the
+    /// Material text-appearance for each component -- is baked into the SAME paint
+    /// that does both measureText (layout) and drawText (render), keeping advances
+    /// consistent. Other ports get the default no-op.
+    @Override
+    public Object deriveTrueTypeFontWithLetterSpacing(Object font, float letterSpacing) {
+        NativeFont fnt = (NativeFont) font;
+        CodenameOneTextPaint copy = new CodenameOneTextPaint((CodenameOneTextPaint) fnt.font);
+        copy.setLetterSpacing(letterSpacing);
+        return new NativeFont(fnt.face, fnt.style, fnt.size, copy, fnt.fileName, fnt.height, fnt.weight);
+    }
+
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         NativeFont fnt = (NativeFont)font;
@@ -2225,6 +2239,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         CodenameOneTextPaint newPaint = new CodenameOneTextPaint(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
+        // preserve any letter spacing already configured on the source paint
+        newPaint.setLetterSpacing(paint.getLetterSpacing());
         NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
         return n;
     }
@@ -2357,6 +2373,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object getNativeGraphics(Object image) {
         AndroidGraphics g =  new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        g.underlyingBitmap = (Bitmap) image;
         g.setClip(0, 0, ((Bitmap)image).getWidth(), ((Bitmap)image).getHeight());
         return g;
     }
@@ -12361,6 +12378,59 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public boolean isGaussianBlurSupported() {
         return (!brokenGaussian) && android.os.Build.VERSION.SDK_INT >= 11;
+    }
+
+    @Override
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        if (radius <= 0f || width <= 0 || height <= 0 || !isGaussianBlurSupported()) {
+            return radius <= 0f || width <= 0 || height <= 0;
+        }
+        // In-place CSS backdrop-filter:blur on a mutable-image target. Read/write the
+        // backing Bitmap directly at absolute coordinates (bypassing the canvas
+        // transform), Gaussian-blur the region via RenderScript. The live screen
+        // canvas has no backing Bitmap here -> returns false (component paints
+        // without the blur).
+        if (!(graphics instanceof AndroidGraphics)) {
+            return false;
+        }
+        Bitmap dest = ((AndroidGraphics) graphics).underlyingBitmap;
+        if (dest == null || !dest.isMutable()) {
+            return false;
+        }
+        try {
+            int rx = Math.max(0, x), ry = Math.max(0, y);
+            int rw = Math.min(width, dest.getWidth() - rx);
+            int rh = Math.min(height, dest.getHeight() - ry);
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            int[] pix = new int[rw * rh];
+            dest.getPixels(pix, 0, rw, rx, ry, rw, rh);
+            Bitmap region = Bitmap.createBitmap(pix, rw, rh, Bitmap.Config.ARGB_8888);
+            Bitmap blurred = Bitmap.createBitmap(region);
+            RenderScript rs = RenderScript.create(getContext());
+            try {
+                ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+                Allocation tmpIn = Allocation.createFromBitmap(rs, region);
+                Allocation tmpOut = Allocation.createFromBitmap(rs, blurred);
+                // RenderScript blur radius is capped at 25.
+                theIntrinsic.setRadius(Math.min(25f, radius));
+                theIntrinsic.setInput(tmpIn);
+                theIntrinsic.forEach(tmpOut);
+                tmpOut.copyTo(blurred);
+                tmpIn.destroy();
+                tmpOut.destroy();
+                theIntrinsic.destroy();
+            } finally {
+                rs.destroy();
+            }
+            blurred.getPixels(pix, 0, rw, 0, 0, rw, rh);
+            dest.setPixels(pix, 0, rw, rx, ry, rw, rh);
+            return true;
+        } catch (Throwable t) {
+            brokenGaussian = true;
+            return false;
+        }
     }
 
     public static boolean checkForPermission(String permission, String description){
