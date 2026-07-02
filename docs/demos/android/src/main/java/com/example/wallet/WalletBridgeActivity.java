@@ -17,6 +17,10 @@ public class WalletBridgeActivity extends Activity {
         String caller = getCallingPackage();
 
         Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
+        if (launch == null) {
+            finish();
+            return;
+        }
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         launch.putExtra("wallet_payload", in.getStringExtra("payload"));
         launch.putExtra("wallet_caller", caller == null ? "" : caller);

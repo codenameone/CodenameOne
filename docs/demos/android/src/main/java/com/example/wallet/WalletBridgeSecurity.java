@@ -7,7 +7,6 @@ import android.content.pm.Signature;
 import android.os.Build;
 
 import java.security.MessageDigest;
-import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -19,7 +18,9 @@ public final class WalletBridgeSecurity {
 
     // tag::walletTrustedCallerSignature[]
     public static boolean isTrustedCallerSignature(Context ctx, String packageName, Set<String> allowedSha256) {
-        if (packageName == null || packageName.isEmpty()) return false;
+        if (ctx == null || packageName == null || packageName.isEmpty() || allowedSha256 == null || allowedSha256.isEmpty()) {
+            return false;
+        }
         try {
             PackageManager pm = ctx.getPackageManager();
             PackageInfo info;
@@ -49,8 +50,13 @@ public final class WalletBridgeSecurity {
     }
 
     private static String toHex(byte[] data) {
+        char[] digits = "0123456789ABCDEF".toCharArray();
         StringBuilder out = new StringBuilder(data.length * 2);
-        for (byte b : data) out.append(String.format(Locale.US, "%02X", b));
+        for (byte b : data) {
+            int value = b & 0xff;
+            out.append(digits[value >>> 4]);
+            out.append(digits[value & 0x0f]);
+        }
         return out.toString();
     }
     // end::walletTrustedCallerSignature[]

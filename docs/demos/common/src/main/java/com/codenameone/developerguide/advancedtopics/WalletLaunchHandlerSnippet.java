@@ -20,7 +20,7 @@ public class WalletLaunchHandlerSnippet {
                 return;
             }
 
-            // Run authentication + back end verification, then call native bridge completion API.
+            verifyWalletPayload(payload, caller);
             return;
         }
         showMainForm();
@@ -33,6 +33,10 @@ public class WalletLaunchHandlerSnippet {
 
     private void failClosed() {
         // Complete the native bridge with a declined/canceled result.
+    }
+
+    private void verifyWalletPayload(String payload, String caller) {
+        // Run authentication + back end verification, then call native bridge completion API.
     }
 
     private void showMainForm() {
