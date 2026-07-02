@@ -41,12 +41,6 @@ import java.io.IOException;
 /// The audio track, when present, is exposed as interleaved PCM through `#readAudio()`.
 ///
 /// Obtain an instance from `VideoIO#openReader(String)`. Always `#close()` it when done.
-///
-/// @author Shai Almog
-///
-/// #### Since
-///
-/// 8.0
 public abstract class VideoReader {
     /// The width of the video track in pixels, or -1 if there is no video.
     public abstract int getWidth();

@@ -61,7 +61,6 @@ class AndroidVideoWriter extends VideoWriter {
     private final List<Sample> audioSamples = new ArrayList<Sample>();
     private int audioSampleRate;
     private int audioChannels;
-    private long audioFramesFed;
 
     private boolean closed;
 
@@ -162,6 +161,12 @@ class AndroidVideoWriter extends VideoWriter {
             bytes[o++] = (byte) (s & 0xff);
             bytes[o++] = (byte) ((s >> 8) & 0xff);
         }
+        // Presentation timestamp of the first sample in this block, as supplied
+        // by the caller -- VideoWriter documents the argument as exactly that.
+        // Honouring it (rather than assuming every block is contiguous from zero)
+        // keeps audio aligned with video when the first timestamp is non-zero or
+        // successive blocks leave gaps or overlaps.
+        long baseUs = presentationTimeMillis * 1000L;
         int offset = 0;
         while (offset < bytes.length) {
             int index = audioCodec.dequeueInputBuffer(TIMEOUT_US);
@@ -170,11 +175,12 @@ class AndroidVideoWriter extends VideoWriter {
                 in.clear();
                 int chunk = Math.min(in.remaining(), bytes.length - offset);
                 in.put(bytes, offset, chunk);
-                long framesSoFar = audioFramesFed;
-                long ptsUs = framesSoFar * 1000000L / Math.max(1, audioSampleRate);
+                // Offset the timestamp by the frames already consumed from this
+                // block so successive input buffers within one call stay ordered.
+                long framesIntoBlock = (long) (offset / 2) / Math.max(1, audioChannels);
+                long ptsUs = baseUs + framesIntoBlock * 1000000L / Math.max(1, audioSampleRate);
                 audioCodec.queueInputBuffer(index, 0, chunk, ptsUs, 0);
                 offset += chunk;
-                audioFramesFed += (chunk / 2) / Math.max(1, audioChannels);
             } else {
                 audioFormat = drain(audioCodec, audioSamples, false);
             }

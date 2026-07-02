@@ -68,6 +68,7 @@ class FFMPEGVideoWriter extends VideoWriter {
 
     private int actualSampleRate = -1;
     private int actualChannels = -1;
+    private long audioFramesWritten;
     private byte[] rgbaScratch;
     private boolean closed;
 
@@ -192,6 +193,24 @@ class FFMPEGVideoWriter extends VideoWriter {
             actualSampleRate = sampleRate;
             actualChannels = channels;
         }
+        // Honour the presentation timestamp (VideoWriter documents the argument
+        // as the timestamp of the first sample). The audio track is a flat s16le
+        // stream, so align blocks by padding forward gaps -- an initial non-zero
+        // start or a gap between blocks -- with silence, keeping audio in sync
+        // with the video. Overlaps cannot be represented in a flat stream, so a
+        // timestamp earlier than the current position is appended as-is.
+        int ch = actualChannels > 0 ? actualChannels : Math.max(1, channels);
+        long targetFrame = presentationTimeMillis * Math.max(1, actualSampleRate) / 1000L;
+        if (targetFrame > audioFramesWritten) {
+            long gapBytes = (targetFrame - audioFramesWritten) * ch * 2L;
+            byte[] silence = new byte[4096];
+            while (gapBytes > 0) {
+                int w = (int) Math.min(silence.length, gapBytes);
+                audioStream.write(silence, 0, w);
+                gapBytes -= w;
+            }
+            audioFramesWritten = targetFrame;
+        }
         int n = interleavedPcm.length;
         byte[] bytes = new byte[n * 2];
         int o = 0;
@@ -201,6 +220,7 @@ class FFMPEGVideoWriter extends VideoWriter {
             bytes[o++] = (byte) ((s >> 8) & 0xff);
         }
         audioStream.write(bytes);
+        audioFramesWritten += n / Math.max(1, ch);
     }
 
     @Override

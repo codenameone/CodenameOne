@@ -29,12 +29,6 @@ package com.codename1.media;
 ///
 /// Instances are immutable value objects. Capability fields that the platform cannot
 /// report are returned as `-1` (integers) or empty arrays.
-///
-/// @author Shai Almog
-///
-/// #### Since
-///
-/// 8.0
 public final class VideoCodec {
     private final String id;
     private final String name;

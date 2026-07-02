@@ -50,12 +50,6 @@ import java.io.IOException;
 /// }
 /// w.close();
 /// ```
-///
-/// @author Shai Almog
-///
-/// #### Since
-///
-/// 8.0
 public abstract class VideoWriter {
     /// Writes a single video frame at the given presentation timestamp. The frame may be
     /// any `Image`; its pixels are read via `Image#getRGB()`. Frames should be supplied

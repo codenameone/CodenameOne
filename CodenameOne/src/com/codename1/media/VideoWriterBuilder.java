@@ -40,12 +40,6 @@ import java.io.IOException;
 ///         .hasAudio(true).audioCodec(VideoIO.CODEC_AAC).sampleRate(44100).audioChannels(2)
 ///         .build();
 /// ```
-///
-/// @author Shai Almog
-///
-/// #### Since
-///
-/// 8.0
 public class VideoWriterBuilder {
     private String path;
     private String container = VideoIO.CONTAINER_MP4;

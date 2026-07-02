@@ -31,12 +31,6 @@ import com.codename1.ui.Image;
 /// pixel buffers.
 ///
 /// Instances are immutable and safe to hand off between threads.
-///
-/// @author Shai Almog
-///
-/// #### Since
-///
-/// 8.0
 public final class VideoFrame {
     private final int[] argb;
     private final int width;

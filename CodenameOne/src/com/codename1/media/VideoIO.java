@@ -59,12 +59,6 @@ import java.io.OutputStream;
 /// rate, frame accurate `VideoReader#frameAt(long)`, a variable to constant frame rate
 /// resampler `VideoReader#readFrames(float, com.codename1.media.VideoReader.FrameCallback)`
 /// and the audio track as PCM via `VideoReader#readAudio()`.
-///
-/// @author Shai Almog
-///
-/// #### Since
-///
-/// 8.0
 public abstract class VideoIO {
     /// Codec id for H.264 / AVC video, the most broadly compatible video codec.
     public static final String CODEC_H264 = "h264";

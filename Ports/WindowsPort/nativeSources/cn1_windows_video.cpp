@@ -250,6 +250,18 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     if (!st->hasAudio) {
         return JAVA_NULL;
     }
+    // readAudio() promises the entire audio track. A prior frameAt()/readFrames()
+    // may have repositioned the shared source reader via SetCurrentPosition, which
+    // moves every stream (not just video), so rewind to the start before draining
+    // the audio stream -- otherwise audio would begin at the last video seek.
+    {
+        PROPVARIANT pos;
+        PropVariantInit(&pos);
+        pos.vt = VT_I8;
+        pos.hVal.QuadPart = 0;
+        st->reader->SetCurrentPosition(GUID_NULL, pos);
+        PropVariantClear(&pos);
+    }
     unsigned char* pcm = NULL;
     size_t pcmLen = 0, pcmCap = 0;
     for (;;) {

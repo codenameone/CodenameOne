@@ -347,10 +347,28 @@ class HTML5VideoIO extends VideoIO {
     private static native int cn1VideoDuration(int id);
 
     @JSBody(params = {"id", "ms"}, script =
-            "var s = window['__cn1video_' + id]; if (s) { s.seeked = false; s.el.currentTime = ms / 1000; }")
+            "var s = window['__cn1video_' + id]; if (s) {"
+            + "  var t = ms / 1000;"
+            + "  if (Math.abs((s.el.currentTime || 0) - t) < 0.001) {"
+            // No-op seek (e.g. the first frame at t=0, or the same timestamp
+            // twice): browsers are not required to fire a 'seeked' event, so
+            // waiting for one would hang. Treat it as done as soon as the frame
+            // at the current position is decodable (readyState>=HAVE_CURRENT_DATA);
+            // cn1VideoSeeked() re-checks readyState until then.
+            + "    s.sameTime = true; s.seeked = (s.el.readyState >= 2);"
+            + "  } else {"
+            + "    s.sameTime = false; s.seeked = false; s.el.currentTime = t;"
+            + "  }"
+            + "}")
     private static native void cn1VideoSeek(int id, int ms);
 
-    @JSBody(params = {"id"}, script = "var s = window['__cn1video_' + id]; return s ? !!s.seeked : false;")
+    @JSBody(params = {"id"}, script = "var s = window['__cn1video_' + id];"
+            + "if (!s) { return false; }"
+            + "if (s.seeked) { return true; }"
+            // A no-op seek that had not buffered a frame yet completes once the
+            // current frame becomes available -- no 'seeked' event will arrive.
+            + "if (s.sameTime && s.el.readyState >= 2) { s.seeked = true; return true; }"
+            + "return false;")
     private static native boolean cn1VideoSeeked(int id);
 
     @JSBody(params = {"id", "w", "h"}, script =
