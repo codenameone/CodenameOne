@@ -397,6 +397,15 @@ public class Cn1libInstaller {
                 throw new MojoExecutionException("Failed to copy "+winJar+" to "+cn1libJars, ex);
             }
         }
+
+        File linuxJar = new File(libOutputJars, "nativelinux.zip");
+        if (linuxJar.exists()) {
+            try {
+                FileUtils.copyFile(linuxJar, new File(cn1libJars, linuxJar.getName()));
+            } catch (IOException ex) {
+                throw new MojoExecutionException("Failed to copy "+linuxJar+" to "+cn1libJars, ex);
+            }
+        }
         
         
         File cssJar = new File(libOutputJars, "css.zip");

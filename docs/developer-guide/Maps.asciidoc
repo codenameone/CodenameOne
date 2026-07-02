@@ -15,7 +15,7 @@ The pure-vector `MapView` renders real maps with zero configuration and no API k
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maps.java.txt[tag=maps-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MapsSnippets.java[tag=maps-java-001,indent=0]
 ----
 
 `LatLng` is the immutable WGS84 coordinate value type used throughout the API. The camera is described by a center `LatLng` and a fractional zoom level (the standard slippy-map scale where each whole increment doubles the scale).
@@ -28,7 +28,7 @@ Every map -- vector or native -- exposes the same operations through `MapSurface
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maps.java.txt[tag=maps-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MapsSnippets.java[tag=maps-java-002,indent=0]
 ----
 
 Marker icons are supplied as `EncodedImage` and anchored in normalized `(u, v)` image space (`0.5, 1.0` puts the pin tip on the location). When no icon is given, a marker draws the standard Material Design map pin. Polygon and circle fills accept an `0xAARRGGBB` color so you can make them translucent.
@@ -50,7 +50,7 @@ For a real app you point `MapView` at a hosted tile service. The simplest keyles
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maps.java.txt[tag=maps-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MapsSnippets.java[tag=maps-java-003,indent=0]
 ----
 
 If the URL has no `{z}` token it's treated as a TileJSON document and the real tile-URL template (and min/max zoom) are resolved from it automatically, so you can paste a provider's TileJSON URL directly.
@@ -67,7 +67,7 @@ image::img/maps-dark.png[The same vector data rendered with the built-in dark st
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maps.java.txt[tag=maps-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MapsSnippets.java[tag=maps-java-004,indent=0]
 ----
 
 image::img/maps-native.png[NativeMap backed by Apple MapKit (ios.maps.provider=apple),scaledwidth=40%]
@@ -94,7 +94,7 @@ When a provider is selected the build server injects that provider's implementat
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maps.java.txt[tag=maps-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MapsSnippets.java[tag=maps-java-005,indent=0]
 ----
 
 ==== Provider API keys
@@ -113,14 +113,14 @@ A native provider only renders on the platforms that ship its SDK. To show a pro
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maps.java.txt[tag=maps-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MapsSnippets.java[tag=maps-java-006,indent=0]
 ----
 
 Because it needs only a web view, the web provider (id `web`) is the natural last step before the pure-vector fallback in a provider chain. The order is fully customizable from code, so you can express per-platform preferences -- for example "try the native Google SDK, then the web map, then the vector `MapView`":
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maps.java.txt[tag=maps-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MapsSnippets.java[tag=maps-java-007,indent=0]
 ----
 
 image::img/maps-web.png[Google Maps rendered cross-platform through WebMapProvider,scaledwidth=40%]

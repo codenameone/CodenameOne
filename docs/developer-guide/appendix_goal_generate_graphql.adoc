@@ -115,7 +115,7 @@ The `@GraphQLClient` interface looks like:
 
 [source, java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-graphql.java.txt[tag=appendix-goal-generate-graphql-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AppendixGoalGenerateGraphqlSnippets.java[tag=appendix-goal-generate-graphql-java-001,indent=0]
 ----
 
 Call sites use the static factory.  Queries and mutations report through
@@ -123,7 +123,7 @@ an `OnComplete<GraphQLResponse<T>>`:
 
 [source, java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-graphql.java.txt[tag=appendix-goal-generate-graphql-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AppendixGoalGenerateGraphqlSnippets.java[tag=appendix-goal-generate-graphql-java-002,indent=0]
 ----
 
 A subscription returns a `GraphQLSubscription` handle whose `cancel()`
@@ -131,7 +131,7 @@ ends the stream:
 
 [source, java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-graphql.java.txt[tag=appendix-goal-generate-graphql-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AppendixGoalGenerateGraphqlSnippets.java[tag=appendix-goal-generate-graphql-java-003,indent=0]
 ----
 
 The `<Name>Impl` class that performs the request lives in

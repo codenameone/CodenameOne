@@ -482,7 +482,7 @@ Then in Java, you might do something like:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/css.java.txt[tag=css-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/CssSnippets.java[tag=css-java-001,indent=0]
 ----
 
 ==== Loading images from URLs

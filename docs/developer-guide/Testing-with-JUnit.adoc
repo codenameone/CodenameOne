@@ -41,7 +41,7 @@ Tests live in `common/src/test/java`. Surefire only runs from the `javase` modul
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-001,indent=0]
 ----
 
 Run with:
@@ -66,7 +66,7 @@ Place on a method (or on the class for all tests) when the body mutates UI state
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-002,indent=0]
 ----
 
 Class-level `@RunOnEdt` also routes `@BeforeEach`/`@AfterEach` methods through the EDT. Method-level `@RunOnEdt` is scoped to that one `@Test`.
@@ -79,7 +79,7 @@ Set a property visible to the simulator before the test runs.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-003,indent=0]
 ----
 
 The `scope` field selects where the value lands:
@@ -107,7 +107,7 @@ Loads a base theme resource and installs it through `UIManager.setThemeProps`, t
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-004,indent=0]
 ----
 
 The enum carries the resource path (`NativeTheme.IOS_MODERN.resourcePath()` returns `/iOSModernTheme.res`) and the simulator-menu label (`displayName()`), so test reports can render the same name a user sees in the simulator UI.
@@ -116,7 +116,7 @@ The enum carries the resource path (`NativeTheme.IOS_MODERN.resourcePath()` retu
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-005,indent=0]
 ----
 
 If both `nativeTheme` and `value` are set, `nativeTheme` wins. If neither is set, the annotation is a no-op.
@@ -127,7 +127,7 @@ Toggles dark/light mode via `Display.setDarkMode(Boolean)` and refreshes the act
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-006,indent=0]
 ----
 
 === `@LargerText`
@@ -136,7 +136,7 @@ Sets the accessibility text-scale multiplier — the same knob exposed by the si
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-007,indent=0]
 ----
 
 `scale = 1.0f` restores the default size; common values mirror the menu's `1.3f` / `1.6f` / `2.0f` presets.
@@ -147,7 +147,7 @@ Forces the simulator into portrait or landscape for the test.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-008,indent=0]
 ----
 
 This calls a non-persisting setter on `JavaSEPort` and sets an explicit-portrait flag honored by `Display.isPortrait()` — so unit-test JVMs (where the canvas inherits the host window's full size and would otherwise read landscape on every wide screen) get the expected orientation back.
@@ -158,7 +158,7 @@ Flips the look-and-feel into right-to-left mode (Arabic, Hebrew) via `UIManager.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-009,indent=0]
 ----
 
 === Annotation resolution
@@ -167,7 +167,7 @@ When the same annotation appears at both the class and the method level, *method
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-010,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-010,indent=0]
 ----
 
 === EDT semantics
@@ -209,13 +209,13 @@ The same "sign in, assert Home is shown" check, written both ways:
 .AbstractTest / `cn1:test`
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-011,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-011,indent=0]
 ----
 
 .JUnit 5 / Surefire
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/testing-with-junit.java.txt[tag=testing-with-junit-java-012,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/TestingWithJunitSnippets.java[tag=testing-with-junit-java-012,indent=0]
 ----
 
 The UI driving (`TestUtils.*`) is identical -- `TestUtils` is independent of the runner. What changes is the lifecycle plumbing: `shouldExecuteOnEDT()` + `runTest() returns boolean` becomes `@RunOnEdt` + `@Test void` + a standard assertion library.

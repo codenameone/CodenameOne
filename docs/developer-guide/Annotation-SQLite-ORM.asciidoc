@@ -18,7 +18,7 @@ by side.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-sqlite-orm.java.txt[tag=annotation-sqlite-orm-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSnippets.java[tag=annotation-sqlite-orm-java-001,indent=0]
 ----
 <1> Excluded from the generated table.
 
@@ -48,7 +48,7 @@ include::../demos/common/src/main/snippets/developer-guide/annotation-sqlite-orm
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-sqlite-orm.java.txt[tag=annotation-sqlite-orm-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSnippets.java[tag=annotation-sqlite-orm-java-002,indent=0]
 ----
 <1> Idempotent -- `CREATE TABLE IF NOT EXISTS`.
 <2> The autoincrement `id` is filled in via
@@ -63,7 +63,7 @@ dao surface isn't enough. Transactions:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-sqlite-orm.java.txt[tag=annotation-sqlite-orm-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationSqliteOrmSnippets.java[tag=annotation-sqlite-orm-java-003,indent=0]
 ----
 
 === Relationships

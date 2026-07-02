@@ -14,7 +14,7 @@ It's a thin alternative to the imperative `UiBinding` API
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-component-binding.java.txt[tag=annotation-component-binding-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-001,indent=0]
 ----
 <1> JavaBeans `getUser` / `setUser` are detected automatically when the
     field is private. The processor instruments `setUser` to fire a
@@ -52,7 +52,7 @@ The default lookup matches GUI-builder names exactly.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-component-binding.java.txt[tag=annotation-component-binding-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-002,indent=0]
 ----
 
 `Binding` is the handle the binder returns:
@@ -115,7 +115,7 @@ ASM and inserts the equivalent of:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-component-binding.java.txt[tag=annotation-component-binding-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-003,indent=0]
 ----
 
 The injection lands before every `return` point of the setter. The
@@ -172,7 +172,7 @@ Multiple annotations on the same field are combined into a
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-component-binding.java.txt[tag=annotation-component-binding-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-004,indent=0]
 ----
 <1> `@Required @Email` is the canonical "mandatory address" pair. The
     standard email regex accepts the empty string as "not yet an
@@ -192,7 +192,7 @@ After binding, drive validation through the returned handle:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-component-binding.java.txt[tag=annotation-component-binding-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationComponentBindingSnippets.java[tag=annotation-component-binding-java-005,indent=0]
 ----
 
 `Binding#getValidator()` never returns `null` -- when the model has no

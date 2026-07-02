@@ -23,6 +23,7 @@
         <sourceDirectory>src/main/dummy</sourceDirectory>
         <resources>
             <resource><directory>src/main/java</directory></resource>
+            <resource><directory>src/main/resources</directory></resource>
         </resources>
         <plugins>
             <plugin>
@@ -38,6 +39,7 @@
                                 <mkdir dir="${basedir}/src/main/java"/>
                                 <jar destfile="${project.build.directory}/${project.build.finalName}.jar" compress="true">
                                     <fileset dir="${basedir}/src/main/java" erroronmissingdir="false" />
+                                    <fileset dir="${basedir}/src/main/resources" erroronmissingdir="false" />
                                 </jar>
                             </target>
                         </configuration>

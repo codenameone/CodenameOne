@@ -29,4 +29,6 @@ import com.codename1.system.NativeInterface;
 /// live in their respective port modules under this cn1lib.
 public interface NativeWhisperRecognizer extends NativeInterface {
     String transcribe(String modelPath, String audioPath);
+
+    String transcribeSegments(String modelPath, String audioPath);
 }

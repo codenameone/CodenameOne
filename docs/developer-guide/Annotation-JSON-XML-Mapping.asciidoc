@@ -22,7 +22,7 @@ or any mix:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-json-xml-mapping.java.txt[tag=annotation-json-xml-mapping-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-001,indent=0]
 ----
 <1> Every `@Mapped` class must declare a public no-arg constructor --
     the generated mapper calls it from `fromJson` / `fromXml`.
@@ -34,7 +34,7 @@ mutation:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-json-xml-mapping.java.txt[tag=annotation-json-xml-mapping-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-002,indent=0]
 ----
 
 ==== Field-level annotations
@@ -71,7 +71,7 @@ include::../demos/common/src/main/snippets/developer-guide/annotation-json-xml-m
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-json-xml-mapping.java.txt[tag=annotation-json-xml-mapping-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-003,indent=0]
 ----
 
 `Mappers.fromJson` and `Mappers.fromXml` both accept either a `String`
@@ -125,7 +125,7 @@ Hand-write a `Mapper<T>` and register it at startup:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/annotation-json-xml-mapping.java.txt[tag=annotation-json-xml-mapping-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AnnotationJsonXmlMappingSnippets.java[tag=annotation-json-xml-mapping-java-004,indent=0]
 ----
 
 Hand-written mappers take precedence over generated ones for the same

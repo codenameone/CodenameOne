@@ -146,7 +146,7 @@ the generated class directly:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.java.txt[tag=svg-transcoder-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/SvgTranscoderSnippets.java[tag=svg-transcoder-java-001,indent=0]
 ----
 
 Constructors come in three flavours, matching the three CSS sizing
@@ -155,7 +155,7 @@ the one to prefer for the reasons in the previous section.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.java.txt[tag=svg-transcoder-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/SvgTranscoderSnippets.java[tag=svg-transcoder-java-002,indent=0]
 ----
 
 `scaled(int, int)` returns a lightweight view that reports the
@@ -217,7 +217,7 @@ include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.css[ta
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.java.txt[tag=svg-transcoder-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/SvgTranscoderSnippets.java[tag=svg-transcoder-java-003,indent=0]
 ----
 
 `.lottie` (dotLottie ZIP) files are accepted alongside `.json` for

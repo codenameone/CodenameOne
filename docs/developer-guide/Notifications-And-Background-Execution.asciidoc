@@ -19,7 +19,7 @@ its notifications are shown. Request it through `Display`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java.txt[tag=notifications-and-background-execution-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-001,indent=0]
 ----
 
 `NotificationPermissionResult.getAuthorizationLevel()` returns an `AuthorizationLevel`
@@ -49,7 +49,7 @@ before; the bean has been extended with fluent, backward-compatible setters:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java.txt[tag=notifications-and-background-execution-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-002,indent=0]
 ----
 
 When the user taps an action, the selected action id (and any quick-reply text) are
@@ -96,7 +96,7 @@ then reference it from a notification with `setChannelId(...)`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java.txt[tag=notifications-and-background-execution-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-003,indent=0]
 ----
 
 Channels are an Android concept. On iOS and the simulator `register()` is a no-op (the
@@ -111,7 +111,7 @@ reconstructed after a cold launch -- pass state through the input data, not fiel
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java.txt[tag=notifications-and-background-execution-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-004,indent=0]
 ----
 
 [options="header"]
@@ -136,7 +136,7 @@ and links `BackgroundTasks.framework` automatically.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java.txt[tag=notifications-and-background-execution-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-005,indent=0]
 ----
 
 [options="header"]
@@ -156,7 +156,7 @@ text, URLs, files or images shared into your app from other apps:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/notifications-and-background-execution.java.txt[tag=notifications-and-background-execution-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/NotificationsAndBackgroundExecutionSnippets.java[tag=notifications-and-background-execution-java-006,indent=0]
 ----
 
 [options="header"]

@@ -76,6 +76,23 @@ def tag_prefix(source):
     return re.sub(r"[^A-Za-z0-9]+", "-", source.stem).strip("-").lower()
 
 
+def java_snippet_file(source):
+    words = {
+        "3d": "ThreeD",
+        "ai": "Ai",
+        "ios": "Ios",
+        "nfc": "Nfc",
+        "junit": "Junit",
+        "svg": "Svg",
+        "css": "Css",
+        "io": "Io",
+        "tvplatforms": "TvPlatforms",
+    }
+    parts = re.split(r"[^A-Za-z0-9]+", source.stem)
+    name = "".join(words.get(part.lower(), part[:1].upper() + part[1:]) for part in parts if part)
+    return f"{name}Snippets.java"
+
+
 def is_include_body(lines):
     nonempty = [line.strip() for line in lines if line.strip()]
     return len(nonempty) == 1 and INCLUDE_RE.match(nonempty[0]) is not None
@@ -135,7 +152,7 @@ def migrate_file(source, snippets_dir, dry_run):
         counters[normalized_language] += 1
         tag = f"{prefix}-{normalized_language.replace(' ', '-')}-{counters[normalized_language]:03d}"
         extension = snippet_extension(language)
-        snippet_file = f"{prefix}.{extension}"
+        snippet_file = java_snippet_file(source) if extension == "java" else f"{prefix}.{extension}"
         include_path = f"../demos/common/src/main/snippets/developer-guide/{snippet_file}"
         generated[snippet_file].append((tag, code_lines))
 

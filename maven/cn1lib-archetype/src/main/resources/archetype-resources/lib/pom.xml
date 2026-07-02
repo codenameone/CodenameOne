@@ -102,6 +102,22 @@
           </dependencies>
       </profile>
       <profile>
+          <id>linux</id>
+          <activation>
+              <property>
+                  <name>codename1.platform</name>
+                  <value>linux</value>
+              </property>
+          </activation>
+          <dependencies>
+              <dependency>
+                  <groupId>${project.groupId}</groupId>
+                  <artifactId>${cn1lib.name}-linux</artifactId>
+                  <version>${project.version}</version>
+              </dependency>
+          </dependencies>
+      </profile>
+      <profile>
           <id>android</id>
           <activation>
               <property>

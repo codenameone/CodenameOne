@@ -300,7 +300,7 @@ Add a new class inside the "common/src/main/java" directory with package `com.ex
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java.txt[tag=maven-creating-cn1libs-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MavenCreatingCn1libsSnippets.java[tag=maven-creating-cn1libs-java-001,indent=0]
 ----
 
 Now build the library again. (See <<building-library>>).
@@ -346,7 +346,7 @@ Now try it out. Try adding the following code to your application project's main
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java.txt[tag=maven-creating-cn1libs-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MavenCreatingCn1libsSnippets.java[tag=maven-creating-cn1libs-java-002,indent=0]
 ----
 
 And build the project. The project should build OK, and if you run it, you should see that the `helloWorld()` method works as designed.
@@ -384,7 +384,7 @@ The simulator dispatches every action on the Codename One EDT through `Display.c
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java.txt[tag=maven-creating-cn1libs-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MavenCreatingCn1libsSnippets.java[tag=maven-creating-cn1libs-java-003,indent=0]
 ----
 
 The `Display.isInitialized()` guard is a useful pattern when the same static methods are also called from JUnit tests that don't run inside a live CN1 simulator — the state mutation runs in both contexts, only the UI feedback is skipped.
@@ -408,7 +408,7 @@ CN1 unit tests (`AbstractTest` subclasses run via `mvn cn1:test`) compile under 
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/maven-creating-cn1libs.java.txt[tag=maven-creating-cn1libs-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/MavenCreatingCn1libsSnippets.java[tag=maven-creating-cn1libs-java-004,indent=0]
 ----
 
 A common pattern: ship label-bearing hooks for actions a developer might want to fire manually (toggle adapter, inject notification), and ship label-less hooks for test-only state setup (`primeReadFailure`, `seedFixture`) that would just clutter the menu.

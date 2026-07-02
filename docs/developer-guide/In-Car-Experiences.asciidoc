@@ -15,7 +15,7 @@ Register a single `CarApplication` from your app's `init()` -- before a head uni
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java.txt[tag=in-car-experiences-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-001,indent=0]
 ----
 
 That single description renders natively on both platforms:
@@ -47,7 +47,7 @@ Head units enforce a hard cap on the number of rows/items they display (driver-d
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java.txt[tag=in-car-experiences-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-002,indent=0]
 ----
 
 === Screen stack & lifecycle
@@ -56,14 +56,14 @@ include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.ja
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java.txt[tag=in-car-experiences-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-003,indent=0]
 ----
 
 `CarScreen` exposes optional lifecycle hooks -- `onCreate()`, `onResume()`, `onPause()`, `onDestroy()` -- and `CarApplication` is notified of connection changes via `onCarConnected(CarContext)` / `onCarDisconnected()`. You can also observe connection globally:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/in-car-experiences.java.txt[tag=in-car-experiences-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/InCarExperiencesSnippets.java[tag=in-car-experiences-java-004,indent=0]
 ----
 
 === Now-playing (audio apps)

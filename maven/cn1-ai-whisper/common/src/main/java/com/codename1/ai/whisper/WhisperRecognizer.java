@@ -24,9 +24,16 @@
 package com.codename1.ai.whisper;
 
 import com.codename1.ai.LlmException;
+import com.codename1.media.Transcriber;
+import com.codename1.media.TranscriptionRequest;
+import com.codename1.media.TranscriptionResult;
+import com.codename1.media.TranscriptionSegment;
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /// On-device speech-to-text via whisper.cpp.
 ///
@@ -73,5 +80,194 @@ public final class WhisperRecognizer {
             }
         });
         return out;
+    }
+
+    /// Provider-pluggable transcriber backed by whisper.cpp. `modelPath`
+    /// is the filesystem path to a ggml-format Whisper model; each
+    /// request supplies the 16kHz mono WAV audio path.
+    public static Transcriber transcriber(final String modelPath) {
+        return new Transcriber() {
+            @Override
+            public AsyncResource<TranscriptionResult> transcribe(TranscriptionRequest request) {
+                if (request == null) {
+                    AsyncResource<TranscriptionResult> out = new AsyncResource<TranscriptionResult>();
+                    out.error(new IllegalArgumentException("request is required"));
+                    return out;
+                }
+                return transcribeSegments(modelPath, request.getAudioPath());
+            }
+
+            @Override
+            public String getProvider() {
+                return "whisper";
+            }
+        };
+    }
+
+    /// Transcribes audio and returns timed segments. This exposes the
+    /// segment timestamps already emitted by whisper.cpp, converted to
+    /// millisecond offsets from the start of the audio.
+    public static AsyncResource<TranscriptionResult> transcribeSegments(final String modelPath,
+                                                                         final String audioPath) {
+        final AsyncResource<TranscriptionResult> out = new AsyncResource<TranscriptionResult>();
+        final NativeWhisperRecognizer bridge =
+                NativeLookup.create(NativeWhisperRecognizer.class);
+        if (bridge == null || !bridge.isSupported()) {
+            out.error(new LlmException("WhisperRecognizer.transcribeSegments is not supported on this platform.",
+                    -1, null, null, null, LlmException.ErrorType.UNKNOWN));
+            return out;
+        }
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override public void run() {
+                try {
+                    final String payload = bridge.transcribeSegments(modelPath, audioPath);
+                    final TranscriptionResult result = parseSegments(payload);
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override public void run() { out.complete(result); }
+                    });
+                } catch (final Throwable t) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override public void run() {
+                            out.error(new LlmException("WhisperRecognizer.transcribeSegments failed: " + t.getMessage(),
+                                    -1, null, null, t, LlmException.ErrorType.UNKNOWN));
+                        }
+                    });
+                }
+            }
+        });
+        return out;
+    }
+
+    static TranscriptionResult parseSegments(String payload) {
+        ArrayList<TranscriptionSegment> segments = new ArrayList<TranscriptionSegment>();
+        if (payload != null && payload.length() > 0) {
+            String[] lines = splitLines(payload);
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                if (line.length() == 0) {
+                    continue;
+                }
+                String[] parts = splitTabs(line);
+                if (parts.length != 3) {
+                    throw new IllegalArgumentException("Invalid Whisper segment payload line: " + line);
+                }
+                segments.add(new TranscriptionSegment(
+                        Long.parseLong(parts[0]),
+                        Long.parseLong(parts[1]),
+                        decodeText(parts[2])));
+            }
+        }
+        return new TranscriptionResult(segments);
+    }
+
+    static String encodeSegmentsPayload(List<TranscriptionSegment> segments) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < segments.size(); i++) {
+            TranscriptionSegment s = segments.get(i);
+            out.append(s.getStartTimeMs()).append('\t')
+                    .append(s.getEndTimeMs()).append('\t')
+                    .append(encodeText(s.getText())).append('\n');
+        }
+        return out.toString();
+    }
+
+    private static String[] splitLines(String payload) {
+        ArrayList<String> lines = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i < payload.length(); i++) {
+            char ch = payload.charAt(i);
+            if (ch == '\n') {
+                int end = i;
+                if (end > start && payload.charAt(end - 1) == '\r') {
+                    end--;
+                }
+                lines.add(payload.substring(start, end));
+                start = i + 1;
+            }
+        }
+        if (start < payload.length()) {
+            lines.add(payload.substring(start));
+        }
+        return lines.toArray(new String[lines.size()]);
+    }
+
+    private static String[] splitTabs(String line) {
+        ArrayList<String> parts = new ArrayList<String>(3);
+        int start = 0;
+        for (int i = 0; i < line.length(); i++) {
+            if (line.charAt(i) == '\t') {
+                parts.add(line.substring(start, i));
+                start = i + 1;
+            }
+        }
+        parts.add(line.substring(start));
+        return parts.toArray(new String[parts.size()]);
+    }
+
+    private static String encodeText(String text) {
+        String value = text == null ? "" : text;
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                default:
+                    out.append(ch);
+                    break;
+            }
+        }
+        return out.toString();
+    }
+
+    private static String decodeText(String encoded) {
+        if (encoded == null || encoded.length() == 0) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(encoded.length());
+        boolean escaping = false;
+        for (int i = 0; i < encoded.length(); i++) {
+            char ch = encoded.charAt(i);
+            if (!escaping) {
+                if (ch == '\\') {
+                    escaping = true;
+                } else {
+                    out.append(ch);
+                }
+                continue;
+            }
+            switch (ch) {
+                case '\\':
+                    out.append('\\');
+                    break;
+                case 't':
+                    out.append('\t');
+                    break;
+                case 'n':
+                    out.append('\n');
+                    break;
+                case 'r':
+                    out.append('\r');
+                    break;
+                default:
+                    out.append(ch);
+                    break;
+            }
+            escaping = false;
+        }
+        if (escaping) {
+            out.append('\\');
+        }
+        return out.toString();
     }
 }

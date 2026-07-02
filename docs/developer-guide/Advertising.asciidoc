@@ -79,7 +79,7 @@ method that registers its provider with `AdManager`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-001,indent=0]
 ----
 
 That single call binds the provider; the rest of your code uses only the
@@ -98,7 +98,7 @@ identifier. The recommended order is to initialize, gather consent, then load:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-002,indent=0]
 ----
 
 `AdConfig` also carries the global compliance flags every network requires:
@@ -116,7 +116,7 @@ anchored at the top or bottom) and call `load()`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-003,indent=0]
 ----
 
 The default `SIZE_ADAPTIVE` requests an anchored adaptive banner sized to the
@@ -129,7 +129,7 @@ next one when the current ad is dismissed:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-004,indent=0]
 ----
 
 You can also let Codename One show an interstitial automatically on screen
@@ -137,7 +137,7 @@ transitions, no more often than a given interval:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-005,indent=0]
 ----
 
 === Rewarded and rewarded interstitial ads
@@ -147,7 +147,7 @@ rewards, verify server side rather than trusting the client:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-006,indent=0]
 ----
 
 `RewardedInterstitialAd` has the same API but is shown on a transition rather
@@ -160,7 +160,7 @@ manager and provider handle the foreground hook and freshness window for you:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-007,indent=0]
 ----
 
 === Native ads
@@ -174,7 +174,7 @@ styled like the others fits in. The ad must still be clearly labelled
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-008,indent=0]
 ----
 
 `NativeAd` exposes the headline, body, call-to-action, advertiser and rating
@@ -210,5 +210,5 @@ with stable sizes and colours. Enable it the same way:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/advertising.java.txt[tag=advertising-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/AdvertisingSnippets.java[tag=advertising-java-009,indent=0]
 ----

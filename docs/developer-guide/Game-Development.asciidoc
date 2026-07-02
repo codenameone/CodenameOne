@@ -74,7 +74,7 @@ the game in `update(double)`, and the view draws the scene every frame.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-001,indent=0]
 ----
 
 The `dt` passed to `update` is the wall clock time since the previous frame.
@@ -90,7 +90,7 @@ call before or after the form is shown.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-002,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-002,indent=0]
 ----
 
 `setClearColor(int argb)` sets the background the view is cleared to each frame.
@@ -106,7 +106,7 @@ rendered positions between physics states:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-003,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-003,indent=0]
 ----
 
 ==== Threading
@@ -137,7 +137,7 @@ to the `GameView`'s top left.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-004,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-004,indent=0]
 ----
 
 === On-screen touch controls
@@ -165,7 +165,7 @@ never recompute coordinates:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-005,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-005,indent=0]
 ----
 
 The joystick (bottom-left) and JUMP button (bottom-right) are visible in the
@@ -192,7 +192,7 @@ default), and rotation and scale pivot around that anchor.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-006,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-006,indent=0]
 ----
 
 `getBounds()` returns the axis aligned bounding box and `intersects(Sprite)` does a
@@ -211,7 +211,7 @@ You don't need a `GameView` to render sprites: a `SpriteRenderer` is itself a
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-007,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-007,indent=0]
 ----
 
 ==== Sprite sheets and animation
@@ -226,7 +226,7 @@ it every frame, so adding it to the scene is all you need.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-008,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-008,indent=0]
 ----
 
 image::img/game-spritesheet.png[A six-frame run cycle laid out as a sprite sheet,640]
@@ -238,7 +238,7 @@ build the frames yourself, which is what `ScrollerGameSample`'s runner does:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-009,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-009,indent=0]
 ----
 
 Setting a *negative scale* flips the sprite horizontally, so a single set of frames
@@ -268,7 +268,7 @@ the thin point reads exactly the same to the eye:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-010,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-010,indent=0]
 ----
 
 This is the same negative/positive scale trick the scroller uses to flip its
@@ -280,7 +280,7 @@ each card's bounding box:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-011,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-011,indent=0]
 ----
 
 The rest of the sample is a small state machine living in plain fields: the
@@ -305,7 +305,7 @@ as 2:1 diamonds -- columns step right-and-down, rows step left-and-down:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-012,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-012,indent=0]
 ----
 
 *Picking is the inverse.* Because the mapping is linear it inverts with two
@@ -314,7 +314,7 @@ required:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-013,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-013,indent=0]
 ----
 
 *Depth from z-order.* Cells further down the screen must draw over the cells
@@ -325,7 +325,7 @@ layers the sprites within a cell:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-014,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-014,indent=0]
 ----
 
 That pair of lines is also the whole "3D height" illusion: the piece is drawn
@@ -370,7 +370,7 @@ that always faces the camera, so your existing 2D art keeps working in 3D:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-015,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-015,indent=0]
 ----
 
 World coordinates are right-handed with y up (the `com.codename1.gpu` convention),
@@ -388,7 +388,7 @@ runs once before the first frame:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-016,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-016,indent=0]
 ----
 
 `onSetup` is also where you load real assets with `com.codename1.gpu.GltfLoader`
@@ -409,7 +409,7 @@ uploading it with `com.codename1.gpu.GraphicsDevice#createTexture(com.codename1.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-017,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-017,indent=0]
 ----
 
 For richer geometry, load glTF (`.glb`/`.gltf`) assets with
@@ -425,7 +425,7 @@ the same time.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-018,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-018,indent=0]
 ----
 
 `play` returns a voice id (or `-1` if the pool is momentarily exhausted -- it never
@@ -449,7 +449,7 @@ engine can report completion, so guard with `isVoiceCompletionSupported()`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-019,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-019,indent=0]
 ----
 
 NOTE: Load your sounds once, up front -- ideally on a background thread with
@@ -479,7 +479,7 @@ objects, and step it once per frame from your `update`:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-020,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-020,indent=0]
 ----
 
 Bodies come in three kinds, the
@@ -501,7 +501,7 @@ come from one piece of geometry:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-021,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-021,indent=0]
 ----
 
 ==== Driving sprites from physics
@@ -513,7 +513,7 @@ rotation automatically (in pixels, screen space) -- and the scene draws it there
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-022,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-022,indent=0]
 ----
 
 ==== Collisions
@@ -526,7 +526,7 @@ that until after `step` returns.
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-023,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-023,indent=0]
 ----
 
 If you need a feature the wrapper doesn't expose, `PhysicsWorld.getNativeWorld()`
@@ -542,7 +542,7 @@ handle:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/game-development.java.txt[tag=game-development-java-024,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/GameDevelopmentSnippets.java[tag=game-development-java-024,indent=0]
 ----
 
 `createWeldJoint` and `createPrismaticJoint` (a sliding axis) round out the set.
