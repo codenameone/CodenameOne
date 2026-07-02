@@ -770,7 +770,10 @@ PopupContent {
     MultiLine3 { color: #938f99; }
     MultiLine4 { color: #938f99; }
 
-    Dialog { background-color: #211f26; color: #e6e0e9; border: 0.4mm solid #635f6b; }
+    /* border-radius must be restated: this dark override REPLACES the light
+       Dialog style wholesale, so omitting it dropped the 6mm card radius and
+       the dark dialog rendered as a square outlined box. */
+    Dialog { background-color: #211f26; color: #e6e0e9; border: 0.4mm solid #635f6b; border-radius: 6mm; }
     DialogBody { background-color: #211f26; color: #e6e0e9; }
     DialogTitle { color: #e6e0e9; background-color: #211f26; }
     DialogBody { color: #cac4d0; }
