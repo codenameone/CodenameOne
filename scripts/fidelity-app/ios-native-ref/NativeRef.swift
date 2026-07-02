@@ -163,6 +163,11 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
         return b
     case "ios_uibutton_filled":
         // Prominent / call-to-action button -> iOS 26 prominent Liquid Glass.
+        // NOTE: prominentGlass has NO static highlighted appearance -- its press
+        // feedback is the interactive scale/shimmer only, so the "pressed" still
+        // reference legitimately equals "normal" (verified: forcing
+        // isHighlighted + updateConfiguration changes nothing). The CN1 pressed
+        // style should therefore keep the same fill.
         let b: UIButton
         if #available(iOS 26.0, *) {
             var cfg = UIButton.Configuration.prominentGlass()
@@ -497,6 +502,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                     host.addSubview(container)
                     container.setNeedsLayout()
                     container.layoutIfNeeded()
+                    if state == "pressed" {
+                        // Configuration-based buttons (glass / prominentGlass)
+                        // resolve their highlighted appearance in an automatic
+                        // configuration update on a later runloop turn -- a
+                        // synchronous capture right after isHighlighted=true
+                        // would still show the normal look. Force the update and
+                        // give the runloop a beat to apply it.
+                        if let btn = control as? UIButton {
+                            btn.setNeedsUpdateConfiguration()
+                            btn.updateConfiguration()
+                        }
+                        RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+                        container.layoutIfNeeded()
+                    }
 
                     let fmt = UIGraphicsImageRendererFormat()
                     fmt.scale = CAPTURE_SCALE
