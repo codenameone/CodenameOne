@@ -3056,7 +3056,7 @@ public class Component implements Animation, StyleListener, Editable {
             GlassRecipe recipe = null;
             if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
                 int fg = getStyle().getFgColor();
-                int fgLuma = (int)(0.2126f*((fg>>16)&0xff) + 0.7152f*((fg>>8)&0xff) + 0.0722f*(fg&0xff));
+                int fgLuma = (int) (0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff));
                 boolean darkMat = fgLuma > 128; // dark theme uses a light fg
                 recipe = GlassRecipe.resolve(getUIManager(), getUIID(), darkMat);
                 if (recipe.getKind() == GlassRecipe.Kind.PLAIN_BLUR) {

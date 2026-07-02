@@ -1536,7 +1536,9 @@ public final class Graphics {
     /// than spilling into a square. Used to realize the frosted glass
     /// backdrop-filter material.
     public boolean glassRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
-        if (width <= 0 || height <= 0) { return true; }
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
         return impl.glassRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
     }
 
@@ -1546,7 +1548,9 @@ public final class Graphics {
     /// the accent colour only where the lens covers them. Unlike glassRegion this is
     /// drawn OVER the content. cornerRadius&lt;0 = capsule. tintColor is 0xRRGGBB.
     public boolean lensRegion(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
-        if (width <= 0 || height <= 0) { return true; }
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
         return impl.lensRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, cornerRadius, magnify, aberration, tintColor, tintStrength);
     }
 

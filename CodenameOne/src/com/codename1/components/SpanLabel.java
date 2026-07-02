@@ -176,22 +176,27 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     protected com.codename1.ui.geom.Dimension calcPreferredSize() {
         // Honor the setPreferredW contract: the preferred HEIGHT must account
         // for the text wrapping at the capped width. A TextArea wraps its rows
-        // to its CURRENT width and derives its preferred height from those rows,
-        // so prime that width from the cap before measuring -- otherwise a
-        // width-capped span label reports its unwrapped (shorter) height and
-        // the extra rows clip (e.g. a dialog card whose width cap binds on a
-        // narrow screen).
-        if (preferredW > -1) {
-            int innerW = preferredW
-                    - getStyle().getHorizontalPadding()
-                    - text.getStyle().getHorizontalPadding();
-            if (icon.getIcon() != null) {
-                innerW -= iconWrapper.getPreferredW();
+        // to its CURRENT width and derives its preferred height from those
+        // rows, so run the REAL layout at the capped width and let it decide
+        // the text's wrap width. Reconstructing that width arithmetically
+        // misses width consumers (the WEST icon cell exists even with no
+        // icon, the text has margins) and measures a wider wrap than layout
+        // delivers -- the granted height then comes up one row short and the
+        // last row clips on any port whose font metrics cross a row boundary
+        // (the JavaScript port's dialog body dropped its final word this way).
+        if (preferredW > getStyle().getHorizontalPadding()) {
+            int ow = getWidth();
+            int oh = getHeight();
+            setWidth(preferredW);
+            if (oh <= 0) {
+                setHeight(1);
             }
-            if (innerW > 0 && text.getWidth() != innerW) {
-                text.setWidth(innerW);
-                text.setShouldCalcPreferredSize(true);
-            }
+            layoutContainer();
+            text.setShouldCalcPreferredSize(true);
+            com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+            setWidth(ow);
+            setHeight(oh);
+            return d;
         }
         return super.calcPreferredSize();
     }

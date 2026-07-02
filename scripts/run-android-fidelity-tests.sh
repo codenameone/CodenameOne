@@ -141,10 +141,9 @@ if [ "$CN1_COUNT" -eq 0 ]; then
   rf_log "FATAL: no CN1 renders delivered over WebSocket"
   exit 12
 fi
-if [ "$NATIVE_COUNT" -eq 0 ]; then
-  rf_log "FATAL: no native references delivered (NativeWidgetFactory unavailable?)"
-  exit 12
-fi
+# NATIVE_COUNT is normally 0: native references are committed golden sets
+# captured locally (build-android-native-ref.sh); any same-run native renders
+# are archived for diagnostics only.
 
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_FIDELITY_ANDROID_COMMENT -->"
 export CN1SS_FIDELITY_SPEC="${CN1SS_FIDELITY_SPEC:-$APP_DIR/common/src/main/resources/fidelity-tests.yaml}"
