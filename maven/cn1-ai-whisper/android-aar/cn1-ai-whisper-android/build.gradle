@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.library'
+}
+
+def whisperCppDir = project.findProperty('whisperCppDir') ?: System.getenv('WHISPER_CPP_DIR')
+def whisperPrebuiltDir = project.findProperty('whisperPrebuiltDir') ?: System.getenv('WHISPER_PREBUILT_DIR')
+def whisperIncludeDir = project.findProperty('whisperIncludeDir') ?: System.getenv('WHISPER_INCLUDE_DIR')
+
+android {
+    namespace 'com.codename1.ai.whisper.android'
+    compileSdk 33
+    ndkVersion '26.3.11579264'
+
+    defaultConfig {
+        minSdk 19
+        externalNativeBuild {
+            cmake {
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+                arguments '-DANDROID_STL=c++_shared'
+                if (whisperCppDir != null && whisperCppDir.trim().length() > 0) {
+                    arguments "-DWHISPER_CPP_DIR=${file(whisperCppDir).absolutePath}"
+                }
+                if (whisperPrebuiltDir != null && whisperPrebuiltDir.trim().length() > 0) {
+                    arguments "-DWHISPER_PREBUILT_DIR=${file(whisperPrebuiltDir).absolutePath}"
+                }
+                if (whisperIncludeDir != null && whisperIncludeDir.trim().length() > 0) {
+                    arguments "-DWHISPER_INCLUDE_DIR=${file(whisperIncludeDir).absolutePath}"
+                }
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+        }
+    }
+
+    sourceSets {
+        main {
+            if (whisperPrebuiltDir != null && whisperPrebuiltDir.trim().length() > 0) {
+                jniLibs.srcDirs += file(whisperPrebuiltDir)
+            }
+        }
+    }
+}

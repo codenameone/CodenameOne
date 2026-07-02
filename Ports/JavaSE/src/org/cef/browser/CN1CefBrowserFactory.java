@@ -24,17 +24,17 @@ package org.cef.browser;
 
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
-import org.cef.browser.CefBrowserFactory;
 import org.cef.browser.CefRequestContext;
 
 /**
  *
  * @author shannah
  */
-public class CN1CefBrowserFactory extends CefBrowserFactory {
+public final class CN1CefBrowserFactory {
+    private CN1CefBrowserFactory() {
+    }
 
-    @Override
-    public CefBrowser create(CefClient client, String url, boolean isOffscreenRendered, boolean isTransparent, CefRequestContext context) {
+    public static CefBrowser create(CefClient client, String url, boolean isTransparent, CefRequestContext context) {
         return new CN1CefBrowser(client, url, isTransparent, context);
     }
     

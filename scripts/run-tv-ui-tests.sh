@@ -73,6 +73,33 @@ if [ -z "$TV_UDID" ]; then
   TV_UDID="$(printf '%s\n' "$DEVLIST" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
 fi
 if [ -z "$TV_UDID" ]; then
+  # Xcode 26 on some macos-15 runner images ships without the tvOS Simulator
+  # runtime (the same lean-image issue run-ios-ui-tests.sh handles for iOS).
+  # Install it on demand and create an Apple TV 4K device (matches the 1920x1080
+  # golden) so the run has a target. Gated on CI / XCODE_DOWNLOAD_PLATFORMS;
+  # never runs when a device is already present, so healthy runners are untouched.
+  TV_DL="${XCODE_DOWNLOAD_PLATFORMS:-}"
+  if [ -z "$TV_DL" ] && [ "${GITHUB_ACTIONS:-false}" = "true" ]; then TV_DL="true"; fi
+  if [ "${TV_DL:-false}" = "true" ]; then
+    rt_log "No Apple TV simulator; installing tvOS platform via xcodebuild -downloadPlatform tvOS"
+    xcodebuild -downloadPlatform tvOS || true
+    TV_RT="$(xcrun simctl list -j runtimes available 2>/dev/null | python3 -c 'import json,sys
+rs=[r for r in json.load(sys.stdin).get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.tvOS-")]
+rs.sort(key=lambda r:r.get("version",""),reverse=True)
+print(rs[0]["identifier"] if rs else "")' 2>/dev/null || true)"
+    TV_DT="$(xcrun simctl list -j devicetypes 2>/dev/null | python3 -c 'import json,sys
+ts=[t["identifier"] for t in json.load(sys.stdin).get("devicetypes",[]) if "Apple TV 4K" in t.get("name","")]
+print(ts[0] if ts else "")' 2>/dev/null || true)"
+    if [ -n "$TV_RT" ] && [ -n "$TV_DT" ]; then
+      rt_log "Creating Apple TV simulator ($TV_DT on $TV_RT)"
+      xcrun simctl create "cn1-tv-tests" "$TV_DT" "$TV_RT" >/dev/null 2>&1 || true
+      DEVLIST="$(xcrun simctl list devices available 2>/dev/null | grep -iE 'Apple TV')"
+      TV_UDID="$(printf '%s\n' "$DEVLIST" | grep -i "$TV_MODEL_PREF" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+      [ -z "$TV_UDID" ] && TV_UDID="$(printf '%s\n' "$DEVLIST" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')"
+    fi
+  fi
+fi
+if [ -z "$TV_UDID" ]; then
   rt_log "No Apple TV simulator available. Install a tvOS runtime in Xcode."; exit 4
 fi
 rt_log "Apple TV simulators available:"; printf '%s\n' "$DEVLIST" | sed 's/^/  /' >&2

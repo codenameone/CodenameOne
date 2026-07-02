@@ -73,6 +73,9 @@
 #endif
 #import <MediaPlayer/MediaPlayer.h>
 #import <CoreLocation/CoreLocation.h>
+#if !TARGET_OS_TV
+#import <CoreMotion/CoreMotion.h>
+#endif
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
 #import <CoreText/CoreText.h>
@@ -169,7 +172,14 @@
 extern int popoverSupported();
 //#define CN1_INCLUDE_NOTIFICATIONS2
 #define INCLUDE_CN1_PUSH2
-#ifdef CN1_INCLUDE_NOTIFICATIONS2
+// Import UserNotifications whenever it is actually used below. The push code
+// (INCLUDE_CN1_PUSH2) references UNUserNotificationCenter/UNNotification*, but
+// the import was gated only on CN1_INCLUDE_NOTIFICATIONS2 and otherwise relied
+// on clang's implicit module auto-import. Enabling the Metal screenTexture
+// readback above (compiled on iOS now, not just Catalyst/TV) perturbs that
+// auto-import and the push symbols fail to resolve; importing the framework
+// explicitly when push is enabled makes it robust.
+#if defined(CN1_INCLUDE_NOTIFICATIONS2) || (defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH)
 #import <UserNotifications/UserNotifications.h>
 #endif
 #if !TARGET_OS_WATCH
@@ -1549,6 +1559,49 @@ void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(CN1_THREAD_STATE
 
 
 
+// Extracts the rich pointer detail (tool type, pressure, Apple Pencil tilt and contact size)
+// from a UITouch and forwards it to Java just before the pointer event is dispatched, so the
+// cross-platform stylus and pressure APIs work on iOS. Invoked from both the view controller
+// touch handlers and the CN1TapGestureRecognizer. UITouch is unavailable on
+// watchOS, so the helper (and its callers) are compiled out there.
+#if !TARGET_OS_WATCH
+void cn1CapturePointerMetadata(UITouch* touch) {
+    if (touch == nil) {
+        return;
+    }
+    int pointerType = 1; // PointerEvent.TYPE_TOUCH
+    float pressure = 1.0f;
+    float tiltX = 0.0f;
+    float tiltY = 0.0f;
+    float contactSize = 0.0f;
+    if (@available(iOS 9.0, *)) {
+        if (touch.type == UITouchTypeStylus) {
+            pointerType = 3; // PointerEvent.TYPE_STYLUS
+            CGFloat maxForce = touch.maximumPossibleForce;
+            if (maxForce > 0) {
+                pressure = (float)(touch.force / maxForce);
+            }
+            tiltX = (float)((M_PI_2 - touch.altitudeAngle) * 180.0 / M_PI);
+            tiltY = (float)([touch azimuthAngleInView:nil] * 180.0 / M_PI);
+        } else {
+            CGFloat maxForce = touch.maximumPossibleForce;
+            if (maxForce > 0 && touch.force > 0) {
+                pressure = (float)(touch.force / maxForce);
+            }
+        }
+    }
+    if (@available(iOS 13.4, *)) {
+        if (touch.type == UITouchTypeIndirectPointer) {
+            pointerType = 2; // PointerEvent.TYPE_MOUSE
+        }
+    }
+    if (touch.majorRadius > 0) {
+        contactSize = (float)touch.majorRadius;
+    }
+    com_codename1_impl_ios_IOSImplementation_pointerMetadataCallback___int_float_float_float_float(CN1_THREAD_GET_STATE_PASS_ARG pointerType, pressure, tiltX, tiltY, contactSize);
+}
+#endif // !TARGET_OS_WATCH
+
 void pointerPressed(int* x, int* y, int length) {
     if(length == 1) {
         com_codename1_impl_ios_IOSImplementation_pointerPressedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x[0], y[0]);
@@ -1642,6 +1695,18 @@ void pointerHoverNative(int x, int y) {
 
 void pointerHoverReleasedNative(int x, int y) {
     com_codename1_impl_ios_IOSImplementation_pointerHoverReleasedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y);
+}
+
+void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
+    com_codename1_impl_ios_IOSImplementation_pointerWheelMovedCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y, scrollX, scrollY);
+}
+
+void pinchMagnifyCallback(float scale, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_pinchMagnifyCallback___float_int_int(CN1_THREAD_GET_STATE_PASS_ARG scale, x, y);
+}
+
+void rotationGestureCallback(float radians, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_rotationGestureCallback___float_int_int(CN1_THREAD_GET_STATE_PASS_ARG radians, x, y);
 }
 
 void stringEdit(int finished, int cursorPos, NSString* text) {
@@ -2517,6 +2582,175 @@ void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD
 extern void vibrateDevice();
 void com_codename1_impl_ios_IOSNative_vibrate___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT duration) {
     vibrateDevice();
+}
+
+// ---- CoreMotion backed motion sensors (com.codename1.sensors) ----
+// These constants mirror MotionSensorManager.TYPE_*. iOS exposes the raw
+// accelerometer, gyroscope and magnetometer natively; the core derives the
+// gravity, linear acceleration and orientation values from them.
+#define CN1_MOTION_ACCELEROMETER 1
+#define CN1_MOTION_GYROSCOPE 4
+#define CN1_MOTION_MAGNETOMETER 5
+#define CN1_MOTION_G 9.80665
+
+#if !TARGET_OS_TV
+static CMMotionManager *cn1MotionManager = nil;
+static CMMotionManager *cn1GetMotionManager() {
+    if(cn1MotionManager == nil) {
+        cn1MotionManager = [[CMMotionManager alloc] init];
+    }
+    return cn1MotionManager;
+}
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if TARGET_OS_TV
+    return JAVA_FALSE;
+#else
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            return m.accelerometerAvailable ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_GYROSCOPE:
+            return m.gyroAvailable ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_MAGNETOMETER:
+            return m.magnetometerAvailable ? JAVA_TRUE : JAVA_FALSE;
+        default:
+            return JAVA_FALSE;
+    }
+#endif
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
+}
+
+void com_codename1_impl_ios_IOSNative_startMotionSensor___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_INT rateMillis) {
+#if !TARGET_OS_TV
+    CMMotionManager *m = cn1GetMotionManager();
+    NSTimeInterval interval = ((double)rateMillis) / 1000.0;
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            m.accelerometerUpdateInterval = interval;
+            [m startAccelerometerUpdates];
+            break;
+        case CN1_MOTION_GYROSCOPE:
+            m.gyroUpdateInterval = interval;
+            [m startGyroUpdates];
+            break;
+        case CN1_MOTION_MAGNETOMETER:
+            m.magnetometerUpdateInterval = interval;
+            [m startMagnetometerUpdates];
+            break;
+        default:
+            break;
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_stopMotionSensor___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if !TARGET_OS_TV
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            [m stopAccelerometerUpdates];
+            break;
+        case CN1_MOTION_GYROSCOPE:
+            [m stopGyroUpdates];
+            break;
+        case CN1_MOTION_MAGNETOMETER:
+            [m stopMagnetometerUpdates];
+            break;
+        default:
+            break;
+    }
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if TARGET_OS_TV
+    return JAVA_FALSE;
+#else
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER:
+            return m.accelerometerData != nil ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_GYROSCOPE:
+            return m.gyroData != nil ? JAVA_TRUE : JAVA_FALSE;
+        case CN1_MOTION_MAGNETOMETER:
+            return m.magnetometerData != nil ? JAVA_TRUE : JAVA_FALSE;
+        default:
+            return JAVA_FALSE;
+    }
+#endif
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
+}
+
+#if !TARGET_OS_TV
+// axis: 0 = x, 1 = y, 2 = z
+static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
+    CMMotionManager *m = cn1GetMotionManager();
+    switch(type) {
+        case CN1_MOTION_ACCELEROMETER: {
+            CMAccelerometerData *d = m.accelerometerData;
+            if(d == nil) {
+                return 0;
+            }
+            CMAcceleration a = d.acceleration;
+            double v = (axis == 0) ? a.x : (axis == 1 ? a.y : a.z);
+            // CoreMotion reports G units with gravity negative when face up;
+            // negate and scale to m/s^2 so the convention matches the API
+            // (at rest, face up, z reports +9.81).
+            return (JAVA_FLOAT)(-v * CN1_MOTION_G);
+        }
+        case CN1_MOTION_GYROSCOPE: {
+            CMGyroData *d = m.gyroData;
+            if(d == nil) {
+                return 0;
+            }
+            CMRotationRate r = d.rotationRate;
+            double v = (axis == 0) ? r.x : (axis == 1 ? r.y : r.z);
+            return (JAVA_FLOAT)v;
+        }
+        case CN1_MOTION_MAGNETOMETER: {
+            CMMagnetometerData *d = m.magnetometerData;
+            if(d == nil) {
+                return 0;
+            }
+            CMMagneticField f = d.magneticField;
+            double v = (axis == 0) ? f.x : (axis == 1 ? f.y : f.z);
+            return (JAVA_FLOAT)v;
+        }
+        default:
+            return 0;
+    }
+}
+#else
+static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
+    return 0;
+}
+#endif
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorX___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 0);
+}
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorX___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 0);
+}
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorY___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 1);
+}
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorY___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 1);
+}
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorZ___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 2);
+}
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorZ___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+    return cn1ReadMotionAxis(type, 2);
 }
 
 // Peer Component methods
@@ -6703,7 +6937,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
+#if defined(CN1_USE_METAL)
 // Reads the Metal renderer's persistent screenTexture back into a CGImage.
 // screenTexture is exactly the frame presentFramebuffer blits into the
 // CAMetalLayer drawable, so it IS the genuine on-screen pixel content. Unlike
@@ -6741,14 +6975,14 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                            width:w height:h mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
-#if TARGET_OS_TV
-    // tvOS is unified-memory only (like iOS): MTLStorageModeManaged and
-    // -synchronizeResource: are unavailable. Stage into a Shared texture, which
-    // the CPU can getBytes from directly once the blit completes -- no
-    // synchronize step is needed.
-    desc.storageMode = MTLStorageModeShared;
-#else
+#if TARGET_OS_MACCATALYST
     desc.storageMode = MTLStorageModeManaged;
+#else
+    // iOS (device + simulator) and tvOS are unified-memory: MTLStorageModeManaged
+    // and -synchronizeResource: are unavailable there. Stage into a Shared
+    // texture, which the CPU can getBytes from directly once the blit completes
+    // -- no synchronize step is needed.
+    desc.storageMode = MTLStorageModeShared;
 #endif
     id<MTLTexture> staging = [device newTextureWithDescriptor:desc];
     if (staging == nil) {
@@ -6763,9 +6997,9 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
                 toTexture:staging
          destinationSlice:0 destinationLevel:0
         destinationOrigin:MTLOriginMake(0, 0, 0)];
-#if !TARGET_OS_TV
+#if TARGET_OS_MACCATALYST
     // Managed storage (Catalyst) must be synchronized to become CPU-visible;
-    // Shared storage (tvOS) is already CPU-visible, so this would be invalid.
+    // Shared storage (iOS / tvOS) is already CPU-visible, so this would be invalid.
     [blit synchronizeResource:staging];
 #endif
     [blit endEncoding];
@@ -6912,12 +7146,24 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
     }
 #endif
-#if defined(CN1_USE_METAL) && (TARGET_OS_MACCATALYST || TARGET_OS_TV)
+#if defined(CN1_USE_METAL)
     // The Metal screen view: capture from the renderer's screenTexture, the
     // exact pixels presented to the drawable. On headless Mac Catalyst the
     // display link never presents, so -drawViewHierarchyInRect: below would
     // snapshot a stale CALayer frame. The screenTexture readback is always the
     // latest committed frame, so it is both correct and deterministic.
+    //
+    // This used to be gated to Catalyst/TV, leaving the iPhone/iPad simulator
+    // and device on drawViewHierarchyInRect:afterScreenUpdates:NO, which
+    // snapshots the CALayer's currently-presented drawable. That drawable lags
+    // the screenTexture: presentFramebuffer commits the screenTexture->drawable
+    // blit without waiting (METALView.m), and the CALayer composites it on a
+    // later CA transaction, so a screenshot taken right after a Form.show()
+    // could capture the PREVIOUS form (the stale-frame race that made
+    // DesktopModeScreenshotTest non-deterministic -- it intermittently captured
+    // the prior test's form). The screenTexture readback below blits +
+    // waitUntilCompleted, so it always reflects the latest committed CN1 frame
+    // regardless of drawable-present / CALayer-composite timing.
     if (!drawn && [renderView isKindOfClass:[METALView class]]) {
         CGImageRef cg = cn1_copyMetalScreenTextureImage((METALView *)renderView);
         if (cg != NULL) {
@@ -7139,49 +7385,48 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG wbyteArr);
     return;
 #else
-#ifdef NEW_CODENAME_ONE_VM
-    struct ThreadLocalData* capturedThreadStateData = threadStateData;
-#endif
-
+    __block NSData *capturedPng = nil;
     void (^performCapture)(void) = ^{
-#ifdef NEW_CODENAME_ONE_VM
-        struct ThreadLocalData* threadStateData = capturedThreadStateData;
-#endif
         POOL_BEGIN();
         UIView *view = [CodenameOne_GLViewController instance].view;
         UIImage *img = cn1_captureView(view);
-        NSData *png = nil;
         if (img != nil) {
-            png = UIImagePNGRepresentation(img);
-        }
-
-        JAVA_OBJECT byteArr = JAVA_NULL;
-        if (png != nil) {
-            int len = (int)[png length];
-            if (len > 0) {
-#ifndef NEW_CODENAME_ONE_VM
-                org_xmlvm_runtime_XMLVMArray* arr = XMLVMArray_createSingleDimension(__CLASS_byte, len);
-                memcpy(arr->fields.org_xmlvm_runtime_XMLVMArray.array_, [png bytes], len);
-                byteArr = arr;
+            NSData *png = UIImagePNGRepresentation(img);
+            if (png != nil) {
+#ifdef CN1_USE_ARC
+                capturedPng = png;
 #else
-                enteringNativeAllocations();
-                JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG len);
-                memcpy(((JAVA_ARRAY)arr)->data, [png bytes], len);
-                finishedNativeAllocations();
-                byteArr = arr;
+                capturedPng = [png retain];
 #endif
             }
         }
-
-        com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG byteArr);
         POOL_END();
     };
 
-    if ([NSThread isMainThread]) {
-        performCapture();
-    } else {
-        dispatch_async(dispatch_get_main_queue(), performCapture);
+    cn1RunSyncOnMainQueue(performCapture);
+
+    JAVA_OBJECT byteArr = JAVA_NULL;
+    if (capturedPng != nil) {
+        int len = (int)[capturedPng length];
+        if (len > 0) {
+#ifndef NEW_CODENAME_ONE_VM
+            org_xmlvm_runtime_XMLVMArray* arr = XMLVMArray_createSingleDimension(__CLASS_byte, len);
+            memcpy(arr->fields.org_xmlvm_runtime_XMLVMArray.array_, [capturedPng bytes], len);
+            byteArr = arr;
+#else
+            enteringNativeAllocations();
+            JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG len);
+            memcpy(((JAVA_ARRAY)arr)->data, [capturedPng bytes], len);
+            finishedNativeAllocations();
+            byteArr = arr;
+#endif
+        }
     }
+#ifndef CN1_USE_ARC
+    [capturedPng release];
+#endif
+
+    com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG byteArr);
 #endif // TARGET_OS_WATCH
 }
 
@@ -13464,6 +13709,120 @@ void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_Stri
     com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, JAVA_NULL);
 }
 #endif // CN1_USE_APP_ATTEST
+
+// --- CarPlay (CarPlay.framework) ------------------------------------------
+// Gated by CN1_USE_CARPLAY: the builder uncomments the define, links
+// CarPlay.framework, injects the CarPlay scene into the Info.plist scene manifest
+// and adds the carplay entitlement, when the app references com.codename1.car.
+// Builds without it compile the stub branch (no CarPlay import/link). The C
+// functions are thin trampolines onto CN1CarPlayManager (CodenameOne_CarPlaySceneDelegate).
+// CN1_USE_CARPLAY is defined in CodenameOne_GLViewController.h (imported near the top of this file),
+// flipped by the builder when the app references com.codename1.car.
+#ifdef CN1_USE_CARPLAY
+#import "CodenameOne_CarPlaySceneDelegate.h"
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 14.0, *)) {
+        return [CN1CarPlayManager sharedManager].connected ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_carPlaySetTemplate___int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json, JAVA_BOOLEAN isRoot) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* j = (json == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG json);
+        int sid = (int)screenId;
+        BOOL root = (isRoot == JAVA_TRUE);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] setTemplate:sid json:j isRoot:root];
+        });
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayUpdateTemplate___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* j = (json == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG json);
+        int sid = (int)screenId;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] updateTemplate:sid json:j];
+        });
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayPopTemplate__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 14.0, *)) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] popTemplate];
+        });
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayRegisterImage___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT pngArr) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* k = (key == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG key);
+        NSData* data = nil;
+        if (pngArr != JAVA_NULL) {
+#ifndef NEW_CODENAME_ONE_VM
+            org_xmlvm_runtime_XMLVMArray* ba = pngArr;
+            JAVA_ARRAY_BYTE* bytes = (JAVA_ARRAY_BYTE*)ba->fields.org_xmlvm_runtime_XMLVMArray.array_;
+            int len = ba->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+            JAVA_ARRAY ba = (JAVA_ARRAY)pngArr;
+            void* bytes = ba->data;
+            int len = (int)ba->length;
+#endif
+            data = [NSData dataWithBytes:bytes length:len];
+        }
+        NSString* kk = k;
+        NSData* dd = data;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] registerImage:kk data:dd];
+        });
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_carPlayShowToast___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT message, JAVA_INT seconds) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        NSString* m = (message == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG message);
+        int s = (int)seconds;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[CN1CarPlayManager sharedManager] showToast:m seconds:s];
+        });
+        POOL_END();
+    }
+}
+#else // CN1_USE_CARPLAY
+
+// CarPlay not enabled: CarPlay.framework is neither imported nor linked.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_carPlaySetTemplate___int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json, JAVA_BOOLEAN isRoot) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayUpdateTemplate___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT screenId, JAVA_OBJECT json) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayPopTemplate__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayRegisterImage___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT pngArr) {
+}
+void com_codename1_impl_ios_IOSNative_carPlayShowToast___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT message, JAVA_INT seconds) {
+}
+#endif // CN1_USE_CARPLAY
+
+// New-VM (return-type-encoded) mangling for the boolean CarPlay query. Defined here, after the
+// isCarPlayConnected__ implementation/stub above, so the call is to an already-declared function
+// (the wrapper section higher up runs before this definition). The void carPlay* methods need no
+// _R_ wrapper. Always defined (real or stub) regardless of CN1_USE_CARPLAY.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
 
 void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {
     if (cn1_keychainAccessGroup != nil) {

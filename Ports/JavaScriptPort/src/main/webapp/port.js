@@ -1797,6 +1797,296 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
   return flags[jvm.toNativeString(name)] ? 1 : 0;
 });
 
+// The clipboard is unreachable from the worker (no document/execCommand, and
+// navigator.clipboard is Window-only), so route the write to the main thread
+// host bridge, which performs it within the forwarded click's user activation.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard___java_lang_String_R_boolean"
+], function*(text) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const value = text == null ? "" : jvm.toNativeString(text);
+  const result = yield jvm.invokeHostNative("__cn1_copy_to_clipboard__", [{ text: value }]);
+  return result ? 1 : 0;
+});
+
+// navigator.share lives on the main-thread Window only, so the worker cannot
+// answer "is native share supported" itself -- route the check to the host.
+// (The actual share() invocations are void and self-route via the @JSBody
+// fire-and-forget host-call in HTML5Implementation.) Symbol mangling mirrors
+// the no-arg boolean isPhone_ binding above.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isNavigatorShareSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isNavigatorShareSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const result = yield jvm.invokeHostNative("__cn1_native_share_supported__", []);
+  return result ? 1 : 0;
+});
+
+// The build version lives on the host page's <html data-cn1-app-version> and is
+// unreadable from the worker. Route to the host; null falls back to AppVersion
+// in getBuildVersion(). Safe either way -- the @JSBody is document-guarded.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBuildVersion__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBuildVersion___R_java_lang_String"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  // Preserve the original @JSBody's null-safe contract. That script returned
+  // null whenever document was unreadable (always, in the worker) and
+  // getBuildVersion() then fell back to the AppVersion property -- it never
+  // threw. This binding replaced it with a host call, but browser_bridge.js
+  // ships from the translator artifact while port.js ships fresh from source,
+  // so a host bundle predating the __cn1_build_version__ handler rejects the
+  // call with "Unhandled host call". getBuildVersion() runs during boot inside
+  // the synchronous getArrayBufferInputStream (cache-busting ?v=), so that
+  // error would propagate out and abort app init. Swallow it and fall back.
+  let value;
+  try {
+    value = yield jvm.invokeHostNative("__cn1_build_version__", []);
+  } catch (err) {
+    return null;
+  }
+  return value == null ? null : jvm.createStringLiteral(String(value));
+});
+
+// DOM-element creation for the native overlay button (fullscreen gesture) and
+// the FileChooser file inputs/buttons (photo capture) can't run in the worker
+// (no document/jQuery). Route to the host element factory; the click
+// EventListener is passed as a top-level arg so mapHostArgs materialises it into
+// a worker-callback proxy on the main thread.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_showButton__java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_showButton___java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement"
+], function*(label, l) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const text = label == null ? "" : jvm.toNativeString(label);
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "button", attrs: { "class": "btn btn-default" }, text: text, appendToBody: true }, l]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLButtonElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createFileInput__R_com_codename1_html5_js_dom_HTMLInputElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createFileInput___R_com_codename1_html5_js_dom_HTMLInputElement"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__", [{ tag: "input", attrs: { type: "file" } }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLInputElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createMultiFileInput__R_com_codename1_html5_js_dom_HTMLInputElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_createMultiFileInput___R_com_codename1_html5_js_dom_HTMLInputElement"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "input", attrs: { type: "file", multiple: "" } }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLInputElement");
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_showButton_java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_showButton___java_lang_String_com_codename1_html5_js_dom_EventListener_R_com_codename1_html5_js_dom_HTMLButtonElement"
+], function*(label, l) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const text = label == null ? "" : jvm.toNativeString(label);
+  const ref = yield jvm.invokeHostNative("__cn1_create_dom_element__",
+    [{ tag: "button", attrs: { "class": "btn btn-default" }, text: text, appendToBody: true }, l]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLButtonElement");
+});
+
+// FileChooser file reading: the chosen <input>.files only exist on the MAIN
+// thread; in the worker fileEl is a host-ref proxy with no real .files. Read the
+// count + per-file bytes (base64) via the host so the worker can persist them.
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFileCount_com_codename1_html5_js_dom_HTMLInputElement_R_int",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFileCount___com_codename1_html5_js_dom_HTMLInputElement_R_int"
+], function*(el) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const ref = jvm.unwrapJsValue(el);
+  const n = yield jvm.invokeHostNative("__cn1_input_file_count__", [{ el: ref }]);
+  return n | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFile_com_codename1_html5_js_dom_HTMLInputElement_int_R_java_lang_String",
+  "cn1_com_codename1_teavm_ext_usermedia_FileChooser_nativeSelectedFile___com_codename1_html5_js_dom_HTMLInputElement_int_R_java_lang_String"
+], function*(el, index) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = jvm.unwrapJsValue(el);
+  const r = yield jvm.invokeHostNative("__cn1_read_input_file__", [{ el: ref, index: index | 0 }]);
+  return r == null ? null : jvm.createStringLiteral(String(r));
+});
+
+// Live camera (com.codename1.camera.Camera): getUserMedia, the <video> preview
+// and the capture <canvas> are all main-thread only -- and a MediaStream can't
+// cross the worker boundary -- so the whole media session runs on the host and
+// the worker holds only the opaque <video> host-ref (handed to PeerComponent for
+// the live preview and back to the host to grab still frames).
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_camera_supported__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraOpen_java_lang_String_boolean_R_com_codename1_html5_js_dom_HTMLVideoElement",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraOpen___java_lang_String_boolean_R_com_codename1_html5_js_dom_HTMLVideoElement"
+], function*(facing, audio) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const f = facing == null ? "environment" : jvm.toNativeString(facing);
+  const ref = yield jvm.invokeHostNative("__cn1_camera_open__", [{ facing: f, audio: !!audio }]);
+  return ref == null ? null : jvm.wrapJsObject(ref, "com_codename1_html5_js_dom_HTMLVideoElement");
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraLastError___R_java_lang_String"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return jvm.createStringLiteral("");
+  }
+  const v = yield jvm.invokeHostNative("__cn1_camera_last_error__", []);
+  return jvm.createStringLiteral(v == null ? "" : String(v));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraGrab_com_codename1_html5_js_dom_HTMLVideoElement_int_int_double_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraGrab___com_codename1_html5_js_dom_HTMLVideoElement_int_int_double_R_java_lang_String"
+], function*(video, w, h, quality) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const ref = jvm.unwrapJsValue(video);
+  const r = yield jvm.invokeHostNative("__cn1_camera_grab__", [{ video: ref, w: w | 0, h: h | 0, quality: +quality }]);
+  return r == null ? null : jvm.createStringLiteral(String(r));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraClose_com_codename1_html5_js_dom_HTMLVideoElement",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraClose___com_codename1_html5_js_dom_HTMLVideoElement"
+], function*(video) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return;
+  }
+  const ref = jvm.unwrapJsValue(video);
+  yield jvm.invokeHostNative("__cn1_camera_close__", [{ video: ref }]);
+});
+
+// Fullscreen: document.fullscreen* lives on the main thread. Queries return the
+// real host state; enter/exit do the host request and then invoke the Java
+// RequestFullScreenCallback (onComplete(boolean)) back in the worker.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreenSupported__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreenSupported___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_fullscreen_supported__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreen__R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isFullScreen___R_boolean"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_is_fullscreen__", [])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestFullScreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestFullScreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_boolean"
+], function*(onComplete) {
+  const cb = jvm.unwrapJsValue(onComplete);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [0], null); }
+    return 0;
+  }
+  const ok = yield jvm.invokeHostNative("__cn1_request_fullscreen__", []);
+  if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [ok ? 1 : 0], null); }
+  return 1;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen__com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_exitFullscreen___com_codename1_impl_html5_HTML5Implementation_RequestFullScreenCallback_R_void"
+], function*(onComplete) {
+  const cb = jvm.unwrapJsValue(onComplete);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [0], null); }
+    return null;
+  }
+  const ok = yield jvm.invokeHostNative("__cn1_exit_fullscreen__", []);
+  if (cb) { spawnVirtualCallback(cb, "cn1_s_onComplete_boolean", [ok ? 1 : 0], null); }
+  return null;
+});
+
+// Print: the Blob + object URL + iframe + window.print() must all run on the
+// main thread (a worker-created blob: URL is invalid in the main-thread iframe).
+// Hand the base64 document bytes to the host, then invoke the Java
+// PrintFrameCallback (onResult(boolean, String)) with the {ok, error} outcome.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData__java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData___java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData__java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_printData___java_lang_String_java_lang_String_com_codename1_impl_html5_HTML5Implementation_PrintFrameCallback_R_void"
+], function*(b64, mimeType, callback) {
+  const cb = jvm.unwrapJsValue(callback);
+  if (typeof jvm.invokeHostNative !== "function") {
+    if (cb) {
+      spawnVirtualCallback(cb, "cn1_s_onResult_boolean_java_lang_String",
+        [0, jvm.createStringLiteral("Printing host bridge unavailable")], null);
+    }
+    return null;
+  }
+  const data = b64 == null ? "" : jvm.toNativeString(b64);
+  const type = mimeType == null ? "application/octet-stream" : jvm.toNativeString(mimeType);
+  const res = yield jvm.invokeHostNative("__cn1_print_data__", [{ b64: data, mimeType: type }]);
+  if (cb) {
+    const ok = res && res.ok ? 1 : 0;
+    const err = (res && res.error != null) ? jvm.createStringLiteral(String(res.error)) : null;
+    // Invoke onResult on THIS green thread (which resumed on the EDT after the
+    // host call) rather than via spawnVirtualCallback: a freshly-spawned thread's
+    // callSerially never reaches the EDT queue, so the PrintResultListener would
+    // never fire.
+    const onResult = jvm.resolveVirtual(cb.__class, "cn1_s_onResult_boolean_java_lang_String");
+    yield* cn1_ivAdapt(onResult.apply(null, [cb, ok, err]));
+  }
+  return null;
+});
+
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function() {
   const win = global.window || global;
   const normalizeWheel = win.cn1NormalizeWheel;

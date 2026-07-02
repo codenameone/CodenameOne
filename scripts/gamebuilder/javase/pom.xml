@@ -6,12 +6,16 @@
         <artifactId>cn1-gamebuilder</artifactId>
         <version>8.0-SNAPSHOT</version>
     </parent>
-    <!-- The distributable editor coordinates. In a Codename One release this module is
-         built in the maven/ reactor at the CN1 version and published to Maven Central;
-         the cn1:gamebuilder goal then resolves it like the Designer jar. -->
+    <!-- The distributable editor coordinates. In a Codename One release the release
+         workflow builds this module at the CN1 version (a Java-17 pass over
+         scripts/gamebuilder with -Pexecutable-jar -Pgamebuilder-central) and publishes
+         it to Maven Central; the cn1:gamebuilder goal then resolves it like the
+         Designer jar. -->
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-gamebuilder</artifactId>
     <name>codenameone-gamebuilder</name>
+    <!-- description is required by Maven Central and is not inherited. -->
+    <description>Standalone Codename One Game Builder editor (visual level/map editor).</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

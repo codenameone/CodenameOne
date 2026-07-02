@@ -97,6 +97,7 @@ jobs:
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
+        id: cn1_tools
         uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
@@ -146,7 +147,13 @@ jobs:
           key: ${{ steps.cn1_built_key.outputs.key }}
 
       - name: Setup workspace
-        if: steps.cn1_built.outputs.cache-hit != 'true'
+        # Run when the prebuilt CN1 jars are missing, OR when the
+        # codenameone-tools cache (keyed separately, on setup-workspace.sh) is
+        # missing. Without the second condition a jars-cache hit short-circuits
+        # setup-workspace and leaves tools/env.sh absent, which the dependent app
+        # jobs (build-ios*, native-ios, packaging, mac-native) need but only ever
+        # restore from cache -- so an evicted tools cache breaks all of them.
+        if: steps.cn1_built.outputs.cache-hit != 'true' || steps.cn1_tools.outputs.cache-hit != 'true'
         run: ./scripts/setup-workspace.sh -q -DskipTests
         timeout-minutes: 40
 
@@ -162,3 +169,40 @@ jobs:
           else
             echo "cn1-built cache MISS for key cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — built fresh."
           fi
+
+      # Hand the built tree to dependent jobs as a workflow ARTIFACT, not only a
+      # cache. The cache above is kept for cross-run build-skip, but caches are
+      # LRU-evicted once the repo cache store exceeds quota -- which, during long
+      # runner-starvation queues, happened between this job and a dependent job's
+      # fail-on-cache-miss restore, hard-failing build-ios/metal/tv/watch/
+      # mac-native/packaging at the restore step before any work. Artifacts are
+      # not evicted for the life of the run (and survive partial `--failed`
+      # re-runs), so the handoff is reliable. tar relative to / so the home
+      # (~/.m2) and workspace paths restore to identical absolute locations on
+      # the consumer (same macos-15 image -> same /Users/runner paths).
+      - name: Bundle built CN1 + iOS port artifacts
+        run: |
+          set -euo pipefail
+          # Include codenameone-tools (the workspace tools dir holding
+          # tools/env.sh) alongside the built tree. It is produced by
+          # setup-workspace in this job and consumed by every dependent build
+          # script (build-ios-app.sh etc. read ${TMPDIR}/codenameone-tools/
+          # tools/env.sh, TMPDIR=runner.temp). It had its own evictable cache
+          # too; when that cache was evicted mid-queue the dependent builds
+          # failed with "Workspace tools not found" even after the cn1-built
+          # restore succeeded. Bundling it into the same artifact makes the
+          # whole handoff eviction-proof.
+          tar -C / -cf "$RUNNER_TEMP/cn1-built-bundle.tar" \
+            "${HOME#/}/.m2/repository/com/codenameone" \
+            "${GITHUB_WORKSPACE#/}/Themes" \
+            "${GITHUB_WORKSPACE#/}/Ports/iOSPort/nativeSources" \
+            "${RUNNER_TEMP#/}/codenameone-tools"
+          ls -la "$RUNNER_TEMP/cn1-built-bundle.tar"
+
+      - name: Upload built CN1 + iOS port bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}/cn1-built-bundle.tar
+          retention-days: 1
+          if-no-files-found: error

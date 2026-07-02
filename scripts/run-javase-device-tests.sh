@@ -100,6 +100,7 @@ ensure_dir "$SCREENSHOT_DIR"
 ensure_dir "$PREVIEW_DIR"
 
 jd_log "Ensuring Java SE port is built"
+"$REPO_ROOT/scripts/ci-install-upstream-jcef-jar.sh"
 ant -noinput -buildfile Ports/JavaSE/build.xml jar
 
 CN1_CLASSPATH="CodenameOne/dist/CodenameOne.jar:Ports/JavaSE/dist/JavaSE.jar:Ports/CLDC11/dist/CLDC11.jar"

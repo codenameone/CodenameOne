@@ -89,3 +89,76 @@ jobs:
         run: |
           echo "Release failed: deploy reported failure and the artifacts never appeared on Maven Central."
           exit 1
+
+      # --- Game Builder editor -------------------------------------------------
+      # The cn1:gamebuilder goal resolves
+      # com.codenameone:codenameone-gamebuilder:<version>:jar-with-dependencies
+      # from Maven Central. That editor lives outside the maven/ reactor
+      # (scripts/gamebuilder), compiles at Java 17, and depends on the
+      # core/javase/plugin published above, so it is built and deployed in a
+      # second pass here. These steps run only when the core release succeeded;
+      # update-version.sh already synced the gamebuilder poms to GITHUB_REF_NAME.
+      # Deliberately does NOT import the GPG key: it was already imported by the
+      # Java 8 "Set up Maven Central Repository" step above and persists in the
+      # runner keyring (gpg signing in the editor deploy below uses it fine). If
+      # both setup-java steps import the key, both of their cleanup post-steps
+      # try to delete it; the second deletion fails ("gpg ... exit code 2") and
+      # marks the whole release red even though every artifact published.
+      - name: Set up JDK 17 for the Game Builder editor
+        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Deploy Game Builder editor to Maven Central
+        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        run: |
+          export GPG_TTY=$(tty)
+          cd scripts/gamebuilder
+          # The core/javase/plugin just released are already in the local repo
+          # from the deploy above (install runs before the Central upload).
+          # -Dcn1.version/-Dcn1.plugin.version pin the build to that version.
+          # -Dmaven.test.skip=true also skips test *compilation* (the editor's
+          # JUnit test deps are irrelevant to the published jar). -Pgamebuilder-
+          # central adds the sources/javadoc jars, GPG signatures and the
+          # central-publishing bundle; -Pexecutable-jar builds the fat jar.
+          # -Dcodename1.platform=javase is REQUIRED: it activates the parent's
+          # `javase` profile (which contributes the editor module) by property.
+          # That profile is activeByDefault, but any explicit -P activation
+          # suppresses activeByDefault, so without this property the editor
+          # (codenameone-gamebuilder) silently drops out of the reactor and only
+          # the parent + common modules would be published.
+          xvfb-run -a mvn -Pexecutable-jar -Pgamebuilder-central deploy \
+            -Dcodename1.platform=javase \
+            -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
+            -Dmaven.test.skip=true
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Confirm Game Builder editor on Maven Central
+        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          # Informational only: the editor bundle was accepted by Sonatype
+          # Central in the step above (which would have failed otherwise).
+          # Propagation to repo1 can take 30+ minutes, so this is a best-effort
+          # sanity poll, not a gate.
+          set +e
+          url="https://repo1.maven.org/maven2/com/codenameone/codenameone-gamebuilder/${GITHUB_REF_NAME}/codenameone-gamebuilder-${GITHUB_REF_NAME}-jar-with-dependencies.jar"
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" = "200" ]; then
+              echo "Confirmed codenameone-gamebuilder ${GITHUB_REF_NAME} (jar-with-dependencies) on Maven Central"
+              exit 0
+            fi
+            echo "[$i/15] Waiting on Maven Central for codenameone-gamebuilder (code=$code)"
+            sleep 20
+          done
+          echo "codenameone-gamebuilder ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."

@@ -1395,7 +1395,7 @@ Still, if you want to keep an eye of every change in the resource file you can s
 
 That's useful as you can edit the files directly and keep track of every file in git. For example, this has two big drawbacks:
 
-- it's flaky - while this mode works it never reached the stability of the regular res file mode
+- It's flaky - while this mode works it never reached the stability of the regular res file mode
 - It conflicts - the simulator/device are oblivious to this mode. If you fetch an update you also need to update the res file and you might still have conflicts related to that file
 
 Both of these issues shouldn't be a deal-breaker. Even though this mode is a bit flaky it's better than the alternative as you can "see" the content of the resource file. You can revert and reapply your changes to the res file when merging from git, it's tedious but again not a deal-breaker.

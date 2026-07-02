@@ -19,7 +19,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.251";
+    private static final String CN1_PLUGIN_VERSION = "7.0.255";
     private static final String PREVIEW_BUTTON_SELECTOR =
             "Button, InitializrLiveButtonDarkClean, "
                     + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
@@ -312,21 +312,14 @@ public class GeneratorModel {
     }
 
     private void copyZipEntriesToMap(String zipResource, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
-        boolean dropWindowsModule = options.javaVersion == ProjectOptions.JavaVersion.JAVA_17;
         try(ZipInputStream zis = new ZipInputStream(getResourceAsStream(zipResource))) {
             ZipEntry entry = zis.getNextEntry();
             while (entry != null) {
                 if (!entry.isDirectory()) {
-                    String name = entry.getName();
-                    if (dropWindowsModule && (name.startsWith("win/") || name.startsWith("win\\"))) {
-                        // Java 17 projects don't ship the UWP/Windows native module — strip
-                        // its source tree from the extracted skeleton. The matching root-pom
-                        // <profile id="win"> block is removed in applyDataReplacements below.
-                        zis.closeEntry();
-                        entry = zis.getNextEntry();
-                        continue;
-                    }
-                    copyEntryToMap(name, readToBytesNoClose(zis), mergedEntries, zipType);
+                    // The win/ module is the native win32 target, shipped for every Java
+                    // version. (The retired UWP module that once lived here used to be
+                    // stripped for Java 17 -- that strip is gone now that win/ is win32.)
+                    copyEntryToMap(entry.getName(), readToBytesNoClose(zis), mergedEntries, zipType);
                 }
                 zis.closeEntry();
                 entry = zis.getNextEntry();
@@ -412,9 +405,6 @@ public class GeneratorModel {
         if ("pom.xml".equals(targetPath)) {
             content = replaceTagValue(content, "cn1.plugin.version", CN1_PLUGIN_VERSION);
             content = replaceTagValue(content, "cn1.version", CN1_PLUGIN_VERSION);
-            if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
-                content = stripWindowsModuleProfile(content);
-            }
         }
         if ("android/pom.xml".equals(targetPath) || "ios/pom.xml".equals(targetPath) || "javascript/pom.xml".equals(targetPath)) {
             content = hardenPlatformModulePomAgainstDoubleJarAttach(content);
@@ -608,34 +598,6 @@ public class GeneratorModel {
             return xml;
         }
         return xml.substring(0, valueStart) + value + xml.substring(end);
-    }
-
-    private static String stripWindowsModuleProfile(String pom) {
-        // Remove the <profile><id>win</id>... </profile> block from the root pom.
-        // Tolerant of leading whitespace and any inner content. The win/ source
-        // tree is also dropped from the zip extraction (see copyZipEntriesToMap).
-        int idIdx = pom.indexOf("<id>win</id>");
-        if (idIdx < 0) {
-            return pom;
-        }
-        int profileStart = pom.lastIndexOf("<profile>", idIdx);
-        if (profileStart < 0) {
-            return pom;
-        }
-        int profileEnd = pom.indexOf("</profile>", idIdx);
-        if (profileEnd < 0) {
-            return pom;
-        }
-        profileEnd += "</profile>".length();
-        // Swallow trailing newline if present so we don't leave an empty line.
-        while (profileEnd < pom.length() && (pom.charAt(profileEnd) == '\n' || pom.charAt(profileEnd) == '\r')) {
-            profileEnd++;
-        }
-        // Also swallow leading whitespace on the line containing <profile>.
-        while (profileStart > 0 && (pom.charAt(profileStart - 1) == ' ' || pom.charAt(profileStart - 1) == '\t')) {
-            profileStart--;
-        }
-        return pom.substring(0, profileStart) + pom.substring(profileEnd);
     }
 
     private static String normalizeJavasePom(String pom) {

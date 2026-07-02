@@ -1578,6 +1578,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 nativeCallSerially(new Runnable() {
                     public void run() {
                         try {
+                            applyMouseMetadata(me);
                             HTML5Implementation.this.pointerPressed(new int[]{x}, new int[]{y});
                         } finally {
                             completePressInFlight();
@@ -1631,6 +1632,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
+                applyMouseMetadata(me);
 
                 final Runnable releaseDispatch = new Runnable() {
                     public void run() {
@@ -1738,6 +1740,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 });
                 if (touchDecision.shouldFirePointerPressed()) {
                     installBacksideHooksInUserInteraction();
+                    applyTouchMetadata();
                     nativeCallSerially(new Runnable() {
 
                         @Override
@@ -2665,6 +2668,64 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={}, script="return window.cn1WheelMultiplier || 1.0")
     private static native double wheelMultiplier();
     
+    /// Records the mouse button, button mask and keyboard modifiers for the next dispatched pointer
+    /// event so the cross-platform PointerEvent / context-menu APIs work in the browser. The DOM
+    /// {@code button} that changed is 0 (left), 1 (middle), 2 (right), 3 (back), 4 (forward); the DOM
+    /// {@code buttons} bitmask of held buttons aligns 1:1 with PointerEvent.MASK_* so it is used
+    /// directly (it drives the mask during a drag).
+    private void applyMouseMetadata(MouseEvent me) {
+        int button;
+        switch (me.getButton()) {
+            case 1:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+                break;
+            case 2:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+                break;
+            case 3:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_BACK;
+                break;
+            case 4:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
+                break;
+            default:
+                button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+                break;
+        }
+        // buttons is 0 on mouseup, so fall back to the single button that changed (1 << button).
+        int mask = me.getButtons();
+        if (mask == 0) {
+            mask = 1 << button;
+        }
+        setPointerEventMetadata(button, mask, com.codename1.ui.events.PointerEvent.TYPE_MOUSE,
+                1f, 0, 0, 0, mouseModifiers(me), false);
+    }
+
+    /// Folds the DOM modifier-key flags into the PointerEvent.MODIFIER_* bitmask.
+    private int mouseModifiers(MouseEvent me) {
+        int modifiers = 0;
+        if (me.isShiftKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_SHIFT;
+        }
+        if (me.isCtrlKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_CONTROL;
+        }
+        if (me.isAltKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_ALT;
+        }
+        if (me.isMetaKey()) {
+            modifiers |= com.codename1.ui.events.PointerEvent.MODIFIER_META;
+        }
+        return modifiers;
+    }
+
+    /// Flags the next dispatched pointer event as a finger touch.
+    private void applyTouchMetadata() {
+        setPointerEventMetadata(com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY,
+                com.codename1.ui.events.PointerEvent.MASK_PRIMARY,
+                com.codename1.ui.events.PointerEvent.TYPE_TOUCH, 1f, 0, 0, 0, 0, false);
+    }
+
     public void mouseWheelMoved(WheelEvent e) {
         NormalizedWheelEvent ne = normalizeWheelEvent(e);
         
@@ -2683,6 +2744,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final int dx = -(int)(ne.getPixelX() * getDevicePixelRatio() * wheelMultiplier());
         final int dy = -(int)(ne.getPixelY() * getDevicePixelRatio() * wheelMultiplier());
         //debugLog("dx="+dx+"; dy="+dy);
+        // Give mouse wheel listeners a chance to handle (and consume) the wheel before the default
+        // scroll gesture, so WheelEvent is the same universal scroll API used on desktop and mobile.
+        if (Display.getInstance().fireMouseWheelEvent(x, y, dx, dy, true, 0)) {
+            return;
+        }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 scrollWheeling = true;
@@ -7669,7 +7735,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         } else if (instanceOf(obj, "Uint8Array")) {
             return BlobUtil.createBlob((Uint8Array)obj, "application/octet-stream");
         } else {
-            throw new IOException("File at "+file+" is not a blob");
+            // Files written via openOutputStream are stored in LocalForage's
+            // serialized byte form (e.g. a "b:<base64>" string), not as a live
+            // Blob/Uint8Array. Recover the bytes through the input-stream path
+            // (the same one openFileInputStream uses) and wrap them so e.g.
+            // Image.createImage(capturedPhotoPath) works.
+            InputStream in = null;
+            try {
+                in = openFileInputStream(file);
+                byte[] data = com.codename1.io.Util.readInputStream(in);
+                return BlobUtil.createBlob(data, "application/octet-stream");
+            } finally {
+                com.codename1.io.Util.cleanup(in);
+            }
         }
     }
 
@@ -9312,13 +9390,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 cache = new HashMap<Character,Integer>();
                 charWidthCache.put(getCSS(), cache);
             }
-            Character ch = new Character(c);
+            Character ch = c;
             Integer i = cache.get(ch);
             if (i != null){
                 return i.intValue();
             }
             int w = graphics.charsWidth(this, new char[]{c},0,1);
-            cache.put(ch, new Integer(w));
+            cache.put(ch, w);
             return w;
         }
         
@@ -9335,7 +9413,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     return i.intValue();
                 }
                 int w = graphics.stringWidth(this, str);
-                cache.put(str, new Integer(w));
+                cache.put(str, w);
                 return w;
             } else {
                 return graphics.stringWidth(this, str);
@@ -9651,20 +9729,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 requestFullScreen_(new RequestFullScreenCallback() {
                     @Override
                     public void onComplete(final boolean result) {
-                        new Thread(new Runnable() {
-                           public void run() {
-                               res[0] = result;
-                                complete[0] = true;
-                                synchronized(complete) {
-                                    try {
-                                        complete.notifyAll();
-                                    } catch (Throwable t) {
+                        // Notify directly -- the callback already runs on its own
+                        // thread/green-thread, and spawning a java.lang.Thread here
+                        // never executes on the single-threaded HTML5 worker, which
+                        // would leave the invokeAndBlock below waiting forever.
+                        synchronized(complete) {
+                            res[0] = result;
+                            complete[0] = true;
+                            try {
+                                complete.notifyAll();
+                            } catch (Throwable t) {
 
-                                    }
-                                }
-                           }
-                        }).start();
-
+                            }
+                        }
                     }
                 });
             }
@@ -9701,21 +9778,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         exitFullscreen_(new RequestFullScreenCallback() {
             @Override
             public void onComplete(final boolean result) {
-                new Thread(new Runnable() {
-                    public void run() {
-                        res[0] = result;
-                         complete[0] = true;
-                         synchronized(complete) {
-                             try {
-                                 complete.notifyAll();
-                             } catch (Throwable t) {
+                // Notify directly -- a java.lang.Thread never executes on the
+                // single-threaded HTML5 worker (see requestFullScreen()).
+                synchronized(complete) {
+                    res[0] = result;
+                    complete[0] = true;
+                    try {
+                        complete.notifyAll();
+                    } catch (Throwable t) {
 
-                             }
-                         }
                     }
-                 }).start();
+                }
             }
-            
+
         });
         CN.invokeAndBlock(new Runnable() {
             public void run() {
@@ -9829,13 +9904,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return isNavigatorShareSupported_();
     }
 
-    @JSBody(params={"url"}, script="navigator.share({text:'', url:url})")
+    // navigator.share is Window-only, so on the worker-based port these scripts
+    // run where it does not exist. Fire-and-forget the share to the main thread
+    // (__cn1_native_share__ in browser_bridge.js) using the same host-call
+    // message shape the renderer uses for void surface ops. On the legacy
+    // main-thread (TeaVM) runtime navigator.share is present and used directly.
+    // __cn1Share(text, url) is the shared JS helper prepended to each script.
+    private static final String SHARE_POST_HELPER =
+        "function __cn1Share(t, u){"
+        // Worker args arrive as Java String objects; convert to native JS strings
+        // (toNativeString is a no-op on real strings, so this is safe on TeaVM).
+      + "  var hasJ = (typeof jvm !== 'undefined' && jvm && typeof jvm.toNativeString === 'function');"
+      + "  var ts = hasJ ? jvm.toNativeString(t) : t; var us = hasJ ? jvm.toNativeString(u) : u;"
+      + "  ts = (ts == null || ts === 'null') ? '' : String(ts); us = (us == null || us === 'null') ? '' : String(us);"
+      + "  try { if (typeof navigator !== 'undefined' && navigator.share) { navigator.share({text: ts, url: us}); return; } } catch (e) {}"
+      + "  try {"
+      + "    var m = { type: 'host-call', symbol: '__cn1_native_share__', args: [{ text: ts, url: us, __cn1_no_response: true }], id: 0 };"
+      + "    if (typeof self !== 'undefined') {"
+      + "      if (typeof self.emitVmMessage === 'function') { self.emitVmMessage(m); }"
+      + "      else if (typeof self.postMessage === 'function') { self.postMessage(m); }"
+      + "    }"
+      + "  } catch (e) {}"
+      + "}";
+
+    @JSBody(params={"url"}, script=SHARE_POST_HELPER + " __cn1Share('', url);")
     private native static void shareURL_(String url);
-    
-    @JSBody(params={"text"}, script="navigator.share({text:text, url:''})")
+
+    @JSBody(params={"text"}, script=SHARE_POST_HELPER + " __cn1Share(text, '');")
     private native static void shareText_(String text);
-    
-    @JSBody(params={"text", "link"}, script="navigator.share({text:text, url:link})")
+
+    @JSBody(params={"text", "link"}, script=SHARE_POST_HELPER + " __cn1Share(text, link);")
     private native static void shareTextAndLink_(String text, String link);
     
     @Override
@@ -9906,42 +10004,51 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void print(final String filePath, final String mimeType, final PrintResultListener listener) {
         final boolean[] fired = new boolean[1];
-        new Thread(new Runnable() {
+        // callSerially rather than new Thread(): a java.lang.Thread never executes
+        // on the single-threaded HTML5 worker, so the work below (and the listener)
+        // would never run. callSerially keeps print() non-blocking on every port.
+        Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                String url;
+                String b64;
                 try {
-                    Blob blob = openFileAsBlob(filePath);
-                    if (mimeType != null && !Objects.equals(blob.getType(), mimeType)) {
-                        blob = BlobUtil.toType(blob, mimeType);
+                    // Read the document bytes through the file system input stream,
+                    // which recovers binary data even when LocalForage round-trips
+                    // it as an array-like (the host<->worker bridge drops the
+                    // Uint8Array type). The bytes are base64'd and handed to the
+                    // main thread, which builds the Blob + object URL + print
+                    // iframe there -- a worker-created blob: URL would be invalid
+                    // in the main-thread iframe.
+                    InputStream in = FileSystemStorage.getInstance().openInputStream(filePath);
+                    byte[] data;
+                    try {
+                        data = Util.readInputStream(in);
+                    } finally {
+                        Util.cleanup(in);
                     }
-                    url = BlobUtil.createObjectURL(blob);
-                    if (url == null) {
-                        firePrintResult(listener, PrintResult.failed("Object URLs are not supported in this browser"), fired);
+                    if (data == null || data.length == 0) {
+                        firePrintResult(listener, PrintResult.failed("Document is empty or could not be read"), fired);
                         return;
                     }
-                } catch (Exception ex) {
+                    b64 = Base64.encodeNoNewline(data);
+                } catch (Throwable ex) {
                     Log.e(ex);
                     firePrintResult(listener, PrintResult.failed(ex.getMessage()), fired);
                     return;
                 }
-                printObjectURL_(url, new PrintFrameCallback() {
+                final String type = (mimeType == null || mimeType.length() == 0) ? "application/octet-stream" : mimeType;
+                printData_(b64, type, new PrintFrameCallback() {
                     public void onResult(final boolean completed, final String error) {
-                        // Hop off the JS callback context before touching
-                        // Codename One code, matching the other JSFunctor
-                        // callbacks in this class.
-                        new Thread(new Runnable() {
-                            public void run() {
-                                if (completed) {
-                                    firePrintResult(listener, PrintResult.completed(), fired);
-                                } else {
-                                    firePrintResult(listener, PrintResult.failed(error), fired);
-                                }
-                            }
-                        }).start();
+                        // onResult is dispatched on the EDT (the port routes it
+                        // there), so report the result directly.
+                        if (completed) {
+                            firePrintResult(listener, PrintResult.completed(), fired);
+                        } else {
+                            firePrintResult(listener, PrintResult.failed(error), fired);
+                        }
                     }
                 });
             }
-        }).start();
+        });
     }
 
     /// Reports a print result exactly once. The native print script fires
@@ -9969,17 +10076,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // outcome through the callback. The iframe and the object URL are kept
     // alive for 60 seconds (or until afterprint) because print dialogs read
     // the frame content lazily.
-    @JSBody(params = {"url", "callback"}, script =
+    @JSBody(params = {"b64", "mimeType", "callback"}, script =
             "var done = false;\n"
             + "var cleaned = false;\n"
             + "var iframe = null;\n"
+            + "var url = null;\n"
+            + "var urlApi = (typeof URL !== 'undefined' && URL) ? URL : ((typeof window !== 'undefined' && window.webkitURL) ? window.webkitURL : null);\n"
             + "var finish = function(ok, msg) { if (done) return; done = true; callback(ok, msg); };\n"
             + "var cleanup = function() {\n"
             + "    if (cleaned) return; cleaned = true;\n"
-            + "    try { var u = (typeof URL !== 'undefined' && URL) ? URL : ((typeof window !== 'undefined' && window.webkitURL) ? window.webkitURL : null); if (u) u.revokeObjectURL(url); } catch (e) {}\n"
+            + "    try { if (urlApi && url) urlApi.revokeObjectURL(url); } catch (e) {}\n"
             + "    try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}\n"
             + "};\n"
             + "if (typeof document === 'undefined' || !document.body) { finish(false, 'Printing requires a browser document context'); return; }\n"
+            + "try {\n"
+            + "    var bin = atob(b64); var u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) { u8[i] = bin.charCodeAt(i); }\n"
+            + "    var blob = new Blob([u8], { type: mimeType });\n"
+            + "    url = urlApi ? urlApi.createObjectURL(blob) : null;\n"
+            + "    if (!url) { finish(false, 'Object URLs are not supported in this browser'); return; }\n"
+            + "} catch (e) { finish(false, 'Failed to decode document for printing: ' + e); return; }\n"
             + "iframe = document.createElement('iframe');\n"
             + "iframe.style.cssText = 'position:fixed;visibility:hidden;right:0;bottom:0;width:0;height:0;border:0';\n"
             + "iframe.onload = function() {\n"
@@ -9997,8 +10112,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             + "iframe.onerror = function() { finish(false, 'Failed to load document for printing'); cleanup(); };\n"
             + "iframe.src = url;\n"
             + "document.body.appendChild(iframe);\n"
+            // onload/afterprint don't fire reliably for an image blob in a hidden
+            // iframe; resolve as completed after a short grace period regardless.
+            + "setTimeout(function() { finish(true, null); }, 3000);\n"
             + "setTimeout(cleanup, 60000);")
-    private native static void printObjectURL_(String url, PrintFrameCallback callback);
+    private native static void printData_(String b64, String mimeType, PrintFrameCallback callback);
 
     private static interface CancelableEvent extends Event {
         @JSProperty
@@ -10168,7 +10286,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
 
-    @JSBody(params={"name"}, script="return document.execCommand(name)")
+    @JSBody(params={"name"}, script="return (typeof document !== 'undefined' && document.execCommand) ? document.execCommand(name) : false")
     private native static boolean execCommand(String name);
     
     
@@ -10180,9 +10298,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
     }
-    @JSBody(params={"command"}, script="if (!document.queryCommandEnabled) return true; return document.queryCommandEnabled(command);")
+    @JSBody(params={"command"}, script="if (typeof document === 'undefined' || !document.queryCommandEnabled) return false; return document.queryCommandEnabled(command);")
     private native static boolean queryCommandEnabled(String command);
-    
+
+    // Writes text to the system clipboard. On the worker-based JavaScript port
+    // this method is overridden by a port.js binding that hands the write to the
+    // main thread (the worker has no document/execCommand and no
+    // navigator.clipboard), so the @JSBody below is only ever used by the legacy
+    // main-thread (TeaVM) runtime, where document.execCommand is available.
+    @JSBody(params={"text"}, script=
+        "try {" +
+        "  var ta = document.createElement('textarea');" +
+        "  ta.setAttribute('readonly', '');" +
+        "  ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.left = '0'; ta.style.opacity = '0';" +
+        "  document.body.appendChild(ta);" +
+        "  ta.value = text;" +
+        "  var ok = false;" +
+        "  try { ta.focus(); ta.select(); ok = !!document.execCommand('copy'); } catch (e) { ok = false; }" +
+        "  document.body.removeChild(ta);" +
+        "  return ok;" +
+        "} catch (e) { return false; }")
+    private native static boolean nativeBrowserCopyToClipboard(String text);
+
     @Override
     public void copyToClipboard(Object obj) {
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
@@ -10192,6 +10329,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         String selectedText = (String)obj;
+        // Preferred path: let the main thread perform the copy via the modern
+        // async clipboard API (or an execCommand fallback). This is the only
+        // path that works on the worker-based port; the textarea/execCommand
+        // dance below runs in the worker where document is unavailable.
+        if (nativeBrowserCopyToClipboard(selectedText)) {
+            return;
+        }
         HTMLDocument doc = Window.current().getDocument();
         HTMLTextAreaElement textArea = (HTMLTextAreaElement)doc.createElement("textarea");
         textArea.setAttribute("readonly", "");

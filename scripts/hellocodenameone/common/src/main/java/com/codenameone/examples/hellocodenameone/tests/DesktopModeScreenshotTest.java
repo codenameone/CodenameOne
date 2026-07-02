@@ -105,6 +105,16 @@ public class DesktopModeScreenshotTest extends BaseTest {
         return true;
     }
 
+    /// The 30-row scrollable form is heavy enough that on the iOS Metal backend
+    /// its first frame is occasionally presented just after the capture fires,
+    /// so Display.screenshot() reads the previous test's framebuffer and this
+    /// test "captures the wrong form". Force a repaint and a short extra settle
+    /// so the DesktopMode form is fully presented before the screenshot.
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        return 700;
+    }
+
     @Override
     protected synchronized void done() {
         // Revert the global desktop-mode toggles now that the screenshot has been captured, so the

@@ -81,3 +81,12 @@ dSYM
 
 # Deobfuscation of Android stack traces via the mapping file.
 [Dd]eobfuscat(e|es|ed|ing|ion)
+
+# TV / form-factor + open-source-licensing vocabulary (this week's analytics,
+# maps, TV, editors and the "funding open source" parent post).
+[Ll]eanback
+Classpath
+[Rr]elicens(e|es|ed|ing)
+[Ff]orkable
+[Kk]otlin
+[Dd]ogfood(s|ed|ing)?

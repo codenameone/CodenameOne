@@ -78,6 +78,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private static final int EVENT_CLOSE = 7;
     private static final int EVENT_MOUSE_WHEEL = 8;
     private static final int EVENT_MOUSE_HWHEEL = 9;
+    private static final int EVENT_PINCH = 10;
+    private static final int EVENT_ROTATE = 11;
+
+    // The native gesture events encode their float (incremental scale / radians) as
+    // an int in 1/10000 units; see CN1_GESTURE_FIXED in cn1_linux.h.
+    private static final float GESTURE_FIXED = 10000f;
 
     // One mouse-wheel notch is WHEEL_DELTA (120). Linux defaults to scrolling
     // three lines per notch; * 5 then converted through the screen DPI gives a
@@ -545,6 +551,17 @@ public class LinuxImplementation extends CodenameOneImplementation {
         LinuxNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
     }
 
+    /// Issue #5273: confine a clip set while a component paints to its flushed
+    /// (dirty) region. The Linux port draws screen ops immediately into a
+    /// persistent Cairo surface, so without this an oversized clip would escape
+    /// the repainted sub-region and leave stale pixels until a full repaint.
+    @Override
+    protected void setPaintDirtyRegionClip(int x, int y, int width, int height) {
+        if (windowGraphicsPeer != 0) {
+            LinuxNative.setFlushRect(windowGraphicsPeer, x, y, width, height);
+        }
+    }
+
     /*
      * Capture the already-rendered window instead of the base behaviour, which
      * re-paints the current form into a fresh mutable image
@@ -581,6 +598,38 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // not pump or drain on its own (it is not the window's owning thread).
     }
 
+    // High bit the native layer ORs into a pointer event's key field to flag a touch
+    // digitizer (see cn1_linux.h CN1_PE_TOUCH_FLAG); the low byte is the button
+    // bitmask (PointerEvent.MASK_*).
+    private static final int POINTER_BUTTON_BITS = 0xFF;
+    private static final int POINTER_TOUCH_FLAG = 256;
+
+    // Decodes the native pointer key field (button mask + touch flag) into the
+    // cross-platform PointerEvent metadata for the next dispatched pointer event, so
+    // the rich pointer / context-menu APIs report the real button and device type.
+    private void markPointer(int keyField) {
+        int mask = keyField & POINTER_BUTTON_BITS;
+        int type = (keyField & POINTER_TOUCH_FLAG) != 0
+                ? com.codename1.ui.events.PointerEvent.TYPE_TOUCH
+                : com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        int button;
+        if (mask == 0) {
+            mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+            button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_PRIMARY) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_SECONDARY) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_MIDDLE) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_BACK) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_BACK;
+        } else {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
+        }
+        setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
+    }
+
     private void drainInput() {
         while (LinuxNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
@@ -589,12 +638,15 @@ public class LinuxImplementation extends CodenameOneImplementation {
             int key = eventScratch[3];
             switch (type) {
                 case EVENT_POINTER_PRESSED:
+                    markPointer(key);
                     pointerPressed(x, y);
                     break;
                 case EVENT_POINTER_RELEASED:
+                    markPointer(key);
                     pointerReleased(x, y);
                     break;
                 case EVENT_POINTER_DRAGGED:
+                    markPointer(key);
                     pointerDragged(x, y);
                     break;
                 case EVENT_KEY_PRESSED:
@@ -617,6 +669,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     // A positive horizontal notch tilts right (scrolls content
                     // left), i.e. drags the finger left -> negative scrollX.
                     pointerWheelMoved(x, y, -wheelUnits(key), 0);
+                    break;
+                case EVENT_PINCH:
+                    // key is the incremental scale multiplier in 1/10000 units.
+                    Display.getInstance().fireMagnifyGesture(x, y, key / GESTURE_FIXED);
+                    break;
+                case EVENT_ROTATE:
+                    // key is the incremental rotation in 1/10000 radians.
+                    Display.getInstance().fireRotationGesture(x, y, key / GESTURE_FIXED);
                     break;
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();
@@ -1998,7 +2058,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isTouchDevice() {
-        return false;
+        return LinuxNative.isTouchDevice();
     }
 
     @Override

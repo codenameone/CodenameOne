@@ -102,8 +102,8 @@ if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
   ri_log "JAVA17_HOME not set correctly" >&2
   exit 3
 fi
-if ! command -v xcodebuild >/dev/null 2>&1; then
-  ri_log "xcodebuild not found" >&2
+if [ ! -x "$XCODEBUILD" ]; then
+  ri_log "xcodebuild not found at $XCODEBUILD" >&2
   exit 3
 fi
 if ! command -v xcrun >/dev/null 2>&1; then
@@ -119,7 +119,7 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 
-SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+SDK_LIST="$("$XCODEBUILD" -showsdks 2>/dev/null || true)"
 RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
 DOWNLOAD_PLATFORMS="${XCODE_DOWNLOAD_PLATFORMS:-}"
 if [ -z "$DOWNLOAD_PLATFORMS" ] && [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
@@ -130,9 +130,9 @@ ri_log "XCODE_DOWNLOAD_PLATFORMS=${DOWNLOAD_PLATFORMS}"
 
 if ! printf '%s\n' "$SDK_LIST" | grep -q "iphonesimulator" || ! printf '%s\n' "$RUNTIME_LIST" | grep -q "iOS"; then
   if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
-    ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
-    xcodebuild -downloadPlatform iOS || true
-    SDK_LIST="$(xcodebuild -showsdks 2>/dev/null || true)"
+    ri_log "Attempting to download missing iOS platform via $XCODEBUILD -downloadPlatform iOS"
+    "$XCODEBUILD" -downloadPlatform iOS || true
+    SDK_LIST="$("$XCODEBUILD" -showsdks 2>/dev/null || true)"
     RUNTIME_LIST="$(xcrun simctl list runtimes available 2>/dev/null || true)"
   else
     ri_log "Missing simulator SDKs/runtimes detected. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
@@ -161,6 +161,32 @@ if [ -z "$REQUESTED_SCHEME" ]; then
   fi
 fi
 SCHEME="$REQUESTED_SCHEME"
+
+scheme_list_contains() {
+  local scheme_name="$1"
+  local listed="$2"
+  printf '%s\n' "$listed" | awk '
+    /^[[:space:]]+[[:graph:]].*/ {
+      sub(/^[[:space:]]+/, "", $0)
+      if ($0 == target) found=1
+    }
+    END { exit found ? 0 : 1 }
+  ' target="$scheme_name"
+}
+
+if [[ "$WORKSPACE_PATH" == *.xcworkspace ]] && [[ "$SCHEME" != *" ("* ]]; then
+  WORKSPACE_BASENAME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
+  XCODEBUILD_LIST="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -list 2>/dev/null || true)"
+  PROJECT_QUALIFIED_SCHEME="$SCHEME ($WORKSPACE_BASENAME project)"
+  WORKSPACE_QUALIFIED_SCHEME="$SCHEME ($WORKSPACE_BASENAME Workspace)"
+  if scheme_list_contains "$PROJECT_QUALIFIED_SCHEME" "$XCODEBUILD_LIST"; then
+    SCHEME="$PROJECT_QUALIFIED_SCHEME"
+    ri_log "Resolved ambiguous workspace scheme to $SCHEME"
+  elif scheme_list_contains "$WORKSPACE_QUALIFIED_SCHEME" "$XCODEBUILD_LIST"; then
+    SCHEME="$WORKSPACE_QUALIFIED_SCHEME"
+    ri_log "Resolved ambiguous workspace scheme to $SCHEME"
+  fi
+fi
 ri_log "Using scheme $SCHEME"
 
 # The golden-image directory defaults to scripts/ios/screenshots for the
@@ -200,11 +226,14 @@ else
   ri_log "WebSocket screenshot server did not start; relying on base64 fallback"
 fi
 
-# Patch scheme env vars to point to our runtime dirs
-SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
+# Patch scheme env vars to point to our runtime dirs. Use the requested scheme
+# filename, not an xcodebuild-disambiguated name like
+# "AppName (AppName project)".
+SCHEME_FILE_NAME="$REQUESTED_SCHEME"
+SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME_FILE_NAME.xcscheme"
 if [ ! -f "$SCHEME_FILE" ] && [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
   PROJECT_DIR="$(cd "$(dirname "$WORKSPACE_PATH")" && pwd)"
-  PROJECT_SCHEME_FILE="$PROJECT_DIR/$(basename "$WORKSPACE_PATH" .xcworkspace).xcodeproj/xcshareddata/xcschemes/$SCHEME.xcscheme"
+  PROJECT_SCHEME_FILE="$PROJECT_DIR/$(basename "$WORKSPACE_PATH" .xcworkspace).xcodeproj/xcshareddata/xcschemes/$SCHEME_FILE_NAME.xcscheme"
   if [ -f "$PROJECT_SCHEME_FILE" ]; then
     SCHEME_FILE="$PROJECT_SCHEME_FILE"
   fi
@@ -224,7 +253,7 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-SIM_SDK_VERSION="$(xcodebuild -showsdks 2>/dev/null | awk '/iphonesimulator/ {print $NF}' | tail -n 1 | sed 's/iphonesimulator//')"
+SIM_SDK_VERSION="$("$XCODEBUILD" -showsdks 2>/dev/null | awk '/iphonesimulator/ {print $NF}' | tail -n 1 | sed 's/iphonesimulator//')"
 SIM_SDK_MAJOR="${SIM_SDK_VERSION%%.*}"
 case "$SIM_SDK_MAJOR" in
   ''|*[!0-9]*) SIM_SDK_MAJOR=20 ;;
@@ -278,7 +307,7 @@ normalize_destination() {
 auto_select_destination() {
   local show_dest rc=0 best_line="" best_key="" line payload platform id name os priority key part value
   set +e
-  show_dest="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
+  show_dest="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
   rc=$?
   set -e
 
@@ -421,6 +450,53 @@ fallback_sim_destination() {
   fi
 }
 
+# Create a throwaway iOS simulator from the newest available iOS runtime + an
+# iPhone device type. Used after `xcodebuild -downloadPlatform iOS` installs a
+# runtime for the active Xcode but no device of that runtime exists yet, so
+# -showdestinations / `simctl list` still surface nothing buildable. Building
+# against a device of the freshly-installed runtime works where a device from a
+# *different* Xcode's runtime does not. Mirrors run-ios-native-tests.sh. Echoes
+# "platform=iOS Simulator,id=<udid>" or nothing on failure.
+create_ios_sim_destination() {
+  command -v xcrun >/dev/null 2>&1 || return
+  command -v python3 >/dev/null 2>&1 || return
+  local pair runtime device_type new_id
+  # Pick the newest available iOS runtime AND a device type that runtime
+  # *actually supports* (from its supportedDeviceTypes). A naive alphabetical
+  # pick of all iPhone device types selects "iPhone Xs Max" ("X" > "1"), which is
+  # too old for a current runtime, so `simctl create` fails with "Unable to
+  # create a device for device type: ... runtime: iOS 26.x". Prefer the
+  # highest-numbered plain iPhone among the runtime's supported types.
+  pair="$(xcrun simctl list -j runtimes available 2>/dev/null | python3 -c '
+import json,sys,re
+data=json.load(sys.stdin)
+rs=[r for r in data.get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]
+rs.sort(key=lambda r: [int(x) for x in re.findall(r"\d+", r.get("version","0"))][:3], reverse=True)
+if not rs:
+    sys.exit(0)
+rt=rs[0]
+dts=[d for d in rt.get("supportedDeviceTypes",[]) if "iPhone" in d.get("name","")]
+def num(d):
+    m=re.search(r"iPhone (\d+)", d.get("name",""))
+    return int(m.group(1)) if m else -1
+dts.sort(key=num, reverse=True)
+if dts:
+    print(rt["identifier"]+"|"+dts[0]["identifier"])
+' 2>/dev/null || true)"
+  runtime="${pair%%|*}"
+  device_type="${pair##*|}"
+  [ -z "$pair" ] && return
+  [ -z "$runtime" ] && return
+  [ -z "$device_type" ] && return
+  new_id="$(xcrun simctl create "cn1-ui-tests" "$device_type" "$runtime" 2>/dev/null || true)"
+  # simctl prints just the UDID on success; on failure the error text can reach
+  # stdout. Only emit a destination when it is a real UDID (hex + dashes, no
+  # spaces) so a failed create can never be booted as a garbage "id".
+  if [[ "$new_id" =~ ^[0-9A-Fa-f-]+$ ]]; then
+    printf 'platform=iOS Simulator,id=%s\n' "$new_id"
+  fi
+}
+
 
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
@@ -433,20 +509,54 @@ if [ -z "$SIM_DESTINATION" ]; then
   else
     ri_log "Simulator auto-selection did not return a destination"
     SHOW_DEST_LOG="$ARTIFACTS_DIR/xcodebuild-showdestinations.log"
-    xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+    "$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
       > "$SHOW_DEST_LOG" 2>&1 || true
-    if grep -q "not installed" "$SHOW_DEST_LOG"; then
+    # The active Xcode is missing the iOS Simulator platform when -showdestinations
+    # reports it "not installed" OR lists no iOS Simulator destination at all. The
+    # latter happens on runners whose selected Xcode only has the tvOS platform
+    # installed: the scheme enumerates only Apple TV destinations even though
+    # `simctl` can boot an iOS device belonging to a *different* Xcode's runtime,
+    # so building -- even against that device's id= -- fails with "Unable to find
+    # a destination matching ... { platform:iOS Simulator }". The top-of-script
+    # runtime probe doesn't catch this because simctl's runtime list is global and
+    # already shows the other Xcode's iOS runtime. Download the iOS platform for
+    # the active Xcode and re-run discovery.
+    IOS_PLATFORM_MISSING="false"
+    if grep -q "not installed" "$SHOW_DEST_LOG" || ! grep -q "platform:iOS Simulator" "$SHOW_DEST_LOG"; then
+      IOS_PLATFORM_MISSING="true"
+    fi
+    if [ "$IOS_PLATFORM_MISSING" = "true" ]; then
       if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
-        ri_log "Attempting to download missing iOS platform via xcodebuild -downloadPlatform iOS"
-        xcodebuild -downloadPlatform iOS || true
-        xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
+        ri_log "No iOS simulator platform for the active Xcode; downloading via $XCODEBUILD -downloadPlatform iOS"
+        "$XCODEBUILD" -downloadPlatform iOS || true
+        "$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations \
           > "$SHOW_DEST_LOG" 2>&1 || true
+        SELECTED_DESTINATION="$(auto_select_destination || true)"
+        if [ -n "${SELECTED_DESTINATION:-}" ]; then
+          SIM_DESTINATION="$SELECTED_DESTINATION"
+          ri_log "Auto-selected simulator destination after platform download '$SIM_DESTINATION'"
+        fi
+        # Installing the runtime does not create a device, and -showdestinations
+        # can keep reporting no concrete iOS destination until one exists.
+        # Create a device from the freshly-installed runtime and build against it.
+        if [ -z "$SIM_DESTINATION" ]; then
+          CREATED_DESTINATION="$(create_ios_sim_destination || true)"
+          if [ -n "${CREATED_DESTINATION:-}" ]; then
+            SIM_DESTINATION="$CREATED_DESTINATION"
+            ri_log "Created iOS simulator destination after platform download '$SIM_DESTINATION'"
+          fi
+        fi
+        # If discovery/creation produced a destination the platform is now usable.
+        [ -n "$SIM_DESTINATION" ] && IOS_PLATFORM_MISSING="false"
       else
-        ri_log "Destinations report missing platforms. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
+        ri_log "Destinations report no iOS simulator platform. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
       fi
     fi
-    if grep -q "not installed" "$SHOW_DEST_LOG"; then
-      ri_log "No eligible simulator destinations reported by xcodebuild. See $SHOW_DEST_LOG" >&2
+    # Bail with a clear error only when the iOS platform is genuinely absent and
+    # we obtained no destination. If the platform is present but no device was
+    # auto-selected, fall through to the simctl fallback below.
+    if [ "$IOS_PLATFORM_MISSING" = "true" ] && [ -z "$SIM_DESTINATION" ]; then
+      ri_log "No iOS simulator platform available for the active Xcode. See $SHOW_DEST_LOG" >&2
       exit 3
     fi
   fi
@@ -481,7 +591,20 @@ if [ -n "$SIM_UDID" ]; then
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   SIM_DESTINATION="id=$SIM_UDID"
 fi
-if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
+if [ -n "$SIM_UDID" ]; then
+  # We have a concrete simulator that simctl already booted, so build against
+  # its id rather than generic/platform=iOS Simulator. The generic destination
+  # is resolved through the same `xcodebuild -showdestinations` enumeration that
+  # returned no iOS devices for this scheme on tvOS-heavy GitHub runners (the
+  # generated project gained tvOS support, so -showdestinations lists only Apple
+  # TV destinations). A generic build there fails with "Unable to find a
+  # destination matching ... { platform:iOS Simulator }" even though an iPhone
+  # simulator is booted and usable. An id= destination is matched directly
+  # against the booted device and sidesteps that enumeration. ARCHS is still
+  # pinned below while USE_GENERIC_BUILD_DESTINATION is set.
+  BUILD_DESTINATION="$SIM_DESTINATION"
+  ri_log "Building on concrete simulator destination '$BUILD_DESTINATION' and running on '$SIM_DESTINATION'"
+elif [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
   ri_log "Building with generic simulator destination '$BUILD_DESTINATION' and running on '$SIM_DESTINATION'"
 else
   BUILD_DESTINATION="$SIM_DESTINATION"
@@ -511,7 +634,7 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
 XCODE_BUILD_CMD=(
-  xcodebuild
+  "$XCODEBUILD"
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH"
   -scheme "$SCHEME"
   -sdk iphonesimulator
@@ -545,7 +668,7 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
 
-BUILD_SETTINGS="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
+BUILD_SETTINGS="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
 if [ -z "$WRAPPER_NAME" ]; then

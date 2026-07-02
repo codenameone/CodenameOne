@@ -1027,6 +1027,10 @@ class BytecodeInstructionIntegrationTest {
             assertTrue(Files.exists(srcRoot.resolve("Images.xcassets")));
             assertTrue(Files.exists(dist.resolve("MyAppIOS.xcodeproj")));
             assertTrue(Files.exists(srcRoot.resolve("MyAppIOS-Info.plist")));
+            String pbxproj = new String(Files.readAllBytes(
+                    dist.resolve("MyAppIOS.xcodeproj/project.pbxproj")), StandardCharsets.UTF_8);
+            assertTrue(pbxproj.contains("CoreText.framework"),
+                    "iOS projects must link CoreText for IOSNative bundled font registration");
 
             // Verify bundle copied
             assertTrue(Files.exists(srcRoot.resolve("test.bundle")));

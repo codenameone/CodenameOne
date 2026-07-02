@@ -121,6 +121,12 @@ public final class LinuxNative {
     public static native boolean pollEvent(int[] out);
 
     /**
+     * True when the default seat has a touchscreen device, used for
+     * {@code Display.isTouchScreen()}.
+     */
+    public static native boolean isTouchDevice();
+
+    /**
      * Parks the calling (main) thread to keep the process alive in headless
      * screenshot mode, where there is no window message loop. The EDT exits the
      * process via {@link #headlessTick()} once the screenshot has been written.
@@ -207,6 +213,11 @@ public final class LinuxNative {
     public static native void setClip(long graphics, int x, int y, int width, int height);
 
     public static native void clipRect(long graphics, int x, int y, int width, int height);
+
+    /** Issue #5273: report the current paintDirty flush region so the native
+     *  renderer can confine a screen clip set during a component's paint to it.
+     *  width/height == 0 disables the clamp (full repaint). */
+    public static native void setFlushRect(long graphics, int x, int y, int width, int height);
 
     /** Sets the clip to an arbitrary screen-space polygon/path (flattened, same
      *  encoding as {@link #fillShape}). Used for clipRect under a transform and

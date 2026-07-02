@@ -840,10 +840,24 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return false;
     }
     
-     protected String getCefPlatform() {
+    protected String getCefPlatform() {
         if (isMac) return "mac";
         if (isWindows) return is64Bit ? "win64" : "win32";
-        if (isUnix && is64Bit && "amd64".equals(ARCH)) return "linux64";
+        if (isUnix && is64Bit && ("amd64".equals(ARCH) || "aarch64".equals(ARCH))) return "linux64";
+        return null;
+    }
+
+    protected String getJcefNativeArtifactId() {
+        if (isMac) return "aarch64".equals(ARCH) ? "jcef-natives-macosx-arm64" : "jcef-natives-macosx-amd64";
+        if (isWindows) return "aarch64".equals(ARCH) ? "jcef-natives-windows-arm64" : "jcef-natives-windows-amd64";
+        if (isUnix && is64Bit) return "aarch64".equals(ARCH) ? "jcef-natives-linux-arm64" : "jcef-natives-linux-amd64";
+        return null;
+    }
+
+    protected String getCefRuntimeSubdir() {
+        if (isMac) return "macos64";
+        if (isWindows) return path("lib", is64Bit ? "win64" : "win32");
+        if (isUnix) return path("lib", is64Bit ? "linux64" : "linux32");
         return null;
     }
 
@@ -852,6 +866,20 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
         if (path == null || path.isEmpty()) return null;
         return new File(path);
+    }
+
+    protected File getFFmpegDir() {
+        String path = System.getProperty("ffmpeg.dir", null);
+        if (path == null || path.isEmpty()) return null;
+        return new File(path);
+    }
+
+    protected boolean isFFmpegSetup() {
+        File dir = getFFmpegDir();
+        if (dir == null || !dir.exists()) {
+            return false;
+        }
+        return findExecutable(dir, "ffmpeg") != null && findExecutable(dir, "ffprobe") != null;
     }
 
     protected boolean isCefSetup() {
@@ -933,6 +961,94 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     }
 
+    private File extractCefBundle(File nativeJar) {
+        File extractedDir = new File(project.getBuild().getDirectory(), "cn1-cef-" + getCefPlatform());
+        File cefRoot = new File(extractedDir, "cef");
+        File runtimeDir = new File(cefRoot, getCefRuntimeSubdir());
+        File tempExtract = new File(extractedDir, "tmp");
+        boolean needsRefresh = !runtimeDir.exists() || extractedDir.lastModified() < nativeJar.lastModified();
+        if (isMac) {
+            File chromiumEmbeddedFramework = new File(runtimeDir, "Chromium Embedded Framework.framework/Chromium Embedded Framework");
+            needsRefresh = needsRefresh || !Files.isSymbolicLink(chromiumEmbeddedFramework.toPath());
+        }
+        if (!needsRefresh) {
+            return cefRoot;
+        }
+
+        if (extractedDir.exists()) {
+            delTree(extractedDir);
+        }
+        runtimeDir.mkdirs();
+        tempExtract.mkdirs();
+
+        getLog().info("Expanding CEF");
+        Expand expand = (Expand) antProject.createTask("unzip");
+        expand.setDest(tempExtract);
+        expand.setSrc(nativeJar);
+        expand.execute();
+
+        File tarball = findFileBySuffix(tempExtract, ".tar.gz");
+        if (tarball == null) {
+            throw new IllegalStateException("Failed to find native JCEF tarball in " + nativeJar);
+        }
+        ExecTask tar = (ExecTask) antProject.createTask("exec");
+        tar.setExecutable("tar");
+        tar.createArg().setValue("-xzf");
+        tar.createArg().setFile(tarball);
+        tar.createArg().setValue("-C");
+        tar.createArg().setFile(runtimeDir);
+        tar.execute();
+        delTree(tempExtract);
+        return cefRoot;
+    }
+
+    private File findFileBySuffix(File root, String suffix) {
+        if (root == null || !root.exists()) {
+            return null;
+        }
+        if (root.isFile()) {
+            return root.getName().endsWith(suffix) ? root : null;
+        }
+        for (File child : root.listFiles()) {
+            File found = findFileBySuffix(child, suffix);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private File findExecutable(File root, String name) {
+        if (root == null || !root.exists()) {
+            return null;
+        }
+        String alt = isWindows ? name + ".exe" : name;
+        if (root.isFile()) {
+            return root.getName().equals(alt) ? root : null;
+        }
+        for (File child : root.listFiles()) {
+            File found = findExecutable(child, name);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    protected void setupFFmpeg() {
+        // The simulator resolves ffmpeg/ffprobe from the bundled
+        // org.bytedeco:ffmpeg-platform binaries at runtime (see FFMPEGMedia), so
+        // we no longer stage an externally installed ffmpeg here. Staging a copy
+        // of a PATH executable is fragile -- e.g. on Windows it picks up a
+        // chocolatey shimgen shim that does not work once copied out of place,
+        // which silently produced zero decoded frames. We only honor an explicit
+        // ffmpeg.dir override when one is already configured.
+        if (isFFmpegSetup()) {
+            project.getProperties().setProperty("ffmpeg.dir", getFFmpegDir().getAbsolutePath());
+            System.setProperty("ffmpeg.dir", getFFmpegDir().getAbsolutePath());
+        }
+    }
+
     protected void setupCef() {
         if (isCefSetup()) {
             fixCefPermissions(getCefDir());
@@ -943,53 +1059,20 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             getLog().warn("CEF not supported on this platform.  Not adding dependency");
             return;
         }
-        File cefZip = getJar("com.codenameone", "codenameone-cef", platform);
-        if (cefZip == null || !cefZip.exists()) {
-            getLog().warn("codenameone-cef not found in dependencies.  Not adding CEF dependency");
+        String artifactId = getJcefNativeArtifactId();
+        if (artifactId == null) {
+            getLog().warn("No upstream JCEF artifact is configured for this platform");
             return;
         }
-        File extractedDir = new File(cefZip.getParentFile(), cefZip.getName()+"-extracted");
-
-        boolean missingSymlinks = false;
-        if (isMac) {
-            File chromiumEmbeddedFramework = new File(extractedDir, "cef/macos64/Chromium Embedded Framework.framework/Chromium Embedded Framework");
-            if (!Files.isSymbolicLink(chromiumEmbeddedFramework.toPath())) {
-                missingSymlinks = true;
-            }
+        File nativeJar = getJar("me.friwi", artifactId);
+        if (nativeJar == null || !nativeJar.exists()) {
+            getLog().warn("Upstream JCEF native bundle " + artifactId + " not found in dependencies. Not adding CEF dependency");
+            return;
         }
-
-        if (!extractedDir.exists() || extractedDir.lastModified() < cefZip.lastModified() || missingSymlinks) {
-            if (isMac) {
-                // Mac needs to retain symlinks when extracting the package
-                if (extractedDir.exists()) {
-                    delTree(extractedDir);
-                }
-                extractedDir.mkdirs();
-                getLog().info("Expanding CEF");
-                ExecTask unzip = (ExecTask) antProject.createTask("exec");
-                unzip.setExecutable("unzip");
-                unzip.createArg().setFile(cefZip);
-                unzip.createArg().setValue("-d");
-                unzip.createArg().setFile(extractedDir);
-                unzip.execute();
-
-            } else {
-                if (extractedDir.exists()) {
-                    delTree(extractedDir);
-                }
-                getLog().info("Expanding CEF");
-                Expand expand = (Expand) antProject.createTask("unzip");
-                expand.setDest(extractedDir);
-                expand.setSrc(cefZip);
-                expand.execute();
-            }
-        }
-        if (new File(extractedDir, "cef").exists()) {
-            extractedDir = new File(extractedDir, "cef");
-        }
-        project.getProperties().setProperty("cef.dir", extractedDir.getAbsolutePath());
-        System.setProperty("cef.dir", extractedDir.getAbsolutePath());
-        fixCefPermissions(extractedDir);
+        File cefDir = extractCefBundle(nativeJar);
+        project.getProperties().setProperty("cef.dir", cefDir.getAbsolutePath());
+        System.setProperty("cef.dir", cefDir.getAbsolutePath());
+        fixCefPermissions(cefDir);
         
     }
 

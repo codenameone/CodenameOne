@@ -63,10 +63,30 @@ for a in cn1app-archetype cn1lib-archetype; do
   done
 done
 
+# Game Builder editor (scripts/gamebuilder) lives outside the maven/ reactor
+# with its own coordinates, so the mvn versions:set above does not reach it.
+# Rewrite its module version and the cn1.version/cn1.plugin.version it builds
+# against (kept in lock-step with the reactor) so the published
+# com.codenameone:codenameone-gamebuilder matches the plugin version that the
+# cn1:gamebuilder goal resolves from Maven Central. Done with perl rather than
+# versions:set because at release time the old SNAPSHOT plugin it references is
+# not yet resolvable in a clean .m2, which would make versions:set fail.
+for f in ../scripts/gamebuilder/pom.xml \
+         ../scripts/gamebuilder/common/pom.xml \
+         ../scripts/gamebuilder/javase/pom.xml; do
+  [ -f "$f" ] && perl -pi -e "s{<version>\Q$oldVersion\E</version>}{<version>$version</version>}g" "$f"
+done
+gbParent=../scripts/gamebuilder/pom.xml
+if [ -f "$gbParent" ]; then
+  perl -pi -e "s{<cn1\.version>\Q$oldVersion\E</cn1\.version>}{<cn1.version>$version</cn1.version>}g" "$gbParent"
+  perl -pi -e "s{<cn1\.plugin\.version>\Q$oldVersion\E</cn1\.plugin\.version>}{<cn1.plugin.version>$version</cn1.plugin.version>}g" "$gbParent"
+fi
+
 echo "Committing version change in git"
 git add -u .
 # Note: the -u is to prevent adding files that aren't added to git yet.  Only changed
 # files.  This is to help avoid accidents.
+git add -u ../scripts/gamebuilder
 git commit -m "Updated version to $version"
 if [[ "$version" == *-SNAPSHOT ]]; then
   echo "This is a snapshot version so not adding a tag"

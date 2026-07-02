@@ -21,9 +21,9 @@ import java.util.Map;
 /// use the blocking, ACK-paced sink (Cn1ssWebSocketSink.trySend); the JS port
 /// (which can't block the browser event loop) uses the async sink that
 /// advances the sequential suite from the ACK callback. There is no
-/// base64-over-stdout or filesystem fallback -- when the socket is
-/// unavailable the screenshot is simply absent and the host-side
-/// missing-screenshot guard flags it.
+/// base64-over-stdout or filesystem fallback -- when the socket is unavailable
+/// or a native send remains unacknowledged after its bounded retry, the runner
+/// retries that one test once.
 interface Cn1ssDeviceRunnerHelper {
     // Standard, fixed port the host-side Cn1ssScreenshotServer listens on
     // (scripts/lib/cn1ss.sh starts it with --port 8765). The runner does not
@@ -31,6 +31,10 @@ interface Cn1ssDeviceRunnerHelper {
     // no platform-specific env/property plumbing is needed. Keep this value in
     // sync with CN1SS_WS_PORT in scripts/lib/cn1ss.sh.
     int CN1SS_WS_DEFAULT_PORT = 8765;
+    class TransportFailureState {
+        private static boolean failed;
+        private static String message;
+    }
 
     static void runOnEdtSync(Runnable runnable) {
         Display display = Display.getInstance();
@@ -134,12 +138,13 @@ interface Cn1ssDeviceRunnerHelper {
                     return true;
                 }
                 println("CN1SS:ERR:test=" + safeName + " message=websocket-unavailable");
-            } else if (!Cn1ssWebSocketSink.trySend(safeName, pngBytes, hash)) {
-                println("CN1SS:ERR:test=" + safeName + " message=websocket-unavailable");
+            } else {
+                boolean wsDelivered = Cn1ssWebSocketSink.trySend(safeName, pngBytes, hash);
+                if (!wsDelivered) {
+                    println("CN1SS:ERR:test=" + safeName + " message=websocket-unavailable");
+                    markTransportFailure(safeName);
+                }
             }
-            // WebSocket is the only transport. When it is unavailable the
-            // screenshot is simply absent and the host-side missing-screenshot
-            // guard flags it -- there is no base64 / file fallback any more.
             return false;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
@@ -148,6 +153,31 @@ interface Cn1ssDeviceRunnerHelper {
             return false;
         } finally {
             screenshot.dispose();
+        }
+    }
+
+    static void clearTransportFailure() {
+        synchronized (TransportFailureState.class) {
+            TransportFailureState.failed = false;
+            TransportFailureState.message = null;
+        }
+    }
+
+    private static void markTransportFailure(String safeName) {
+        synchronized (TransportFailureState.class) {
+            TransportFailureState.failed = true;
+            TransportFailureState.message = safeName;
+        }
+    }
+
+    static String consumeTransportFailure() {
+        synchronized (TransportFailureState.class) {
+            if (!TransportFailureState.failed) {
+                return null;
+            }
+            String message = TransportFailureState.message;
+            clearTransportFailure();
+            return message == null ? "unknown" : message;
         }
     }
 
@@ -332,14 +362,13 @@ final class Cn1ssHashTracker {
 /// host writes the PNG to disk and ACKs immediately on LAN; if we hit the
 /// timeout something is genuinely broken and the test should fail loudly.
 ///
-/// `trySend` returns true if the WS path successfully uploaded the PNG
-/// (or transiently failed after the connection was established), and false
-/// if WS is unavailable (no URL configured, unsupported platform, connect
-/// timed out). WebSocket is the only transport now, so a false return just
-/// means the screenshot is absent and the host-side guard flags it.
+/// `trySend` returns true only after the host ACKs the PNG. It returns false
+/// when WS is unavailable or the ACK times out after a bounded reconnect retry,
+/// so the suite runner can rerun just the affected test once.
 final class Cn1ssWebSocketSink {
     private static final int ACK_TIMEOUT_MS = 10_000;
     private static final int CONNECT_TIMEOUT_MS = 5_000;
+    private static final int SEND_ATTEMPTS = 2;
     private static final Map<String, AckLatch> pending = new HashMap<String, AckLatch>();
     private static WebSocket socket;
     private static volatile boolean attemptedConnect;
@@ -507,6 +536,20 @@ final class Cn1ssWebSocketSink {
     }
 
     static synchronized boolean trySend(String safeName, byte[] pngBytes, String hashHex) {
+        for (int attempt = 1; attempt <= SEND_ATTEMPTS; attempt++) {
+            if (trySendOnce(safeName, pngBytes, hashHex)) {
+                return true;
+            }
+            resetConnection();
+            if (attempt < SEND_ATTEMPTS) {
+                System.out.println("CN1SS:WARN:test=" + safeName
+                        + " message=ws-send-retry attempt=" + (attempt + 1));
+            }
+        }
+        return false;
+    }
+
+    private static boolean trySendOnce(String safeName, byte[] pngBytes, String hashHex) {
         if (!ensureConnected()) {
             return false;
         }
@@ -525,7 +568,7 @@ final class Cn1ssWebSocketSink {
             }
             System.out.println("CN1SS:ERR:test=" + safeName + " message=ws-send-failed:" + t);
             Log.e(t);
-            return true; // WS path was attempted; don't fall through to chunks.
+            return false;
         }
         boolean acked = latch.await(ACK_TIMEOUT_MS);
         synchronized (pending) {
@@ -535,7 +578,20 @@ final class Cn1ssWebSocketSink {
             System.out.println("CN1SS:ERR:test=" + safeName
                     + " message=ws-ack-timeout-after-" + ACK_TIMEOUT_MS + "ms");
         }
-        return true;
+        return acked;
+    }
+
+    private static void resetConnection() {
+        if (socket != null) {
+            try {
+                socket.close();
+            } catch (Throwable ignored) {
+                // The next send attempt creates a fresh socket regardless.
+            }
+        }
+        socket = null;
+        attemptedConnect = false;
+        unavailable = false;
     }
 
     private static boolean ensureConnected() {

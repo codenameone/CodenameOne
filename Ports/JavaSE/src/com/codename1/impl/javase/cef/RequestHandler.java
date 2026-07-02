@@ -9,9 +9,7 @@ import java.awt.Container;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.callback.CefAuthCallback;
-import org.cef.callback.CefRequestCallback;
-import org.cef.handler.CefLoadHandler.ErrorCode;
-import org.cef.handler.CefRequestHandler;
+import org.cef.handler.CefRequestHandlerAdapter;
 import org.cef.handler.CefResourceHandler;
 import org.cef.handler.CefResourceRequestHandler;
 import org.cef.handler.CefResourceRequestHandlerAdapter;
@@ -31,10 +29,21 @@ import javax.swing.SwingUtilities;
 //import tests.detailed.dialog.CertErrorDialog;
 //import tests.detailed.dialog.PasswordDialog;
 
-public class RequestHandler extends CefResourceRequestHandlerAdapter implements CefRequestHandler {
+public class RequestHandler extends CefRequestHandlerAdapter {
     private final WeakReference<Container> ownerRef;
     //private BrowserComponent browserComponent_;
     private final BrowserNavigationCallback navigationCallback_;
+    private final CefResourceRequestHandler resourceRequestHandler = new CefResourceRequestHandlerAdapter() {
+        @Override
+        public boolean onBeforeResourceLoad(CefBrowser browser, CefFrame frame, CefRequest request) {
+            return RequestHandler.this.onBeforeResourceLoadImpl(browser, frame, request);
+        }
+
+        @Override
+        public CefResourceHandler getResourceHandler(CefBrowser browser, CefFrame frame, CefRequest request) {
+            return RequestHandler.this.getResourceHandlerImpl(browser, frame, request);
+        }
+    };
     
 
     public RequestHandler(Container owner, BrowserNavigationCallback navigationCallback) {
@@ -89,11 +98,10 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
     public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame,
             CefRequest request, boolean isNavigation, boolean isDownload, String requestInitiator,
             BoolRef disableDefaultHandling) {
-        return this;
+        return resourceRequestHandler;
     }
 
-    @Override
-    public boolean onBeforeResourceLoad(CefBrowser browser, CefFrame frame, CefRequest request) {
+    private boolean onBeforeResourceLoadImpl(CefBrowser browser, CefFrame frame, CefRequest request) {
         // If you send a HTTP-POST request to http://www.google.com/
         // google rejects your request because they don't allow HTTP-POST.
         //
@@ -144,8 +152,7 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
         return false;
     }
 
-    @Override
-    public CefResourceHandler getResourceHandler(
+    private CefResourceHandler getResourceHandlerImpl(
             CefBrowser browser, CefFrame frame, CefRequest request) {
         // the non existing domain "foo.bar" is handled by the ResourceHandler implementation
         // E.g. if you try to load the URL http://www.foo.bar, you'll be forwarded
@@ -169,25 +176,7 @@ public class RequestHandler extends CefResourceRequestHandlerAdapter implements 
     }
 
     @Override
-    public boolean onQuotaRequest(
-            CefBrowser browser, String origin_url, long new_size, CefRequestCallback callback) {
-        return false;
-    }
-
-    @Override
-    public boolean onCertificateError(CefBrowser browser, ErrorCode cert_error, String request_url,
-            CefRequestCallback callback) {
-        //SwingUtilities.invokeLater(new CertErrorDialog(owner_, cert_error, request_url, callback));
-        return true;
-    }
-
-    @Override
-    public void onPluginCrashed(CefBrowser browser, String pluginPath) {
-        System.out.println("Plugin " + pluginPath + "CRASHED");
-    }
-
-    @Override
-    public void onRenderProcessTerminated(CefBrowser browser, TerminationStatus status) {
+    public void onRenderProcessTerminated(CefBrowser browser, TerminationStatus status, int errorCode, String errorString) {
         System.out.println("render process terminated: " + status);
     }
 }

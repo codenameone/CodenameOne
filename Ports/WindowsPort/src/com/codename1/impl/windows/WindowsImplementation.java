@@ -69,6 +69,12 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int EVENT_CLOSE = 7;
     private static final int EVENT_MOUSE_WHEEL = 8;
     private static final int EVENT_MOUSE_HWHEEL = 9;
+    private static final int EVENT_PINCH = 10;
+    private static final int EVENT_ROTATE = 11;
+
+    // The native gesture events encode their float (incremental scale / radians) as
+    // an int in 1/10000 units; see CN1_GESTURE_FIXED in cn1_windows.h.
+    private static final float GESTURE_FIXED = 10000f;
 
     // One mouse-wheel notch is WHEEL_DELTA (120). Windows defaults to scrolling
     // three lines per notch; * 5 then converted through the screen DPI gives a
@@ -571,6 +577,44 @@ public class WindowsImplementation extends CodenameOneImplementation {
         // not pump or drain on its own (it is not the window's owning thread).
     }
 
+    // High bits the native layer ORs into a pointer event's key field to flag the
+    // input source (see cn1_windows.h CN1_PE_TOUCH_FLAG / CN1_PE_PEN_FLAG); the low
+    // byte is the button bitmask (PointerEvent.MASK_*).
+    private static final int POINTER_BUTTON_BITS = 0xFF;
+    private static final int POINTER_TOUCH_FLAG = 256;
+    private static final int POINTER_PEN_FLAG = 512;
+
+    // Decodes the native pointer key field (button mask + touch/pen flags) into the
+    // cross-platform PointerEvent metadata for the next dispatched pointer event, so
+    // the rich pointer / context-menu APIs report the real button and device type.
+    private void markPointer(int keyField) {
+        int mask = keyField & POINTER_BUTTON_BITS;
+        int type;
+        if ((keyField & POINTER_PEN_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_STYLUS;
+        } else if ((keyField & POINTER_TOUCH_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_TOUCH;
+        } else {
+            type = com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        }
+        int button;
+        if (mask == 0) {
+            mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+            button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_PRIMARY) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_SECONDARY) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_MIDDLE) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+        } else if ((mask & com.codename1.ui.events.PointerEvent.MASK_BACK) != 0) {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_BACK;
+        } else {
+            button = com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
+        }
+        setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
+    }
+
     private void drainInput() {
         while (WindowsNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
@@ -579,12 +623,15 @@ public class WindowsImplementation extends CodenameOneImplementation {
             int key = eventScratch[3];
             switch (type) {
                 case EVENT_POINTER_PRESSED:
+                    markPointer(key);
                     pointerPressed(x, y);
                     break;
                 case EVENT_POINTER_RELEASED:
+                    markPointer(key);
                     pointerReleased(x, y);
                     break;
                 case EVENT_POINTER_DRAGGED:
+                    markPointer(key);
                     pointerDragged(x, y);
                     break;
                 case EVENT_KEY_PRESSED:
@@ -607,6 +654,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     // A positive horizontal notch tilts right (scrolls content
                     // left), i.e. drags the finger left -> negative scrollX.
                     pointerWheelMoved(x, y, -wheelUnits(key), 0);
+                    break;
+                case EVENT_PINCH:
+                    // key is the incremental scale multiplier in 1/10000 units.
+                    Display.getInstance().fireMagnifyGesture(x, y, key / GESTURE_FIXED);
+                    break;
+                case EVENT_ROTATE:
+                    // key is the incremental rotation in 1/10000 radians.
+                    Display.getInstance().fireRotationGesture(x, y, key / GESTURE_FIXED);
                     break;
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();
@@ -1988,7 +2043,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isTouchDevice() {
-        return false;
+        return WindowsNative.isTouchDevice();
     }
 
     @Override

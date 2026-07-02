@@ -10,4 +10,8 @@ public class WebsiteThemeNativeImpl implements com.codename1.initializr.WebsiteT
     }
     public void notifyUiReady() {}
 
+    public int chatLauncherClearance() {
+        return 0;
+    }
+
 }

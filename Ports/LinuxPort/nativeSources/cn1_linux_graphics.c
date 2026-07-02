@@ -75,8 +75,31 @@ void cn1LinuxApplyClip(CN1Graphics* g) {
         cn1BuildPath(g->cr, g->clipCoords, g->clipTypes, g->clipTypeCount);
         cairo_clip(g->cr);
     } else {
+        int cx = g->clipX, cy = g->clipY, cw = g->clipW, ch = g->clipH;
+        /* Issue #5273: confine a screen clip to the current flush region. On a
+         * partial repaint paintDirty pushes the dirty sub-region via setFlushRect
+         * before the component paints; a clip the component then sets can extend
+         * past that sub-region, and because the window draws into a PERSISTENT
+         * Cairo surface the escaping fill would overwrite -- and leave stale --
+         * pixels outside the flushed area until a full repaint (the same defect
+         * the iOS Metal backend had). Clamp so the fill can never touch them.
+         * Window target only (mutable images keep flushW == 0 and are
+         * unaffected); skipped when no flush rect is set so a clip is never
+         * collapsed to nothing. */
+        if (g->isWindowTarget && g->flushW > 0 && g->flushH > 0) {
+            int cx2 = cx + cw, cy2 = cy + ch;
+            int fx2 = g->flushX + g->flushW, fy2 = g->flushY + g->flushH;
+            if (cx < g->flushX) { cx = g->flushX; }
+            if (cy < g->flushY) { cy = g->flushY; }
+            if (cx2 > fx2) { cx2 = fx2; }
+            if (cy2 > fy2) { cy2 = fy2; }
+            cw = cx2 - cx;
+            ch = cy2 - cy;
+            if (cw < 0) { cw = 0; }
+            if (ch < 0) { ch = 0; }
+        }
         cairo_identity_matrix(g->cr);
-        cairo_rectangle(g->cr, g->clipX, g->clipY, g->clipW, g->clipH);
+        cairo_rectangle(g->cr, cx, cy, cw, ch);
         cairo_clip(g->cr);
     }
 }
@@ -140,6 +163,19 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_setClip___long_int_int_int_int(CO
     g->clipH = height;
     g->clipIsRect = 1;
     cn1LinuxFreeClipShape(g);
+}
+
+/* Issue #5273: record the current paintDirty flush region (screen space) so a
+ * rectangular screen clip set while a component paints is confined to it in
+ * cn1LinuxApplyClip. width/height == 0 disables the clamp (full repaint / no
+ * partial flush). Only meaningful on the window graphics; mutable-image
+ * graphics never receive this call. */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_setFlushRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG graphics, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
+    CN1Graphics* g = CN1G(graphics);
+    g->flushX = x;
+    g->flushY = y;
+    g->flushW = width;
+    g->flushH = height;
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_clipRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG graphics, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {

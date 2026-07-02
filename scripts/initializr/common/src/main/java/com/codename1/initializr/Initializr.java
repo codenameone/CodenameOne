@@ -29,6 +29,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.StringUtil;
 
@@ -43,6 +44,15 @@ public class Initializr extends Lifecycle {
      *  the exact form they triggered (the simulator's app-under-test lifecycle
      *  keeps an earlier form "current", so getCurrent() is not reliable in-test). */
     static Form lastBuiltForm;
+
+    /** The primary "Generate Project" button. Held so the website-theme poll can
+     *  nudge it left when the host page's Crisp chat launcher would cover it. */
+    private Button generateButton;
+
+    /** Last chat-launcher clearance (pixels) applied to the generate button's
+     *  right margin. -1 forces the next poll to (re)apply it, e.g. after a theme
+     *  refresh reloads the button style and drops the margin override. */
+    private int lastChatClearance = -1;
 
     // UIIDs that have a "...Dark" variant in theme.css. Used to re-skin the whole
     // tree when the host website / system switches between light and dark.
@@ -153,8 +163,13 @@ public class Initializr extends Lifecycle {
 
         // ----- generate bar -----
         final Button generateButton = new Button("Generate Project");
-        FontImage.setMaterialIcon(generateButton, FontImage.MATERIAL_DOWNLOAD);
         generateButton.setUIID("InitializrPrimaryButton");
+        // Derive the icon AFTER the UIID is applied. setMaterialIcon bakes the
+        // component's current background into the FontImage; doing it while the
+        // button still carried the default Button style is what painted a white
+        // box behind the download glyph.
+        FontImage.setMaterialIcon(generateButton, FontImage.MATERIAL_DOWNLOAD);
+        this.generateButton = generateButton;
         generateButton.addActionListener(e -> {
             if (!validateInputs(appNameField, packageField)) {
                 updateValidationErrorLabels(appNameField, packageField, appNameError, packageError);
@@ -164,7 +179,7 @@ public class Initializr extends Lifecycle {
             }
             String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
-            ProjectOptions options = currentOptions(includeLocalizationBundles, previewLanguage, javaVersion);
+            ProjectOptions options = downloadOptions(includeLocalizationBundles, previewLanguage, javaVersion);
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
 
@@ -199,11 +214,28 @@ public class Initializr extends Lifecycle {
         }, "initializr-storage-cleanup").start();
     }
 
+    // Options that drive the LIVE PREVIEW only. The preview mock-up reflects the
+    // website's current light/dark chrome (via darkMode) so a dark-host visitor
+    // still sees a dark, natively-styled preview. This is purely cosmetic: the
+    // preview is styled with the initializr's own UIIDs and never compiles the
+    // generated theme.css. Downloads use downloadOptions() instead.
     private ProjectOptions currentOptions(boolean[] includeLocalizationBundles,
                                           ProjectOptions.PreviewLanguage[] previewLanguage,
                                           ProjectOptions.JavaVersion[] javaVersion) {
         ProjectOptions.ThemeMode mode = darkMode ? ProjectOptions.ThemeMode.DARK : ProjectOptions.ThemeMode.LIGHT;
         return new ProjectOptions(mode, ProjectOptions.Accent.DEFAULT, true,
+                includeLocalizationBundles[0], previewLanguage[0], javaVersion[0], "");
+    }
+
+    // Options for the generated DOWNLOAD. The UI no longer exposes a theme
+    // picker, so every project ships the barebones default theme regardless of
+    // the website's current dark/light chrome. Baking the host state in here is
+    // what used to emit top-level "Initializr Theme Overrides" that broke light
+    // mode; the default theme.css adapts to the device at runtime on its own.
+    private ProjectOptions downloadOptions(boolean[] includeLocalizationBundles,
+                                           ProjectOptions.PreviewLanguage[] previewLanguage,
+                                           ProjectOptions.JavaVersion[] javaVersion) {
+        return new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT, true,
                 includeLocalizationBundles[0], previewLanguage[0], javaVersion[0], "");
     }
 
@@ -532,7 +564,24 @@ public class Initializr extends Lifecycle {
             if (nowDark != darkMode) {
                 applyDarkMode(form, nowDark);
             }
+            applyChatLauncherClearance(form, websiteThemeNative.chatLauncherClearance());
         });
+    }
+
+    // The Crisp chat launcher floats over the bottom-right of the host page,
+    // directly on top of the generate button. The website reports how many
+    // pixels of horizontal clearance the launcher needs (0 when it is hidden);
+    // we add that as a right margin so the button slides left, clear of it. The
+    // JS port works in CSS pixels, so the reported value maps 1:1.
+    private void applyChatLauncherClearance(Form form, int clearancePx) {
+        if (generateButton == null || clearancePx < 0 || clearancePx == lastChatClearance) {
+            return;
+        }
+        lastChatClearance = clearancePx;
+        Style all = generateButton.getAllStyles();
+        all.setMarginUnitRight(Style.UNIT_TYPE_PIXELS);
+        all.setMarginRight(clearancePx);
+        form.revalidate();
     }
 
     private void applyDarkMode(Form form, boolean dark) {
@@ -547,6 +596,9 @@ public class Initializr extends Lifecycle {
         }
         applyTheme(form, dark);
         form.refreshTheme();
+        // refreshTheme reloads the button style from the theme, dropping the
+        // chat-launcher margin override; force the next poll to reapply it.
+        lastChatClearance = -1;
     }
 
     private void applyTheme(Component component, boolean dark) {

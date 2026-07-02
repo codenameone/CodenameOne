@@ -156,14 +156,12 @@ public class StickyHeaderContainer extends Container {
         scroller.addScrollListener(new ScrollListener() {
             @Override
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                // The ScrollContainer fires this event before its
-                // internal scrollY field is updated, so reading it back
-                // via getScrollY() returns the previous value. Drive the
-                // recompute off the new scroll position the listener was
-                // handed: a single multi-pixel drag/momentum step that
-                // crosses the push window otherwise sees pushOffset stuck
-                // at 0 and the rising header appears to slide *under* the
-                // pinned header instead of pushing it out.
+                // Drive the recompute off the new scroll position the
+                // listener was handed rather than re-reading getScrollY():
+                // a single multi-pixel drag/momentum step that crosses the
+                // push window otherwise risks seeing pushOffset stuck at 0
+                // and the rising header appears to slide *under* the pinned
+                // header instead of pushing it out.
                 updateSticky(scrollY);
             }
         });
@@ -468,10 +466,9 @@ public class StickyHeaderContainer extends Container {
         boolean activationChanged = (newActive != activeIndex);
         if (activationChanged) {
             applyActivation(newActive);
-            // Don't re-read scroller.getScrollY() here: when invoked
-            // from the ScrollListener, the scroller hasn't yet updated
-            // its internal scrollY field, so getScrollY() would return
-            // the stale value and undo the parameter we were handed.
+            // Drive everything off the sy parameter we were handed rather
+            // than re-reading scroller.getScrollY(), so the computation is
+            // identical whether invoked from the ScrollListener or directly.
         }
 
         int newPush = computePushOffset(sy);
