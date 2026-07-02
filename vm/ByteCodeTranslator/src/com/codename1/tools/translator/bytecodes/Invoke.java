@@ -522,11 +522,22 @@ public class Invoke extends Instruction {
             if (target == null || !target.isStatic()) {
                 return null;
             }
-            Field f = trivialStaticFieldGetter(target);
-            if (f != null) {
-                Field getstatic = new Field(Opcodes.GETSTATIC, f.getOwner(), f.getFieldName(), f.getDesc());
-                getstatic.setMethod(getMethod());
-                return getstatic;
+            // Follow trivial static FORWARDER chains: with pre-nestmates javac a
+            // lazy-holder getter compiles to `INVOKESTATIC Holder.access$000()`
+            // whose own body is the GETSTATIC. optimize() collapses that inner
+            // call IN PLACE, so whether this call site sees a foldable body
+            // depends on CLASS EMISSION ORDER -- and the dependency re-scan
+            // (updateInlinableFieldDependencies) would disagree with emission.
+            // Resolving through the chain here makes both phases deterministic:
+            // the fold always lands on the final field, order-independent.
+            for (int depth = 0; target != null && depth < 4; depth++) {
+                Field f = trivialStaticFieldGetter(target);
+                if (f != null) {
+                    Field getstatic = new Field(Opcodes.GETSTATIC, f.getOwner(), f.getFieldName(), f.getDesc());
+                    getstatic.setMethod(getMethod());
+                    return getstatic;
+                }
+                target = trivialStaticForwarderTarget(target);
             }
             return null;
         }
@@ -546,8 +557,12 @@ public class Invoke extends Instruction {
                 return getfield;
             }
         }
-        // setter: one arg, void return
-        if (desc.endsWith(")V")) {
+        // setter: EXACTLY one arg, void return. A multi-arg method whose body
+        // happens to store only arg1 (e.g. DateTimeRenderer.setMarkToday
+        // (boolean, long) -- the long is unused) still POPS every argument as a
+        // CALL; folding it to a PUTFIELD strands the extra args on the operand
+        // stack and the emitted C reads misaligned slots.
+        if (desc.endsWith(")V") && countDescArguments(desc) == 1) {
             Field f = trivialSetterField(target);
             if (f != null) {
                 Field putfield = new Field(Opcodes.PUTFIELD, f.getOwner(), f.getFieldName(), f.getDesc());
@@ -582,6 +597,58 @@ public class Invoke extends Instruction {
             return null; // genuinely virtual -> target not fixed -> unsafe to inline
         }
         return findMethodUp(Parser.getClassObject(rc.replace('/', '_').replace('$', '_')));
+    }
+
+    /**
+     * If {@code m}'s body is exactly {@code INVOKESTATIC n()X ; xRETURN} (a
+     * synthetic accessor / forwarder), resolves and returns n's method; else null.
+     */
+    private static BytecodeMethod trivialStaticForwarderTarget(BytecodeMethod m) {
+        Instruction a = null, b = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else return null;
+        }
+        if (count != 2 || !(a instanceof Invoke)) return null;
+        Invoke inner = (Invoke) a;
+        if (inner.opcode != Opcodes.INVOKESTATIC) return null;
+        if (inner.desc.length() < 3 || inner.desc.charAt(0) != '(' || inner.desc.charAt(1) != ')'
+                || inner.desc.charAt(2) == 'V') return null;
+        int rc = b.getOpcode();
+        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
+        BytecodeMethod t = inner.findMethodUp(Parser.getClassObject(
+                inner.owner.replace('/', '_').replace('$', '_')));
+        return (t != null && t.isStatic()) ? t : null;
+    }
+
+    /** Number of declared arguments (not slots) in a method descriptor. */
+    private static int countDescArguments(String desc) {
+        int n = 0;
+        int i = 1; // skip '('
+        while (i < desc.length() && desc.charAt(i) != ')') {
+            char c = desc.charAt(i);
+            if (c == '[') {
+                i++;
+                continue; // array dims prefix the element type
+            }
+            n++;
+            if (c == 'L') {
+                i = desc.indexOf(';', i) + 1;
+                if (i == 0) {
+                    return -1; // malformed
+                }
+            } else {
+                i++;
+            }
+        }
+        return n;
     }
 
     /** Finds the method (name+desc) declared in cls or, if inherited, a superclass. */
