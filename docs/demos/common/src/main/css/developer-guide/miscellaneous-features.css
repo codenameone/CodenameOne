@@ -1,0 +1,18 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::miscellaneous-features-css-001[]
+#Constants {
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;       /* 8mm circle           */
+    pullToRefreshIndicatorStrokeMm: "0.6";     /* 0.6mm stroke thickness */
+}
+
+TabIndicator {
+    /* The pull-to-refresh arc shares its color with the animated tab
+       indicator -- both follow the brand's accent. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+// end::miscellaneous-features-css-001[]

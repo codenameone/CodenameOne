@@ -180,13 +180,7 @@ layout:
 
 [source,text]
 ----
-Apple-iPhone-16-Pro.skin/
-  skin.png            # portrait body (device frame + transparent screen + cutouts)
-  skin_l.png          # 90° rotated portrait
-  skin_map.png        # black rect = screen, white = frame, used for hit-testing
-  skin_map_l.png      # rotated map
-  iOS7Theme.res       # bundled native theme (or android_holo_light.res / winTheme.res)
-  skin.properties     # platform metadata, safe-area, PPI, display rect
+include::../demos/common/src/main/snippets/developer-guide/skin-designer.txt[tag=skin-designer-text-001,indent=0]
 ----
 
 The `skin.properties` file is a normal Java `.properties`. The most
@@ -194,40 +188,7 @@ important keys the wizard writes:
 
 [source,properties]
 ----
-touch=true
-platformName=ios
-tablet=false
-ppi=460
-pixelRatio=18.110236220472443
-
-# roundScreen=true makes the simulator paint skin.png *over* the rendered
-# UI rather than clipping the UI to non-frame pixels. That overlay step is
-# what makes the Dynamic Island / punch-hole shapes appear "floating" on
-# top of the iOS status bar instead of being carved out of the display.
-roundScreen=true
-displayX=89
-displayY=89
-displayWidth=1206
-displayHeight=2622
-
-# Safe area in display-relative coordinates (origin = screen top-left).
-safePortraitX=0
-safePortraitY=237
-safePortraitWidth=1206
-safePortraitHeight=2272
-safeLandscapeX=237
-safeLandscapeY=0
-safeLandscapeWidth=2272
-safeLandscapeHeight=1206
-
-# These get composed by overrideNames(device) — they let users layer
-# device-specific styling on top of the platform theme via
-# UIManager.addThemeProps()-style theme inheritance.
-overrideNames=phone,ios,iphone
-
-systemFontFamily=SF Pro
-proportionalFontFamily=SF Pro
-monospaceFontFamily=SF Mono
+include::../demos/common/src/main/snippets/developer-guide/skin-designer.properties[tag=skin-designer-properties-001,indent=0]
 ----
 
 NOTE: The wizard intentionally does *not* write `smallFontSize`,

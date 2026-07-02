@@ -37,6 +37,14 @@ public final class DemoRegistry {
                     new SwipeBackSupportDemo()
             )
     );
+    private static final List<GuideScreenshot> SCREENSHOTS = Collections.unmodifiableList(
+            Arrays.asList(
+                    screenshot("layout-animations", "Layout Animations", "layout-animation-1.png"),
+                    screenshot("slide-transitions", "Slide Transitions", "transition-slide.png"),
+                    screenshot("bubble-transition", "Bubble Transition", "transition-bubble.png"),
+                    screenshot("morph-transition", "Morph Transition", "mighty-morphing-components-1.png")
+            )
+    );
 
     private DemoRegistry() {
         // utility class
@@ -44,5 +52,18 @@ public final class DemoRegistry {
 
     public static List<Demo> getDemos() {
         return DEMOS;
+    }
+
+    public static List<GuideScreenshot> getScreenshots() {
+        return SCREENSHOTS;
+    }
+
+    private static GuideScreenshot screenshot(String id, String demoTitle, String fileName) {
+        for (Demo demo : DEMOS) {
+            if (demo.getTitle().equals(demoTitle)) {
+                return new GuideScreenshot(id, demo, fileName);
+            }
+        }
+        throw new IllegalStateException("No guide demo registered with title: " + demoTitle);
     }
 }

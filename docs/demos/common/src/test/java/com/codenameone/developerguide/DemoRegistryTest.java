@@ -30,6 +30,16 @@ public class DemoRegistryTest extends AbstractTest {
         assertTrue(titles.contains("Slide Transitions"), "Slide Transitions demo should be registered.");
         assertTrue(titles.contains("Bubble Transition"), "Bubble Transition demo should be registered.");
 
+        assertFalse(DemoRegistry.getScreenshots().isEmpty(), "Screenshot registry should contain guide screenshots.");
+        for (GuideScreenshot screenshot : DemoRegistry.getScreenshots()) {
+            assertNotNull(screenshot.getId(), "Screenshot IDs must not be null.");
+            assertFalse(screenshot.getId().trim().isEmpty(), "Screenshot IDs must not be empty.");
+            assertNotNull(screenshot.getDemo(), "Screenshot demos must not be null.");
+            assertTrue(demos.contains(screenshot.getDemo()), "Screenshot demos must be registered demos.");
+            assertNotNull(screenshot.getFileName(), "Screenshot filenames must not be null.");
+            assertFalse(screenshot.getFileName().trim().isEmpty(), "Screenshot filenames must not be empty.");
+        }
+
         boolean immutable = false;
         try {
             demos.add(new Demo() {

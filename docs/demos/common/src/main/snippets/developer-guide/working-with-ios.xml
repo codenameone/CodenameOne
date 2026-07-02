@@ -1,0 +1,5 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::working-with-ios-xml-001[]
+<key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+// end::working-with-ios-xml-001[]

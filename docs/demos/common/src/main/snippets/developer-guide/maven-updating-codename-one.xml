@@ -1,0 +1,6 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::maven-updating-codename-one-xml-001[]
+<cn1.plugin.version>{cn1-plugin-release-version}</cn1.plugin.version>
+<cn1.version>{cn1-release-version}</cn1.version>
+// end::maven-updating-codename-one-xml-001[]

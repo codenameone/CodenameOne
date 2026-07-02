@@ -1,0 +1,16 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::maven-project-templates-rpf-001[]
+template.mainName=$YOUR_PROJECT_MAIN_NAME
+template.packageName=$YOUR_PROJECT_PACKAGE_NAME
+
+[dependencies]
+====
+... YOUR PROJECT MAVEN DEPENDENCIES ...
+====
+
+[parentDependencies]
+====
+... YOUR PARENT PROJECT MAVEN DEPENDENCIES ...
+====
+// end::maven-project-templates-rpf-001[]

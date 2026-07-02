@@ -5,6 +5,7 @@ on:
     paths:
       - 'docs/developer-guide/**'
       - 'docs/demos/**'
+      - 'scripts/developer-guide/**'
       - '.github/workflows/developer-guide-docs.yml'
   release:
     types: [published]
@@ -30,9 +31,14 @@ jobs:
           filters: |
             demos:
               - 'docs/demos/**'
+              - 'scripts/developer-guide/compare-guide-screenshots.sh'
+              - 'scripts/developer-guide/guide-screenshots.txt'
               - '.github/workflows/developer-guide-docs.yml'
             docs:
               - 'docs/developer-guide/**'
+              - 'docs/demos/common/src/main/snippets/**'
+              - 'scripts/developer-guide/migrate-inline-guide-snippets.py'
+              - 'scripts/developer-guide/validate-guide-snippets.py'
               - '.github/workflows/developer-guide-docs.yml'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
@@ -41,46 +47,81 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '11'
+          java-version: '17'
+
+      - name: Install local Codename One Maven artifacts
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          xvfb-run -a mvn -B -ntp -f maven/pom.xml \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin \
+            -am install \
+            -Plocal-dev-javase \
+            -DskipTests \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.source.skip=true \
+            -Dspotbugs.skip=true \
+            -Dpmd.skip=true \
+            -Dcheckstyle.skip=true
 
       - name: Build Codename One demos
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.codenameone"
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml install
+          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml test
+
+      - name: Compile Android demo sources
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          scripts/developer-guide/compile-android-demo-sources.sh
+
+      - name: Validate developer guide snippets
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          python3 scripts/developer-guide/validate-guide-snippets.py
 
       - name: Install ImageMagick for screenshot comparison
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends imagemagick
 
-      - name: Compare animation screenshots
-        id: compare_animation_screenshots
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+      - name: Compare guide screenshots
+        id: compare_guide_screenshots
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
-          ARTIFACT_DIR="build/developer-guide/animation-screenshots"
+          ARTIFACT_DIR="build/developer-guide/guide-screenshots"
           mkdir -p "${ARTIFACT_DIR}"
-          .github/scripts/compare-animation-screenshots.sh "${ARTIFACT_DIR}"
+          scripts/developer-guide/compare-guide-screenshots.sh "${ARTIFACT_DIR}"
 
-      - name: Upload animation screenshot mismatches
-        if: steps.compare_animation_screenshots.outcome == 'failure'
+      - name: Upload guide screenshot mismatches
+        if: steps.compare_guide_screenshots.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
-          name: developer-guide-animation-screenshots
-          path: build/developer-guide/animation-screenshots
+          name: developer-guide-screenshots
+          path: build/developer-guide/guide-screenshots
           if-no-files-found: warn
 
-      - name: Fail when animation screenshots differ
-        if: steps.compare_animation_screenshots.outcome == 'failure'
+      - name: Upload generated guide screenshots
+        if: always() && (github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true')
+        uses: actions/upload-artifact@v7
+        with:
+          name: developer-guide-generated-screenshots
+          path: build/developer-guide/guide-screenshots/generated
+          if-no-files-found: warn
+
+      - name: Fail when guide screenshots differ
+        if: steps.compare_guide_screenshots.outcome == 'failure'
         run: |
-          echo "Animation demo screenshots differ from developer guide assets." >&2
+          echo "Generated guide screenshots differ from developer guide assets." >&2
           exit 1
 
       - name: Determine publication metadata
@@ -407,7 +448,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload AsciiDoc linter report
-        if: always()
+        if: always() && env.ASCII_DOC_LINT_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-asciidoc-lint
@@ -435,7 +476,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload paragraph capitalization report
-        if: always()
+        if: always() && env.PARAGRAPH_CAP_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-paragraph-capitalization
@@ -443,7 +484,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload LanguageTool report
-        if: always()
+        if: always() && env.LANGUAGETOOL_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-languagetool

@@ -19,20 +19,7 @@ The following snippet creates a button, that, when pressed, will fade itself and
 
 [source,java]
 ----
-import static com.codename1.ui.ComponentSelector.$;
-
-// ...
-
-Button slideUp = $(new Button("Slide Up")) // <1>
-    .setIcon(FontImage.MATERIAL_EXPAND_LESS) // <2>
-    .addActionListener(e->{ // <3>
-        $(e) // <4>
-            .getParent() // <5>
-            .find(">*") // <6>
-            .slideUpAndWait(1000) // <7>
-            .slideDownAndWait(1000); // <8>
-    })
-    .asComponent(Button.class); // <9>
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ComponentSelectorJava001Snippet.java[tag=component-selector-java-001,indent=0]
 ----
 <1> - Creates a new Button and wraps it in a `ComponentSelector` so that you can use ComponentSelector's fluent API to change the button.
 <2> - Sets the icon on the button
@@ -91,30 +78,6 @@ Some examples above mention the use of "tags." Tags are analogous to "classes" i
 
 Here is an example that uses tags to implement table striping so that even rows are a different color than odd rows in a table:
 
-[source,java]
-----
-TableLayout tl = new TableLayout(numRows, numCols);
-Container table = new Container(tl);
-int rowNum = 0;
-int colNum = 0;
-for (String[] row : data) {
-    colNum = 0;
-    for (String cell : row) {
-        table.add(
-            tl.createConstraint(rowNum, colNum),
-            $(new Button(cell))
-                .setUIID("Label")
-                .addTags(rowNum % 2 == 0 ? "even":"odd")
-                .asComponent()
-        );
-        colNum++;
-    }
-    rowNum++;
-}
-$(".even", table)
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
-----
 
 image::img/component-selector-table-striping.png[Table striping screenshot]
 
@@ -124,40 +87,15 @@ In the above example you add a tag to each label when you add it to the table or
 
 ComponentSelector includes wrappers for most of the methods of `com.codename1.ui.plaf.Style` so that you can change the styles of selected components using a fluent API. This was demonstrated a little bit in the table striping example (`setBgColor()` and `setBgTransparency()` were called on even rows of the table). It's worth going over this in a little more detail though as Codename One styles have "state." For example, For the snippet of code:
 
-[source,java]
-----
-$(".even", table)
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
-----
 
 Were you setting these values on the "selected" style, the "unselected" style, the "disabled" style, "ALL" styles? In fact you were setting these values on the "current" style. That is, the call to `setBgColor()` caused something like the following loop to happen on all the components in the set:
 
-[source,java]
-----
-for (Component c : evenComponents) {
-    c.getStyle().setBgColor(0xcccccc);
-}
-----
 
 If a component was in "selected" state, then this would changed the selected style. If it was in pressed state, then it would change the "pressed" style. Etc. What if you wanted to specifically change the styles in the "pressed" state. Then you would call `selectPressedStyle()` prior calling your style mutation methods. For example:
 
-[source,java]
-----
-$(".even", table)
-    .selectPressedStyle()
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
-----
 
 Or, ComponentSelector supports a "state" pseudo-selector that will initialize the selected style so that you don't have to call `selectXXXStyle()` before making changes. For example, The following snippet is equivalent to the previous:
 
-[source,java]
-----
-$(".even:pressed", table)
-    .setBgColor(0xcccccc)
-    .setBgTransparency(255);
-----
 
 The following "state" pseudo-selectors are available:
 
@@ -184,32 +122,6 @@ Also to these basic effects, ComponentSelector wraps all the existing animation 
 
 For example, Consider this example, that shows a button that replaces itself and all siblings with replacement labels, and then replaces them back:
 
-[source,java]
-----
-Button replace = $(new Button("Replace Fade/Slide"))
-    .setIcon(FontImage.MATERIAL_REDEEM)
-    .addActionListener(e->{
-        $(e).getParent()
-            .find(">*")  // <1>
-            .replaceAndWait(c->{ // <2>
-                return $(new Label("Replacement")) // <3>
-                    .putClientProperty("origComponent", c) // <4>
-                    .asComponent();
-            }, CommonTransitions.createFade(1000)) // <5>
-            .replaceAndWait(c->{
-                Component orig = (Component)c.getClientProperty("origComponent");
-                if (orig != null) {
-                    c.putClientProperty("origComponent", null);
-                    return orig; // <6>
-                }
-                return c;
-
-            }, CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, false, 1000)); // <7>
-
-
-    })
-    .asComponent(Button.class);
-----
 <1> Finds all siblings of the source button
 <2> Call `replaceAndWait()` with a mapping function to define the component that should replace each component. This will replace each component in the set with a replacement component in its respective container. This will also return a new ComponentSelector with the set of replacement components.
 <3> In your "mapper" callback, you will return a new Label component to replace each existing component.

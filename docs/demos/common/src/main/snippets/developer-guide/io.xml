@@ -1,0 +1,62 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::io-xml-001[]
+<?xml version="1.0" encoding="UTF-8"?>
+<GeocodeResponse>
+  <status>OK</status>
+  <result> <!-- (irrelevant content removed) -->
+      <address_component>
+          <long_name>London</long_name>
+          <short_name>London</short_name>
+          <type>locality</type>
+          <type>political</type>
+      </address_component>
+      <!-- (irrelevant content removed) -->
+     <address_component>
+          <long_name>Ontario</long_name>
+          <short_name>ON</short_name>
+          <type>administrative_area_level_1</type>
+          <type>political</type>
+      </address_component>
+      <address_component>
+         <long_name>Canada</long_name>
+         <short_name>CA</short_name>
+         <type>country</type>
+         <type>political</type>
+      </address_component>
+  </result>
+</GeocodeResponse>
+// end::io-xml-001[]
+
+// tag::io-xml-002[]
+<rankings type="aus" gender="male" date="2011-12-31">
+    <player id="1036" coretennisid="6752" rank="1"
+       delta="0" singlespoints="485000" doublespoints="675"
+       deductedpoints="0" totalpoints="485675">
+        <firstname>Bernard</firstname>
+        <lastname>Tomic</lastname>
+        <town>SOUTHPORT</town>
+        <state>QLD</state>
+        <dob>1992-10-21</dob>
+    </player>
+    <player id="2585" coretennisid="1500" rank="2"
+       delta="0" singlespoints="313500" doublespoints="12630"
+       deductedpoints="0" totalpoints="326130">
+        <firstname>Mathew</firstname>
+        <lastname>Ebden</lastname>
+        <town>CHURCHLANDS</town>
+        <state>WA</state>
+        <dob>1987-11-26</dob>
+    </player>
+    <player id="6457" coretennisid="287" rank="3"
+        delta="0" singlespoints="132500" doublespoints="1500"
+        deductedpoints="0" totalpoints="134000">
+       <firstname>Lleyton</firstname>
+       <lastname>Hewitt</lastname>
+       <town>EXETER</town>
+       <state>SA</state>
+       <dob>1981-02-24</dob>
+    </player>
+    <!-- ... etc ... -->
+</rankings>
+// end::io-xml-002[]

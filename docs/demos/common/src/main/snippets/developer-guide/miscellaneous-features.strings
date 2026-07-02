@@ -1,0 +1,19 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::miscellaneous-features-strings-001[]
+"CFBundleDisplayName"="Hello App";
+// end::miscellaneous-features-strings-001[]
+
+// tag::miscellaneous-features-strings-002[]
+"CFBundleDisplayName"="Bonjour App";
+// end::miscellaneous-features-strings-002[]
+
+// tag::miscellaneous-features-strings-003[]
+"CFBundleDisplayName"="Hello App";
+"NSCameraUsageDescription"="This app needs to use your camera to scan bar codes";
+// end::miscellaneous-features-strings-003[]
+
+// tag::miscellaneous-features-strings-004[]
+"CFBundleDisplayName"="Bonjour App";
+"NSCameraUsageDescription"="Cette application doit utiliser votre appareil photo pour scanner les codes à barres";
+// end::miscellaneous-features-strings-004[]

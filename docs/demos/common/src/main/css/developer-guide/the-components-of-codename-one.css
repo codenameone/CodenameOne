@@ -1,0 +1,19 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::the-components-of-codename-one-css-001[]
+#Constants {
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;    /* tween duration in ms */
+    tabsAnimatedIndicatorThicknessMm: 1;      /* underline thickness  */
+}
+
+TabIndicator {
+    /* The indicator picks up its color from this UIID's fg. If the
+       UIID isn't defined or has fgColor == 0, the indicator falls
+       back to the currently-selected tab's fgColor. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+// end::the-components-of-codename-one-css-001[]

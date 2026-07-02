@@ -1,0 +1,14 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::maven-creating-cn1libs-xml-001[]
+<!-- INJECT DEPENDENCIES -->
+// end::maven-creating-cn1libs-xml-001[]
+
+// tag::maven-creating-cn1libs-xml-002[]
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>mylib-lib</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <type>pom</type>
+</dependency>
+// end::maven-creating-cn1libs-xml-002[]

@@ -949,7 +949,7 @@ You will start with Android which should be familiar and intuitive to many devel
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/mycompany/myapp/MyNativeImplStub.java[tag=myNativeAndroidStub,indent=0]
+include::../demos/android/src/main/java/com/mycompany/myapp/MyNativeImplStub.java[tag=myNativeAndroidStub,indent=0]
 ----
 
 The stub implementation always returns `false`, `null` or `0` by default. The `isSupported` also defaults to `false` thus allowing you to implement a `NativeInterface` on some platforms and leave the rest out without knowing anything about these platforms.
@@ -1157,20 +1157,14 @@ in the bodies. Each function takes the thread state as its first argument and
 
 [source,java]
 ----
-public interface MyNative extends NativeInterface {
-    String hello(String name);
-}
+include::../demos/common/src/main/java/com/mycompany/myapp/MyNative.java[tag=myNativeInterface,indent=0]
 ----
 
 This generates the C stub below (returning `JAVA_NULL` until you implement it):
 
 [source,c]
 ----
-#include "cn1_globals.h"
-
-JAVA_OBJECT com_mycompany_myapp_MyNativeImplCodenameOne_hello___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT param1) {
-    return JAVA_NULL;
-}
+include::../demos/linux/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c[tag=advanced-topics-under-the-hood-c-001,indent=0]
 ----
 
 Type mapping: the primitives (`int`, `long`, `boolean`, `byte`, `short`, `char`,
@@ -1192,42 +1186,14 @@ The default generated stubs for the JavaScript build look like this `com_mycompa
 
 [source,JavaScript]
 ----
-(function(exports){
-
-var o = {};
-
-    o.helloWorld__java_lang_String = function(param1, callback) {
-        callback.error(new Error("Not implemented yet"));
-    };
-
-    o.isSupported_ = function(callback) {
-        callback.complete(false);
-    };
-
-exports.com_mycompany_myapp_MyNative= o;
-
-})(cn1_get_native_interfaces());
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-001,indent=0]
 ----
 
 A simple implementation looks like this:
 
 [source,JavaScript]
 ----
-(function(exports){
-
-var o = {};
-
-    o.helloWorld__java_lang_String = function(param1, callback) {
-        callback.complete("Hello World!!!");
-    }
-
-    o.isSupported_ = function(callback) {
-        callback.complete(true);
-    };
-
-exports.com_my_code_MyNative = o;
-
-})(cn1_get_native_interfaces());
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-002,indent=0]
 ----
 
 Notice that you use the `complete()` method of the provided callback to pass the return value rather than using the `return` statement. This is to work around the fact that JavaScript doesn't natively support threads. The *Java* thread that's calling your native interface will block until your method calls `callback.complete()`. This allows you to use asynchronous APIs inside your native method while still allowing Codename One to work use your native interface through a synchronous API.
@@ -1258,10 +1224,7 @@ becomes
 
 [source,JavaScript]
 ----
-o.print__java_lang_String = function(param1, callback) {
-    console.log(param1);
-    callback.complete();
-}
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-003,indent=0]
 ----
 
 Java API:
@@ -1275,9 +1238,7 @@ becomes
 
 [source,JavaScript]
 ----
-o.add__int_int = function(param1, param2, callback) {
-    callback.complete(param1 + param2);
-}
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-004,indent=0]
 ----
 
 [source,java]
@@ -1289,13 +1250,7 @@ becomes
 
 [source,JavaScript]
 ----
-o.add__int_1ARRAY = function(param1, callback) {
-    var c = 0, len = param1.length;
-    for (var i =0; i<len; i++) {
-        c += param1[i];
-    }
-    callback.complete(c);
-}
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-005,indent=0]
 ----
 
 ==== Native GUI components
@@ -1328,11 +1283,7 @@ JavaScript would expect a DOM Element (for example: a `<div>` tag to be returned
 
 [source,JavaScript]
 ----
-o.createHelloComponent_ = function(callback) {
-    var c = jQuery('<div>Hello World</div>')
-            .css({'background-color' : 'yellow', 'border' : '1px solid blue'});
-    callback.complete(c.get(0));
-};
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-006,indent=0]
 ----
 
 
@@ -1405,12 +1356,7 @@ NOTE: You had to break lines for the print version, the JavaScript version is a 
 .JavaScript Version
 [source,JavaScript]
 ----
-o.test__byte_boolean_char_short_int_long_float_double
-_java_lang_String_byte_1ARRAY_boolean_1ARRAY_char_1ARRAY
-_short_1ARRAY_int_1ARRAY_long_1ARRAY_float_1ARRAY_double
-_1ARRAY_com_codename1_ui_PeerComponent = function(param1, param2, param3, param4, param5, param6, param7, param8, param9, param10, param11, param12, param13, param14, param15, param16, param17, param18, callback) {
-    callback.error(new Error("Not implemented yet"));
-};
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-007,indent=0]
 ----
 
 .Java SE Version
@@ -1419,13 +1365,6 @@ _1ARRAY_com_codename1_ui_PeerComponent = function(param1, param2, param3, param4
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/PeerComponentExamples.java[tag=javascriptAllTypesSignature,indent=0]
 ----
 
-
-.C# Version
-[source,csharp]
-----
-public void test(byte param, bool param1, char param2, short param3, int param4, long param5, float param6, double param7, String param8, byte[] param9, boolean[] param10, char[] param11, short[] param12, int[] param13, long[] param14, float[] param15, double[] param16, FrameworkElement param17) {
-}
-----
 
 ==== Android native permissions
 
@@ -1511,66 +1450,28 @@ However, there is still more you need to do. To implement this natively you need
 
 [source,xml]
 ----
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.bulsy.smstalk1">
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.SEND_SMS"/>
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
-
-    <application
-        android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        <receiver android:name="com.bulsy.smstalk1.SmsListener"
-               android:enabled="true"
-               android:permission="android.permission.BROADCAST_SMS"
-               android:exported="true">
-            <intent-filter android:priority="2147483647">//this doesnt work
-                <category android:name="android.intent.category.DEFAULT" />
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </receiver>
-    </application>
-</manifest>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-001,indent=0]
 ----
 
 You need the broadcast permission XML and the permission XML. Both are doable through the build hints. The former is pretty easy:
 
 [source,xml]
 ----
-android.xpermissions=<uses-permission android:name="android.permission.RECEIVE_SMS" />
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-002,indent=0]
 ----
 
 The latter isn't much harder; notice that many lines have been merged into a single line for convenience:
 
 [source,xml]
 ----
-android.xapplication=<receiver android:name="com.codename1.sms.intercept.SMSListener"  android:enabled="true" android:permission="android.permission.BROADCAST_SMS"  android:exported="true">                    <intent-filter android:priority="2147483647"><category android:name="android.intent.category.DEFAULT" />        <action android:name="android.provider.Telephony.SMS_RECEIVED" />                 </intent-filter>             </receiver>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-003,indent=0]
 ----
 
 Here it's formatted for readability:
 
 [source,xml]
 ----
-<receiver android:name="com.codename1.sms.intercept.SMSListener"
-              android:enabled="true"
-              android:permission="android.permission.BROADCAST_SMS"
-              android:exported="true">
-                   <intent-filter android:priority="2147483647">
-                          <category android:name="android.intent.category.DEFAULT" />
-                          <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-                   </intent-filter>
-</receiver>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-004,indent=0]
 ----
 
 ===== Listening & permissions
@@ -1730,10 +1631,7 @@ This method is called from JavaScript inside a native interface using the follow
 
 [source,JavaScript]
 ----
-var fireMapChangeEvent = this.$GLOBAL$.com_codename1_googlemaps_MapContainer.fireMapChangeEvent__int_int_double_double;
-google.maps.event.addListener(this.map, 'bounds_changed', function() {
-    fireMapChangeEvent(self.mapId, self.map.getZoom(), self.map.getCenter().lat(), self.map.getCenter().lng());
-});
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-008,indent=0]
 ----
 
 In this example you first get a reference to the `fireMapChangeEvent` method, and then call it later. For example, you could have called it directly also.
@@ -1761,14 +1659,14 @@ One of the problematic aspects of calling back into Java from JavaScript is that
 
 [source,JavaScript]
 ----
-this.$GLOBAL$.com_codename1_googlemaps_MapContainer.fireMapChangeEvent__int_int_double_double;
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-009,indent=0]
 ----
 
 to
 
 [source,JavaScript]
 ----
-this.$GLOBAL$.com_codename1_googlemaps_MapContainer.fireMapChangeEvent__int_int_double_double$async;
+include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-under-the-hood.js[tag=advanced-topics-under-the-hood-javascript-010,indent=0]
 ----
 
 This will cause the call to be wrapped in the appropriate bootstrap code to work with threads - and it's necessary in cases where the method *may* use threads of any kind. The side-effect of calling a method with the `$async` suffix is that you can't use return values from the method.
@@ -1809,12 +1707,7 @@ Codename One has a large repository of https://www.codenameone.com/cn1libs.html[
 
 [source,xml]
 ----
-<dependency>
-    <groupId>com.example</groupId>
-    <artifactId>mylib-lib</artifactId>
-    <version>1.0.0</version>
-    <type>pom</type>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-005,indent=0]
 ----
 
 Add the dependency *before* the `<!-- INJECT DEPENDENCIES -->` comment in `common/pom.xml`. The `-lib` suffix on the `artifactId` and the `<type>pom</type>` declaration are both important - they tell Maven to pull in the library's "lib" aggregator module rather than a plain jar. See <<creating-cn1libs>> for the full library-consumption guide.
@@ -1834,14 +1727,7 @@ The quickest path from a shell:
 
 [source,bash]
 ----
-mvn archetype:generate \
-  -DarchetypeArtifactId=cn1lib-archetype \
-  -DarchetypeGroupId=com.codenameone \
-  -DarchetypeVersion=LATEST \
-  -DgroupId=com.example.mylib \
-  -DartifactId=mylib \
-  -Dversion=1.0-SNAPSHOT \
-  -DinteractiveMode=false
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.sh[tag=advanced-topics-under-the-hood-bash-001,indent=0]
 ----
 
 Once the project is generated, add your cross-platform Java sources under `common/src/main/java`, CSS under `common/src/main/css`, and run `mvn install` from the project root to build. The build produces both a Maven artifact for pom-style consumption and a legacy `.cn1lib` file in `common/target` for users still on Ant.
@@ -1888,99 +1774,16 @@ The rule of thumb is that a build hint with a numeric or boolean value is always
 
 These build hints are probably of the "required" type:
 
-[source,java]
+[source,properties]
 ----
-android.debug
-android.release
-android.installLocation
-android.licenseKey
-android.stack_size
-android.statusbar_hidden
-android.googleAdUnitId
-android.includeGPlayServices
-android.headphoneCallback
-android.gpsPermission
-android.asyncPaint
-android.supportV4
-android.theme
-android.cusom_layout1
-android.versionCode
-android.captureRecord
-android.removeBasePermissions
-android.blockExternalStoragePermission
-android.min_sdk_version
-android.smallScreens
-android.streamMode
-android.enableProguard
-android.targetSDKVersion
-android.web_loading_hidden
-facebook.appId
-facebook.clientToken
-ios.keyboardOpen
-ios.project_type
-ios.newStorageLocation
-ios.prerendered_icon
-ios.application_exits
-ios.themeMode
-ios.xcode_version
-javascript.inject_proxy
-javascript.minifying
-javascript.proxy.url
-javascript.sourceFilesCopied
-javascript.teavm.version
-google.adUnitId
-ios.includePush
-ios.headphoneCallback
-ios.enableAutoplayVideo
-ios.googleAdUnitId
-ios.googleAdUnitIdPadding
-ios.enableBadgeClear
-ios.locationUsageDescription
-ios.bundleVersion
-ios.objC
-ios.testFlight
-ios.metal
-desktop.width
-desktop.height
-desktop.adaptToRetina
-desktop.resizable
-desktop.fontSizes
-desktop.theme
-desktop.themeMac
-desktop.themeWin
-desktop.windowsOutput
-noExtraResources
-android.permission.<PERMISSION_NAME>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-001,indent=0]
 ----
 
 These build hints should probably be appended:
 
-[source,java]
+[source,properties]
 ----
-android.xapplication
-android.xpermissions
-android.xintent_filter
-android.facebook_permissions
-android.stringsXml
-android.style
-android.nonconsumable
-android.xapplication_attr
-android.xactivity
-android.pushVibratePattern
-android.proguardKeep
-android.sharedUserId
-android.sharedUserLabel
-ios.urlScheme
-ios.interface_orientation
-ios.plistInject
-ios.facebook_permissions
-ios.applicationDidEnterBackground
-ios.viewDidLoad
-ios.glAppDelegateHeader
-ios.glAppDelegateBody
-ios.beforeFinishLaunching
-ios.afterFinishLaunching
-ios.add_libs
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-002,indent=0]
 ----
 
 .cn1lib Structure/File Format
@@ -2051,23 +1854,7 @@ The code below allows you to rearrange the items based on a sensible order. Noti
 
 [source,java]
 ----
-Form hi = new Form("Rearrangeable Items", new BorderLayout());
-String[] buttons = {"A Game of Thrones", "A Clash Of Kings",  "A Storm Of Swords",
-    "A Feast For Crows", "A Dance With Dragons", "The Winds of Winter", "A Dream of Spring" };
-
-Container box = new Container(BoxLayout.y());
-box.setScrollableY(true);
-box.setDropTarget(true);
-java.util.List<String> got = Arrays.asList(buttons);
-Collections.shuffle(got);
-for(String current : got) {
-    MultiButton mb = new MultiButton(current);
-    box.add(mb);
-    mb.setDraggable(true);
-}
-
-hi.add(BorderLayout.NORTH, "Arrange The Titles").add(BorderLayout.CENTER, box);
-hi.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/RearrangeableItemsDemo.java[tag=rearrangeableItems,indent=0]
 ----
 
 .Drag demo
@@ -2105,11 +1892,7 @@ of your project. It should look like this:
 
 [source,xml]
 ----
-<resources>
-   <color name="colorPrimary">#ff00ff00</color>
-   <color name="colorPrimaryDark">#80ff0000</color>
-   <color name="colorAccent">#800000ff</color>
-</resources>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-006,indent=0]
 ----
 
 === Intercepting URLs on iOS & Android
@@ -2124,7 +1907,7 @@ On Android you need to define an intent filter which you can do using the `andro
 
 [source,xml]
 ----
-android.xintent_filter=<intent-filter>   <action android:name="android.intent.action.VIEW" />    <category android:name="android.intent.category.DEFAULT" />    <category android:name="android.intent.category.BROWSABLE" />    <data android:scheme="myapp" />  </intent-filter>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-007,indent=0]
 ----
 
 You can read more about it in link:http://stackoverflow.com/questions/11421048/android-ios-custom-uri-protocol-handling[this stack overflow question].
@@ -2173,7 +1956,7 @@ Use `android.xapplication` to inject a dedicated bridge activity and bind the ac
 
 [source,properties]
 ----
-codename1.arg.android.xapplication=<activity android:name="com.example.wallet.WalletBridgeActivity" android:exported="true" android:launchMode="singleTop" android:noHistory="true" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar"><intent-filter><action android:name="com.example.wallet.ACTION_VERIFY"/><category android:name="android.intent.category.DEFAULT"/></intent-filter></activity>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-003,indent=0]
 ----
 
 Keep `codename1.arg.android.activity.launchMode=singleTask` on your main CN1 activity so app resume behavior is predictable.
@@ -2217,76 +2000,12 @@ Optional native Android example for certificate fingerprint verification (called
 
 [source,java]
 ----
-private static boolean isTrustedCallerSignature(Context ctx, String packageName, Set<String> allowedSha256) {
-    if (packageName == null || packageName.isEmpty()) return false;
-    try {
-        PackageManager pm = ctx.getPackageManager();
-        PackageInfo info;
-        if (Build.VERSION.SDK_INT >= 28) {
-            info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES);
-            Signature[] sigs = info.signingInfo != null
-                    ? info.signingInfo.getApkContentsSigners()
-                    : null;
-            return hasAllowedFingerprint(sigs, allowedSha256);
-        } else {
-            info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES);
-            return hasAllowedFingerprint(info.signatures, allowedSha256);
-        }
-    } catch (Exception ex) {
-        return false;
-    }
-}
-
-private static boolean hasAllowedFingerprint(Signature[] sigs, Set<String> allowedSha256) throws Exception {
-    if (sigs == null) return false;
-    MessageDigest md = MessageDigest.getInstance("SHA-256");
-    for (Signature s : sigs) {
-        String fp = toHex(md.digest(s.toByteArray()));
-        if (allowedSha256.contains(fp)) return true;
-    }
-    return false;
-}
-
-private static String toHex(byte[] data) {
-    StringBuilder out = new StringBuilder(data.length * 2);
-    for (byte b : data) out.append(String.format("%02X", b));
-    return out.toString();
-}
+include::../demos/android/src/main/java/com/example/wallet/WalletBridgeSecurity.java[tag=walletTrustedCallerSignature,indent=0]
 ----
 
 [source,java]
 ----
-public class WalletBridgeActivity extends Activity {
-    private static WalletBridgeActivity active;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        active = this;
-
-        Intent in = getIntent();
-        String caller = getCallingPackage();
-
-        Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        launch.putExtra("wallet_payload", in.getStringExtra("payload"));
-        launch.putExtra("wallet_caller", caller == null ? "" : caller);
-        startActivity(launch);
-        // Do not finish yet. CN1 will finish this activity via native callback once verification completes.
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (active == this) {
-            active = null;
-        }
-        super.onDestroy();
-    }
-
-    public static WalletBridgeActivity getActive() {
-        return active;
-    }
-}
+include::../demos/android/src/main/java/com/example/wallet/WalletBridgeActivity.java[tag=walletBridgeActivity,indent=0]
 ----
 
 ===== Reading contract data in `start()`
@@ -2303,25 +2022,7 @@ Codename One exposes launch metadata through `AppArg` and `Display` properties. 
 
 [source,java]
 ----
-@Override
-public void start() {
-    Display d = Display.getInstance();
-    String action = d.getProperty("android.intent.action", null);
-    if ("com.example.wallet.ACTION_VERIFY".equals(action)) {
-        boolean callerVerified = "true".equals(d.getProperty("android.intent.caller.verified", "false"));
-        String payload = d.getProperty("android.intent.extra.wallet_payload", d.getProperty("AppArg", null));
-        String caller = d.getProperty("android.intent.caller", "");
-
-        if (!callerVerified || !isAllowedCaller(caller)) {
-            failClosed(); // return declined/canceled via bridge completion API
-            return;
-        }
-
-        // Run authentication + back end verification, then call native bridge completion API.
-        return;
-    }
-    showMainForm();
-}
+include::../demos/android/src/main/java/com/example/wallet/WalletLaunchHandlerSnippet.java[tag=walletLaunchStart,indent=0]
 ----
 
 ===== Returning results to the wallet API
@@ -2351,14 +2052,14 @@ The equivalent on the iOS side would be:
 
 [source,xml]
 ----
-ios.plistInject=<key>CFBundleURLTypes</key>     <array>         <dict>             <key>CFBundleURLName</key>             <string>com.yourcompany.myapp</string>         </dict>         <dict>             <key>CFBundleURLSchemes</key>             <array>                 <string>myapp</string>             </array>         </dict>     </array>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-008,indent=0]
 ----
 
 For example, that can conflict with the Facebook integration if you use `FacebookConnect` which needs access to the schemes. To work around this you can use the build hint `ios.urlScheme` for example:
 
 [source,xml]
 ----
-ios.urlScheme=<string>myapp</string>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-009,indent=0]
 ----
 
 [[native-peer-components]]
@@ -2816,93 +2517,7 @@ You can find the manifest file injections required by opening the `AndroidManife
 
 [source,xml]
 ----
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.freshdesk.mobihelp"
-    android:versionCode="1"
-    android:versionName="1.0" >
-
-     <uses-sdk
-        android:minSdkVersion="10" />
-
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.READ_LOGS" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-
-    <application>
-        <activity
-            android:name="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
-            android:configChanges="orientation|screenSize"
-            android:theme="@style/Theme.Mobihelp"
-            android:windowSoftInputMode="adjustPan" >
-        </activity>
-        <activity
-            android:name="com.freshdesk.mobihelp.activity.FeedbackActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize"
-            android:theme="@style/Theme.Mobihelp"
-            android:windowSoftInputMode="adjustResize|stateVisible" >
-        </activity>
-        <activity
-            android:name="com.freshdesk.mobihelp.activity.InterstitialActivity"
-            android:configChanges="orientation|screenSize"
-            android:theme="@style/Theme.AppCompat">
-		</activity>
-        <activity
-            android:name="com.freshdesk.mobihelp.activity.TicketListActivity"
-            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
-            android:theme="@style/Theme.Mobihelp" >
-
-            <!-- Parent activity meta-data to support 4.0 and lower -->
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
-        </activity>
-        <activity
-            android:name="com.freshdesk.mobihelp.activity.SolutionArticleActivity"
-            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
-            android:theme="@style/Theme.Mobihelp"
-            android:configChanges="orientation|screenSize|keyboard|keyboardHidden" >
-
-            <!-- Parent activity meta-data to support 4.0 and lower -->
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
-        </activity>
-        <activity
-            android:name="com.freshdesk.mobihelp.activity.ConversationActivity"
-            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
-            android:theme="@style/Theme.Mobihelp"
-            android:windowSoftInputMode="adjustResize|stateHidden" >
-
-            <!-- Parent activity meta-data to support 4.0 and lower -->
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
-        </activity>
-        <activity
-            android:name="com.freshdesk.mobihelp.activity.AttachmentHandlerActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize"
-            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
-            android:theme="@style/Theme.Mobihelp" >
-
-            <!-- Parent activity meta-data to support 4.0 and lower -->
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
-        </activity>
-
-        <service android:name="com.freshdesk.mobihelp.service.MobihelpService" />
-
-        <receiver android:name="com.freshdesk.mobihelp.receiver.ConnectivityReceiver" >
-            <intent-filter>
-                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
-            </intent-filter>
-        </receiver>
-    </application>
-
-</manifest>
-
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-010,indent=0]
 ----
 
 
@@ -3114,37 +2729,7 @@ NOTE: Codename One also supports https://www.codenameone.com/blog/mirah-for-code
 
 The first thing to do is take a look at the byte-code that's produced by the compiler. Use `javap` to print out a nice version.
 
-Consider this sample Kotlin class:
-
-[source,kotlin]
-----
-package com.codename1.hellokotlin2
-
-import com.codename1.ui.Button
-import com.codename1.ui.Form
-import com.codename1.ui.Label
-import com.codename1.ui.layouts.BoxLayout
-
-/**
- * Created by shannah on 2017-07-10.
- */
-class KotlinForm : Form {
-
-    constructor() : super("Hello Kotlin", BoxLayout.y()) {
-        val label = Label("Hello Kotlin")
-        val clickMe = Button("Click Me")
-        clickMe.addActionListener {
-            label.setText("You Clicked Me");
-            revalidate();
-        }
-
-        add(label).add(clickMe);
-
-    }
-
-
-}
-----
+Consider a sample Kotlin class that extends `Form`, creates a `Label` and `Button`, and updates the label from the button's listener.
 
 Take a look at the bytecode that Kotlin produced for this class:
 
@@ -3154,145 +2739,7 @@ $ javap -v com/codename1/hellokotlin2/KotlinForm.class
 
 [source,bytecode]
 ----
-  Last modified 10-Jul-2017; size 1456 bytes
-  MD5 checksum 1cb00f6e63b918bb5a9f146ca8b0b78e
-  Compiled from "KotlinForm.kt"
-public final class com.codename1.hellokotlin2.KotlinForm extends com.codename1.ui.Form
-  SourceFile: "KotlinForm.kt"
-  InnerClasses:
-       static final #31; //class com/codename1/hellokotlin2/KotlinForm$1
-  RuntimeVisibleAnnotations:
-    0: #56(#57=[I#58,I#58,I#59],#60=[I#58,I#61,I#58],#62=I#58,#63=[s#64],#65=[s#55,s#66,s#6,s#67])
-  minor version: 0
-  major version: 50
-  flags: ACC_PUBLIC, ACC_FINAL, ACC_SUPER
-Constant pool:
-   #1 = Utf8               com/codename1/hellokotlin2/KotlinForm
-   #2 = Class              #1             //  com/codename1/hellokotlin2/KotlinForm
-   #3 = Utf8               com/codename1/ui/Form
-   #4 = Class              #3             //  com/codename1/ui/Form
-   #5 = Utf8               <init>
-   #6 = Utf8               ()V
-   #7 = Utf8               Hello Kotlin
-   #8 = String             #7             //  Hello Kotlin
-   #9 = Utf8               com/codename1/ui/layouts/BoxLayout
-  #10 = Class              #9             //  com/codename1/ui/layouts/BoxLayout
-  #11 = Utf8               y
-  #12 = Utf8               ()Lcom/codename1/ui/layouts/BoxLayout;
-  #13 = NameAndType        #11:#12        //  y:()Lcom/codename1/ui/layouts/BoxLayout;
-  #14 = Methodref          #10.#13        //  com/codename1/ui/layouts/BoxLayout.y:()Lcom/codename1/ui/layouts/BoxLayout;
-  #15 = Utf8               com/codename1/ui/layouts/Layout
-  #16 = Class              #15            //  com/codename1/ui/layouts/Layout
-  #17 = Utf8               (Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
-  #18 = NameAndType        #5:#17         //  "<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
-  #19 = Methodref          #4.#18         //  com/codename1/ui/Form."<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
-  #20 = Utf8               com/codename1/ui/Label
-  #21 = Class              #20            //  com/codename1/ui/Label
-  #22 = Utf8               (Ljava/lang/String;)V
-  #23 = NameAndType        #5:#22         //  "<init>":(Ljava/lang/String;)V
-  #24 = Methodref          #21.#23        //  com/codename1/ui/Label."<init>":(Ljava/lang/String;)V
-  #25 = Utf8               com/codename1/ui/Button
-  #26 = Class              #25            //  com/codename1/ui/Button
-  #27 = Utf8               Click Me
-  #28 = String             #27            //  Click Me
-  #29 = Methodref          #26.#23        //  com/codename1/ui/Button."<init>":(Ljava/lang/String;)V
-  #30 = Utf8               com/codename1/hellokotlin2/KotlinForm$1
-  #31 = Class              #30            //  com/codename1/hellokotlin2/KotlinForm$1
-  #32 = Utf8               (Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
-  #33 = NameAndType        #5:#32         //  "<init>":(Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
-  #34 = Methodref          #31.#33        //  com/codename1/hellokotlin2/KotlinForm$1."<init>":(Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
-  #35 = Utf8               com/codename1/ui/events/ActionListener
-  #36 = Class              #35            //  com/codename1/ui/events/ActionListener
-  #37 = Utf8               addActionListener
-  #38 = Utf8               (Lcom/codename1/ui/events/ActionListener;)V
-  #39 = NameAndType        #37:#38        //  addActionListener:(Lcom/codename1/ui/events/ActionListener;)V
-  #40 = Methodref          #26.#39        //  com/codename1/ui/Button.addActionListener:(Lcom/codename1/ui/events/ActionListener;)V
-  #41 = Utf8               com/codename1/ui/Component
-  #42 = Class              #41            //  com/codename1/ui/Component
-  #43 = Utf8               add
-  #44 = Utf8               (Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
-  #45 = NameAndType        #43:#44        //  add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
-  #46 = Methodref          #2.#45         //  com/codename1/hellokotlin2/KotlinForm.add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
-  #47 = Utf8               com/codename1/ui/Container
-  #48 = Class              #47            //  com/codename1/ui/Container
-  #49 = Methodref          #48.#45        //  com/codename1/ui/Container.add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
-  #50 = Utf8               clickMe
-  #51 = Utf8               Lcom/codename1/ui/Button;
-  #52 = Utf8               label
-  #53 = Utf8               Lcom/codename1/ui/Label;
-  #54 = Utf8               this
-  #55 = Utf8               Lcom/codename1/hellokotlin2/KotlinForm;
-  #56 = Utf8               Lkotlin/Metadata;
-  #57 = Utf8               mv
-  #58 = Integer            1
-  #59 = Integer            6
-  #60 = Utf8               bv
-  #61 = Integer            0
-  #62 = Utf8               k
-  #63 = Utf8               d1
-  #64 = Utf8
-                           \n\n\20¢¨
-  #65 = Utf8               d2
-  #66 = Utf8               Lcom/codename1/ui/Form;
-  #67 = Utf8               HelloKotlin2
-  #68 = Utf8               KotlinForm.kt
-  #69 = Utf8               Code
-  #70 = Utf8               LocalVariableTable
-  #71 = Utf8               LineNumberTable
-  #72 = Utf8               SourceFile
-  #73 = Utf8               InnerClasses
-  #74 = Utf8               RuntimeVisibleAnnotations
-{
-  public com.codename1.hellokotlin2.KotlinForm();
-    descriptor: ()V
-    flags: ACC_PUBLIC
-    Code:
-      stack=5, locals=3, args_size=1
-         0: aload_0
-         1: ldc           #8                  // String Hello Kotlin
-         3: invokestatic  #14                 // Method com/codename1/ui/layouts/BoxLayout.y:()Lcom/codename1/ui/layouts/BoxLayout;
-         6: checkcast     #16                 // class com/codename1/ui/layouts/Layout
-         9: invokespecial #19                 // Method com/codename1/ui/Form."<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
-        12: new           #21                 // class com/codename1/ui/Label
-        15: dup
-        16: ldc           #8                  // String Hello Kotlin
-        18: invokespecial #24                 // Method com/codename1/ui/Label."<init>":(Ljava/lang/String;)V
-        21: astore_1
-        22: new           #26                 // class com/codename1/ui/Button
-        25: dup
-        26: ldc           #28                 // String Click Me
-        28: invokespecial #29                 // Method com/codename1/ui/Button."<init>":(Ljava/lang/String;)V
-        31: astore_2
-        32: aload_2
-        33: new           #31                 // class com/codename1/hellokotlin2/KotlinForm$1
-        36: dup
-        37: aload_0
-        38: aload_1
-        39: invokespecial #34                 // Method com/codename1/hellokotlin2/KotlinForm$1."<init>":(Lcom/codename1/hellokotlin2/KotlinForm;Lcom/codename1/ui/Label;)V
-        42: checkcast     #36                 // class com/codename1/ui/events/ActionListener
-        45: invokevirtual #40                 // Method com/codename1/ui/Button.addActionListener:(Lcom/codename1/ui/events/ActionListener;)V
-        48: aload_0
-        49: aload_1
-        50: checkcast     #42                 // class com/codename1/ui/Component
-        53: invokevirtual #46                 // Method add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
-        56: aload_2
-        57: checkcast     #42                 // class com/codename1/ui/Component
-        60: invokevirtual #49                 // Method com/codename1/ui/Container.add:(Lcom/codename1/ui/Component;)Lcom/codename1/ui/Container;
-        63: pop
-        64: return
-      LocalVariableTable:
-        Start  Length  Slot  Name   Signature
-           32      32     2 clickMe   Lcom/codename1/ui/Button;
-           22      42     1 label   Lcom/codename1/ui/Label;
-            0      65     0  this   Lcom/codename1/hellokotlin2/KotlinForm;
-      LineNumberTable:
-        line 13: 0
-        line 14: 12
-        line 15: 22
-        line 16: 32
-        line 21: 48
-}
-
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.txt[tag=advanced-topics-under-the-hood-bytecode-001,indent=0]
 ----
 
 That's a big mess of stuff, but it's pretty easy to pick through it when you know what you're looking for. The layout of this output is pretty straight forward. The beginning shows that this is a class definition:
@@ -3308,8 +2755,7 @@ After the class definition, it shows the internal classes:
 
 [source,bytecode]
 ----
-InnerClasses:
-     static final #31; //class com/codename1/hellokotlin2/KotlinForm$1
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.txt[tag=advanced-topics-under-the-hood-bytecode-002,indent=0]
 ----
 
 **The Constant Pool**
@@ -3318,17 +2764,7 @@ And the constants that are used in the class:
 
 [source,bytecode]
 ----
-Constant pool:
-   #1 = Utf8               com/codename1/hellokotlin2/KotlinForm
-   #2 = Class              #1             //  com/codename1/hellokotlin2/KotlinForm
-   #3 = Utf8               com/codename1/ui/Form
-   #4 = Class              #3             //  com/codename1/ui/Form
-   #5 = Utf8               <init>
-   #6 = Utf8               ()V
-   #7 = Utf8               Hello Kotlin
-   #8 = String             #7             //  Hello Kotlin
-   #9 = Utf8               com/codename1/ui/layouts/BoxLayout
-   ... etc.
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.txt[tag=advanced-topics-under-the-hood-bytecode-003,indent=0]
 ----
 
 
@@ -3342,20 +2778,7 @@ After the constant pool, you see each of the methods of the class written out as
 
 [source,bytecode]
 ----
-public com.codename1.hellokotlin2.KotlinForm();
-  descriptor: ()V
-  flags: ACC_PUBLIC
-  Code:
-    stack=5, locals=3, args_size=1
-       0: aload_0
-       1: ldc           #8                  // String Hello Kotlin
-       3: invokestatic  #14                 // Method com/codename1/ui/layouts/BoxLayout.y:()Lcom/codename1/ui/layouts/BoxLayout;
-       6: checkcast     #16                 // class com/codename1/ui/layouts/Layout
-       9: invokespecial #19                 // Method com/codename1/ui/Form."<init>":(Ljava/lang/String;Lcom/codename1/ui/layouts/Layout;)V
-      12: new           #21                 // class com/codename1/ui/Label
-      15: dup
-      16: ldc           #8                  // String Hello Kotlin
-      etc.
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.txt[tag=advanced-topics-under-the-hood-bytecode-004,indent=0]
 ----
 
 In the above snippet, the first instruction is `aload_0` (which adds `this` to the stack). The 2nd instruction is `ldc`, (which loads constant #8 -- the string "Hello Kotlin" to the stack). The 3rd instruction is `invokestatic` which calls the static method define by Constant #14 from the constant pool, with the two parameters that had been added to the stack.
@@ -3392,21 +2815,9 @@ IMPORTANT: Building cn1libs manually in this way is a ** bad habit, as it bypass
 
 For your "Hello World" test you will need to create a separate project in your JVM language and produce class files that you will *manually* copy into an appropriate location of your project. You will want to use the *normal* tools for the language and not worry about how it integrates with Codename One. For Kotlin, the steps follow the getting started tutorial on the Kotlin site to create a new Kotlin project in IntelliJ. When Steve ported Mirah, he used a text editor and the mirahc command-line compiler to create your Hello World class. The tools and process will depend on the language.
 
-Here is the "hello world" you created in Kotlin:
+Create a minimal "hello world" class in the external language runtime you are evaluating.
 
-[source,kotlin]
-----
-package com.mycompany.myapp
-
-class HelloKotlin {
-
-    fun hello() {
-        System.out.println("Hello from Kotlin");
-    }
-}
-----
-
-After building this, the build produces a directory that contains "com/mycompany/myapp/HelloKotlin.class".
+After building this, the build produces a directory that contains `com/mycompany/myapp/HelloKotlin.class`.
 
 It also produced a.jar file that contains this class.
 
@@ -3453,7 +2864,7 @@ For both the Kotlin and Mirah support, you wanted integration to be seamless. Yo
 
 [source,xml]
 ----
-<withKotlin/>
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-011,indent=0]
 ----
 
 And it would automatically handle Kotlin and Java files together: Seamlessly. A few places in a Codename One's build.xml file where you call "javac" so you needed to inject these tags in those places. This injection is performed automatically by the Codename One IntelliJ plugin.
@@ -3485,7 +2896,7 @@ An update happens by running this tool with a path to a Codename One project for
 
 [source,bash]
 ----
-java -jar ~/.codenameone/UpdateCodenameOne.jar path_to_my_codenameone_project
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.sh[tag=advanced-topics-under-the-hood-bash-002,indent=0]
 ----
 
 For example:
@@ -3510,7 +2921,7 @@ Notice that no download happened since the files were up-to-date. You can also f
 
 [source,bash]
 ----
-java -jar ~/.codenameone/UpdateCodenameOne.jar path_to_my_codenameone_project
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.sh[tag=advanced-topics-under-the-hood-bash-003,indent=0]
 ----
 
 The way this works under the hood is thought a `Versions.properties` within your directory that lists the versions of local files. That way you know what should be updated.

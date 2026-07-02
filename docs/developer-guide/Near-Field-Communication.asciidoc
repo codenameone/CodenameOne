@@ -8,49 +8,13 @@ A single entry point exposes the platform NFC controller, a typed enum reports t
 
 [source,java]
 ----
-import com.codename1.nfc.Nfc;
-import com.codename1.nfc.NfcReadOptions;
-import com.codename1.nfc.NdefMessage;
-
-Nfc nfc = Nfc.getInstance();
-if (!nfc.canRead()) {
-    // no NFC hardware, or it is disabled in system settings
-    return;
-}
-nfc.readNdef(new NfcReadOptions()
-        .setNdefOnly(true)
-        .setAlertMessage("Hold near the poster"))
-   .onResult((NdefMessage msg, Throwable err) -> {
-        if (err != null) {
-            return;
-        }
-        String url = msg.getFirstRecord().getUriPayload();
-        Display.getInstance().execute(url);
-   });
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearFieldCommunicationJava001Snippet.java[tag=near-field-communication-java-001,indent=0]
 ----
 
 `setNdefOnly(true)` picks the fastest iOS Core NFC session (`NFCNDEFReaderSession`) and matches the most common tag layout. For mixed payloads use `readTag(...)` and inspect `tag.getTypes()`.
 
 === Quick start: Write an NDEF URI
 
-[source,java]
-----
-import com.codename1.nfc.NdefMessage;
-import com.codename1.nfc.NdefRecord;
-
-NdefMessage msg = new NdefMessage(
-        NdefRecord.createUri("https://codenameone.com"),
-        NdefRecord.createText("en", "Codename One"));
-Nfc.getInstance().writeNdef(
-        new NfcReadOptions().setAlertMessage("Tap a writable tag"),
-        msg)
-   .onResult((Boolean ok, Throwable err) -> {
-       if (err != null) {
-           NfcError code = ((NfcException) err).getError();
-           // READ_ONLY, CAPACITY_EXCEEDED, INVALID_NDEF, TAG_LOST, ...
-       }
-   });
-----
 
 NDEF records carry one of the well-known types (`T`, `U`, `Sp`), a MIME media type, an absolute URI, or an external `domain:type`. Use the factory methods on `NdefRecord` rather than constructing raw byte arrays:
 
@@ -68,23 +32,6 @@ NDEF records carry one of the well-known types (`T`, `U`, `Sp`), a MIME media ty
 
 Beyond NDEF, the discovered `Tag` exposes accessors for the underlying technologies:
 
-[source,java]
-----
-nfc.readTag(new NfcReadOptions()
-        .setTechFilter(TagType.ISO_DEP)
-        .setIsoSelectAids(myAid))
-   .onResult((Tag tag, Throwable err) -> {
-        if (err != null) return;
-        IsoDep iso = tag.getIsoDep();
-        if (iso == null) return;
-        iso.transceive(myCommandApdu).onResult((byte[] resp, Throwable e) -> {
-            if (ApduResponse.isSuccess(resp)) {
-                byte[] body = ApduResponse.body(resp);
-                // application-specific parsing
-            }
-        });
-   });
-----
 
 Each accessor returns `null` when the tag doesn't advertise the corresponding technology, so always null-check before calling.
 
@@ -102,12 +49,6 @@ Each accessor returns `null` when the tag doesn't advertise the corresponding te
 
 For FeliCa on iOS, set the system codes in `NfcReadOptions`:
 
-[source,java]
-----
-new NfcReadOptions()
-    .setTechFilter(TagType.NFC_F)
-    .setFelicaSystemCodes("0003", "8008");
-----
 
 The Codename One Maven plugin and build daemon automatically register `com.apple.developer.nfc.readersession.felica.systemcodes` from these values.
 
@@ -115,27 +56,6 @@ The Codename One Maven plugin and build daemon automatically register `com.apple
 
 Host Card Emulation (HCE) lets the device pretend to be a contactless smart card. A nearby reader (Android phone, payment terminal, access control gate) sends ISO 7816 APDUs and your app responds. Subclass `HostCardEmulationService` and register the instance:
 
-[source,java]
-----
-class MyService extends HostCardEmulationService {
-    @Override
-    public String[] getAids() {
-        return new String[] { "F0010203040506" };
-    }
-    @Override
-    public byte[] processCommand(byte[] apdu) {
-        if (apdu.length > 1 && apdu[1] == (byte) 0xA4) {
-            // SELECT -- terminal has just routed an APDU to our AID
-            return ApduResponse.withStatus(
-                    new byte[] { 'O', 'K' },
-                    ApduResponse.swSuccess());
-        }
-        return ApduResponse.swInsNotSupported();
-    }
-}
-
-Nfc.getInstance().registerHostCardEmulationService(new MyService());
-----
 
 Set the AIDs as a build hint so they appear in the platform routing tables:
 
@@ -151,7 +71,7 @@ iOS HCE (`CardSession`) requires iOS 17.4+ and, as of 2026, is EU-only. The Code
 
 === Permissions and build hints
 
-The Codename One build pipeline auto-detects NFC usage. Apps that never touch `com.codename1.nfc` see no manifest / plist change.
+The Codename One build pipeline automatically detects NFC usage. Apps that never touch `com.codename1.nfc` see no manifest / plist change.
 
 [options="header"]
 |===

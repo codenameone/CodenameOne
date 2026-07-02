@@ -1,0 +1,11 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::skin-designer-text-001[]
+Apple-iPhone-16-Pro.skin/
+  skin.png            # portrait body (device frame + transparent screen + cutouts)
+  skin_l.png          # 90° rotated portrait
+  skin_map.png        # black rect = screen, white = frame, used for hit-testing
+  skin_map_l.png      # rotated map
+  iOS7Theme.res       # bundled native theme (or android_holo_light.res / winTheme.res)
+  skin.properties     # platform metadata, safe-area, PPI, display rect
+// end::skin-designer-text-001[]

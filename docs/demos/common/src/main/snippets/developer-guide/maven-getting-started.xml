@@ -1,0 +1,23 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::maven-getting-started-xml-001[]
+<dependency>
+  <groupId>com.codenameone</groupId>
+  <artifactId>cn1app-archetype</artifactId>
+  <version>LATEST</version>
+  <type>maven-archetype</type>
+</dependency>
+// end::maven-getting-started-xml-001[]
+
+// tag::maven-getting-started-xml-002[]
+<dependency>
+  <groupId>com.codenameone</groupId>
+  <artifactId>googlemaps-lib</artifactId>
+  <version>1.0.1</version>
+  <type>pom</type>
+</dependency>
+// end::maven-getting-started-xml-002[]
+
+// tag::maven-getting-started-xml-003[]
+<!-- INJECT DEPENDENCIES -->
+// end::maven-getting-started-xml-003[]

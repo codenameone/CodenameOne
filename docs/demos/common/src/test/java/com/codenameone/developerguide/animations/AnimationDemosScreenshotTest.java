@@ -8,27 +8,25 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
-import com.codenameone.developerguide.Demo;
 import com.codenameone.developerguide.DemoRegistry;
+import com.codenameone.developerguide.GuideScreenshot;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Captures screenshots for all animation demos and persists them using Storage so
+ * Captures screenshots for all registered guide demos and persists them using Storage so
  * that external tooling can compare them against the developer guide imagery.
  */
 public class AnimationDemosScreenshotTest extends AbstractTest {
     private static final String HOST_TITLE = "Demo Test Host";
     private static final long FORM_TIMEOUT_MS = 10000L;
-    private static final String STORAGE_PREFIX = "developer-guide.animations.";
+    private static final String STORAGE_PREFIX = "developer-guide.screenshots.";
 
-    private static final Map<String, String> SCREENSHOT_NAME_OVERRIDES = createScreenshotNameOverrides();
-    private static final Set<String> OVERRIDE_FILE_NAMES = new HashSet<>(SCREENSHOT_NAME_OVERRIDES.values());
+    private static final Set<String> SCREENSHOT_FILE_NAMES = createScreenshotFileNames();
 
     private final Storage storage = Storage.getInstance();
 
@@ -36,20 +34,23 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     public boolean runTest() throws Exception {
         clearPreviousScreenshots();
 
-        Form host = new Form(HOST_TITLE);
-        host.show();
-        TestUtils.waitForFormTitle(HOST_TITLE, FORM_TIMEOUT_MS);
+        Form host = runOnEdt(() -> {
+            Form form = new Form(HOST_TITLE);
+            form.show();
+            return form;
+        });
+        waitForCurrentForm(host);
 
-        for (Demo demo : DemoRegistry.getDemos()) {
-            Form previous = Display.getInstance().getCurrent();
-            demo.show(host);
+        for (GuideScreenshot screenshotDemo : DemoRegistry.getScreenshots()) {
+            Form previous = currentForm();
+            runOnEdt(() -> screenshotDemo.getDemo().show(host));
             Form demoForm = waitForFormChange(previous);
             waitForFormReady(demoForm);
 
             Image screenshot = capture(demoForm);
-            saveScreenshot(storageKeyFor(demo.getTitle()), screenshot);
+            saveScreenshot(storageKeyFor(screenshotDemo), screenshot);
 
-            host.show();
+            runOnEdt(host::show);
             waitForHost(host);
         }
 
@@ -65,18 +66,18 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             if (entry == null) {
                 continue;
             }
-            if (entry.startsWith(STORAGE_PREFIX) || OVERRIDE_FILE_NAMES.contains(entry)) {
+            if (entry.startsWith(STORAGE_PREFIX) || SCREENSHOT_FILE_NAMES.contains(entry)) {
                 storage.deleteStorageFile(entry);
             }
         }
     }
 
-    private String storageKeyFor(String title) {
-        String override = SCREENSHOT_NAME_OVERRIDES.get(title);
-        if (override != null && override.length() > 0) {
-            return override;
+    private String storageKeyFor(GuideScreenshot screenshotDemo) {
+        String fileName = screenshotDemo.getFileName();
+        if (fileName != null && fileName.length() > 0) {
+            return fileName;
         }
-        return STORAGE_PREFIX + sanitizeFileName(title) + ".png";
+        return STORAGE_PREFIX + screenshotDemo.getId() + ".png";
     }
 
     private void saveScreenshot(String storageKey, Image screenshot) throws IOException {
@@ -95,26 +96,28 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     }
 
     private Image capture(Form form) {
-        Image screenshot = Image.createImage(form.getWidth(), form.getHeight());
-        form.paintComponent(screenshot.getGraphics(), true);
-        return screenshot;
+        return runOnEdt(() -> {
+            Image screenshot = Image.createImage(form.getWidth(), form.getHeight());
+            form.paintComponent(screenshot.getGraphics(), true);
+            return screenshot;
+        });
     }
 
     private Form waitForFormChange(Form previous) {
         long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
-        while (Display.getInstance().getCurrent() == previous) {
+        while (currentForm() == previous) {
             TestUtils.waitFor(50);
             if (System.currentTimeMillis() > deadline) {
                 fail("Timed out waiting for demo form to appear.");
                 break;
             }
         }
-        return Display.getInstance().getCurrent();
+        return currentForm();
     }
 
     private void waitForFormReady(Form form) {
         long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
-        while ((form.getWidth() <= 0 || form.getHeight() <= 0) && System.currentTimeMillis() <= deadline) {
+        while ((!hasSize(form)) && System.currentTimeMillis() <= deadline) {
             TestUtils.waitFor(50);
         }
         assertTrue(form.getWidth() > 0, "Demo form width should be > 0 for screenshot capture.");
@@ -123,33 +126,74 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     }
 
     private void waitForHost(Form host) {
-        long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
-        while (Display.getInstance().getCurrent() != host) {
-            TestUtils.waitFor(50);
-            if (System.currentTimeMillis() > deadline) {
-                fail("Timed out waiting to return to host form.");
-                break;
-            }
-        }
+        waitForCurrentForm(host);
         TestUtils.waitFor(200);
     }
 
-    private static Map<String, String> createScreenshotNameOverrides() {
-        Map<String, String> map = new HashMap<>();
-        map.put("Layout Animations", "layout-animation-1.png");
-        map.put("Slide Transitions", "transition-slide.png");
-        map.put("Bubble Transition", "transition-bubble.png");
-        map.put("Morph Transition", "mighty-morphing-components-1.png");
-        return map;
+    private void waitForCurrentForm(Form expected) {
+        long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
+        while (currentForm() != expected) {
+            TestUtils.waitFor(50);
+            if (System.currentTimeMillis() > deadline) {
+                fail("Timed out waiting for expected form: " + expected.getTitle());
+                break;
+            }
+        }
     }
 
-    private String sanitizeFileName(String value) {
-        String sanitized = value.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
-        return sanitized.isEmpty() ? "demo-screenshot" : sanitized;
+    private Form currentForm() {
+        return runOnEdt(() -> Display.getInstance().getCurrent());
+    }
+
+    private boolean hasSize(Form form) {
+        Boolean hasSize = runOnEdt(() -> form.getWidth() > 0 && form.getHeight() > 0);
+        return hasSize.booleanValue();
+    }
+
+    private <T> T runOnEdt(UiSupplier<T> supplier) {
+        AtomicReference<T> result = new AtomicReference<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Display.getInstance().callSeriallyAndWait(() -> {
+            try {
+                result.set(supplier.get());
+            } catch (Throwable ex) {
+                failure.set(ex);
+            }
+        });
+        if (failure.get() != null) {
+            Throwable thrown = failure.get();
+            if (thrown instanceof RuntimeException) {
+                throw (RuntimeException) thrown;
+            }
+            if (thrown instanceof Error) {
+                throw (Error) thrown;
+            }
+            throw new RuntimeException(thrown);
+        }
+        return result.get();
+    }
+
+    private void runOnEdt(Runnable runnable) {
+        runOnEdt(() -> {
+            runnable.run();
+            return null;
+        });
+    }
+
+    private static Set<String> createScreenshotFileNames() {
+        Set<String> names = new HashSet<>();
+        for (GuideScreenshot screenshot : DemoRegistry.getScreenshots()) {
+            names.add(screenshot.getFileName());
+        }
+        return names;
     }
 
     @Override
     public boolean shouldExecuteOnEDT() {
-        return true;
+        return false;
+    }
+
+    private interface UiSupplier<T> {
+        T get();
     }
 }

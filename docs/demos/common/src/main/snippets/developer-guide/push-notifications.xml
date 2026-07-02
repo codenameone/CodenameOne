@@ -1,0 +1,9 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::push-notifications-xml-001[]
+<push type="1" body="Hello World"><img src="https://exmaple.com/myimage.jpg"/></push>
+// end::push-notifications-xml-001[]
+
+// tag::push-notifications-xml-002[]
+<push type="1" body="Would you like to come to a party?" category="invite"/>
+// end::push-notifications-xml-002[]
