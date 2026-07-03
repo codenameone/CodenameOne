@@ -232,10 +232,6 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     ///
     /// True if time is in 12 hour format.  False otherwise.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #setShowMeridiem(boolean)
@@ -251,10 +247,6 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /// #### Parameters
     ///
     /// - `showMeridiem`: True to show times in 12 hour format (the default).  False to show in 24 hour format.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -274,10 +266,6 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /// - `min`: The minimum hour to display (0-24).  -1 for no limit.
     ///
     /// - `max`: The max hour to display (0-24).  -1 for no limit.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -301,10 +289,6 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     ///
     /// Min hour (0-24) or -1 for no limit.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #getMaxHour()
@@ -322,10 +306,6 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /// #### Returns
     ///
     /// Max hour (0-24) or -1 for no limit.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///

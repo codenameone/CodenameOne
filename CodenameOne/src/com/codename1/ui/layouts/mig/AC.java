@@ -238,9 +238,6 @@ public final class AC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new AxisConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public AC sizeGroup() {
         return sizeGroup("", curIx);
     }
@@ -473,9 +470,6 @@ public final class AC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new AxisConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public AC grow() {
         return grow(1f, curIx);
     }
@@ -565,9 +559,6 @@ public final class AC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new AxisConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public AC shrink() {
         return shrink(100f, curIx);
     }
@@ -584,9 +575,6 @@ public final class AC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new AxisConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public AC shrink(float w) {
         return shrink(w, curIx);
     }
@@ -605,9 +593,6 @@ public final class AC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new AxisConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public AC shrink(float w, int... indexes) {
         Float sw = Float.valueOf(w);
         for (int i = indexes.length - 1; i >= 0; i--) {

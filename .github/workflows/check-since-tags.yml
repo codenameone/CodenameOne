@@ -1,9 +1,8 @@
-name: Check @since tags
+name: Check since tags
 
-# Fails the build if any Java source under CodenameOne/src carries an @since
-# javadoc tag whose version does not correspond to an existing git tag in
-# this repository. Without this gate, prose can advertise APIs as available
-# in versions that never shipped (e.g. "@since 9.0").
+# Fails the build if Java sources under CodenameOne/src carry @since tags or
+# Markdown/Javadoc "Since" sections. Generated documentation changes have
+# repeatedly guessed versions, which is worse than omitting the metadata.
 
 permissions:
   contents: read
@@ -30,12 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          # Full history including all tags so `git tag --list` returns
-          # the complete set of released versions.
-          fetch-depth: 0
-          fetch-tags: true
 
-      - name: Validate @since references against git tags
+      - name: Reject since markers in API docs
         shell: bash
         run: scripts/check-since-tags.sh

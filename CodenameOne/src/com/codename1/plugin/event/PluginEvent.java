@@ -44,9 +44,6 @@ import com.codename1.ui.events.ActionEvent;
 ///
 /// - `The`: type of the response to the event. If the event does not require a response, this should be `Void`.
 ///
-/// #### Since
-///
-/// 8.0
 public abstract class PluginEvent<T> extends ActionEvent {
 
     private T pluginEventResponse;

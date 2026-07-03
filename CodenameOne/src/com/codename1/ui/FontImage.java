@@ -6906,9 +6906,6 @@ public final class FontImage extends Image {
     ///
     /// false if the type isn't supported
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static boolean setMaterialIcon(Component cmp, char[] icons, float size) {
         if (cmp instanceof IconHolder) {
             setIcon((IconHolder) cmp, getMaterialDesignFont(), icons, size);
@@ -7013,10 +7010,6 @@ public final class FontImage extends Image {
     ///
     /// - `size`: The font size.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### Deprecated
     ///
     /// use `float)` instead
@@ -7037,9 +7030,6 @@ public final class FontImage extends Image {
     ///
     /// - `size`: The font size.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void setIcon(IconHolder l, Font font, char[] icons, float size) {
         Style s = new Style(l.getIconStyleComponent().getUnselectedStyle());
         s.setFont(font.derive(rightSize(s, size), Font.STYLE_PLAIN));
@@ -7120,9 +7110,6 @@ public final class FontImage extends Image {
     ///
     /// - `size`: the size of the icon in millimeters, or -1 to use the default height of the font
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void setMaterialIcon(Label l, char[] icons, float size) {
         setFontIcon(l, getMaterialDesignFont(), icons, size);
     }
@@ -7318,9 +7305,6 @@ public final class FontImage extends Image {
     ///
     /// - `icon`: one of the MATERIAL_* icons
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void setMaterialIcon(IconHolder l, char icon) {
         FontImage.setIcon(l, icon, -1);
     }
@@ -8104,9 +8088,6 @@ public final class FontImage extends Image {
     ///
     /// - `alpha`: 0-255 alpha value.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setFgAlpha(int alpha) {
         fgAlpha = alpha;
     }

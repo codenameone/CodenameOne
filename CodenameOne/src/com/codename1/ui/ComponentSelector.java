@@ -4277,10 +4277,6 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - IconHolder#setIconUIID(java.lang.String)
@@ -4572,9 +4568,6 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     ///
     /// - `l`: The listener to remove
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public ComponentSelector removeActionListener(ActionListener l) {
         for (Component c : this) {
             if (c instanceof ActionSource) {
@@ -4658,10 +4651,6 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// #### Returns
     ///
     /// Self for chaining.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -5384,9 +5373,6 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public ComponentSelector setMaterialIcon(char icon, float size) {
         for (Component c : this) {
             if (c instanceof Label) {
@@ -5457,9 +5443,6 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     ///
     /// A ComponentSelector with 0 or 1 element.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public ComponentSelector first() {
         if (!isEmpty()) {
             return new ComponentSelector(results.iterator().next());

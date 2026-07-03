@@ -300,9 +300,6 @@ public class Font extends CN {
     ///
     /// a font object
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static Font createTrueTypeFont(String fontName, float size, byte sizeUnit) {
         return createTrueTypeFont(fontName, fontName).
                 derive(Display.getInstance().convertToPixels(size, sizeUnit), STYLE_PLAIN);
@@ -523,9 +520,6 @@ public class Font extends CN {
     ///
     /// scaled font instance
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public Font derive(float size, int weight, byte unitType) {
         return derive(Display.getInstance().convertToPixels(size, unitType), weight);
     }

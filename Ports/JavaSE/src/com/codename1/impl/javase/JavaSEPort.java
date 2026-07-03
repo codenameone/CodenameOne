@@ -498,7 +498,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * Returns the Java version as an int value.
      *
      * @return the Java version as an int value (8, 9, etc.)
-     * @since 12130
+     * @since 7.0
      */
     private static int getJavaVersion() {
         if (cachedJavaVersion < 0) {
@@ -2414,7 +2414,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      *
      * @param cmp The component to print.
      * @param indent Indent string printed at start of each line.
-     * @since 8.0
+     * @since 7.0
      */
     public static void dumpComponentProperties(Object cmp, String indent) {
         Class cls = cmp.getClass();
@@ -15206,6 +15206,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             };
         }
         return imIO;
+    }
+
+    private com.codename1.media.VideoIO videoIO;
+    private boolean videoIOResolved;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (!videoIOResolved) {
+            videoIOResolved = true;
+            if (com.codename1.impl.javase.ffmpeg.FFMPEGVideoIO.isAvailable()) {
+                videoIO = new com.codename1.impl.javase.ffmpeg.FFMPEGVideoIO();
+            }
+        }
+        return videoIO;
     }
 
     @Override

@@ -256,9 +256,6 @@ public final class Util {
     ///
     /// - `IOException`: If the file does not exist, or cannot be read for some reason.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static String readToString(File file, String charset) throws IOException {
         if (charset == null) {
             charset = "UTF-8";
@@ -283,9 +280,6 @@ public final class Util {
     ///
     /// - `IOException`: If the file does not exist, or cannot be read for some reason.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static String readToString(File file) throws IOException {
         return readToString(file, "UTF-8");
     }
@@ -302,9 +296,6 @@ public final class Util {
     ///
     /// - `IOException`: If it cannot write to the file for some reason.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static void writeStringToFile(File file, String contents) throws IOException {
         writeStringToFile(file, contents, "UTF-8");
     }
@@ -323,9 +314,6 @@ public final class Util {
     ///
     /// - `IOException`: If it cannot write to the file for some reason.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static void writeStringToFile(File file, String contents, String charset) throws IOException {
         if (charset == null) {
             charset = "UTF-8";
@@ -375,9 +363,6 @@ public final class Util {
     ///
     /// - `IOException`: thrown by the stream
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static String readToString(Reader reader) throws IOException {
         StringBuilder sb = new StringBuilder();
         char[] buf = new char[1024];
@@ -2124,10 +2109,6 @@ public final class Util {
     ///
     /// - `onFail`: Callback called if we fail to load the image.
     ///
-    /// #### Since
-    ///
-    /// 3.4
-    ///
     /// #### See also
     ///
     /// - ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
@@ -2144,10 +2125,6 @@ public final class Util {
     ///
     /// - `fileName`: @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
     /// network request altogether.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -2183,10 +2160,6 @@ public final class Util {
     ///
     /// - `onSuccess`: Callback called on success.
     ///
-    /// #### Since
-    ///
-    /// 3.4
-    ///
     /// #### See also
     ///
     /// - ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback)
@@ -2208,10 +2181,6 @@ public final class Util {
     ///
     /// - `onFail`: Callback called if we fail to load the image.
     ///
-    /// #### Since
-    ///
-    /// 3.4
-    ///
     /// #### See also
     ///
     /// - ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
@@ -2228,10 +2197,6 @@ public final class Util {
     ///
     /// - `fileName`: @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
     /// network request altogether.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -2279,9 +2244,6 @@ public final class Util {
     ///
     /// AsyncResource to wrap the Image.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncResource<Image> downloadImageToCache(String url) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToCache(url, new SuccessCallback<Image>() {
@@ -2312,10 +2274,6 @@ public final class Util {
     /// network request altogether.
     ///
     /// - `onSuccess`: Callback called on success.
-    ///
-    /// #### Since
-    ///
-    /// 3.4
     ///
     /// #### See also
     ///

@@ -97,10 +97,6 @@ public final class AnimationManager {
     ///
     /// - `an`: The animation
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - UIMutation
@@ -171,10 +167,6 @@ public final class AnimationManager {
     /// - `an`: The animation
     ///
     /// - `callback`: A callback to be run on completion.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

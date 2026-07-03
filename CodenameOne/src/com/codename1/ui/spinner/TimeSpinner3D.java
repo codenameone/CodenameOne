@@ -261,10 +261,6 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     ///
     /// - `IllegalStateException`: If the spinner is not in 24 hour mode.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #getMinHour()
@@ -285,10 +281,6 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     ///
     /// The current minimum hour (0-24).  -1 for no limit.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #setHourRange(int, int)
@@ -303,10 +295,6 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     /// #### Returns
     ///
     /// The current maximum hour (0-24). -1 for no limit.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///

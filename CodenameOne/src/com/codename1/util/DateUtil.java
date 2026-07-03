@@ -65,9 +65,6 @@ public class DateUtil {
     ///
     /// The earliest of a set of dates.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public static Date min(Date... dates) {
         int len = dates.length;
         if (len == 0) {
@@ -97,9 +94,6 @@ public class DateUtil {
     ///
     /// -1 if first date is earlier.  1 if first date is later.  0 if they are the same.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public static int compare(Date d1, Date d2) {
         if (d1 == null) {
             return d2 == null ? 0 : -1;
@@ -155,9 +149,6 @@ public class DateUtil {
     ///
     /// - == 0 - if they are equal.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Comparator<Date> compareByDateField(final long field) {
         return new Comparator<Date>() {
             @Override
@@ -205,9 +196,6 @@ public class DateUtil {
     ///
     /// The latest of a set of dates.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public static Date max(Date... dates) {
         int len = dates.length;
         if (len == 0) {
@@ -279,9 +267,6 @@ public class DateUtil {
     ///
     /// True if the two times are on the same year.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameYear(Calendar c1, Calendar c2) {
 
         return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR);
@@ -299,9 +284,6 @@ public class DateUtil {
     ///
     /// True if the two dates are on the same year.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameYear(Date d1, Date d2) {
         Calendar c1 = Calendar.getInstance(tz);
         c1.setTime(d1);
@@ -323,9 +305,6 @@ public class DateUtil {
     ///
     /// True if the two times are on the same month.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameMonth(Calendar c1, Calendar c2) {
 
         return isSameYear(c1, c2)
@@ -344,9 +323,6 @@ public class DateUtil {
     ///
     /// True if the two dates are on the same month.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameMonth(Date d1, Date d2) {
         Calendar c1 = Calendar.getInstance(tz);
         c1.setTime(d1);
@@ -368,9 +344,6 @@ public class DateUtil {
     ///
     /// True if the two times are on the same day.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameDay(Calendar c1, Calendar c2) {
 
         return isSameMonth(c1, c2)
@@ -389,9 +362,6 @@ public class DateUtil {
     ///
     /// True if the two dates are on the same day.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameDay(Date d1, Date d2) {
         Calendar c1 = Calendar.getInstance(tz);
         c1.setTime(d1);
@@ -413,9 +383,6 @@ public class DateUtil {
     ///
     /// True if the two times are on the same hour.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameHour(Calendar c1, Calendar c2) {
 
         return isSameDay(c1, c2)
@@ -434,9 +401,6 @@ public class DateUtil {
     ///
     /// True if the two dates are on the same hour.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameHour(Date d1, Date d2) {
         Calendar c1 = Calendar.getInstance(tz);
         c1.setTime(d1);
@@ -458,9 +422,6 @@ public class DateUtil {
     ///
     /// True if the two times are on the same minute.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameMinute(Calendar c1, Calendar c2) {
 
         return isSameHour(c1, c2)
@@ -479,9 +440,6 @@ public class DateUtil {
     ///
     /// True if the two dates are on the same minute.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameMinute(Date d1, Date d2) {
         Calendar c1 = Calendar.getInstance(tz);
         c1.setTime(d1);
@@ -503,9 +461,6 @@ public class DateUtil {
     ///
     /// True if the two times are on the same second.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameSecond(Calendar c1, Calendar c2) {
 
         return isSameMinute(c1, c2)
@@ -524,9 +479,6 @@ public class DateUtil {
     ///
     /// True if the two dates are on the same second.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameSecond(Date d1, Date d2) {
         Calendar c1 = Calendar.getInstance(tz);
         c1.setTime(d1);
@@ -548,9 +500,6 @@ public class DateUtil {
     ///
     /// True if the two times are on the same time.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameTime(Calendar c1, Calendar c2) {
 
         return c1.getTime().getTime() == c2.getTime().getTime();
@@ -568,9 +517,6 @@ public class DateUtil {
     ///
     /// True if the two dates are on the same time.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSameTime(Date d1, Date d2) {
         return d1.getTime() == d2.getTime();
     }
@@ -585,9 +531,6 @@ public class DateUtil {
     ///
     /// String representing how long ago from now the given date is.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public String getTimeAgo(Date date) {
         if (date == null) {
             return "N/A";

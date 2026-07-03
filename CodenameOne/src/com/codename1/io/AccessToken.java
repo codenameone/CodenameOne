@@ -48,9 +48,6 @@ public class AccessToken implements Externalizable {
     /// since the expires value may just be the number of seconds that the access token is good
     /// for since it was generated - and we may not have that information stored.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     private Date expiryDate;
 
     private String refreshToken;
@@ -70,7 +67,6 @@ public class AccessToken implements Externalizable {
 
     /// Constructor with parameters
     ///
-    /// @since 7.0
     ///
     /// #### Parameters
     ///
@@ -85,7 +81,6 @@ public class AccessToken implements Externalizable {
 
     /// Constructor with parameters
     ///
-    /// @since 7.0
     ///
     /// #### Parameters
     ///
@@ -104,9 +99,6 @@ public class AccessToken implements Externalizable {
         this.identityToken = identityToken;
     }
 
-    /// #### Since
-    ///
-    /// 7.0
     public AccessToken() {
 
     }
@@ -117,9 +109,6 @@ public class AccessToken implements Externalizable {
     ///
     /// - `expiryDate`: The expiry date.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AccessToken createWithExpiryDate(String token, Date expiryDate) {
         AccessToken out = new AccessToken(token, null);
 
@@ -238,9 +227,6 @@ public class AccessToken implements Externalizable {
     ///
     /// Refresh token.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public String getRefreshToken() {
         return refreshToken;
     }
@@ -251,9 +237,6 @@ public class AccessToken implements Externalizable {
     ///
     /// - `refreshToken`: The refresh token.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setRefreshToken(String refreshToken) {
         this.refreshToken = refreshToken;
     }
@@ -291,9 +274,6 @@ public class AccessToken implements Externalizable {
     ///
     /// The expiry date of this token or null.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Date getExpiryDate() {
         return expiryDate;
     }
@@ -304,9 +284,6 @@ public class AccessToken implements Externalizable {
     ///
     /// - `date`: The expiry date of this token.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setExpiryDate(Date date) {
         this.expiryDate = date;
     }
@@ -317,9 +294,6 @@ public class AccessToken implements Externalizable {
     ///
     /// False if no expiry date is set or the expiryDate is before the current time.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isExpired() {
         return expiryDate != null && DateUtil.compare(expiryDate, new Date()) < 0;
     }
@@ -328,9 +302,6 @@ public class AccessToken implements Externalizable {
     ///
     /// the identityToken
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public String getIdentityToken() {
         return identityToken;
     }
@@ -339,9 +310,6 @@ public class AccessToken implements Externalizable {
     ///
     /// - `identityToken`: the identityToken to set
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setIdentityToken(String identityToken) {
         this.identityToken = identityToken;
     }

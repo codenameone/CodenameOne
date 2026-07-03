@@ -41,10 +41,6 @@ public final class Graphics {
     /// primitives in a quick way, at the cost of quality, if there is an
     /// expensive operation.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setRenderingHints(int)
@@ -212,10 +208,6 @@ public final class Graphics {
     ///
     /// - `paint`
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - LinearGradientPaint
@@ -228,10 +220,6 @@ public final class Graphics {
     /// #### Returns
     ///
     /// The paint that is to be used for filling shapes.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -251,9 +239,6 @@ public final class Graphics {
     ///
     /// The previous color value.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int setAndGetColor(int rgb) {
         int old = getColor();
         setColor(rgb);
@@ -1201,9 +1186,6 @@ public final class Graphics {
     ///
     /// - `transform`: The transform to concatenate.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void transform(Transform transform) {
         Transform existing = getTransform();
         existing.concatenate(transform);
@@ -1683,9 +1665,6 @@ public final class Graphics {
     ///
     /// The previous alpha setting (0-255).
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public int concatenateAlpha(int a) {
         if (a == 255) {
             return getAlpha();
@@ -1893,9 +1872,6 @@ public final class Graphics {
     ///
     /// - `angle`: the rotation angle in radians about graphics context's translated origin.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void rotateRadians(float angle) {
         rotateRadians(angle, 0, 0);
     }
@@ -1933,9 +1909,6 @@ public final class Graphics {
     ///
     /// - `pivotY`: the pivot point relative to the current graphics context's translation.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void rotateRadians(float angle, int pivotX, int pivotY) {
         impl.rotate(nativeGraphics, angle, pivotX + xTranslate, pivotY + yTranslate);
     }
@@ -2103,10 +2076,6 @@ public final class Graphics {
     /// #### Parameters
     ///
     /// - `hints`: int of rendering hints produced by logical AND on all applicable hints.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

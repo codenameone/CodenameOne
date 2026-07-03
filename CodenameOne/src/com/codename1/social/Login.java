@@ -75,10 +75,6 @@ public abstract class Login {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setScope(java.lang.String)
@@ -124,9 +120,6 @@ public abstract class Login {
     ///
     /// AsyncResource that can be monitored for completion.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Login> connect() {
         final AsyncResource<Login> out = new AsyncResource<Login>();
         if (isUserLoggedIn()) {
@@ -153,9 +146,6 @@ public abstract class Login {
     ///
     /// - `callback`: Callback to be called if login succeeds or fails.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void doLogin(LoginCallback callback) {
         if (callback != null) {
             loginCallbacksSingleUse.add(callback);
@@ -437,9 +427,6 @@ public abstract class Login {
     ///
     /// the preferRedirectPrompt
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isPreferRedirectPrompt() {
         return preferRedirectPrompt;
     }
@@ -453,9 +440,6 @@ public abstract class Login {
     ///
     /// - `preferRedirectPrompt`: the preferRedirectPrompt to set
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setPreferRedirectPrompt(boolean preferRedirectPrompt) {
         this.preferRedirectPrompt = preferRedirectPrompt;
     }

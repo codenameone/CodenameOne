@@ -219,9 +219,6 @@ import java.util.Arrays;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 6.0
 public abstract class ButtonList extends Container implements DataChangedListener, SelectionListener, ActionListener, ActionSource {
     private final EventDispatcher actionListeners = new EventDispatcher();
     private final java.util.List<Runnable> onReady = new ArrayList<Runnable>();

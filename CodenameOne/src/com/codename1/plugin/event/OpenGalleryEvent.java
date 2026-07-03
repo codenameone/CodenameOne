@@ -28,9 +28,6 @@ import com.codename1.ui.events.ActionListener;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 8.0
 public class OpenGalleryEvent extends PluginEvent<Void> {
     private final ActionListener response;
 
@@ -48,10 +45,6 @@ public class OpenGalleryEvent extends PluginEvent<Void> {
     ///
     /// The response listener.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - Display#openGallery(com.codename1.ui.events.ActionListener, int)
@@ -64,10 +57,6 @@ public class OpenGalleryEvent extends PluginEvent<Void> {
     /// #### Returns
     ///
     /// The type of gallery to open.
-    ///
-    /// #### Since
-    ///
-    /// 8.0
     ///
     /// #### See also
     ///

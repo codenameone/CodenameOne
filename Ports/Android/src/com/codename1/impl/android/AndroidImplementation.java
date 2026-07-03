@@ -7169,7 +7169,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return os;
     }
 
-    private String removeFilePrefix(String file) {
+    static String removeFilePrefix(String file) {
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
@@ -7736,7 +7736,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @param context The context
      * @param soundName The name of the sound to use for notifications on this channel.  E.g. mysound.mp3.  This feature is not yet implemented, but
      *  parameter is added now to scaffold compatibility with build daemon until implementation is complete.
-     * @since 8.0
+     * @since 7.0
      */
     public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context, String soundName) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
@@ -9984,6 +9984,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return l10n;
     }
     private com.codename1.ui.util.ImageIO imIO;
+
+    private com.codename1.media.VideoIO videoIO;
+    private boolean videoIOResolved;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (!videoIOResolved) {
+            videoIOResolved = true;
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                videoIO = new AndroidVideoIO();
+            }
+        }
+        return videoIO;
+    }
 
     @Override
     public com.codename1.ui.util.ImageIO getImageIO() {

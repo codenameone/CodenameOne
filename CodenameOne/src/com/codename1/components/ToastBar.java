@@ -402,9 +402,6 @@ public final class ToastBar {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public ToastBar useFormLayeredPane(boolean useFormLayeredPane) {
         if (useFormLayeredPane != this.useFormLayeredPane) {
             ToastBarComponent c = getToastBarComponent(false);

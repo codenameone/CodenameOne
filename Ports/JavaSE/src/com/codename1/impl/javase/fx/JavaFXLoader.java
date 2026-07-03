@@ -489,7 +489,7 @@ public class JavaFXLoader {
      * Returns the Java version as an int value.
      *
      * @return the Java version as an int value (8, 9, etc.)
-     * @since 12130
+     * @since 7.0
      */
     private static int getJavaVersion() {
         if (cachedJavaVersion < 0) {

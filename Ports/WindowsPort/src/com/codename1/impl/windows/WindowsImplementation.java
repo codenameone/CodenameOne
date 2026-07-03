@@ -2266,6 +2266,26 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return new WindowsWebSocketImpl(url);
     }
 
+    /* --------------------------------------------------------- video I/O */
+
+    private com.codename1.media.VideoIO videoIO;
+    private boolean videoIOResolved;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (!videoIOResolved) {
+            videoIOResolved = true;
+            try {
+                if (WindowsNative.videoBackendAvailable()) {
+                    videoIO = new WindowsVideoIO();
+                }
+            } catch (Throwable t) {
+                videoIO = null;
+            }
+        }
+        return videoIO;
+    }
+
     /* --------------------------------------------------------- image I/O */
 
     @Override

@@ -28,9 +28,6 @@ package com.codename1.ui;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public interface SelectableIconHolder extends IconHolder {
 
     /// Indicates the icon that is displayed on the button when the button is in

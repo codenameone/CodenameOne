@@ -49,9 +49,6 @@ public abstract class SocketConnection {
     ///
     /// - `connectTimeout`: The connect timeout.  0 for infinite.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public SocketConnection(int connectTimeout) {
         this.connectTimeout = connectTimeout;
     }
@@ -102,9 +99,6 @@ public abstract class SocketConnection {
     ///
     /// - `connectTimeout`: The connect timeout.  0 for infinite timeout.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setConnectTimeout(int connectTimeout) {
         this.connectTimeout = connectTimeout;
     }

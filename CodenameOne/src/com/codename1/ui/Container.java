@@ -333,9 +333,6 @@ public class Container extends Component implements Iterable<Component> {
     ///
     /// True if this container is a surface.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isSurface() {
         return surface;
     }
@@ -346,10 +343,6 @@ public class Container extends Component implements Iterable<Component> {
     /// #### Parameters
     ///
     /// - `surface`: True to set this container as a surface.
-    ///
-    /// #### Since
-    ///
-    /// 8.0
     ///
     /// #### See also
     ///
@@ -868,9 +861,6 @@ public class Container extends Component implements Iterable<Component> {
     /// @return True if children should calculate their layout widgets as if the component
     /// weren't scrollable.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected boolean constrainWidthWhenScrollable() {
         return false;
     }
@@ -889,9 +879,6 @@ public class Container extends Component implements Iterable<Component> {
     /// @return True if children should calculate their layout widgets as if the component
     /// weren't scrollable.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected boolean constrainHeightWhenScrollable() {
         return false;
     }
@@ -1528,9 +1515,6 @@ public class Container extends Component implements Iterable<Component> {
     /// the container at its final position.  Using this method, it will
     /// wait until running animations are complete before it revalidates.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void revalidateWithAnimationSafety() {
         if (revalidatePending) {
             return;
@@ -1891,10 +1875,6 @@ public class Container extends Component implements Iterable<Component> {
     /// #### Parameters
     ///
     /// - `allow`: Whether to allow enable layout on paint.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -2296,10 +2276,6 @@ public class Container extends Component implements Iterable<Component> {
     ///
     /// True if this container is a safe area.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setSafeArea(boolean)
@@ -2325,10 +2301,6 @@ public class Container extends Component implements Iterable<Component> {
     ///
     /// - `safeArea`: True to make this container a safe area.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - Form#getSafeArea()
@@ -2344,10 +2316,6 @@ public class Container extends Component implements Iterable<Component> {
     /// against whose bounds, safe area margins are calculated for child components.
     ///
     /// Forms are safe area roots by default.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -2366,9 +2334,6 @@ public class Container extends Component implements Iterable<Component> {
     /// calculating the safe areas of child components.  Setting a root can facilitate the
     /// layout of a container's children before it appears on the screen.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Container getSafeAreaRoot() {
         if (safeAreaRoot) {
             return this;
@@ -2402,10 +2367,6 @@ public class Container extends Component implements Iterable<Component> {
     /// #### Parameters
     ///
     /// - `root`: True to make this a root.  False to make it "not" a root.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

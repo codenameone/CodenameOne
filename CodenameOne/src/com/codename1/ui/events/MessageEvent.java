@@ -30,10 +30,6 @@ import com.codename1.util.AsyncResource;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
-///
 /// #### See also
 ///
 /// - Display#postMessage(com.codename1.ui.events.MessageEvent)

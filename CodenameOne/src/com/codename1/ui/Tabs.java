@@ -2150,9 +2150,6 @@ public class Tabs extends Container {
     ///
     /// - `b`: `true` to set the swipe on the X-Axis, `false` to set the swipe on the Y-Axis
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setSwipeOnXAxis(boolean b) {
         if (swipeOnXAxis != b) {
             swipeOnXAxis = b;

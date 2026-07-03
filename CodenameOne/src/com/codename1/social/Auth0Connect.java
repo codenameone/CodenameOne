@@ -63,7 +63,6 @@ import java.util.Map;
 /// your custom API) pass it via [#withAudience(String)] before calling
 /// [#signIn(String, String, String...)].
 ///
-/// @since 7.0.245
 public final class Auth0Connect extends Login {
 
     private static Auth0Connect INSTANCE;
@@ -131,7 +130,6 @@ public final class Auth0Connect extends Login {
     /// [com.codename1.io.webauthn.WebAuthnException#NOT_IMPLEMENTED] on
     /// platforms that don't have a WebAuthn implementation.
     ///
-    /// @since 7.0.245
     public AsyncResource<OidcTokens> signInWithPasskey(final String clientId,
                                                        final String realm,
                                                        final String... scopes) {
@@ -173,7 +171,6 @@ public final class Auth0Connect extends Login {
     /// 2. Run [WebAuthnClient#create] with those options.
     /// 3. POST `/oauth/token` to swap the authenticator response for tokens.
     ///
-    /// @since 7.0.245
     public AsyncResource<OidcTokens> registerPasskey(final String clientId,
                                                      final String realm,
                                                      final String email,

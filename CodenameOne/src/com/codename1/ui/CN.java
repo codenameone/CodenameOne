@@ -165,18 +165,12 @@ public class CN extends CN1Constants {
     ///
     /// - `bookmark`: A `Runnable` that can be run to restore the app to a particular point.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static void setBookmark(Runnable bookmark) {
         Display.getInstance().setBookmark(bookmark);
     }
 
     /// Runs the last bookmark that was set using `#setBookmark(java.lang.Runnable)`
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static void restoreToBookmark() {
         Display.getInstance().restoreToBookmark();
     }
@@ -242,10 +236,6 @@ public class CN extends CN1Constants {
     ///
     /// Whether async stack traces are enabled.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setEnableAsyncStackTraces(boolean)
@@ -262,10 +252,6 @@ public class CN extends CN1Constants {
     /// #### Parameters
     ///
     /// - `enable`: True to enable async stack traces.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -413,9 +399,6 @@ public class CN extends CN1Constants {
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
     /// anywhere in the Runnable.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void invokeWithoutBlocking(Runnable r) {
         Display.INSTANCE.invokeWithoutBlocking(r);
     }
@@ -433,9 +416,6 @@ public class CN extends CN1Constants {
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
     /// anywhere in the Runnable.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
         return Display.INSTANCE.invokeWithoutBlockingWithResultSync(r);
     }
@@ -526,9 +506,6 @@ public class CN extends CN1Constants {
     ///
     /// The value converted to pixels.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static int convertToPixels(float value, byte unitType, boolean horizontal) {
         return Display.INSTANCE.convertToPixels(value, unitType, horizontal);
     }
@@ -547,9 +524,6 @@ public class CN extends CN1Constants {
     ///
     /// The value converted to pixels.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static int convertToPixels(float value, byte unitType) {
         return Display.INSTANCE.convertToPixels(value, unitType);
     }
@@ -747,10 +721,6 @@ public class CN extends CN1Constants {
     /// @return true on success.  This will also return true if the app is already running in full-screen mode.  It will return false
     /// if the app fails to enter full-screen mode.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #exitFullScreen()
@@ -775,10 +745,6 @@ public class CN extends CN1Constants {
     /// @return true on success.  This will also return true if the app is already NOT in full-screen mode.  It will return false
     /// if the app fails to exit full-screen mode.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #requestFullScreen()
@@ -795,10 +761,6 @@ public class CN extends CN1Constants {
     /// #### Returns
     ///
     /// true if the app is currently in full-screen mode.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -824,10 +786,6 @@ public class CN extends CN1Constants {
     /// #### Returns
     ///
     /// true if Full-screen mode is supported on this platform.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -2178,10 +2136,6 @@ public class CN extends CN1Constants {
     ///
     /// True if you are able to prompt the user to install the app on their homescreen.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #promptInstallOnHomescreen()
@@ -2198,10 +2152,6 @@ public class CN extends CN1Constants {
     ///
     /// @return The result of the user prompt.  true if the user accepts the installation,
     /// false if they reject it.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -2220,9 +2170,6 @@ public class CN extends CN1Constants {
     /// - `r`: @param r Runnable that will be run when/if you are permitted to prompt the user to install
     /// the app on their homescreen.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public static void onCanInstallOnHomescreen(Runnable r) {
         Display.impl.onCanInstallOnHomescreen(r);
     }
@@ -2233,9 +2180,6 @@ public class CN extends CN1Constants {
     ///
     /// An image of the screen, or null if it fails.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Image captureScreen() {
         return Display.impl.captureScreen();
     }
@@ -2253,9 +2197,6 @@ public class CN extends CN1Constants {
     ///
     /// - `l`: The listener.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void addMessageListener(ActionListener<MessageEvent> l) {
         Display.INSTANCE.addMessageListener(l);
     }
@@ -2268,9 +2209,6 @@ public class CN extends CN1Constants {
     ///
     /// - `l`: The listener.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void removeMessageListener(ActionListener<MessageEvent> l) {
         Display.INSTANCE.removeMessageListener(l);
     }
@@ -2287,9 +2225,6 @@ public class CN extends CN1Constants {
     ///
     /// - `message`: The message to send to the native platform.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void postMessage(MessageEvent message) {
         Display.INSTANCE.postMessage(message);
     }
@@ -2305,10 +2240,6 @@ public class CN extends CN1Constants {
     /// #### Returns
     ///
     /// The Timer object that can be used to cancel the task.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -2329,10 +2260,6 @@ public class CN extends CN1Constants {
     /// #### Returns
     ///
     /// The timer object which can be used to cancel the task.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -2374,9 +2301,6 @@ public class CN extends CN1Constants {
     ///
     /// A shared BrowserComponent
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static BrowserComponent getSharedJavascriptContext() {
         return Display.impl.getSharedJavscriptContext();
     }
@@ -2387,9 +2311,6 @@ public class CN extends CN1Constants {
     ///
     /// The plugin support object.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static PluginSupport getPluginSupport() {
         return Display.INSTANCE.getPluginSupport();
     }

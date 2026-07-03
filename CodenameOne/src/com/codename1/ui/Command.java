@@ -146,9 +146,6 @@ public class Command implements ActionListener<ActionEvent> {
     ///
     /// a newly created Command instance
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public static Command createMaterial(String name, char icon, final ActionListener ev) {
         Command cmd = new Command(name) {
             @Override

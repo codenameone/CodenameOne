@@ -41,7 +41,6 @@ import java.util.Map;
 /// attestation or assertion on the device -- that is the relying party's
 /// responsibility.
 ///
-/// @since 7.0.245
 public final class PublicKeyCredential {
 
     /// Credential type -- always `"public-key"` for WebAuthn.

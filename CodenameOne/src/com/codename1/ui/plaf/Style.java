@@ -121,9 +121,6 @@ public class Style {
     public static final String ICON_GAP = "iconGap";
     /// Icon gap unit attribute.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static final String ICON_GAP_UNIT = "iconGapUnit";
     /// Surface attribute name for the theme hashtable.
     public static final String SURFACE = "surface";
@@ -231,34 +228,19 @@ public class Style {
     public static final byte UNIT_TYPE_DIPS = 2;
     /// Indicates the unit type for padding/margin as a percentage of the screen width.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static final byte UNIT_TYPE_VW = 3;
     /// Indicates the unit type for padding/margin as a percentage of the screen height.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static final byte UNIT_TYPE_VH = 4;
     /// Indicates the unit type for padding/margin as a percentage the minimum of screen width and height.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static final byte UNIT_TYPE_VMIN = 5;
     /// Indicates the unit type for padding/margin as a percentage the maximum of screen width and height.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static final byte UNIT_TYPE_VMAX = 6;
     /// Indicates the unit type for padding/margin relative to the font size of the default font.
     /// 1rem == Font.getDefaultFont().getHeight()
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static final byte UNIT_TYPE_REM = 7;
     /// Indicates the background alignment for use in tiling or aligned images.
     private static final byte BACKGROUND_IMAGE_ALIGN_TOP = (byte) 0xa1;
@@ -605,9 +587,6 @@ public class Style {
     ///
     /// The elevation value.  Default is 0.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int getElevation() {
         return elevation;
     }
@@ -618,18 +597,12 @@ public class Style {
     ///
     /// - `elevation`: The elevation value.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setElevation(int elevation) {
         setElevation(elevation, false);
     }
 
     /// Returns the icon gap in pixels.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int getIconGap() {
         if (iconGap < 0) {
             return -1;
@@ -674,10 +647,6 @@ public class Style {
     ///
     /// - `gap`: The icon gap.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - #getIconGapUnit()
@@ -693,9 +662,6 @@ public class Style {
     ///
     /// The icon gap unit
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int getIconGapUnit() {
         return iconGapUnit;
     }
@@ -706,9 +672,6 @@ public class Style {
     ///
     /// - `unit`: The icon gap unit.  One of the standard style units of measurement.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setIconGapUnit(byte unit) {
         setIconGapUnit(unit, false);
     }
@@ -720,9 +683,6 @@ public class Style {
     ///
     /// True if container should be rendered as a surface.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isSurface() {
         return surface;
     }
@@ -735,9 +695,6 @@ public class Style {
     ///
     /// - `surface`: True to enable surface rendering mode.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setSurface(boolean surface) {
         setSurface(surface, false);
     }
@@ -975,9 +932,6 @@ public class Style {
     ///
     /// the foreground alpha for the component
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int getFgAlpha() {
         return fgAlpha;
     }
@@ -1018,9 +972,6 @@ public class Style {
     /// - `override`: @param override  If set to true allows the look and feel/theme to override
     /// the value in this attribute when changing a theme/look and feel
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setElevation(int elevation, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1048,10 +999,6 @@ public class Style {
     ///
     /// - `override`: @param override If set to true allows the look and feel/theme to override
     /// the value in this attribute when changing a theme/look and feel
-    ///
-    /// #### Since
-    ///
-    /// 8.0
     ///
     /// #### See also
     ///
@@ -1083,10 +1030,6 @@ public class Style {
     /// - `override`: @param override If set to true allows the look and feel/theme to override
     /// the value in this attribute when changing a theme/look and feel
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - #setIconGapUnit(byte, boolean)
@@ -1102,9 +1045,6 @@ public class Style {
     ///
     /// - `unit`: The unit. One of the standard style units of measurement.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setIconGap(float gap, byte unit) {
         setIconGap(gap, unit, false);
     }
@@ -1118,9 +1058,6 @@ public class Style {
     /// - `override`: @param override If set to true allows the look and feel/theme to override
     /// the value in this attribute when changing a theme/look and feel
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setIconGapUnit(byte unit, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1148,9 +1085,6 @@ public class Style {
     /// - `override`: @param override If set to true allows the look and feel/theme to override
     /// the value in this attribute when changing a theme/look and feel
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setSurface(boolean surface, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1525,9 +1459,6 @@ public class Style {
 
     /// Strips all margin and padding from this style.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void stripMarginAndPadding() {
         setPadding(0, 0, 0, 0);
         setMargin(0, 0, 0, 0);
@@ -1771,10 +1702,6 @@ public class Style {
     ///
     /// amount of padding in the given orientation using current units.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - #getPaddingUnit()
@@ -1828,9 +1755,6 @@ public class Style {
     /// - `unit`: @param unit One of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setPaddingUnitLeft(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1849,9 +1773,6 @@ public class Style {
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setPaddingUnitRight(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1870,9 +1791,6 @@ public class Style {
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setPaddingUnitTop(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -1891,9 +1809,6 @@ public class Style {
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setPaddingUnitBottom(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -2478,9 +2393,6 @@ public class Style {
     ///
     /// number of margin using the current unit in the given orientation
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public float getMarginFloatValue(boolean rtl, int orientation) {
         if (orientation < Component.TOP || orientation > Component.RIGHT) {
             throw new IllegalArgumentException("wrong orientation " + orientation);
@@ -3093,9 +3005,6 @@ public class Style {
     ///
     /// True if change events are suppressed.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isSuppressChangeEvents() {
         return suppressChangeEvents;
     }
@@ -3106,9 +3015,6 @@ public class Style {
     ///
     /// - `suppress`: True to suppress change events.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setSuppressChangeEvents(boolean suppress) {
         this.suppressChangeEvents = suppress;
     }
@@ -3340,9 +3246,6 @@ public class Style {
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setMarginUnitLeft(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -3361,9 +3264,6 @@ public class Style {
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setMarginUnitRight(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -3382,9 +3282,6 @@ public class Style {
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setMarginUnitTop(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
@@ -3403,9 +3300,6 @@ public class Style {
     /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
     /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setMarginUnitBottom(byte unit) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
