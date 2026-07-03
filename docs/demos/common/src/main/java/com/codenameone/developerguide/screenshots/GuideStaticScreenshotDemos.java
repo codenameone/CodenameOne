@@ -396,8 +396,11 @@ public final class GuideStaticScreenshotDemos {
                 form.show();
                 Display.getInstance().callSerially(() -> {
                     InteractionDialog dialog = new InteractionDialog("Interaction");
+                    dialog.setAnimateShow(false);
+                    dialog.setRepositionAnimation(false);
                     dialog.setLayout(new BorderLayout());
                     dialog.add(BorderLayout.CENTER, new SpanLabel("This dialog can stay open while the form remains interactive."));
+                    dialog.add(BorderLayout.SOUTH, new Button("Close"));
                     dialog.show(80, 80, 80, 80);
                 });
             }
