@@ -28,9 +28,6 @@ package com.codename1.ui;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 8.0
 public class ComponentImage extends Image {
 
     private final Component cmp;

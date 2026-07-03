@@ -32,7 +32,6 @@ import java.io.IOException;
 /// (`"transport_error"`, `"state_mismatch"`, `"nonce_mismatch"`, `"user_cancelled"`,
 /// `"discovery_failed"`, `"invalid_id_token"`).
 ///
-/// @since 7.0.245
 public class OidcException extends IOException {
 
     /// Authorization server returned `error=access_denied`.

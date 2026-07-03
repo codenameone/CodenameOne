@@ -57,9 +57,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class TextSelection {
 
     /// Comparator used for ordering components in left-to-right mode.

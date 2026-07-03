@@ -27,9 +27,6 @@ package com.codename1.util;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public interface AsyncResult<V> {
     /// Called when an AsyncResource completes.  If it completes with an error, then error will be non-null.
     ///

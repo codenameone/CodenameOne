@@ -1447,9 +1447,6 @@ public abstract class MathUtil {
     /// if `f1` is numerically greater than
     /// `f2`.
     ///
-    /// #### Since
-    ///
-    /// 1.4
     public static int compare(float f1, float f2) {
         if (f1 < f2) {
             return -1;           // Neither val is NaN, thisVal is smaller
@@ -1495,9 +1492,6 @@ public abstract class MathUtil {
     /// if `d1` is numerically greater than
     /// `d2`.
     ///
-    /// #### Since
-    ///
-    /// 1.4
     public static int compare(double d1, double d2) {
         if (d1 < d2) {
             return -1;           // Neither val is NaN, thisVal is smaller

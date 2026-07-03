@@ -26,9 +26,6 @@ package com.codename1.ui;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public abstract class MultipleGradientPaint implements Paint {
 
 

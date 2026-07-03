@@ -561,9 +561,6 @@ public final class MigLayout extends Layout {
         }
     }
 
-    /// #### Since
-    ///
-    /// 3.7.3
     private void resetLastInvalidOnParent(Container parent) {
         while (parent != null) {
             Layout layoutManager = parent.getLayout();

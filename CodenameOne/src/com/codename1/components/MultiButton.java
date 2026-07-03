@@ -868,9 +868,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     ///
     /// String with textLine1 to textLine4 delimited by "\n"
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public String getTextLines() {
         return getTextLine1() + "\n" + getTextLine2() + "\n" + getTextLine3() + "\n" + getTextLine4();
     }
@@ -882,9 +879,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     ///
     /// - `text`: The text to set.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setTextLines(String text) {
         //String currTextVal = btn.getText();
         String newTextVal0 = text;
@@ -1324,9 +1318,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public int getGap() {
         return gap;
@@ -1334,9 +1325,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setGap(int gap) {
         if (gap != this.gap) {
@@ -1347,9 +1335,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public int getTextPosition() {
         String iconPosition = getIconPosition();
@@ -1371,9 +1356,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setTextPosition(int textPosition) {
         switch (textPosition) {
@@ -1412,9 +1394,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Component getIconStyleComponent() {
         return icon;
@@ -1422,9 +1401,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 8.0
     @Override
     public void setMaterialIcon(char c, float size) {
         icon.setMaterialIcon(c, size);
@@ -1432,9 +1408,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 8.0
     @Override
     public void setFontIcon(Font font, char c, float size) {
         icon.setFontIcon(font, c, size);
@@ -1442,9 +1415,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getRolloverIcon() {
         return icon.getRolloverIcon();
@@ -1452,9 +1422,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setRolloverIcon(Image arg0) {
         icon.setRolloverIcon(arg0);
@@ -1462,9 +1429,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getPressedIcon() {
         return icon.getPressedIcon();
@@ -1472,9 +1436,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setPressedIcon(Image arg0) {
         icon.setPressedIcon(arg0);
@@ -1482,9 +1443,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getDisabledIcon() {
         return icon.getDisabledIcon();
@@ -1492,9 +1450,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setDisabledIcon(Image arg0) {
         icon.setDisabledIcon(arg0);
@@ -1502,9 +1457,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getRolloverPressedIcon() {
         return icon.getRolloverPressedIcon();
@@ -1512,9 +1464,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setRolloverPressedIcon(Image icn) {
         icon.setRolloverPressedIcon(icn);
@@ -1522,9 +1471,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getIconFromState() {
         return icon.getIconFromState();
@@ -1535,10 +1481,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     /// #### Returns
     ///
     /// the badge text to be used on this label.  May return if no text is set.
-    ///
-    /// #### Since
-    ///
-    /// 8.0
     ///
     /// #### See also
     ///
@@ -1561,10 +1503,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     /// - `badgeText`: @param badgeText The text to include in the badge.   null or empty strings will result in the
     /// badge not being rendered.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - #getBadgeText()
@@ -1583,10 +1521,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     ///
     /// - `badgeUIID`: The UIID to use for the badge.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - #setBadgeText(java.lang.String)
@@ -1601,10 +1535,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     /// #### Returns
     ///
     /// The component whose style can be used to style the badge.  May return null if none set.
-    ///
-    /// #### Since
-    ///
-    /// 8.0
     ///
     /// #### See also
     ///

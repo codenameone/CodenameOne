@@ -32,10 +32,6 @@ import com.codename1.ui.list.ListModel;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 6.0
-///
 /// #### See also
 ///
 /// - ButtonList for code samples

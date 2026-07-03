@@ -292,9 +292,6 @@ public class Slider extends Label implements ActionSource {
     ///
     /// The progress of the slider.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public int getProgress(ActionEvent evt) {
         if (evt instanceof SliderActionEvent) {
             return ((SliderActionEvent) evt).value;

@@ -140,9 +140,6 @@ public class L10NManager {
     ///
     /// Short month name.  E.g. Jan, Feb, etc..
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public String getShortMonthName(Date date) {
         return limitLength(getLongMonthName(date), 3);
     }
@@ -157,9 +154,6 @@ public class L10NManager {
     ///
     /// Long month name.  E.g. January, February, etc..
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public String getLongMonthName(Date date) {
         String fmt = formatDateLongStyle(date);
         try {

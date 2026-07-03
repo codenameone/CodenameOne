@@ -470,10 +470,6 @@ public class RadioButton extends Button {
     ///
     /// - `l`: Listener to be notified when selected value changes.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #removeChangeListener(com.codename1.ui.events.ActionListener)
@@ -489,10 +485,6 @@ public class RadioButton extends Button {
     /// #### Parameters
     ///
     /// - `l`
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///

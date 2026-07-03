@@ -94,9 +94,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// A listener used to bind the state with another button.  When that button's state
     /// changes, then this button state will also change.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     private ActionListener<? extends ActionEvent> bindListener;
 
     /// Constructs a button with an empty string for its text.
@@ -340,10 +337,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     ///
     /// - `button`: The button whose state to bind to.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #unbindStateFrom(com.codename1.ui.Button)
@@ -356,10 +349,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// #### Parameters
     ///
     /// - `button`: The button to unbind state from.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -554,10 +543,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     ///
     /// - `l`: Listener to be notified when state changes
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #getState()
@@ -578,10 +563,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// #### Parameters
     ///
     /// - `l`: State change listener to remove.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

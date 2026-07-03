@@ -28,10 +28,6 @@ import com.codename1.ui.geom.Rectangle2D;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
-///
 /// #### See also
 ///
 /// - Graphics#setColor(com.codename1.ui.Paint)

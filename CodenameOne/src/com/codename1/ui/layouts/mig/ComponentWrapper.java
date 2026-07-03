@@ -139,10 +139,6 @@ public interface ComponentWrapper {
     ///
     /// The minimum width of the component.
     ///
-    /// #### Since
-    ///
-    /// @since 3.5. Added the hint as a parameter knowing that a correction and recompilation is necessary for
-    /// any implementing classes. This change was worth it though.
     int getMinimumWidth(int hHint);
 
     /// Returns the minimum height of the component.
@@ -158,10 +154,6 @@ public interface ComponentWrapper {
     ///
     /// The minimum height of the component.
     ///
-    /// #### Since
-    ///
-    /// @since 3.5. Added the hint as a parameter knowing that a correction and recompilation is necessary for
-    /// any implementing classes. This change was worth it though.
     int getMinimumHeight(int wHint);
 
     /// Returns the preferred width of the component.
@@ -177,10 +169,6 @@ public interface ComponentWrapper {
     ///
     /// The preferred width of the component.
     ///
-    /// #### Since
-    ///
-    /// @since 3.5. Added the hint as a parameter knowing that a correction and recompilation is necessary for
-    /// any implementing classes. This change was worth it though.
     int getPreferredWidth(int hHint);
 
     /// Returns the preferred height of the component.
@@ -196,10 +184,6 @@ public interface ComponentWrapper {
     ///
     /// The preferred height of the component.
     ///
-    /// #### Since
-    ///
-    /// @since 3.5. Added the hint as a parameter knowing that a correction and recompilation is necessary for
-    /// any implementing classes. This change was worth it though.
     int getPreferredHeight(int wHint);
 
     /// Returns the maximum width of the component.
@@ -215,10 +199,6 @@ public interface ComponentWrapper {
     ///
     /// The maximum width of the component.
     ///
-    /// #### Since
-    ///
-    /// @since 3.5. Added the hint as a parameter knowing that a correction and recompilation is necessary for
-    /// any implementing classes. This change was worth it though.
     int getMaximumWidth(int hHint);
 
     /// Returns the maximum height of the component.
@@ -234,10 +214,6 @@ public interface ComponentWrapper {
     ///
     /// The maximum height of the component.
     ///
-    /// #### Since
-    ///
-    /// @since 3.5. Added the hint as a parameter knowing that a correction and recompilation is necessary for
-    /// any implementing classes. This change was worth it though.
     int getMaximumHeight(int wHint);
 
     /// Sets the component's bounds.
@@ -410,8 +386,5 @@ public interface ComponentWrapper {
     /// If the min/pref/max width depends on it's height (not common) return `net.miginfocom.layout.LayoutUtil#VERTICAL`
     /// If there is no connection between the preferred min/pref/max and the size of the component return -1.
     ///
-    /// #### Since
-    ///
-    /// 5.0
     int getContentBias();
 }

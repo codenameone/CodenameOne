@@ -430,9 +430,6 @@ public class BrowserComponent extends Container {
     ///
     /// a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public static String createDataURI(byte[] data, String mime) {
         return "data:" + mime + ";base64," + Base64.encodeNoNewline(data);
     }
@@ -447,10 +444,6 @@ public class BrowserComponent extends Container {
     ///
     /// True if javascript callbacks are run on the EDT.
     ///
-    /// #### Since
-    ///
-    /// 5.0
-    ///
     /// #### See also
     ///
     /// - #setFireCallbacksOnEdt(boolean)
@@ -464,9 +457,6 @@ public class BrowserComponent extends Container {
     ///
     /// - `edt`: True if callbacks should be run on EDT.  False if they should be run on the platform's main thread.
     ///
-    /// #### Since
-    ///
-    /// 5.0
     public void setFireCallbacksOnEdt(boolean edt) {
         this.fireCallbacksOnEdt = edt;
     }
@@ -479,9 +469,6 @@ public class BrowserComponent extends Container {
     ///
     /// AsyncResource resolving to an Image of the webview contents.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Image> captureScreenshot() {
         if (internal != null) {
             AsyncResource<Image> i = Display.impl.captureBrowserScreenshot(internal);
@@ -606,9 +593,6 @@ public class BrowserComponent extends Container {
     ///
     /// - `targetOrigin`: The target origin of the message.  E.g. http://example.com:1234
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void postMessage(final String message, final String targetOrigin) {
         if (internal == null) {
             onReady(new Runnable() {
@@ -774,10 +758,6 @@ public class BrowserComponent extends Container {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #waitForReady()
@@ -804,9 +784,6 @@ public class BrowserComponent extends Container {
     ///
     /// AsyncResouce that will complete when the browser component is ready.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<BrowserComponent> ready() {
         return ready(5000);
     }
@@ -822,9 +799,6 @@ public class BrowserComponent extends Container {
     ///
     /// AsyncResouce that will complete when the browser component is ready.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<BrowserComponent> ready(int timeout) {
         final AsyncResource<BrowserComponent> out = new AsyncResource<BrowserComponent>();
 
@@ -1332,9 +1306,6 @@ public class BrowserComponent extends Container {
     ///
     /// The result as a string.
     ///
-    /// #### Since
-    ///
-    /// 5.0
     public String executeAndReturnString(String javaScript, Object[] params) {
         return executeAndReturnString(injectParameters(javaScript, params));
     }

@@ -12,9 +12,6 @@ import java.io.OutputStream;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class WAVWriter implements AutoCloseable {
     private final File outputFile;
     private final int samplingRate;

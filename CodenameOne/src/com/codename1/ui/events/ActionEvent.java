@@ -43,9 +43,6 @@ public class ActionEvent {
     /// us from receiving new pointer pressed events while a drag is in progress.  This flag may be added to a pointer dragged
     /// event to indicate that the pointer was pressed again - in case your listener wants to monitor for this.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     private boolean pointerPressedDuringDrag;
 
     /// The rich pointer detail attached to this event, populated for pointer events.
@@ -467,9 +464,6 @@ public class ActionEvent {
     /// pointer pressed events are not delivered.  This allows you to detect if a pointer press occurred
     /// during a scroll or drag.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isPointerPressedDuringDrag() {
         return pointerPressedDuringDrag;
     }
@@ -479,9 +473,6 @@ public class ActionEvent {
     /// pointer pressed events are not delivered.  This allows you to detect if a pointer press occurred
     /// during a scroll or drag.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setPointerPressedDuringDrag(boolean pressed) {
         this.pointerPressedDuringDrag = pressed;
     }

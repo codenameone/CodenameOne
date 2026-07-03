@@ -29,9 +29,6 @@ package com.codename1.ui;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 6.0
 public interface Editable {
     /// Checks whether the component is editable.
     boolean isEditable();

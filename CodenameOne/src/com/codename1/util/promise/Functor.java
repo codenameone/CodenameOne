@@ -26,9 +26,6 @@ package com.codename1.util.promise;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 8.0
 public interface Functor<T, V> {
 
     /// Calls the function.

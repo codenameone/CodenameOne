@@ -96,9 +96,6 @@ import com.codename1.ui.util.EventDispatcher;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 3.4
 public class SignatureComponent extends Container implements ActionSource<ActionEvent> {
 
     private final SignaturePanel signaturePanel = new SignaturePanel();

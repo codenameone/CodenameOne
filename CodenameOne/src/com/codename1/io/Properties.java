@@ -214,9 +214,6 @@ public class Properties extends HashMap<String, String> {
     ///
     /// - `IOException`
     ///
-    /// #### Since
-    ///
-    /// 1.6
     @SuppressWarnings({"fallthrough", "PMD.SwitchStmtsShouldHaveDefault"})
     public synchronized void load(Reader in) throws IOException {
         if (in == null) {
@@ -402,9 +399,6 @@ public class Properties extends HashMap<String, String> {
     ///
     /// a set of keys in the property list
     ///
-    /// #### Since
-    ///
-    /// 1.6
     public Set<String> stringPropertyNames() {
         Hashtable<String, Object> stringProperties = new Hashtable<String, Object>();
         selectProperties(stringProperties, true);
@@ -505,9 +499,6 @@ public class Properties extends HashMap<String, String> {
     ///
     /// - `ClassCastException`: if a key or value is not a string
     ///
-    /// #### Since
-    ///
-    /// 1.6
     public synchronized void store(Writer writer, String comment) throws IOException {
         if (comment != null && comment.length() > 0) {
             writer.write("#");

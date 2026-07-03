@@ -38,7 +38,6 @@ import java.util.Map;
 /// [WebAuthnClient#get(PublicKeyCredentialRequestOptions)], post the result
 /// back to your server for verification.
 ///
-/// @since 7.0.245
 public final class PublicKeyCredentialRequestOptions {
 
     private final String json;

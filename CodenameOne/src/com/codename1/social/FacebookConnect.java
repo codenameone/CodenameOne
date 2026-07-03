@@ -272,9 +272,6 @@ public class FacebookConnect extends Login {
     /// classic OAuth flows -- `getIdToken()` will be `null`; use
     /// `getAccessToken()` and call the Graph API to read user profile data).
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public AsyncResource<OidcTokens> signIn(String appId,
                                             String redirectUri,
                                             String... permissions) {

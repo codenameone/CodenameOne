@@ -209,9 +209,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public final class UIFragment {
 
 

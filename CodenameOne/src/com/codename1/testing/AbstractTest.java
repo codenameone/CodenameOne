@@ -301,10 +301,6 @@ public abstract class AbstractTest implements UnitTest {
         TestUtils.assertEqual(expected, actual, maxRelativeError);
     }
 
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - TestUtils#assertRange(double, double, double)
@@ -312,10 +308,6 @@ public abstract class AbstractTest implements UnitTest {
         TestUtils.assertRange(expected, actual, maxAbsoluteError);
     }
 
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - TestUtils#assertRange(double, double, double, String)

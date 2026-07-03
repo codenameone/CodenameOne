@@ -178,9 +178,6 @@ public final class LinkHandler {
     /// This method clear any weak references right away instead of waiting for the GC. This might be advantageous
     /// if lots of layout are created and disposed of quickly to keep memory consumption down.
     ///
-    /// #### Since
-    ///
-    /// 3.7.4
     public synchronized static void clearWeakReferencesNow() {
         LAYOUTS.clear();
     }

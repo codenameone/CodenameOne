@@ -26,9 +26,6 @@ package com.codename1.ui.events;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public interface ActionSource<T extends ActionEvent> {
     /// Adds ActionListener to receive action events form this source.
     ///

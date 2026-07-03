@@ -43,9 +43,6 @@ package com.codename1.ui;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 8.0
 public abstract class ImageFactory {
     private static final String KEY = "$$IMAGE_FACTORY$$";
 

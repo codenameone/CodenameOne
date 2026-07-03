@@ -31,7 +31,6 @@ package com.codename1.social;
 /// native callback; [AppleSignIn] backfills them from [com.codename1.io.Preferences]
 /// when present, so the application sees a consistent result.
 ///
-/// @since 7.0.245
 public final class AppleSignInResult {
 
     String identityToken;

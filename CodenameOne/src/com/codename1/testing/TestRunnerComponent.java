@@ -52,9 +52,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 7.0
 public class TestRunnerComponent extends Container {
     private final ArrayList<AbstractTest> tests = new ArrayList<AbstractTest>();
     private final Container resultsPane = new Container(BoxLayout.y());
