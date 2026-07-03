@@ -222,33 +222,27 @@ jobs:
           Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb-run.log 2>&1 &
           export DISPLAY=:99
           sleep 2
-          # Hang watchdog: the suite intermittently wedges mid-run with no output
-          # (the app-output tee just stops mid-line). When the app is alive but
-          # its output has not grown for 90s, dump every thread's native stack
-          # with gdb into the artifact -- the Linux equivalent of the macOS
-          # ``sample`` hang report that pinned the iOS EDT deadlock.
-          (
-            last=-1; still=0
-            while true; do
-              sleep 15
-              pid="$(pgrep -f 'LinuxHelloMain' | head -1 || true)"
-              [ -z "$pid" ] && continue
-              sz="$(stat -c %s "$CN1_APP_LOG_TEE" 2>/dev/null || echo 0)"
-              if [ "$sz" = "$last" ]; then still=$((still+15)); else still=0; last="$sz"; fi
-              if [ "$still" -ge 90 ] && [ ! -f "$(dirname "$CN1_APP_LOG_TEE")/hang-stacks.txt" ]; then
-                mkdir -p "$(dirname "$CN1_APP_LOG_TEE")"
-                echo "WATCHDOG: app pid=$pid silent for ${still}s" > "$(dirname "$CN1_APP_LOG_TEE")/hang-stacks.txt"
-                sudo gdb -p "$pid" -batch -ex 'set pagination off' -ex 'thread apply all bt' \
-                  >> "$(dirname "$CN1_APP_LOG_TEE")/hang-stacks.txt" 2>&1 || true
-              fi
-            done
-          ) &
-          WATCHDOG_PID=$!
+          # The suite intermittently DIES mid-run with no output (gdb-attach
+          # watchdog found the pid already gone -- a silent crash, not a hang).
+          # Enable core dumps and post-mortem them into the artifact.
+          ulimit -c unlimited
+          echo '/tmp/cn1-cores/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern >/dev/null
+          mkdir -p /tmp/cn1-cores
+          rc=0
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am \
             '-Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux' \
-            '-Dsurefire.failIfNoSpecifiedTests=false'
-          kill $WATCHDOG_PID 2>/dev/null || true
+            '-Dsurefire.failIfNoSpecifiedTests=false' || rc=$?
+          for core in /tmp/cn1-cores/core.*; do
+            [ -f "$core" ] || continue
+            elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+            mkdir -p "$(dirname "$CN1_APP_LOG_TEE")"
+            {
+              echo "=== post-mortem of $core (elf=$elf) ==="
+              gdb "$elf" "$core" -batch -ex 'set pagination off' -ex 'thread apply all bt' 2>&1
+            } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
+          done
+          exit $rc
 
       - name: Upload screenshot artifact (${{ matrix.arch }})
         if: always()

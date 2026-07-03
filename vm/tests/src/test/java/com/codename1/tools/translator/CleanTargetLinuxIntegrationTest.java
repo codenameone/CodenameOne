@@ -412,6 +412,15 @@ class CleanTargetLinuxIntegrationTest {
             long lastChange = System.currentTimeMillis();
             while (System.currentTimeMillis() < deadline) {
                 if (finished.get()) { break; }
+                if (!app.isAlive()) {
+                    // The suite intermittently DIES mid-run with no output (the
+                    // tee cuts mid-line): surface the exit status -- 128+N means
+                    // signal N (e.g. 139 = SIGSEGV) -- instead of burning the
+                    // stabilization window waiting on a dead process.
+                    System.out.println("CN1SS:HARNESS: suite process exited early, exitValue="
+                            + app.exitValue() + " pngs=" + CleanTargetIntegrationTest.countPngFiles(outDir));
+                    break;
+                }
                 pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
                 if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
