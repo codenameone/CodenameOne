@@ -62,6 +62,11 @@ measurement (`BENCH <name> rep <n> ns=<t> checksum=<c>` lines):
 | ThreadChurn | thread lifecycle |
 | GcStress / MtStress | allocation storms, single- and multi-threaded, in cooperative and forced-signal (`CN1_GC_SIGNAL_STOP=1`) stop modes |
 
+`ClinitThrow` is a standalone liveness reproducer (not byte-identical to the
+host JVM by design — ParparVM's initialization-failure semantics differ): a
+throwing `<clinit>` must release the class-init monitor so other threads
+don't deadlock. Build and run it directly with `translate-and-build.sh`.
+
 ## Mandatory compiler flags
 
 Generated C **must** be compiled with

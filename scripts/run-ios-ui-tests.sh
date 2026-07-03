@@ -751,16 +751,27 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   fi
 
   LOG_STREAM_PID=0
+  APP_CONSOLE_PID=0
   cleanup() {
     if [ "$LOG_STREAM_PID" -ne 0 ]; then
       kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
       wait "$LOG_STREAM_PID" 2>/dev/null || true
+    fi
+    if [ "$APP_CONSOLE_PID" -ne 0 ]; then
+      kill "$APP_CONSOLE_PID" >/dev/null 2>&1 || true
+      wait "$APP_CONSOLE_PID" 2>/dev/null || true
     fi
     if [ -n "$SIM_DEVICE_ID" ] && [ -n "$BUNDLE_IDENTIFIER" ]; then
       xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
     fi
   }
   trap cleanup EXIT
+
+  # Second, unfiltered per-process stream: the CN1SS predicate below hides the
+  # app's own diagnostics. When the suite wedged mid-run on CI (EDT deadlocked
+  # in a static initializer while logging an exception) the exception text and
+  # the VM's "GC trapped" messages were unrecoverable without this.
+  APP_PROC_NAME="$(basename "$APP_BUNDLE_PATH" .app)"
 
   ri_log "Streaming simulator logs to $TEST_LOG"
   if [ -n "$SIM_DEVICE_ID" ]; then
@@ -771,10 +782,18 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
       log stream --style compact --level debug \
       --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
       > "$TEST_LOG" 2>&1 &
+    LOG_STREAM_PID=$!
+    xcrun simctl spawn "$SIM_DEVICE_ID" \
+      log stream --style compact \
+      --predicate 'processImagePath CONTAINS "'"$APP_PROC_NAME"'"' \
+      > "$ARTIFACTS_DIR/app-console.log" 2>&1 &
+    APP_CONSOLE_PID=$!
   else
     xcrun simctl spawn booted log stream --style compact --level debug --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' > "$TEST_LOG" 2>&1 &
+    LOG_STREAM_PID=$!
+    xcrun simctl spawn booted log stream --style compact --predicate 'processImagePath CONTAINS "'"$APP_PROC_NAME"'"' > "$ARTIFACTS_DIR/app-console.log" 2>&1 &
+    APP_CONSOLE_PID=$!
   fi
-  LOG_STREAM_PID=$!
   sleep 2
 
   LAUNCH_LOG="$ARTIFACTS_DIR/simctl-launch.log"

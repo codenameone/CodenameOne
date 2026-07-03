@@ -1230,12 +1230,18 @@ public class ByteCodeClass {
         b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__").append(clsName).append("_LOADED__) return;\n\n    ");
 
         
-        b.append("monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
-        
+        // Block-registered enter/exit (the synchronized-method pattern): if the
+        // <clinit> body throws, throwException()'s unwind releases the class
+        // monitor. With a plain monitorEnter the lock leaked on a throwing
+        // clinit and every later thread touching the class deadlocked in
+        // monitorEnter (observed on CI as the EDT wedged initializing
+        // BufferedOutputStream while logging the very exception that leaked it).
+        b.append("monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__");
+
         b.append(clsName);
         b.append(");\n    if(class__");
         b.append(clsName);
-        b.append(".initialized) {\n        monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+        b.append(".initialized) {\n        monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
         b.append(clsName);
         b.append(");\n        return;\n    }\n\n");
         
@@ -1316,7 +1322,7 @@ public class ByteCodeClass {
             b.append(clInitMethod);
             b.append("(threadStateData);\n");
         }
-        b.append("monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+        b.append("monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
         b.append(clsName);
         b.append(");\n");
 
