@@ -2043,10 +2043,23 @@ extern void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE);
 // Cost on the hot path: one load + a predicted-not-taken branch. `retval` is the
 // method's default return ('' for void, 0 for primitives); throwException normally
 // longjmps, so the return is just the unreachable fall-through the compiler needs.
+// The trip test is TWO-SIDED: only an address inside the guard band
+// [limit - BAND, limit) throws. A one-sided (addr < limit) test misfires when
+// this thread-state executes on a FOREIGN stack -- iOS natives dispatch_sync
+// blocks onto the main queue and call Java helpers with the EDT's captured
+// threadStateData, so the main thread's frame addresses were compared against
+// the EDT's stack bounds and getBytes/toNSString spuriously threw
+// StackOverflowError the first time RichTextArea set a browser page (observed
+// as build-ios/metal/mac-native dying at exactly 78 screenshots). A foreign
+// stack essentially never maps into the 256KB band of another stack, while a
+// genuinely overflowing stack must descend THROUGH the band (no single
+// frameless frame approaches 256KB), so overflow detection is preserved.
 #define CN1_FRAMELESS_SOE_GUARD(retval) \
     do { \
         if (__builtin_expect(threadStateData->nativeStackLimit == 0, 0)) { cn1ComputeNativeStackLimit(threadStateData); } \
-        if (__builtin_expect((JAVA_LONG)(intptr_t)__builtin_frame_address(0) < threadStateData->nativeStackLimit, 0)) { \
+        JAVA_LONG __cn1FrameAddr = (JAVA_LONG)(intptr_t)__builtin_frame_address(0); \
+        if (__builtin_expect(__cn1FrameAddr < threadStateData->nativeStackLimit \
+                && __cn1FrameAddr >= threadStateData->nativeStackLimit - (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND, 0)) { \
             cn1ThrowStackOverflow(threadStateData); \
             return retval; \
         } \
