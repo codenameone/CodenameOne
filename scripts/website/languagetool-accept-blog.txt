@@ -90,3 +90,7 @@ Classpath
 [Ff]orkable
 [Kk]otlin
 [Dd]ogfood(s|ed|ing)?
+
+# Media tool names used in the JavaSE media backend.
+ffmpeg
+ffprobe

@@ -33,7 +33,7 @@ flowchart LR
     H -. "support and capacity, not revenue share" .-> A
 {{< /mermaid >}}
 
-The red-team question is not "how many bullet points shipped?" It is "where does this force the app developer into a trap?"
+The real question is not "how many bullet points shipped?" It is "where does this force the developer into a trap?"
 
 For the core APIs, the answer should be boring: if a sensor, stylus, foldable hinge, car head unit, or video backend is unavailable, the app can detect that and adapt. For the cloud APIs, the answer has to be more explicit: **Codename One does not take a percentage of your in-app purchases, subscriptions, ad revenue, commerce revenue, or app revenue**. Commerce validates receipts and entitlements. It does not replace IAP, does not process the payment, and does not become a toll booth. If Commerce quota is exhausted, validation degrades; store purchases still go through and users are not blocked from buying.
 
@@ -78,9 +78,9 @@ new Thread(() -> {
 }).start();
 ```
 
-Secrets is deliberately lower volume and is enabled for everyone. It fetches app-readable secrets from the cloud vault at runtime and caches them in `SecureStorage`, so API keys do not need to live in code or in the binary. Server-only credentials, such as App Store or Google Play keys used by commerce validation, stay server-side and are not served to the app.
+The Secrets API has deliberately lower volume and is enabled for everyone. It fetches app-readable secrets from the cloud vault at runtime and caches them in `SecureStorage`, so API keys do not need to live in code or in the binary. Server-only credentials, such as App Store or Google Play keys used by commerce validation, stay server-side and are not served to the app.
 
-Monday's post is mostly a red-team pass over Commerce: what it does, what it refuses to do, what happens when quota is exhausted, and why optional validation is not an IAP tax.
+Monday's post is mostly a failure-mode pass over Commerce: what it does, what it refuses to do, what happens when quota is exhausted, and why optional validation is not an IAP tax.
 
 ![Commerce dashboard for receipt validation and entitlement tracking](/blog/commerce-secrets-without-iap-tax/commerce.png)
 
@@ -94,9 +94,9 @@ Versioned builds are back, and the model is better suited to Maven than the old 
 build.cn1Version=master
 ```
 
-That `master` option is in some ways better than the nightly-build request we resisted for years. You are not waiting for an artificial daily package. You are asking the build server to use the current development head.
+Building against master is in some ways better than the nightly build request we resisted for years. You are not waiting for an artificial daily package. You are asking the build server to use the current development head.
 
-This is limited by subscription tier because old versions create support churn, not because fetching a few artifacts is the business model. The further back a build goes, the harder it is to diagnose a regression against the current code. The new model still opens versioned builds much further down the account ladder than before, including limited access for basic/free usage, while giving paying teams the longer support windows they actually need. Tuesday's post covers the tradeoff.
+Subscription tiers limit versioned build access because old versions create support churn, not because fetching a few artifacts drives the business model. The further back a build goes, the harder it is to diagnose a regression against the current code. The new model still opens versioned builds much further down the account ladder than before, including limited access for basic/free usage, while giving paying teams the longer support windows they actually need. Tuesday's post covers the tradeoff.
 
 ## Video, Audio, And Subtitles
 

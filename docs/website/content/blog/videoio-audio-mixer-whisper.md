@@ -160,7 +160,7 @@ MorphTransition transition = MorphTransition.create(300)
 transition.setProgress(0.5);
 ```
 
-Scrubbing means a transition can be rendered deterministically at progress `0.0`, `0.1`, `0.2`, and so on. That is exactly what a video export loop needs.
+Scrubbing means a transition can be rendered deterministically at progress `0.0`, `0.1`, `0.2`, and onward. That is exactly what a video export loop needs.
 
 ## Platform Backends
 
@@ -177,7 +177,7 @@ This gives each platform the codec set and acceleration it already has. App code
 
 ## Wrapping Up
 
-Video export used to be something a Codename One app handed off to a backend or a native library. Now the app can render frames, mix PCM, encode a video, decode it back for validation, and generate timed captions. That opens up tutorials, game clips, social exports, support recordings, animated explainers and media QA workflows from the same Java/Kotlin codebase.
+Video export used to be something a Codename One app handed off to a backend or a native library. Now the app can render frames, mix PCM, encode a video, decode it back for validation, and generate timed captions. That opens up tutorials, game clips, social exports, support recordings, animated explainers and media QA workflows from the same Java codebase.
 
 No special revenue model is attached to that. The app generates the media. The app owns the output.
 

@@ -15,7 +15,7 @@ Commerce is the easiest feature in this release to misunderstand, so the first s
 
 **Commerce does not replace IAP and never will.**
 
-Purchases still go through Apple, Google, or the payment processor you chose. Codename One does not process the payment, does not touch the money, and does not take a percentage. [PR #5300](https://github.com/codenameone/CodenameOne/pull/5300) adds infrastructure around the annoying backend work that comes after a purchase: validation, entitlement checks, subscription lifecycle, webhooks and reporting.
+Purchases still go through Apple, Google, or the payment processor you chose. Codename One does not process the payment, does not touch the money, and does not take a percentage. [PR #5300](https://github.com/codenameone/CodenameOne/pull/5300) adds infrastructure around the annoying backend work that comes after a purchase: validation, entitlement checks, subscription lifecycle, webhooks, and reporting.
 
 That backend work is real. Anyone who has shipped subscriptions knows the trap. Buying a SKU is not the same as knowing whether the user has the right to a feature right now. Renewals, grace periods, refunds, billing retry, product changes, trials, family sharing and store server notifications all show up later. The device has one view. The store has another. Your backend usually needs a third.
 
@@ -75,7 +75,7 @@ new Thread(() -> {
 
 ## What Happens When Quota Runs Out
 
-This is the red-team question that matters most. If Commerce is tiered, what happens when a developer exceeds quota?
+This is the real question that matters most. If Commerce is tiered, what happens when a developer exceeds quota?
 
 Validation degrades. Purchases do not stop.
 
@@ -109,7 +109,7 @@ cm.refresh();
 boolean active = cm.isEntitled("remove_ads");
 ```
 
-This is why Commerce complements IAP instead of replacing it. `Purchase` starts the transaction. Commerce answers the longer-term entitlement question.
+That split explains how Commerce complements IAP instead of replacing it. `Purchase` starts the transaction. Commerce answers the longer-term entitlement question.
 
 ## Secrets
 
@@ -135,7 +135,7 @@ That rule is non-negotiable: do not check API keys into source, do not paste the
 
 ## The Boundary
 
-Commerce and Secrets are both cloud features, but they sit on different sides of the volume line. Secrets is low volume and enabled for everyone. Commerce is tiered because validation and analytics can create real backend load.
+Commerce and Secrets are both cloud features, but they sit on different sides of the volume line. Secrets usage stays low enough to enable it for everyone. Commerce has tiers because validation and analytics can create real backend load.
 
 The important boundary is not tiering. The boundary is lock-in. You can still use the raw `Purchase` API. You can still build your own receipt backend. You can still ship an app that sells subscriptions without giving Codename One a revenue share.
 

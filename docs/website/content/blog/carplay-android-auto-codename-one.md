@@ -69,7 +69,7 @@ screen.invalidate();
 context.showToast("Added to queue");
 ```
 
-`CarScreen` has lifecycle hooks for create, resume, pause and destroy. `CarApplication` receives connect and disconnect callbacks, and you can listen globally:
+`CarScreen` has lifecycle hooks for create, resume, pause, and destroy. `CarApplication` receives connect and disconnect callbacks, and you can listen globally:
 
 ```java
 Car.addConnectionListener(new CarConnectionListener() {

@@ -62,7 +62,7 @@ The small overhead of fetching versioned artifacts is noticeable, but that is no
 
 The hard cost is support.
 
-If a free user reports a build issue from six months ago, and another user reports one from yesterday, and an enterprise customer needs a diagnosis against a two-month-old version, support becomes a bisection problem across a moving build system. The further back the community goes, the harder every issue is to understand, reproduce and fix.
+If a free user reports a build issue from six months ago, and another user reports one from yesterday, and an enterprise customer needs a diagnosis against a two-month-old version, support becomes a bisection problem across a moving build system. The further back the community goes, the harder every issue is to understand, reproduce, and fix.
 
 That does not mean versioned builds should only exist at the top. The new approach opens them much further down than before, including limited access for basic/free usage. The longer windows still belong to higher tiers because those teams are the ones that need older reproducible builds and the support time that comes with them.
 
