@@ -392,7 +392,7 @@ public final class GuideStaticScreenshotDemos {
             content.add(new Label("Underlying Form"));
             content.add(new Button("Refresh"));
             content.add(new Button("Details"));
-            form.add(BorderLayout.CENTER, content);
+            form.add(BorderLayout.WEST, content);
             return form;
         }) {
             @Override
