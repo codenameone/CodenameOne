@@ -389,7 +389,7 @@ public final class GuideStaticScreenshotDemos {
             Form form = new Form("Interaction Dialog", new BorderLayout());
             Container content = new Container(BoxLayout.y());
             content.setUIID("PaddedContainer");
-            content.add(new Label("Underlying Form"));
+            content.add(new Label("Form"));
             content.add(new Button("Refresh"));
             content.add(new Button("Details"));
             form.add(BorderLayout.WEST, content);
