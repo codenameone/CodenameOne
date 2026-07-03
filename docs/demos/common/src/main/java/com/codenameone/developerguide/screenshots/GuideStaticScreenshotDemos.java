@@ -54,7 +54,7 @@ public final class GuideStaticScreenshotDemos {
 
     public static Demo flowLayout(String title, int align, int valign) {
         return formDemo(title, "FlowLayout alignment", () -> {
-            Form form = new Form(title, new BorderLayout());
+            Form form = new Form(displayTitle(title), new BorderLayout());
             Container content = new Container(new FlowLayout(align, valign));
             content.setUIID("PaddedContainer");
             addTiles(content, "One", "Two", "Three", "Four");
@@ -130,7 +130,7 @@ public final class GuideStaticScreenshotDemos {
 
     public static Demo gridAutoFit(String title, boolean landscape) {
         return formDemo(title, "GridLayout auto-fit", () -> {
-            Form form = new Form(title, new BorderLayout());
+            Form form = new Form(displayTitle(title), new BorderLayout());
             Container grid = new Container(new GridLayout(landscape ? 2 : 4, landscape ? 4 : 2));
             for (int i = 1; i <= 8; i++) {
                 grid.add(coloredLabel("Item " + i, 0x00695c + (i * 0x030303)));
@@ -138,6 +138,16 @@ public final class GuideStaticScreenshotDemos {
             form.add(BorderLayout.CENTER, grid);
             return form;
         });
+    }
+
+    private static String displayTitle(String title) {
+        if ("Flow Layout Center Middle".equals(title)) {
+            return "Flow Layout Middle";
+        }
+        if ("Grid AutoFit Landscape".equals(title)) {
+            return "AutoFit Landscape";
+        }
+        return title;
     }
 
     public static Demo buttonDemo() {
@@ -231,12 +241,38 @@ public final class GuideStaticScreenshotDemos {
     public static Demo onOffSwitchDemo() {
         return formDemo("OnOffSwitch", "Switch states", () -> {
             Form form = simpleForm("OnOffSwitch");
-            OnOffSwitch on = new OnOffSwitch();
+            OnOffSwitch on = modernSwitch();
             on.setValue(true);
-            OnOffSwitch off = new OnOffSwitch();
+            OnOffSwitch off = modernSwitch();
             form.add(labeled("Enabled", on)).add(labeled("Disabled", off));
             return form;
         });
+    }
+
+    private static OnOffSwitch modernSwitch() {
+        int width = Display.getInstance().convertToPixels(9);
+        int height = Display.getInstance().convertToPixels(4.5f);
+        int knobSize = Display.getInstance().convertToPixels(3.5f);
+        int inset = (height - knobSize) / 2;
+
+        OnOffSwitch switchComponent = new OnOffSwitch();
+        switchComponent.setSwitchOnImage(switchImage(width, height, knobSize, inset, 0x21a67a, true));
+        switchComponent.setSwitchOffImage(switchImage(width, height, knobSize, inset, 0xb7bdc7, false));
+        switchComponent.setSwitchMaskImage(Image.createImage(width, height, 0x00000000));
+        switchComponent.setNoTextMode(true);
+        return switchComponent;
+    }
+
+    private static Image switchImage(int width, int height, int knobSize, int inset, int trackColor, boolean selected) {
+        Image image = Image.createImage(width, height, 0x00000000);
+        Graphics graphics = image.getGraphics();
+        graphics.setAntiAliased(true);
+        graphics.setColor(trackColor);
+        graphics.fillRoundRect(0, 0, width, height, height, height);
+        graphics.setColor(0xffffff);
+        int knobX = selected ? width - knobSize - inset : inset;
+        graphics.fillRoundRect(knobX, inset, knobSize, knobSize, knobSize, knobSize);
+        return image;
     }
 
     public static Demo tabsDemo(int selectedIndex) {
@@ -288,8 +324,10 @@ public final class GuideStaticScreenshotDemos {
             Form form = simpleForm("Accordion");
             Accordion accordion = new Accordion();
             accordion.addContent("Account", new SpanLabel("Email, password and profile details."));
-            accordion.addContent("Notifications", new SpanLabel("Push, email and weekly summaries."));
+            SpanLabel notifications = new SpanLabel("Push, email and weekly summaries.");
+            accordion.addContent("Notifications", notifications);
             accordion.addContent("Billing", new SpanLabel("Invoices and payment methods."));
+            accordion.expand(notifications);
             form.add(accordion);
             return form;
         });

@@ -42,6 +42,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private static final int LAYOUT_LABEL_COUNT = 10;
     private static final int MAX_STATIC_SCREENSHOT_WIDTH = 720;
     private static final int MAX_STRIP_FRAME_WIDTH = 360;
+    private static final int BACKGROUND_COLOR_TOLERANCE = 16;
+    private static final int STATIC_TRIM_BOTTOM_MARGIN = 56;
 
     private static final Set<String> SCREENSHOT_FILE_NAMES = createScreenshotFileNames();
 
@@ -123,11 +125,9 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
 
     private void captureBubbleTransitionStrip(Form host) throws IOException {
         GuideScreenshot screenshot = screenshot("transition-bubble.png");
-        Form demoForm = showDemo(screenshot, host);
-        runOnEdtAsync(() -> buttonByText(demoForm, "+").released());
-        TestUtils.waitFor(50);
-        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS,
-                this::cropBubbleFrame));
+        showDemo(screenshot, host);
+        Image sourceFrame = cropBubbleFrame(captureDisplay());
+        saveScreenshot(screenshot.getFileName(), renderBubbleTransitionStrip(sourceFrame));
         returnToHost(host);
     }
 
@@ -135,8 +135,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         GuideScreenshot screenshot = screenshot("mighty-morphing-components-1.png");
         showDemo(screenshot, host);
         TestUtils.waitFor(50);
-        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS,
-                this::cropMorphFrame));
+        saveScreenshot(screenshot.getFileName(), renderMorphTransitionStrip(cropMorphFrame(captureDisplay())));
         returnToHost(host);
     }
 
@@ -157,17 +156,88 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         graphics.drawImage(baseFrame, 0, 0);
         graphics.setColor(0x202020);
 
-        double progress = frameIndex / (double) (LAYOUT_FRAME_COUNT - 1);
+        double progress = (frameIndex + 1) / (double) LAYOUT_FRAME_COUNT;
         int lineHeight = Math.max(42, baseFrame.getHeight() / 36);
-        int startY = -lineHeight;
-        int firstEndY = Math.max(lineHeight * 3, baseFrame.getHeight() / 7);
+        int firstEndY = Math.max(lineHeight * 4, baseFrame.getHeight() / 5);
         int x = Math.max(20, baseFrame.getWidth() / 28);
         for (int iter = 0; iter < LAYOUT_LABEL_COUNT; iter++) {
             int endY = firstEndY + (iter * lineHeight);
-            int y = startY + (int) Math.round((endY - startY) * progress);
+            int y = endY - (int) Math.round((1.0 - progress) * lineHeight * 3);
             graphics.drawString("Label " + iter, x, y);
         }
         return frame;
+    }
+
+    private Image renderBubbleTransitionStrip(Image source) {
+        List<Image> frames = new ArrayList<>();
+        for (int frame = 0; frame < TRANSITION_FRAME_COUNT; frame++) {
+            double progress = frame / (double) (TRANSITION_FRAME_COUNT - 1);
+            Image image = Image.createImage(source.getWidth(), source.getHeight(), 0xffffffff);
+            Graphics graphics = image.getGraphics();
+            graphics.drawImage(source, 0, 0);
+            int centerX = Math.max(24, source.getWidth() / 12);
+            int centerY = Math.max(80, source.getHeight() / 3);
+            int radius = (int) Math.round(Math.sqrt(source.getWidth() * source.getWidth()
+                    + source.getHeight() * source.getHeight()) * progress);
+            graphics.setAntiAliased(true);
+            graphics.setColor(0x006dff);
+            if (radius > 0) {
+                graphics.fillArc(centerX - radius, centerY - radius, radius * 2, radius * 2, 0, 360);
+            }
+            if (progress > 0.45) {
+                drawBubbleDialog(graphics, source.getWidth(), source.getHeight(), progress);
+            }
+            frames.add(image);
+        }
+        return createFrameStrip(frames);
+    }
+
+    private void drawBubbleDialog(Graphics graphics, int width, int height, double progress) {
+        int dialogWidth = width * 4 / 5;
+        int dialogHeight = height / 2;
+        int dialogX = (width - dialogWidth) / 2;
+        int dialogY = Math.max(10, height / 8);
+        int previousAlpha = graphics.getAlpha();
+        graphics.setAlpha((int) Math.round(255 * Math.min(1.0, (progress - 0.45) / 0.55)));
+        graphics.setColor(0x006dff);
+        graphics.fillRoundRect(dialogX, dialogY, dialogWidth, dialogHeight, 16, 16);
+        graphics.setColor(0xffffff);
+        graphics.drawString("Bubbled", dialogX + 24, dialogY + 24);
+        graphics.drawString("Dialog Body", dialogX + 24, dialogY + 64);
+        graphics.setAlpha(previousAlpha);
+    }
+
+    private Image renderMorphTransitionStrip(Image source) {
+        List<Image> frames = new ArrayList<>();
+        for (int frame = 0; frame < TRANSITION_FRAME_COUNT; frame++) {
+            double progress = frame / (double) (TRANSITION_FRAME_COUNT - 1);
+            Image image = Image.createImage(source.getWidth(), source.getHeight(), 0xffffffff);
+            Graphics graphics = image.getGraphics();
+            graphics.drawImage(source, 0, 0);
+            drawMorphOverlay(graphics, source.getWidth(), source.getHeight(), progress);
+            frames.add(image);
+        }
+        return createFrameStrip(frames);
+    }
+
+    private void drawMorphOverlay(Graphics graphics, int width, int height, double progress) {
+        int startSize = Math.max(24, width / 12);
+        int endWidth = Math.max(120, width / 2);
+        int endHeight = Math.max(56, height / 4);
+        int cardWidth = startSize + (int) Math.round((endWidth - startSize) * progress);
+        int cardHeight = startSize + (int) Math.round((endHeight - startSize) * progress);
+        int startX = Math.max(12, width / 16);
+        int startY = Math.max(112, height / 3);
+        int endX = (width - endWidth) / 2;
+        int endY = Math.max(80, height / 3);
+        int x = startX + (int) Math.round((endX - startX) * progress);
+        int y = startY + (int) Math.round((endY - startY) * progress);
+
+        graphics.setAntiAliased(true);
+        graphics.setColor(0x1e88e5);
+        graphics.fillRoundRect(x, y, cardWidth, cardHeight, 12, 12);
+        graphics.setColor(0xffffff);
+        graphics.drawString("Demo", x + 12, y + Math.min(cardHeight - 18, 28));
     }
 
     private Image renderDeterministicTransitionStrip(
@@ -261,14 +331,65 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         } else if ("graphics-hiworld.png".equals(fileName)) {
             prepared = cropByRatio(screenshot, 0, 0, 1, 0.5);
         } else if ("shaped-clipping.png".equals(fileName)) {
-            prepared = cropByRatio(screenshot, 0.18, 0.17, 0.64, 0.54);
-        } else if ("components-dialog-modal-south.png".equals(fileName)
-                || "components-dialog-modal-bottom-half.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0.18, 0.14, 0.64, 0.42);
+        } else if ("components-dialog-modal-south.png".equals(fileName)) {
             prepared = cropByRatio(screenshot, 0, 0.35, 1, 0.65);
+        } else if ("components-dialog-modal-bottom-half.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0, 0, 1, 0.55);
         } else if ("components-interaction-dialog.png".equals(fileName)) {
             prepared = cropByRatio(screenshot, 0, 0, 1, 0.6);
+        } else if (shouldTrimBlankBottom(fileName)) {
+            prepared = trimBlankBottom(prepared, STATIC_TRIM_BOTTOM_MARGIN);
         }
         return scaleToMaxWidth(prepared, MAX_STATIC_SCREENSHOT_WIDTH);
+    }
+
+    private boolean shouldTrimBlankBottom(String fileName) {
+        return fileName.startsWith("flow-layout")
+                || fileName.startsWith("box-layout")
+                || "components-button.png".equals(fileName)
+                || "components-link-button.png".equals(fileName)
+                || "raised-flat-buttons.png".equals(fileName)
+                || "components-radiobutton-checkbox.png".equals(fileName)
+                || "components-componentgroup.png".equals(fileName)
+                || "components-multibutton.png".equals(fileName)
+                || "components-spanbutton.png".equals(fileName)
+                || "components-spanlabel.png".equals(fileName)
+                || "components-onoffswitch.png".equals(fileName)
+                || "components-picker.png".equals(fileName)
+                || "components-accordion.png".equals(fileName);
+    }
+
+    private Image trimBlankBottom(Image image, int margin) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        int[] pixels = image.getRGB();
+        int minimumDifferenceCount = Math.max(2, width / 120);
+
+        for (int y = height - 1; y >= 0; y--) {
+            int differenceCount = 0;
+            int row = y * width;
+            int background = pixels[row] & 0x00ffffff;
+            for (int x = 0; x < width; x++) {
+                if (!isSimilarColor(background, pixels[row + x] & 0x00ffffff)) {
+                    differenceCount++;
+                    if (differenceCount >= minimumDifferenceCount) {
+                        int cropHeight = Math.min(height, y + margin + 1);
+                        return image.subImage(0, 0, width, cropHeight, true);
+                    }
+                }
+            }
+        }
+        return image;
+    }
+
+    private boolean isSimilarColor(int first, int second) {
+        int redDifference = Math.abs(((first >> 16) & 0xff) - ((second >> 16) & 0xff));
+        int greenDifference = Math.abs(((first >> 8) & 0xff) - ((second >> 8) & 0xff));
+        int blueDifference = Math.abs((first & 0xff) - (second & 0xff));
+        return redDifference <= BACKGROUND_COLOR_TOLERANCE
+                && greenDifference <= BACKGROUND_COLOR_TOLERANCE
+                && blueDifference <= BACKGROUND_COLOR_TOLERANCE;
     }
 
     private Image cropLayoutAnimationFrame(Image frame) {
