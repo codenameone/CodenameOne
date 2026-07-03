@@ -27,6 +27,7 @@ import com.codename1.ui.Slider;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -385,8 +386,13 @@ public final class GuideStaticScreenshotDemos {
 
     public static Demo interactionDialogDemo() {
         return new FormDemo("Interaction Dialog", "InteractionDialog screenshot", () -> {
-            Form form = simpleForm("Interaction Dialog");
-            form.add(centeredHint("Interaction host"));
+            Form form = new Form("Interaction Dialog", new BorderLayout());
+            Container content = new Container(BoxLayout.y());
+            content.setUIID("PaddedContainer");
+            content.add(new Label("Underlying Form"));
+            content.add(new Button("Refresh"));
+            content.add(new Button("Details"));
+            form.add(BorderLayout.CENTER, content);
             return form;
         }) {
             @Override
@@ -395,13 +401,17 @@ public final class GuideStaticScreenshotDemos {
                 addBack(form, parent);
                 form.show();
                 Display.getInstance().callSerially(() -> {
-                    InteractionDialog dialog = new InteractionDialog("Interaction");
+                    InteractionDialog dialog = new InteractionDialog("Hello");
                     dialog.setAnimateShow(false);
                     dialog.setRepositionAnimation(false);
                     dialog.setLayout(new BorderLayout());
-                    dialog.add(BorderLayout.CENTER, new SpanLabel("This dialog can stay open while the form remains interactive."));
-                    dialog.add(BorderLayout.SOUTH, new Button("Close"));
-                    dialog.show(80, 80, 80, 80);
+                    dialog.add(BorderLayout.CENTER, new Label("Hello Dialog"));
+                    Button close = new Button("Close");
+                    close.addActionListener(event -> dialog.dispose());
+                    dialog.add(BorderLayout.SOUTH, close);
+                    Dimension preferred = dialog.getContentPane().getPreferredSize();
+                    int left = Display.getInstance().getDisplayWidth() - (preferred.getWidth() + preferred.getWidth() / 6);
+                    dialog.show(0, 0, left, 0);
                 });
             }
         };
