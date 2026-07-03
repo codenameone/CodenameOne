@@ -702,6 +702,14 @@
         "featured_media_id": 124678,
         "yoast_meta_set": true,
         "syndicated_at": "2026-07-03T15:15:12+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/437da890be1e/edit",
+        "syndicated_at": "2026-07-03T17:01:49+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3663930/edit.html",
+        "syndicated_at": "2026-07-03T17:03:20+00:00"
       }
     }
   }
