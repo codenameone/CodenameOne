@@ -2296,6 +2296,14 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
 // (b) Conservative range scan: read every aligned word in [lo,hi), resolve it, and MARK
 // it for real. gcMarkObject in the GC-thread serial context just pushes to the worklist
 // (no lock, no malloc), so this is safe to run while mutator threads are stopped.
+//
+// A conservative stack scan reads EVERY aligned word in [lo,hi), including the
+// inter-variable padding a normal build treats as ordinary stack memory. Under
+// -fsanitize=address those reads land in ASan's poisoned stack redzones and raise
+// guaranteed stack-buffer-underflow false positives that bury any real finding.
+// Exempt the scan (standard practice for conservative collectors) so ASan builds
+// of the VM surface genuine heap bugs instead. No effect on a normal build.
+__attribute__((no_sanitize("address")))
 void cn1ConservativeMarkRange(CODENAME_ONE_THREAD_STATE, char* lo, char* hi) {
     if(lo == 0 || hi == 0 || hi <= lo) return;
     char* p = (char*)(((uintptr_t)lo + (sizeof(void*) - 1)) & ~((uintptr_t)(sizeof(void*) - 1)));
