@@ -2997,7 +2997,22 @@ static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal) {
 #endif
 
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
-    if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
+    if(obj == JAVA_NULL || CN1_IS_TAGGED(obj)) {
+        return;
+    }
+    // ACQUIRE-load the mark word (the object's publication point) BEFORE reading any
+    // other header field. cn1BibopInitSlot writes parentClsReference/heapPosition and
+    // THEN release-stores the mark word LAST, so the mark word is the single
+    // happens-before edge that publishes a freshly-allocated object. The parallel
+    // marker used a RELAXED load here: on arm64's weak memory model that let a worker
+    // observe the object (mark word) WITHOUT observing the preceding parentClsReference
+    // store, so it dereferenced a stale/garbage parentClsReference->markFunction and
+    // crashed at a wild PC (random SIGSEGV in the theme phase, x86 masked it because
+    // every x86 load is already acquire). The acquire here pairs with that release and
+    // orders every parentClsReference read below -- the guard, the CAS-success deref,
+    // and (transitively, through the worklist mutex) the drain worker's deref.
+    int markSnapshot = __atomic_load_n(&obj->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+    if(obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
     }
 #ifdef CN1_NURSERY
@@ -3022,7 +3037,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // recursionKey re-scan (which writes __codenameOneReferenceCount and is rare) stays
     // entirely on the serial path below, keeping the parallel region race-free.
     if(gcMarkLocalBuf != 0) {
-        int old = __atomic_load_n(&obj->__codenameOneGcMark, __ATOMIC_RELAXED);
+        int old = markSnapshot; // acquire-loaded above; pairs with the alloc release
         if(old == markVal) {
             return; // already marked this cycle
         }
