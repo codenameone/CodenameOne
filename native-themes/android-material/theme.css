@@ -607,10 +607,13 @@ DialogBody {
 DialogButton {
     color: var(--accent-color, #6750a4);
     background-color: transparent;
-    padding: 1mm 2.5mm 1mm 2.5mm;
+    /* M3 dialog text button: 14sp label (2.25mm at the 160dpi contract) with
+       12dp horizontal padding; 2.5mm/2.5mm rendered the command row ~20px
+       wider than the native alert's. */
+    padding: 1mm 1.9mm 1mm 1.9mm;
     margin: 0 0.5mm 0 0.5mm;
     font-family: "native:MainRegular";
-    font-size: 2.5mm;
+    font-size: 2.25mm;
     text-align: center;
 }
 DialogTitle {
@@ -622,7 +625,9 @@ DialogTitle {
     text-align: left;
 }
 DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
-DialogCommandArea { background-color: transparent; padding: 1mm; }
+/* M3 places the action row 24dp under the supporting text; without the top
+   padding the whole card ran ~15px shorter than the native alert. */
+DialogCommandArea { background-color: transparent; padding: 3.2mm 1mm 1mm 1mm; }
 
 FloatingActionButton {
     color: var(--accent-on-container-color, #21005d);
@@ -808,7 +813,7 @@ PopupContent {
     Dialog { background-color: #2b2930; color: #e6e0e9; border: none; border-radius: 4.4mm; }
     DialogBody { background-color: transparent; color: #cac4d0; }
     DialogTitle { color: #e6e0e9; background-color: transparent; }
-    DialogButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    DialogButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; padding: 1mm 1.9mm 1mm 1.9mm; margin: 0 0.5mm 0 0.5mm; font-family: "native:MainRegular"; font-size: 2.25mm; }
     DialogContentPane { background-color: transparent; }
     DialogCommandArea { background-color: transparent; }
     PopupContent { background-color: #211f26; color: #e6e0e9; }
