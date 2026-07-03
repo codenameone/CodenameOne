@@ -13,7 +13,12 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.TextField;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.FlipTransition;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
 import com.codenameone.developerguide.DemoRegistry;
 import com.codenameone.developerguide.GuideScreenshot;
@@ -94,9 +99,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         GuideScreenshot screenshot = screenshot(fileName);
         Form demoForm = showDemo(screenshot, host);
         configureSlideDemo(demoForm, transitionName, horizontal);
-        runOnEdtAsync(() -> buttonByText(demoForm, "Show").released());
-        TestUtils.waitFor(50);
-        saveScreenshot(fileName, captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS));
+        saveScreenshot(fileName, renderSlideTransitionStrip(transitionName, horizontal));
         returnToHost(host);
     }
 
@@ -125,6 +128,88 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             picker.setSelectedString(transitionName);
             duration.setText(String.valueOf(TRANSITION_DURATION_MS));
             horizontalToggle.setSelected(horizontal);
+        });
+    }
+
+    private Image renderSlideTransitionStrip(String transitionName, boolean horizontal) {
+        Transition transition = createSlideTransition(transitionName, horizontal);
+        TransitionRenderContext context = runOnEdt(() -> {
+            Form source = createTransitionSourceForm(transitionName, horizontal);
+            Form destination = createTransitionDestinationForm();
+            source.show();
+            source.setWidth(Display.getInstance().getDisplayWidth());
+            source.setHeight(Display.getInstance().getDisplayHeight());
+            destination.setWidth(source.getWidth());
+            destination.setHeight(source.getHeight());
+            source.layoutContainer();
+            destination.layoutContainer();
+            transition.init(source, destination);
+            transition.initTransition();
+            return new TransitionRenderContext(transition, source.getWidth(), source.getHeight());
+        });
+
+        List<Image> frames = new ArrayList<>();
+        for (int frame = 0; frame < TRANSITION_FRAME_COUNT; frame++) {
+            frames.add(renderTransitionFrame(context));
+            TestUtils.waitFor(TRANSITION_FRAME_DELAY_MS);
+            runOnEdt(context.transition::animate);
+        }
+        runOnEdt(context.transition::cleanup);
+        return createFrameStrip(frames);
+    }
+
+    private Transition createSlideTransition(String transitionName, boolean horizontal) {
+        int direction = horizontal ? CommonTransitions.SLIDE_HORIZONTAL : CommonTransitions.SLIDE_VERTICAL;
+        switch (transitionName) {
+            case "Slide":
+                return CommonTransitions.createSlide(direction, true, TRANSITION_DURATION_MS);
+            case "SlideFade":
+                return CommonTransitions.createSlideFadeTitle(true, TRANSITION_DURATION_MS);
+            case "Cover":
+                return CommonTransitions.createCover(direction, true, TRANSITION_DURATION_MS);
+            case "Uncover":
+                return CommonTransitions.createUncover(direction, true, TRANSITION_DURATION_MS);
+            case "Fade":
+                return CommonTransitions.createFade(TRANSITION_DURATION_MS);
+            case "Flip":
+                return new FlipTransition(-1, TRANSITION_DURATION_MS);
+            default:
+                throw new IllegalArgumentException("Unsupported transition: " + transitionName);
+        }
+    }
+
+    private Form createTransitionSourceForm(String transitionName, boolean horizontal) {
+        Form source = new Form("Transitions", new BoxLayout(BoxLayout.Y_AXIS));
+        Style bg = source.getContentPane().getUnselectedStyle();
+        bg.setBgTransparency(255);
+        bg.setBgColor(0xff0000);
+        source.add(new Button("Show"));
+        Picker picker = new Picker();
+        picker.setStrings("Slide", "SlideFade", "Cover", "Uncover", "Fade", "Flip");
+        picker.setSelectedString(transitionName);
+        source.add(picker);
+        source.add(new TextField(String.valueOf(TRANSITION_DURATION_MS), "Duration", 6, TextField.NUMERIC));
+        CheckBox horizontalToggle = CheckBox.createToggle("Horizontal");
+        horizontalToggle.setSelected(horizontal);
+        source.add(horizontalToggle);
+        return source;
+    }
+
+    private Form createTransitionDestinationForm() {
+        Form destination = new Form("Destination");
+        Style bg = destination.getContentPane().getUnselectedStyle();
+        bg.setBgTransparency(255);
+        bg.setBgColor(0xff);
+        destination.getToolbar().addCommandToLeftBar("Back", null, ignored -> {
+        });
+        return destination;
+    }
+
+    private Image renderTransitionFrame(TransitionRenderContext context) {
+        return runOnEdt(() -> {
+            Image frame = Image.createImage(context.width, context.height, 0xffffffff);
+            context.transition.paint(frame.getGraphics());
+            return frame;
         });
     }
 
@@ -364,5 +449,17 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
 
     private interface ComponentMatcher {
         boolean matches(Component component);
+    }
+
+    private static final class TransitionRenderContext {
+        private final Transition transition;
+        private final int width;
+        private final int height;
+
+        private TransitionRenderContext(Transition transition, int width, int height) {
+            this.transition = transition;
+            this.width = width;
+            this.height = height;
+        }
     }
 }
