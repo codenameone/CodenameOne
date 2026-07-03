@@ -60,8 +60,26 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         captureSlideTransitionStrips(host);
         captureBubbleTransitionStrip(host);
         captureMorphTransitionStrip(host);
+        captureStaticGuideScreenshots(host);
 
         return true;
+    }
+
+    private void captureStaticGuideScreenshots(Form host) throws IOException {
+        for (GuideScreenshot screenshot : DemoRegistry.getScreenshots()) {
+            if (isAnimationScreenshot(screenshot.getFileName())) {
+                continue;
+            }
+            showDemoWithoutParent(screenshot);
+            saveScreenshot(screenshot.getFileName(), captureDisplay());
+            returnToHost(host);
+        }
+    }
+
+    private boolean isAnimationScreenshot(String fileName) {
+        return fileName.startsWith("layout-animation-")
+                || fileName.startsWith("transition-")
+                || "mighty-morphing-components-1.png".equals(fileName);
     }
 
     private void captureLayoutAnimationFrames(Form host) throws IOException {
@@ -251,6 +269,14 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         return demoForm;
     }
 
+    private Form showDemoWithoutParent(GuideScreenshot screenshotDemo) {
+        Form previous = currentForm();
+        runOnEdt(() -> screenshotDemo.getDemo().show(null));
+        Form demoForm = waitForFormChange(previous);
+        waitForFormReady(demoForm);
+        return demoForm;
+    }
+
     private void returnToHost(Form host) {
         runOnEdt(host::show);
         waitForHost(host);
@@ -370,12 +396,12 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         }
         assertTrue(form.getWidth() > 0, "Demo form width should be > 0 for screenshot capture.");
         assertTrue(form.getHeight() > 0, "Demo form height should be > 0 for screenshot capture.");
-        TestUtils.waitFor(200);
+        TestUtils.waitFor(100);
     }
 
     private void waitForHost(Form host) {
         waitForCurrentForm(host);
-        TestUtils.waitFor(200);
+        TestUtils.waitFor(50);
     }
 
     private void waitForCurrentForm(Form expected) {
