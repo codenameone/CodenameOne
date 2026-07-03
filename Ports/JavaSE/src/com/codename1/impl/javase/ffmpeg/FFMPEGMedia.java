@@ -82,7 +82,7 @@ public final class FFMPEGMedia {
         return out;
     }
 
-    private static File resolveExecutable(String name) {
+    static File resolveExecutable(String name) {
         String dir = System.getProperty("ffmpeg.dir", "");
         String executable = isWindows() ? name + ".exe" : name;
         if (!dir.isEmpty()) {
@@ -138,7 +138,7 @@ public final class FFMPEGMedia {
         return null;
     }
 
-    private static boolean isWindows() {
+    static boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase().contains("win");
     }
 

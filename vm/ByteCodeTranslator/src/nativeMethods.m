@@ -942,12 +942,10 @@ JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CO
         }
     }
     i=0;
-    while (j-->0){
+    while (j-->0 && i < 31){
         s[i++]=s2[j];
-        if (s[i]=='\0'){
-            break;
-        }
     }
+    s[i]='\0';
     if (strcmp(s, "NAN") == 0) {
         s[1] = 'a';
     }
@@ -1004,12 +1002,10 @@ JAVA_OBJECT java_lang_Float_toStringImpl___float_boolean_R_java_lang_String(CODE
         }
     }
     i=0;
-    while (j-->0){
+    while (j-->0 && i < 31){
         s[i++]=s2[j];
-        if (s[i]=='\0'){
-            break;
-        }
     }
+    s[i]='\0';
     if (strcmp(s, "NAN") == 0) {
         s[1] = 'a';
     }

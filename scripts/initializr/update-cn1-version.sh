@@ -70,6 +70,16 @@ while IFS= read -r pom; do
   replace_file "$pom" "s|<cn1\\.version>[^<]+</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
 done < <(find "$ROOT_INITIALIZR_DIR" -name pom.xml -type f)
 
+# The cn1-local-workspace profile (scripts/initializr/pom.xml) is built against the
+# locally bootstrapped repo HEAD (the current SNAPSHOT), NOT the pinned release, so
+# the website CI can demo unreleased API. The global bump above is release-only, so
+# restore that profile's versions to the repo SNAPSHOT here -- a version bump must
+# never pin it to the release (it broke the website build when it last did).
+SNAPSHOT_VERSION="$(perl -0ne 'print "$1\n" and last if m{<artifactId>codenameone</artifactId>\s*<version>([^<]+)</version>}s' "$ROOT_DIR/maven/pom.xml" 2>/dev/null | head -n1)"
+SNAPSHOT_VERSION="${SNAPSHOT_VERSION:-8.0-SNAPSHOT}"
+replace_file "$ROOT_INITIALIZR_DIR/pom.xml" "s|(<id>cn1-local-workspace</id>.*?<cn1\\.version>)[^<]+(</cn1\\.version>)|\${1}$SNAPSHOT_VERSION\${2}|s;"
+replace_file "$ROOT_INITIALIZR_DIR/pom.xml" "s|(<id>cn1-local-workspace</id>.*?<cn1\\.plugin\\.version>)[^<]+(</cn1\\.plugin\\.version>)|\${1}$SNAPSHOT_VERSION\${2}|s;"
+
 replace_file "$GENERATOR_MODEL" "s|private static final String CN1_PLUGIN_VERSION = \\\"[^\\\"]+\\\";|private static final String CN1_PLUGIN_VERSION = \\\"$VERSION\\\";|g;"
 replace_file "$MATRIX_TEST" "s|<cn1\\.plugin\\.version>[^<]+</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
 replace_file "$MATRIX_TEST" "s|<cn1\\.version>[^<]+</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"

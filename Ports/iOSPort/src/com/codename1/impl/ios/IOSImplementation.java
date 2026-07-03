@@ -9805,6 +9805,263 @@ public class IOSImplementation extends CodenameOneImplementation {
         return imageIO;
     }
 
+    private com.codename1.media.VideoIO videoIO;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (isWatch() || isTV()) {
+            // AVFoundation's video classes (AVAssetReader / AVAssetWriter /
+            // AVAssetImageGenerator) are unavailable on watchOS, and VideoIO is
+            // not supported on the TV target, so report no support there.
+            return null;
+        }
+        if (videoIO == null) {
+            videoIO = new com.codename1.media.VideoIO() {
+                @Override
+                public com.codename1.media.VideoCodec[] getAvailableEncoders() {
+                    return iosCodecs(true);
+                }
+
+                @Override
+                public com.codename1.media.VideoCodec[] getAvailableDecoders() {
+                    return iosCodecs(false);
+                }
+
+                @Override
+                public com.codename1.media.VideoWriter createWriter(com.codename1.media.VideoWriterBuilder cfg) throws IOException {
+                    return new IOSVideoWriter(cfg);
+                }
+
+                @Override
+                public com.codename1.media.VideoReader openReader(String filePath) throws IOException {
+                    long peer = nativeInstance.videoReaderOpen(filePath);
+                    if (peer == 0) {
+                        throw new IOException("Failed to open video: " + filePath);
+                    }
+                    return new IOSVideoReader(peer);
+                }
+            };
+        }
+        return videoIO;
+    }
+
+    com.codename1.media.VideoCodec[] iosCodecs(boolean encoder) {
+        java.util.List<com.codename1.media.VideoCodec> out = new java.util.ArrayList<com.codename1.media.VideoCodec>();
+        String[] mp4 = new String[]{com.codename1.media.VideoIO.CONTAINER_MP4, com.codename1.media.VideoIO.CONTAINER_MOV};
+        out.add(new com.codename1.media.VideoCodec(com.codename1.media.VideoIO.CODEC_H264, "H.264 (AVFoundation)", "video/avc", true, encoder, !encoder, true, -1, -1, mp4));
+        if (nativeInstance.videoSupportsHEVC()) {
+            out.add(new com.codename1.media.VideoCodec(com.codename1.media.VideoIO.CODEC_HEVC, "HEVC (AVFoundation)", "video/hevc", true, encoder, !encoder, true, -1, -1, mp4));
+        }
+        out.add(new com.codename1.media.VideoCodec(com.codename1.media.VideoIO.CODEC_AAC, "AAC (AVFoundation)", "audio/mp4a-latm", false, encoder, !encoder, false, -1, -1, mp4));
+        return out.toArray(new com.codename1.media.VideoCodec[out.size()]);
+    }
+
+    private byte[] nsDataToBytes(long p) {
+        int size = nativeInstance.getNSDataSize(p);
+        byte[] b = new byte[size];
+        nativeInstance.nsDataToByteArray(p, b);
+        nativeInstance.releasePeer(p);
+        return b;
+    }
+
+    private static int[] rgbaBytesToArgb(byte[] rgba, int pixels) {
+        int[] argb = new int[pixels];
+        int o = 0;
+        for (int i = 0; i < pixels; i++) {
+            int r = rgba[o] & 0xff;
+            int g = rgba[o + 1] & 0xff;
+            int b = rgba[o + 2] & 0xff;
+            int a = rgba[o + 3] & 0xff;
+            argb[i] = (a << 24) | (r << 16) | (g << 8) | b;
+            o += 4;
+        }
+        return argb;
+    }
+
+    private static byte[] argbToRgbaBytes(int[] argb, int pixels) {
+        byte[] rgba = new byte[pixels * 4];
+        int o = 0;
+        for (int i = 0; i < pixels; i++) {
+            int p = argb[i];
+            rgba[o++] = (byte) ((p >> 16) & 0xff);
+            rgba[o++] = (byte) ((p >> 8) & 0xff);
+            rgba[o++] = (byte) (p & 0xff);
+            rgba[o++] = (byte) ((p >> 24) & 0xff);
+        }
+        return rgba;
+    }
+
+    class IOSVideoReader extends com.codename1.media.VideoReader {
+        private final long peer;
+        private final int width;
+        private final int height;
+        private final long duration;
+        private final float frameRate;
+        private final boolean hasVideo;
+        private final boolean hasAudio;
+        private final int audioSampleRate;
+        private final int audioChannels;
+
+        IOSVideoReader(long peer) {
+            this.peer = peer;
+            this.width = nativeInstance.videoReaderWidth(peer);
+            this.height = nativeInstance.videoReaderHeight(peer);
+            this.duration = nativeInstance.videoReaderDuration(peer);
+            this.frameRate = nativeInstance.videoReaderFrameRate(peer);
+            this.hasVideo = nativeInstance.videoReaderHasVideo(peer);
+            this.hasAudio = nativeInstance.videoReaderHasAudio(peer);
+            this.audioSampleRate = nativeInstance.videoReaderAudioSampleRate(peer);
+            this.audioChannels = nativeInstance.videoReaderAudioChannels(peer);
+        }
+
+        public int getWidth() { return hasVideo ? width : -1; }
+        public int getHeight() { return hasVideo ? height : -1; }
+        public long getDurationMillis() { return duration; }
+        public float getFrameRate() { return frameRate; }
+        public boolean hasVideo() { return hasVideo; }
+        public boolean hasAudio() { return hasAudio; }
+        public int getAudioSampleRate() { return hasAudio ? audioSampleRate : -1; }
+        public int getAudioChannels() { return hasAudio ? audioChannels : -1; }
+
+        public com.codename1.media.VideoFrame frameAt(long millis) throws IOException {
+            if (!hasVideo) {
+                return null;
+            }
+            long nsd = nativeInstance.videoReaderFrameAt(peer, Math.max(0, millis));
+            if (nsd == 0) {
+                return null;
+            }
+            byte[] rgba = nsDataToBytes(nsd);
+            return new com.codename1.media.VideoFrame(rgbaBytesToArgb(rgba, width * height), width, height, millis);
+        }
+
+        public void readFrames(float fps, FrameCallback callback) throws IOException {
+            if (!hasVideo) {
+                return;
+            }
+            if (fps <= 0f) {
+                throw new IllegalArgumentException("fps must be positive");
+            }
+            long step = Math.max(1, Math.round(1000.0 / fps));
+            for (long t = 0; duration <= 0 || t < duration; t += step) {
+                com.codename1.media.VideoFrame f = frameAt(t);
+                if (f == null) {
+                    break;
+                }
+                if (!callback.frame(f)) {
+                    break;
+                }
+                if (duration <= 0) {
+                    break;
+                }
+            }
+        }
+
+        public com.codename1.media.AudioBuffer readAudio() throws IOException {
+            if (!hasAudio) {
+                return null;
+            }
+            long nsd = nativeInstance.videoReaderReadAudio(peer);
+            if (nsd == 0) {
+                return null;
+            }
+            byte[] pcm = nsDataToBytes(nsd);
+            int sampleCount = pcm.length / 2;
+            float[] samples = new float[sampleCount];
+            int o = 0;
+            for (int i = 0; i < sampleCount; i++) {
+                int lo = pcm[o] & 0xff;
+                int hi = pcm[o + 1];
+                short s = (short) ((hi << 8) | lo);
+                samples[i] = s / 32768f;
+                o += 2;
+            }
+            int sr = audioSampleRate > 0 ? audioSampleRate : 44100;
+            int ch = audioChannels > 0 ? audioChannels : 2;
+            com.codename1.media.AudioBuffer buffer = new com.codename1.media.AudioBuffer(Math.max(1, sampleCount));
+            buffer.copyFrom(sr, ch, samples);
+            return buffer;
+        }
+
+        public void close() throws IOException {
+            nativeInstance.videoReaderClose(peer);
+        }
+    }
+
+    class IOSVideoWriter extends com.codename1.media.VideoWriter {
+        private final long peer;
+        private final int width;
+        private final int height;
+        private final float frameRate;
+        private final boolean hasVideo;
+        private final boolean hasAudio;
+        private boolean closed;
+
+        IOSVideoWriter(com.codename1.media.VideoWriterBuilder cfg) throws IOException {
+            this.width = cfg.getWidth();
+            this.height = cfg.getHeight();
+            this.frameRate = cfg.getFrameRate();
+            this.hasVideo = cfg.isHasVideo();
+            this.hasAudio = cfg.isHasAudio();
+            boolean hevc = com.codename1.media.VideoIO.CODEC_HEVC.equals(cfg.getVideoCodec());
+            int bitRate = cfg.getVideoBitRate();
+            if (bitRate <= 0) {
+                bitRate = (int) Math.max(800000L, Math.min((long) (width * (long) height * Math.max(1f, frameRate) * 0.10), 100000000L));
+            }
+            int gop = Math.max(1, Math.round(cfg.getKeyFrameInterval() * Math.max(1f, frameRate)));
+            this.peer = nativeInstance.videoWriterOpen(cfg.getPath(), width, height, frameRate, hevc, bitRate, gop,
+                    hasAudio, cfg.getSampleRate(), cfg.getAudioChannels(), cfg.getAudioBitRate());
+            if (peer == 0) {
+                throw new IOException("Failed to create video writer for " + cfg.getPath());
+            }
+        }
+
+        public void writeFrame(int[] argb, int frameWidth, int frameHeight, long presentationTimeMillis) throws IOException {
+            if (closed) {
+                throw new IOException("writer is closed");
+            }
+            if (!hasVideo) {
+                throw new IOException("video track is not enabled for this writer");
+            }
+            if (frameWidth != width || frameHeight != height) {
+                throw new IllegalArgumentException("frame is " + frameWidth + "x" + frameHeight
+                        + " but writer was configured for " + width + "x" + height);
+            }
+            nativeInstance.videoWriterAddFrame(peer, argbToRgbaBytes(argb, width * height), width, height, Math.max(0, presentationTimeMillis));
+        }
+
+        public void writeAudio(short[] interleavedPcm, int sampleRate, int channels, long presentationTimeMillis) throws IOException {
+            if (closed) {
+                throw new IOException("writer is closed");
+            }
+            if (!hasAudio) {
+                throw new IOException("audio track is not enabled for this writer");
+            }
+            byte[] bytes = new byte[interleavedPcm.length * 2];
+            int o = 0;
+            for (int i = 0; i < interleavedPcm.length; i++) {
+                short s = interleavedPcm[i];
+                bytes[o++] = (byte) (s & 0xff);
+                bytes[o++] = (byte) ((s >> 8) & 0xff);
+            }
+            nativeInstance.videoWriterAddAudio(peer, bytes, sampleRate, channels, Math.max(0, presentationTimeMillis));
+        }
+
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            if (!nativeInstance.videoWriterClose(peer)) {
+                throw new IOException("Failed to finalize video file");
+            }
+        }
+
+        public int getWidth() { return width; }
+        public int getHeight() { return height; }
+        public float getFrameRate() { return frameRate; }
+    }
+
     
     /**
      * Workaround for XMLVM bug

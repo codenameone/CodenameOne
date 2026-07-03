@@ -753,14 +753,14 @@ public class Sheet extends Container {
     /// internally to complete it. The cast is unchecked at runtime -- pick a type
     /// you control inside the sheet.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public <T> AsyncResource<T> showForResult() {
         return showForResult(DEFAULT_TRANSITION_DURATION);
     }
 
     /// `#showForResult` with a custom slide duration.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     @SuppressWarnings("unchecked")
     public <T> AsyncResource<T> showForResult(int duration) {
         // Always create a fresh resource per show -- re-showing a Sheet via
@@ -779,7 +779,7 @@ public class Sheet extends Container {
     ///   in which case subscribers see the same outcome as a user-initiated
     ///   dismissal.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public void finish(Object result) {
         AsyncResource<Object> r = pendingResult;
         pendingResult = null;

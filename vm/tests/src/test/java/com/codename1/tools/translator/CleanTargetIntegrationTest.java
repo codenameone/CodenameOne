@@ -105,6 +105,51 @@ class CleanTargetIntegrationTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void scientificFloatToStringOutputIsTerminated(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("float-string-sources");
+        Path classesDir = Files.createTempDirectory("float-string-classes");
+        Path javaApiDir = Files.createTempDirectory("float-string-java-api");
+        Files.write(sourceDir.resolve("FloatingToStringApp.java"),
+                floatingToStringSource().getBytes(StandardCharsets.UTF_8));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("float-string-output");
+        runTranslator(classesDir, outputDir, "FloatingToStringApp");
+
+        Path distDir = outputDir.resolve("dist");
+        Path cmakeLists = distDir.resolve("CMakeLists.txt");
+        assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
+
+        Path srcRoot = distDir.resolve("FloatingToStringApp-src");
+        replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
+                "cmake",
+                "-S", distDir.toString(),
+                "-B", buildDir.toString(),
+                "-DCMAKE_BUILD_TYPE=Release"));
+        configure.addAll(CompilerHelper.cmakeToolchainArgs());
+        runCommand(configure, distDir);
+
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        Path executable = buildDir.resolve(CompilerHelper.executableName("FloatingToStringApp"));
+        String output = runCommand(Arrays.asList(executable.toString()), buildDir);
+
+        assertFalse(output.contains("FLOATING_TO_STRING_FAIL"),
+                "Scientific float/double strings should not retain stale buffer contents:\n" + output);
+        assertTrue(output.contains("FLOATING_TO_STRING_PASS"),
+                "FloatingToStringApp should report success, actual output was:\n" + output);
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void generatesRunnableExecutableForWindowsAppType(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 
@@ -1604,6 +1649,44 @@ class CleanTargetIntegrationTest {
                 "#include <stdio.h>\n" +
                 "void HelloWorld_nativeHello__(CODENAME_ONE_THREAD_STATE) {\n" +
                 "    printf(\"Hello, Clean Target!\\n\");\n" +
+                "}\n";
+    }
+
+    static String floatingToStringSource() {
+        return "public class FloatingToStringApp {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        int failures = 0;\n" +
+                "        failures += check(\"double-min-scientific\", Double.toString(10000000.0d), \"1.0E7\");\n" +
+                "        failures += check(\"double-trimmed-scientific\", Double.toString(12500000.0d), \"1.25E7\");\n" +
+                "        failures += check(\"double-large-scientific\", Double.toString(125000000.0d), \"1.25E8\");\n" +
+                "        failures += check(\"float-min-scientific\", Float.toString(10000000.0f), \"1.0E7\");\n" +
+                "        failures += check(\"float-trimmed-scientific\", Float.toString(12500000.0f), \"1.25E7\");\n" +
+                "        failures += check(\"float-large-scientific\", Float.toString(16777216.0f), \"1.6777216E7\");\n" +
+                "        failures += check(\"string-valueOf-double\", String.valueOf(12500000.0d), \"1.25E7\");\n" +
+                "        failures += check(\"string-valueOf-float\", String.valueOf(12500000.0f), \"1.25E7\");\n" +
+                "        failures += check(\"concat-double\", \"balance=\" + 12500000.0d, \"balance=1.25E7\");\n" +
+                "        failures += check(\"builder-double\", new StringBuilder().append(12500000.0d).toString(), \"1.25E7\");\n" +
+                "        failures += check(\"buffer-float\", new StringBuffer().append(12500000.0f).toString(), \"1.25E7\");\n" +
+                "        failures += check(\"arrays-double\", java.util.Arrays.toString(new double[]{12500000.0d}), \"[1.25E7]\");\n" +
+                "        failures += check(\"arrays-float\", java.util.Arrays.toString(new float[]{12500000.0f}), \"[1.25E7]\");\n" +
+                "        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();\n" +
+                "        java.io.PrintStream ps = new java.io.PrintStream(out);\n" +
+                "        ps.print(12500000.0d);\n" +
+                "        ps.print('|');\n" +
+                "        ps.print(12500000.0f);\n" +
+                "        failures += check(\"printstream\", out.toString(), \"1.25E7|1.25E7\");\n" +
+                "        if (failures == 0) {\n" +
+                "            System.out.println(\"FLOATING_TO_STRING_PASS\");\n" +
+                "        }\n" +
+                "    }\n" +
+                "\n" +
+                "    private static int check(String name, String actual, String expected) {\n" +
+                "        if (!expected.equals(actual)) {\n" +
+                "            System.out.println(\"FLOATING_TO_STRING_FAIL \" + name + \" expected=[\" + expected + \"] actual=[\" + actual + \"] len=\" + actual.length());\n" +
+                "            return 1;\n" +
+                "        }\n" +
+                "        return 0;\n" +
+                "    }\n" +
                 "}\n";
     }
 

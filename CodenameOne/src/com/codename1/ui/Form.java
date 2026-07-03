@@ -1592,7 +1592,7 @@ public class Form extends Container {
     ///
     /// Pass `null` to remove a previously installed guard.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     ///
     /// #### See also
     ///
@@ -1603,7 +1603,7 @@ public class Form extends Container {
 
     /// Returns the currently installed pop guard, or null.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public com.codename1.router.PopGuard getPopGuard() {
         return popGuard;
     }
@@ -1614,7 +1614,7 @@ public class Form extends Container {
     /// by developer code that implements its own back navigation and wants to
     /// honor any pop guard installed on the form.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public boolean checkPopGuard(com.codename1.router.PopReason reason) {
         com.codename1.router.PopGuard g = this.popGuard;
         if (g == null) {

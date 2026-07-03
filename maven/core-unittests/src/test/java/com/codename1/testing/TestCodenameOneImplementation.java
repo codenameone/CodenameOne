@@ -17,6 +17,7 @@ import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.media.VideoIO;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.ui.Button;
@@ -124,6 +125,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private LocationManager locationManager;
     private L10NManager localizationManager;
     private ImageIO imageIO;
+    private VideoIO videoIO;
     private boolean gaussianBlurSupported;
     private int gaussianBlurInvocations;
     private MediaRecorderBuilderHandler mediaRecorderBuilderHandler;
@@ -1332,6 +1334,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setImageIO(ImageIO imageIO) {
         this.imageIO = imageIO;
+    }
+
+    public void setVideoIO(VideoIO videoIO) {
+        this.videoIO = videoIO;
     }
 
     public void setMediaRecorderHandler(MediaRecorderHandler handler) {
@@ -3115,6 +3121,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public ImageIO getImageIO() {
         return imageIO;
+    }
+
+    @Override
+    public VideoIO getVideoIO() {
+        return videoIO;
     }
 
     public void setGaussianBlurSupported(boolean gaussianBlurSupported) {

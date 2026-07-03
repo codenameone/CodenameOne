@@ -46,6 +46,7 @@ import com.codename1.share.ShareResult;
 import com.codename1.share.ShareResultListener;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.media.VideoIO;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.NotificationChannelBuilder;
@@ -5618,7 +5619,7 @@ public final class Display extends CN1Constants {
     /// Since 6.0, there is native sharing support in the Javascript port using the [navigator.share](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share)
     /// API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.
     ///
-    /// Since 8.0, you can share files using using the file path in the text parameter.  The file must exist in file system storage, and
+    /// Since 7.0, you can share files using using the file path in the text parameter.  The file must exist in file system storage, and
     /// you must define the appropriate mimeType in the mimeType parameter.  E.g. `share("file:/.../myfile.pdf", null, "application.pdf")`
     ///
     /// #### Parameters
@@ -5913,6 +5914,17 @@ public final class Display extends CN1Constants {
     /// the image IO instance or null if image IO isn't supported for the given platform
     public ImageIO getImageIO() {
         return impl.getImageIO();
+    }
+
+    /// Returns the video IO instance for video encoding and frame accurate decoding, or
+    /// null if video IO isn't supported on the given platform. See
+    /// `com.codename1.media.VideoIO`.
+    ///
+    /// #### Returns
+    ///
+    /// the video IO instance or null if unsupported
+    public VideoIO getVideoIO() {
+        return impl.getVideoIO();
     }
 
     /// Gets the recording mime type for the returned Media from the
