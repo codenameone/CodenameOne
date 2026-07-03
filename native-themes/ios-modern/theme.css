@@ -518,7 +518,9 @@ Title {
     /* Transparent so the glass nav-bar (and its backdrop) shows through; an
        opaque title paints a hard white box over the translucent bar. */
     background-color: transparent;
-    padding: 1mm;
+    /* Asymmetric vertical padding: the centred title sat 5px below the native
+       bar's title baseline (y48 vs y43 on the fidelity tile). */
+    padding: 0.72mm 1mm 1.28mm 1mm;
     /* iOS inline navigation-bar title: ~17pt semibold, centred. 4.5mm was the
        large-title size and read far too big next to the native bar. */
     font-family: "native:MainBold";
@@ -615,7 +617,9 @@ TabsContainer {
        yellow); 0.60/blur40 washed and cross-mixed the colours. */
     background-color: rgba(255,255,255,0.22);
     color: #3c3c43;
-    backdrop-filter: blur(24px);
+    /* Tight local blur: 24px still dragged neighbouring backdrop colour across
+       the pill (blue bleeding into the warm left gap); native frost stays local. */
+    backdrop-filter: blur(14px);
     /* Horizontal end-padding widens the pill at its rounded ends WITHOUT moving the tab
        centres (the pill grows symmetrically and the content shifts by the same amount,
        cancelling) -- this is how native's first/last cells get extra width. Tuned so the
