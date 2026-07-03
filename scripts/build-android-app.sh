@@ -94,7 +94,14 @@ ba_log "Building Android gradle project ($APP_DIR) using Codename One port"
   # does for the iOS pipeline.
   export JAVA_HOME="$JAVA17_HOME"
   export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
-  xvfb-run -a ./mvnw package \
+  # xvfb-run only exists on the Linux CI runners (headless X for the theme
+  # compiler's AWT bits); on macOS the build runs directly against the
+  # regular window server.
+  MVN_WRAP=""
+  if command -v xvfb-run >/dev/null 2>&1; then
+    MVN_WRAP="xvfb-run -a"
+  fi
+  $MVN_WRAP ./mvnw package \
     -DskipTests \
     -Dcodename1.platform=android \
     -Dcodename1.buildTarget=android-source \

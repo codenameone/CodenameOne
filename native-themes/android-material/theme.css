@@ -71,6 +71,10 @@
     tabsSafeAreaBool: true;
     tabsFillRowsBool: true;
     tabsGridBool: true;
+    /* Non-scrolling equal-width cells (native M3 fixed tabs divide the row
+       into equal thirds); tabsGridBool alone leaves the row scrollable, which
+       sizes every cell to the WIDEST tab and drifts the centers. */
+    tabsEqualWidthBool: true;
     /* Material 3 NavigationBar-style sliding indicator: a thin coloured
        underline that tweens between tabs when the user changes
        selection. Off by default in the framework so existing apps
@@ -497,16 +501,26 @@ Tab {
     background-color: #fef7ff;
     /* Top padding tuned against the native tile: 2.2mm sat the icon+label
        ~6px lower than TabLayout and grew the bar by the same 6px. */
-    padding: 1.25mm 2mm 2.1mm 2mm;
+    /* Bottom padding sets the bar's total height: 2.1mm left the bar edge
+       2px below TabLayout's (full-width diff rows); 1.75mm = 11px lands the
+       edge on the native row. */
+    padding: 1.25mm 2mm 1.75mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
-    font-size: 2.5mm;
+    /* M3 tab labels are labelLarge: 14sp with the SAME (medium) weight for
+       both states -- the active tab differs only in color. 2.25mm = 14px at
+       the 160dpi contract; 2.5mm rendered 15-16px glyphs visibly larger than
+       TabLayout's, and the old bold active label overweighted vs native. */
+    font-size: 2.25mm;
+    /* Native gap between the icon bottom and the label top is ~9px; the
+       default button gap rendered ~5px. */
+    icon-gap: 1mm;
     text-align: center;
 }
-Tab.selected { color: var(--accent-color, #6750a4); background-color: #fef7ff; font-family: "native:MainBold"; font-size: 2.5mm; }
+Tab.selected { color: var(--accent-color, #6750a4); background-color: #fef7ff; font-family: "native:MainBold"; font-size: 2.25mm; }
 Tab.pressed { color: var(--accent-color, #6750a4); background-color: #fef7ff; }
 
-SelectedTab { cn1-derive: Tab; color: var(--accent-color, #6750a4); background-color: #fef7ff; font-family: "native:MainBold"; font-size: 2.5mm; }
+SelectedTab { cn1-derive: Tab; color: var(--accent-color, #6750a4); background-color: #fef7ff; font-family: "native:MainBold"; font-size: 2.25mm; }
 UnselectedTab { cn1-derive: Tab; color: #49454f; }
 
 /* TabIndicator: color reference read by Tabs.paintAnimatedIndicator()
@@ -762,9 +776,9 @@ PopupContent {
     TabsContainer { background-color: #141218; color: #e6e0e9; }
     TabsDivider { background-color: #49454f; }
     Tab { color: #cac4d0; background-color: #141218; }
-    Tab.selected { color: var(--accent-color-dark, #d0bcff); background-color: #141218; font-family: "native:MainBold"; font-size: 2.5mm; }
+    Tab.selected { color: var(--accent-color-dark, #d0bcff); background-color: #141218; font-family: "native:MainBold"; font-size: 2.25mm; }
     Tab.pressed { color: var(--accent-color-dark, #d0bcff); background-color: #141218; }
-    SelectedTab { color: var(--accent-color-dark, #d0bcff); background-color: #141218; font-family: "native:MainBold"; font-size: 2.5mm; }
+    SelectedTab { color: var(--accent-color-dark, #d0bcff); background-color: #141218; font-family: "native:MainBold"; font-size: 2.25mm; }
     UnselectedTab { color: #cac4d0; }
 
     /* Animated indicator inherits the dark-mode accent. */
