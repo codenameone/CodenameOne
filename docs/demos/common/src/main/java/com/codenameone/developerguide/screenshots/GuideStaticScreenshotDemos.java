@@ -410,7 +410,9 @@ public final class GuideStaticScreenshotDemos {
                     close.addActionListener(event -> dialog.dispose());
                     dialog.add(BorderLayout.SOUTH, close);
                     Dimension preferred = dialog.getContentPane().getPreferredSize();
-                    int left = Display.getInstance().getDisplayWidth() - (preferred.getWidth() + preferred.getWidth() / 6);
+                    int displayWidth = Display.getInstance().getDisplayWidth();
+                    int dialogWidth = Math.max(preferred.getWidth() + preferred.getWidth() / 6, displayWidth / 2);
+                    int left = displayWidth - dialogWidth;
                     dialog.show(0, 0, left, 0);
                 });
             }
