@@ -385,6 +385,11 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     private static final class AnnotationPainter implements Painter {
         private final List<Annotation> annotations;
         private final boolean dark;
+        // Diagnostic: the callout font is inherited from the Graphics state at
+        // glass-pane paint time, which turned out to be environment-dependent
+        // (a partial repaint cycle leaves the default font on the Graphics).
+        // Log each distinct resolved font height so CI runs are diagnosable.
+        private int lastLoggedFontH = -1;
 
         AnnotationPainter(List<Annotation> annotations, boolean dark) {
             this.annotations = annotations;
@@ -452,13 +457,19 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 // Callout placed outside the component (to the right if
                 // there's room, otherwise below).
                 String label = "H=" + heightMm + "mm, text=" + textHeightMm + "mm";
-                Font f = g.getFont();
+                Font gFont = g.getFont();
+                Font f = gFont;
                 if (f == null) {
                     f = Font.getDefaultFont();
                     g.setFont(f);
                 }
                 int textW = f.stringWidth(label);
                 int textH = f.getHeight();
+                if (textH != lastLoggedFontH) {
+                    lastLoggedFontH = textH;
+                    System.out.println("[DualAppearance] annotation fontH=" + textH
+                            + " gFontNull=" + (gFont == null) + " dark=" + dark);
+                }
                 int labelX = x + w + 2;
                 int labelY = y + (h - textH) / 2;
                 if (labelX + textW + 4 > rightEdge) {

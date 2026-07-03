@@ -38,14 +38,47 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
     }
 
     @Override
-    protected void registerReadyCallback(Form parent, Runnable run) {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
         ToastBar tb = ToastBar.getInstance();
         tb.setPosition(Component.TOP);
 
         // Use a long timeout so the toast stays visible for the screenshot
+        System.out.println("[ToastBarTop] showMessage at " + System.currentTimeMillis());
         ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO, 30000);
 
         // Wait for the toast animation to complete before taking the screenshot
-        UITimer.timer(2000, false, parent, run);
+        UITimer.timer(2000, false, parent, new Runnable() {
+            public void run() {
+                // Diagnostic dump of the layered-pane tree at capture time: on
+                // some CI environments the toast has not appeared 2s after
+                // showMessage, and this is the only evidence of its state.
+                // ToastBar sits in a class-specific sub-layer, so dump the
+                // wrapper (the parent of the default layer) two levels deep.
+                Container base = parent.getLayeredPane();
+                Container wrapper = base.getParent() != null ? base.getParent() : base;
+                StringBuilder sb = new StringBuilder("[ToastBarTop] capture at ")
+                        .append(System.currentTimeMillis());
+                dump(wrapper, sb, 0);
+                System.out.println(sb.toString());
+                run.run();
+            }
+        });
+    }
+
+    private static void dump(Component c, StringBuilder sb, int depth) {
+        if (depth > 2) {
+            return;
+        }
+        sb.append(" d").append(depth).append(':')
+          .append(c.getClass().getName())
+          .append(" visible=").append(c.isVisible())
+          .append(" bounds=").append(c.getX()).append(',').append(c.getY())
+          .append(',').append(c.getWidth()).append('x').append(c.getHeight());
+        if (c instanceof Container) {
+            Container ct = (Container) c;
+            for (int i = 0; i < ct.getComponentCount(); i++) {
+                dump(ct.getComponentAt(i), sb, depth + 1);
+            }
+        }
     }
 }
