@@ -661,8 +661,35 @@ XCODE_BUILD_CMD+=("GCC_OPTIMIZATION_LEVEL=$CN1_TEST_OPT_LEVEL")
 ri_log "Building translated C at -O$CN1_TEST_OPT_LEVEL (GCC_OPTIMIZATION_LEVEL)"
 XCODE_BUILD_CMD+=(build)
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
-  ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
-  exit 10
+  # CI runners occasionally lose the booted device between simctl boot and the
+  # xcodebuild connection (CoreSimulator wedges; the boot itself took minutes).
+  # When the failure is specifically "no device matching the destination", the
+  # device list -- not the build -- is at fault: restart CoreSimulator, re-boot
+  # (or recreate) the simulator and retry the build once before giving up.
+  if grep -q "Unable to find a device matching the provided destination" "$BUILD_LOG" \
+      && [ -n "$SIM_UDID" ]; then
+    ri_log "Destination '$SIM_UDID' vanished mid-job; restarting CoreSimulator and retrying the build once"
+    xcrun simctl shutdown all >/dev/null 2>&1 || true
+    launchctl remove com.apple.CoreSimulator.CoreSimulatorService >/dev/null 2>&1 || true
+    sleep 5
+    if ! xcrun simctl list devices 2>/dev/null | grep -q "$SIM_UDID"; then
+      NEW_DEST="$(create_ios_sim_destination || true)"
+      if [ -n "$NEW_DEST" ]; then
+        SIM_UDID="${NEW_DEST##*id=}"
+        SIM_DESTINATION="$NEW_DEST"
+        ri_log "Recreated simulator destination '$SIM_DESTINATION'"
+      fi
+    fi
+    xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+    XCODE_BUILD_CMD=("${XCODE_BUILD_CMD[@]/id=*/id=$SIM_UDID}")
+    if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
+      ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG (after destination retry)"
+      exit 10
+    fi
+  else
+    ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
+    exit 10
+  fi
 fi
 COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
