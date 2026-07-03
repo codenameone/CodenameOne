@@ -58,15 +58,19 @@ for asset in assets:
     if asset.get("name") == "developer-guide.pdf":
         asset_url = asset.get("browser_download_url", "")
         break
-if not asset_url:
-    raise SystemExit("developer-guide.pdf asset not found in latest release.")
 print(f"{tag} {asset_url}")
 ' "${release_json}"
 )"
 
 if [ -z "${asset_url}" ]; then
-  echo "Resolved developer-guide.pdf URL is empty." >&2
-  exit 1
+  if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
+    asset_url="https://github.com/codenameone/CodenameOne/releases/download/${release_tag}/developer-guide.pdf"
+    echo "developer-guide.pdf asset not found in latest release; using PR fallback ${asset_url}" >&2
+  else
+    echo "developer-guide.pdf asset not found in latest release." >&2
+    echo "Resolved developer-guide.pdf URL is empty." >&2
+    exit 1
+  fi
 fi
 
 awk -v begin="${BEGIN_MARKER}" -v end="${END_MARKER}" '
