@@ -12,9 +12,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
-import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
-import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
@@ -69,9 +67,10 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private void captureLayoutAnimationFrames(Form host) throws IOException {
         GuideScreenshot firstFrame = screenshot("layout-animation-1.png");
         showDemo(firstFrame, host);
+        Image baseFrame = captureDisplay();
 
         for (int frame = 1; frame <= LAYOUT_FRAME_COUNT; frame++) {
-            saveScreenshot("layout-animation-" + frame + ".png", renderLayoutAnimationFrame(frame - 1));
+            saveScreenshot("layout-animation-" + frame + ".png", renderLayoutAnimationFrame(frame - 1, baseFrame));
         }
 
         returnToHost(host);
@@ -92,7 +91,11 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         GuideScreenshot screenshot = screenshot(fileName);
         Form demoForm = showDemo(screenshot, host);
         configureSlideDemo(demoForm, transitionName, horizontal);
-        saveScreenshot(fileName, renderDeterministicTransitionStrip(transitionName, horizontal));
+        TestUtils.waitFor(100);
+        Image sourceFrame = captureDisplay();
+        Image destinationFrame = captureTransitionDestinationFrame();
+        saveScreenshot(fileName,
+                renderDeterministicTransitionStrip(transitionName, horizontal, sourceFrame, destinationFrame));
         returnToHost(host);
     }
 
@@ -124,63 +127,36 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         });
     }
 
-    private Image renderLayoutAnimationFrame(int frameIndex) {
-        return runOnEdt(() -> {
-            int width = Display.getInstance().getDisplayWidth();
-            int height = Display.getInstance().getDisplayHeight();
-            Form form = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
-            Button fall = new Button("Fall");
-            form.add(fall);
-            List<Label> labels = new ArrayList<>();
-            for (int iter = 0; iter < LAYOUT_LABEL_COUNT; iter++) {
-                Label label = new Label("Label " + iter);
-                labels.add(label);
-                form.add(label);
-            }
-            form.setWidth(width);
-            form.setHeight(height);
-            form.layoutContainer();
+    private Image renderLayoutAnimationFrame(int frameIndex, Image baseFrame) {
+        Image frame = Image.createImage(baseFrame.getWidth(), baseFrame.getHeight(), 0xffffffff);
+        Graphics graphics = frame.getGraphics();
+        graphics.drawImage(baseFrame, 0, 0);
+        graphics.setColor(0x202020);
 
-            double progress = frameIndex / (double) (LAYOUT_FRAME_COUNT - 1);
-            int startY = -Math.max(1, fall.getHeight());
-            for (Label label : labels) {
-                int endY = label.getY();
-                label.setY(startY + (int) Math.round((endY - startY) * progress));
-            }
-            return paintForm(form, width, height);
-        });
+        double progress = frameIndex / (double) (LAYOUT_FRAME_COUNT - 1);
+        int lineHeight = Math.max(42, baseFrame.getHeight() / 36);
+        int startY = -lineHeight;
+        int firstEndY = Math.max(lineHeight * 3, baseFrame.getHeight() / 7);
+        int x = Math.max(20, baseFrame.getWidth() / 28);
+        for (int iter = 0; iter < LAYOUT_LABEL_COUNT; iter++) {
+            int endY = firstEndY + (iter * lineHeight);
+            int y = startY + (int) Math.round((endY - startY) * progress);
+            graphics.drawString("Label " + iter, x, y);
+        }
+        return frame;
     }
 
-    private Image renderDeterministicTransitionStrip(String transitionName, boolean horizontal) {
-        return runOnEdt(() -> {
-            int width = Display.getInstance().getDisplayWidth();
-            int height = Display.getInstance().getDisplayHeight();
-            Image source = paintForm(createTransitionSourceForm(transitionName, horizontal), width, height);
-            Image destination = paintForm(createTransitionDestinationForm(), width, height);
-            List<Image> frames = new ArrayList<>();
-            for (int frame = 0; frame < TRANSITION_FRAME_COUNT; frame++) {
-                double progress = frame / (double) (TRANSITION_FRAME_COUNT - 1);
-                frames.add(renderTransitionFrame(transitionName, horizontal, source, destination, progress));
-            }
-            return createFrameStrip(frames);
-        });
-    }
-
-    private Form createTransitionSourceForm(String transitionName, boolean horizontal) {
-        Form source = new Form("Transitions", new BoxLayout(BoxLayout.Y_AXIS));
-        Style bg = source.getContentPane().getUnselectedStyle();
-        bg.setBgTransparency(255);
-        bg.setBgColor(0xff0000);
-        source.add(new Button("Show"));
-        Picker picker = new Picker();
-        picker.setStrings("Slide", "SlideFade", "Cover", "Uncover", "Fade", "Flip");
-        picker.setSelectedString(transitionName);
-        source.add(picker);
-        source.add(new TextField(String.valueOf(TRANSITION_DURATION_MS), "Duration", 6, TextField.NUMERIC));
-        CheckBox horizontalToggle = CheckBox.createToggle("Horizontal");
-        horizontalToggle.setSelected(horizontal);
-        source.add(horizontalToggle);
-        return source;
+    private Image renderDeterministicTransitionStrip(
+            String transitionName,
+            boolean horizontal,
+            Image source,
+            Image destination) {
+        List<Image> frames = new ArrayList<>();
+        for (int frame = 0; frame < TRANSITION_FRAME_COUNT; frame++) {
+            double progress = frame / (double) (TRANSITION_FRAME_COUNT - 1);
+            frames.add(renderTransitionFrame(transitionName, horizontal, source, destination, progress));
+        }
+        return createFrameStrip(frames);
     }
 
     private Form createTransitionDestinationForm() {
@@ -191,6 +167,15 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         destination.getToolbar().addCommandToLeftBar("Back", null, ignored -> {
         });
         return destination;
+    }
+
+    private Image captureTransitionDestinationFrame() {
+        Form previous = currentForm();
+        runOnEdt(() -> createTransitionDestinationForm().show());
+        Form destination = waitForFormChange(previous);
+        waitForFormReady(destination);
+        TestUtils.waitFor(300);
+        return captureDisplay();
     }
 
     private Image renderTransitionFrame(
@@ -256,15 +241,6 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         graphics.setAlpha(Math.max(0, Math.min(255, alpha)));
         graphics.drawImage(image, x, y);
         graphics.setAlpha(previousAlpha);
-    }
-
-    private Image paintForm(Form form, int width, int height) {
-        form.setWidth(width);
-        form.setHeight(height);
-        form.layoutContainer();
-        Image image = Image.createImage(width, height, 0xffffffff);
-        form.paintComponent(image.getGraphics(), true);
-        return image;
     }
 
     private Form showDemo(GuideScreenshot screenshotDemo, Form host) {
