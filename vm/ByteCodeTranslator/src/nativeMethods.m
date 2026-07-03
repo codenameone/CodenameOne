@@ -1582,10 +1582,19 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         }
         unlockCriticalSection();
         err = pthread_mutex_lock(&data->__codenameOneMutex);
-        data->ownerThread = threadStateData->threadId;
+        data->ownerThread = CN1_MONITOR_SELF();
         data->counter++;
     } else {
-        JAVA_LONG own = threadStateData->threadId;
+        // The reentrancy identity MUST be the pthread, not threadStateData->threadId:
+        // one pthread can legitimately run under two ThreadLocalData structs (the
+        // main-thread-hosted EDT executes with the CodenameOneThread's state passed
+        // explicitly, while any native helper that calls getThreadLocalData() gets the
+        // pthread's own TLS struct). With id-based ownership a static-field accessor
+        // running inside that thread's own class initializer compared different ids,
+        // missed the reentrant case, and pthread_mutex_lock'd the mutex the same
+        // pthread already held -- observed as the EDT freezing in
+        // __STATIC_INITIALIZER_BufferedOutputStream while logging its first throwable.
+        JAVA_LONG own = CN1_MONITOR_SELF();
         JAVA_LONG currentlyHeldBy = data->ownerThread;
 
         // we already own the lock...
@@ -1724,7 +1733,7 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     }
 
     // restore the ownership of the thread
-    data->ownerThread = threadStateData->threadId;
+    data->ownerThread = CN1_MONITOR_SELF();
     data->counter = counter;
     
     threadStateData->threadActive = JAVA_TRUE;

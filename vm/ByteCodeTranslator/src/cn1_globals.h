@@ -1385,6 +1385,20 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 
 extern struct ThreadLocalData* getThreadLocalData();
 
+/* Monitor-ownership identity for the reentrancy check in monitorEnter/wait.
+ * This MUST identify the executing pthread, not the ThreadLocalData struct:
+ * one pthread can run under two states (the main-thread-hosted EDT executes
+ * with an explicitly-passed CodenameOneThread state, while natives calling
+ * getThreadLocalData() get the pthread's own TLS struct), and an id-based
+ * check then misses the reentrant case and self-deadlocks. pthread_t is a
+ * pointer on Apple/glibc targets; the Windows compat shim's pthread_t is a
+ * struct, so there GetCurrentThreadId() supplies the per-thread identity. */
+#if defined(_WIN32)
+#define CN1_MONITOR_SELF() ((JAVA_LONG)GetCurrentThreadId())
+#else
+#define CN1_MONITOR_SELF() ((JAVA_LONG)(uintptr_t)pthread_self())
+#endif
+
 
 #define BEGIN_TRY(classId, destinationJump) {\
         threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0; \
