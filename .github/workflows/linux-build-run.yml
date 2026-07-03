@@ -239,7 +239,11 @@ jobs:
             mkdir -p "$(dirname "$CN1_APP_LOG_TEE")"
             {
               echo "=== post-mortem of $core (elf=$elf) ==="
-              gdb "$elf" "$core" -batch -ex 'set pagination off' -ex 'thread apply all bt' 2>&1
+              gdb "$elf" "$core" -batch -ex 'set pagination off' \
+                -ex 'thread apply all bt' \
+                -ex 'frame 1' -ex 'info locals' -ex 'info args' \
+                -ex 'p/x batch' -ex 'p gcMarkWorklistTop' -ex 'p currentGcMarkValue' \
+                2>&1
             } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
           done
           exit $rc
